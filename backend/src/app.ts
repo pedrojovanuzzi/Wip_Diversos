@@ -1,5 +1,7 @@
 import express from "express";
 import ChamadosRouter from './routes/Chamados.Routes'; // Caminho correto para o arquivo de rotas
+import Home from "./routes/Home.Routes";
+import Auth from "./routes/Auth.Routes";
 
 export class App{
   public server: express.Application;
@@ -16,5 +18,7 @@ export class App{
 
   private router(){
     this.server.use("/chamados", ChamadosRouter);
+    this.server.use("/", Home);
+    this.server.use("/auth", Auth);
   }
 }

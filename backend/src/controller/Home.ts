@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 
 class Home{
-    public home( req : Request, res : Response){
-        res.send("feef");
+    public show( req : Request, res : Response){
+        res.json("Initial Page");
       }
 }
 

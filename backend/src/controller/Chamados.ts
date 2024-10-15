@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
+import MkauthSource from "../database/MkauthSorce";
 
 class Chamados {
-  public home( req : Request, res : Response){
-    res.send("feef");
+  public show( req : Request, res : Response){
+    res.json("Chamados Page");
   }
 }
 
