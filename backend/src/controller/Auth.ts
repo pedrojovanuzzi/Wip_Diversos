@@ -60,7 +60,7 @@ class Auth{
 
         res.status(201).json({ message: 'User created successfully', user: { login }, token: generateToken(String(newUser.id))});
       } catch (error) {
-        res.status(401).json({ message: 'User Error', error: error });
+        res.status(401).json({ message: 'Ocorreu um Erro'});
       }
     }
     
