@@ -46,19 +46,21 @@ class Auth{
       const salt = await bcrypt.genSalt();
       const passwordHash = await bcrypt.hash(password, salt);
 
-      const newUser = await userRepository.create({
+      const newUser = userRepository.create({
         login,
         password: passwordHash
       });
 
-      if(!newUser){
-        res.status(422).json({errors: ["Houve um Erro, por favor tente mais tarde"]});
-        return
+      const savedUser = await userRepository.save(newUser);
+
+      if (!savedUser) {
+        res.status(422).json({ errors: ["Houve um Erro, por favor tente mais tarde"] });
+        return;
       }
 
         res.status(201).json({ message: 'User created successfully', user: { login }, token: generateToken(String(newUser.id))});
       } catch (error) {
-        res.status(401).json({ message: 'User created successfully' });
+        res.status(401).json({ message: 'User Error', error: error });
       }
     }
     
