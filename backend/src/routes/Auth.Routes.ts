@@ -6,5 +6,7 @@ const router: Router = Router()
 //Routes
 router.get("/", Auth.show);
 router.post("/create", Auth.createUser);
+router.post("/login", Auth.Login);
+router.get("/getUser", Auth.getCurrentUser);
 
 export default router;
