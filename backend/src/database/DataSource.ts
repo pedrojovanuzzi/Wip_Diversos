@@ -1,6 +1,7 @@
 import { DataSource } from "typeorm";
 import dotenv from "dotenv";
-import path from "path"; // Importando o 'path' para manipular caminhos
+import path from "path";
+import { User } from "../entities/User";
 
 dotenv.config();
 
@@ -11,8 +12,8 @@ const AppDataSource = new DataSource({
     username: process.env.DATABASE_USERNAME,
     password: process.env.DATABASE_PASSWORD,
     database: process.env.DATABASE,
-    entities: [path.join(__dirname, "../entities/*.ts")], // Caminho absoluto para as entidades
-    migrations: [path.join(__dirname, "../migration/*.ts")], // Caminho absoluto para as migrações
+    entities: [User],
+    migrations: [path.join(__dirname, "../migration/*.ts")], 
 })
 
 AppDataSource.initialize()
