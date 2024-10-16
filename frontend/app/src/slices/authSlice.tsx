@@ -7,7 +7,6 @@ let user;
 
 if (data) {
     user = JSON.parse(data);
-    console.log(user);
 } else {
     console.log("Usuário não encontrado.");
 }
@@ -30,7 +29,7 @@ export const loginThunk = createAsyncThunk<string, { login: string; password: st
     const data = await login(user);
 
     if(data.errors){
-        return thunkAPI.rejectWithValue(data.errors[0])
+        return thunkAPI.rejectWithValue(data.errors[0].msg);
     }
 
     return data;
@@ -42,7 +41,7 @@ export const authSlice = createSlice({name: "auth",
     initialState,
     reducers: {
         reset: (state) => {
-            state.loading = false,
+            state.loading = false;
             state.error = false;
             state.success = false;
         }
@@ -59,7 +58,7 @@ export const authSlice = createSlice({name: "auth",
             state.user = action.payload;
         })
         .addCase(loginThunk.rejected, (state, action) => {
-            state.loading = false,
+            state.loading = false;
             state.error = action.payload ?? 'Erro desconhecido';
             state.user = null;
         })

@@ -40,7 +40,7 @@ async function AuthGuard(req : Request, res : Response, next : NextFunction){
             res.status(401).json({errors: ["Usuário não encontrado"]});
             return;
         }
-
+        
         next();
 
     } catch (error) {

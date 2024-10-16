@@ -1,4 +1,4 @@
-export const api = process.env.URL + "/auth";
+export const api = process.env.REACT_APP_URL;
 
 export function requestConfig(method: "GET" | "POST" | "PUT" | "DELETE", data: any, token : string | null = null) : RequestInit{
 
@@ -32,7 +32,7 @@ export function setCookie(name: string, value: string, days: number) {
         date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));  // Converte os dias para milissegundos
         expires = "; expires=" + date.toUTCString();
     }
-    document.cookie = name + "=" + (value || "") + expires + "; path=/";  // Define o cookie
+    document.cookie = name + "=" + (value || "") + expires + "; path=/;";
 }
 
 export function getCookie(name: string) {

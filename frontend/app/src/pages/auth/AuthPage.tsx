@@ -30,6 +30,8 @@ export const AuthPage = () => {
         console.log(user);
         
         dispatch(loginThunk(user));
+
+        
     }
 
     useEffect(() => {

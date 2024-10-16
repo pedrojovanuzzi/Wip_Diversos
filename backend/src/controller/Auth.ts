@@ -2,9 +2,11 @@ import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import DataSource from "../database/DataSource";
 import bcrypt from "bcrypt";
-
+import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import { User } from '../entities/User';
+
+dotenv.config();
 
 const jwtSecret = String(process.env.JWT_SECRET);
 
@@ -25,8 +27,8 @@ class Auth{
     public async createUser(req : Request, res : Response){
       
       try {
-        await body('login').trim().escape().notEmpty().withMessage('Login is required').run(req);
-        await body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters').run(req);
+        await body('login').trim().escape().notEmpty().withMessage('Login é Obrigatorio').run(req);
+        await body('password').isLength({ min: 6 }).withMessage('Senha tem que tem no Minimo 6 Caracteres').run(req);
 
       
       const errors = validationResult(req);
@@ -67,10 +69,28 @@ class Auth{
       }
     }
 
-    public async Login(req : Request, res : Response){
+    public async getToken(req : Request, res : Response){
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+    
+      if (!token) {
+        res.status(401).json({ valid: false });
+        return;
+      }
+    
+      jwt.verify(token, String(process.env.JWT_SECRET), (err, decoded) => {
+        if (err) {
+          res.status(401).json({ valid: false });
+          return;
+        }
+        res.json({ valid: true });
+      });
+    }
 
-      await body('login').trim().escape().notEmpty().withMessage('Login is required').run(req);
-      await body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters').run(req);
+    public async Login(req : Request, res : Response){
+      
+      await body('login').trim().escape().notEmpty().withMessage('Login é Obrigatorio').run(req);
+      await body('password').isLength({ min: 6 }).withMessage('Senha tem que tem no Minimo 6 Caracteres').run(req);
 
       
       const errors = validationResult(req);

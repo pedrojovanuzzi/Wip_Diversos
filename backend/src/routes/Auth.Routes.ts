@@ -8,5 +8,6 @@ router.get("/", Auth.show);
 router.post("/create", Auth.createUser);
 router.post("/login", Auth.Login);
 router.get("/getUser", Auth.getCurrentUser);
+router.post("/api", Auth.getToken);
 
 export default router;
