@@ -6,7 +6,7 @@ const router: Router = Router()
 
 //Routes
 router.get("/", AuthGuard, Chamados.showMonth);
-router.get("/year", AuthGuard, Chamados.showMonth);
-router.get("/all", AuthGuard, Chamados.showYear);
+router.get("/year", AuthGuard, Chamados.showYear);
+router.get("/all", AuthGuard, Chamados.showAll);
 
 export default router;

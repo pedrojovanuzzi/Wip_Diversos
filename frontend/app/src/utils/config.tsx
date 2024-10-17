@@ -1,29 +1,28 @@
 export const api = process.env.REACT_APP_URL;
 
-export function requestConfig(method: "GET" | "POST" | "PUT" | "DELETE", data: any, token : string | null = null) : RequestInit{
-
+export function requestConfig(method: "GET" | "POST" | "PUT" | "DELETE", data: any = null, token: string | null = null): RequestInit {
     let headers: Record<string, string> = {};
 
-    if (method !== "DELETE" && data !== null) {
+    if (method !== "DELETE" && data !== null && method !== "GET") { // Apenas coloca o body em métodos POST, PUT, etc.
         headers["Content-Type"] = "application/json";
     }
 
-    if(token){
+    if (token) {
         headers["Authorization"] = `Bearer ${token}`;
     }
 
-    let config : RequestInit = {
+    let config: RequestInit = {
         method,
-        headers
+        headers,
     };
-    
-    if (data !== null && method !== "DELETE") {
+
+    if (data !== null && method !== "DELETE" && method !== "GET") { // Apenas POST/PUT podem ter corpo
         config.body = JSON.stringify(data);
     }
 
     return config;
-
 }
+
 
 export function setCookie(name: string, value: string, days: number) {
     let expires = "";

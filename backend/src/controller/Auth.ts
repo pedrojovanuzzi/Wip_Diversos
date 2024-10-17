@@ -80,10 +80,14 @@ class Auth{
     
       jwt.verify(token, String(process.env.JWT_SECRET), (err, decoded) => {
         if (err) {
+          
+          
           res.status(401).json({ valid: false });
           return;
         }
+        
         res.json({ valid: true });
+        return;
       });
     }
 

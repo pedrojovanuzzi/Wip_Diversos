@@ -6,6 +6,7 @@ import { Between } from 'typeorm';
 class Chamados {
 
   public async showMonth( req : Request, res : Response){
+    
     const MkRepository = MkauthSource.getRepository(ChamadosEntities);
     const currentDate = new Date();
     const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -14,12 +15,13 @@ class Chamados {
       const Dados = await MkRepository.createQueryBuilder("chamado")
         .select("chamado.login")  
         .addSelect("COUNT(chamado.id)", "totalChamados")  
-        .where("chamado.abertura BETWEEN :start AND :end", {
+        .where("(chamado.abertura BETWEEN :start AND :end) and not login = 'noc'", {
           start: firstDayOfMonth,
           end: lastDayOfMonth,
         })
         .groupBy("chamado.login") 
         .orderBy("totalChamados", "DESC") 
+        .limit(10)
         .getRawMany();
   
       res.status(200).json(Dados);
@@ -38,12 +40,13 @@ class Chamados {
       const Dados = await MkRepository.createQueryBuilder("chamado")
         .select("chamado.login")  
         .addSelect("COUNT(chamado.id)", "totalChamados")  
-        .where("chamado.abertura BETWEEN :start AND :end", {
+        .where("(chamado.abertura BETWEEN :start AND :end) and not login = 'noc' ", {
           start: firstDayOfYear,
           end: lastDayOfYear,
         })
         .groupBy("chamado.login") 
         .orderBy("totalChamados", "DESC") 
+        .limit(10)
         .getRawMany();
   
       res.status(200).json(Dados);
@@ -57,9 +60,11 @@ class Chamados {
     try {
       const Dados = await MkRepository.createQueryBuilder("chamado")
         .select("chamado.login")  
+        .where("not login = 'noc'")
         .addSelect("COUNT(chamado.id)", "totalChamados")
         .groupBy("chamado.login") 
-        .orderBy("totalChamados", "DESC") 
+        .orderBy("totalChamados", "DESC")
+        .limit(10)
         .getRawMany();
   
       res.status(200).json(Dados);
