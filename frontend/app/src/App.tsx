@@ -12,7 +12,7 @@ import { GoAlert } from "react-icons/go";
 function App() {
   const { auth, loading } = useAuth();
 
-  const manutencao = false;
+  const manutencao = true;
 
   if (loading) {
     return <p className='flex h-screen justify-center items-center bg-black text-white font-semibold gap-4'><AiOutlineLoading3Quarters className='animate-spin text-white' />Carregando...</p>;
@@ -22,7 +22,7 @@ function App() {
     return (
       <div className='flex h-screen justify-center flex-col gap-10 items-center bg-yellow-300'>
         <GoAlert className='size-40'/>
-        <p className='text-black text-xl font-semibold'>
+        <p className='text-black sm:text-xl font-semibold'>
           O site está em manutenção. Volte mais tarde.
         </p>
       </div>
