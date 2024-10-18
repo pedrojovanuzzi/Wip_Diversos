@@ -36,10 +36,6 @@ export const ChamadosPage = () => {
   let { data: chamadosData = [], loading, error } = useTypedSelector((state) => state.chamados);
   const { user } = useTypedSelector((state) => state.auth);
 
-  if(error === undefined){
-    error = "Erro Desconhecido";
-  }
-
   // Estado para controlar o tipo de gráfico (mensal, anual, total)
   const [chartType, setChartType] = useState<'month' | 'year' | 'all'>('month');
   
@@ -174,7 +170,7 @@ export const ChamadosPage = () => {
 
         {/* Botões para mudar o gráfico */}
         {loading && <p>Carregando Página....</p>}
-      {error && <Message msg={String(error)} type='error' />}
+      {error && <Message msg={String(error ? error : "Erro Desconhecido")} type='error' />}
         <div className="flex gap-4 mb-4">
           <button 
             onClick={() => setChartType('month')} 
