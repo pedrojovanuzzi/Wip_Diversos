@@ -53,7 +53,9 @@ export const chamadosYearThunk = createAsyncThunk("chamados/year", async functio
     if (res.errors[0].msg) {
         return thunkAPI.rejectWithValue(res.errors[0].msg);
     }
-    
+    else if (res.errors[0].message) {
+      return thunkAPI.rejectWithValue(res.errors[0].message);
+    }
     else if (res.errors[0]) {
         return thunkAPI.rejectWithValue(res.errors[0]);
     }
