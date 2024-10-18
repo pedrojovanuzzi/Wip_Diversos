@@ -122,7 +122,7 @@ export const chamadosSlice = createSlice({
       })
       .addCase(chamadosAllThunk.rejected, (state, action) => {
         state.loading = false;
-        state.error = String(action.payload) ?? 'Erro desconhecido';
+        state.error = String(action.payload);
       });
   },
 });

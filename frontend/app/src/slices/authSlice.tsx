@@ -59,7 +59,7 @@ export const authSlice = createSlice({name: "auth",
         })
         .addCase(loginThunk.rejected, (state, action) => {
             state.loading = false;
-            state.error = action.payload ?? 'Erro desconhecido';
+            state.error = String(action.payload);
             state.user = null;
         })
     }
