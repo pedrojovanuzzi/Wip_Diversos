@@ -26,7 +26,7 @@ class Chamados {
   
       res.status(200).json(Dados);
     } catch (error) {
-      res.status(500).json({ message: 'Erro ao buscar os chamados do mês.', error });
+      res.status(500).json({ errors: [{ msg: 'Ocorreu um Erro' }]});
     }
   }
 
@@ -51,7 +51,7 @@ class Chamados {
   
       res.status(200).json(Dados);
     }catch (error) {
-        res.status(500).json({ message: 'Erro ao buscar os chamados do ano.', error });
+      res.status(500).json({ errors: [{ msg: 'Ocorreu um Erro' }]});
     }
 }
 
@@ -69,7 +69,7 @@ class Chamados {
   
       res.status(200).json(Dados);
     } catch (error) {
-      res.status(500).json({ message: 'Erro ao buscar os chamados do ano.', error });
+      res.status(500).json({ errors: [{ msg: 'Ocorreu um Erro' }]});
   }
   }
 

@@ -170,7 +170,7 @@ export const ChamadosPage = () => {
 
         {/* Botões para mudar o gráfico */}
         {loading && <p>Carregando Página....</p>}
-      {error && <Message msg={String(error ? error : "Erro Desconhecido")} type='error' />}
+      {error && <Message msg={String(error)} type='error' />}
         <div className="flex gap-4 mb-4">
           <button 
             onClick={() => setChartType('month')} 

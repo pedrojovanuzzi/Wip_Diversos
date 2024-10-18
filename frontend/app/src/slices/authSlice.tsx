@@ -29,13 +29,8 @@ export const loginThunk = createAsyncThunk<string, { login: string; password: st
     const data = await login(user);
 
     if (data.errors && data.errors[0]) {
-        
         if (data.errors[0].msg) {
             return thunkAPI.rejectWithValue(data.errors[0].msg);
-        }
-        
-        else if (data.errors[0]) {
-            return thunkAPI.rejectWithValue(data.errors[0]);
         }
     }
 

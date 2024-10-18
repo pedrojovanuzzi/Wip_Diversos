@@ -36,7 +36,7 @@ class Auth{
     //     res.status(400).json({ errors: errors.array() });
     //   }
 
-      
+    //   let errorsArray = validationResult(req).array();
 
     //   const { login, password } = req.body;
 
@@ -44,7 +44,16 @@ class Auth{
     //   const user = await userRepository.findOne({where: {login : login}})
 
     //   if(user){
-    //     res.status(422).json({errors: ["Por favor, utilize outro e-mail"]});
+
+    //     errorsArray.push({
+    //       type: "field",
+    //       value: "",
+    //       path: "user",
+    //       msg: "Por favor, utilize outro e-mail",
+    //       location: "body" // Onde o erro ocorreu (corpo da requisição)
+    //     });
+
+    //     res.status(422).json({errors: errorsArray});
     //     return
     //   }
 
@@ -59,18 +68,28 @@ class Auth{
     //   const savedUser = await userRepository.save(newUser);
 
     //   if (!savedUser) {
-    //     res.status(422).json({ errors: ["Houve um Erro, por favor tente mais tarde"] });
+
+    //     errorsArray.push({
+    //       type: "field",
+    //       value: "",
+    //       path: "user",
+    //       msg: "Houve um Erro, por favor tente mais tarde",
+    //       location: "body" // Onde o erro ocorreu (corpo da requisição)
+    //     });
+
+    //     res.status(422).json({ errors: errorsArray });
     //     return;
     //   }
 
     //     res.status(201).json({ message: 'User created successfully', id: newUser.id ,user: { login }, token: generateToken(String(newUser.id))});
     //   } catch (error) {
-    //     res.status(401).json({ message: 'Ocorreu um Erro'});
+    //     res.status(401).json({ errors: [{ msg: 'Ocorreu um Erro' }] });
     //   }
     // }
 
     public async getToken(req : Request, res : Response){
-      const authHeader = req.headers['authorization'];
+      try {
+        const authHeader = req.headers['authorization'];
       const token = authHeader && authHeader.split(' ')[1];
     
       if (!token) {
@@ -89,11 +108,15 @@ class Auth{
         res.json({ valid: true });
         return;
       });
+      } catch (error) {
+        res.status(401).json({ errors: [{ msg: 'Ocorreu um Erro' }] });
+      }
     }
 
     public async Login(req : Request, res : Response){
       
-      await body('login').trim().escape().notEmpty().withMessage('Login é Obrigatorio').run(req);
+      try {
+        await body('login').trim().escape().notEmpty().withMessage('Login é Obrigatorio').run(req);
       await body('password').isLength({ min: 6 }).withMessage('Senha tem que ter no Minimo 6 Caracteres').run(req);
 
       
@@ -108,13 +131,33 @@ class Auth{
       const userRepository = DataSource.getRepository(User);
       const user = await userRepository.findOne({where: {login : login}})
 
-      if(!user){
-        res.status(422).json({errors: ["Usuário não encontrado"]});
-        return
+      let errorsArray = validationResult(req).array();
+
+      if (!user) {
+
+        errorsArray.push({
+          type: "field",
+          value: "",
+          path: "user",
+          msg: "Usuário não encontrado",
+          location: "body" // Onde o erro ocorreu (corpo da requisição)
+        });
+    
+        res.status(422).json({ errors: errorsArray });
+        return;
       }
 
       if(!(await bcrypt.compare(password, String(user.password)))){
-        res.status(422).json({errors: ["Senha Inválida"]});
+
+        errorsArray.push({
+          type: "field",
+          value: "",
+          path: "user",
+          msg: "Senha Inválida",
+          location: "body"
+        });
+
+        res.status(422).json({errors: errorsArray});
         return;
       }
 
@@ -124,11 +167,19 @@ class Auth{
         token: generateToken(String(user.id))
       });
 
+      } catch (error) {
+        res.status(401).json({ errors: [{ msg: 'Ocorreu um Erro' }] });
+      }
+
     }
 
     public async getCurrentUser(req : AuthenticatedRequest, res : Response){
-      const user = req.user;
-      res.status(200).json(user);
+      try {
+        const user = req.user;
+        res.status(200).json(user);
+      } catch (error) {
+        res.status(401).json({ errors: [{ msg: 'Ocorreu um Erro' }] });
+      }
     }
     
 }
