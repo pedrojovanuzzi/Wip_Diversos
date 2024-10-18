@@ -19,8 +19,8 @@ export class App{
   }
 
   private router(){
-    this.server.use("/chamados", ChamadosRouter);
-    this.server.use("/", Home);
-    this.server.use("/auth", Auth);
+    this.server.use("/api/chamados", ChamadosRouter);
+    this.server.use("/api/", Home);
+    this.server.use("/api/auth", Auth);
   }
 }

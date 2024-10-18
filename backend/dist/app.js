@@ -20,9 +20,9 @@ class App {
         this.server.use((0, cors_1.default)({ origin: process.env.URL }));
     }
     router() {
-        this.server.use("/chamados", Chamados_Routes_1.default);
-        this.server.use("/", Home_Routes_1.default);
-        this.server.use("/auth", Auth_Routes_1.default);
+        this.server.use("/api/chamados", Chamados_Routes_1.default);
+        this.server.use("/api/", Home_Routes_1.default);
+        this.server.use("/api/auth", Auth_Routes_1.default);
     }
 }
 exports.App = App;
