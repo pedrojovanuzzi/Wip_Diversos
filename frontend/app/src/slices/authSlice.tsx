@@ -28,12 +28,16 @@ const initialState: AuthState = {
 export const loginThunk = createAsyncThunk<string, { login: string; password: string }, { rejectValue: string } >("auth/login", async function(user : any, thunkAPI){
     const data = await login(user);
 
-    if(data.errors){
-        return thunkAPI.rejectWithValue(
-            data.errors && data.errors[0] 
-              ? (data.errors[0].msg || data.errors[0]) 
-              : 'Erro desconhecido'
-          );    }
+    if (data.errors && data.errors[0]) {
+        
+        if (data.errors[0].msg) {
+            return thunkAPI.rejectWithValue(data.errors[0].msg);
+        }
+        
+        else if (data.errors[0].errors && data.errors[0].errors[0]) {
+            return thunkAPI.rejectWithValue(data.errors[0].errors[0]);
+        }
+    }
 
     return data;
 
