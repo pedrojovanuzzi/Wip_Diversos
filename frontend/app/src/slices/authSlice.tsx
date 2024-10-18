@@ -34,8 +34,8 @@ export const loginThunk = createAsyncThunk<string, { login: string; password: st
             return thunkAPI.rejectWithValue(data.errors[0].msg);
         }
         
-        else if (data.errors[0][0]) {
-            return thunkAPI.rejectWithValue(data.errors[0][0]);
+        else if (data.errors[0]) {
+            return thunkAPI.rejectWithValue(data.errors[0]);
         }
     }
 
