@@ -33,8 +33,12 @@ export const ChamadosPage = () => {
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
   
   // Acessar dados e estados do Redux
-  const { data: chamadosData = [], loading, error } = useTypedSelector((state) => state.chamados);
+  let { data: chamadosData = [], loading, error } = useTypedSelector((state) => state.chamados);
   const { user } = useTypedSelector((state) => state.auth);
+
+  if(error === undefined){
+    error = "Erro Desconhecido";
+  }
 
   // Estado para controlar o tipo de gráfico (mensal, anual, total)
   const [chartType, setChartType] = useState<'month' | 'year' | 'all'>('month');
