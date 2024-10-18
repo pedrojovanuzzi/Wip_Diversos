@@ -33,12 +33,12 @@ export const loginThunk = createAsyncThunk<string, { login: string; password: st
         if (data.errors[0].msg) {
             return thunkAPI.rejectWithValue(data.errors[0].msg);
         }
-        else if (data.error.message) {
-            return thunkAPI.rejectWithValue(data.error.message);
-          }
         else if (data.errors[0]) {
             return thunkAPI.rejectWithValue(data.errors[0]);
         }
+        else{
+            return thunkAPI.rejectWithValue("Erro Desconhecido");
+          }
     }
 
     return data;
