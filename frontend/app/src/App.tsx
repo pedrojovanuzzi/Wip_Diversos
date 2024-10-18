@@ -12,7 +12,7 @@ import { GoAlert } from "react-icons/go";
 function App() {
   const { auth, loading } = useAuth();
 
-  const manutencao = true;
+  const manutencao = false;
 
   if (loading) {
     return <p className='flex h-screen justify-center items-center bg-black text-white font-semibold gap-4'><AiOutlineLoading3Quarters className='animate-spin text-white' />Carregando...</p>;
