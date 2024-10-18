@@ -15,6 +15,7 @@ import { AppDispatch, RootState } from '../../store';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import { reset, chamadosMonthThunk, chamadosYearThunk, chamadosAllThunk } from '../../slices/chamadosSlice';
 import Message from '../../components/Message';
+import { AiOutlineLoading3Quarters } from 'react-icons/ai';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartDataLabels); // Registrando o plugin
 
@@ -163,7 +164,7 @@ export const ChamadosPage = () => {
       <NavBar />
       <div className='grid grid-cols-1 grid-rows-[100px] sm:grid-rows-[100px] justify-items-center items-center h-screen'>
         <h1 className='col-span-1 font-semibold sm:place-self-start sm:ml-40 sm:mt-10 text-2xl'>Chamados</h1>
-        {loading && <p>Carregando Página....</p>}
+        {loading && <p className='text-black font-semibold gap-4 flex justify-center items-center h-5 m-20'><AiOutlineLoading3Quarters className='animate-spin text-black' />Carregando Página....</p>}
         {error && <Message msg={error === true ? String(error) : "Erro desconhecido"} type='error' />}
         <div className="flex gap-4 mb-4">
           <button 
