@@ -15,3 +15,11 @@ code {
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.message{
+  @apply font-bold;
+}
+
+.error{
+  @apply text-red-600;
+}

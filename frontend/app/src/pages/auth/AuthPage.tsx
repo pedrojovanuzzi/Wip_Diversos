@@ -67,7 +67,7 @@ export const AuthPage = () => {
         </div>
         {!loading && <input type="submit" value={"Ok"} className='bg-gradient-to-r from-green-400 to-green-300 mt-10 w-64 h-11 border-black rounded-md font-semibold cursor-pointer hover:border-2'></input>}
         {loading && <input type="submit" value={"Aguarde"} disabled className='bg-gradient-to-r from-green-400 to-green-300 mt-10 w-64 h-11 border-black rounded-md font-semibold cursor-pointer hover:border-2'></input>}
-        {error && <Message msg={String(error)} type='error' />}
+        {error && <Message msg={String(error)} type='error'/>}
         </form>
     </div>
   )
