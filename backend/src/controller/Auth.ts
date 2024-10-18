@@ -28,7 +28,7 @@ class Auth{
       
     //   try {
     //     await body('login').trim().escape().notEmpty().withMessage('Login é Obrigatorio').run(req);
-    //     await body('password').isLength({ min: 6 }).withMessage('Senha tem que tem no Minimo 6 Caracteres').run(req);
+    //     await body('password').isLength({ min: 6 }).withMessage('Senha tem que ter no Minimo 6 Caracteres').run(req);
 
       
     //   const errors = validationResult(req);
@@ -94,7 +94,7 @@ class Auth{
     public async Login(req : Request, res : Response){
       
       await body('login').trim().escape().notEmpty().withMessage('Login é Obrigatorio').run(req);
-      await body('password').isLength({ min: 6 }).withMessage('Senha tem que tem no Minimo 6 Caracteres').run(req);
+      await body('password').isLength({ min: 6 }).withMessage('Senha tem que ter no Minimo 6 Caracteres').run(req);
 
       
       const errors = validationResult(req);

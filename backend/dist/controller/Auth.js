@@ -30,7 +30,7 @@ class Auth {
     // public async createUser(req : Request, res : Response){
     //   try {
     //     await body('login').trim().escape().notEmpty().withMessage('Login é Obrigatorio').run(req);
-    //     await body('password').isLength({ min: 6 }).withMessage('Senha tem que tem no Minimo 6 Caracteres').run(req);
+    //     await body('password').isLength({ min: 6 }).withMessage('Senha tem que ter no Minimo 6 Caracteres').run(req);
     //   const errors = validationResult(req);
     //   if (!errors.isEmpty()) {
     //     res.status(400).json({ errors: errors.array() });
@@ -79,7 +79,7 @@ class Auth {
     Login(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             yield (0, express_validator_1.body)('login').trim().escape().notEmpty().withMessage('Login é Obrigatorio').run(req);
-            yield (0, express_validator_1.body)('password').isLength({ min: 6 }).withMessage('Senha tem que tem no Minimo 6 Caracteres').run(req);
+            yield (0, express_validator_1.body)('password').isLength({ min: 6 }).withMessage('Senha tem que ter no Minimo 6 Caracteres').run(req);
             const errors = (0, express_validator_1.validationResult)(req);
             if (!errors.isEmpty()) {
                 res.status(400).json({ errors: errors.array() });
