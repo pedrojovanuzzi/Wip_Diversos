@@ -33,8 +33,8 @@ export const loginThunk = createAsyncThunk<string, { login: string; password: st
         if (data.errors[0].msg) {
             return thunkAPI.rejectWithValue(data.errors[0].msg);
         }
-        else if (data.error[0].message) {
-            return thunkAPI.rejectWithValue(data.error[0].message);
+        else if (data.error.message) {
+            return thunkAPI.rejectWithValue(data.error.message);
           }
         else if (data.errors[0]) {
             return thunkAPI.rejectWithValue(data.errors[0]);
