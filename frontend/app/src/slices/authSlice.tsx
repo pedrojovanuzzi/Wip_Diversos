@@ -11,6 +11,7 @@ if (data) {
     console.log("Usuário não encontrado.");
 }
 
+
 interface AuthState {
     user: any | null; // Defina o tipo de `user` conforme necessário
     error: boolean | string;

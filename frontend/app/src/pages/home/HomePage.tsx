@@ -1,8 +1,14 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { HiCheckCircle } from "react-icons/hi2";
 import { NavBar } from '../../components/navbar/NavBar';
 
 export const HomePage = () => {
+
+  useEffect(() => {
+    document.title = 'Home';
+  }, []);
+
+
   return (
     <div>
       <NavBar/>

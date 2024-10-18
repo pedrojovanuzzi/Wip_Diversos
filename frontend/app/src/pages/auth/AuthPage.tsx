@@ -35,6 +35,10 @@ export const AuthPage = () => {
     }
 
     useEffect(() => {
+      document.title = 'Login';
+    }, []);
+
+    useEffect(() => {
       dispatch(reset());
     }, [dispatch])
 

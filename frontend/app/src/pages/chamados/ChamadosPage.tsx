@@ -159,6 +159,10 @@ export const ChamadosPage = () => {
     },
   };
   
+  useEffect(() => {
+    document.title = 'Chamados';
+  }, []);
+
   return (
     <div>
       <NavBar />
