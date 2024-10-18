@@ -169,6 +169,8 @@ export const ChamadosPage = () => {
         <h1 className='col-span-1 font-semibold sm:place-self-start sm:ml-40 sm:mt-10 text-2xl'>Chamados</h1>
 
         {/* Botões para mudar o gráfico */}
+        {loading && <p>Carregando Página....</p>}
+      {error && <Message msg={String(error)} type='error' />}
         <div className="flex gap-4 mb-4">
           <button 
             onClick={() => setChartType('month')} 
@@ -192,8 +194,6 @@ export const ChamadosPage = () => {
           <Bar data={data} options={options} />
         </div>
       </div>
-      {loading && <p>Carregando Página....</p>}
-      {error && <Message msg={String(error)} type='error' />}
     </div>
   );
 };
