@@ -158,19 +158,13 @@ export const ChamadosPage = () => {
     },
   };
   
-  
-  
-  
-
   return (
     <div>
       <NavBar />
       <div className='grid grid-cols-1 grid-rows-[100px] sm:grid-rows-[100px] justify-items-center items-center h-screen'>
         <h1 className='col-span-1 font-semibold sm:place-self-start sm:ml-40 sm:mt-10 text-2xl'>Chamados</h1>
-
-        {/* Botões para mudar o gráfico */}
         {loading && <p>Carregando Página....</p>}
-      {error && <Message msg={String(error)} type='error' />}
+        {error && <Message msg={error === true ? String(error) : "Erro desconhecido"} type='error' />}
         <div className="flex gap-4 mb-4">
           <button 
             onClick={() => setChartType('month')} 
@@ -188,8 +182,6 @@ export const ChamadosPage = () => {
             Total
           </button>
         </div>
-
-        {/* Gráfico de Barras */}
         <div className="w-screen  sm:h-screen sm:w-2/3 place-self-center">
           <Bar data={data} options={options} />
         </div>
