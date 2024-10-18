@@ -24,50 +24,50 @@ class Auth{
         res.json("Auth Page");
       }
 
-    public async createUser(req : Request, res : Response){
+    // public async createUser(req : Request, res : Response){
       
-      try {
-        await body('login').trim().escape().notEmpty().withMessage('Login é Obrigatorio').run(req);
-        await body('password').isLength({ min: 6 }).withMessage('Senha tem que tem no Minimo 6 Caracteres').run(req);
-
-      
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        res.status(400).json({ errors: errors.array() });
-      }
+    //   try {
+    //     await body('login').trim().escape().notEmpty().withMessage('Login é Obrigatorio').run(req);
+    //     await body('password').isLength({ min: 6 }).withMessage('Senha tem que tem no Minimo 6 Caracteres').run(req);
 
       
+    //   const errors = validationResult(req);
+    //   if (!errors.isEmpty()) {
+    //     res.status(400).json({ errors: errors.array() });
+    //   }
 
-      const { login, password } = req.body;
+      
 
-      const userRepository = DataSource.getRepository(User);
-      const user = await userRepository.findOne({where: {login : login}})
+    //   const { login, password } = req.body;
 
-      if(user){
-        res.status(422).json({errors: ["Por favor, utilize outro e-mail"]});
-        return
-      }
+    //   const userRepository = DataSource.getRepository(User);
+    //   const user = await userRepository.findOne({where: {login : login}})
 
-      const salt = await bcrypt.genSalt();
-      const passwordHash = await bcrypt.hash(password, salt);
+    //   if(user){
+    //     res.status(422).json({errors: ["Por favor, utilize outro e-mail"]});
+    //     return
+    //   }
 
-      const newUser = userRepository.create({
-        login,
-        password: passwordHash
-      });
+    //   const salt = await bcrypt.genSalt();
+    //   const passwordHash = await bcrypt.hash(password, salt);
 
-      const savedUser = await userRepository.save(newUser);
+    //   const newUser = userRepository.create({
+    //     login,
+    //     password: passwordHash
+    //   });
 
-      if (!savedUser) {
-        res.status(422).json({ errors: ["Houve um Erro, por favor tente mais tarde"] });
-        return;
-      }
+    //   const savedUser = await userRepository.save(newUser);
 
-        res.status(201).json({ message: 'User created successfully', id: newUser.id ,user: { login }, token: generateToken(String(newUser.id))});
-      } catch (error) {
-        res.status(401).json({ message: 'Ocorreu um Erro'});
-      }
-    }
+    //   if (!savedUser) {
+    //     res.status(422).json({ errors: ["Houve um Erro, por favor tente mais tarde"] });
+    //     return;
+    //   }
+
+    //     res.status(201).json({ message: 'User created successfully', id: newUser.id ,user: { login }, token: generateToken(String(newUser.id))});
+    //   } catch (error) {
+    //     res.status(401).json({ message: 'Ocorreu um Erro'});
+    //   }
+    // }
 
     public async getToken(req : Request, res : Response){
       const authHeader = req.headers['authorization'];
