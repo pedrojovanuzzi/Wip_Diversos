@@ -30,12 +30,15 @@ if (data) {
 export const chamadosMonthThunk = createAsyncThunk("chamados/month", async function(data : any, thunkAPI : any){
   const res = await getChamadosMonth(data);
 
-  if (res.errors[0].msg) {
-    return thunkAPI.rejectWithValue(res.errors[0].msg);
-}
-
-else if (res.errors[0]) {
-    return thunkAPI.rejectWithValue(res.errors[0]);
+  if (res.errors && res.errors[0]) {
+        
+    if (res.errors[0].msg) {
+        return thunkAPI.rejectWithValue(res.errors[0].msg);
+    }
+    
+    else if (res.errors[0]) {
+        return thunkAPI.rejectWithValue(res.errors[0]);
+    }
 }
 
   return res;
@@ -45,12 +48,15 @@ else if (res.errors[0]) {
 export const chamadosYearThunk = createAsyncThunk("chamados/year", async function(data : any, thunkAPI : any){
   const res = await getChamadosYear(data);
 
-  if (res.errors[0].msg) {
-    return thunkAPI.rejectWithValue(res.errors[0].msg);
-}
-
-else if (res.errors[0]) {
-    return thunkAPI.rejectWithValue(res.errors[0]);
+  if (res.errors && res.errors[0]) {
+        
+    if (res.errors[0].msg) {
+        return thunkAPI.rejectWithValue(res.errors[0].msg);
+    }
+    
+    else if (res.errors[0]) {
+        return thunkAPI.rejectWithValue(res.errors[0]);
+    }
 }
 
   return res;
@@ -60,13 +66,16 @@ else if (res.errors[0]) {
 export const chamadosAllThunk = createAsyncThunk("chamados/all", async function(data : any, thunkAPI : any){
   const res = await getChamadosAll(data);
 
-  if (res.errors[0].msg) {
-    return thunkAPI.rejectWithValue(res.errors[0].msg);
-  }
-
-  else if (res.errors[0]) {
-      return thunkAPI.rejectWithValue(res.errors[0]);
-  }
+  if (res.errors && res.errors[0]) {
+        
+    if (res.errors[0].msg) {
+        return thunkAPI.rejectWithValue(res.errors[0].msg);
+    }
+    
+    else if (res.errors[0]) {
+        return thunkAPI.rejectWithValue(res.errors[0]);
+    }
+}
 
   return res;
 
