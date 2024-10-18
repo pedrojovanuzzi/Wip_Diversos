@@ -17,9 +17,9 @@ export const HomePage = () => {
         <h2 className='col-span-1'>Por Enquanto Não Temos Nada Aqui</h2>
         <HiCheckCircle className='size-40 col-span-1 self-start text-green-500' />
         <h2>Links da nossas outras Paginas</h2>
-        <a className='bg-green-500 text-black border-black hover:border-2 hover:bg-green-300 w-1/6 rounded-md  p-2' href="https://apimk.wiptelecomunicacoes.com.br/">Pix</a>
-        <a className='bg-green-500 text-black border-black hover:border-2 hover:bg-green-300 w-1/6 rounded-md  p-2' href="https://wippainel.wiptelecomunicacoes.com.br/">Wip Painel</a>
-        <a className='bg-green-500 text-black border-black hover:border-2 hover:bg-green-300 w-1/6 rounded-md  p-2 mb-10' href="https://whatsemail.wiptelecomunicacoes.com.br/">Mensagens Whatsapp</a>
+        <a className='bg-green-500 text-black border-black hover:border-2 transition-colors hover:bg-green-300 w-1/6 rounded-md  p-2' href="https://apimk.wiptelecomunicacoes.com.br/">Pix</a>
+        <a className='bg-green-500 text-black border-black hover:border-2 transition-colors hover:bg-green-300 w-1/6 rounded-md  p-2' href="https://wippainel.wiptelecomunicacoes.com.br/">Wip Painel</a>
+        <a className='bg-green-500 text-black border-black hover:border-2 transition-colors hover:bg-green-300 w-1/6 rounded-md  p-2 mb-10' href="https://whatsemail.wiptelecomunicacoes.com.br/">Mensagens Whatsapp</a>
       </div>
     </div>
   )
