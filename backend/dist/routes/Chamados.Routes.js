@@ -11,4 +11,6 @@ const router = (0, express_1.Router)();
 router.get("/", AuthGuard_1.default, Chamados_1.default.showMonth);
 router.get("/year", AuthGuard_1.default, Chamados_1.default.showYear);
 router.get("/all", AuthGuard_1.default, Chamados_1.default.showAll);
+router.get("/returns/month", AuthGuard_1.default, Chamados_1.default.returnMonth);
+router.get("/returns/year", AuthGuard_1.default, Chamados_1.default.returnYear);
 exports.default = router;

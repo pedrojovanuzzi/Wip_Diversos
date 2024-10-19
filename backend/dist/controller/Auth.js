@@ -35,11 +35,19 @@ class Auth {
     //   if (!errors.isEmpty()) {
     //     res.status(400).json({ errors: errors.array() });
     //   }
+    //   let errorsArray = validationResult(req).array();
     //   const { login, password } = req.body;
     //   const userRepository = DataSource.getRepository(User);
     //   const user = await userRepository.findOne({where: {login : login}})
     //   if(user){
-    //     res.status(422).json({errors: ["Por favor, utilize outro e-mail"]});
+    //     errorsArray.push({
+    //       type: "field",
+    //       value: "",
+    //       path: "user",
+    //       msg: "Por favor, utilize outro e-mail",
+    //       location: "body" // Onde o erro ocorreu (corpo da requisição)
+    //     });
+    //     res.status(422).json({errors: errorsArray});
     //     return
     //   }
     //   const salt = await bcrypt.genSalt();
@@ -50,63 +58,100 @@ class Auth {
     //   });
     //   const savedUser = await userRepository.save(newUser);
     //   if (!savedUser) {
-    //     res.status(422).json({ errors: ["Houve um Erro, por favor tente mais tarde"] });
+    //     errorsArray.push({
+    //       type: "field",
+    //       value: "",
+    //       path: "user",
+    //       msg: "Houve um Erro, por favor tente mais tarde",
+    //       location: "body" // Onde o erro ocorreu (corpo da requisição)
+    //     });
+    //     res.status(422).json({ errors: errorsArray });
     //     return;
     //   }
     //     res.status(201).json({ message: 'User created successfully', id: newUser.id ,user: { login }, token: generateToken(String(newUser.id))});
     //   } catch (error) {
-    //     res.status(401).json({ message: 'Ocorreu um Erro'});
+    //     res.status(401).json({ errors: [{ msg: 'Ocorreu um Erro' }] });
     //   }
     // }
     getToken(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
-            const authHeader = req.headers['authorization'];
-            const token = authHeader && authHeader.split(' ')[1];
-            if (!token) {
-                res.status(401).json({ valid: false });
-                return;
-            }
-            jsonwebtoken_1.default.verify(token, String(process.env.JWT_SECRET), (err, decoded) => {
-                if (err) {
+            try {
+                const authHeader = req.headers['authorization'];
+                const token = authHeader && authHeader.split(' ')[1];
+                if (!token) {
                     res.status(401).json({ valid: false });
                     return;
                 }
-                res.json({ valid: true });
-                return;
-            });
+                jsonwebtoken_1.default.verify(token, String(process.env.JWT_SECRET), (err, decoded) => {
+                    if (err) {
+                        res.status(401).json({ valid: false });
+                        return;
+                    }
+                    res.json({ valid: true });
+                    return;
+                });
+            }
+            catch (error) {
+                res.status(401).json({ errors: [{ msg: 'Ocorreu um Erro' }] });
+            }
         });
     }
     Login(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
-            yield (0, express_validator_1.body)('login').trim().escape().notEmpty().withMessage('Login é Obrigatorio').run(req);
-            yield (0, express_validator_1.body)('password').isLength({ min: 6 }).withMessage('Senha tem que ter no Minimo 6 Caracteres').run(req);
-            const errors = (0, express_validator_1.validationResult)(req);
-            if (!errors.isEmpty()) {
-                res.status(400).json({ errors: errors.array() });
-                return;
+            try {
+                yield (0, express_validator_1.body)('login').trim().escape().notEmpty().withMessage('Login é Obrigatorio').run(req);
+                yield (0, express_validator_1.body)('password').isLength({ min: 6 }).withMessage('Senha tem que ter no Minimo 6 Caracteres').run(req);
+                const errors = (0, express_validator_1.validationResult)(req);
+                if (!errors.isEmpty()) {
+                    res.status(400).json({ errors: errors.array() });
+                    return;
+                }
+                const { login, password } = req.body;
+                const userRepository = DataSource_1.default.getRepository(User_1.User);
+                const user = yield userRepository.findOne({ where: { login: login } });
+                let errorsArray = (0, express_validator_1.validationResult)(req).array();
+                if (!user) {
+                    errorsArray.push({
+                        type: "field",
+                        value: "",
+                        path: "user",
+                        msg: "Usuário não encontrado",
+                        location: "body" // Onde o erro ocorreu (corpo da requisição)
+                    });
+                    res.status(422).json({ errors: errorsArray });
+                    return;
+                }
+                if (!(yield bcrypt_1.default.compare(password, String(user.password)))) {
+                    errorsArray.push({
+                        type: "field",
+                        value: "",
+                        path: "user",
+                        msg: "Senha Inválida",
+                        location: "body"
+                    });
+                    res.status(422).json({ errors: errorsArray });
+                    return;
+                }
+                res.status(201).json({
+                    id: user.id,
+                    login: user.login,
+                    token: generateToken(String(user.id))
+                });
             }
-            const { login, password } = req.body;
-            const userRepository = DataSource_1.default.getRepository(User_1.User);
-            const user = yield userRepository.findOne({ where: { login: login } });
-            if (!user) {
-                res.status(422).json({ errors: ["Usuário não encontrado"] });
-                return;
+            catch (error) {
+                res.status(401).json({ errors: [{ msg: 'Ocorreu um Erro' }] });
             }
-            if (!(yield bcrypt_1.default.compare(password, String(user.password)))) {
-                res.status(422).json({ errors: ["Senha Inválida"] });
-                return;
-            }
-            res.status(201).json({
-                id: user.id,
-                login: user.login,
-                token: generateToken(String(user.id))
-            });
         });
     }
     getCurrentUser(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
-            const user = req.user;
-            res.status(200).json(user);
+            try {
+                const user = req.user;
+                res.status(200).json(user);
+            }
+            catch (error) {
+                res.status(401).json({ errors: [{ msg: 'Ocorreu um Erro' }] });
+            }
         });
     }
 }
