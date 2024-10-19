@@ -127,7 +127,6 @@ class Chamados {
         })
         .andWhere("chamado.login != 'noc'")
         .andWhere("chamado.tecnico != 0")
-        .andWhere("chamado.assunto = :assunto", { assunto: 'retorno' }) // Filtro para o assunto "retorno"
         .groupBy("func.nome")
         .orderBy("totalChamados", "DESC")
         .limit(10)
@@ -157,7 +156,6 @@ class Chamados {
         })
         .andWhere("chamado.login != 'noc'")
         .andWhere("chamado.tecnico != 0")
-        .andWhere("chamado.assunto = :assunto", { assunto: 'retorno' }) // Filtro para o assunto "retorno"
         .groupBy("func.nome")  // Agrupa pelo nome do técnico
         .orderBy("totalChamados", "DESC")
         .limit(10)

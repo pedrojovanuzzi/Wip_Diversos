@@ -111,7 +111,7 @@ export const ChamadosPage = () => {
     labels: Array.isArray(limitedChamadosReturnData) ? limitedChamadosReturnData.map((item: any) => item.tecnicoNome) : [],
     datasets: [
       {
-        label: 'Total Retornos',
+        label: 'Total Chamados Feitos',
         data: Array.isArray(limitedChamadosReturnData) ? limitedChamadosReturnData.map((item: any) => Number(item.totalChamados)) : [],
         backgroundColor: backgroundColors,
         borderColor: borderColors,
