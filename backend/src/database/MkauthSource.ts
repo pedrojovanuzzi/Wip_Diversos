@@ -1,6 +1,8 @@
 import { DataSource } from "typeorm"
 import dotenv from "dotenv";
 import { ChamadosEntities } from "../entities/ChamadosEntities";
+import { ClientesEntities } from "../entities/ClientesEntities";
+import { FuncionariosEntities } from "../entities/FuncionariosEntities";
 
 dotenv.config();
 
@@ -10,7 +12,7 @@ const AppDataSource = new DataSource({
     port: 3306,
     username: process.env.DATABASE_USERNAME_API,
     password: process.env.DATABASE_PASSWORD_API,
-    entities: [ChamadosEntities],
+    entities: [ChamadosEntities, ClientesEntities, FuncionariosEntities],
     synchronize: false,
     database: process.env.DATABASE_API,
 })

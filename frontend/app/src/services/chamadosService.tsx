@@ -40,3 +40,31 @@ export async function getChamadosAll(token : any){
         throw error;
     }
 }
+
+
+export async function getChamadosReturnMonth(token : any){
+    const config = requestConfig("GET", null, token);
+
+    try {
+        const res = await fetch(`${api}/chamados/returns/month`, config);
+        const data = await res.json();
+        return data;
+    } catch (error) {
+        console.error("Erro ao buscar chamados por Todos:", error);
+        throw error;
+    }
+}
+
+export async function getChamadosReturnYear(token : any){
+    const config = requestConfig("GET", null, token);
+
+    try {
+        const res = await fetch(`${api}/chamados/returns/year`, config);
+        const data = await res.json();
+        return data;
+    } catch (error) {
+        console.error("Erro ao buscar chamados por Todos:", error);
+        throw error;
+    }
+}
+

@@ -13,7 +13,7 @@ import { Bar } from 'react-chartjs-2';
 import { NavBar } from '../../components/navbar/NavBar';
 import { AppDispatch, RootState } from '../../store';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
-import { reset, chamadosMonthThunk, chamadosYearThunk, chamadosAllThunk } from '../../slices/chamadosSlice';
+import { reset, chamadosMonthThunk, chamadosYearThunk, chamadosAllThunk, chamadosReturnMonthThunk, chamadosReturnYearThunk } from '../../slices/chamadosSlice';
 import Message from '../../components/Message';
 import { AiOutlineLoading3Quarters } from 'react-icons/ai';
 
@@ -34,11 +34,13 @@ export const ChamadosPage = () => {
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
   
   // Acessar dados e estados do Redux
-  let { data: chamadosData = [], loading, error } = useTypedSelector((state) => state.chamados);
+  let { data: chamadosData = [], dataReturn: chamadosDataReturn, loading, error, loadingReturn, errorReturn } = useTypedSelector((state) => state.chamados);
   const { user } = useTypedSelector((state) => state.auth);
 
   // Estado para controlar o tipo de gráfico (mensal, anual, total)
   const [chartType, setChartType] = useState<'month' | 'year' | 'all'>('month');
+
+  const [chartTypeReturn, setChartTypeReturn] = useState<'returnMonth' | 'returnYear'>('returnMonth');
   
   // Estado para detectar se é uma tela de celular
   const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768);
@@ -51,30 +53,39 @@ export const ChamadosPage = () => {
   }, []);
 
   useEffect(() => {
-    console.log("Token usado:", user?.token);
     if (user?.token) {
-      dispatch(reset());
-
       if (chartType === 'month') {
         dispatch(chamadosMonthThunk(user.token));
       } else if (chartType === 'year') {
-        console.log("Requisição Anual");
-        dispatch(chamadosYearThunk(user.token))
-          .then((result) => console.log("Resultado Year:", result))
-          .catch((error) => console.error("Erro Year:", error));
+        dispatch(chamadosYearThunk(user.token));
       } else if (chartType === 'all') {
-        console.log("Requisição Total");
-        dispatch(chamadosAllThunk(user.token))
-          .then((result) => console.log("Resultado All:", result))
-          .catch((error) => console.error("Erro All:", error));
+        dispatch(chamadosAllThunk(user.token));
       }
     }
   }, [dispatch, user?.token, chartType]);
+
+  useEffect(() => {
+    if (user?.token) {
+      if (chartTypeReturn === 'returnMonth') {
+        dispatch(chamadosReturnMonthThunk(user.token));
+      } else if (chartTypeReturn === 'returnYear') {
+        dispatch(chamadosReturnYearThunk(user.token));
+      }
+    }
+  }, [dispatch, user?.token, chartTypeReturn]);
+  
 
   // Limitar o número de barras no gráfico se for mobile
   const limitedChamadosData = isMobile
     ? chamadosData.slice(0, 5) // Se for mobile, limita a 5 barras
     : chamadosData;
+
+
+
+  // Limitar o número de barras no gráfico se for mobile
+  const limitedChamadosReturnData = isMobile
+  ? chamadosDataReturn.slice(0, 5) // Se for mobile, limita a 5 barras
+  : chamadosDataReturn;
 
   // Define cores para até 20 barras
   const backgroundColors = limitedChamadosData.map((_: any, index: number) => colors[index % 20]);
@@ -95,7 +106,23 @@ export const ChamadosPage = () => {
     ],
   };
 
+
+  const dataReturn = {
+    labels: Array.isArray(limitedChamadosReturnData) ? limitedChamadosReturnData.map((item: any) => item.tecnicoNome) : [],
+    datasets: [
+      {
+        label: 'Total Retornos',
+        data: Array.isArray(limitedChamadosReturnData) ? limitedChamadosReturnData.map((item: any) => Number(item.totalChamados)) : [],
+        backgroundColor: backgroundColors,
+        borderColor: borderColors,
+        borderWidth: 1,
+        barThickness: 40,
+      },
+    ],
+  };
+
   const maxChamadosValue = Math.max(...chamadosData.map((item: any) => Number(item.totalChamados))) * 1.5;
+  const maxChamadosReturnValue = Math.max(...chamadosDataReturn.map((item: any) => Number(item.totalChamados))) * 1.5;
 
   const options = {
     responsive: true,
@@ -103,6 +130,68 @@ export const ChamadosPage = () => {
       y: {
         beginAtZero: true,
         max: maxChamadosValue, // Define o valor máximo calculado dinamicamente
+        grid: {
+          display: false,
+        },
+        ticks: {
+          color: '#000',
+          font: {
+            size: 14, // Tamanho fixo da fonte
+          },
+          padding: 10, // Espaçamento à esquerda do eixo Y
+        },
+      },
+      x: {
+        grid: {
+          display: false,
+        },
+        ticks: {
+          color: '#000',
+          font: {
+            size: 12, // Tamanho fixo da fonte
+          },
+          maxRotation: 45, // Rotação máxima dos rótulos no eixo X
+          minRotation: 0,  // Rotação mínima
+          callback: function (val: any) {
+            const label: string = val as string;
+            return label.length > 10 ? `${label.substring(0, 10)}...` : label; // Limita o comprimento dos rótulos
+          }
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        display: false,
+      },
+      title: {
+        display: false,
+      },
+      datalabels: {
+        anchor: 'end' as const,  // Ajusta a âncora dos rótulos
+        align: 'end' as const,  // Alinha os rótulos no final
+        color: '#000',
+        font: {
+          size: 10, // Tamanho fixo da fonte dos rótulos
+          weight: 'bold' as const, // Peso da fonte
+        },
+        rotation: 340, // Rotaciona os rótulos em 90 graus
+        formatter: (value: any, context: any) => context.chart.data.labels[context.dataIndex],
+      },
+    },
+    layout: {
+      padding: {
+        left: 0, // Remove o espaçamento à esquerda do gráfico
+        top: 20, // Padding superior fixo
+      },
+    },
+  };
+
+  const optionsReturn = {
+    responsive: true,
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: maxChamadosReturnValue, // Define o valor máximo calculado dinamicamente
         grid: {
           display: false,
         },
@@ -189,6 +278,24 @@ export const ChamadosPage = () => {
         </div>
         <div className="w-screen  sm:h-screen sm:w-2/3 place-self-center">
           <Bar data={data} options={options} />
+        </div>
+        {loadingReturn && <p className='text-black font-semibold gap-4 flex justify-center items-center h-5 m-20'><AiOutlineLoading3Quarters className='animate-spin text-black' />Carregando Página....</p>}
+        {errorReturn && <Message msg={error === true ? String(error) : "Erro desconhecido"} type='error' />}
+        <div className="flex gap-4 mb-4">
+          <button 
+            onClick={() => setChartTypeReturn('returnMonth')} 
+            className={`px-4 py-2 rounded ${chartTypeReturn === 'returnMonth' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-black'}`}>
+            Mensal
+          </button>
+          <button 
+            onClick={() => setChartTypeReturn('returnYear')} 
+            className={`px-4 py-2 rounded ${chartTypeReturn === 'returnYear' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-black'}`}>
+            Anual
+          </button>
+        </div>
+        <div className="w-screen  sm:h-screen sm:w-2/3 place-self-center">
+          <Bar data={dataReturn} options={optionsReturn} />
+        
         </div>
       </div>
     </div>
