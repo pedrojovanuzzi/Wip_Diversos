@@ -184,6 +184,15 @@ export const ChamadosPage = () => {
         top: 20, // Padding superior fixo
       },
     },
+    animation: {
+      duration: 1000, // Duração da animação
+    },
+    elements: {
+      bar: {
+        borderRadius: 10, // Cantos arredondados
+        borderWidth: 0, // Remover bordas
+      },
+    },
   };
 
   const optionsReturn = {
@@ -244,6 +253,15 @@ export const ChamadosPage = () => {
       padding: {
         left: 0, // Remove o espaçamento à esquerda do gráfico
         top: 20, // Padding superior fixo
+      },
+    },
+    animation: {
+      duration: 1000, // Duração da animação
+    },
+    elements: {
+      bar: {
+        borderRadius: 10, // Cantos arredondados
+        borderWidth: 0, // Remover bordas
       },
     },
   };
