@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { TypedUseSelectorHook, useSelector } from 'react-redux'
-import { RootState } from '../store';
+import { RootState } from '../types';
 
 export const useAuth = () => {
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;

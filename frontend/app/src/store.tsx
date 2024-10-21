@@ -8,6 +8,3 @@ export const store = configureStore({
         chamados: chamadosReducer
     }
 });
-
-export type AppDispatch = typeof store.dispatch;
-export type RootState = ReturnType<typeof store.getState>;

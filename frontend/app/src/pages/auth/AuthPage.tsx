@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import { loginThunk, reset } from '../../slices/authSlice';
-import { AppDispatch, RootState } from '../../store';
+import { RootState, AppDispatch } from '../../types';
 
 import Message from '../../components/Message';
 

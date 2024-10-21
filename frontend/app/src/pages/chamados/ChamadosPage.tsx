@@ -11,7 +11,7 @@ import {
 import ChartDataLabels from 'chartjs-plugin-datalabels'; // Plugin para exibir rótulos nas barras
 import { Bar } from 'react-chartjs-2';
 import { NavBar } from '../../components/navbar/NavBar';
-import { AppDispatch, RootState } from '../../store';
+import { RootState, AppDispatch } from '../../types';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import { reset, chamadosMonthThunk, chamadosYearThunk, chamadosAllThunk, chamadosReturnMonthThunk, chamadosReturnYearThunk } from '../../slices/chamadosSlice';
 import Message from '../../components/Message';
