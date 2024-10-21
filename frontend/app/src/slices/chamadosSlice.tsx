@@ -2,6 +2,7 @@ import React from 'react'
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { getChamadosMonth, getChamadosYear, getChamadosAll, getChamadosReturnMonth, getChamadosReturnYear } from '../services/chamadosService' 
 import { getCookie } from '../utils/config';
+import { chamadosAllBuilder,chamadosMonthBuilder,chamadosReturnMonthBuilder,chamadosReturnYearBuilder,chamadosYearBuilder } from '../builder/ChamadosBuilder';
 
 interface Data {
   data: any | string,
@@ -139,91 +140,11 @@ export const chamadosSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // Thunk para Chamados por Mês
-    builder
-      .addCase(chamadosMonthThunk.pending, (state) => {
-        state.loading = true;
-        state.error = false;
-      })
-      .addCase(chamadosMonthThunk.fulfilled, (state, action) => {
-        console.log("Chamados recebidos:", action.payload);
-        state.loading = false;
-        state.success = true;
-        state.error = false;
-        state.data = action.payload;
-      })
-      .addCase(chamadosMonthThunk.rejected, (state, action) => {
-        state.loading = false;
-        state.error = String(action.payload) ?? 'Erro desconhecido';
-      });
-
-    // Thunk para Chamados por Ano
-    builder
-      .addCase(chamadosYearThunk.pending, (state) => {
-        state.loading = true;
-        state.error = false;
-      })
-      .addCase(chamadosYearThunk.fulfilled, (state, action) => {
-        state.loading = false;
-        state.success = true;
-        state.error = false;
-        state.data = action.payload;
-      })
-      .addCase(chamadosYearThunk.rejected, (state, action) => {
-        state.loading = false;
-        state.error = String(action.payload) ?? 'Erro desconhecido';
-      });
-
-      builder
-      .addCase(chamadosAllThunk.pending, (state) => {
-        state.loading = true;
-        state.error = false;
-      })
-      .addCase(chamadosAllThunk.fulfilled, (state, action) => {
-        state.loading = false;
-        state.success = true;
-        state.error = false;
-        state.data = action.payload;
-      })
-      .addCase(chamadosAllThunk.rejected, (state, action) => {
-        state.loading = false;
-        state.error = String(action.payload) ?? 'Erro desconhecido';
-      });
-
-    // Thunk para Todos os Chamados
-    builder
-      .addCase(chamadosReturnMonthThunk.pending, (state) => {
-        state.loadingReturn = true;
-        state.errorReturn = false;
-      })
-      .addCase(chamadosReturnMonthThunk.fulfilled, (state, action) => {
-        state.loadingReturn = false;
-        state.successReturn = true;
-        state.errorReturn = false;
-        state.dataReturn = action.payload;
-      })
-      .addCase(chamadosReturnMonthThunk.rejected, (state, action) => {
-        state.loadingReturn = false;
-        state.errorReturn = String(action.payload);
-      });
-
-      builder
-      .addCase(chamadosReturnYearThunk.pending, (state) => {
-        state.loadingReturn = true;
-        state.errorReturn = false;
-      })
-      .addCase(chamadosReturnYearThunk.fulfilled, (state, action) => {
-        state.loadingReturn = false;
-        state.successReturn = true;
-        state.errorReturn = false;
-        state.dataReturn = action.payload;
-      })
-      .addCase(chamadosReturnYearThunk.rejected, (state, action) => {
-        state.loadingReturn = false;
-        state.errorReturn = String(action.payload);
-      });
-
-      
+    chamadosMonthBuilder(builder);
+    chamadosYearBuilder(builder);
+    chamadosAllBuilder(builder);
+    chamadosReturnMonthBuilder(builder);
+    chamadosReturnYearBuilder(builder);
   },
 });
 
