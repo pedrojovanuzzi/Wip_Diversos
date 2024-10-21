@@ -3,19 +3,9 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { getChamadosMonth, getChamadosYear, getChamadosAll, getChamadosReturnMonth, getChamadosReturnYear } from '../services/chamadosService' 
 import { getCookie } from '../utils/config';
 import { chamadosAllBuilder,chamadosMonthBuilder,chamadosReturnMonthBuilder,chamadosReturnYearBuilder,chamadosYearBuilder } from '../builder/ChamadosBuilder';
+import { ChamadosProps } from '../interfaces/ChamadosProps';
 
-interface Data {
-  data: any | string,
-  dataReturn: any | string,
-  error: boolean | string;
-  success: boolean;
-  loading: boolean;
-  loadingReturn: boolean;
-  successReturn: boolean;
-  errorReturn: boolean | string;
-}
-
-const initialState: Data = {
+const initialState: ChamadosProps = {
   data: [],
   dataReturn: [],
   error: false,
