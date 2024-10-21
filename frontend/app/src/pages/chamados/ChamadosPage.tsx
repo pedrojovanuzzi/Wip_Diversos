@@ -259,6 +259,7 @@ export const ChamadosPage = () => {
         <h1 className='col-span-1 font-semibold sm:place-self-start sm:ml-40 sm:mt-10 text-2xl'>Chamados</h1>
         {loading && <p className='text-black font-semibold gap-4 flex justify-center items-center h-5 m-20'><AiOutlineLoading3Quarters className='animate-spin text-black' />Carregando Página....</p>}
         {error && <Message msg={error === true ? String(error) : "Erro desconhecido"} type='error' />}
+        <h1 className='m-10 font-semibold'>Clientes com Mais Chamados</h1>
         <div className="flex gap-4 mb-4">
           <button 
             onClick={() => setChartType('month')} 
@@ -281,6 +282,7 @@ export const ChamadosPage = () => {
         </div>
         {loadingReturn && <p className='text-black font-semibold gap-4 flex justify-center items-center h-5 m-20'><AiOutlineLoading3Quarters className='animate-spin text-black' />Carregando Página....</p>}
         {errorReturn && <Message msg={error === true ? String(error) : "Erro desconhecido"} type='error' />}
+        <h1 className='m-10 font-semibold'>Chamados Finalizados por Técnico</h1>
         <div className="flex gap-4 mb-4">
           <button 
             onClick={() => setChartTypeReturn('returnMonth')} 
