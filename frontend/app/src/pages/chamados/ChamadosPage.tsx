@@ -121,8 +121,8 @@ export const ChamadosPage = () => {
     ],
   };
 
-  const maxChamadosValue = Math.round(Math.max(...chamadosData.map((item: any) => Math.floor(Number(item.totalChamados)))) * 1.2);
-  const maxChamadosReturnValue = Math.round(Math.max(...chamadosDataReturn.map((item: any) => Math.floor(Number(item.totalChamados)))) * 1.2);
+  let maxChamadosValue = Math.round(Math.max(...chamadosData.map((item: any) => Math.floor(Number(item.totalChamados)))) * 1.2);
+  let maxChamadosReturnValue = Math.round(Math.max(...chamadosDataReturn.map((item: any) => Math.floor(Number(item.totalChamados)))) * 1.2);
   
   
 
@@ -131,7 +131,7 @@ export const ChamadosPage = () => {
     scales: {
       y: {
         beginAtZero: true,
-        max: maxChamadosValue, // Define o valor máximo calculado dinamicamente
+        max: isMobile ? maxChamadosValue *= 1.5 : maxChamadosValue, // Define o valor máximo calculado dinamicamente
         grid: {
           display: false,
         },
@@ -202,7 +202,7 @@ export const ChamadosPage = () => {
     scales: {
       y: {
         beginAtZero: true,
-        max: maxChamadosReturnValue, // Define o valor máximo calculado dinamicamente
+        max: isMobile? maxChamadosReturnValue *= 1.5 : maxChamadosReturnValue, // Define o valor máximo calculado dinamicamente
         grid: {
           display: false,
         },
