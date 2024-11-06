@@ -101,7 +101,7 @@ export const ChamadosPage = () => {
         backgroundColor: backgroundColors,
         borderColor: borderColors,
         borderWidth: 1,
-        barThickness: 40,
+        barThickness: isMobile ? 20 : 40,
       },
     ],
   };
@@ -116,7 +116,7 @@ export const ChamadosPage = () => {
         backgroundColor: backgroundColors,
         borderColor: borderColors,
         borderWidth: 1,
-        barThickness: 40,
+        barThickness: isMobile ? 20 : 40,
       },
     ],
   };
@@ -131,14 +131,14 @@ export const ChamadosPage = () => {
     scales: {
       y: {
         beginAtZero: true,
-        max: isMobile ? maxChamadosValue *= 1.5 : maxChamadosValue, // Define o valor máximo calculado dinamicamente
+        max: isMobile ? maxChamadosValue *= 1 : maxChamadosValue, // Define o valor máximo calculado dinamicamente
         grid: {
           display: false,
         },
         ticks: {
           color: '#000',
           font: {
-            size: 14, // Tamanho fixo da fonte
+            size: isMobile? 10 : 14, // Tamanho fixo da fonte
           },
           padding: 10, // Espaçamento à esquerda do eixo Y
         },
@@ -173,7 +173,7 @@ export const ChamadosPage = () => {
         align: 'end' as const,  // Alinha os rótulos no final
         color: '#000',
         font: {
-          size: 10, // Tamanho fixo da fonte dos rótulos
+          size: isMobile? 7 : 10, // Tamanho fixo da fonte dos rótulos
           weight: 'bold' as const, // Peso da fonte
         },
         rotation: 340, // Rotaciona os rótulos em 90 graus
@@ -191,7 +191,7 @@ export const ChamadosPage = () => {
     },
     elements: {
       bar: {
-        borderRadius: 10, // Cantos arredondados
+        borderRadius: isMobile? 5 : 10, // Cantos arredondados
         borderWidth: 0, // Remover bordas
       },
     },
@@ -202,14 +202,14 @@ export const ChamadosPage = () => {
     scales: {
       y: {
         beginAtZero: true,
-        max: isMobile? maxChamadosReturnValue *= 1.5 : maxChamadosReturnValue, // Define o valor máximo calculado dinamicamente
+        max: isMobile? maxChamadosReturnValue *= 1: maxChamadosReturnValue, // Define o valor máximo calculado dinamicamente
         grid: {
           display: false,
         },
         ticks: {
           color: '#000',
           font: {
-            size: 14, // Tamanho fixo da fonte
+            size: isMobile? 10 : 14, // Tamanho fixo da fonte
           },
           padding: 10, // Espaçamento à esquerda do eixo Y
         },
@@ -244,7 +244,7 @@ export const ChamadosPage = () => {
         align: 'end' as const,  // Alinha os rótulos no final
         color: '#000',
         font: {
-          size: 10, // Tamanho fixo da fonte dos rótulos
+          size: isMobile? 7 : 10,
           weight: 'bold' as const, // Peso da fonte
         },
         rotation: 340, // Rotaciona os rótulos em 90 graus
@@ -262,7 +262,7 @@ export const ChamadosPage = () => {
     },
     elements: {
       bar: {
-        borderRadius: 10, // Cantos arredondados
+        borderRadius: isMobile? 5 : 10, // Cantos arredondados
         borderWidth: 0, // Remover bordas
       },
     },
