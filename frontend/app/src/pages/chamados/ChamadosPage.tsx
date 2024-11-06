@@ -121,8 +121,8 @@ export const ChamadosPage = () => {
     ],
   };
 
-  let maxChamadosValue = Math.round(Math.max(...chamadosData.map((item: any) => Math.floor(Number(item.totalChamados)))) * 1.2);
-  let maxChamadosReturnValue = Math.round(Math.max(...chamadosDataReturn.map((item: any) => Math.floor(Number(item.totalChamados)))) * 1.2);
+  let maxChamadosValue = Math.round(Math.max(...chamadosData.map((item: any) => Math.floor(Number(item.totalChamados)))) * 1.5);
+  let maxChamadosReturnValue = Math.round(Math.max(...chamadosDataReturn.map((item: any) => Math.floor(Number(item.totalChamados)))) * 1.5);
   
   
 
