@@ -20,6 +20,9 @@ export function requestConfig(method: "GET" | "POST" | "PUT" | "DELETE", data: a
         config.body = JSON.stringify(data);
     }
 
+    console.log(config);
+    
+
     return config;
 }
 
