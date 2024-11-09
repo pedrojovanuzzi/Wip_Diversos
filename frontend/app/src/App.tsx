@@ -6,26 +6,14 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from './hooks/useAuth';
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { GoAlert } from "react-icons/go";
-import { getCookie, requestConfig } from './utils/config';
-import { useEffect } from 'react';
-import { TypedUseSelectorHook, useSelector } from 'react-redux';
-import { RootState } from './types';
 
-const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
+
 
 function App() {
   const { auth, loading } = useAuth();
-  const { user } = useTypedSelector((state) => state.auth);
 
   const manutencao = false;
 
-  useEffect(() => {
-    if (user && user.token) {
-      const token = user.token;
-      const config = requestConfig("GET", null, token);
-      console.log("Config gerado:", config);
-    }
-  }, [user]);
 
   if (loading) {
     return <p className='flex h-screen justify-center items-center bg-black text-white font-semibold gap-4'><AiOutlineLoading3Quarters className='animate-spin text-white' />Carregando...</p>;
@@ -34,7 +22,7 @@ function App() {
   if (manutencao) {
     return (
       <div className='flex h-screen justify-center flex-col gap-10 items-center bg-yellow-300'>
-        <GoAlert className='size-40' />
+        <GoAlert className='size-40'/>
         <p className='text-black sm:text-xl font-semibold'>
           O site está em manutenção. Volte mais tarde.
         </p>
@@ -42,6 +30,7 @@ function App() {
     );
   }
 
+  
   return (
     <BrowserRouter>
       <div className='App'>
