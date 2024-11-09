@@ -6,6 +6,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from './hooks/useAuth';
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { GoAlert } from "react-icons/go";
+import { getCookie, requestConfig } from './utils/config';
+import { useEffect } from 'react';
+import { TypedUseSelectorHook, useSelector } from 'react-redux';
+import { RootState } from './types';
 
 
 
@@ -13,6 +17,14 @@ function App() {
   const { auth, loading } = useAuth();
 
   const manutencao = false;
+
+  useEffect(() => {
+    const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
+    const { user } = useTypedSelector((state) => state.auth);
+    const token = user.token;
+    const config = requestConfig("GET", null, token);
+    console.log("Config gerado:", config);
+  }, []);
 
 
   if (loading) {
