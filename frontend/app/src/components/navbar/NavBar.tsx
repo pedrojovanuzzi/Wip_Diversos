@@ -30,8 +30,8 @@ export const NavBar = () => {
         ) : (
           /* Ícones de setas para dispositivos maiores */
           <div
-            className={`${isOpen ? 'relative' : 'absolute'} ${isOpen ? '' : '-right-6'} transition-all duration-300`}
-            style={{ top: '0px' }}  // Ajuste a posição da seta quando o menu estiver fechado
+            className={`${isOpen ? 'relative' : 'absolute'} ${isOpen ? '' : 'left-10 top-5'} transition-all duration-300`}
+             // Ajuste a posição da seta quando o menu estiver fechado
           >
             {isOpen ? (
               <HiChevronLeft 
