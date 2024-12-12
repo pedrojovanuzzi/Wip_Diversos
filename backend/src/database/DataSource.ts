@@ -2,6 +2,7 @@ import { DataSource } from "typeorm";
 import dotenv from "dotenv";
 import path from "path";
 import { User } from "../entities/User";
+import { Feedback } from "../entities/NotaColaboradores";
 
 dotenv.config();
 
@@ -12,7 +13,7 @@ const AppDataSource = new DataSource({
     username: process.env.DATABASE_USERNAME,
     password: process.env.DATABASE_PASSWORD,
     database: process.env.DATABASE,
-    entities: [User],
+    entities: [User, Feedback],
     migrations: [path.join(__dirname, "../migration/*.ts")], 
 })
 

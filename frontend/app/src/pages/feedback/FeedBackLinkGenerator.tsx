@@ -54,9 +54,6 @@ const FeedbackLinkGenerator = () => {
             <p>
               Compartilhe este link com os clientes: <a href={generatedLink}>{generatedLink}</a>
             </p>
-            <button onClick={() => submitFeedback(generatedLink)}>
-              Enviar Feedback (Simulação)
-            </button>
           </div>
         )}
       </div>
