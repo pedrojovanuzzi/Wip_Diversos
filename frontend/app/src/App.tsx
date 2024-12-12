@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from './hooks/useAuth';
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { GoAlert } from "react-icons/go";
+import FeedbackLinkGenerator from './pages/feedback/FeedBackLinkGenerator';
+import FeedbackPage from './pages/feedback/FeedbackPage';
 
 
 
@@ -38,6 +40,8 @@ function App() {
           <Route path="/" element={auth ? <HomePage /> : <Navigate to="/auth/login" />} />
           <Route path="/auth/login" element={!auth ? <AuthPage /> : <Navigate to="/" />} />
           <Route path="/chamados/" element={auth ? <ChamadosPage /> : <Navigate to="/auth/login" />} />
+          <Route path="/feedbackCreate" element={auth ? <FeedbackLinkGenerator /> : <Navigate to="/auth/login" />} />
+          <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
         </Routes>
       </div>
     </BrowserRouter>
