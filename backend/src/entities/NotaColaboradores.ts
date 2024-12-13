@@ -1,8 +1,11 @@
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
-@Entity('notas_feedback')
+@Entity('feedback')
 export class Feedback {
     @PrimaryGeneratedColumn()
     id?: number
+
+    @Column({ unique: true })
+    unique_identifier?: string;
 
     @Column()
     login?: string
@@ -27,4 +30,7 @@ export class Feedback {
 
     @Column()
     you_recomend?: string
+
+    @Column({ default: false })
+    used?: boolean;
 }

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { v4 as uuidv4 } from "uuid";
 import { NavBar } from "../../components/navbar/NavBar";
 import Select from "./components/Select";
+import { TypedUseSelectorHook , useSelector } from "react-redux";
+import { RootState } from "../../types";
 
 
 interface Tech {
@@ -12,30 +13,38 @@ interface Tech {
 
 const FeedbackLinkGenerator = () => {
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
-  const [usedLinks, setUsedLinks] = useState<Record<string, boolean>>({});
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
+  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
+  const { user } = useTypedSelector((state) => state.auth);
 
-  const createLink = (): void => {
+  const createLink = async () => {
     if (!selectedTechnician) {
-      alert("Selecione um técnico antes de gerar o link.");
-      return;
-    }
-    const uniqueUrl = `/feedback/${selectedTechnician}/${uuidv4()}`;
-    setGeneratedLink(uniqueUrl);
-  };
-
-  const submitFeedback = (link: string): void => {
-    if (usedLinks[link]) {
-      alert("Este link já foi utilizado ou está indisponível.");
-      return;
+        alert("Selecione um técnico antes de gerar o link.");
+        return;
     }
 
-    // Aqui você pode adicionar a lógica para o cliente enviar a nota, por exemplo:
-    // sendFeedbackToServer(link, feedback);
+    const token = user.token; // Certifique-se de que `user.token` contém o valor correto.
 
-    setUsedLinks({ ...usedLinks, [link]: true });
-    alert("Feedback enviado com sucesso!");
-  };
+    const response = await fetch(`${process.env.REACT_APP_URL}/feedback/create`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}` // Adiciona o token no cabeçalho
+        },
+        body: JSON.stringify({ technician: selectedTechnician }),
+    });
+
+    if (response.ok) {
+        const data = await response.json();
+        setGeneratedLink(data.link);
+    } else {
+        const errorMessage = await response.text();
+        alert(`Erro ao gerar o link: ${errorMessage}`);
+    }
+};
+
+
+
 
   return (
     <>
@@ -47,7 +56,7 @@ const FeedbackLinkGenerator = () => {
           <Select onChange={(tech : Tech) => setSelectedTechnician(tech.name)} />
         </div>
 
-        <button className="bg-slate-900 sm:w-1/12 self-center text-gray-300 rounded p-5 hover:bg-slate-700" onClick={createLink}>Gerar Link</button>
+        <button className="bg-slate-900 self-center text-gray-300 rounded p-5 hover:bg-slate-700" onClick={createLink}>Gerar Link</button>
 
         {generatedLink && (
           <div>
