@@ -47,7 +47,7 @@ const FeedbackLinkGenerator = () => {
           <Select onChange={(tech : Tech) => setSelectedTechnician(tech.name)} />
         </div>
 
-        <button className="bg-slate-900 w-1/12 self-center text-gray-300 rounded p-5 hover:bg-slate-700" onClick={createLink}>Gerar Link</button>
+        <button className="bg-slate-900 sm:w-1/12 self-center text-gray-300 rounded p-5 hover:bg-slate-700" onClick={createLink}>Gerar Link</button>
 
         {generatedLink && (
           <div>

@@ -4,6 +4,7 @@ import { ChevronUpDownIcon } from "@heroicons/react/16/solid";
 import { CheckIcon } from "@heroicons/react/20/solid";
 
 const people = [
+  { id: 0, name: "Selecione um Técnico", online: false },
   { id: 1, name: "Arnaldo", online: true },
   { id: 2, name: "Bruno", online: true },
   { id: 3, name: "Marcelo", online: true },
@@ -28,6 +29,10 @@ export default function Select({ onChange }: SelectProps) {
   const [selected, setSelected] = useState(people[0]);
 
   const handleChange = (person: { id: number; name: string; online: boolean }) => {
+    if(person.name === "Selecione um Técnico"){
+      alert("Selecione um técnico válido.");
+      return;
+    }
     setSelected(person);
     onChange(person); // Passa o selecionado para o componente pai
   };
@@ -36,7 +41,7 @@ export default function Select({ onChange }: SelectProps) {
     <Listbox value={selected} onChange={handleChange}>
       <Label className="block text-sm/6 font-medium text-gray-900">Colaborador:</Label>
       <div className="relative mt-2">
-        <ListboxButton className="grid w-1/2 justify-self-center cursor-default grid-cols-1 rounded-md bg-white py-1.5 pl-3 pr-2 text-left text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6">
+        <ListboxButton className="grid w-1/2 sm:w-1/4 justify-self-center cursor-default grid-cols-1 rounded-md bg-white py-1.5 pl-3 pr-2 text-left text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6">
           <span className="col-start-1 row-start-1 flex items-center gap-3 pr-6">
             <span
               aria-label={selected.online ? "Online" : "Offline"}
@@ -55,7 +60,7 @@ export default function Select({ onChange }: SelectProps) {
 
         <ListboxOptions
           transition
-          className="absolute z-10 mt-1 left-1/2 -translate-x-1/2 max-h-60 w-1/2 overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none data-[closed]:data-[leave]:opacity-0 data-[leave]:transition data-[leave]:duration-100 data-[leave]:ease-in sm:text-sm"
+          className="absolute z-10 mt-1 left-1/2 -translate-x-1/2 max-h-60 w-1/2 sm:w-1/4 overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none data-[closed]:data-[leave]:opacity-0 data-[leave]:transition data-[leave]:duration-100 data-[leave]:ease-in sm:text-sm"
         >
           {people.map((person) => (
             <ListboxOption
