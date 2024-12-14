@@ -17,6 +17,12 @@ interface Note {
   count: number;
 }
 
+interface NoteTech {
+  note: number;
+  count: number;
+  name: string;
+}
+
 const FeedbackBarChart = ({ data, label, isMobile } : { data: Note[], label: string, isMobile: boolean }) => {
   const chartData = data.map((d) => ({
     note: d.note,
@@ -51,15 +57,59 @@ const FeedbackBarChart = ({ data, label, isMobile } : { data: Note[], label: str
   );
 };
 
+
+const TechBarChart = ({ data, label, isMobile } : { data: NoteTech[], label: string, isMobile: boolean }) => {
+  const chartData = data.map((d) => ({
+    note: d.note,
+    count: d.count,
+    name: d.name,
+  }));
+
+  return (
+    <BarChart
+      width={isMobile ? 300 : 500}
+      height={300}
+      series={[
+        {
+          data: chartData.map((d) => d.count),
+          label,
+          id: "count",
+          color: "none"
+        },
+      ]}
+      xAxis={[
+        {
+          data: chartData.map((d) => d.note),
+          scaleType: "band",
+          colorMap: {
+            type: "continuous",
+            min: 10,
+            max: 0,
+            color: ["green", "red"],
+          },
+        },
+      ]}
+    />
+  );
+};
+
+
+//FAZER TECNICO COM POST
+
 const FeedbackLinkGenerator = () => {
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
+  const [selectedTechnicianGraph, setSelectedTechnicianGraph] = useState<string>("");
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
   const { user } = useTypedSelector((state) => state.auth);
   const [noteData, setNoteData] = useState<{ [key: string]: Note[] }>({
     internet: [],
     service: [],
     responseTime: [],
+    technician: [],
+  });
+  const [technoteData, settechNoteData] = useState<{ [key: string]: NoteTech[] }>({
+    technician: [],
   });
   const [isMonthly, setMonthly] = useState(true);
   const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768);
@@ -70,6 +120,20 @@ const FeedbackLinkGenerator = () => {
     const response = await fetch(endpoint, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
+    });
+    return response.json();
+  };
+
+  const fetchNotesTech = async (type: string) => {
+    const period = isMonthly ? "month" : "year";
+    const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${user.token}`,
+      },
+      body: JSON.stringify({ technician: selectedTechnicianGraph }),
     });
     return response.json();
   };
@@ -117,13 +181,28 @@ const FeedbackLinkGenerator = () => {
           fetchNotes("ResponseTime"),
         ]);
 
-        setNoteData({ internet, service, responseTime });
+        setNoteData({ internet, service, responseTime});
+        
+      } catch (error) {
+        console.error("Erro ao buscar os dados:", error);
+      }
+    };
+
+    const fetchTechNotes = async () => {
+      try {
+        const [tech] = await Promise.all([
+          fetchNotesTech("Technician"),
+        ]);
+
+        settechNoteData({tech});
+        
       } catch (error) {
         console.error("Erro ao buscar os dados:", error);
       }
     };
 
     fetchAllNotes();
+    fetchTechNotes();
   }, [isMonthly]);
 
   return (
@@ -162,6 +241,15 @@ const FeedbackLinkGenerator = () => {
             <FeedbackBarChart data={noteData.responseTime} label="Notas sobre o Tempo de Resposta" isMobile={isMobile} />
           </div>
         </div>
+
+        <div className="flex flex-col items-center gap-10 mt-1 sm:mt-10">
+
+          <div className="flex flex-col w-full gap-5">
+            <Select onChange={(tech: Tech) => setSelectedTechnicianGraph(tech.name)} />
+            <TechBarChart data={technoteData.Technician} label="Notas sobre o Tempo de Resposta" isMobile={isMobile} />
+          </div>
+        </div>
+
       </div>
     </>
   );

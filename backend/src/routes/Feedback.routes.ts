@@ -14,6 +14,9 @@ router.get("/NoteService/year", Feedback.getNoteService_Year);
 router.get("/NoteResponseTime/month", Feedback.getNoteResponseTime_Month);
 router.get("/NoteResponseTime/year", Feedback.getNoteResponseTime_Year);
 
+router.post("/NoteTechnician/month", Feedback.getTechnician_Month);
+router.post("/NoteTechnician/year", Feedback.getTechnician_Year);
+
 router.post("/create", AuthGuard, Feedback.createFeedbackLink);
 router.post("/:id", Feedback.submitFeedback);
 router.get("/:id", Feedback.getFeedbackUUID);

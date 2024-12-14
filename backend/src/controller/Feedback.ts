@@ -20,6 +20,8 @@ class FeedbackController {
     this.getNoteService_Year = this.getNoteService_Year.bind(this);
     this.getNoteResponseTime_Month = this.getNoteResponseTime_Month.bind(this);
     this.getNoteResponseTime_Year = this.getNoteResponseTime_Year.bind(this);
+    this.getTechnician_Month = this.getTechnician_Month.bind(this);
+    this.getTechnician_Year = this.getTechnician_Year.bind(this);
   }
 
   public async createFeedbackLink(req: Request, res: Response) {
@@ -165,6 +167,34 @@ class FeedbackController {
     }
   }
 
+  private async getNoteTech(
+    field: keyof Feedback,
+    tech: string,
+    period: "month" | "year",
+    res: Response
+  ) {
+    try {
+      const { start, end } = this.getDateRange(period);
+      const feedbackRepository = AppDataSource.getRepository(Feedback);
+
+      const feedbackCounts = await feedbackRepository
+        .createQueryBuilder("feedback")
+        .select(`feedback.${field}`, "note")
+        .addSelect("COUNT(*)", "count")
+        .where("feedback.time BETWEEN :start AND :end", { start, end })
+        .andWhere(`feedback.${field} IS NOT NULL`)
+        .andWhere(`feedback.login == ${tech}`)
+        .groupBy(`feedback.${field}`)
+        .orderBy(`feedback.${field}`, "DESC")
+        .getRawMany();
+
+      return res.status(200).send(feedbackCounts);
+    } catch (error) {
+      console.error(`Erro ao buscar feedback para ${field}:`, error);
+      return res.status(500).send("Erro interno do servidor.");
+    }
+  }
+
   public async getNoteInternet_Month(req: Request, res: Response) {
     this.getNote("note_internet", "month", res);
     return;
@@ -194,6 +224,19 @@ class FeedbackController {
     this.getNote("note_response_time", "year", res);
     return;
   }
+
+  public async getTechnician_Month(req: Request, res: Response) {
+    const {technician} = req.body
+    this.getNoteTech("note_technician_service", technician, "month", res);
+    return;
+  }
+
+  public async getTechnician_Year(req: Request, res: Response) {
+    const {technician} = req.body
+    this.getNoteTech("note_technician_service", technician, "year", res);
+    return;
+  }
+
 }
 
 export default new FeedbackController();
