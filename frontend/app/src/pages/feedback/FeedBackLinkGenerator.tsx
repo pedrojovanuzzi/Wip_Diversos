@@ -17,7 +17,7 @@ interface Note {
   count: number;
 }
 
-const FeedbackBarChart = ({ data, label, isMobile }: { data: Note[], label: string, isMobile: boolean }) => {
+const FeedbackBarChart = ({ data, label, isMobile } : { data: Note[], label: string, isMobile: boolean }) => {
   const chartData = data.map((d) => ({
     note: d.note,
     count: d.count,

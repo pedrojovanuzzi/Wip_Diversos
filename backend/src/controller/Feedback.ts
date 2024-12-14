@@ -124,167 +124,75 @@ class FeedbackController {
     }
   }
 
-  private getMonthDateRange(date: Date): {
-    startOfMonth: Date;
-    endOfMonth: Date;
-  } {
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const endOfMonth = new Date(
-      date.getFullYear(),
-      date.getMonth() + 1,
-      0,
-      23,
-      59,
-      59,
-      999
-    );
-    return { startOfMonth, endOfMonth };
+  private getDateRange(period: "month" | "year"): { start: Date; end: Date } {
+    const date = new Date();
+    if (period === "month") {
+      return {
+        start: new Date(date.getFullYear(), date.getMonth(), 1),
+        end: new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59),
+      };
+    } else {
+      return {
+        start: new Date(date.getFullYear(), 0, 1),
+        end: new Date(date.getFullYear(), 11, 31, 23, 59, 59),
+      };
+    }
   }
 
-  private getYearDateRange(date: Date): { startOfYear: Date; endOfYear: Date } {
-    const startOfYear = new Date(date.getFullYear(), 0, 1);
-    const endOfYear = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
-    return { startOfYear, endOfYear };
+  private async getNote(
+    field: keyof Feedback,
+    period: "month" | "year",
+    res: Response
+  ) {
+    try {
+      const { start, end } = this.getDateRange(period);
+      const feedbackRepository = AppDataSource.getRepository(Feedback);
+
+      const feedbackCounts = await feedbackRepository
+        .createQueryBuilder("feedback")
+        .select(`feedback.${field}`, "note")
+        .addSelect("COUNT(*)", "count")
+        .where("feedback.time BETWEEN :start AND :end", { start, end })
+        .andWhere(`feedback.${field} IS NOT NULL`)
+        .groupBy(`feedback.${field}`)
+        .orderBy(`feedback.${field}`, "DESC")
+        .getRawMany();
+
+      return res.status(200).send(feedbackCounts);
+    } catch (error) {
+      console.error(`Erro ao buscar feedback para ${field}:`, error);
+      return res.status(500).send("Erro interno do servidor.");
+    }
   }
 
   public async getNoteInternet_Month(req: Request, res: Response) {
-    try {
-      const { startOfMonth, endOfMonth } = this.getMonthDateRange(new Date());
-      const feedbackRepository = AppDataSource.getRepository(Feedback);
-      const feedbackCounts = await feedbackRepository
-        .createQueryBuilder("feedback")
-        .select("feedback.note_internet", "note")
-        .addSelect("COUNT(*)", "count")
-        .where("feedback.time BETWEEN :start AND :end", {
-          start: startOfMonth,
-          end: endOfMonth,
-        })
-        .andWhere("feedback.note_internet IS NOT NULL")
-        .groupBy("feedback.note_internet")
-        .orderBy("feedback.note_internet", "DESC")
-        .getRawMany();
-      res.status(200).send(feedbackCounts);
-    } catch (error) {
-      console.error("Erro ao buscar feedback mensal:", error);
-      res.status(500).send("Erro interno do servidor.");
-    }
+    this.getNote("note_internet", "month", res);
+    return;
   }
 
   public async getNoteInternet_Year(req: Request, res: Response) {
-    try {
-      const { startOfYear, endOfYear } = this.getYearDateRange(new Date());
-      const feedbackRepository = AppDataSource.getRepository(Feedback);
-      const feedbackCounts = await feedbackRepository
-        .createQueryBuilder("feedback")
-        .select("feedback.note_internet", "note")
-        .addSelect("COUNT(*)", "count")
-        .where("feedback.time BETWEEN :start AND :end", {
-          start: startOfYear,
-          end: endOfYear,
-        })
-        .andWhere("feedback.note_internet IS NOT NULL")
-        .groupBy("feedback.note_internet")
-        .orderBy("feedback.note_internet", "DESC")
-        .getRawMany();
-      res.status(200).send(feedbackCounts);
-    } catch (error) {
-      console.error("Erro ao buscar feedback Anual:", error);
-      res.status(500).send("Erro interno do servidor.");
-    }
+    this.getNote("note_internet", "year", res);
+    return;
   }
 
   public async getNoteService_Month(req: Request, res: Response) {
-    try {
-      const { startOfMonth, endOfMonth } = this.getMonthDateRange(new Date());
-      const feedbackRepository = AppDataSource.getRepository(Feedback);
-      const feedbackCounts = await feedbackRepository
-        .createQueryBuilder("feedback")
-        .select("feedback.note_service", "note")
-        .addSelect("COUNT(*)", "count")
-        .where("feedback.time BETWEEN :start AND :end", {
-          start: startOfMonth,
-          end: endOfMonth,
-        })
-        .andWhere("feedback.note_service IS NOT NULL")
-        .groupBy("feedback.note_service")
-        .orderBy("feedback.note_service", "DESC")
-        .getRawMany();
-      res.status(200).send(feedbackCounts);
-    } catch (error) {
-      console.error("Erro ao buscar feedback mensal:", error);
-      res.status(500).send("Erro interno do servidor.");
-    }
+    this.getNote("note_service", "month", res);
+    return;
   }
 
   public async getNoteService_Year(req: Request, res: Response) {
-    try {
-      const { startOfYear, endOfYear } = this.getYearDateRange(new Date());
-      const feedbackRepository = AppDataSource.getRepository(Feedback);
-      const feedbackCounts = await feedbackRepository
-        .createQueryBuilder("feedback")
-        .select("feedback.note_service", "note")
-        .addSelect("COUNT(*)", "count")
-        .where("feedback.time BETWEEN :start AND :end", {
-          start: startOfYear,
-          end: endOfYear,
-        })
-        .andWhere("feedback.note_service IS NOT NULL")
-        .groupBy("feedback.note_service")
-        .orderBy("feedback.note_service", "DESC")
-        .getRawMany();
-      res.status(200).send(feedbackCounts);
-    } catch (error) {
-      console.error("Erro ao buscar feedback Anual:", error);
-      res.status(500).send("Erro interno do servidor.");
-    }
+    this.getNote("note_service", "year", res);
+    return;
   }
 
   public async getNoteResponseTime_Month(req: Request, res: Response) {
-    try {
-      const { startOfMonth, endOfMonth } = this.getMonthDateRange(new Date());
-      const feedbackRepository = AppDataSource.getRepository(Feedback);
-      const feedbackCounts = await feedbackRepository
-        .createQueryBuilder("feedback")
-        .select("feedback.note_response_time", "note")
-        .addSelect("COUNT(*)", "count")
-        .where("feedback.time BETWEEN :start AND :end", {
-          start: startOfMonth,
-          end: endOfMonth,
-        })
-        .andWhere("feedback.note_response_time IS NOT NULL")
-        .groupBy("feedback.note_response_time")
-        .orderBy("feedback.note_response_time", "DESC")
-        .getRawMany();
-      res.status(200).send(feedbackCounts);
-    } catch (error) {
-      console.error("Erro ao buscar feedback mensal:", error);
-      res.status(500).send("Erro interno do servidor.");
-    }
+    this.getNote("note_response_time", "month", res);
+    return;
   }
 
   public async getNoteResponseTime_Year(req: Request, res: Response) {
-    try {
-      const { startOfYear, endOfYear } = this.getYearDateRange(new Date());
-      const feedbackRepository = AppDataSource.getRepository(Feedback);
-      const feedbackCounts = await feedbackRepository
-        .createQueryBuilder("feedback")
-        .select("feedback.note_response_time", "note")
-        .addSelect("COUNT(*)", "count")
-        .where("feedback.time BETWEEN :start AND :end", {
-          start: startOfYear,
-          end: endOfYear,
-        })
-        .andWhere("feedback.note_response_time IS NOT NULL")
-        .groupBy("feedback.note_response_time")
-        .orderBy("feedback.note_response_time", "DESC")
-        .getRawMany();
-      res.status(200).send(feedbackCounts);
-      console.log(feedbackCounts);
-      
-    } catch (error) {
-      console.error("Erro ao buscar feedback Anual:", error);
-      res.status(500).send("Erro interno do servidor.");
-    }
+    this.getNote("note_response_time", "year", res);
+    return;
   }
 }
 
