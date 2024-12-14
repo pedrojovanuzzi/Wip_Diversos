@@ -3,8 +3,25 @@ import { Feedback } from "../entities/NotaColaboradores";
 import { isUUID } from "class-validator";
 import AppDataSource from "../database/DataSource";
 import { v4 as uuidv4 } from "uuid";
+import { Between } from "typeorm";
 
 class FeedbackController {
+  private date: Date;
+
+  constructor() {
+    this.date = new Date(); // Inicializa a variável no construtor
+
+    this.createFeedbackLink = this.createFeedbackLink.bind(this);
+    this.submitFeedback = this.submitFeedback.bind(this);
+    this.getFeedbackUUID = this.getFeedbackUUID.bind(this);
+    this.getNoteInternet_Month = this.getNoteInternet_Month.bind(this);
+    this.getNoteInternet_Year = this.getNoteInternet_Year.bind(this);
+    this.getNoteService_Month = this.getNoteService_Month.bind(this);
+    this.getNoteService_Year = this.getNoteService_Year.bind(this);
+    this.getNoteResponseTime_Month = this.getNoteResponseTime_Month.bind(this);
+    this.getNoteResponseTime_Year = this.getNoteResponseTime_Year.bind(this);
+  }
+
   public async createFeedbackLink(req: Request, res: Response) {
     try {
       const { technician } = req.body;
@@ -104,6 +121,169 @@ class FeedbackController {
         .status(500)
         .json({ message: "Erro interno do servidor.", used: null });
       return;
+    }
+  }
+
+  private getMonthDateRange(date: Date): {
+    startOfMonth: Date;
+    endOfMonth: Date;
+  } {
+    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const endOfMonth = new Date(
+      date.getFullYear(),
+      date.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    );
+    return { startOfMonth, endOfMonth };
+  }
+
+  private getYearDateRange(date: Date): { startOfYear: Date; endOfYear: Date } {
+    const startOfYear = new Date(date.getFullYear(), 0, 1);
+    const endOfYear = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
+    return { startOfYear, endOfYear };
+  }
+
+  public async getNoteInternet_Month(req: Request, res: Response) {
+    try {
+      const { startOfMonth, endOfMonth } = this.getMonthDateRange(new Date());
+      const feedbackRepository = AppDataSource.getRepository(Feedback);
+      const feedbackCounts = await feedbackRepository
+        .createQueryBuilder("feedback")
+        .select("feedback.note_internet", "note")
+        .addSelect("COUNT(*)", "count")
+        .where("feedback.time BETWEEN :start AND :end", {
+          start: startOfMonth,
+          end: endOfMonth,
+        })
+        .andWhere("feedback.note_internet IS NOT NULL")
+        .groupBy("feedback.note_internet")
+        .orderBy("feedback.note_internet", "DESC")
+        .getRawMany();
+      res.status(200).send(feedbackCounts);
+    } catch (error) {
+      console.error("Erro ao buscar feedback mensal:", error);
+      res.status(500).send("Erro interno do servidor.");
+    }
+  }
+
+  public async getNoteInternet_Year(req: Request, res: Response) {
+    try {
+      const { startOfYear, endOfYear } = this.getYearDateRange(new Date());
+      const feedbackRepository = AppDataSource.getRepository(Feedback);
+      const feedbackCounts = await feedbackRepository
+        .createQueryBuilder("feedback")
+        .select("feedback.note_internet", "note")
+        .addSelect("COUNT(*)", "count")
+        .where("feedback.time BETWEEN :start AND :end", {
+          start: startOfYear,
+          end: endOfYear,
+        })
+        .andWhere("feedback.note_internet IS NOT NULL")
+        .groupBy("feedback.note_internet")
+        .orderBy("feedback.note_internet", "DESC")
+        .getRawMany();
+      res.status(200).send(feedbackCounts);
+    } catch (error) {
+      console.error("Erro ao buscar feedback Anual:", error);
+      res.status(500).send("Erro interno do servidor.");
+    }
+  }
+
+  public async getNoteService_Month(req: Request, res: Response) {
+    try {
+      const { startOfMonth, endOfMonth } = this.getMonthDateRange(new Date());
+      const feedbackRepository = AppDataSource.getRepository(Feedback);
+      const feedbackCounts = await feedbackRepository
+        .createQueryBuilder("feedback")
+        .select("feedback.note_service", "note")
+        .addSelect("COUNT(*)", "count")
+        .where("feedback.time BETWEEN :start AND :end", {
+          start: startOfMonth,
+          end: endOfMonth,
+        })
+        .andWhere("feedback.note_service IS NOT NULL")
+        .groupBy("feedback.note_service")
+        .orderBy("feedback.note_service", "DESC")
+        .getRawMany();
+      res.status(200).send(feedbackCounts);
+    } catch (error) {
+      console.error("Erro ao buscar feedback mensal:", error);
+      res.status(500).send("Erro interno do servidor.");
+    }
+  }
+
+  public async getNoteService_Year(req: Request, res: Response) {
+    try {
+      const { startOfYear, endOfYear } = this.getYearDateRange(new Date());
+      const feedbackRepository = AppDataSource.getRepository(Feedback);
+      const feedbackCounts = await feedbackRepository
+        .createQueryBuilder("feedback")
+        .select("feedback.note_service", "note")
+        .addSelect("COUNT(*)", "count")
+        .where("feedback.time BETWEEN :start AND :end", {
+          start: startOfYear,
+          end: endOfYear,
+        })
+        .andWhere("feedback.note_service IS NOT NULL")
+        .groupBy("feedback.note_service")
+        .orderBy("feedback.note_service", "DESC")
+        .getRawMany();
+      res.status(200).send(feedbackCounts);
+    } catch (error) {
+      console.error("Erro ao buscar feedback Anual:", error);
+      res.status(500).send("Erro interno do servidor.");
+    }
+  }
+
+  public async getNoteResponseTime_Month(req: Request, res: Response) {
+    try {
+      const { startOfMonth, endOfMonth } = this.getMonthDateRange(new Date());
+      const feedbackRepository = AppDataSource.getRepository(Feedback);
+      const feedbackCounts = await feedbackRepository
+        .createQueryBuilder("feedback")
+        .select("feedback.note_response_time", "note")
+        .addSelect("COUNT(*)", "count")
+        .where("feedback.time BETWEEN :start AND :end", {
+          start: startOfMonth,
+          end: endOfMonth,
+        })
+        .andWhere("feedback.note_response_time IS NOT NULL")
+        .groupBy("feedback.note_response_time")
+        .orderBy("feedback.note_response_time", "DESC")
+        .getRawMany();
+      res.status(200).send(feedbackCounts);
+    } catch (error) {
+      console.error("Erro ao buscar feedback mensal:", error);
+      res.status(500).send("Erro interno do servidor.");
+    }
+  }
+
+  public async getNoteResponseTime_Year(req: Request, res: Response) {
+    try {
+      const { startOfYear, endOfYear } = this.getYearDateRange(new Date());
+      const feedbackRepository = AppDataSource.getRepository(Feedback);
+      const feedbackCounts = await feedbackRepository
+        .createQueryBuilder("feedback")
+        .select("feedback.note_response_time", "note")
+        .addSelect("COUNT(*)", "count")
+        .where("feedback.time BETWEEN :start AND :end", {
+          start: startOfYear,
+          end: endOfYear,
+        })
+        .andWhere("feedback.note_response_time IS NOT NULL")
+        .groupBy("feedback.note_response_time")
+        .orderBy("feedback.note_response_time", "DESC")
+        .getRawMany();
+      res.status(200).send(feedbackCounts);
+      console.log(feedbackCounts);
+      
+    } catch (error) {
+      console.error("Erro ao buscar feedback Anual:", error);
+      res.status(500).send("Erro interno do servidor.");
     }
   }
 }

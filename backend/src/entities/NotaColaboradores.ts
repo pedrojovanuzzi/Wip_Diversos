@@ -33,4 +33,7 @@ export class Feedback {
 
     @Column({ default: false })
     used?: boolean;
+
+    @Column()
+    time?: Date
 }

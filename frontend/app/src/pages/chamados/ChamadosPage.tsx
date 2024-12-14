@@ -13,7 +13,7 @@ import { Bar } from 'react-chartjs-2';
 import { NavBar } from '../../components/navbar/NavBar';
 import { RootState, AppDispatch } from '../../types';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
-import { reset, chamadosMonthThunk, chamadosYearThunk, chamadosAllThunk, chamadosReturnMonthThunk, chamadosReturnYearThunk } from '../../slices/chamadosSlice';
+import { chamadosMonthThunk, chamadosYearThunk, chamadosAllThunk, chamadosReturnMonthThunk, chamadosReturnYearThunk } from '../../slices/chamadosSlice';
 import Message from '../../components/Message';
 import { AiOutlineLoading3Quarters } from 'react-icons/ai';
 

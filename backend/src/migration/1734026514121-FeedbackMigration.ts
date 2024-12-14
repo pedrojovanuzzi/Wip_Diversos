@@ -16,10 +16,12 @@ export class FeedbackMigration1734026514121 implements MigrationInterface {
                 you_problem_as_solved bit NULL,
                 you_recomend bit NULL,
                 used bit NULL,
+                time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, 
                 PRIMARY KEY (id)
             );`
         );
     }
+    
 
     public async down(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(

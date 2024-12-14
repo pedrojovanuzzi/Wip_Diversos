@@ -198,7 +198,7 @@ const FeedbackPage = () => {
         </div>
 
         <div>
-          <label>De 0 a 10 quanto você avalia nosso serviço?: </label>
+          <label>De 0 a 10 quanto você avalia nosso atendimento?: </label>
           <div className="mt-5">
             {renderRatingButtons(ratingService, setRatingService)}
           </div>
