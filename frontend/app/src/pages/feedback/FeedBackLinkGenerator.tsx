@@ -329,7 +329,7 @@ const FeedbackLinkGenerator = () => {
               Compartilhe este link com os clientes:{" "}
               <button
                 className="text-sky-600 m-5 underline"
-                onClick={() => navigator.clipboard.writeText(generatedLink)}
+                onClick={() => navigator.clipboard.writeText(`${process.env.REACT_APP_URL}${generatedLink}`)}
               >
                 Copiar Link
               </button>
