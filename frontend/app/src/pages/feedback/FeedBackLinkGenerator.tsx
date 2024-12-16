@@ -89,7 +89,7 @@ const YesOrNoChart = ({
       series={[
         {
           data: [simCount, naoCount],
-          label: label, 
+          label: label,
           id: "yes-no",
         },
       ]}
@@ -102,6 +102,7 @@ const YesOrNoChart = ({
     />
   );
 };
+
 
 const TechBarChart = ({
   data = [],
