@@ -298,6 +298,8 @@ const FeedbackLinkGenerator = () => {
     fetchAllNotes();
   });
 
+  
+
   return (
     <>
       <NavBar />
@@ -329,13 +331,13 @@ const FeedbackLinkGenerator = () => {
               Compartilhe este link com os clientes:{" "}
               <button
                 className="text-sky-600 m-5 underline"
-                onClick={() => navigator.clipboard.writeText(`${process.env.REACT_APP_BASE_URL}${generatedLink}`)}
+                onClick={() => navigator.clipboard.writeText(`${process.env.REACT_APP_BASE_URL}` + generatedLink)}
               >
                 Copiar Link
               </button>
             </p>
           </div>
-        )}
+        ) }
 
         <div className="flex flex-col items-center gap-10 mt-1 sm:mt-10">
           <Toggle
