@@ -48,7 +48,7 @@ const FeedbackBarChart = ({
       height={300}
       series={[
         {
-          data: chartData.map((d) => d.count),
+          data: chartData.map((d) => d.count) || 0,
           label,
           id: "count",
           color: "none",
@@ -56,7 +56,7 @@ const FeedbackBarChart = ({
       ]}
       xAxis={[
         {
-          data: chartData.map((d) => d.note),
+          data: chartData.map((d) => d.note) || ["Notas"],
           scaleType: "band",
           colorMap: {
             type: "continuous",
@@ -130,7 +130,7 @@ const TechBarChart = ({
       height={300}
       series={[
         {
-          data: chartData.map((d) => d.count),
+          data: chartData.map((d) => d.count) || 0,
           label,
           id: "count",
           color: "none",
@@ -138,7 +138,7 @@ const TechBarChart = ({
       ]}
       xAxis={[
         {
-          data: chartData.map((d) => d.note),
+          data: chartData.map((d) => d.note) || ["Notas"],
           scaleType: "band",
           colorMap: {
             type: "continuous",
