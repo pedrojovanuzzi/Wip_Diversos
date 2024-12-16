@@ -176,24 +176,29 @@ class FeedbackController {
     try {
       const { start, end } = this.getDateRange(period);
       const feedbackRepository = AppDataSource.getRepository(Feedback);
-
+  
       const feedbackCounts = await feedbackRepository
         .createQueryBuilder("feedback")
         .select(`feedback.${field}`, "note")
         .addSelect("COUNT(*)", "count")
+        .addSelect("feedback.login", "login") // Adiciona o campo login
         .where("feedback.time BETWEEN :start AND :end", { start, end })
         .andWhere(`feedback.${field} IS NOT NULL`)
-        .andWhere(`feedback.login == ${tech}`)
+        .andWhere("feedback.login = :tech", { tech })
         .groupBy(`feedback.${field}`)
+        .addGroupBy("feedback.login") // Adiciona agrupamento pelo login
         .orderBy(`feedback.${field}`, "DESC")
         .getRawMany();
-
+  
       return res.status(200).send(feedbackCounts);
     } catch (error) {
       console.error(`Erro ao buscar feedback para ${field}:`, error);
       return res.status(500).send("Erro interno do servidor.");
     }
   }
+  
+  
+  
 
   public async getNoteInternet_Month(req: Request, res: Response) {
     this.getNote("note_internet", "month", res);
@@ -226,7 +231,7 @@ class FeedbackController {
   }
 
   public async getTechnician_Month(req: Request, res: Response) {
-    const {technician} = req.body
+    const {technician} = req.body    
     this.getNoteTech("note_technician_service", technician, "month", res);
     return;
   }

@@ -20,7 +20,7 @@ interface Note {
 interface NoteTech {
   note: number;
   count: number;
-  name: string;
+  login: string;
 }
 
 const FeedbackBarChart = ({ data, label, isMobile } : { data: Note[], label: string, isMobile: boolean }) => {
@@ -58,11 +58,16 @@ const FeedbackBarChart = ({ data, label, isMobile } : { data: Note[], label: str
 };
 
 
-const TechBarChart = ({ data, label, isMobile } : { data: NoteTech[], label: string, isMobile: boolean }) => {
+const TechBarChart = ({ data = [], label, isMobile }: { data: NoteTech[]; label: string; isMobile: boolean }) => {
+  if (!Array.isArray(data)) {
+    console.warn("Data passed to TechBarChart is not an array:", data);
+    return null; // Retorna nada caso os dados estejam errados
+  }
+
   const chartData = data.map((d) => ({
     note: d.note,
     count: d.count,
-    name: d.name,
+    name: d.login,
   }));
 
   return (
@@ -94,6 +99,7 @@ const TechBarChart = ({ data, label, isMobile } : { data: NoteTech[], label: str
 };
 
 
+
 //FAZER TECNICO COM POST
 
 const FeedbackLinkGenerator = () => {
@@ -106,7 +112,6 @@ const FeedbackLinkGenerator = () => {
     internet: [],
     service: [],
     responseTime: [],
-    technician: [],
   });
   const [technoteData, settechNoteData] = useState<{ [key: string]: NoteTech[] }>({
     technician: [],
@@ -124,19 +129,43 @@ const FeedbackLinkGenerator = () => {
     return response.json();
   };
 
-  const fetchNotesTech = async (type: string) => {
+  const fetchNotesTech = async (type: string): Promise<NoteTech[]> => {
     const period = isMonthly ? "month" : "year";
     const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${user.token}`,
-      },
-      body: JSON.stringify({ technician: selectedTechnicianGraph }),
-    });
-    return response.json();
+  
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({ technician: selectedTechnicianGraph }),
+      });
+  
+      if (response.ok) {
+        const data = await response.json();
+  
+        // Converte o dado recebido no formato correto
+        const parsedData = data.map((item: any) => ({
+          note: item.note,
+          count: Number(item.count), // Converte count para número
+          name: item.login || "",    // Usa o campo login como 'name'
+        }));
+  
+        return parsedData;
+      } else {
+        console.error("Erro na requisição:", response.status, await response.text());
+        return []; // Retorna um array vazio no caso de erro
+      }
+    } catch (error) {
+      console.error("Erro ao buscar dados do técnico:", error);
+      return []; // Retorna um array vazio em caso de exceção
+    }
   };
+  
+  
+  
 
   const createLink = async () => {
     if (!selectedTechnician) {
@@ -157,10 +186,8 @@ const FeedbackLinkGenerator = () => {
       if (response.ok) {
         const data = await response.json();
         setGeneratedLink(data.link);
-      } else {
-        const errorMessage = await response.text();
-        alert(`Erro ao gerar o link: ${errorMessage}`);
-      }
+      } 
+
     } catch (error) {
       console.error("Erro ao gerar o link:", error);
     }
@@ -180,30 +207,24 @@ const FeedbackLinkGenerator = () => {
           fetchNotes("Service"),
           fetchNotes("ResponseTime"),
         ]);
-
-        setNoteData({ internet, service, responseTime});
-        
+  
+        setNoteData({ internet, service, responseTime });
+  
+        const tech = await fetchNotesTech("Technician");
+        settechNoteData({ technician: tech });
       } catch (error) {
         console.error("Erro ao buscar os dados:", error);
       }
     };
-
-    const fetchTechNotes = async () => {
-      try {
-        const [tech] = await Promise.all([
-          fetchNotesTech("Technician"),
-        ]);
-
-        settechNoteData({tech});
-        
-      } catch (error) {
-        console.error("Erro ao buscar os dados:", error);
-      }
-    };
-
+  
     fetchAllNotes();
-    fetchTechNotes();
-  }, [isMonthly]);
+  }, [isMonthly, selectedTechnicianGraph]);
+  
+  useEffect(() => {
+    console.log("Estado atualizado:", technoteData);
+  }, [technoteData]);
+  
+  
 
   return (
     <>
@@ -242,11 +263,10 @@ const FeedbackLinkGenerator = () => {
           </div>
         </div>
 
-        <div className="flex flex-col items-center gap-10 mt-1 sm:mt-10">
-
-          <div className="flex flex-col w-full gap-5">
-            <Select onChange={(tech: Tech) => setSelectedTechnicianGraph(tech.name)} />
-            <TechBarChart data={technoteData.Technician} label="Notas sobre o Tempo de Resposta" isMobile={isMobile} />
+        <div className="flex flex-col gap-10 mt-1 sm:mt-10">
+        <Select onChange={(tech: Tech) => setSelectedTechnicianGraph(tech.name)} />
+          <div className="flex flex-col w-full items-center gap-5">
+            <TechBarChart data={technoteData.technician} label="Notas sobre o Técnico" isMobile={isMobile} />
           </div>
         </div>
 
