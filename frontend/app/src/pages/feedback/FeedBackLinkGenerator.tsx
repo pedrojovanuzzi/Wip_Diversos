@@ -28,7 +28,6 @@ interface NoteYesOrNo {
   count: number;
 }
 
-
 const FeedbackBarChart = ({
   data,
   label,
@@ -175,8 +174,10 @@ const FeedbackLinkGenerator = () => {
     const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
     const response = await fetch(endpoint, {
       method: "GET",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${user.token}`,  },
-
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${user.token}`,
+      },
     });
     return response.json();
   };
@@ -295,7 +296,7 @@ const FeedbackLinkGenerator = () => {
     };
 
     fetchAllNotes();
-  },);
+  });
 
   return (
     <>
@@ -314,16 +315,24 @@ const FeedbackLinkGenerator = () => {
           >
             Gerar Link
           </button>
-          <a href="/feedback/Opnion" className="bg-slate-400 p-5 rounded transition-all hover:bg-slate-300">Opinião</a>
+          <a
+            href="/feedback/Opnion"
+            className="bg-slate-400 p-5 rounded transition-all hover:bg-slate-300"
+          >
+            Opinião
+          </a>
         </div>
 
         {generatedLink && (
           <div>
             <p>
               Compartilhe este link com os clientes:{" "}
-              <a className="text-sky-600 m-5" href={generatedLink}>
-                {generatedLink}
-              </a>
+              <button
+                className="text-sky-600 m-5 underline"
+                onClick={() => navigator.clipboard.writeText(generatedLink)}
+              >
+                Copiar Link
+              </button>
             </p>
           </div>
         )}
