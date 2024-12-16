@@ -48,7 +48,7 @@ const FeedbackBarChart = ({
       height={300}
       series={[
         {
-          data: chartData.map((d) => d.count) || 0,
+            data: chartData.map((d) => d.count) || [0, 0],
           label,
           id: "count",
           color: "none",
@@ -130,7 +130,7 @@ const TechBarChart = ({
       height={300}
       series={[
         {
-          data: chartData.map((d) => d.count) || 0,
+          data: chartData.map((d) => d.count) || [0, 0],
           label,
           id: "count",
           color: "none",
