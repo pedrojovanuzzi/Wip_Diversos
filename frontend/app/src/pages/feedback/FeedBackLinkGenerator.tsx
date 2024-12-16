@@ -28,6 +28,7 @@ interface NoteYesOrNo {
   count: number;
 }
 
+
 const FeedbackBarChart = ({
   data,
   label,
@@ -48,7 +49,7 @@ const FeedbackBarChart = ({
       height={300}
       series={[
         {
-            data: chartData.map((d) => d.count) || [0, 0],
+          data: chartData.map((d) => d.count) || [0, 0],
           label,
           id: "count",
           color: "none",
@@ -102,7 +103,6 @@ const YesOrNoChart = ({
     />
   );
 };
-
 
 const TechBarChart = ({
   data = [],
@@ -175,7 +175,8 @@ const FeedbackLinkGenerator = () => {
     const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
     const response = await fetch(endpoint, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${user.token}`,  },
+
     });
     return response.json();
   };
@@ -260,7 +261,7 @@ const FeedbackLinkGenerator = () => {
         count: Number(item.count), // Garante que 'count' seja um número
       }));
     };
-  
+
     const fetchAllNotes = async () => {
       try {
         const [internet, service, responseTime, recommend, solved] =
@@ -270,12 +271,13 @@ const FeedbackLinkGenerator = () => {
             fetchNotes("ResponseTime"),
             fetchNotes("DoYouRecommend"),
             fetchNotes("DoYouProblemAsSolved"),
+            fetchNotes("DoYouProblemAsSolved"),
           ]);
-  
+
         // Processa apenas os dados de Yes/No (recommend e solved)
         const processedRecommend = parseNoteData(recommend);
         const processedSolved = parseNoteData(solved);
-  
+
         // Define o estado com os dados processados
         setNoteData({
           internet,
@@ -284,17 +286,16 @@ const FeedbackLinkGenerator = () => {
           recommend: processedRecommend,
           solved: processedSolved,
         });
-  
+
         const tech = await fetchNotesTech("Technician");
         settechNoteData({ technician: tech });
       } catch (error) {
         console.error("Erro ao buscar os dados:", error);
       }
     };
-  
+
     fetchAllNotes();
-  }, [isMonthly, selectedTechnician]);
-  
+  },);
 
   return (
     <>
@@ -306,12 +307,15 @@ const FeedbackLinkGenerator = () => {
           <Select onChange={(tech: Tech) => setSelectedTechnician(tech.name)} />
         </div>
 
-        <button
-          className="bg-slate-900 self-center text-gray-300 rounded p-5 hover:bg-slate-700"
-          onClick={createLink}
-        >
-          Gerar Link
-        </button>
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-10">
+          <button
+            className="bg-slate-900 self-center  text-gray-300 rounded p-5 hover:bg-slate-700"
+            onClick={createLink}
+          >
+            Gerar Link
+          </button>
+          <a href="/feedback/Opnion" className="bg-slate-400 p-5 rounded transition-all hover:bg-slate-300">Opinião</a>
+        </div>
 
         {generatedLink && (
           <div>
@@ -366,13 +370,13 @@ const FeedbackLinkGenerator = () => {
               />
             </div>
             <div className="flex sm:max-w-[30%]">
-            {technoteData.technician.length > 0 && (
-            <TechBarChart
-              data={technoteData.technician}
-              label={`Notas sobre o ${selectedTechnician}`}
-              isMobile={isMobile}
-            />
-          )}
+              {technoteData.technician.length > 0 && (
+                <TechBarChart
+                  data={technoteData.technician}
+                  label={`Notas sobre o ${selectedTechnician}`}
+                  isMobile={isMobile}
+                />
+              )}
             </div>
           </div>
         </div>

@@ -8,6 +8,7 @@ import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { GoAlert } from "react-icons/go";
 import FeedbackLinkGenerator from './pages/feedback/FeedBackLinkGenerator';
 import FeedbackPage from './pages/feedback/FeedbackPage';
+import { Opnion } from './pages/feedback/Opnion';
 
 
 
@@ -41,6 +42,8 @@ function App() {
           <Route path="/auth/login" element={!auth ? <AuthPage /> : <Navigate to="/" />} />
           <Route path="/chamados/" element={auth ? <ChamadosPage /> : <Navigate to="/auth/login" />} />
           <Route path="/feedbackCreate" element={auth ? <FeedbackLinkGenerator /> : <Navigate to="/auth/login" />} />
+          <Route path="/feedback/Opnion" element={<Opnion />} />
+          <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
         </Routes>
       </div>

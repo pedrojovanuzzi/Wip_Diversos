@@ -26,6 +26,7 @@ class FeedbackController {
     this.doYouProblemAsSolved_Year = this.doYouProblemAsSolved_Year.bind(this);
     this.doYouRecommend_Month = this.doYouRecommend_Month.bind(this);
     this.doYouRecommend_Year = this.doYouRecommend_Year.bind(this);
+    this.feedbackOpnion = this.feedbackOpnion.bind(this);
   }
 
   public async createFeedbackLink(req: Request, res: Response) {
@@ -262,6 +263,34 @@ class FeedbackController {
   public async doYouRecommend_Year(req: Request, res: Response) {
     this.getNote("you_recomend", "year", res);
     return;
+  }
+
+  public async feedbackOpnion(req: Request, res: Response) {
+    try {
+      const { start, end } = this.getDateRange("month");
+      const feedbackRepository = AppDataSource.getRepository(Feedback);
+      const field = "opnion"
+      const feedbackCounts = await feedbackRepository
+        .createQueryBuilder("feedback")
+        .select(`feedback.${field}`, "opnion")
+        .addSelect("COUNT(*)", "count")
+        .addSelect("feedback.login", "login")
+        .addSelect("feedback.time", "time")
+        .where("feedback.time BETWEEN :start AND :end", { start, end })
+        .andWhere(`feedback.${field} IS NOT NULL`)
+        .groupBy(`feedback.${field}`)
+        .addGroupBy("feedback.login")
+        .addGroupBy("feedback.time")
+        .orderBy(`feedback.${field}`, "DESC")
+        .getRawMany();
+  
+      res.status(200).send(feedbackCounts);
+      return;
+    } catch (error) {
+      console.error(`Erro ao buscar feedback para Opnion:`, error);
+      res.status(500).send("Erro interno do servidor.");
+      return;
+    }
   }
 
 }

@@ -5,23 +5,25 @@ import AuthGuard from "../middleware/AuthGuard";
 const router: Router = Router()
 
 //Routes
-router.get("/NoteInternet/month", Feedback.getNoteInternet_Month);
-router.get("/NoteInternet/year", Feedback.getNoteInternet_Year);
+router.get("/NoteInternet/month", AuthGuard, Feedback.getNoteInternet_Month);
+router.get("/NoteInternet/year", AuthGuard, Feedback.getNoteInternet_Year);
 
-router.get("/NoteService/month", Feedback.getNoteService_Month);
-router.get("/NoteService/year", Feedback.getNoteService_Year);
+router.get("/NoteService/month", AuthGuard, Feedback.getNoteService_Month);
+router.get("/NoteService/year", AuthGuard, Feedback.getNoteService_Year);
 
-router.get("/NoteResponseTime/month", Feedback.getNoteResponseTime_Month);
-router.get("/NoteResponseTime/year", Feedback.getNoteResponseTime_Year);
+router.get("/NoteResponseTime/month", AuthGuard, Feedback.getNoteResponseTime_Month);
+router.get("/NoteResponseTime/year", AuthGuard, Feedback.getNoteResponseTime_Year);
 
-router.post("/NoteTechnician/month", Feedback.getTechnician_Month);
-router.post("/NoteTechnician/year", Feedback.getTechnician_Year);
+router.post("/NoteTechnician/month", AuthGuard, Feedback.getTechnician_Month);
+router.post("/NoteTechnician/year", AuthGuard, Feedback.getTechnician_Year);
 
-router.get("/NoteDoYouRecommend/month", Feedback.doYouRecommend_Month);
-router.get("/NoteDoYouRecommend/year", Feedback.doYouRecommend_Year);
+router.get("/NoteDoYouRecommend/month", AuthGuard, Feedback.doYouRecommend_Month);
+router.get("/NoteDoYouRecommend/year", AuthGuard, Feedback.doYouRecommend_Year);
 
-router.get("/NoteDoYouProblemAsSolved/month", Feedback.doYouProblemAsSolved_Month);
-router.get("/NoteDoYouProblemAsSolved/year", Feedback.doYouProblemAsSolved_Year);
+router.get("/NoteDoYouProblemAsSolved/month", AuthGuard, Feedback.doYouProblemAsSolved_Month);
+router.get("/NoteDoYouProblemAsSolved/year", AuthGuard, Feedback.doYouProblemAsSolved_Year);
+
+router.get("/NoteFeedbackOpnion", AuthGuard, Feedback.feedbackOpnion);
 
 router.post("/create", AuthGuard, Feedback.createFeedbackLink);
 router.post("/:id", Feedback.submitFeedback);
