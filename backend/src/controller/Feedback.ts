@@ -22,6 +22,10 @@ class FeedbackController {
     this.getNoteResponseTime_Year = this.getNoteResponseTime_Year.bind(this);
     this.getTechnician_Month = this.getTechnician_Month.bind(this);
     this.getTechnician_Year = this.getTechnician_Year.bind(this);
+    this.doYouProblemAsSolved_Month = this.doYouProblemAsSolved_Month.bind(this);
+    this.doYouProblemAsSolved_Year = this.doYouProblemAsSolved_Year.bind(this);
+    this.doYouRecommend_Month = this.doYouRecommend_Month.bind(this);
+    this.doYouRecommend_Year = this.doYouRecommend_Year.bind(this);
   }
 
   public async createFeedbackLink(req: Request, res: Response) {
@@ -196,9 +200,7 @@ class FeedbackController {
       return res.status(500).send("Erro interno do servidor.");
     }
   }
-  
-  
-  
+
 
   public async getNoteInternet_Month(req: Request, res: Response) {
     this.getNote("note_internet", "month", res);
@@ -239,6 +241,26 @@ class FeedbackController {
   public async getTechnician_Year(req: Request, res: Response) {
     const {technician} = req.body
     this.getNoteTech("note_technician_service", technician, "year", res);
+    return;
+  }
+
+  public async doYouProblemAsSolved_Month(req: Request, res: Response) {
+    this.getNote("you_problem_as_solved", "month", res);
+    return;
+  }
+
+  public async doYouProblemAsSolved_Year(req: Request, res: Response) {
+    this.getNote("you_problem_as_solved", "year", res);
+    return;
+  }
+
+  public async doYouRecommend_Month(req: Request, res: Response) {
+    this.getNote("you_recomend", "month", res);
+    return;
+  }
+
+  public async doYouRecommend_Year(req: Request, res: Response) {
+    this.getNote("you_recomend", "year", res);
     return;
   }
 
