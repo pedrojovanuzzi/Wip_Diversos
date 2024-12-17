@@ -15,6 +15,12 @@ export const Opnion = () => {
     time: string;
   }
 
+  function convertToBrasiliaTime(utcTime: string) {
+    const date = new Date(utcTime);
+    date.setHours(date.getHours());
+    return date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  }
+
   async function getFeed() {
     try {
       const response = await fetch(
@@ -38,12 +44,12 @@ export const Opnion = () => {
 
   useEffect(() => {
     getFeed();
-  });
+  }, []);
 
   const people = feedback?.map((client) => ({
     login: client.login,
     opnion: client.opnion,
-    time: client.time,
+    time: convertToBrasiliaTime(client.time),
   }));
 
   return (

@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import PopUp from "./components/PopUp";
 import PopUpError from "./components/PopUpError";
+import { Helmet } from "react-helmet-async";
+import icon from "./imgs/icon.png";
+
 
 const FeedbackPage = () => {
   const { technician, id } = useParams<{ technician: string; id: string }>();
@@ -70,24 +73,23 @@ const FeedbackPage = () => {
         if (!response.ok) {
           if (response.status === 400) {
             setErrorMessage("O link é inválido ou já foi utilizado.");
-            setIsUsed(true); 
+            setIsUsed(true);
           } else {
             throw new Error("Erro ao verificar o status do link.");
           }
         } else {
           const data = await response.json();
-          setIsUsed(data.used);           
+          setIsUsed(data.used);
         }
       } catch (error) {
         setErrorMessage("Erro ao verificar o status do link. Tente novamente.");
       } finally {
-        setLoading(false); 
+        setLoading(false);
       }
     };
 
     checkUUID();
   }, [id]);
-
 
   if (loading) {
     return <p>Carregando...</p>;
@@ -108,9 +110,8 @@ const FeedbackPage = () => {
           <PopUpError />
         </div>
       </div>
-    )
+    );
   }
-
 
   if (errorMessage) {
     return (
@@ -184,6 +185,17 @@ const FeedbackPage = () => {
 
   return (
     <div className="flex justify-center flex-col font-semibold bg-gray-900 text-gray-200">
+      <Helmet>
+        <title>Página de Feedback</title>
+        <link rel="icon" href={icon} type="image/png" />
+        <meta property="og:title" content="Feedback" />
+        <meta property="og:description" content="Página para dar sua opnião e nota para a empresa" />
+        <meta
+          property="og:image"
+          content={icon}
+        />
+        <meta property="og:type" content="website" />
+      </Helmet>
       <main className="flex flex-col gap-10 sm:h-auto p-10">
         <div>
           <div className="mb-10 justify-self-center">
