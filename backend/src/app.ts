@@ -4,6 +4,7 @@ import Home from "./routes/Home.Routes";
 import Auth from "./routes/Auth.Routes";
 import cors from "cors";
 import Feed from "./routes/Feedback.routes";
+import Nfe from "./routes/Nfe.routes";
 
 export class App{
   public server: express.Application;
@@ -24,5 +25,6 @@ export class App{
     this.server.use("/api/", Home);
     this.server.use("/api/auth", Auth);
     this.server.use("/api/feedback", Feed);
+    this.server.use("/api/Nfe", Nfe);
   }
 }

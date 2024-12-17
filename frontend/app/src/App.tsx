@@ -9,6 +9,7 @@ import { GoAlert } from "react-icons/go";
 import FeedbackLinkGenerator from './pages/feedback/FeedBackLinkGenerator';
 import FeedbackPage from './pages/feedback/FeedbackPage';
 import { Opnion } from './pages/feedback/Opnion';
+import { Nfe } from './pages/Nfe/Nfe';
 
 
 
@@ -45,6 +46,7 @@ function App() {
           <Route path="/feedback/Opnion" element={<Opnion />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
+          <Route path="/Nfe" element={auth ? <Nfe /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>
     </BrowserRouter>

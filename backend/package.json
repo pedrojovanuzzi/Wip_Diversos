@@ -20,6 +20,7 @@
     "express-validator": "^7.2.0",
     "jsonwebtoken": "^9.0.2",
     "mysql": "^2.18.1",
+    "nfewizard-io": "^0.3.0",
     "typeorm": "^0.3.20",
     "uuid": "^11.0.3"
   },
