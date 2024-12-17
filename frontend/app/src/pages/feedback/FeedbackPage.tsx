@@ -5,7 +5,6 @@ import PopUpError from "./components/PopUpError";
 import { Helmet } from "react-helmet-async";
 import icon from "./imgs/icon.png";
 
-
 const FeedbackPage = () => {
   const { technician, id } = useParams<{ technician: string; id: string }>();
   const [ratingInternet, setRatingInternet] = useState<number | null>(null);
@@ -188,14 +187,31 @@ const FeedbackPage = () => {
       <Helmet>
         <title>Página de Feedback</title>
         <link rel="icon" href={icon} type="image/png" />
-        <meta property="og:title" content="Feedback" />
-        <meta property="og:description" content="Página para dar sua opnião e nota para a empresa" />
+
+        <title>Wip Diversos</title>
+        <meta name="title" content="Wip Diversos" />
+        <meta
+          name="description"
+          content="a Wip Telecom tem o orgulho de ser pioneira na implantação da tecnologia de conexão em Fibra Óptica na cidade de Arealva, 
+          entregando internet de alta qualidade, velocidade e segurança para nossos clientes. 
+          Nosso compromisso é atender com agilidade e excelência as demandas de um mercado cada vez mais exigente, 
+          superando expectativas e garantindo um serviço eficiente."
+        />
+
+        <meta property="og:type" content="website" />
+        <meta
+          property="og:url"
+          content="https://wipdiversos.wiptelecomunicacoes.com.br/feedback/"
+        />
+        <meta property="og:title" content="Wip Diversos" />
+        <meta
+          property="og:description"
+          content="De um Feedback para o nosso atendimento"
+        />
         <meta
           property="og:image"
           content={icon}
         />
-        <meta property="og:url" content="https://wipdiversos.wiptelecomunicacoes.com.br/feedback" />
-        <meta property="og:type" content="website" />
       </Helmet>
       <main className="flex flex-col gap-10 sm:h-auto p-10">
         <div>
