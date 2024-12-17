@@ -186,10 +186,7 @@ const FeedbackPage = () => {
     <div className="flex justify-center flex-col font-semibold bg-gray-900 text-gray-200">
       <Helmet>
         <title>Página de Feedback</title>
-        <link rel="icon" href={icon} type="image/png" />
-
-        <title>Wip Diversos</title>
-        <meta name="title" content="Wip Diversos" />
+        <link rel="icon" href="./imgs/icon.png" type="image/png" />
         <meta
           name="description"
           content="a Wip Telecom tem o orgulho de ser pioneira na implantação da tecnologia de conexão em Fibra Óptica na cidade de Arealva, 
@@ -210,7 +207,7 @@ const FeedbackPage = () => {
         />
         <meta
           property="og:image"
-          content={icon}
+          content="./imgs/icon.png"
         />
       </Helmet>
       <main className="flex flex-col gap-10 sm:h-auto p-10">
