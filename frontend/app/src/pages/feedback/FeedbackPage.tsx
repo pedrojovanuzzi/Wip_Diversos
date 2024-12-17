@@ -187,14 +187,6 @@ const FeedbackPage = () => {
     <div className="flex justify-center flex-col font-semibold bg-gray-900 text-gray-200">
       <Helmet>
         <title>Página de Feedback</title>
-        <link rel="icon" href={icon} type="image/png" />
-        <meta property="og:title" content="Feedback" />
-        <meta property="og:description" content="Página para dar sua opnião e nota para a empresa" />
-        <meta
-          property="og:image"
-          content={icon}
-        />
-        <meta property="og:type" content="website" />
       </Helmet>
       <main className="flex flex-col gap-10 sm:h-auto p-10">
         <div>
