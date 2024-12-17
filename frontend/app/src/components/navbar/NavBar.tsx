@@ -21,7 +21,7 @@ export const NavBar = () => {
   }, []);
 
   return (
-    <div className={`sm:h-screen ${isOpen ? 'sm:w-32' : 'sm:w-0'} bg-black sm:fixed sm:top-0 sm:left-0 grid sm:grid-rows-[auto,1fr] p-4 sm:p-0 sm:pt-10 transition-all duration-300`}>
+    <div className={`z-10 sm:h-screen ${isOpen ? 'sm:w-32' : 'sm:w-0'} bg-black sm:fixed sm:top-0 sm:left-0 grid sm:grid-rows-[auto,1fr] p-4 sm:p-0 sm:pt-10 transition-all duration-300`}>
       
       <nav className='sm:w-full sm:p-4 grid place-items-center relative'>
         {/* Ícone de menu "HiBars3" para dispositivos móveis */}

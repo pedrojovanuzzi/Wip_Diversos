@@ -1,48 +1,53 @@
-import { Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
-import { ChevronDownIcon, FunnelIcon } from '@heroicons/react/20/solid'
+import {
+  Disclosure,
+  DisclosureButton,
+  DisclosurePanel,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuItems,
+} from "@headlessui/react";
+import { ChevronDownIcon, FunnelIcon } from "@heroicons/react/20/solid";
+import { useState } from "react";
 
 const filters = {
-  price: [
-    { value: '0', label: '$0 - $25', checked: false },
-    { value: '25', label: '$25 - $50', checked: false },
-    { value: '50', label: '$50 - $75', checked: false },
-    { value: '75', label: '$75+', checked: false },
+  plano: [
+    { value: "plan_5", label: "5M", checked: false },
+    { value: "plan_8", label: "8M", checked: false },
+    { value: "plan_15", label: "15M", checked: false },
+    { value: "plan_340", label: "340M", checked: false },
+    { value: "plan_400", label: "400M", checked: false },
+    { value: "plan_500", label: "500M", checked: false },
+    { value: "plan_600", label: "600M", checked: false },
+    { value: "plan_700", label: "700M", checked: false },
+    { value: "plan_800", label: "800M", checked: false },
   ],
-  color: [
-    { value: 'white', label: 'White', checked: false },
-    { value: 'beige', label: 'Beige', checked: false },
-    { value: 'blue', label: 'Blue', checked: true },
-    { value: 'brown', label: 'Brown', checked: false },
-    { value: 'green', label: 'Green', checked: false },
-    { value: 'purple', label: 'Purple', checked: false },
+  outros: [{ value: "active_client", label: "Cliente Ativo", checked: false }],
+  vencimento: [
+    { value: "venc5", label: "Dia 5", checked: false },
+    { value: "venc10", label: "Dia 10", checked: false },
+    { value: "venc15", label: "Dia 15", checked: false },
+    { value: "venc20", label: "Dia 20", checked: false },
+    { value: "venc25", label: "Dia 25", checked: false },
   ],
-  size: [
-    { value: 'xs', label: 'XS', checked: false },
-    { value: 's', label: 'S', checked: true },
-    { value: 'm', label: 'M', checked: false },
-    { value: 'l', label: 'L', checked: false },
-    { value: 'xl', label: 'XL', checked: false },
-    { value: '2xl', label: '2XL', checked: false },
-  ],
-  category: [
-    { value: 'all-new-arrivals', label: 'All New Arrivals', checked: false },
-    { value: 'tees', label: 'Tees', checked: false },
-    { value: 'objects', label: 'Objects', checked: false },
-    { value: 'sweatshirts', label: 'Sweatshirts', checked: false },
-    { value: 'pants-and-shorts', label: 'Pants & Shorts', checked: false },
-  ],
-}
-const sortOptions = [
-  { name: 'Most Popular', href: '#', current: true },
-  { name: 'Best Rating', href: '#', current: false },
-  { name: 'Newest', href: '#', current: false },
-]
-
-function classNames(...classes: string[]) {
-  return classes.filter(Boolean).join(' ')
-}
+};
 
 export default function Filter() {
+  const [filter, setFilter] = useState<string[]>([]);
+
+  const clickedFilter = (selectedFilter: string) => {
+    setFilter(
+      (prevFilters) =>
+        prevFilters.includes(selectedFilter)
+          ? prevFilters.filter((f) => f !== selectedFilter)
+          : [...prevFilters, selectedFilter]
+    );
+  };
+
+  const clearFilter = () => {
+    setFilter([]);
+  };
+
   return (
     <div className="bg-white">
       <Disclosure
@@ -61,237 +66,170 @@ export default function Filter() {
                   aria-hidden="true"
                   className="mr-2 size-5 flex-none text-gray-400 group-hover:text-gray-500"
                 />
-                2 Filtros
+                {`${filter.length} Filtros`}
               </DisclosureButton>
             </div>
             <div className="pl-6">
-              <button type="button" className="text-gray-500">
+              <button
+                onClick={clearFilter}
+                type="button"
+                className="text-gray-500"
+              >
                 Limpar Filtro
               </button>
             </div>
           </div>
         </div>
+
         <DisclosurePanel className="border-t border-gray-200 py-10">
-          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
-            <div className="grid auto-rows-min grid-cols-1 gap-y-10 md:grid-cols-2 md:gap-x-6">
-              <fieldset>
-                <legend className="block font-medium">Price</legend>
-                <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
-                  {filters.price.map((option, optionIdx) => (
-                    <div key={option.value} className="flex gap-3">
-                      <div className="flex h-5 shrink-0 items-center">
-                        <div className="group grid size-4 grid-cols-1">
-                          <input
-                            defaultValue={option.value}
-                            defaultChecked={option.checked}
-                            id={`price-${optionIdx}`}
-                            name="price[]"
-                            type="checkbox"
-                            className="col-start-1 row-start-1 appearance-none rounded border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 indeterminate:border-indigo-600 indeterminate:bg-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 forced-colors:appearance-auto"
+          <div className="mx-auto grid max-w-7xl grid-cols-3 gap-x-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
+            <fieldset>
+              <legend className="block font-medium">Plano</legend>
+              <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
+                {filters.plano.map((option, optionIdx) => (
+                  <div key={option.value} className="flex gap-3">
+                    <div className="flex h-5 shrink-0 items-center">
+                      <div className="group grid size-4 grid-cols-1">
+                        <input
+                          value={option.value}
+                          checked={filter.includes(option.value)}
+                          onChange={() => clickedFilter(option.value)}
+                          id={`plano-${optionIdx}`}
+                          name="plano[]"
+                          type="checkbox"
+                          className="col-start-1 row-start-1 appearance-none rounded border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                        />
+                        <svg
+                          fill="none"
+                          viewBox="0 0 14 14"
+                          className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-[:disabled]:stroke-gray-950/25"
+                        >
+                          <path
+                            d="M3 8L6 11L11 3.5"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="opacity-0 group-has-[:checked]:opacity-100"
                           />
-                          <svg
-                            fill="none"
-                            viewBox="0 0 14 14"
-                            className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-[:disabled]:stroke-gray-950/25"
-                          >
-                            <path
-                              d="M3 8L6 11L11 3.5"
-                              strokeWidth={2}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="opacity-0 group-has-[:checked]:opacity-100"
-                            />
-                            <path
-                              d="M3 7H11"
-                              strokeWidth={2}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="opacity-0 group-has-[:indeterminate]:opacity-100"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                      <label htmlFor={`price-${optionIdx}`} className="text-base text-gray-600 sm:text-sm">
-                        {option.label}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </fieldset>
-              <fieldset>
-                <legend className="block font-medium">Color</legend>
-                <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
-                  {filters.color.map((option, optionIdx) => (
-                    <div key={option.value} className="flex gap-3">
-                      <div className="flex h-5 shrink-0 items-center">
-                        <div className="group grid size-4 grid-cols-1">
-                          <input
-                            defaultValue={option.value}
-                            defaultChecked={option.checked}
-                            id={`color-${optionIdx}`}
-                            name="color[]"
-                            type="checkbox"
-                            className="col-start-1 row-start-1 appearance-none rounded border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 indeterminate:border-indigo-600 indeterminate:bg-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 forced-colors:appearance-auto"
+                          <path
+                            d="M3 7H11"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="opacity-0 group-has-[:indeterminate]:opacity-100"
                           />
-                          <svg
-                            fill="none"
-                            viewBox="0 0 14 14"
-                            className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-[:disabled]:stroke-gray-950/25"
-                          >
-                            <path
-                              d="M3 8L6 11L11 3.5"
-                              strokeWidth={2}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="opacity-0 group-has-[:checked]:opacity-100"
-                            />
-                            <path
-                              d="M3 7H11"
-                              strokeWidth={2}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="opacity-0 group-has-[:indeterminate]:opacity-100"
-                            />
-                          </svg>
-                        </div>
+                        </svg>
                       </div>
-                      <label htmlFor={`color-${optionIdx}`} className="text-base text-gray-600 sm:text-sm">
-                        {option.label}
-                      </label>
                     </div>
-                  ))}
-                </div>
-              </fieldset>
-            </div>
-            <div className="grid auto-rows-min grid-cols-1 gap-y-10 md:grid-cols-2 md:gap-x-6">
-              <fieldset>
-                <legend className="block font-medium">Size</legend>
-                <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
-                  {filters.size.map((option, optionIdx) => (
-                    <div key={option.value} className="flex gap-3">
-                      <div className="flex h-5 shrink-0 items-center">
-                        <div className="group grid size-4 grid-cols-1">
-                          <input
-                            defaultValue={option.value}
-                            defaultChecked={option.checked}
-                            id={`size-${optionIdx}`}
-                            name="size[]"
-                            type="checkbox"
-                            className="col-start-1 row-start-1 appearance-none rounded border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 indeterminate:border-indigo-600 indeterminate:bg-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 forced-colors:appearance-auto"
+                    <label
+                      htmlFor={`plano-${optionIdx}`}
+                      className="text-base text-gray-600 sm:text-sm"
+                    >
+                      {option.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="block font-medium">Outros</legend>
+              <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
+                {filters.outros.map((option, optionIdx) => (
+                  <div key={option.value} className="flex gap-3">
+                    <div className="flex h-5 shrink-0 items-center">
+                      <div className="group grid size-4 grid-cols-1">
+                        <input
+                          value={option.value}
+                          checked={filter.includes(option.value)}
+                          onChange={() => clickedFilter(option.value)}
+                          id={`outros-${optionIdx}`}
+                          name="outros[]"
+                          type="checkbox"
+                          className="col-start-1 row-start-1 appearance-none rounded border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                        />
+                        <svg
+                          fill="none"
+                          viewBox="0 0 14 14"
+                          className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-[:disabled]:stroke-gray-950/25"
+                        >
+                          <path
+                            d="M3 8L6 11L11 3.5"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="opacity-0 group-has-[:checked]:opacity-100"
                           />
-                          <svg
-                            fill="none"
-                            viewBox="0 0 14 14"
-                            className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-[:disabled]:stroke-gray-950/25"
-                          >
-                            <path
-                              d="M3 8L6 11L11 3.5"
-                              strokeWidth={2}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="opacity-0 group-has-[:checked]:opacity-100"
-                            />
-                            <path
-                              d="M3 7H11"
-                              strokeWidth={2}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="opacity-0 group-has-[:indeterminate]:opacity-100"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                      <label htmlFor={`size-${optionIdx}`} className="text-base text-gray-600 sm:text-sm">
-                        {option.label}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </fieldset>
-              <fieldset>
-                <legend className="block font-medium">Category</legend>
-                <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
-                  {filters.category.map((option, optionIdx) => (
-                    <div key={option.value} className="flex gap-3">
-                      <div className="flex h-5 shrink-0 items-center">
-                        <div className="group grid size-4 grid-cols-1">
-                          <input
-                            defaultValue={option.value}
-                            defaultChecked={option.checked}
-                            id={`category-${optionIdx}`}
-                            name="category[]"
-                            type="checkbox"
-                            className="col-start-1 row-start-1 appearance-none rounded border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 indeterminate:border-indigo-600 indeterminate:bg-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 forced-colors:appearance-auto"
+                          <path
+                            d="M3 7H11"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="opacity-0 group-has-[:indeterminate]:opacity-100"
                           />
-                          <svg
-                            fill="none"
-                            viewBox="0 0 14 14"
-                            className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-[:disabled]:stroke-gray-950/25"
-                          >
-                            <path
-                              d="M3 8L6 11L11 3.5"
-                              strokeWidth={2}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="opacity-0 group-has-[:checked]:opacity-100"
-                            />
-                            <path
-                              d="M3 7H11"
-                              strokeWidth={2}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="opacity-0 group-has-[:indeterminate]:opacity-100"
-                            />
-                          </svg>
-                        </div>
+                        </svg>
                       </div>
-                      <label htmlFor={`category-${optionIdx}`} className="text-base text-gray-600 sm:text-sm">
-                        {option.label}
-                      </label>
                     </div>
-                  ))}
-                </div>
-              </fieldset>
-            </div>
+                    <label
+                      htmlFor={`plano-${optionIdx}`}
+                      className="text-base text-gray-600 sm:text-sm"
+                    >
+                      {option.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="block font-medium">Vencimento</legend>
+              <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
+                {filters.vencimento.map((option, optionIdx) => (
+                  <div key={option.value} className="flex gap-3">
+                    <div className="flex h-5 shrink-0 items-center">
+                      <div className="group grid size-4 grid-cols-1">
+                        <input
+                          value={option.value}
+                          checked={filter.includes(option.value)}
+                          onChange={() => clickedFilter(option.value)}
+                          id={`vencimento-${optionIdx}`}
+                          name="vencimento[]"
+                          type="checkbox"
+                          className="col-start-1 row-start-1 appearance-none rounded border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                        />
+                        <svg
+                          fill="none"
+                          viewBox="0 0 14 14"
+                          className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-[:disabled]:stroke-gray-950/25"
+                        >
+                          <path
+                            d="M3 8L6 11L11 3.5"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="opacity-0 group-has-[:checked]:opacity-100"
+                          />
+                          <path
+                            d="M3 7H11"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="opacity-0 group-has-[:indeterminate]:opacity-100"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                    <label
+                      htmlFor={`plano-${optionIdx}`}
+                      className="text-base text-gray-600 sm:text-sm"
+                    >
+                      {option.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </fieldset>
           </div>
         </DisclosurePanel>
-        <div className="col-start-1 row-start-1 py-4">
-          <div className="mx-auto flex max-w-7xl justify-end px-4 sm:px-6 lg:px-8">
-            <Menu as="div" className="relative inline-block">
-              <div className="flex">
-                <MenuButton className="group inline-flex justify-center text-sm font-medium text-gray-700 hover:text-gray-900">
-                  Ordenar
-                  <ChevronDownIcon
-                    aria-hidden="true"
-                    className="-mr-1 ml-1 size-5 shrink-0 text-gray-400 group-hover:text-gray-500"
-                  />
-                </MenuButton>
-              </div>
-
-              <MenuItems
-                transition
-                className="absolute right-0 z-10 mt-2 w-40 origin-top-right rounded-md bg-white shadow-2xl ring-1 ring-black/5 transition focus:outline-none data-[closed]:scale-95 data-[closed]:transform data-[closed]:opacity-0 data-[enter]:duration-100 data-[leave]:duration-75 data-[enter]:ease-out data-[leave]:ease-in"
-              >
-                <div className="py-1">
-                  {sortOptions.map((option) => (
-                    <MenuItem key={option.name}>
-                      <a
-                        href={option.href}
-                        className={classNames(
-                          option.current ? 'font-medium text-gray-900' : 'text-gray-500',
-                          'block px-4 py-2 text-sm data-[focus]:bg-gray-100 data-[focus]:outline-none',
-                        )}
-                      >
-                        {option.name}
-                      </a>
-                    </MenuItem>
-                  ))}
-                </div>
-              </MenuItems>
-            </Menu>
-          </div>
-        </div>
       </Disclosure>
     </div>
-  )
+  );
 }

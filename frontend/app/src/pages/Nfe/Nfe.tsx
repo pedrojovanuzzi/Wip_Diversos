@@ -27,7 +27,7 @@ export const Nfe = () => {
       <Filter />
       <main className="flex justify-center mt-20">
         <button
-          className="bg-slate-500 text-gray-200 p-5 rounded hover:bg-slate-400 transition-all"
+          className="bg-slate-500 text-gray-200 p-5 m-5 rounded hover:bg-slate-400 transition-all"
           onClick={emitirNFe}
         >
           Emitir NF-e
