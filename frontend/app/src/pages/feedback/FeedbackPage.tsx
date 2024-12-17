@@ -195,6 +195,7 @@ const FeedbackPage = () => {
           content={icon}
         />
         <meta property="og:type" content="website" />
+      </Helmet>
       <main className="flex flex-col gap-10 sm:h-auto p-10">
         <div>
           <div className="mb-10 justify-self-center">
@@ -293,7 +294,6 @@ const FeedbackPage = () => {
           Enviar Feedback
         </button>
       </main>
-      </Helmet>
     </div>
   );
 };
