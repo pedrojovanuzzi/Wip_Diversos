@@ -258,11 +258,11 @@ const FeedbackLinkGenerator = () => {
   useEffect(() => {
     const parseNoteData = (data: any[]): NoteYesOrNo[] => {
       return data.map((item) => ({
-        note: Array.isArray(item.note.data) ? item.note.data[0] : item.note, // Converte o buffer para número
-        count: Number(item.count), // Garante que 'count' seja um número
+        note: Array.isArray(item.note.data) ? item.note.data[0] : item.note,
+        count: Number(item.count),
       }));
     };
-
+  
     const fetchAllNotes = async () => {
       try {
         const [internet, service, responseTime, recommend, solved] =
@@ -272,14 +272,11 @@ const FeedbackLinkGenerator = () => {
             fetchNotes("ResponseTime"),
             fetchNotes("DoYouRecommend"),
             fetchNotes("DoYouProblemAsSolved"),
-            fetchNotes("DoYouProblemAsSolved"),
           ]);
-
-        // Processa apenas os dados de Yes/No (recommend e solved)
+  
         const processedRecommend = parseNoteData(recommend);
         const processedSolved = parseNoteData(solved);
-
-        // Define o estado com os dados processados
+  
         setNoteData({
           internet,
           service,
@@ -287,16 +284,17 @@ const FeedbackLinkGenerator = () => {
           recommend: processedRecommend,
           solved: processedSolved,
         });
-
+  
         const tech = await fetchNotesTech("Technician");
         settechNoteData({ technician: tech });
       } catch (error) {
         console.error("Erro ao buscar os dados:", error);
       }
     };
-
+  
     fetchAllNotes();
-  });
+  }, [isMonthly, selectedTechnician]);
+  
 
   
 
