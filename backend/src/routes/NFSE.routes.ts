@@ -7,19 +7,27 @@ import path from "path";
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "../files"));
+    cb(null, path.join(__dirname, '../files'));
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, `certificado.pfx`);
-  },
+    cb(null, 'certificado.pfx');
+  }
 });
 
-const upload = multer({ storage: storage });
+const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  // Verifica se a extensão do arquivo é .pfx
+  if (path.extname(file.originalname).toLowerCase() === '.pfx') {
+    cb(null, true);
+  } else {
+    cb(new Error('Apenas arquivos com extensão .pfx são permitidos.'));
+  }
+};
+
+const upload = multer({ storage, fileFilter });
 
 const router: Router = Router();
 
-router.get("/", AuthGuard, NFSE.create);
+router.post("/", AuthGuard, NFSE.enviarLote.bind(NFSE));
 router.post("/upload", upload.any(), AuthGuard, NFSE.uploadCertificado);
 
 export default router;
