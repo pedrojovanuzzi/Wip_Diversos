@@ -86,16 +86,13 @@ class Nfe {
 
   public async uploadCertificado(req: Request, res: Response): Promise<void> {
     try {
-      if (!req.file) {
-        res.status(400).json({ erro: 'Nenhum arquivo foi enviado.' });
-        return;
-      }
-
       res.status(200).json({ mensagem: 'Certificado enviado com sucesso.' });
     } catch (error) {
+      console.error('Erro ao processar o upload:', error);
       res.status(500).json({ erro: 'Erro ao processar o upload do certificado.' });
     }
   }
+  
 }
 
 export default new Nfe();

@@ -47,7 +47,7 @@ export const Nfe = () => {
     }
 
     const formData = new FormData();
-    formData.append("arquivo", arquivo); // Adiciona o arquivo ao FormData
+    formData.append("arquivo", arquivo);
 
     try {
       const resposta = await axios.post(
@@ -56,7 +56,7 @@ export const Nfe = () => {
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data", // Indica que é um upload de arquivo
+            "Content-Type": "multipart/form-data",
           },
         }
       );
