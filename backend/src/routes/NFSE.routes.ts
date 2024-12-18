@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import Nfe from "../controller/Nfe";
+import NFSE from "../controller/NFSE";
 import AuthGuard from "../middleware/AuthGuard";
 import multer from "multer";
 import path from "path";
@@ -19,7 +19,7 @@ const upload = multer({ storage: storage });
 
 const router: Router = Router();
 
-router.get("/", AuthGuard, Nfe.create);
-router.post("/upload", upload.any(), AuthGuard, Nfe.uploadCertificado);
+router.get("/", AuthGuard, NFSE.create);
+router.post("/upload", upload.any(), AuthGuard, NFSE.uploadCertificado);
 
 export default router;
