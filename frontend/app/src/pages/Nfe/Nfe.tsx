@@ -6,6 +6,9 @@ import Filter from "./Components/Filter";
 import { CiCirclePlus } from "react-icons/ci";
 import { TypedUseSelectorHook, useSelector } from "react-redux";
 import { RootState } from "../../types";
+import { BsFiletypeDoc } from "react-icons/bs";
+import { IoArrowUpCircleOutline } from "react-icons/io5";
+
 
 export const Nfe = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -69,8 +72,8 @@ export const Nfe = () => {
       <Stacked />
       <Filter />
       <main className="flex justify-center mt-20">
-        <div className="flex flex-col items-center">
-        <label className="relative bg-slate-500  text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all cursor-pointer">
+        <div className="flex flex-col sm:flex-row items-center">
+        <label className="relative ring-2 ring-black bg-slate-500  text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all cursor-pointer">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-4xl"><CiCirclePlus/></span>
             <span>Adicionar Novo Certificado</span>
             <input
@@ -78,26 +81,32 @@ export const Nfe = () => {
               onChange={(e) => setArquivo(e.target.files?.[0] || null)}
               className="hidden"
             />
-          </label>
-          {arquivo && (
-            <p className="text-sm text-gray-500">
-              Arquivo selecionado: <span className="font-semibold">{arquivo.name}</span>
-            </p>
-          )}
+          </label>   
+          <div className="relative">
+            <span className="absolute left-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl"><IoArrowUpCircleOutline/></span>
           <button
-            className="bg-indigo-500 text-white p-5 m-5 rounded hover:bg-indigo-400 transition-all"
+            className="bg-indigo-500 ring-2 ring-black text-white py-3 px-16 m-5 rounded hover:bg-indigo-400 transition-all"
             onClick={enviarCertificado}
           >
             Enviar Certificado
           </button>
+          </div>
+        </div>
+      </main>
+      <div className="relative">
+            <span className="absolute translate-x-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl"><BsFiletypeDoc/></span>
           <button
-            className="bg-slate-500 text-gray-200 p-5 m-5 rounded hover:bg-slate-400 transition-all"
+            className="bg-slate-500 ring-2 ring-black text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
             onClick={emitirNFe}
           >
             Emitir NF-e
           </button>
         </div>
-      </main>
+      {arquivo && (
+            <p className="text-sm text-gray-500 m-5">
+              Arquivo selecionado: <span className="font-semibold">{arquivo.name}</span>
+            </p>
+          )}
     </div>
   );
 };
