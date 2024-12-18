@@ -12,23 +12,26 @@ import { useState } from "react";
 
 const filters = {
   plano: [
-    { value: "plan_5", label: "5M", checked: false },
-    { value: "plan_8", label: "8M", checked: false },
-    { value: "plan_15", label: "15M", checked: false },
-    { value: "plan_340", label: "340M", checked: false },
-    { value: "plan_400", label: "400M", checked: false },
-    { value: "plan_500", label: "500M", checked: false },
-    { value: "plan_600", label: "600M", checked: false },
-    { value: "plan_700", label: "700M", checked: false },
-    { value: "plan_800", label: "800M", checked: false },
+    { value: "plan_5", label: "5M"},
+    { value: "plan_8", label: "8M"},
+    { value: "plan_15", label: "15M"},
+    { value: "plan_340", label: "340M"},
+    { value: "plan_400", label: "400M"},
+    { value: "plan_500", label: "500M"},
+    { value: "plan_600", label: "600M"},
+    { value: "plan_700", label: "700M"},
+    { value: "plan_800", label: "800M"},
   ],
-  outros: [{ value: "active_client", label: "Cliente Ativo", checked: false }],
+  outros: [
+    { value: "active_client", label: "Cliente Ativo"},
+    { value: "new_nfe", label: "Nova NFE"}
+  ],
   vencimento: [
-    { value: "venc5", label: "Dia 5", checked: false },
-    { value: "venc10", label: "Dia 10", checked: false },
-    { value: "venc15", label: "Dia 15", checked: false },
-    { value: "venc20", label: "Dia 20", checked: false },
-    { value: "venc25", label: "Dia 25", checked: false },
+    { value: "venc5", label: "Dia 5"},
+    { value: "venc10", label: "Dia 10"},
+    { value: "venc15", label: "Dia 15"},
+    { value: "venc20", label: "Dia 20"},
+    { value: "venc25", label: "Dia 25"},
   ],
 };
 
