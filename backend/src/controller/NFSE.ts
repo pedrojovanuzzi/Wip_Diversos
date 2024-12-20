@@ -1,167 +1,153 @@
-import * as fs from 'fs';
-import { Builder } from 'xml2js';
-import { createClientAsync } from 'soap';
-import * as forge from 'node-forge';
-import { Request, Response } from 'express';
-import * as dotenv from 'dotenv';
-import path from 'path';
+import * as fs from "fs";
+import { createClientAsync } from "soap";
+import * as dotenv from "dotenv";
+import path from "path";
+import * as https from "https";
+import { Request, Response } from "express";
+import {
+  IRecepcionarLoteRpsInput,
+  IRecepcionarLoteRpsOutput,
+  IServiceGinfesImplPortSoap,
+} from "../types/ServiceGinfesImplPort";
+import * as forge from "node-forge";
+
 
 dotenv.config();
 
 class NFSE {
-  // Caminho para o certificado digital
-  private certPath = path.resolve(__dirname, "..", './files/certificado.pfx');
-  private certPassword : string | undefined;
+  private certPath = path.resolve(__dirname, "..", "./files/certificado.pfx");
 
-  // GINFES WSDL URL (Ambiente de homologação ou produção)
-  private WSDL_URL = 'https://homologacao.ginfes.com.br/ServiceGinfesImpl?wsdl';
-
-  // Dados do prestador
-  private prestador = {
-    cnpj: '12345678901234',
-    inscricaoMunicipal: '123456',
-    razaoSocial: 'Nome da Empresa',
-  };
-
-  // Dados do lote RPS
-  private rpsLote = {
-    numeroLote: '1',
-    quantidadeRPS: 2,
-    listaRPS: [
-      {
-        numero: '1',
-        serie: 'A',
-        dataEmissao: new Date().toISOString(),
-        tomador: {
-          cpfCnpj: '98765432109',
-          nome: 'Cliente 1',
-          endereco: 'Rua Exemplo, 123',
-        },
-        valorServico: 150.0,
-      },
-      {
-        numero: '2',
-        serie: 'A',
-        dataEmissao: new Date().toISOString(),
-        tomador: {
-          cpfCnpj: '45678912300',
-          nome: 'Cliente 2',
-          endereco: 'Rua Exemplo, 456',
-        },
-        valorServico: 250.0,
-      },
-    ],
-  };
-
-  // Gerar o XML do lote de RPS
-  private gerarXMLLoteRPS(): string {
-    const builder = new Builder({ headless: true });
-    const xmlObject = {
-      LoteRps: {
-        $: { versao: '2.00' },
-        NumeroLote: this.rpsLote.numeroLote,
-        Prestador: {
-          Cnpj: this.prestador.cnpj,
-          InscricaoMunicipal: this.prestador.inscricaoMunicipal,
-        },
-        ListaRps: {
-          Rps: this.rpsLote.listaRPS.map((rps) => ({
-            IdentificacaoRps: {
-              Numero: rps.numero,
-              Serie: rps.serie,
-            },
-            DataEmissao: rps.dataEmissao,
-            Tomador: {
-              IdentificacaoTomador: { CpfCnpj: { Cnpj: rps.tomador.cpfCnpj } },
-              Nome: rps.tomador.nome,
-              Endereco: rps.tomador.endereco,
-            },
-            Servico: { ValorServicos: rps.valorServico },
-          })),
-        },
-      },
-    };
-    return builder.buildObject(xmlObject);
-  }
-
-  // Assinar o XML com o certificado digital
-  private assinarXML(xml: string): string {
-    const pfxBuffer = fs.readFileSync(this.certPath);
-    const pfxString = pfxBuffer.toString('binary'); // Converte o Buffer para string binária
-  
-    const p12Asn1 = forge.asn1.fromDer(pfxString);
-    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, this.certPassword);
-  
-    const keyBag = p12.getBags({ friendlyName: 'privateKey' }).friendlyName;
-  
-    if (!keyBag || keyBag.length === 0) {
-      throw new Error('Chave privada não encontrada no certificado.');
-    }
-  
-    const keyObj = keyBag[0].key;
-    if (!keyObj) {
-      throw new Error('Erro ao carregar a chave privada.');
-    }
-  
-    const privateKey = forge.pki.privateKeyToPem(keyObj);
-  
-    console.log('XML assinado com sucesso.');
-    return xml; // Aqui o XML assinado deve ser retornado
-  }
-  
-  // Enviar o lote de RPS
-  private async enviarLoteRPS() {
+  public createRPS = async (req: Request, res: Response) => {
     try {
-      const xmlLote = this.gerarXMLLoteRPS();
-      const xmlAssinado = this.assinarXML(xmlLote);
+      const { password } = req.body;
+      console.log(this.certPath);
 
-      // Cria o cliente SOAP
-      const client = await createClientAsync(this.WSDL_URL);
-      console.log('Conectado ao serviço SOAP.');
-
-      // Parâmetros para envio
-      const params = { xml: xmlAssinado };
-
-      console.log('Enviando lote de RPS...');
-      const [result] = await client.RecepcionarLoteRpsAsync(params);
-      console.log('Resposta:', result);
-      return result;
-    } catch (error) {
-      console.error('Erro ao enviar lote:', error);
-      throw error;
-    }
-  }
-
-  // Endpoint para envio do lote
-  public async enviarLote(req: Request, res: Response) {
-    try {
-      const {password} = req.body;
-      this.certPassword = password;
-      const resultado = await this.enviarLoteRPS();
-      res.status(200).json({ mensagem: 'Lote enviado com sucesso!', resultado });
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error('Erro ao enviar lote:', error.message);
-        res.status(500).json({ erro: 'Erro ao enviar lote de RPS.', detalhes: error.message });
-      } else {
-        console.error('Erro desconhecido:', error);
-        res.status(500).json({ erro: 'Erro desconhecido ao enviar lote.' });
+      if (!password) {
+        throw new Error("Senha do certificado não fornecida.");
       }
+
+      const result = await this.enviarLoteRps(password);
+      res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
+    } catch (error) {
+      console.error("Erro ao criar o RPS:", error);
+      res.status(500).json({ erro: "Erro ao criar o RPS." });
     }
-    
+  };
+
+  async enviarLoteRps(password : string) {
+    const CERT_PATH = "./src/files/certificado.pfx";
+    const WSDL_URL = "https://homologacao.ginfes.com.br/ServiceGinfesImpl?wsdl";
+  
+    try {
+      // Ler o arquivo PFX
+      const pfxBuffer = fs.readFileSync(CERT_PATH);
+  
+      // Converter o PFX para componentes separados usando node-forge
+      const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
+      const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
+  
+      let privateKeyPem = "";
+      let certificatePem = "";
+  
+      // Iterar sobre os "bags" do PFX
+      p12.safeContents.forEach((safeContent) => {
+        safeContent.safeBags.forEach((bag) => {
+          if (bag.type === forge.pki.oids.certBag) {
+            // Certificado público
+            if (bag.cert) {
+              certificatePem = forge.pki.certificateToPem(bag.cert);
+            }
+          } else if (bag.type === forge.pki.oids.pkcs8ShroudedKeyBag) {
+            // Chave privada
+            if (bag.key) {
+              privateKeyPem = forge.pki.privateKeyToPem(bag.key);
+            }
+          }
+        });
+      });
+  
+      if (!privateKeyPem || !certificatePem) {
+        throw new Error("Certificado ou chave privada não foram extraídos corretamente.");
+      }
+  
+      console.log("Certificado e chave extraídos com sucesso!");
+  
+      // Configurar o agente HTTPS com o certificado e chave extraídos
+      const httpsAgent = new https.Agent({
+        key: privateKeyPem,
+        cert: certificatePem,
+        rejectUnauthorized: false, // Apenas para homologação
+      });
+  
+      // Criar o cliente SOAP
+      const client = await createClientAsync(WSDL_URL, {
+        wsdl_options: { httpsAgent },
+      });
+  
+      console.log("Cliente SOAP configurado!");
+  
+      // Exemplo de XML para envio
+      const xmlLoteRps = `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Body>
+          <RecepcionarLoteRps xmlns="http://homologacao.ginfes.com.br">
+            <arg0>
+              <!-- XML do Lote de RPS -->
+              <EnviarLoteRpsEnvio>
+                <LoteRps>
+                  <NumeroLote>12345</NumeroLote>
+                  <Cnpj>12345678901234</Cnpj>
+                  <InscricaoMunicipal>123456</InscricaoMunicipal>
+                  <QuantidadeRps>1</QuantidadeRps>
+                  <ListaRps>
+                    <Rps>
+                      <IdentificacaoRps>
+                        <Numero>1</Numero>
+                        <Serie>A</Serie>
+                        <Tipo>1</Tipo>
+                      </IdentificacaoRps>
+                      <DataEmissao>2024-12-18</DataEmissao>
+                      <Servico>
+                        <ValorServicos>150.00</ValorServicos>
+                      </Servico>
+                      <Tomador>
+                        <CpfCnpj>
+                          <Cnpj>98765432100012</Cnpj>
+                        </CpfCnpj>
+                        <Nome>Cliente Teste</Nome>
+                      </Tomador>
+                    </Rps>
+                  </ListaRps>
+                </LoteRps>
+              </EnviarLoteRpsEnvio>
+            </arg0>
+          </RecepcionarLoteRps>
+        </soap:Body>
+      </soap:Envelope>`;
+  
+      const input = { arg0: xmlLoteRps };
+      client.RecepcionarLoteRps(input, (err: any, result: { return: any; }, raw: any, soapHeader: any) => {
+        if (err) {
+          console.error("Erro ao enviar lote:", err);
+        } else {
+          console.log("Resposta do servidor:", result.return);
+        }
+      });
+    } catch (error) {
+      console.error("Erro ao processar o certificado ou conectar ao serviço:", error);
+    }
   }
 
-  // Endpoint para upload do certificado
+
   public async uploadCertificado(req: Request, res: Response) {
     try {
-      // Upload do certificado via multipart/form-data pode ser implementado aqui
-      res.status(200).json({ mensagem: 'Certificado enviado com sucesso.' });
+      res.status(200).json({ mensagem: "Certificado enviado com sucesso." });
     } catch (error) {
-      console.error('Erro ao processar o upload:', error);
-      res.status(500).json({ erro: 'Erro ao processar o upload do certificado.' });
+      console.error("Erro ao processar o upload:", error);
+      res
+        .status(500)
+        .json({ erro: "Erro ao processar o upload do certificado." });
     }
   }
-
 }
 
 export default new NFSE();

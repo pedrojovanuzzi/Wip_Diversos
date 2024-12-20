@@ -27,7 +27,7 @@ const upload = multer({ storage, fileFilter });
 
 const router: Router = Router();
 
-router.post("/", AuthGuard, NFSE.enviarLote.bind(NFSE));
+router.post('/', NFSE.createRPS.bind(NFSE));
 router.post("/upload", upload.any(), AuthGuard, NFSE.uploadCertificado);
 
 export default router;
