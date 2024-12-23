@@ -4,13 +4,10 @@ import * as dotenv from "dotenv";
 import path from "path";
 import * as https from "https";
 import { Request, Response } from "express";
-import {
-  IRecepcionarLoteRpsInput,
-  IRecepcionarLoteRpsOutput,
-  IServiceGinfesImplPortSoap,
-} from "../types/ServiceGinfesImplPort";
 import * as forge from "node-forge";
-
+import { XMLParser, XMLValidator } from "fast-xml-parser";
+import axios from "axios";
+import { execSync } from "child_process";
 
 dotenv.config();
 
@@ -34,109 +31,146 @@ class NFSE {
     }
   };
 
-  async enviarLoteRps(password : string) {
-    const CERT_PATH = "./src/files/certificado.pfx";
-    const WSDL_URL = "https://homologacao.ginfes.com.br/ServiceGinfesImpl?wsdl";
-  
+  async enviarLoteRps(password: string) {
+    const WSDL_URL = "https://homologacao.ginfes.com.br/ServiceGinfesImpl";
+    const CERT_PATH = path.resolve(__dirname, "../files/certificado.pfx");
+    const tempDir = path.resolve(__dirname, "../files");
+    const NEW_CERT_PATH = path.resolve(tempDir, "new_certificado.pfx");
+
+    // Crie o diretório, se não existir
+    if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+        console.log("Diretório criado:", tempDir);
+    }
+
     try {
-      // Ler o arquivo PFX
-      const pfxBuffer = fs.readFileSync(CERT_PATH);
-  
-      // Converter o PFX para componentes separados usando node-forge
-      const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
-      const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
-  
-      let privateKeyPem = "";
-      let certificatePem = "";
-  
-      // Iterar sobre os "bags" do PFX
-      p12.safeContents.forEach((safeContent) => {
-        safeContent.safeBags.forEach((bag) => {
-          if (bag.type === forge.pki.oids.certBag) {
-            // Certificado público
-            if (bag.cert) {
-              certificatePem = forge.pki.certificateToPem(bag.cert);
-            }
-          } else if (bag.type === forge.pki.oids.pkcs8ShroudedKeyBag) {
-            // Chave privada
-            if (bag.key) {
-              privateKeyPem = forge.pki.privateKeyToPem(bag.key);
-            }
-          }
+        // Passo 1: Converter PFX usando OpenSSL
+        console.log("Convertendo certificado...");
+
+        const opensslCommand = `
+        openssl pkcs12 -in "${CERT_PATH}" -nodes -passin pass:${password} | openssl pkcs12 -export -out "${NEW_CERT_PATH}" -password pass:${password}
+        `.replace(/\n/g, ' '); // Remove quebras de linha
+
+        console.log("Executando comando OpenSSL...");
+        console.log(opensslCommand);
+
+        execSync(opensslCommand, { stdio: "inherit" });
+
+        // Verificação se o arquivo foi gerado
+        if (fs.existsSync(NEW_CERT_PATH)) {
+            console.log(`Certificado gerado com sucesso em: ${NEW_CERT_PATH}`);
+        } else {
+            throw new Error(`Arquivo não encontrado após execução: ${NEW_CERT_PATH}`);
+        }
+
+        // Passo 2: Lê o novo arquivo PFX convertido
+        const pfxBuffer = fs.readFileSync(NEW_CERT_PATH);
+
+        // Cria o agente HTTPS usando o novo PFX
+        const httpsAgent = new https.Agent({
+            pfx: pfxBuffer,
+            passphrase: password,
+            rejectUnauthorized: false,  // Ambiente de homologação
         });
-      });
-  
-      if (!privateKeyPem || !certificatePem) {
-        throw new Error("Certificado ou chave privada não foram extraídos corretamente.");
-      }
-  
-      console.log("Certificado e chave extraídos com sucesso!");
-  
-      // Configurar o agente HTTPS com o certificado e chave extraídos
-      const httpsAgent = new https.Agent({
-        key: privateKeyPem,
-        cert: certificatePem,
-        rejectUnauthorized: false, // Apenas para homologação
-      });
-  
-      // Criar o cliente SOAP
-      const client = await createClientAsync(WSDL_URL, {
-        wsdl_options: { httpsAgent },
-      });
-  
-      console.log("Cliente SOAP configurado!");
-  
-      // Exemplo de XML para envio
-      const xmlLoteRps = `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-        <soap:Body>
-          <RecepcionarLoteRps xmlns="http://homologacao.ginfes.com.br">
-            <arg0>
-              <!-- XML do Lote de RPS -->
-              <EnviarLoteRpsEnvio>
-                <LoteRps>
+
+        console.log("Cliente HTTPS configurado!");
+
+        // Corpo da requisição SOAP
+        const xmlLoteRps = `<?xml version="1.0" encoding="utf-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:gin="http://homologacao.ginfes.com.br">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <gin:RecepcionarLoteRps>
+         <arg0><![CDATA[
+            <EnviarLoteRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
+               <LoteRps Id="lote1" versao="1">
                   <NumeroLote>12345</NumeroLote>
-                  <Cnpj>12345678901234</Cnpj>
-                  <InscricaoMunicipal>123456</InscricaoMunicipal>
+                  <Cnpj>12345678000195</Cnpj>
+                  <InscricaoMunicipal>987654</InscricaoMunicipal>
                   <QuantidadeRps>1</QuantidadeRps>
                   <ListaRps>
-                    <Rps>
-                      <IdentificacaoRps>
-                        <Numero>1</Numero>
-                        <Serie>A</Serie>
-                        <Tipo>1</Tipo>
-                      </IdentificacaoRps>
-                      <DataEmissao>2024-12-18</DataEmissao>
-                      <Servico>
-                        <ValorServicos>150.00</ValorServicos>
-                      </Servico>
-                      <Tomador>
-                        <CpfCnpj>
-                          <Cnpj>98765432100012</Cnpj>
-                        </CpfCnpj>
-                        <Nome>Cliente Teste</Nome>
-                      </Tomador>
-                    </Rps>
+                     <Rps>
+                        <InfRps>
+                           <IdentificacaoRps>
+                              <Numero>1</Numero>
+                              <Serie>1</Serie>
+                              <Tipo>1</Tipo>
+                           </IdentificacaoRps>
+                           <DataEmissao>2024-12-23</DataEmissao>
+                           <NaturezaOperacao>1</NaturezaOperacao>
+                           <RegimeEspecialTributacao>1</RegimeEspecialTributacao>
+                           <OptanteSimplesNacional>1</OptanteSimplesNacional>
+                           <IncentivadorCultural>1</IncentivadorCultural>
+                           <Status>1</Status>
+                           <Servico>
+                              <Valores>
+                                 <ValorServicos>500.00</ValorServicos>
+                                 <ValorDeducoes>0.00</ValorDeducoes>
+                                 <ValorPis>0.00</ValorPis>
+                                 <ValorCofins>0.00</ValorCofins>
+                                 <ValorInss>0.00</ValorInss>
+                                 <ValorIr>0.00</ValorIr>
+                                 <ValorCsll>0.00</ValorCsll>
+                                 <IssRetido>2</IssRetido>
+                              </Valores>
+                              <ItemListaServico>101</ItemListaServico>
+                              <Discriminacao>Serviço de TI</Discriminacao>
+                              <CodigoMunicipio>3550308</CodigoMunicipio>
+                           </Servico>
+                           <Prestador>
+                              <Cnpj>12345678000195</Cnpj>
+                              <InscricaoMunicipal>987654</InscricaoMunicipal>
+                           </Prestador>
+                           <Tomador>
+                              <IdentificacaoTomador>
+                                 <CpfCnpj>
+                                    <Cnpj>11111111000191</Cnpj>
+                                 </CpfCnpj>
+                                 <InscricaoMunicipal>123456</InscricaoMunicipal>
+                              </IdentificacaoTomador>
+                              <RazaoSocial>Empresa Exemplo</RazaoSocial>
+                              <Endereco>
+                                 <Endereco>Rua Teste</Endereco>
+                                 <Numero>123</Numero>
+                                 <Bairro>Centro</Bairro>
+                                 <CodigoMunicipio>3550308</CodigoMunicipio>
+                                 <Uf>SP</Uf>
+                                 <Cep>01000000</Cep>
+                              </Endereco>
+                           </Tomador>
+                        </InfRps>
+                     </Rps>
                   </ListaRps>
-                </LoteRps>
-              </EnviarLoteRpsEnvio>
-            </arg0>
-          </RecepcionarLoteRps>
-        </soap:Body>
-      </soap:Envelope>`;
-  
-      const input = { arg0: xmlLoteRps };
-      client.RecepcionarLoteRps(input, (err: any, result: { return: any; }, raw: any, soapHeader: any) => {
-        if (err) {
-          console.error("Erro ao enviar lote:", err);
-        } else {
-          console.log("Resposta do servidor:", result.return);
-        }
-      });
-    } catch (error) {
-      console.error("Erro ao processar o certificado ou conectar ao serviço:", error);
-    }
-  }
+               </LoteRps>
+            </EnviarLoteRpsEnvio>
+         ]]></arg0>
+      </gin:RecepcionarLoteRps>
+   </soapenv:Body>
+</soapenv:Envelope>`;
 
+        // Passo 3: Envia a requisição SOAP usando axios
+        const response = await axios.post(WSDL_URL, xmlLoteRps, {
+            httpsAgent,
+            headers: {
+                "Content-Type": "text/xml;charset=utf-8",
+                SOAPAction: "",
+            },
+        });
+
+        console.log("Resposta do servidor:", response.data);
+
+        // Remover o certificado temporário
+        if (fs.existsSync(NEW_CERT_PATH)) {
+            fs.unlinkSync(NEW_CERT_PATH);
+            console.log("Certificado temporário removido.");
+        }
+    } catch (error) {
+        console.error("Erro ao enviar requisição:", error);
+        if (error) {
+            console.error("Erro de resposta:", error);
+        }
+    }
+}
 
   public async uploadCertificado(req: Request, res: Response) {
     try {
