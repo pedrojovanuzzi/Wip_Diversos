@@ -35,47 +35,47 @@ class NFSE {
     const WSDL_URL = "https://homologacao.ginfes.com.br/ServiceGinfesImpl";
     const CERT_PATH = path.resolve(__dirname, "../files/certificado.pfx");
     const tempDir = path.resolve(__dirname, "../files");
+    const DECRYPTED_CERT_PATH = path.resolve(tempDir, "decrypted_certificado.tmp");
     const NEW_CERT_PATH = path.resolve(tempDir, "new_certificado.pfx");
 
-    // Crie o diretório, se não existir
     if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
         console.log("Diretório criado:", tempDir);
     }
 
     try {
-        // Passo 1: Converter PFX usando OpenSSL
         console.log("Convertendo certificado...");
 
-        const opensslCommand = `
-        openssl pkcs12 -in "${CERT_PATH}" -nodes -passin pass:${password} | openssl pkcs12 -export -out "${NEW_CERT_PATH}" -password pass:${password}
-        `.replace(/\n/g, ' '); // Remove quebras de linha
+        const opensslDecryptCommand = `
+        openssl pkcs12 -in "${CERT_PATH}" -nodes -legacy -passin pass:${password} -out "${DECRYPTED_CERT_PATH}"
+        `.replace(/\n/g, ' ');
 
-        console.log("Executando comando OpenSSL...");
-        console.log(opensslCommand);
+        console.log("Executando comando OpenSSL (decrypt)...", opensslDecryptCommand);
+        execSync(opensslDecryptCommand, { stdio: "inherit" });
 
-        execSync(opensslCommand, { stdio: "inherit" });
+        const opensslExportCommand = `
+        openssl pkcs12 -in "${DECRYPTED_CERT_PATH}" -export -out "${NEW_CERT_PATH}" -passout pass:${password}
+        `.replace(/\n/g, ' ');
 
-        // Verificação se o arquivo foi gerado
+        console.log("Executando comando OpenSSL (export)...", opensslExportCommand);
+        execSync(opensslExportCommand, { stdio: "inherit" });
+
         if (fs.existsSync(NEW_CERT_PATH)) {
             console.log(`Certificado gerado com sucesso em: ${NEW_CERT_PATH}`);
         } else {
             throw new Error(`Arquivo não encontrado após execução: ${NEW_CERT_PATH}`);
         }
 
-        // Passo 2: Lê o novo arquivo PFX convertido
         const pfxBuffer = fs.readFileSync(NEW_CERT_PATH);
 
-        // Cria o agente HTTPS usando o novo PFX
         const httpsAgent = new https.Agent({
             pfx: pfxBuffer,
             passphrase: password,
-            rejectUnauthorized: false,  // Ambiente de homologação
+            rejectUnauthorized: false,
         });
 
         console.log("Cliente HTTPS configurado!");
 
-        // Corpo da requisição SOAP
         const xmlLoteRps = `<?xml version="1.0" encoding="utf-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:gin="http://homologacao.ginfes.com.br">
    <soapenv:Header/>
@@ -148,7 +148,6 @@ class NFSE {
    </soapenv:Body>
 </soapenv:Envelope>`;
 
-        // Passo 3: Envia a requisição SOAP usando axios
         const response = await axios.post(WSDL_URL, xmlLoteRps, {
             httpsAgent,
             headers: {
@@ -159,16 +158,12 @@ class NFSE {
 
         console.log("Resposta do servidor:", response.data);
 
-        // Remover o certificado temporário
-        if (fs.existsSync(NEW_CERT_PATH)) {
-            fs.unlinkSync(NEW_CERT_PATH);
-            console.log("Certificado temporário removido.");
-        }
+        if (fs.existsSync(NEW_CERT_PATH)) fs.unlinkSync(NEW_CERT_PATH);
+        if (fs.existsSync(DECRYPTED_CERT_PATH)) fs.unlinkSync(DECRYPTED_CERT_PATH);
+
+        console.log("Certificados temporários removidos.");
     } catch (error) {
         console.error("Erro ao enviar requisição:", error);
-        if (error) {
-            console.error("Erro de resposta:", error);
-        }
     }
 }
 
