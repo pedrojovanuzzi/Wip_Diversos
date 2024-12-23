@@ -8,6 +8,7 @@ import * as forge from "node-forge";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import axios from "axios";
 import { execSync } from "child_process";
+import os from "os";
 
 dotenv.config();
 
@@ -35,48 +36,70 @@ class NFSE {
     const WSDL_URL = "https://homologacao.ginfes.com.br/ServiceGinfesImpl";
     const CERT_PATH = path.resolve(__dirname, "../files/certificado.pfx");
     const tempDir = path.resolve(__dirname, "../files");
-    const DECRYPTED_CERT_PATH = path.resolve(tempDir, "decrypted_certificado.tmp");
+    const DECRYPTED_CERT_PATH = path.resolve(
+      tempDir,
+      "decrypted_certificado.tmp"
+    );
     const NEW_CERT_PATH = path.resolve(tempDir, "new_certificado.pfx");
 
     if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-        console.log("Diretório criado:", tempDir);
+      fs.mkdirSync(tempDir, { recursive: true });
+      console.log("Diretório criado:", tempDir);
     }
 
     try {
-        console.log("Convertendo certificado...");
+      console.log("Verificando sistema operacional...");
+
+      const isLinux = os.platform() === "linux";
+      const isWindows = os.platform() === "win32";
+
+      if (isLinux) {
+        console.log(
+          "Sistema operacional Linux detectado. Realizando conversão do certificado..."
+        );
 
         const opensslDecryptCommand = `
-        openssl pkcs12 -in "${CERT_PATH}" -nodes -legacy -passin pass:${password} -out "${DECRYPTED_CERT_PATH}"
-        `.replace(/\n/g, ' ');
+            openssl pkcs12 -in "${CERT_PATH}" -nodes -legacy -passin pass:${password} -out "${DECRYPTED_CERT_PATH}"
+            `.replace(/\n/g, " ");
 
-        console.log("Executando comando OpenSSL (decrypt)...", opensslDecryptCommand);
         execSync(opensslDecryptCommand, { stdio: "inherit" });
 
         const opensslExportCommand = `
-        openssl pkcs12 -in "${DECRYPTED_CERT_PATH}" -export -out "${NEW_CERT_PATH}" -passout pass:${password}
-        `.replace(/\n/g, ' ');
+            openssl pkcs12 -in "${DECRYPTED_CERT_PATH}" -export -out "${NEW_CERT_PATH}" -passout pass:${password}
+            `.replace(/\n/g, " ");
 
-        console.log("Executando comando OpenSSL (export)...", opensslExportCommand);
         execSync(opensslExportCommand, { stdio: "inherit" });
+      } else if (isWindows) {
+        console.log(
+          "Sistema operacional Windows detectado. Realizando conversão com PowerShell..."
+        );
 
-        if (fs.existsSync(NEW_CERT_PATH)) {
-            console.log(`Certificado gerado com sucesso em: ${NEW_CERT_PATH}`);
-        } else {
-            throw new Error(`Arquivo não encontrado após execução: ${NEW_CERT_PATH}`);
-        }
+        const powershellCommand = `
+        $certificado = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('${CERT_PATH}', '${password}', [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable);
+        $bytes = $certificado.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12, '${password}');
+        [System.IO.File]::WriteAllBytes('${NEW_CERT_PATH}', $bytes)
+        `;
 
-        const pfxBuffer = fs.readFileSync(NEW_CERT_PATH);
+        execSync(
+          `powershell -Command "${powershellCommand.replace(/\n/g, " ")}"`,
+          { stdio: "inherit" }
+        );
+      }
 
-        const httpsAgent = new https.Agent({
-            pfx: pfxBuffer,
-            passphrase: password,
-            rejectUnauthorized: false,
-        });
+      const certPathToUse = fs.existsSync(NEW_CERT_PATH)
+        ? NEW_CERT_PATH
+        : CERT_PATH;
+      const pfxBuffer = fs.readFileSync(certPathToUse);
 
-        console.log("Cliente HTTPS configurado!");
+      const httpsAgent = new https.Agent({
+        pfx: pfxBuffer,
+        passphrase: password,
+        rejectUnauthorized: false,
+      });
 
-        const xmlLoteRps = `<?xml version="1.0" encoding="utf-8"?>
+      console.log("Cliente HTTPS configurado!");
+
+      const xmlLoteRps = `<?xml version="1.0" encoding="utf-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:gin="http://homologacao.ginfes.com.br">
    <soapenv:Header/>
    <soapenv:Body>
@@ -121,23 +144,6 @@ class NFSE {
                               <Cnpj>12345678000195</Cnpj>
                               <InscricaoMunicipal>987654</InscricaoMunicipal>
                            </Prestador>
-                           <Tomador>
-                              <IdentificacaoTomador>
-                                 <CpfCnpj>
-                                    <Cnpj>11111111000191</Cnpj>
-                                 </CpfCnpj>
-                                 <InscricaoMunicipal>123456</InscricaoMunicipal>
-                              </IdentificacaoTomador>
-                              <RazaoSocial>Empresa Exemplo</RazaoSocial>
-                              <Endereco>
-                                 <Endereco>Rua Teste</Endereco>
-                                 <Numero>123</Numero>
-                                 <Bairro>Centro</Bairro>
-                                 <CodigoMunicipio>3550308</CodigoMunicipio>
-                                 <Uf>SP</Uf>
-                                 <Cep>01000000</Cep>
-                              </Endereco>
-                           </Tomador>
                         </InfRps>
                      </Rps>
                   </ListaRps>
@@ -148,24 +154,25 @@ class NFSE {
    </soapenv:Body>
 </soapenv:Envelope>`;
 
-        const response = await axios.post(WSDL_URL, xmlLoteRps, {
-            httpsAgent,
-            headers: {
-                "Content-Type": "text/xml;charset=utf-8",
-                SOAPAction: "",
-            },
-        });
+      const response = await axios.post(WSDL_URL, xmlLoteRps, {
+        httpsAgent,
+        headers: {
+          "Content-Type": "text/xml;charset=utf-8",
+          SOAPAction: "",
+        },
+      });
 
-        console.log("Resposta do servidor:", response.data);
+      console.log("Resposta do servidor:", response.data);
 
-        if (fs.existsSync(NEW_CERT_PATH)) fs.unlinkSync(NEW_CERT_PATH);
-        if (fs.existsSync(DECRYPTED_CERT_PATH)) fs.unlinkSync(DECRYPTED_CERT_PATH);
+      if (fs.existsSync(NEW_CERT_PATH)) fs.unlinkSync(NEW_CERT_PATH);
+      if (fs.existsSync(DECRYPTED_CERT_PATH))
+        fs.unlinkSync(DECRYPTED_CERT_PATH);
 
-        console.log("Certificados temporários removidos.");
+      console.log("Certificados temporários removidos.");
     } catch (error) {
-        console.error("Erro ao enviar requisição:", error);
+      console.error("Erro ao enviar requisição:", error);
     }
-}
+  }
 
   public async uploadCertificado(req: Request, res: Response) {
     try {
