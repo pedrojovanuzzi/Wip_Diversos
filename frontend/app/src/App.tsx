@@ -46,7 +46,7 @@ function App() {
           <Route path="/feedback/Opnion" element={<Opnion />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
-          {/* <Route path="/Nfe" element={auth ? <Nfe /> : <Navigate to="/auth/login" />} /> */}
+          <Route path="/Nfe" element={auth ? <Nfe /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>
     </BrowserRouter>

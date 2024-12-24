@@ -32,7 +32,7 @@ class NFSE {
       const result = await this.enviarLoteRps(password);
       res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
     } catch (error) {
-      console.error("Erro ao criar o RPS:", error);
+      // console.error("Erro ao criar o RPS:", error);
       res.status(500).json({ erro: "Erro ao criar o RPS." });
     }
   };
@@ -104,23 +104,100 @@ class NFSE {
       if (fs.existsSync(this.DECRYPTED_CERT_PATH)) fs.unlinkSync(this.DECRYPTED_CERT_PATH);
 
     } catch (error) {
-      console.error("Erro ao enviar requisição:", error);
+      // console.error("Erro ao enviar requisição:", error);
     }
   }
 
   private gerarXmlLote() {
     return `
-    <EnviarLoteRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
-      <LoteRps Id="1" versao="1.00">
+    <?xml version="1.0" encoding="UTF-8"?>
+<EnviarLoteRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.abrasf.org.br/nfse.xsd nfse.xsd">
+    <LoteRps Id="Lote_12345" versao="1.00">
         <NumeroLote>12345</NumeroLote>
         <Prestador>
-          <CpfCnpj>
-            <Cnpj>12345678000195</Cnpj>
-          </CpfCnpj>
+            <CpfCnpj>
+                <Cnpj>12345678000195</Cnpj>
+            </CpfCnpj>
+            <InscricaoMunicipal>123456</InscricaoMunicipal>
         </Prestador>
         <QuantidadeRps>1</QuantidadeRps>
-      </LoteRps>
-    </EnviarLoteRpsEnvio>`;
+        <ListaRps>
+            <Rps>
+                <InfDeclaracaoPrestacaoServico Id="Rps_123">
+                    <Rps>
+                        <IdentificacaoRps>
+                            <Numero>123</Numero>
+                            <Serie>001</Serie>
+                            <Tipo>1</Tipo>
+                        </IdentificacaoRps>
+                        <DataEmissao>2024-12-24</DataEmissao>
+                        <Status>1</Status>
+                    </Rps>
+                    <Competencia>2024-12-01</Competencia>
+                    <Servico>
+                        <Valores>
+                            <ValorServicos>1500.00</ValorServicos>
+                            <ValorDeducoes>0.00</ValorDeducoes>
+                            <ValorPis>10.00</ValorPis>
+                            <ValorCofins>15.00</ValorCofins>
+                            <ValorInss>20.00</ValorInss>
+                            <ValorIr>25.00</ValorIr>
+                            <ValorCsll>30.00</ValorCsll>
+                            <OutrasRetencoes>5.00</OutrasRetencoes>
+                            <ValTotTributos>100.00</ValTotTributos>
+                            <ValorIss>60.00</ValorIss>
+                            <Aliquota>3.00</Aliquota>
+                            <DescontoIncondicionado>0.00</DescontoIncondicionado>
+                            <DescontoCondicionado>0.00</DescontoCondicionado>
+                        </Valores>
+                        <IssRetido>2</IssRetido>
+                        <ItemListaServico>07.02</ItemListaServico>
+                        <CodigoCnae>6202100</CodigoCnae>
+                        <CodigoTributacaoMunicipio>123456</CodigoTributacaoMunicipio>
+                        <CodigoNbs>5345</CodigoNbs>
+                        <Discriminacao>Desenvolvimento de software personalizado</Discriminacao>
+                        <CodigoMunicipio>333</CodigoMunicipio>
+                        <ExigibilidadeISS>1</ExigibilidadeISS>
+                        <MunicipioIncidencia>3550308</MunicipioIncidencia>
+                    </Servico>
+                    <Prestador>
+                        <CpfCnpj>
+                            <Cnpj>12345678000195</Cnpj>
+                        </CpfCnpj>
+                        <InscricaoMunicipal>123456</InscricaoMunicipal>
+                    </Prestador>
+                    <TomadorServico>
+                        <IdentificacaoTomador>
+                            <CpfCnpj>
+                                <Cpf>12345678901</Cpf>
+                            </CpfCnpj>
+                            <InscricaoMunicipal>654321</InscricaoMunicipal>
+                        </IdentificacaoTomador>
+                        <RazaoSocial>Cliente Exemplo LTDA</RazaoSocial>
+                        <Endereco>
+                            <Endereco>Rua Exemplo</Endereco>
+                            <Numero>123</Numero>
+                            <Bairro>Centro</Bairro>
+                            <CodigoMunicipio>3550308</CodigoMunicipio>
+                            <Uf>SP</Uf>
+                            <Cep>01001000</Cep>
+                        </Endereco>
+                        <Contato>
+                            <Telefone>11999999999</Telefone>
+                            <Email>cliente@exemplo.com</Email>
+                        </Contato>
+                    </TomadorServico>
+                    <RegimeEspecialTributacao>1</RegimeEspecialTributacao>
+                    <OptanteSimplesNacional>1</OptanteSimplesNacional>
+                    <IncentivoFiscal>2</IncentivoFiscal>
+                </InfDeclaracaoPrestacaoServico>
+            </Rps>
+        </ListaRps>
+    </LoteRps>
+</EnviarLoteRpsEnvio>
+`;
   }
 
   
@@ -143,7 +220,7 @@ class NFSE {
         }
       });
     });
-  
+      
     if (!privateKeyPem || !certificatePem) {
       throw new Error('Falha ao extrair chave privada ou certificado.');
     }
@@ -169,6 +246,8 @@ class NFSE {
     // Computar a assinatura
     signer.computeSignature(xml);
   
+    console.log('XML assinado:', signer.getSignedXml());
+    
     // Retornar o XML assinado
     return signer.getSignedXml();
   }
@@ -178,7 +257,7 @@ class NFSE {
     try {
       res.status(200).json({ mensagem: "Certificado enviado com sucesso." });
     } catch (error) {
-      console.error("Erro ao processar o upload:", error);
+      // console.error("Erro ao processar o upload:", error);
       res.status(500).json({ erro: "Erro ao processar o upload do certificado." });
     }
   }
