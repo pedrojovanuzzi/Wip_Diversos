@@ -70,11 +70,11 @@ export const NavBar = () => {
                 <MdOutlineFeedback className='text-white size-8 transition-all hover:text-green-400' />
               </Link>
             </li>
-            <li className='p-2 grid place-items-center col-span-2'>
+            {/* <li className='p-2 grid place-items-center col-span-2'>
               <Link to='/Nfe'>
                 <HiDocumentText className='text-white size-8 transition-all hover:text-green-400' />
               </Link>
-            </li>
+            </li> */}
           </ul>
         </div>
       )}
