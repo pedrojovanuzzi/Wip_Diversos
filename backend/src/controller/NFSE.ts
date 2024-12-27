@@ -16,7 +16,6 @@ dotenv.config();
 class NFSE {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
   private WSDL_URL = "https://homologacao.ginfes.com.br/ServiceGinfesImpl";
-  private XSD_PATH = path.resolve(__dirname, "../files/schema nfse v2-04.xsd");
   private TEMP_DIR = path.resolve(__dirname, "../files");
   private DECRYPTED_CERT_PATH = path.resolve(this.TEMP_DIR, "decrypted_certificado.tmp");
   private NEW_CERT_PATH = path.resolve(this.TEMP_DIR, "new_certificado.pfx");
