@@ -13,6 +13,8 @@ import PopUpButton from "./Components/PopUpButton";
 export const Nfe = () => {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
+  const [searchCpf, setSearchCpf] = useState<string>("");
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
@@ -65,11 +67,15 @@ export const Nfe = () => {
     }
   };
 
+  const handleSearch = async () => {
+    console.log("Buscando por:", searchCpf, activeFilters);
+  };
+
   return (
     <div>
       <NavBar />
-      <Stacked />
-      <Filter />
+      <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
+      <Filter setActiveFilters={setActiveFilters} />
       <main className="flex justify-center mt-20">
         <div className="flex flex-col sm:flex-row items-center">
           <label className="relative ring-2 ring-black bg-slate-500 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all cursor-pointer">

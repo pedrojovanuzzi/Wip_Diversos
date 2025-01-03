@@ -8,6 +8,7 @@ import {
   MenuItems,
 } from "@headlessui/react";
 import { ChevronDownIcon, FunnelIcon } from "@heroicons/react/20/solid";
+import { log } from "node:console";
 import { useState } from "react";
 
 const filters = {
@@ -35,16 +36,18 @@ const filters = {
   ],
 };
 
-export default function Filter() {
+export default function Filter({setActiveFilters}: {setActiveFilters: (filters: string[]) => void}) {
   const [filter, setFilter] = useState<string[]>([]);
 
   const clickedFilter = (selectedFilter: string) => {
-    setFilter(
-      (prevFilters) =>
-        prevFilters.includes(selectedFilter)
-          ? prevFilters.filter((f) => f !== selectedFilter)
-          : [...prevFilters, selectedFilter]
-    );
+    setFilter((prevFilters) => {
+      const newFilters = prevFilters.includes(selectedFilter)
+        ? prevFilters.filter((f) => f !== selectedFilter)
+        : [...prevFilters, selectedFilter];
+  
+      setActiveFilters(newFilters);      
+      return newFilters;
+    });
   };
 
   const clearFilter = () => {
