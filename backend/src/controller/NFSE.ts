@@ -34,7 +34,7 @@ const rpsData = {
 
 class NFSE {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  private WSDL_URL = "https://homologacao.ginfes.com.br/ServiceGinfesImpl";
+  private WSDL_URL = "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS";
   private TEMP_DIR = path.resolve(__dirname, "../files");
   private DECRYPTED_CERT_PATH = path.resolve(
     this.TEMP_DIR,
@@ -138,7 +138,7 @@ class NFSE {
       .ele("soapenv:Body")
       .ele("ws:gerarNfse")
       .ele("GerarNfseEnvio", { xmlns: "http://www.abrasf.org.br/nfse.xsd" })
-      .ele("Rps")
+      .ele("Rps", { xmlns: "http://www.abrasf.org.br/nfse.xsd" })
       .ele("InfDeclaracaoPrestacaoServico", { Id: "rps000000000000001999" })
       .ele("Rps")
       .ele("IdentificacaoRps")
@@ -188,7 +188,9 @@ class NFSE {
       .up()
       .up()
       .up()
-      .ele("username")
+      .up()
+      .up()  // Sobe até ws:gerarNfse
+      .ele("username")  // Adiciona depois de GerarNfseEnvio
       .txt(rpsData.cnpj)
       .up()
       .ele("password")
@@ -197,7 +199,9 @@ class NFSE {
       .end({ pretty: true });
 
     return xml;
-  }
+}
+
+
 
   private assinarXml(xml: string, certPath: string, password: string): string {
     const pfxBuffer = fs.readFileSync(certPath);
@@ -266,7 +270,8 @@ class NFSE {
     rpsElement.addNextSibling(signatureElement);
 
     const finalXml = signedDoc.toString();
-    console.log("XML assinado:", finalXml);
+    
+    console.log(finalXml);
 
     return finalXml;
   }
