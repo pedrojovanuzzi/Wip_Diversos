@@ -111,41 +111,41 @@ export const Nfe = () => {
         <div className="mt-10 px-4 sm:px-6 lg:px-8">
           <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
             <table className="min-w-full divide-y divide-gray-300">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 text-center">
                 <tr>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                    className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
                     ID
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                    className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
                     Nome
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                    className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
                     CPF/CNPJ
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                    className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
                     Plano
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                    className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
                     Vencimento
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                    className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
                     Status
                   </th>
