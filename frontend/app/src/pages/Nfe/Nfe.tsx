@@ -15,6 +15,9 @@ export const Nfe = () => {
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
+  const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
+    []
+  );
   const [activeFilters, setActiveFilters] = useState<{
     plano: string[];
     vencimento: string[];
@@ -31,6 +34,16 @@ export const Nfe = () => {
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
   const { user } = useTypedSelector((state: RootState) => state.auth);
   const token = user.token;
+
+  const handleCheckboxChange = (clienteId: number) => {
+    setClientesSelecionados((prev) => {
+      if (prev.includes(clienteId)) {
+        return prev.filter((id) => id !== clienteId); // Remove se já estiver selecionado
+      } else {
+        return [...prev, clienteId]; // Adiciona se não estiver selecionado
+      }
+    });
+  };
 
   const emitirNFe = async () => {
     try {
@@ -109,10 +122,16 @@ export const Nfe = () => {
       <Filter setActiveFilters={setActiveFilters} />
       {clientes.length > 0 ? (
         <div className="mt-10 px-4 sm:px-6 lg:px-8">
-          <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-            <table className="min-w-full divide-y divide-gray-300">
+          <div className="overflow-auto shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+            <table className="min-w-full divide-y divide-gray-300 ">
               <thead className="bg-gray-50 text-center">
                 <tr>
+                <th
+                    scope="col"
+                    className="px-6 py-3 text-sm font-semibold text-gray-900"
+                  >
+                    
+                  </th>
                   <th
                     scope="col"
                     className="px-6 py-3 text-sm font-semibold text-gray-900"
@@ -154,6 +173,13 @@ export const Nfe = () => {
               <tbody className="divide-y divide-gray-200 bg-white">
                 {clientes.map((cliente) => (
                   <tr key={cliente.id}>
+                    <td className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={clientesSelecionados.includes(cliente.id)}
+                        onChange={() => handleCheckboxChange(cliente.id)}
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {cliente.id}
                     </td>
