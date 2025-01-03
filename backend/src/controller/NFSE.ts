@@ -4,34 +4,33 @@ import * as os from "os";
 import * as https from "https";
 import { execSync } from "child_process";
 import axios from "axios";
-import * as libxmljs from "libxmljs";
 import * as dotenv from "dotenv";
 import { Request, Response } from "express";
 import { SignedXml } from "xml-crypto";
 import * as xmlbuilder from "xmlbuilder";
 import * as forge from "node-forge";
 import * as xml2js from "xml2js";
+import * as libxmljs from "libxmljs";
 
 dotenv.config();
 
 const rpsData = {
-  numero: '1',
-  serie: '999',
-  tipo: '1',
-  dataEmissao: '2025-01-03',
-  status: '1',
-  competencia: '2025-01-03',
-  valor: '100.00',
-  aliquota: '2.00',
-  issRetido: '2',
-  responsavelRetencao: '1',
-  itemLista: '01.05',
-  descricao: 'descricao do servico',
-  municipio: '3504800',
-  cnpj: '01001001000113',
-  senha: '123456'
+  numero: "1",
+  serie: "999",
+  tipo: "1",
+  dataEmissao: "2025-01-03",
+  status: "1",
+  competencia: "2025-01-03",
+  valor: "100.00",
+  aliquota: "2.00",
+  issRetido: "2",
+  responsavelRetencao: "1",
+  itemLista: "01.05",
+  descricao: "descricao do servico",
+  municipio: "3504800",
+  cnpj: "01001001000113",
+  senha: "123456",
 };
-
 
 class NFSE {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
@@ -123,48 +122,79 @@ class NFSE {
     }
   }
 
-  
-
   private gerarXmlLote() {
     const builder = xmlbuilder;
 
-    const xml = builder.create('soapenv:Envelope', {
-        version: '1.0', encoding: 'UTF-8'
-    })
-        .att('xmlns:soapenv', 'http://schemas.xmlsoap.org/soap/envelope/')
-        .att('xmlns:ws', 'http://ws.issweb.fiorilli.com.br/')
-        .att('xmlns:xd', 'http://www.w3.org/2000/09/xmldsig#')
-        .ele('soapenv:Header').up()
-        .ele('soapenv:Body')
-        .ele('ws:gerarNfse')
-        .ele('GerarNfseEnvio', { xmlns: 'http://www.abrasf.org.br/nfse.xsd' })
-        .ele('Rps')
-        .ele('InfDeclaracaoPrestacaoServico', { Id: 'rps000000000000001999' })
-        .ele('Rps')
-        .ele('IdentificacaoRps')
-        .ele('Numero').txt(rpsData.numero).up()
-        .ele('Serie').txt(rpsData.serie).up()
-        .ele('Tipo').txt(rpsData.tipo).up()
-        .up()
-        .ele('DataEmissao').txt(rpsData.dataEmissao).up()
-        .ele('Status').txt(rpsData.status).up()
-        .up()
-        .ele('Competencia').txt(rpsData.competencia).up()
-        .ele('Servico')
-        .ele('Valores')
-        .ele('ValorServicos').txt(rpsData.valor).up()
-        .ele('Aliquota').txt(rpsData.aliquota).up()
-        .up()
-        .ele('IssRetido').txt(rpsData.issRetido).up()
-        .ele('ResponsavelRetencao').txt(rpsData.responsavelRetencao).up()
-        .ele('ItemListaServico').txt(rpsData.itemLista).up()
-        .ele('Discriminacao').txt(rpsData.descricao).up()
-        .ele('CodigoMunicipio').txt(rpsData.municipio).up()
-        .up()
-        .up()
-        .ele('username').txt(rpsData.cnpj).up()
-        .ele('password').txt(rpsData.senha).up()
-        .end({ pretty: true });
+    const xml = builder
+      .create("soapenv:Envelope", {
+        version: "1.0",
+        encoding: "UTF-8",
+      })
+      .att("xmlns:soapenv", "http://schemas.xmlsoap.org/soap/envelope/")
+      .att("xmlns:ws", "http://ws.issweb.fiorilli.com.br/")
+      .att("xmlns:xd", "http://www.w3.org/2000/09/xmldsig#")
+      .ele("soapenv:Header")
+      .up()
+      .ele("soapenv:Body")
+      .ele("ws:gerarNfse")
+      .ele("GerarNfseEnvio", { xmlns: "http://www.abrasf.org.br/nfse.xsd" })
+      .ele("Rps")
+      .ele("InfDeclaracaoPrestacaoServico", { Id: "rps000000000000001999" })
+      .ele("Rps")
+      .ele("IdentificacaoRps")
+      .ele("Numero")
+      .txt(rpsData.numero)
+      .up()
+      .ele("Serie")
+      .txt(rpsData.serie)
+      .up()
+      .ele("Tipo")
+      .txt(rpsData.tipo)
+      .up()
+      .up()
+      .ele("DataEmissao")
+      .txt(rpsData.dataEmissao)
+      .up()
+      .ele("Status")
+      .txt(rpsData.status)
+      .up()
+      .up()
+      .ele("Competencia")
+      .txt(rpsData.competencia)
+      .up()
+      .ele("Servico")
+      .ele("Valores")
+      .ele("ValorServicos")
+      .txt(rpsData.valor)
+      .up()
+      .ele("Aliquota")
+      .txt(rpsData.aliquota)
+      .up()
+      .up()
+      .ele("IssRetido")
+      .txt(rpsData.issRetido)
+      .up()
+      .ele("ResponsavelRetencao")
+      .txt(rpsData.responsavelRetencao)
+      .up()
+      .ele("ItemListaServico")
+      .txt(rpsData.itemLista)
+      .up()
+      .ele("Discriminacao")
+      .txt(rpsData.descricao)
+      .up()
+      .ele("CodigoMunicipio")
+      .txt(rpsData.municipio)
+      .up()
+      .up()
+      .up()
+      .ele("username")
+      .txt(rpsData.cnpj)
+      .up()
+      .ele("password")
+      .txt(rpsData.senha)
+      .up()
+      .end({ pretty: true });
 
     return xml;
   }
@@ -211,8 +241,9 @@ class NFSE {
     const signedXml = signer.getSignedXml();
     const signedDoc = libxmljs.parseXml(signedXml);
 
-    const rpsElement = signedDoc.get("//*[local-name(.)='InfDeclaracaoPrestacaoServico']") as Element | null;
-
+    const rpsElement = signedDoc.get(
+      "//*[local-name(.)='InfDeclaracaoPrestacaoServico']"
+    ) as libxmljs.XMLElement | null;
 
     if (!rpsElement) {
       throw new Error("Elemento Rps não encontrado no XML.");
@@ -220,25 +251,19 @@ class NFSE {
 
     const signatureElement = signedDoc.get(
       "//*[local-name(.)='Signature']"
-    ) as Element | null;
+    ) as libxmljs.XMLElement | null;
+
+    // Move a assinatura existente, em vez de clonar ou criar uma nova
+    if (signatureElement) {
+      signatureElement.remove(); // Remove a assinatura duplicada do local errado
+      rpsElement.addChild(signatureElement); // Move para dentro de InfDeclaracaoPrestacaoServico
+    }
 
     if (!signatureElement) {
       throw new Error("Assinatura não encontrada.");
     }
 
-    if (rpsElement && signatureElement) {
-      const parent = rpsElement.parentNode;
-      if (parent && signatureElement) {
-        const next = rpsElement.nextSibling;
-        if (next) {
-          parent.insertBefore(signatureElement, next);
-        } else {
-          parent.appendChild(signatureElement);
-        }
-      }
-    } else {
-      throw new Error("Elemento Rps ou assinatura não encontrado no XML.");
-    }
+    rpsElement.addNextSibling(signatureElement);
 
     const finalXml = signedDoc.toString();
     console.log("XML assinado:", finalXml);
