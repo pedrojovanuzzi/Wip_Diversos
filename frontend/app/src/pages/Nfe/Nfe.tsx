@@ -14,18 +14,29 @@ export const Nfe = () => {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [searchCpf, setSearchCpf] = useState<string>("");
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [clientes, setClientes] = useState<any[]>([]);
+  const [activeFilters, setActiveFilters] = useState<{
+    plano: string[];
+    vencimento: string[];
+    cli_ativado: string[];
+    nova_nfe: string[];
+  }>({
+    plano: [],
+    vencimento: [],
+    cli_ativado: [],
+    nova_nfe: [],
+  });
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const { user } = useTypedSelector((state) => state.auth);
+  const { user } = useTypedSelector((state: RootState) => state.auth);
   const token = user.token;
 
   const emitirNFe = async () => {
     try {
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/`,
-        {password},
+        { password },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -69,6 +80,26 @@ export const Nfe = () => {
 
   const handleSearch = async () => {
     console.log("Buscando por:", searchCpf, activeFilters);
+    try {
+      const resposta = await axios.post(
+        `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
+        {
+          cpf: searchCpf,
+          filters: activeFilters,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      console.log("Clientes encontrados:", resposta.data);
+      setClientes(resposta.data); // Armazena os clientes no estado
+    } catch (erro) {
+      console.error("Erro ao Buscar Clientes:", erro);
+    }
   };
 
   return (
@@ -76,9 +107,86 @@ export const Nfe = () => {
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
       <Filter setActiveFilters={setActiveFilters} />
+      {clientes.length > 0 ? (
+        <div className="mt-10 px-4 sm:px-6 lg:px-8">
+          <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+            <table className="min-w-full divide-y divide-gray-300">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                  >
+                    ID
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                  >
+                    Nome
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                  >
+                    CPF/CNPJ
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                  >
+                    Plano
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                  >
+                    Vencimento
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                  >
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {clientes.map((cliente) => (
+                  <tr key={cliente.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {cliente.id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {cliente.nome}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {cliente.cpf_cnpj}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {cliente.plano}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {cliente.venc}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <p className="text-center mt-10 text-gray-500">
+          Nenhum cliente encontrado
+        </p>
+      )}
+
       <main className="flex justify-center mt-20">
         <div className="flex flex-col sm:flex-row items-center">
-          <label className="relative ring-2 ring-black bg-slate-500 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all cursor-pointer">
+          <label className="relative ring-2 ring-black ring-opacity-5 bg-slate-500 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all cursor-pointer">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-4xl">
               <CiCirclePlus />
             </span>
@@ -94,7 +202,7 @@ export const Nfe = () => {
               <IoArrowUpCircleOutline />
             </span>
             <button
-              className="bg-indigo-500 ring-2 ring-black text-white py-3 px-16 m-5 rounded hover:bg-indigo-400 transition-all"
+              className="bg-indigo-500 ring-2 ring-black ring-opacity-5 text-white py-3 px-16 m-5 rounded hover:bg-indigo-400 transition-all"
               onClick={enviarCertificado}
             >
               Enviar Certificado
@@ -107,7 +215,7 @@ export const Nfe = () => {
           <BsFiletypeDoc />
         </span>
         <button
-          className="bg-slate-500 ring-2 ring-black text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
+          className="bg-slate-500 ring-2 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
           onClick={() => setShowPopUp(true)}
         >
           Emitir NF-e
@@ -120,7 +228,13 @@ export const Nfe = () => {
         </p>
       )}
       {showPopUp && (
-        <PopUpButton setShowPopUp={setShowPopUp} showPopUp={showPopUp} setPassword={setPassword} password={password} emitirNFe={emitirNFe} />
+        <PopUpButton
+          setShowPopUp={setShowPopUp}
+          showPopUp={showPopUp}
+          setPassword={setPassword}
+          password={password}
+          emitirNFe={emitirNFe}
+        />
       )}
     </div>
   );

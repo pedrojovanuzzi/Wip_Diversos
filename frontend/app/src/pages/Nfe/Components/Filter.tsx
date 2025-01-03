@@ -13,18 +13,20 @@ import { useState } from "react";
 
 const filters = {
   plano: [
-    { value: "plan_5", label: "5M"},
-    { value: "plan_8", label: "8M"},
-    { value: "plan_15", label: "15M"},
-    { value: "plan_340", label: "340M"},
-    { value: "plan_400", label: "400M"},
-    { value: "plan_500", label: "500M"},
-    { value: "plan_600", label: "600M"},
-    { value: "plan_700", label: "700M"},
-    { value: "plan_800", label: "800M"},
+    { value: "90_PFJ_Radio5M", label: "5M"},
+    { value: "91_PFJ_Radio8M", label: "8M"},
+    { value: "92_PFJ_Radio15M", label: "15M"},
+    { value: "7_PFJ_FIBRA_340M_RURAL_WIP", label: "340M"},
+    { value: "1_PFJ_FIBRA_400M", label: "400M"},
+    { value: "2_PFJ_FIBRA_500M", label: "500M"},
+    { value: "3_PFJ_FIBRA_600M", label: "600M"},
+    { value: "4_PFJ_FIBRA_700M", label: "700M"},
+    { value: "5_PFJ_FIBRA_800M", label: "800M"},
   ],
-  outros: [
-    { value: "active_client", label: "Cliente Ativo"},
+  cli_ativado: [
+    { value: "s", label: "Cliente Ativo"},
+  ],
+  nova_nfe: [
     { value: "new_nfe", label: "Nova NFE"}
   ],
   vencimento: [
@@ -36,19 +38,57 @@ const filters = {
   ],
 };
 
-export default function Filter({setActiveFilters}: {setActiveFilters: (filters: string[]) => void}) {
+export default function Filter({setActiveFilters}: {setActiveFilters: (filters: { plano: string[], vencimento: string[], cli_ativado: string[], nova_nfe: string[] }) => void}) {
   const [filter, setFilter] = useState<string[]>([]);
+
+  const categorizeFilters = (filters: string[]) => {
+    const categorizedFilters: { plano: string[], vencimento: string[], cli_ativado: string[], nova_nfe: string[]} = {
+      plano: [],
+      vencimento: [],
+      cli_ativado: [],
+      nova_nfe: [],
+    };
+  
+    filters.forEach((filter) => {
+      if (filter.startsWith("plan_")) {
+        categorizedFilters.plano.push(filter);
+      } else if (filter.startsWith("venc")) {
+        categorizedFilters.vencimento.push(filter);
+      } else if (filter === "active_client") {
+        categorizedFilters.cli_ativado.push(filter);  // Corrige a categorização do active_client
+      } else if (filter === "new_nfe") {
+        categorizedFilters.nova_nfe = [filter];  // Garante que apenas um new_nfe esteja ativo
+      }
+    });
+  
+    return categorizedFilters;
+  };
+  
 
   const clickedFilter = (selectedFilter: string) => {
     setFilter((prevFilters) => {
-      const newFilters = prevFilters.includes(selectedFilter)
-        ? prevFilters.filter((f) => f !== selectedFilter)
-        : [...prevFilters, selectedFilter];
+      let newFilters;
   
-      setActiveFilters(newFilters);      
+      // Se for nova_nfe, substitui a seleção anterior
+      if (selectedFilter === "new_nfe") {
+        newFilters = prevFilters.includes(selectedFilter)
+          ? prevFilters.filter((f) => f !== selectedFilter)
+          : prevFilters.filter((f) => !filters.nova_nfe.map(opt => opt.value).includes(f)).concat(selectedFilter);
+      } else {
+        // Caso contrário, adiciona ou remove normalmente
+        newFilters = prevFilters.includes(selectedFilter)
+          ? prevFilters.filter((f) => f !== selectedFilter)
+          : [...prevFilters, selectedFilter];
+      }
+  
+      const organizedFilters = categorizeFilters(newFilters);
+      setActiveFilters(organizedFilters);
+  
+      console.log(organizedFilters);
       return newFilters;
     });
   };
+  
 
   const clearFilter = () => {
     setFilter([]);
@@ -140,7 +180,50 @@ export default function Filter({setActiveFilters}: {setActiveFilters: (filters: 
             <fieldset>
               <legend className="block font-medium">Outros</legend>
               <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
-                {filters.outros.map((option, optionIdx) => (
+                {filters.cli_ativado.map((option, optionIdx) => (
+                  <div key={option.value} className="flex gap-3">
+                    <div className="flex h-5 shrink-0 items-center">
+                      <div className="group grid size-4 grid-cols-1">
+                        <input
+                          value={option.value}
+                          checked={filter.includes(option.value)}
+                          onChange={() => clickedFilter(option.value)}
+                          id={`outros-${optionIdx}`}
+                          name="outros[]"
+                          type="checkbox"
+                          className="col-start-1 row-start-1 appearance-none rounded border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                        />
+                        <svg
+                          fill="none"
+                          viewBox="0 0 14 14"
+                          className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-[:disabled]:stroke-gray-950/25"
+                        >
+                          <path
+                            d="M3 8L6 11L11 3.5"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="opacity-0 group-has-[:checked]:opacity-100"
+                          />
+                          <path
+                            d="M3 7H11"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="opacity-0 group-has-[:indeterminate]:opacity-100"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                    <label
+                      htmlFor={`plano-${optionIdx}`}
+                      className="text-base text-gray-600 sm:text-sm"
+                    >
+                      {option.label}
+                    </label>
+                  </div>
+                ))}
+                {filters.nova_nfe.map((option, optionIdx) => (
                   <div key={option.value} className="flex gap-3">
                     <div className="flex h-5 shrink-0 items-center">
                       <div className="group grid size-4 grid-cols-1">
