@@ -10,8 +10,28 @@ import { Request, Response } from "express";
 import { SignedXml } from "xml-crypto";
 import * as xmlbuilder from "xmlbuilder";
 import * as forge from "node-forge";
+import * as xml2js from "xml2js";
 
 dotenv.config();
+
+const rpsData = {
+  numero: '1',
+  serie: '999',
+  tipo: '1',
+  dataEmissao: '2025-01-03',
+  status: '1',
+  competencia: '2025-01-03',
+  valor: '100.00',
+  aliquota: '2.00',
+  issRetido: '2',
+  responsavelRetencao: '1',
+  itemLista: '01.05',
+  descricao: 'descricao do servico',
+  municipio: '3504800',
+  cnpj: '01001001000113',
+  senha: '123456'
+};
+
 
 class NFSE {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
@@ -103,76 +123,50 @@ class NFSE {
     }
   }
 
+  
+
   private gerarXmlLote() {
-    return `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
-<soapenv:Header/>
-<soapenv:Body>
-<ws:gerarNfse>
-<GerarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
-<Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
-<InfDeclaracaoPrestacaoServico Id="rps000000000000001999">
-<Rps>
-<IdentificacaoRps>
-<Numero>1</Numero>
-<Serie>999</Serie>
-<Tipo>1</Tipo>
-</IdentificacaoRps>
-<DataEmissao>2013-05-13</DataEmissao>
-<Status>1</Status>
-</Rps>
-<Competencia>2013-05-13</Competencia>
-<Servico>
-<Valores>
-<ValorServicos>100.00</ValorServicos>
-<Aliquota>2.0000</Aliquota>
-</Valores>
-<IssRetido>2</IssRetido>
-<ResponsavelRetencao>1</ResponsavelRetencao>
-<ItemListaServico>01.05</ItemListaServico>
-<Discriminacao>descricao do servico</Discriminacao>
-<CodigoMunicipio>3504800</CodigoMunicipio>
-<CodigoPais>1058</CodigoPais>
-<ExigibilidadeISS>1</ExigibilidadeISS>
-<MunicipioIncidencia>3504800</MunicipioIncidencia>
-</Servico>
-<Prestador>
-<CpfCnpj>
-<Cnpj>01001001000113</Cnpj>
-</CpfCnpj>
-<InscricaoMunicipal>1.000.10</InscricaoMunicipal>
-</Prestador>
-<Tomador>
-<IdentificacaoTomador>
-<CpfCnpj>
-<Cpf>27600930854</Cpf>
-</CpfCnpj>
-</IdentificacaoTomador>
-<RazaoSocial>Ivan Moraes</RazaoSocial>
-<Endereco>
-<Endereco>Av Jose Goncalves</Endereco>
-<Numero>93</Numero>
-<Complemento>Casa</Complemento>
-<Bairro>Santa Rosa</Bairro>
-<CodigoMunicipio>3505203</CodigoMunicipio>
-<Uf>SP</Uf>
-<CodigoPais>1058</CodigoPais>
-<Cep>17250000</Cep>
-</Endereco>
-<Contato>
-<Telefone>36620000</Telefone>
-<Email>ivantgm@gmail.com</Email>
-</Contato>
-</Tomador>
-<OptanteSimplesNacional>2</OptanteSimplesNacional>
-<IncentivoFiscal>2</IncentivoFiscal>
-</InfDeclaracaoPrestacaoServico>
-</Rps>
-</GerarNfseEnvio>
-<username>01001001000113</username>
-<password>123456</password>
-</ws:gerarNfse>
-</soapenv:Body>
-</soapenv:Envelope>`;
+    const builder = xmlbuilder;
+
+    const xml = builder.create('soapenv:Envelope', {
+        version: '1.0', encoding: 'UTF-8'
+    })
+        .att('xmlns:soapenv', 'http://schemas.xmlsoap.org/soap/envelope/')
+        .att('xmlns:ws', 'http://ws.issweb.fiorilli.com.br/')
+        .att('xmlns:xd', 'http://www.w3.org/2000/09/xmldsig#')
+        .ele('soapenv:Header').up()
+        .ele('soapenv:Body')
+        .ele('ws:gerarNfse')
+        .ele('GerarNfseEnvio', { xmlns: 'http://www.abrasf.org.br/nfse.xsd' })
+        .ele('Rps')
+        .ele('InfDeclaracaoPrestacaoServico', { Id: 'rps000000000000001999' })
+        .ele('Rps')
+        .ele('IdentificacaoRps')
+        .ele('Numero').txt(rpsData.numero).up()
+        .ele('Serie').txt(rpsData.serie).up()
+        .ele('Tipo').txt(rpsData.tipo).up()
+        .up()
+        .ele('DataEmissao').txt(rpsData.dataEmissao).up()
+        .ele('Status').txt(rpsData.status).up()
+        .up()
+        .ele('Competencia').txt(rpsData.competencia).up()
+        .ele('Servico')
+        .ele('Valores')
+        .ele('ValorServicos').txt(rpsData.valor).up()
+        .ele('Aliquota').txt(rpsData.aliquota).up()
+        .up()
+        .ele('IssRetido').txt(rpsData.issRetido).up()
+        .ele('ResponsavelRetencao').txt(rpsData.responsavelRetencao).up()
+        .ele('ItemListaServico').txt(rpsData.itemLista).up()
+        .ele('Discriminacao').txt(rpsData.descricao).up()
+        .ele('CodigoMunicipio').txt(rpsData.municipio).up()
+        .up()
+        .up()
+        .ele('username').txt(rpsData.cnpj).up()
+        .ele('password').txt(rpsData.senha).up()
+        .end({ pretty: true });
+
+    return xml;
   }
 
   private assinarXml(xml: string, certPath: string, password: string): string {
