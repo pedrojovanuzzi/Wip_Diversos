@@ -202,7 +202,7 @@ class NFSE {
                 .ele("username").txt(rpsData.cnpj).up()
                 .ele("password").txt(rpsData.senha).up()
             .up()
-        .end({ pretty: true });
+        .end({ pretty: false });
 
     return xml;
 }
