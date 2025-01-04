@@ -13,7 +13,7 @@ import * as xml2js from "xml2js";
 import * as libxmljs from "libxmljs";
 import MkauthSource from "../database/MkauthSource";
 import { ClientesEntities } from '../entities/ClientesEntities';
-import { In } from "typeorm";
+import { Between, In } from "typeorm";
 
 dotenv.config();
 
@@ -354,8 +354,8 @@ class NFSE {
   }
 
   public async BuscarClientes(req: Request, res: Response) {
-    const { cpf, filters } = req.body;
-  
+    const { cpf, filters, dateFilter } = req.body;
+    
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
   
     const whereConditions: any = {};
@@ -364,8 +364,13 @@ class NFSE {
     if (cpf) {
         whereConditions.cpf_cnpj = cpf;
     }
+
+    // Adiciona filtro por intervalo de datas (usando Between)
+    if (dateFilter && dateFilter.start && dateFilter.end) {
+        whereConditions.data_desativacao = Between(dateFilter.start, dateFilter.end);
+    }
   
-    // Processa filtros
+    // Processa outros filtros
     if (filters) {
         const { plano, vencimento, cli_ativado, nova_nfe } = filters;
 
@@ -382,8 +387,6 @@ class NFSE {
             whereConditions.tags = In(nova_nfe);
         }
     }
-
-    console.log("Condições de busca:", whereConditions.venc);
 
     try {
         const clientesResponse = await ClientRepository.find({

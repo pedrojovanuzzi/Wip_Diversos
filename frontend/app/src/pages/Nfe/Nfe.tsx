@@ -18,6 +18,7 @@ export const Nfe = () => {
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     []
   );
+  const [dateFilter, setDateFilter] = useState<{ start: string, end: string } | null>(null)
   const [activeFilters, setActiveFilters] = useState<{
     plano: string[];
     vencimento: string[];
@@ -99,6 +100,7 @@ export const Nfe = () => {
         {
           cpf: searchCpf,
           filters: activeFilters,
+          dateFilter: dateFilter,
         },
         {
           headers: {
@@ -119,7 +121,7 @@ export const Nfe = () => {
     <div>
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
-      <Filter setActiveFilters={setActiveFilters} />
+      <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} />
       {clientes.length > 0 ? (
         <div className="mt-10 px-4 sm:px-6 lg:px-8">
           <div className="overflow-auto shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">

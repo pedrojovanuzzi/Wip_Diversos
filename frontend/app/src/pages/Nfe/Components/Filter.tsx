@@ -39,7 +39,16 @@ const filters = {
   ],
 };
 
-export default function Filter({setActiveFilters}: {setActiveFilters: (filters: { plano: string[], vencimento: string[], cli_ativado: string[], nova_nfe: string[] }) => void}) {
+
+interface FilterProps {
+
+  setActiveFilters: (filters: any) => void;
+
+  setDate: React.Dispatch<React.SetStateAction<{ start: string; end: string } | null>>;
+
+}
+
+export default function Filter({ setActiveFilters, setDate } : FilterProps) {
   const [filter, setFilter] = useState<string[]>([]);
 
   const categorizeFilters = (filters: string[]) => {
@@ -108,6 +117,7 @@ export default function Filter({setActiveFilters}: {setActiveFilters: (filters: 
     });
   };
   
+  
 
   const clearFilter = () => {
     setFilter([]);
@@ -147,7 +157,7 @@ export default function Filter({setActiveFilters}: {setActiveFilters: (filters: 
         </div>
 
         <DisclosurePanel className="border-t border-gray-200">
-        <Calendar/>
+        <Calendar setDateFilter={setDate} />
           <div className="mx-auto grid max-w-7xl grid-cols-3 gap-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
             <fieldset>
               <legend className="block font-medium">Plano</legend>
