@@ -358,47 +358,54 @@ class NFSE {
   
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
   
-    const whereConditions: any = {
-      cpf_cnpj: cpf,
-    };
+    const whereConditions: any = {};
+
+    // Adiciona CPF se existir
+    if (cpf) {
+        whereConditions.cpf_cnpj = cpf;
+    }
   
+    // Processa filtros
     if (filters) {
-      if (filters.plano && filters.plano.length > 0) {
-        whereConditions.plano = In(filters.plano);
-      }
-      if (filters.vencimento && filters.vencimento.length > 0) {
-        whereConditions.venc = In(filters.vencimento);
-      }
-      if (filters.cli_ativado && filters.cli_ativado.length > 0) {
-        whereConditions.cli_ativado = In(filters.cli_ativado);
-      }
-      if (filters.nova_nfe && filters.nova_nfe.length > 0) {
-        whereConditions.tags = In(filters.nova_nfe);
-      }
-    }
-  
-    try {
-      const clientesResponse = await ClientRepository.find({
-        where: whereConditions,
-        select: {
-          id: true,
-          nome: true,
-          cpf_cnpj: true,
-          plano: true,
-          venc: true,
-          cli_ativado: true,
-          tags: true,
+        const { plano, vencimento, cli_ativado, nova_nfe } = filters;
+
+        if (plano?.length) {
+            whereConditions.plano = In(plano);
         }
-      });
-  
-      res.status(200).json(clientesResponse);
-      return;
-    } catch (error) {
-      console.error("Erro ao buscar clientes:", error);
-      res.status(500).json({ message: "Erro ao buscar clientes" });
-      return;
+        if (vencimento?.length) {
+            whereConditions.venc = In(vencimento);
+        }
+        if (cli_ativado?.length) {
+            whereConditions.cli_ativado = In(cli_ativado);
+        }
+        if (nova_nfe?.length) {
+            whereConditions.tags = In(nova_nfe);
+        }
     }
-  }
+
+    console.log("Condições de busca:", whereConditions.venc);
+
+    try {
+        const clientesResponse = await ClientRepository.find({
+            where: whereConditions,
+            select: {
+                id: true,
+                nome: true,
+                cpf_cnpj: true,
+                plano: true,
+                venc: true,
+                cli_ativado: true,
+                tags: true,
+            }
+        });
+  
+        res.status(200).json(clientesResponse);
+    } catch (error) {
+        console.error("Erro ao buscar clientes:", error);
+        res.status(500).json({ message: "Erro ao buscar clientes" });
+    }
+}
+
 }
 
 export default new NFSE();

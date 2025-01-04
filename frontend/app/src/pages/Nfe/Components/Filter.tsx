@@ -10,6 +10,7 @@ import {
 import { ChevronDownIcon, FunnelIcon } from "@heroicons/react/20/solid";
 import { log } from "node:console";
 import { useState } from "react";
+import Calendar from "./Calendar";
 
 const filters = {
   plano: [
@@ -30,11 +31,11 @@ const filters = {
     { value: "new_nfe", label: "Nova NFE"}
   ],
   vencimento: [
-    { value: "venc5", label: "Dia 5"},
-    { value: "venc10", label: "Dia 10"},
-    { value: "venc15", label: "Dia 15"},
-    { value: "venc20", label: "Dia 20"},
-    { value: "venc25", label: "Dia 25"},
+    { value: "5", label: "Dia 5"},
+    { value: "10", label: "Dia 10"},
+    { value: "15", label: "Dia 15"},
+    { value: "20", label: "Dia 20"},
+    { value: "25", label: "Dia 25"},
   ],
 };
 
@@ -48,18 +49,36 @@ export default function Filter({setActiveFilters}: {setActiveFilters: (filters: 
       cli_ativado: [],
       nova_nfe: [],
     };
+
+    const planos = [
+      "90_PFJ_Radio5M",
+      "91_PFJ_Radio8M",
+      "92_PFJ_Radio15M",
+      "7_PFJ_FIBRA_340M_RURAL_WIP",
+      "1_PFJ_FIBRA_400M",
+      "2_PFJ_FIBRA_500M",
+      "3_PFJ_FIBRA_600M",
+      "4_PFJ_FIBRA_700M",
+      "5_PFJ_FIBRA_800M"
+    ];
+    
+    const vencimentos = ["5", "10", "15", "20", "25"];
   
     filters.forEach((filter) => {
-      if (filter.startsWith("plan_")) {
+      if (planos.includes(filter)) {
         categorizedFilters.plano.push(filter);
-      } else if (filter.startsWith("venc")) {
+      }
+      else if (filter === "new_nfe") {
+        categorizedFilters.nova_nfe = [filter];  // Apenas um "new_nfe" ativo
+      }
+      else if (filter === "active_client") {
+        categorizedFilters.cli_ativado.push(filter);  // Cliente ativo
+      }
+      else if (vencimentos.includes(filter)) {
         categorizedFilters.vencimento.push(filter);
-      } else if (filter === "active_client") {
-        categorizedFilters.cli_ativado.push(filter);  // Corrige a categorização do active_client
-      } else if (filter === "new_nfe") {
-        categorizedFilters.nova_nfe = [filter];  // Garante que apenas um new_nfe esteja ativo
       }
     });
+    
   
     return categorizedFilters;
   };
@@ -95,7 +114,7 @@ export default function Filter({setActiveFilters}: {setActiveFilters: (filters: 
   };
 
   return (
-    <div className="bg-white">
+    <div className="bg-white p-5">
       <Disclosure
         as="section"
         aria-labelledby="filter-heading"
@@ -127,11 +146,12 @@ export default function Filter({setActiveFilters}: {setActiveFilters: (filters: 
           </div>
         </div>
 
-        <DisclosurePanel className="border-t border-gray-200 py-10">
-          <div className="mx-auto grid max-w-7xl grid-cols-3 gap-x-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
+        <DisclosurePanel className="border-t border-gray-200">
+        <Calendar/>
+          <div className="mx-auto grid max-w-7xl grid-cols-3 gap-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
             <fieldset>
               <legend className="block font-medium">Plano</legend>
-              <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
+              <div className="space-y-6 p-6 sm:space-y-4 sm:pt-4">
                 {filters.plano.map((option, optionIdx) => (
                   <div key={option.value} className="flex gap-3">
                     <div className="flex h-5 shrink-0 items-center">
