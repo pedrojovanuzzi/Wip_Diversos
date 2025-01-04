@@ -76,8 +76,8 @@ export default function Calendar({ setDateFilter }: { setDateFilter: (dates: { s
   const currentMonthName = new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long' })
 
   return (
-    <div className="m-10">
-      <div className="flex items-center justify-between">
+    <div className="m-10 max-w-4xl mx-auto">
+      <div className="flex text-center justify-between">
         <h2 className="text-sm font-semibold text-gray-900">
           {currentMonthName} {currentYear}
         </h2>
