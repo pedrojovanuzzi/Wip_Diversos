@@ -11,6 +11,7 @@ import { ChevronDownIcon, FunnelIcon } from "@heroicons/react/20/solid";
 import { log } from "node:console";
 import { useState } from "react";
 import Calendar from "./Calendar";
+import Line from "./Line";
 
 const filters = {
   plano: [
@@ -124,7 +125,7 @@ export default function Filter({ setActiveFilters, setDate } : FilterProps) {
   };
 
   return (
-    <div className="bg-white p-5">
+    <div className="bg-white">
       <Disclosure
         as="section"
         aria-labelledby="filter-heading"
@@ -158,10 +159,11 @@ export default function Filter({ setActiveFilters, setDate } : FilterProps) {
 
         <DisclosurePanel className="border-t border-gray-200">
         <Calendar setDateFilter={setDate} />
-          <div className="mx-auto grid max-w-7xl grid-cols-3 gap-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
+        <Line />
+          <div className="mx-auto grid max-w-7xl mt-10 grid-cols-3 gap-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
             <fieldset>
               <legend className="block font-medium">Plano</legend>
-              <div className="space-y-6 p-6 sm:space-y-4 sm:pt-4">
+              <div className="space-y-6 p-10 sm:space-y-4 sm:pt-4">
                 {filters.plano.map((option, optionIdx) => (
                   <div key={option.value} className="flex gap-3">
                     <div className="flex h-5 shrink-0 items-center">
