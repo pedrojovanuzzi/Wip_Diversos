@@ -13,27 +13,28 @@ import * as xml2js from "xml2js";
 import * as libxmljs from "libxmljs";
 import MkauthSource from "../database/MkauthSource";
 import { ClientesEntities } from '../entities/ClientesEntities';
+import { Faturas } from '../entities/Faturas';
 import { Between, In } from "typeorm";
 
 dotenv.config();
 
-const rpsData = {
-  numero: "1",
-  serie: "999",
-  tipo: "1",
-  dataEmissao: "2025-01-03",
-  status: "1",
-  competencia: "2025-01-03",
-  valor: "100.00",
-  aliquota: "2.00",
-  issRetido: "2",
-  responsavelRetencao: "1",
-  itemLista: "01.05",
-  descricao: "descricao do servico",
-  municipio: "3504800",
-  cnpj: "01001001000113",
-  senha: "123456",
-};
+// const rpsData = {
+//   numero: "1",
+//   serie: "999",
+//   tipo: "1",
+//   dataEmissao: "2025-01-03",
+//   status: "1",
+//   competencia: "2025-01-03",
+//   valor: "100.00",
+//   aliquota: "2.00",
+//   issRetido: "2",
+//   responsavelRetencao: "1",
+//   itemLista: "01.05",
+//   descricao: "descricao do servico",
+//   municipio: "3504800",
+//   cnpj: "01001001000113",
+//   senha: "123456",
+// };
 
 class NFSE {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
@@ -126,8 +127,15 @@ class NFSE {
     }
   }
 
-  private gerarXmlLote() {
+  private async gerarXmlLote(id : string) {
     const builder = xmlbuilder;
+
+    const RPSQuery = MkauthSource.getRepository(Faturas);
+    const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
+
+    const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+
+    const ClientData = await ClientRepository.findOne({ where: { id: rpsData?.id } });
 
     const xml = builder
       .create("soapenv:Envelope", {
@@ -147,48 +155,48 @@ class NFSE {
       .ele("Rps")
       .ele("IdentificacaoRps")
       .ele("Numero")
-      .txt(rpsData.numero)
+      .txt(rpsData?.numero)
       .up()
       .ele("Serie")
-      .txt(rpsData.serie)
+      .txt(rpsData?.serie)
       .up()
       .ele("Tipo")
-      .txt(rpsData.tipo)
+      .txt(rpsData?.tipo)
       .up()
       .up()
       .ele("DataEmissao")
-      .txt(rpsData.dataEmissao)
+      .txt(rpsData?.processamento ? rpsData.processamento.toISOString().substring(0, 10) : '')
       .up()
       .ele("Status")
-      .txt(rpsData.status)
+      .txt("1")
       .up()
       .up()
       .ele("Competencia")
-      .txt(rpsData.competencia)
+      .txt(rpsData?.datavenc ? rpsData.datavenc.toISOString().substring(0, 10) : '')
       .up()
       .ele("Servico")
       .ele("Valores")
       .ele("ValorServicos")
-      .txt(rpsData.valor)
+      .txt(String(rpsData?.valor))
       .up()
       .ele("Aliquota")
-      .txt(rpsData.aliquota)
+      .txt(rpsData?.aliquota)
       .up()
       .up()
       .ele("IssRetido")
-      .txt(rpsData.issRetido)
+      .txt(rpsData?.issRetido)
       .up()
       .ele("ResponsavelRetencao")
-      .txt(rpsData.responsavelRetencao)
+      .txt(rpsData?.responsavelRetencao)
       .up()
       .ele("ItemListaServico")
-      .txt(rpsData.itemLista)
+      .txt(rpsData?.itemLista)
       .up()
       .ele("Discriminacao")
-      .txt(rpsData.descricao)
+      .txt(rpsData?.descricao)
       .up()
       .ele("CodigoMunicipio")
-      .txt(rpsData.municipio)
+      .txt(rpsData?.municipio)
       .up()
       .ele("ExigibilidadeISS")
       .txt("1")
@@ -197,54 +205,54 @@ class NFSE {
       .ele("Prestador")
       .ele("CpfCnpj")
       .ele("Cnpj")
-      .txt(rpsData.cnpj)
+      .txt("20843290000142")
       .up()
       .up()
       .ele("InscricaoMunicipal")
-      .txt("15000")
+      .txt("21950014")
       .up()
       .up()
       .ele("Tomador")
       .ele("IdentificacaoTomador")
       .ele("CpfCnpj")
-      .ele("Cpf")
-      .txt("27600930854")
+      .ele(ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj")
+      .txt(String(ClientData?.cpf_cnpj))
       .up()
       .up()
       .up()
       .ele("RazaoSocial")
-      .txt("Ivan Moraes")
+      .txt(String(ClientData?.nome))
       .up()
       .ele("Endereco")
       .ele("Endereco")
-      .txt("Rua do Tomador")
+      .txt(String(ClientData?.endereco))
       .up()
       .ele("Numero")
-      .txt("123")
+      .txt(String(ClientData?.numero))
       .up()
       .ele("Complemento")
-      .txt("Sala 123")
+      .txt(String(ClientData?.complemento))
       .up()
       .ele("Bairro")
-      .txt("Centro")
+      .txt(String(ClientData?.bairro))
       .up()
       .ele("CodigoMunicipio")
-      .txt("3505203")
+      .txt("3503406")
       .up()
       .ele("Uf")
       .txt("SP")
       .up()
       // .ele("CodigoPais").txt("1058").up()
       .ele("Cep")
-      .txt("17250000")
+      .txt(String(ClientData?.cep))
       .up()
       .up()
       .ele("Contato")
       .ele("Telefone")
-      .txt("14999999999")
+      .txt(String(ClientData?.celular))
       .up()
       .ele("Email")
-      .txt("wergerge@gmail.com")
+      .txt(String(ClientData?.email))
       .up()
       .up()
       .up()
@@ -257,12 +265,12 @@ class NFSE {
       .up()
       .up()
       .up()
-      .ele("username")
-      .txt(rpsData.cnpj)
-      .up()
-      .ele("password")
-      .txt(rpsData.senha)
-      .up()
+      // .ele("username")
+      // .txt(rpsData?.cnpj)
+      // .up()
+      // .ele("password")
+      // .txt(rpsData?.senha)
+      // .up()
       .up()
       .end({ pretty: false });
 
