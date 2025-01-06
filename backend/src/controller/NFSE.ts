@@ -137,6 +137,12 @@ class NFSE {
 
     const ClientData = await ClientRepository.findOne({ where: { id: rpsData?.id } });
 
+    ClientData?.cidade;
+
+    const response = await axios.get(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`);
+
+    const municipio = response.data.id;
+
     const xml = builder
       .create("soapenv:Envelope", {
         version: "1.0",
@@ -196,7 +202,7 @@ class NFSE {
       .txt(rpsData?.descricao)
       .up()
       .ele("CodigoMunicipio")
-      .txt(rpsData?.municipio)
+      .txt("3503406")
       .up()
       .ele("ExigibilidadeISS")
       .txt("1")
@@ -237,7 +243,7 @@ class NFSE {
       .txt(String(ClientData?.bairro))
       .up()
       .ele("CodigoMunicipio")
-      .txt("3503406")
+      .txt(municipio)
       .up()
       .ele("Uf")
       .txt("SP")
