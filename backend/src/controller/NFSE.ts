@@ -49,13 +49,17 @@ class NFSE {
 
   public createRPS = async (req: Request, res: Response) => {
     try {
-      const { password } = req.body;
+      const { password, clientsid } = req.body;
 
       if (!password) {
         throw new Error("Senha do certificado não fornecida.");
       }
 
-      const result = await this.enviarLoteRps(password);
+      
+
+
+
+      const result = await this.enviarLoteRps(password, clientsid, "EnviarLoteRpsEnvio");
       res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
     } catch (error) {
       console.error("Erro ao criar o RPS:", error);
@@ -63,7 +67,7 @@ class NFSE {
     }
   };
 
-  public async enviarLoteRps(password: string) {
+  public async enviarLoteRps(password: string, id: string, SOAPAction : string) {
     try {
       if (!fs.existsSync(this.TEMP_DIR)) {
         fs.mkdirSync(this.TEMP_DIR, { recursive: true });
@@ -104,14 +108,14 @@ class NFSE {
         rejectUnauthorized: false,
       });
 
-      const xmlLoteRps = this.gerarXmlLote();
-      const signedXml = this.assinarXml(xmlLoteRps, certPathToUse, password);
+      const xmlLoteRps = this.gerarXmlNfse(id);
+      const signedXml = this.assinarXml(await xmlLoteRps, certPathToUse, password, "InfDeclaracaoPrestacaoServico");
 
       const response = await axios.post(this.WSDL_URL, signedXml, {
         httpsAgent,
         headers: {
           "Content-Type": "text/xml;charset=utf-8",
-          SOAPAction: "EnviarLoteRpsEnvio",
+          SOAPAction: SOAPAction,
         },
       });
 
@@ -127,7 +131,7 @@ class NFSE {
     }
   }
 
-  private async gerarXmlLote(id : string) {
+  private async gerarXmlNfse(id : string) {
     const builder = xmlbuilder;
 
     const RPSQuery = MkauthSource.getRepository(Faturas);
@@ -283,7 +287,7 @@ class NFSE {
     return xml;
   }
 
-  private assinarXml(xml: string, certPath: string, password: string): string {
+  private assinarXml(xml: string, certPath: string, password: string, children : string): string {
     const pfxBuffer = fs.readFileSync(certPath);
     const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
     const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
@@ -311,7 +315,7 @@ class NFSE {
     });
 
     signer.addReference({
-      xpath: "//*[local-name(.)='InfDeclaracaoPrestacaoServico']",
+      xpath: `//*[local-name(.)='${children}']`,
       transforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"],
       digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
     });
@@ -326,7 +330,7 @@ class NFSE {
     const signedDoc = libxmljs.parseXml(signedXml);
 
     const rpsElement = signedDoc.get(
-      "//*[local-name(.)='InfDeclaracaoPrestacaoServico']"
+      `//*[local-name(.)='${children}']`
     ) as libxmljs.XMLElement | null;
 
     if (!rpsElement) {
