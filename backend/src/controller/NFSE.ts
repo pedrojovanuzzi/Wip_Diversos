@@ -355,6 +355,9 @@ class NFSE {
 
   public async BuscarClientes(req: Request, res: Response) {
     const { cpf, filters, dateFilter } = req.body;
+
+    console.log("Filtros recebidos:", { cpf, filters, dateFilter });
+    
     
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
   
@@ -381,7 +384,7 @@ class NFSE {
             whereConditions.venc = In(vencimento);
         }
         if (cli_ativado?.length) {
-            whereConditions.cli_ativado = In(cli_ativado);
+            whereConditions.cli_ativado = In(["s"]);
         }
         if (nova_nfe?.length) {
             whereConditions.tags = In(nova_nfe);

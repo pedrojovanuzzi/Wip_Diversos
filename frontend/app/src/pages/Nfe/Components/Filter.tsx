@@ -26,7 +26,7 @@ const filters = {
     { value: "5_PFJ_FIBRA_800M", label: "800M"},
   ],
   cli_ativado: [
-    { value: "s", label: "Cliente Ativo"},
+    { value: "active_client", label: "Cliente Ativo"},
   ],
   nova_nfe: [
     { value: "new_nfe", label: "Nova NFE"}
@@ -82,7 +82,7 @@ export default function Filter({ setActiveFilters, setDate } : FilterProps) {
         categorizedFilters.nova_nfe = [filter];  // Apenas um "new_nfe" ativo
       }
       else if (filter === "active_client") {
-        categorizedFilters.cli_ativado.push(filter);  // Cliente ativo
+        categorizedFilters.cli_ativado = [filter];  // Cliente ativo
       }
       else if (vencimentos.includes(filter)) {
         categorizedFilters.vencimento.push(filter);

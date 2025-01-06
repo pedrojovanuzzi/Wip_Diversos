@@ -9,6 +9,8 @@ import { RootState } from "../../types";
 import { BsFiletypeDoc } from "react-icons/bs";
 import { IoArrowUpCircleOutline } from "react-icons/io5";
 import PopUpButton from "./Components/PopUpButton";
+import { PiPrinter  } from "react-icons/pi";
+
 
 export const Nfe = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -249,7 +251,7 @@ export const Nfe = () => {
           Emitir NF-e
         </button> 
         <span className="absolute translate-x-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
-          <BsFiletypeDoc />
+          <PiPrinter  />
         </span>
         <button
           className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
