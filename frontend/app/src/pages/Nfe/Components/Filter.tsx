@@ -131,9 +131,9 @@ export default function Filter({ setActiveFilters, setDate } : FilterProps) {
         aria-labelledby="filter-heading"
         className="grid items-center border-b border-t border-gray-200"
       >
-        {/* <h2 id="filter-heading" className="sr-only">
+        <h2 id="filter-heading" className="sr-only">
           Filtros
-        </h2> */}
+        </h2>
         <div className="relative col-start-1 row-start-1 py-4">
           <div className="mx-auto flex max-w-7xl space-x-6 divide-x divide-gray-200 px-4 text-sm sm:px-6 lg:px-8">
             <div>
@@ -142,11 +142,11 @@ export default function Filter({ setActiveFilters, setDate } : FilterProps) {
                   aria-hidden="true"
                   className="mr-2 size-5 flex-none text-gray-400 group-hover:text-gray-500"
                 />
-                {/* {`${filter.length} Filtros`} */}
-                Filtrar por Data
+                {`${filter.length} Filtros`}
+                {/* Filtrar por Data */}
               </DisclosureButton>
             </div>
-            {/* <div className="pl-6">
+            <div className="pl-6">
               <button
                 onClick={clearFilter}
                 type="button"
@@ -154,14 +154,14 @@ export default function Filter({ setActiveFilters, setDate } : FilterProps) {
               >
                 Limpar Filtro
               </button>
-            </div> */}
+            </div>
           </div>
         </div>
 
         <DisclosurePanel className="border-t border-gray-200">
         <Calendar setDateFilter={setDate} />
         <Line />
-          {/* <div className="mx-auto grid max-w-7xl mt-10 grid-cols-3 gap-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
+          <div className="mx-auto grid max-w-7xl mt-10 grid-cols-3 gap-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
             <fieldset>
               <legend className="block font-medium">Plano</legend>
               <div className="space-y-6 p-10 sm:space-y-4 sm:pt-4">
@@ -349,7 +349,7 @@ export default function Filter({ setActiveFilters, setDate } : FilterProps) {
                 ))}
               </div>
             </fieldset>
-          </div> */}
+          </div>
         </DisclosurePanel>
       </Disclosure>
     </div>

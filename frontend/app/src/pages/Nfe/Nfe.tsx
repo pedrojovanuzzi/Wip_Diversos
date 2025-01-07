@@ -97,12 +97,15 @@ export const Nfe = () => {
   };
 
   const handleSearch = async () => {
-    console.log("Buscando por:", searchCpf, activeFilters);
+    const searchCpfRegex = searchCpf.replace(/\D/g, "");
+
+    console.log("Buscando por:", searchCpfRegex, activeFilters);
+
     try {
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
         {
-          cpf: searchCpf,
+          cpf: searchCpfRegex,
           filters: activeFilters,
           dateFilter: dateFilter,
         },

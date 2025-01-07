@@ -14,9 +14,9 @@ import * as libxmljs from "libxmljs";
 import MkauthSource from "../database/MkauthSource";
 import AppDataSource from "../database/DataSource";
 import { NFSE } from "../entities/NFSE";
-import { ClientesEntities } from '../entities/ClientesEntities';
-import { Faturas } from '../entities/Faturas';
-import { Between, FindOptionsOrder, In } from "typeorm";
+import { ClientesEntities } from "../entities/ClientesEntities";
+import { Faturas } from "../entities/Faturas";
+import { Between, Equal, FindOptionsOrder, In, IsNull, MoreThanOrEqual } from "typeorm";
 
 dotenv.config();
 
@@ -57,7 +57,11 @@ class NFSEController {
         throw new Error("Senha do certificado não fornecida.");
       }
 
-      const result = await this.enviarLoteRps(password, clientsid, "EnviarLoteRpsEnvio");
+      const result = await this.enviarLoteRps(
+        password,
+        clientsid,
+        "EnviarLoteRpsEnvio"
+      );
       res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
     } catch (error) {
       console.error("Erro ao criar o RPS:", error);
@@ -65,7 +69,7 @@ class NFSEController {
     }
   };
 
-  public async enviarLoteRps(password: string, id: string, SOAPAction : string) {
+  public async enviarLoteRps(password: string, id: string, SOAPAction: string) {
     try {
       if (!fs.existsSync(this.TEMP_DIR)) {
         fs.mkdirSync(this.TEMP_DIR, { recursive: true });
@@ -107,7 +111,12 @@ class NFSEController {
       });
 
       const xmlLoteRps = this.gerarXmlNfse(id);
-      const signedXml = this.assinarXml(await xmlLoteRps, certPathToUse, password, "InfDeclaracaoPrestacaoServico");
+      const signedXml = this.assinarXml(
+        await xmlLoteRps,
+        certPathToUse,
+        password,
+        "InfDeclaracaoPrestacaoServico"
+      );
 
       const response = await axios.post(this.WSDL_URL, signedXml, {
         httpsAgent,
@@ -129,7 +138,7 @@ class NFSEController {
     }
   }
 
-  private async gerarXmlRecepcionarRps(id : string, password : string) {
+  private async gerarXmlRecepcionarRps(id: string, password: string) {
     const builder = xmlbuilder;
 
     const RPSQuery = MkauthSource.getRepository(Faturas);
@@ -137,11 +146,15 @@ class NFSEController {
 
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
 
-    const ClientData = await ClientRepository.findOne({ where: { id: rpsData?.id } });
+    const ClientData = await ClientRepository.findOne({
+      where: { id: rpsData?.id },
+    });
 
     ClientData?.cidade;
 
-    const response = await axios.get(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`);
+    const response = await axios.get(
+      `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
+    );
 
     const municipio = response.data.id;
 
@@ -150,10 +163,8 @@ class NFSEController {
     const NsfeData = AppDataSource.getRepository(NFSE);
 
     const nfseResponse = await NsfeData.findOne({
-      order: {[id] : 'DESC'}
+      order: { [id]: "DESC" },
     });
-
-  
 
     const xml = builder
       .create("soapenv:Envelope", {
@@ -182,7 +193,7 @@ class NFSEController {
       .txt("1")
       .up()
       .ele("ListaRps")
-      .ele("Rps", {xmlns: "http://www.abrasf.org.br/nfse.xsd"})
+      .ele("Rps", { xmlns: "http://www.abrasf.org.br/nfse.xsd" })
       .ele("InfDeclaracaoPrestacaoServico", { Id: String(rpsData?.uuid_lanc) })
       .ele("Rps")
       .ele("IdentificacaoRps")
@@ -197,14 +208,20 @@ class NFSEController {
       .up()
       .up()
       .ele("DataEmissao")
-      .txt(rpsData?.processamento ? rpsData.processamento.toISOString().substring(0, 10) : '')
+      .txt(
+        rpsData?.processamento
+          ? rpsData.processamento.toISOString().substring(0, 10)
+          : ""
+      )
       .up()
       .ele("Status")
       .txt("1")
       .up()
       .up()
       .ele("Competencia")
-      .txt(rpsData?.datavenc ? rpsData.datavenc.toISOString().substring(0, 10) : '')
+      .txt(
+        rpsData?.datavenc ? rpsData.datavenc.toISOString().substring(0, 10) : ""
+      )
       .up()
       .ele("Servico")
       .ele("Valores")
@@ -310,7 +327,7 @@ class NFSEController {
     return xml;
   }
 
-  private async gerarXmlNfse(id : string) {
+  private async gerarXmlNfse(id: string) {
     const builder = xmlbuilder;
 
     const RPSQuery = MkauthSource.getRepository(Faturas);
@@ -318,18 +335,22 @@ class NFSEController {
 
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
 
-    const ClientData = await ClientRepository.findOne({ where: { id: rpsData?.id } });
+    const ClientData = await ClientRepository.findOne({
+      where: { id: rpsData?.id },
+    });
 
     ClientData?.cidade;
 
-    const response = await axios.get(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`);
+    const response = await axios.get(
+      `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
+    );
 
     const municipio = response.data.id;
 
     const NsfeData = AppDataSource.getRepository(NFSE);
 
     const nfseResponse = await NsfeData.findOne({
-      order: {[id] : 'DESC'}
+      order: { [id]: "DESC" },
     });
 
     const xml = builder
@@ -360,14 +381,20 @@ class NFSEController {
       .up()
       .up()
       .ele("DataEmissao")
-      .txt(rpsData?.processamento ? rpsData.processamento.toISOString().substring(0, 10) : '')
+      .txt(
+        rpsData?.processamento
+          ? rpsData.processamento.toISOString().substring(0, 10)
+          : ""
+      )
       .up()
       .ele("Status")
       .txt("1")
       .up()
       .up()
       .ele("Competencia")
-      .txt(rpsData?.datavenc ? rpsData.datavenc.toISOString().substring(0, 10) : '')
+      .txt(
+        rpsData?.datavenc ? rpsData.datavenc.toISOString().substring(0, 10) : ""
+      )
       .up()
       .ele("Servico")
       .ele("Valores")
@@ -472,7 +499,12 @@ class NFSEController {
     return xml;
   }
 
-  private assinarXml(xml: string, certPath: string, password: string, children : string): string {
+  private assinarXml(
+    xml: string,
+    certPath: string,
+    password: string,
+    children: string
+  ): string {
     const pfxBuffer = fs.readFileSync(certPath);
     const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
     const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
@@ -545,14 +577,18 @@ class NFSEController {
     return finalXml;
   }
 
-  private assinaturaXML(certPath: string, password: string, reference : string): string {
+  private assinaturaXML(
+    certPath: string,
+    password: string,
+    reference: string
+  ): string {
     const pfxBuffer = fs.readFileSync(certPath);
-    const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString('binary'));
+    const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
     const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
-  
-    let privateKeyPem = '';
-    let certificatePem = '';
-  
+
+    let privateKeyPem = "";
+    let certificatePem = "";
+
     p12.safeContents.forEach((content) => {
       content.safeBags.forEach((bag) => {
         if (bag.type === forge.pki.oids.pkcs8ShroudedKeyBag && bag.key) {
@@ -562,55 +598,52 @@ class NFSEController {
         }
       });
     });
-  
+
     if (!privateKeyPem || !certificatePem) {
-      throw new Error('Falha ao extrair chave privada ou certificado.');
+      throw new Error("Falha ao extrair chave privada ou certificado.");
     }
-  
+
     const signer = new SignedXml() as any;
-  
+
     signer.addReference({
       xpath: `//*[@Id='${reference}']`, // Certifique-se de que o elemento referenciado tenha o atributo Id="lote1"
       transforms: [
-        'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
-        'http://www.w3.org/TR/2001/REC-xml-c14n-20010315',
+        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
       ],
-      digestAlgorithm: 'http://www.w3.org/2000/09/xmldsig#sha1',
+      digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
     });
-  
-    signer.signatureAlgorithm = 'http://www.w3.org/2000/09/xmldsig#rsa-sha1';
+
+    signer.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
     signer.canonicalizationAlgorithm =
-      'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
-  
-  
+      "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
 
     // Adiciona a chave privada para assinatura
     signer.signingKey = privateKeyPem;
-  
+
     // Define o certificado público
     signer.keyInfoProvider = {
       getKeyInfo() {
         return `
           <X509Data>
             <X509Certificate>${certificatePem
-              .replace('-----BEGIN CERTIFICATE-----', '')
-              .replace('-----END CERTIFICATE-----', '')
-              .replace(/\n/g, '')}</X509Certificate>
+              .replace("-----BEGIN CERTIFICATE-----", "")
+              .replace("-----END CERTIFICATE-----", "")
+              .replace(/\n/g, "")}</X509Certificate>
           </X509Data>`;
       },
     };
-  
+
     const xmlToSign = `
       <root xmlns="http://www.abrasf.org.br/nfse.xsd" Id="lote1">
         <!-- Outros elementos do XML aqui -->
       </root>`;
-  
+
     signer.computeSignature(xmlToSign);
-  
+
     const signedXml = signer.getSignedXml();
     return signedXml;
   }
-  
 
   public async uploadCertificado(req: Request, res: Response) {
     try {
@@ -624,92 +657,124 @@ class NFSEController {
   }
 
   public async BuscarClientes(req: Request, res: Response) {
-    const { cpf, filters, dateFilter } = req.body;    
-    
+    const { cpf, filters, dateFilter } = req.body;
+
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
-  
+
     const whereConditions: any = {};
 
     // Adiciona CPF se existir
     if (cpf) {
-        whereConditions.cpf_cnpj = cpf;
+      whereConditions.cpf_cnpj = cpf;
     }
 
-    // Adiciona filtro por intervalo de datas (usando Between)
     if (dateFilter && dateFilter.start && dateFilter.end) {
-        whereConditions.data_desativacao = Between(dateFilter.start, dateFilter.end);
+      const startDate = new Date(dateFilter.start);
+      const endDate = new Date(dateFilter.end);
+
+      // Adiciona 3 horas diretamente
+      startDate.setHours(startDate.getHours() + 3);
+      endDate.setHours(endDate.getHours() + 3);
+
+      whereConditions.data_desativacao = Between(startDate, endDate);
     }
-  
+
     // Processa outros filtros
     if (filters) {
-        const { plano, vencimento, cli_ativado, nova_nfe } = filters;
+      const { plano, vencimento, cli_ativado, nova_nfe } = filters;
 
-        if (plano?.length) {
-            whereConditions.plano = In(plano);
-        }
-        if (vencimento?.length) {
-            whereConditions.venc = In(vencimento);
-        }
-        if (cli_ativado?.length) {
-            whereConditions.cli_ativado = In(["s"]);
-        }
-        if (nova_nfe?.length) {
-            whereConditions.tags = In(nova_nfe);
-        }
+      if (plano?.length) {
+        whereConditions.plano = In(plano);
+      }
+      if (vencimento?.length) {
+        whereConditions.venc = In(vencimento);
+      }
+      if (cli_ativado?.length) {
+        whereConditions.cli_ativado = In(["s"]);
+      }
+      if (nova_nfe?.length) {
+        whereConditions.tags = In(nova_nfe);
+      }
     }
 
     try {
-        const clientesResponse = await ClientRepository.find({
-            where: whereConditions,
-            select: {
-                login: true,
-                cpf_cnpj: true,
-                cli_ativado: true,
-            }
-        });
-        
-
-        const faturasData = MkauthSource.getRepository(Faturas);
-
-        const faturasResponse = await faturasData.find({
-            where: {
-                login: In(clientesResponse.map((cliente) => cliente.login))
-            },
-            select: {
-                id: true,
-                login: true,
-                datavenc: true,
-                tipo: true,
-                valor: true,
-            }
-        });
-  
-        const clientesComFaturas = clientesResponse.map(cliente => {
-          const fatura = faturasResponse.find(f => f.login === cliente.login) || { id: '', login: '', datavenc: new Date(), tipo: '', valor: '' };
-  
-          return {
-              ...cliente,
-              fatura: {
-                  titulo: fatura.id || null,
-                  login: fatura.login || null,
-                  datavenc: fatura.datavenc || null,
-                  tipo: fatura.tipo || null,
-                  valor: fatura.valor || null
-              }
-          };
+      const clientesResponse = await ClientRepository.find({
+        where: whereConditions,
+        select: {
+          login: true,
+          cpf_cnpj: true,
+          cli_ativado: true,
+        },
       });
 
-      console.log(clientesComFaturas);
-      
-  
-      res.status(200).json(clientesComFaturas);
-      
-    } catch (error) {
-        console.error("Erro ao buscar clientes:", error);
-        res.status(500).json({ message: "Erro ao buscar clientes" });
-    }
-}
+      const faturasData = MkauthSource.getRepository(Faturas);
 
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      const startDate = dateFilter
+        ? new Date(dateFilter.start)
+        : firstDayOfMonth;
+      const endDate = dateFilter ? new Date(dateFilter.end) : lastDayOfMonth;
+
+      startDate.setHours(startDate.getHours() + 3);
+      endDate.setHours(endDate.getHours() + 3);
+
+      console.log("Data de início:", startDate);
+      console.log("Data de fim:", endDate);
+      console.log(firstDayOfMonth, lastDayOfMonth);
+
+      const faturasResponse = await faturasData.find({
+        where: {
+          login: In(clientesResponse.map((cliente) => cliente.login)),
+          datavenc: Between(startDate, endDate),
+          datadel: IsNull(),
+        },
+        select: {
+          id: true,
+          login: true,
+          datavenc: true,
+          tipo: true,
+          valor: true,
+        },
+        order: {
+          datavenc: "DESC",
+        },
+      });
+
+      const clientesComFaturas = clientesResponse
+        .map((cliente) => {
+          const fatura = faturasResponse.filter(
+            (f) => f.login === cliente.login
+          );
+
+          if (fatura.length === 0) return null;
+
+          return {
+            ...cliente,
+            fatura: {
+              titulo: fatura.map((f) => f.id).join(", ") || null,
+              login: fatura.map((f) => f.login).join(", ") || null,
+              datavenc:
+                fatura
+                  .map((f) => new Date(f.datavenc).toLocaleDateString("pt-BR"))
+                  .join(", ") || null,
+              tipo: fatura.map((f) => f.tipo).join(", ") || null,
+              valor: fatura.map((f) => f.valor).join(", ") || null,
+            },
+          };
+        })
+        .filter((cliente) => cliente !== null); // Remove clientes sem fatura
+
+      console.log(clientesComFaturas);
+
+      res.status(200).json(clientesComFaturas);
+    } catch (error) {
+      console.error("Erro ao buscar clientes:", error);
+      res.status(500).json({ message: "Erro ao buscar clientes" });
+    }
+  }
 }
 
 export default new NFSEController();
