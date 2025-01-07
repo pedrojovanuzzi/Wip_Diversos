@@ -52,7 +52,7 @@ export const Nfe = () => {
     try {
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/`,
-        { password },
+        { password, clientesSelecionados },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -61,6 +61,8 @@ export const Nfe = () => {
         }
       );
       console.log("NF-e emitida:", resposta.data);
+      console.log(clientesSelecionados);
+      
       setDadosNFe(resposta.data);
       setShowPopUp(false); // Fecha o PopUp ao concluir
     } catch (erro) {
@@ -140,31 +142,31 @@ export const Nfe = () => {
                     scope="col"
                     className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
-                    ID
+                    Titulo
                   </th>
                   <th
                     scope="col"
                     className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
-                    Nome
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-sm font-semibold text-gray-900"
-                  >
-                    CPF/CNPJ
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-sm font-semibold text-gray-900"
-                  >
-                    Plano
+                    Login
                   </th>
                   <th
                     scope="col"
                     className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
                     Vencimento
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-sm font-semibold text-gray-900"
+                  >
+                    Tipo
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-sm font-semibold text-gray-900"
+                  >
+                    Valor
                   </th>
                   <th
                     scope="col"
@@ -184,22 +186,22 @@ export const Nfe = () => {
                         onChange={() => handleCheckboxChange(cliente.id)}
                       />
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {cliente.id}
+                    <td key={cliente.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {cliente.fatura.titulo}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {cliente.nome}
+                    <td key={cliente.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {cliente.login}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {cliente.cpf_cnpj}
+                    <td key={cliente.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {cliente.fatura.datavenc}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {cliente.plano}
+                    <td key={cliente.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {cliente.fatura.tipo}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {cliente.venc}
+                    <td key={cliente.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {cliente.fatura.valor}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td key={cliente.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
                     </td>
                   </tr>

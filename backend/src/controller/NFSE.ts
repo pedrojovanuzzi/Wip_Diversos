@@ -12,9 +12,11 @@ import * as forge from "node-forge";
 import * as xml2js from "xml2js";
 import * as libxmljs from "libxmljs";
 import MkauthSource from "../database/MkauthSource";
+import AppDataSource from "../database/DataSource";
+import { NFSE } from "../entities/NFSE";
 import { ClientesEntities } from '../entities/ClientesEntities';
 import { Faturas } from '../entities/Faturas';
-import { Between, In } from "typeorm";
+import { Between, FindOptionsOrder, In } from "typeorm";
 
 dotenv.config();
 
@@ -36,7 +38,7 @@ dotenv.config();
 //   senha: "123456",
 // };
 
-class NFSE {
+class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
   private WSDL_URL =
     "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS";
@@ -54,10 +56,6 @@ class NFSE {
       if (!password) {
         throw new Error("Senha do certificado não fornecida.");
       }
-
-    this.gerarXmlRecepcionarRps(clientsid, password);
-
-
 
       const result = await this.enviarLoteRps(password, clientsid, "EnviarLoteRpsEnvio");
       res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
@@ -149,6 +147,14 @@ class NFSE {
 
     const signature = this.assinaturaXML(this.certPath, password, "lote1");
 
+    const NsfeData = AppDataSource.getRepository(NFSE);
+
+    const nfseResponse = await NsfeData.findOne({
+      order: {[id] : 'DESC'}
+    });
+
+  
+
     const xml = builder
       .create("soapenv:Envelope", {
         version: "1.0",
@@ -177,17 +183,17 @@ class NFSE {
       .up()
       .ele("ListaRps")
       .ele("Rps", {xmlns: "http://www.abrasf.org.br/nfse.xsd"})
-      .ele("InfDeclaracaoPrestacaoServico", { Id: "rps000000000000001999" })
+      .ele("InfDeclaracaoPrestacaoServico", { Id: String(rpsData?.uuid_lanc) })
       .ele("Rps")
       .ele("IdentificacaoRps")
       .ele("Numero")
-      .txt(rpsData?.numero)
+      .txt(String(nfseResponse?.numeroRps))
       .up()
       .ele("Serie")
-      .txt(rpsData?.serie)
+      .txt(String(nfseResponse?.serieRps))
       .up()
       .ele("Tipo")
-      .txt(rpsData?.tipo)
+      .txt(String(nfseResponse?.tipoRps))
       .up()
       .up()
       .ele("DataEmissao")
@@ -206,20 +212,20 @@ class NFSE {
       .txt(String(rpsData?.valor))
       .up()
       .ele("Aliquota")
-      .txt(rpsData?.aliquota)
+      .txt(String(nfseResponse?.aliquota))
       .up()
       .up()
       .ele("IssRetido")
-      .txt(rpsData?.issRetido)
+      .txt(String(nfseResponse?.issRetido))
       .up()
       .ele("ResponsavelRetencao")
-      .txt(rpsData?.responsavelRetencao)
+      .txt(String(nfseResponse?.responsavelRetencao))
       .up()
       .ele("ItemListaServico")
-      .txt(rpsData?.itemLista)
+      .txt(String(nfseResponse?.itemListaServico))
       .up()
       .ele("Discriminacao")
-      .txt(rpsData?.descricao)
+      .txt(String(nfseResponse?.discriminacao))
       .up()
       .ele("CodigoMunicipio")
       .txt("3503406")
@@ -320,6 +326,12 @@ class NFSE {
 
     const municipio = response.data.id;
 
+    const NsfeData = AppDataSource.getRepository(NFSE);
+
+    const nfseResponse = await NsfeData.findOne({
+      order: {[id] : 'DESC'}
+    });
+
     const xml = builder
       .create("soapenv:Envelope", {
         version: "1.0",
@@ -334,17 +346,17 @@ class NFSE {
       .ele("ws:gerarNfse")
       .ele("GerarNfseEnvio", { xmlns: "http://www.abrasf.org.br/nfse.xsd" })
       .ele("Rps", { xmlns: "http://www.abrasf.org.br/nfse.xsd" })
-      .ele("InfDeclaracaoPrestacaoServico", { Id: "rps000000000000001999" })
+      .ele("InfDeclaracaoPrestacaoServico", { Id: String(rpsData?.uuid_lanc) })
       .ele("Rps")
       .ele("IdentificacaoRps")
       .ele("Numero")
-      .txt(rpsData?.numero)
+      .txt(String(nfseResponse?.numeroRps))
       .up()
       .ele("Serie")
-      .txt(rpsData?.serie)
+      .txt(String(nfseResponse?.serieRps))
       .up()
       .ele("Tipo")
-      .txt(rpsData?.tipo)
+      .txt(String(nfseResponse?.tipoRps))
       .up()
       .up()
       .ele("DataEmissao")
@@ -363,20 +375,20 @@ class NFSE {
       .txt(String(rpsData?.valor))
       .up()
       .ele("Aliquota")
-      .txt(rpsData?.aliquota)
+      .txt(String(nfseResponse?.aliquota))
       .up()
       .up()
       .ele("IssRetido")
-      .txt(rpsData?.issRetido)
+      .txt(String(nfseResponse?.issRetido))
       .up()
       .ele("ResponsavelRetencao")
-      .txt(rpsData?.responsavelRetencao)
+      .txt(String(nfseResponse?.responsavelRetencao))
       .up()
       .ele("ItemListaServico")
-      .txt(rpsData?.itemLista)
+      .txt(String(nfseResponse?.itemListaServico))
       .up()
       .ele("Discriminacao")
-      .txt(rpsData?.descricao)
+      .txt(String(nfseResponse?.discriminacao))
       .up()
       .ele("CodigoMunicipio")
       .txt("3503406")
@@ -612,10 +624,7 @@ class NFSE {
   }
 
   public async BuscarClientes(req: Request, res: Response) {
-    const { cpf, filters, dateFilter } = req.body;
-
-    console.log("Filtros recebidos:", { cpf, filters, dateFilter });
-    
+    const { cpf, filters, dateFilter } = req.body;    
     
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
   
@@ -653,17 +662,48 @@ class NFSE {
         const clientesResponse = await ClientRepository.find({
             where: whereConditions,
             select: {
-                id: true,
-                nome: true,
+                login: true,
                 cpf_cnpj: true,
-                plano: true,
-                venc: true,
                 cli_ativado: true,
-                tags: true,
+            }
+        });
+        
+
+        const faturasData = MkauthSource.getRepository(Faturas);
+
+        const faturasResponse = await faturasData.find({
+            where: {
+                login: In(clientesResponse.map((cliente) => cliente.login))
+            },
+            select: {
+                id: true,
+                login: true,
+                datavenc: true,
+                tipo: true,
+                valor: true,
             }
         });
   
-        res.status(200).json(clientesResponse);
+        const clientesComFaturas = clientesResponse.map(cliente => {
+          const fatura = faturasResponse.find(f => f.login === cliente.login) || { id: '', login: '', datavenc: new Date(), tipo: '', valor: '' };
+  
+          return {
+              ...cliente,
+              fatura: {
+                  titulo: fatura.id || null,
+                  login: fatura.login || null,
+                  datavenc: fatura.datavenc || null,
+                  tipo: fatura.tipo || null,
+                  valor: fatura.valor || null
+              }
+          };
+      });
+
+      console.log(clientesComFaturas);
+      
+  
+      res.status(200).json(clientesComFaturas);
+      
     } catch (error) {
         console.error("Erro ao buscar clientes:", error);
         res.status(500).json({ message: "Erro ao buscar clientes" });
@@ -672,4 +712,4 @@ class NFSE {
 
 }
 
-export default new NFSE();
+export default new NFSEController();

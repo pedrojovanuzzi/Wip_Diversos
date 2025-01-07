@@ -10,7 +10,7 @@ export class Faturas {
     datavenc!: Date;
 
     @Column({ type: 'varchar', length: 64, nullable: true })
-    nossnum!: string;
+    nossonum!: string;
 
     @Column({ type: 'datetime', nullable: true })
     datapag!: Date;
@@ -49,7 +49,7 @@ export class Faturas {
     usergerou!: string;
 
     @Column({ type: 'varchar', length: 255, default: 'completo' })
-    valoger!: string;
+    valorger!: string;
 
     @Column({ type: 'varchar', length: 20, nullable: true })
     coletor!: string;
@@ -61,10 +61,10 @@ export class Faturas {
     valor!: string;
 
     @Column({ type: 'varchar', length: 50, nullable: true })
-    valorp!: string;
+    valorpag!: string;
 
     @Column({ type: 'varchar', length: 32, nullable: true })
-    gwt_numerr!: string;
+    gwt_numero!: string;
 
     @Column({ type: 'enum', enum: ['sim', 'nao'], default: 'nao' })
     imp!: string;
@@ -76,7 +76,7 @@ export class Faturas {
     tipocob!: string;
 
     @Column({ type: 'int', nullable: true })
-    codigo_carr!: number;
+    codigo_carne!: number;
 
     @Column({ type: 'varchar', length: 32, nullable: true })
     chave_gnet!: string;
@@ -85,13 +85,13 @@ export class Faturas {
     chave_gnet2!: string;
 
     @Column({ type: 'varchar', length: 32, nullable: true })
-    chave_bfaci!: string;
+    chave_bfacil!: string;
 
     @Column({ type: 'varchar', length: 32, nullable: true })
     chave_juno!: string;
 
     @Column({ type: 'varchar', length: 32, nullable: true })
-    chave_galax!: string;
+    chave_galaxpay!: string;
 
     @Column({ type: 'varchar', length: 32, nullable: true })
     chave_iugu!: string;
@@ -103,7 +103,7 @@ export class Faturas {
     gerourem!: number;
 
     @Column({ type: 'decimal', precision: 12, scale: 2, default: 0.00 })
-    removalor!: number;
+    remvalor!: number;
 
     @Column({ type: 'datetime', nullable: true })
     remdata!: Date;
@@ -112,19 +112,19 @@ export class Faturas {
     formapag!: string;
 
     @Column({ type: 'varchar', length: 100, nullable: true })
-    fcartaoaband!: string;
+    fcartaobandeira!: string;
 
     @Column({ type: 'varchar', length: 32, nullable: true })
-    fcartaonum!: string;
+    fcartaonumero!: string;
 
     @Column({ type: 'varchar', length: 100, nullable: true })
-    fchequenum!: string;
+    fchequenumero!: string;
 
     @Column({ type: 'varchar', length: 100, nullable: true })
-    fchequeban!: string;
+    fchequebanco!: string;
 
     @Column({ type: 'varchar', length: 100, nullable: true })
-    fchequeagc!: string;
+    fchequeagcc!: string;
 
     @Column({ type: 'decimal', precision: 4, scale: 2, default: 0.00 })
     percmulta!: number;
@@ -139,7 +139,7 @@ export class Faturas {
     valormora!: number;
 
     @Column({ type: 'decimal', precision: 12, scale: 2, default: 0.00 })
-    perdesc!: number;
+    percdesc!: number;
 
     @Column({ type: 'decimal', precision: 12, scale: 2, default: 0.00 })
     valordesc!: number;
@@ -151,10 +151,10 @@ export class Faturas {
     datadel!: Date;
 
     @Column({ type: 'int', nullable: true })
-    num_recibo!: number;
+    num_recibos!: number;
 
     @Column({ type: 'int', nullable: true })
-    num_retorno!: number;
+    num_retornos!: number;
 
     @Column({ type: 'tinyint', default: 0 })
     alt_venc!: number;
@@ -178,5 +178,5 @@ export class Faturas {
     oco06!: number;
 
     @Column({ type: 'varchar', length: 64, nullable: true })
-    codigo_barr!: string;
+    codigo_barras!: string;
 }
