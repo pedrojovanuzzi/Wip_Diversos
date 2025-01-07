@@ -12,48 +12,59 @@ import { log } from "node:console";
 import { useState } from "react";
 import Calendar from "./Calendar";
 import Line from "./Line";
+import { CiCirclePlus } from "react-icons/ci";
+import { IoArrowUpCircleOutline } from "react-icons/io5";
 
 const filters = {
   plano: [
-    { value: "90_PFJ_Radio5M", label: "5M"},
-    { value: "91_PFJ_Radio8M", label: "8M"},
-    { value: "92_PFJ_Radio15M", label: "15M"},
-    { value: "7_PFJ_FIBRA_340M_RURAL_WIP", label: "340M"},
-    { value: "1_PFJ_FIBRA_400M", label: "400M"},
-    { value: "2_PFJ_FIBRA_500M", label: "500M"},
-    { value: "3_PFJ_FIBRA_600M", label: "600M"},
-    { value: "4_PFJ_FIBRA_700M", label: "700M"},
-    { value: "5_PFJ_FIBRA_800M", label: "800M"},
+    { value: "90_PFJ_Radio5M", label: "5M" },
+    { value: "91_PFJ_Radio8M", label: "8M" },
+    { value: "92_PFJ_Radio15M", label: "15M" },
+    { value: "7_PFJ_FIBRA_340M_RURAL_WIP", label: "340M" },
+    { value: "1_PFJ_FIBRA_400M", label: "400M" },
+    { value: "2_PFJ_FIBRA_500M", label: "500M" },
+    { value: "3_PFJ_FIBRA_600M", label: "600M" },
+    { value: "4_PFJ_FIBRA_700M", label: "700M" },
+    { value: "5_PFJ_FIBRA_800M", label: "800M" },
   ],
-  cli_ativado: [
-    { value: "active_client", label: "Cliente Ativo"},
-  ],
-  nova_nfe: [
-    { value: "new_nfe", label: "Nova NFE"}
-  ],
+  cli_ativado: [{ value: "active_client", label: "Cliente Ativo" }],
+  nova_nfe: [{ value: "new_nfe", label: "Nova NFE" }],
   vencimento: [
-    { value: "05", label: "Dia 5"},
-    { value: "10", label: "Dia 10"},
-    { value: "15", label: "Dia 15"},
-    { value: "20", label: "Dia 20"},
-    { value: "25", label: "Dia 25"},
+    { value: "05", label: "Dia 5" },
+    { value: "10", label: "Dia 10" },
+    { value: "15", label: "Dia 15" },
+    { value: "20", label: "Dia 20" },
+    { value: "25", label: "Dia 25" },
   ],
 };
 
-
 interface FilterProps {
-
   setActiveFilters: (filters: any) => void;
 
-  setDate: React.Dispatch<React.SetStateAction<{ start: string; end: string } | null>>;
+  setDate: React.Dispatch<
+    React.SetStateAction<{ start: string; end: string } | null>
+  >;
 
+  setArquivo: React.Dispatch<React.SetStateAction<File | null>>;
+
+  enviarCertificado: React.Dispatch<React.SetStateAction<File | null>>;
 }
 
-export default function Filter({ setActiveFilters, setDate } : FilterProps) {
+export default function Filter({
+  setActiveFilters,
+  setDate,
+  setArquivo,
+  enviarCertificado,
+}: FilterProps) {
   const [filter, setFilter] = useState<string[]>([]);
 
   const categorizeFilters = (filters: string[]) => {
-    const categorizedFilters: { plano: string[], vencimento: string[], cli_ativado: string[], nova_nfe: string[]} = {
+    const categorizedFilters: {
+      plano: string[];
+      vencimento: string[];
+      cli_ativado: string[];
+      nova_nfe: string[];
+    } = {
       plano: [],
       vencimento: [],
       cli_ativado: [],
@@ -69,56 +80,53 @@ export default function Filter({ setActiveFilters, setDate } : FilterProps) {
       "2_PFJ_FIBRA_500M",
       "3_PFJ_FIBRA_600M",
       "4_PFJ_FIBRA_700M",
-      "5_PFJ_FIBRA_800M"
+      "5_PFJ_FIBRA_800M",
     ];
-    
+
     const vencimentos = ["05", "10", "15", "20", "25"];
-  
+
     filters.forEach((filter) => {
       if (planos.includes(filter)) {
         categorizedFilters.plano.push(filter);
-      }
-      else if (filter === "new_nfe") {
-        categorizedFilters.nova_nfe = [filter];  // Apenas um "new_nfe" ativo
-      }
-      else if (filter === "active_client") {
-        categorizedFilters.cli_ativado = [filter];  // Cliente ativo
-      }
-      else if (vencimentos.includes(filter)) {
+      } else if (filter === "new_nfe") {
+        categorizedFilters.nova_nfe = [filter]; // Apenas um "new_nfe" ativo
+      } else if (filter === "active_client") {
+        categorizedFilters.cli_ativado = [filter]; // Cliente ativo
+      } else if (vencimentos.includes(filter)) {
         categorizedFilters.vencimento.push(filter);
       }
     });
-    
-  
+
     return categorizedFilters;
   };
-  
 
   const clickedFilter = (selectedFilter: string) => {
     setFilter((prevFilters) => {
       let newFilters;
-  
+
       // Se for nova_nfe, substitui a seleção anterior
       if (selectedFilter === "new_nfe") {
         newFilters = prevFilters.includes(selectedFilter)
           ? prevFilters.filter((f) => f !== selectedFilter)
-          : prevFilters.filter((f) => !filters.nova_nfe.map(opt => opt.value).includes(f)).concat(selectedFilter);
+          : prevFilters
+              .filter(
+                (f) => !filters.nova_nfe.map((opt) => opt.value).includes(f)
+              )
+              .concat(selectedFilter);
       } else {
         // Caso contrário, adiciona ou remove normalmente
         newFilters = prevFilters.includes(selectedFilter)
           ? prevFilters.filter((f) => f !== selectedFilter)
           : [...prevFilters, selectedFilter];
       }
-  
+
       const organizedFilters = categorizeFilters(newFilters);
       setActiveFilters(organizedFilters);
-  
+
       console.log(organizedFilters);
       return newFilters;
     });
   };
-  
-  
 
   const clearFilter = () => {
     setFilter([]);
@@ -135,18 +143,15 @@ export default function Filter({ setActiveFilters, setDate } : FilterProps) {
           Filtros
         </h2>
         <div className="relative col-start-1 row-start-1 py-4">
-          <div className="mx-auto flex max-w-7xl space-x-6 divide-x divide-gray-200 px-4 text-sm sm:px-6 lg:px-8">
-            <div>
+          <div className="mx-auto flex items-center justify-between gap-5 max-w-7xl space-x-6 divide-x divide-gray-200 px-4 text-sm sm:px-6 lg:px-8">
+            <div className="flex items-center gap-6">
               <DisclosureButton className="group flex items-center font-medium text-gray-700">
                 <FunnelIcon
                   aria-hidden="true"
                   className="mr-2 size-5 flex-none text-gray-400 group-hover:text-gray-500"
                 />
                 {`${filter.length} Filtros`}
-                {/* Filtrar por Data */}
               </DisclosureButton>
-            </div>
-            <div className="pl-6">
               <button
                 onClick={clearFilter}
                 type="button"
@@ -155,12 +160,33 @@ export default function Filter({ setActiveFilters, setDate } : FilterProps) {
                 Limpar Filtro
               </button>
             </div>
+
+            <div className="flex items-center gap-6">
+              <label className="relative ring-1 ring-black ring-opacity-5 bg-slate-500 text-gray-200 py-6 px-8 rounded hover:bg-slate-400 transition-all cursor-pointer">
+                <span className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 text-4xl">
+                  <CiCirclePlus />
+                </span>
+                <input
+                  type="file"
+                  onChange={(e) => setArquivo(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+              </label>
+
+              <button
+                className="bg-indigo-500 ring-1 ring-black ring-opacity-5 text-white indent-2 py-3 px-8 rounded hover:bg-indigo-400 transition-all flex items-center justify-center"
+                onClick={() => enviarCertificado(null)}
+              >
+                <IoArrowUpCircleOutline className="text-2xl" />
+                Enviar
+              </button>
+            </div>
           </div>
         </div>
 
         <DisclosurePanel className="border-t border-gray-200">
-        <Calendar setDateFilter={setDate} />
-        <Line />
+          <Calendar setDateFilter={setDate} />
+          <Line />
           <div className="mx-auto grid max-w-7xl mt-10 grid-cols-3 gap-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
             <fieldset>
               <legend className="block font-medium">Plano</legend>

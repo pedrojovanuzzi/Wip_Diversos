@@ -144,10 +144,10 @@ export const Nfe = () => {
     <div>
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
-      <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} />
+      <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={enviarCertificado}/>
       {clientes.length > 0 && (
         <h1 className="text-center mt-5 self-center text-2xl font-semibold text-gray-900">
-          Total de Faturas: {clientes.length}
+          Total de Resultados: {clientes.length}
         </h1>
       )}
       {clientes.length > 0 ? (
@@ -241,30 +241,6 @@ export const Nfe = () => {
       )}
 
       <main className="flex justify-center mt-20">
-        <div className="flex flex-col sm:flex-row items-center">
-          <label className="relative ring-1 ring-black ring-opacity-5 bg-slate-500 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all cursor-pointer">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-4xl">
-              <CiCirclePlus />
-            </span>
-            <span>Adicionar Novo Certificado</span>
-            <input
-              type="file"
-              onChange={(e) => setArquivo(e.target.files?.[0] || null)}
-              className="hidden"
-            />
-          </label>
-          <div className="relative">
-            <span className="absolute left-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
-              <IoArrowUpCircleOutline />
-            </span>
-            <button
-              className="bg-indigo-500 ring-1 ring-black ring-opacity-5 text-white py-3 px-16 m-5 rounded hover:bg-indigo-400 transition-all"
-              onClick={enviarCertificado}
-            >
-              Enviar Certificado
-            </button>
-          </div>
-        </div>
       </main>
       <div className="relative">
         <span className="absolute translate-x-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
