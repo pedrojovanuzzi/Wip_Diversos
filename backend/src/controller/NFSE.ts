@@ -659,6 +659,9 @@ class NFSEController {
   public async BuscarClientes(req: Request, res: Response) {
     const { cpf, filters, dateFilter } = req.body;
 
+    console.log(filters);
+    
+
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
 
     const whereConditions: any = {};
@@ -710,10 +713,6 @@ class NFSEController {
       startDate.setHours(startDate.getHours() + 3);
       endDate.setHours(endDate.getHours() + 3);
 
-      console.log("Data de início:", startDate);
-      console.log("Data de fim:", endDate);
-      console.log(firstDayOfMonth, lastDayOfMonth);
-
       const faturasResponse = await faturasData.find({
         where: {
           login: In(clientesResponse.map((cliente) => cliente.login)),
@@ -756,7 +755,6 @@ class NFSEController {
         })
         .filter((cliente) => cliente !== null); // Remove clientes sem fatura
 
-      console.log(clientesComFaturas);
 
       res.status(200).json(clientesComFaturas);
     } catch (error) {

@@ -32,7 +32,7 @@ const filters = {
     { value: "new_nfe", label: "Nova NFE"}
   ],
   vencimento: [
-    { value: "5", label: "Dia 5"},
+    { value: "05", label: "Dia 5"},
     { value: "10", label: "Dia 10"},
     { value: "15", label: "Dia 15"},
     { value: "20", label: "Dia 20"},
@@ -72,7 +72,7 @@ export default function Filter({ setActiveFilters, setDate } : FilterProps) {
       "5_PFJ_FIBRA_800M"
     ];
     
-    const vencimentos = ["5", "10", "15", "20", "25"];
+    const vencimentos = ["05", "10", "15", "20", "25"];
   
     filters.forEach((filter) => {
       if (planos.includes(filter)) {
@@ -340,7 +340,7 @@ export default function Filter({ setActiveFilters, setDate } : FilterProps) {
                       </div>
                     </div>
                     <label
-                      htmlFor={`plano-${optionIdx}`}
+                      htmlFor={`vencimento-${optionIdx}`}
                       className="text-base text-gray-600 sm:text-sm"
                     >
                       {option.label}
