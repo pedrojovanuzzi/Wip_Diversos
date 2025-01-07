@@ -663,21 +663,10 @@ class NFSEController {
 
     const whereConditions: any = {};
 
-    // Adiciona CPF se existir
     if (cpf) {
       whereConditions.cpf_cnpj = cpf;
     }
 
-    if (dateFilter && dateFilter.start && dateFilter.end) {
-      const startDate = new Date(dateFilter.start);
-      const endDate = new Date(dateFilter.end);
-
-      // Adiciona 3 horas diretamente
-      startDate.setHours(startDate.getHours() + 3);
-      endDate.setHours(endDate.getHours() + 3);
-
-      whereConditions.data_desativacao = Between(startDate, endDate);
-    }
 
     // Processa outros filtros
     if (filters) {
