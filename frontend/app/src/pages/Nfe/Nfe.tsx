@@ -9,8 +9,7 @@ import { RootState } from "../../types";
 import { BsFiletypeDoc } from "react-icons/bs";
 import { IoArrowUpCircleOutline } from "react-icons/io5";
 import PopUpButton from "./Components/PopUpButton";
-import { PiPrinter  } from "react-icons/pi";
-
+import { PiPrinter } from "react-icons/pi";
 
 export const Nfe = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -20,7 +19,10 @@ export const Nfe = () => {
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     []
   );
-  const [dateFilter, setDateFilter] = useState<{ start: string, end: string } | null>(null)
+  const [dateFilter, setDateFilter] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
   const [activeFilters, setActiveFilters] = useState<{
     plano: string[];
     vencimento: string[];
@@ -35,17 +37,25 @@ export const Nfe = () => {
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const { user } = useTypedSelector((state: RootState) => state.auth);
+  const user = useTypedSelector((state: RootState) => state.auth.user);
   const token = user.token;
 
   const handleCheckboxChange = (clienteId: number) => {
-    setClientesSelecionados((prev) => {
-      if (prev.includes(clienteId)) {
-        return prev.filter((id) => id !== clienteId); // Remove se já estiver selecionado
-      } else {
-        return [...prev, clienteId]; // Adiciona se não estiver selecionado
-      }
-    });
+    if (clientesSelecionados.includes(clienteId)) {
+      setClientesSelecionados(
+        clientesSelecionados.filter((id) => id !== clienteId)
+      );
+    } else {
+      setClientesSelecionados([...clientesSelecionados, clienteId]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (clientesSelecionados.length === clientes.length) {
+      setClientesSelecionados([]);
+    } else {
+      setClientesSelecionados(clientes.map((cliente) => cliente.id));
+    }
   };
 
   const emitirNFe = async () => {
@@ -62,7 +72,7 @@ export const Nfe = () => {
       );
       console.log("NF-e emitida:", resposta.data);
       console.log(clientesSelecionados);
-      
+
       setDadosNFe(resposta.data);
       setShowPopUp(false); // Fecha o PopUp ao concluir
     } catch (erro) {
@@ -129,18 +139,28 @@ export const Nfe = () => {
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
       <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} />
+      {clientes.length > 0 && (
+        <h1 className="text-center mt-5 self-center text-2xl font-semibold text-gray-900">
+          Total de Faturas:{" "}{clientes.length}
+        </h1>
+      )}
       {clientes.length > 0 ? (
         <div className="mt-10 px-4 sm:px-6 lg:px-8">
           <div className="overflow-auto shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-            <table className="min-w-full divide-y divide-gray-300 ">
-              <thead className="bg-gray-50 text-center">
+            <table className="min-w-full divide-y bg-gray-50 divide-gray-300 ">
+              <thead className="bg-gray-50 w-full text-center">
+                <th className="px-4 py-4">
+                  <input className="cursor-pointer"
+                    type="checkbox"
+                    checked={clientesSelecionados.length === clientes.length}
+                    onChange={handleSelectAll}
+                  />
+                </th>
                 <tr>
-                <th
+                  <th
                     scope="col"
                     className="px-6 py-3 text-sm font-semibold text-gray-900"
-                  >
-                    
-                  </th>
+                  ></th>
                   <th
                     scope="col"
                     className="px-6 py-3 text-sm font-semibold text-gray-900"
@@ -185,26 +205,45 @@ export const Nfe = () => {
                     <td className="px-4 py-4">
                       <input
                         type="checkbox"
+                        className="cursor-pointer"
                         checked={clientesSelecionados.includes(cliente.id)}
                         onChange={() => handleCheckboxChange(cliente.id)}
                       />
                     </td>
-                    <td key={cliente.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td
+                      key={cliente.id}
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                    >
                       {cliente.fatura.titulo}
                     </td>
-                    <td key={cliente.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td
+                      key={cliente.id}
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                    >
                       {cliente.login}
                     </td>
-                    <td key={cliente.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td
+                      key={cliente.id}
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+                    >
                       {cliente.fatura.datavenc}
                     </td>
-                    <td key={cliente.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td
+                      key={cliente.id}
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+                    >
                       {cliente.fatura.tipo}
                     </td>
-                    <td key={cliente.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td
+                      key={cliente.id}
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+                    >
                       {cliente.fatura.valor}
                     </td>
-                    <td key={cliente.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td
+                      key={cliente.id}
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+                    >
                       {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
                     </td>
                   </tr>
@@ -254,16 +293,16 @@ export const Nfe = () => {
           onClick={() => setShowPopUp(true)}
         >
           Emitir NF-e
-        </button> 
+        </button>
         <span className="absolute translate-x-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
-          <PiPrinter  />
+          <PiPrinter />
         </span>
         <button
           className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
           onClick={() => setShowPopUp(true)}
         >
           Imprimir Nota
-        </button> 
+        </button>
       </div>
       {arquivo && (
         <p className="text-sm text-gray-500 m-5">
