@@ -41,22 +41,28 @@ export const Nfe = () => {
   const token = user.token;
 
   const handleCheckboxChange = (clienteId: number) => {
-    if (clientesSelecionados.includes(clienteId)) {
-      setClientesSelecionados(
-        clientesSelecionados.filter((id) => id !== clienteId)
-      );
-    } else {
-      setClientesSelecionados([...clientesSelecionados, clienteId]);
-    }
+    setClientesSelecionados((prevSelecionados) => {
+      if (prevSelecionados.includes(clienteId)) {
+        return prevSelecionados.filter((id) => id !== clienteId);
+      } else {
+        return [...prevSelecionados, clienteId];
+      }
+    });
   };
 
   const handleSelectAll = () => {
     if (clientesSelecionados.length === clientes.length) {
       setClientesSelecionados([]);
     } else {
-      setClientesSelecionados(clientes.map((cliente) => cliente.id));
+      const titulosValidos = clientes
+        .filter((cliente) => cliente.fatura && cliente.fatura.titulo)
+        .map((cliente) => cliente.fatura.titulo);
+  
+      setClientesSelecionados(titulosValidos);
     }
   };
+  
+  
 
   const emitirNFe = async () => {
     try {
@@ -141,7 +147,7 @@ export const Nfe = () => {
       <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} />
       {clientes.length > 0 && (
         <h1 className="text-center mt-5 self-center text-2xl font-semibold text-gray-900">
-          Total de Faturas:{" "}{clientes.length}
+          Total de Faturas: {clientes.length}
         </h1>
       )}
       {clientes.length > 0 ? (
@@ -150,9 +156,13 @@ export const Nfe = () => {
             <table className="min-w-full divide-y bg-gray-50 divide-gray-300 ">
               <thead className="bg-gray-50 w-full text-center">
                 <th className="px-4 py-4">
-                  <input className="cursor-pointer"
+                  <input
+                    className="cursor-pointer"
                     type="checkbox"
-                    checked={clientesSelecionados.length === clientes.length}
+                    checked={
+                      clientesSelecionados.length > 0 &&
+                      clientesSelecionados.length === clientes.length
+                    }
                     onChange={handleSelectAll}
                   />
                 </th>
@@ -204,46 +214,18 @@ export const Nfe = () => {
                   <tr key={cliente.id}>
                     <td className="px-4 py-4">
                       <input
+                      className="cursor-pointer"
                         type="checkbox"
-                        className="cursor-pointer"
-                        checked={clientesSelecionados.includes(cliente.id)}
-                        onChange={() => handleCheckboxChange(cliente.id)}
+                        checked={clientesSelecionados.includes(cliente.fatura.titulo)}
+                        onChange={() => handleCheckboxChange(cliente.fatura.titulo)}
                       />
                     </td>
-                    <td
-                      key={cliente.id}
-                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
-                    >
-                      {cliente.fatura.titulo}
-                    </td>
-                    <td
-                      key={cliente.id}
-                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
-                    >
-                      {cliente.login}
-                    </td>
-                    <td
-                      key={cliente.id}
-                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                    >
-                      {cliente.fatura.datavenc}
-                    </td>
-                    <td
-                      key={cliente.id}
-                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                    >
-                      {cliente.fatura.tipo}
-                    </td>
-                    <td
-                      key={cliente.id}
-                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                    >
-                      {cliente.fatura.valor}
-                    </td>
-                    <td
-                      key={cliente.id}
-                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                    >
+                    <td className="px-6 py-4">{cliente.fatura.titulo}</td>
+                    <td className="px-6 py-4">{cliente.login}</td>
+                    <td className="px-6 py-4">{cliente.fatura.datavenc}</td>
+                    <td className="px-6 py-4">{cliente.fatura.tipo}</td>
+                    <td className="px-6 py-4">{cliente.fatura.valor}</td>
+                    <td className="px-6 py-4">
                       {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
                     </td>
                   </tr>
