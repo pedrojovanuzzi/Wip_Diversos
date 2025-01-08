@@ -27,11 +27,13 @@ const upload = multer({ storage, fileFilter });
 
 const router: Router = Router();
 
-router.post('/', NFSE.createRPS.bind(NFSE));
+router.post('/', NFSE.iniciar.bind(NFSE));
 // router.post('/cancelar', NFSE.cancelarRPS.bind(NFSE));
 // router.get('/consultar', NFSE.consultarRPS.bind(NFSE));
 
 router.post("/BuscarClientes", AuthGuard, NFSE.BuscarClientes);
+
+router.post("/BuscarNSFE", AuthGuard, NFSE.BuscarNSFE);
 
 router.post("/upload", upload.any(), AuthGuard, NFSE.uploadCertificado);
 

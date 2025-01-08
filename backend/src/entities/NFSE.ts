@@ -4,6 +4,9 @@ import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
 export class NFSE {
     @PrimaryGeneratedColumn()
     id!: number;
+    
+    @Column({ type: 'varchar', length: 255 })
+    login!: string;
 
     @Column({ name: 'numero_rps', type: 'int' })
     numeroRps!: number;

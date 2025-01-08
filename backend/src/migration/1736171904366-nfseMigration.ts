@@ -17,6 +17,12 @@ export class NfseMigration1736171904366 implements MigrationInterface {
                         
                     },
                     {
+                        name: 'login',
+                        type: 'varchar',
+                        length: '20',
+                        isNullable: false,
+                    },
+                    {
                         name: 'numero_rps',
                         type: 'int',
                         isNullable: true,

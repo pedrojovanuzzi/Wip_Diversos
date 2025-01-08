@@ -14,6 +14,8 @@ import Calendar from "./Calendar";
 import Line from "./Line";
 import { CiCirclePlus } from "react-icons/ci";
 import { IoArrowUpCircleOutline } from "react-icons/io5";
+import { useNavigate } from "react-router-dom";
+import { HiMiniDocumentMagnifyingGlass } from "react-icons/hi2";
 
 const filters = {
   plano: [
@@ -48,6 +50,8 @@ interface FilterProps {
   setArquivo: React.Dispatch<React.SetStateAction<File | null>>;
 
   enviarCertificado: React.Dispatch<React.SetStateAction<File | null>>;
+  
+  BuscarNfe? : boolean;
 }
 
 export default function Filter({
@@ -55,8 +59,10 @@ export default function Filter({
   setDate,
   setArquivo,
   enviarCertificado,
+  BuscarNfe = true,
 }: FilterProps) {
   const [filter, setFilter] = useState<string[]>([]);
+  const navigate = useNavigate();
 
   const categorizeFilters = (filters: string[]) => {
     const categorizedFilters: {
@@ -180,6 +186,13 @@ export default function Filter({
                 <IoArrowUpCircleOutline className="text-2xl" />
                 Enviar
               </button>
+
+              {BuscarNfe && <button
+              className="bg-teal-500 ring-1 ring-black ring-opacity-5 text-white indent-2 py-3 px-2 rounded hover:bg-teal-400 transition-all flex items-center justify-center"
+                onClick={() => navigate("/BuscarNfeGerada")}              >
+                <HiMiniDocumentMagnifyingGlass className="text-2xl" />
+                NFS-e Geradas
+              </button>}
             </div>
           </div>
         </div>

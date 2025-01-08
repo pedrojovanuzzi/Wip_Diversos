@@ -10,6 +10,7 @@ import FeedbackLinkGenerator from './pages/feedback/FeedBackLinkGenerator';
 import FeedbackPage from './pages/feedback/FeedbackPage';
 import { Opnion } from './pages/feedback/Opnion';
 import { Nfe } from './pages/Nfe/Nfe';
+import { BuscarNfeGerada } from './pages/Nfe/BuscarNfeGerada';
 
 
 
@@ -47,6 +48,7 @@ function App() {
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
           <Route path="/Nfe" element={auth ? <Nfe /> : <Navigate to="/auth/login" />} />
+          <Route path="/BuscarNfeGerada" element={auth ? <BuscarNfeGerada /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>
     </BrowserRouter>

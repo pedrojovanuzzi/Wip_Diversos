@@ -20,23 +20,6 @@ import { Between, Equal, FindOptionsOrder, In, IsNull, MoreThanOrEqual } from "t
 
 dotenv.config();
 
-// const rpsData = {
-//   numero: "1",
-//   serie: "999",
-//   tipo: "1",
-//   dataEmissao: "2025-01-03",
-//   status: "1",
-//   competencia: "2025-01-03",
-//   valor: "100.00",
-//   aliquota: "2.00",
-//   issRetido: "2",
-//   responsavelRetencao: "1",
-//   itemLista: "01.05",
-//   descricao: "descricao do servico",
-//   municipio: "3504800",
-//   cnpj: "01001001000113",
-//   senha: "123456",
-// };
 
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
@@ -49,7 +32,7 @@ class NFSEController {
   );
   private NEW_CERT_PATH = path.resolve(this.TEMP_DIR, "new_certificado.pfx");
 
-  public createRPS = async (req: Request, res: Response) => {
+  public iniciar = async (req: Request, res: Response) => {
     try {
       const { password, clientsid } = req.body;
 
@@ -57,10 +40,10 @@ class NFSEController {
         throw new Error("Senha do certificado não fornecida.");
       }
 
-      const result = await this.enviarLoteRps(
+      const result = await this.gerarNFSE(
         password,
         clientsid,
-        "EnviarLoteRpsEnvio"
+        "GerarNfseEnvio"
       );
       res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
     } catch (error) {
@@ -69,7 +52,7 @@ class NFSEController {
     }
   };
 
-  public async enviarLoteRps(password: string, id: string, SOAPAction: string) {
+  public async gerarNFSE(password: string, id: string, SOAPAction: string) {
     try {
       if (!fs.existsSync(this.TEMP_DIR)) {
         fs.mkdirSync(this.TEMP_DIR, { recursive: true });
@@ -138,194 +121,194 @@ class NFSEController {
     }
   }
 
-  private async gerarXmlRecepcionarRps(id: string, password: string) {
-    const builder = xmlbuilder;
+  // private async gerarXmlRecepcionarRps(id: string, password: string) {
+  //   const builder = xmlbuilder;
 
-    const RPSQuery = MkauthSource.getRepository(Faturas);
-    const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
+  //   const RPSQuery = MkauthSource.getRepository(Faturas);
+  //   const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
 
-    const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+  //   const ClientRepository = MkauthSource.getRepository(ClientesEntities);
 
-    const ClientData = await ClientRepository.findOne({
-      where: { id: rpsData?.id },
-    });
+  //   const ClientData = await ClientRepository.findOne({
+  //     where: { id: rpsData?.id },
+  //   });
 
-    ClientData?.cidade;
+  //   ClientData?.cidade;
 
-    const response = await axios.get(
-      `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
-    );
+  //   const response = await axios.get(
+  //     `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
+  //   );
 
-    const municipio = response.data.id;
+  //   const municipio = response.data.id;
 
-    const signature = this.assinaturaXML(this.certPath, password, "lote1");
+  //   const signature = this.assinaturaXML(this.certPath, password, "lote1");
 
-    const NsfeData = AppDataSource.getRepository(NFSE);
+  //   const NsfeData = AppDataSource.getRepository(NFSE);
 
-    const nfseResponse = await NsfeData.findOne({
-      order: { [id]: "DESC" },
-    });
+  //   const nfseResponse = await NsfeData.findOne({
+  //     order: { [id]: "DESC" },
+  //   });
 
-    const xml = builder
-      .create("soapenv:Envelope", {
-        version: "1.0",
-        encoding: "UTF-8",
-      })
-      .att("xmlns:soapenv", "http://schemas.xmlsoap.org/soap/envelope/")
-      .att("xmlns:ws", "http://ws.issweb.fiorilli.com.br/")
-      .att("xmlns:xd", "http://www.w3.org/2000/09/xmldsig#")
-      .ele("soapenv:Header")
-      .up()
-      .ele("soapenv:Body")
-      .ele("ws:recepcionarLoteRps")
-      .ele("EnviarLoteRpsEnvio", { xmlns: "http://www.abrasf.org.br/nfse.xsd" })
-      .ele("LoteRps", { versao: "2.01", Id: "lote1" })
-      .ele("NumeroLote")
-      .txt("1")
-      .ele("CpfCnpj")
-      .ele("Cnpj")
-      .txt("01001001000113")
-      .up()
-      .ele("InscricaoMunicipal")
-      .txt("21950014")
-      .up()
-      .ele("QuantidadeRps")
-      .txt("1")
-      .up()
-      .ele("ListaRps")
-      .ele("Rps", { xmlns: "http://www.abrasf.org.br/nfse.xsd" })
-      .ele("InfDeclaracaoPrestacaoServico", { Id: String(rpsData?.uuid_lanc) })
-      .ele("Rps")
-      .ele("IdentificacaoRps")
-      .ele("Numero")
-      .txt(String(nfseResponse?.numeroRps))
-      .up()
-      .ele("Serie")
-      .txt(String(nfseResponse?.serieRps))
-      .up()
-      .ele("Tipo")
-      .txt(String(nfseResponse?.tipoRps))
-      .up()
-      .up()
-      .ele("DataEmissao")
-      .txt(
-        rpsData?.processamento
-          ? rpsData.processamento.toISOString().substring(0, 10)
-          : ""
-      )
-      .up()
-      .ele("Status")
-      .txt("1")
-      .up()
-      .up()
-      .ele("Competencia")
-      .txt(
-        rpsData?.datavenc ? rpsData.datavenc.toISOString().substring(0, 10) : ""
-      )
-      .up()
-      .ele("Servico")
-      .ele("Valores")
-      .ele("ValorServicos")
-      .txt(String(rpsData?.valor))
-      .up()
-      .ele("Aliquota")
-      .txt(String(nfseResponse?.aliquota))
-      .up()
-      .up()
-      .ele("IssRetido")
-      .txt(String(nfseResponse?.issRetido))
-      .up()
-      .ele("ResponsavelRetencao")
-      .txt(String(nfseResponse?.responsavelRetencao))
-      .up()
-      .ele("ItemListaServico")
-      .txt(String(nfseResponse?.itemListaServico))
-      .up()
-      .ele("Discriminacao")
-      .txt(String(nfseResponse?.discriminacao))
-      .up()
-      .ele("CodigoMunicipio")
-      .txt("3503406")
-      .up()
-      .ele("ExigibilidadeISS")
-      .txt("1")
-      .up()
-      .up()
-      .ele("Prestador")
-      .ele("CpfCnpj")
-      .ele("Cnpj")
-      .txt("20843290000142")
-      .up()
-      .up()
-      .ele("InscricaoMunicipal")
-      .txt("21950014")
-      .up()
-      .up()
-      .ele("Tomador")
-      .ele("IdentificacaoTomador")
-      .ele("CpfCnpj")
-      .ele(ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj")
-      .txt(String(ClientData?.cpf_cnpj))
-      .up()
-      .up()
-      .up()
-      .ele("RazaoSocial")
-      .txt(String(ClientData?.nome))
-      .up()
-      .ele("Endereco")
-      .ele("Endereco")
-      .txt(String(ClientData?.endereco))
-      .up()
-      .ele("Numero")
-      .txt(String(ClientData?.numero))
-      .up()
-      .ele("Complemento")
-      .txt(String(ClientData?.complemento))
-      .up()
-      .ele("Bairro")
-      .txt(String(ClientData?.bairro))
-      .up()
-      .ele("CodigoMunicipio")
-      .txt(municipio)
-      .up()
-      .ele("Uf")
-      .txt("SP")
-      .up()
-      // .ele("CodigoPais").txt("1058").up()
-      .ele("Cep")
-      .txt(String(ClientData?.cep))
-      .up()
-      .up()
-      .ele("Contato")
-      .ele("Telefone")
-      .txt(String(ClientData?.celular))
-      .up()
-      .ele("Email")
-      .txt(String(ClientData?.email))
-      .up()
-      .up()
-      .up()
-      .ele("OptanteSimplesNacional")
-      .txt("2")
-      .up()
-      .ele("IncentivoFiscal")
-      .txt("2")
-      .up()
-      .up()
-      .raw(signature)
-      .up()
-      .up()
-      // .ele("username")
-      // .txt(rpsData?.cnpj)
-      // .up()
-      // .ele("password")
-      // .txt(rpsData?.senha)
-      // .up()
-      .up()
-      .end({ pretty: false });
+  //   const xml = builder
+  //     .create("soapenv:Envelope", {
+  //       version: "1.0",
+  //       encoding: "UTF-8",
+  //     })
+  //     .att("xmlns:soapenv", "http://schemas.xmlsoap.org/soap/envelope/")
+  //     .att("xmlns:ws", "http://ws.issweb.fiorilli.com.br/")
+  //     .att("xmlns:xd", "http://www.w3.org/2000/09/xmldsig#")
+  //     .ele("soapenv:Header")
+  //     .up()
+  //     .ele("soapenv:Body")
+  //     .ele("ws:recepcionarLoteRps")
+  //     .ele("EnviarLoteRpsEnvio", { xmlns: "http://www.abrasf.org.br/nfse.xsd" })
+  //     .ele("LoteRps", { versao: "2.01", Id: "lote1" })
+  //     .ele("NumeroLote")
+  //     .txt("1")
+  //     .ele("CpfCnpj")
+  //     .ele("Cnpj")
+  //     .txt("01001001000113")
+  //     .up()
+  //     .ele("InscricaoMunicipal")
+  //     .txt("21950014")
+  //     .up()
+  //     .ele("QuantidadeRps")
+  //     .txt("1")
+  //     .up()
+  //     .ele("ListaRps")
+  //     .ele("Rps", { xmlns: "http://www.abrasf.org.br/nfse.xsd" })
+  //     .ele("InfDeclaracaoPrestacaoServico", { Id: String(rpsData?.uuid_lanc) })
+  //     .ele("Rps")
+  //     .ele("IdentificacaoRps")
+  //     .ele("Numero")
+  //     .txt(String(nfseResponse?.numeroRps))
+  //     .up()
+  //     .ele("Serie")
+  //     .txt(String(nfseResponse?.serieRps))
+  //     .up()
+  //     .ele("Tipo")
+  //     .txt(String(nfseResponse?.tipoRps))
+  //     .up()
+  //     .up()
+  //     .ele("DataEmissao")
+  //     .txt(
+  //       rpsData?.processamento
+  //         ? rpsData.processamento.toISOString().substring(0, 10)
+  //         : ""
+  //     )
+  //     .up()
+  //     .ele("Status")
+  //     .txt("1")
+  //     .up()
+  //     .up()
+  //     .ele("Competencia")
+  //     .txt(
+  //       rpsData?.datavenc ? rpsData.datavenc.toISOString().substring(0, 10) : ""
+  //     )
+  //     .up()
+  //     .ele("Servico")
+  //     .ele("Valores")
+  //     .ele("ValorServicos")
+  //     .txt(String(rpsData?.valor))
+  //     .up()
+  //     .ele("Aliquota")
+  //     .txt(String(nfseResponse?.aliquota))
+  //     .up()
+  //     .up()
+  //     .ele("IssRetido")
+  //     .txt(String(nfseResponse?.issRetido))
+  //     .up()
+  //     .ele("ResponsavelRetencao")
+  //     .txt(String(nfseResponse?.responsavelRetencao))
+  //     .up()
+  //     .ele("ItemListaServico")
+  //     .txt(String(nfseResponse?.itemListaServico))
+  //     .up()
+  //     .ele("Discriminacao")
+  //     .txt(String(nfseResponse?.discriminacao))
+  //     .up()
+  //     .ele("CodigoMunicipio")
+  //     .txt("3503406")
+  //     .up()
+  //     .ele("ExigibilidadeISS")
+  //     .txt("1")
+  //     .up()
+  //     .up()
+  //     .ele("Prestador")
+  //     .ele("CpfCnpj")
+  //     .ele("Cnpj")
+  //     .txt("20843290000142")
+  //     .up()
+  //     .up()
+  //     .ele("InscricaoMunicipal")
+  //     .txt("21950014")
+  //     .up()
+  //     .up()
+  //     .ele("Tomador")
+  //     .ele("IdentificacaoTomador")
+  //     .ele("CpfCnpj")
+  //     .ele(ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj")
+  //     .txt(String(ClientData?.cpf_cnpj))
+  //     .up()
+  //     .up()
+  //     .up()
+  //     .ele("RazaoSocial")
+  //     .txt(String(ClientData?.nome))
+  //     .up()
+  //     .ele("Endereco")
+  //     .ele("Endereco")
+  //     .txt(String(ClientData?.endereco))
+  //     .up()
+  //     .ele("Numero")
+  //     .txt(String(ClientData?.numero))
+  //     .up()
+  //     .ele("Complemento")
+  //     .txt(String(ClientData?.complemento))
+  //     .up()
+  //     .ele("Bairro")
+  //     .txt(String(ClientData?.bairro))
+  //     .up()
+  //     .ele("CodigoMunicipio")
+  //     .txt(municipio)
+  //     .up()
+  //     .ele("Uf")
+  //     .txt("SP")
+  //     .up()
+  //     // .ele("CodigoPais").txt("1058").up()
+  //     .ele("Cep")
+  //     .txt(String(ClientData?.cep))
+  //     .up()
+  //     .up()
+  //     .ele("Contato")
+  //     .ele("Telefone")
+  //     .txt(String(ClientData?.celular))
+  //     .up()
+  //     .ele("Email")
+  //     .txt(String(ClientData?.email))
+  //     .up()
+  //     .up()
+  //     .up()
+  //     .ele("OptanteSimplesNacional")
+  //     .txt("2")
+  //     .up()
+  //     .ele("IncentivoFiscal")
+  //     .txt("2")
+  //     .up()
+  //     .up()
+  //     .raw(signature)
+  //     .up()
+  //     .up()
+  //     // .ele("username")
+  //     // .txt(rpsData?.cnpj)
+  //     // .up()
+  //     // .ele("password")
+  //     // .txt(rpsData?.senha)
+  //     // .up()
+  //     .up()
+  //     .end({ pretty: false });
 
-    return xml;
-  }
+  //   return xml;
+  // }
 
   private async gerarXmlNfse(id: string) {
     const builder = xmlbuilder;
@@ -499,6 +482,14 @@ class NFSEController {
     return xml;
   }
 
+  public async BuscarNSFE(req: Request, res: Response) {
+    try {
+      const { clienteid } = req.body;
+    } catch (error) {
+      console.log("Erro ao buscar NFSE:", error);
+    }
+  }
+
   private assinarXml(
     xml: string,
     certPath: string,
@@ -577,73 +568,73 @@ class NFSEController {
     return finalXml;
   }
 
-  private assinaturaXML(
-    certPath: string,
-    password: string,
-    reference: string
-  ): string {
-    const pfxBuffer = fs.readFileSync(certPath);
-    const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
-    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
+  // private assinaturaXML(
+  //   certPath: string,
+  //   password: string,
+  //   reference: string
+  // ): string {
+  //   const pfxBuffer = fs.readFileSync(certPath);
+  //   const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
+  //   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
 
-    let privateKeyPem = "";
-    let certificatePem = "";
+  //   let privateKeyPem = "";
+  //   let certificatePem = "";
 
-    p12.safeContents.forEach((content) => {
-      content.safeBags.forEach((bag) => {
-        if (bag.type === forge.pki.oids.pkcs8ShroudedKeyBag && bag.key) {
-          privateKeyPem = forge.pki.privateKeyToPem(bag.key);
-        } else if (bag.type === forge.pki.oids.certBag && bag.cert) {
-          certificatePem = forge.pki.certificateToPem(bag.cert);
-        }
-      });
-    });
+  //   p12.safeContents.forEach((content) => {
+  //     content.safeBags.forEach((bag) => {
+  //       if (bag.type === forge.pki.oids.pkcs8ShroudedKeyBag && bag.key) {
+  //         privateKeyPem = forge.pki.privateKeyToPem(bag.key);
+  //       } else if (bag.type === forge.pki.oids.certBag && bag.cert) {
+  //         certificatePem = forge.pki.certificateToPem(bag.cert);
+  //       }
+  //     });
+  //   });
 
-    if (!privateKeyPem || !certificatePem) {
-      throw new Error("Falha ao extrair chave privada ou certificado.");
-    }
+  //   if (!privateKeyPem || !certificatePem) {
+  //     throw new Error("Falha ao extrair chave privada ou certificado.");
+  //   }
 
-    const signer = new SignedXml() as any;
+  //   const signer = new SignedXml() as any;
 
-    signer.addReference({
-      xpath: `//*[@Id='${reference}']`, // Certifique-se de que o elemento referenciado tenha o atributo Id="lote1"
-      transforms: [
-        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
-      ],
-      digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
-    });
+  //   signer.addReference({
+  //     xpath: `//*[@Id='${reference}']`, // Certifique-se de que o elemento referenciado tenha o atributo Id="lote1"
+  //     transforms: [
+  //       "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+  //       "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+  //     ],
+  //     digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
+  //   });
 
-    signer.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
-    signer.canonicalizationAlgorithm =
-      "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
+  //   signer.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+  //   signer.canonicalizationAlgorithm =
+  //     "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
 
-    // Adiciona a chave privada para assinatura
-    signer.signingKey = privateKeyPem;
+  //   // Adiciona a chave privada para assinatura
+  //   signer.signingKey = privateKeyPem;
 
-    // Define o certificado público
-    signer.keyInfoProvider = {
-      getKeyInfo() {
-        return `
-          <X509Data>
-            <X509Certificate>${certificatePem
-              .replace("-----BEGIN CERTIFICATE-----", "")
-              .replace("-----END CERTIFICATE-----", "")
-              .replace(/\n/g, "")}</X509Certificate>
-          </X509Data>`;
-      },
-    };
+  //   // Define o certificado público
+  //   signer.keyInfoProvider = {
+  //     getKeyInfo() {
+  //       return `
+  //         <X509Data>
+  //           <X509Certificate>${certificatePem
+  //             .replace("-----BEGIN CERTIFICATE-----", "")
+  //             .replace("-----END CERTIFICATE-----", "")
+  //             .replace(/\n/g, "")}</X509Certificate>
+  //         </X509Data>`;
+  //     },
+  //   };
 
-    const xmlToSign = `
-      <root xmlns="http://www.abrasf.org.br/nfse.xsd" Id="lote1">
-        <!-- Outros elementos do XML aqui -->
-      </root>`;
+  //   const xmlToSign = `
+  //     <root xmlns="http://www.abrasf.org.br/nfse.xsd" Id="lote1">
+  //       <!-- Outros elementos do XML aqui -->
+  //     </root>`;
 
-    signer.computeSignature(xmlToSign);
+  //   signer.computeSignature(xmlToSign);
 
-    const signedXml = signer.getSignedXml();
-    return signedXml;
-  }
+  //   const signedXml = signer.getSignedXml();
+  //   return signedXml;
+  // }
 
   public async uploadCertificado(req: Request, res: Response) {
     try {

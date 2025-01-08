@@ -10,8 +10,9 @@ import { BsFiletypeDoc } from "react-icons/bs";
 import { IoArrowUpCircleOutline } from "react-icons/io5";
 import PopUpButton from "./Components/PopUpButton";
 import { PiPrinter } from "react-icons/pi";
+import Stacked2 from "./Components/Stacked2";
 
-export const Nfe = () => {
+export const BuscarNfeGerada = () => {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [searchCpf, setSearchCpf] = useState<string>("");
@@ -138,7 +139,7 @@ export const Nfe = () => {
 
     try {
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
+        `${process.env.REACT_APP_URL}/Nfe/BuscarNSFE`,
         {
           cpf: searchCpfRegex,
           filters: activeFilters,
@@ -162,8 +163,8 @@ export const Nfe = () => {
   return (
     <div>
       <NavBar />
-      <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
-      <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={enviarCertificado}/>
+      <Stacked2 setSearchCpf={setSearchCpf} onSearch={handleSearch} />
+      <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={enviarCertificado} BuscarNfe={false}/>
       {clientes.length > 0 && (
         <h1 className="text-center mt-5 self-center text-2xl font-semibold text-gray-900">
           Total de Resultados: {clientes.length}
@@ -269,24 +270,9 @@ export const Nfe = () => {
           className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
           onClick={() => setShowPopUp(true)}
         >
-          Emitir NF-e
+          Imprimir Nota
         </button>
       </div>
-      {arquivo && (
-        <p className="text-sm text-gray-500 m-5">
-          Arquivo selecionado:{" "}
-          <span className="font-semibold">{arquivo.name}</span>
-        </p>
-      )}
-      {showPopUp && (
-        <PopUpButton
-          setShowPopUp={setShowPopUp}
-          showPopUp={showPopUp}
-          setPassword={setPassword}
-          password={password}
-          emitirNFe={emitirNFe}
-        />
-      )}
     </div>
   );
 };
