@@ -23,8 +23,9 @@ dotenv.config();
 
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  private WSDL_URL =
-    "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS";
+  // private WSDL_URL =
+  //   "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"; //HOMOLOGAÇÃO
+  private WSDL_URL = "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl"; //PRODUÇÃO
   private TEMP_DIR = path.resolve(__dirname, "../files");
   private DECRYPTED_CERT_PATH = path.resolve(
     this.TEMP_DIR,
@@ -112,13 +113,12 @@ class NFSEController {
         const response = await axios.post(this.WSDL_URL, signedXml, {
           httpsAgent,
           headers: {
-            "Content-Type": "text/xml;charset=utf-8",
+            "Content-Type": "text/xml; charset=UTF-8",
             SOAPAction: SOAPAction,
           },
         });
 
-        console.log("XML Assinado para ID:", id);
-        console.log(signedXml);
+        
         console.log("Resposta do servidor para ID", id, ":", response.data);
       }
 
@@ -130,6 +130,11 @@ class NFSEController {
       console.error("Erro ao enviar requisição:", error);
     }
   }
+
+  private removeBOM(xml: string): string {
+    return xml.charCodeAt(0) === 0xFEFF ? xml.slice(1) : xml;
+  }
+  
 
 
   // private async gerarXmlRecepcionarRps(id: string, password: string) {
@@ -328,26 +333,31 @@ class NFSEController {
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
 
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+    const FaturasRepository = MkauthSource.getRepository(Faturas);
+    
+    const FaturasData = await FaturasRepository.findOne({ where: { id: Number(id) } });
 
     const ClientData = await ClientRepository.findOne({
-      where: { id: rpsData?.id },
+      where: { login: FaturasData?.login },
     });
 
     ClientData?.cidade;
 
     const response = await axios.get(
       `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
-    );
+    );    
 
     const municipio = response.data.id;
 
     const NsfeData = AppDataSource.getRepository(NFSE);
 
-    const nfseResponse = await NsfeData.findOne({
-      order: { [id]: "DESC" },
+    const nfseResponse = await NsfeData.find({
+      order: { id: "DESC" },  
+      take: 1,  
     });
+    
 
-    const nfseNumber = nfseResponse && nfseResponse.numeroRps ? nfseResponse.numeroRps + 1 : 1;
+    const nfseNumber = nfseResponse && nfseResponse[0].numeroRps ? nfseResponse[0].numeroRps + 1 : 1;
 
     const xml = builder
       .create("soapenv:Envelope", {
@@ -370,10 +380,10 @@ class NFSEController {
       .txt(String(nfseNumber))
       .up()
       .ele("Serie")
-      .txt(String(nfseResponse?.serieRps))
+      .txt(String(nfseResponse[0]?.serieRps))
       .up()
       .ele("Tipo")
-      .txt(String(nfseResponse?.tipoRps))
+      .txt(String(nfseResponse[0]?.tipoRps))
       .up()
       .up()
       .ele("DataEmissao")
@@ -398,20 +408,20 @@ class NFSEController {
       .txt(String(rpsData?.valor))
       .up()
       .ele("Aliquota")
-      .txt(String(nfseResponse?.aliquota))
+      .txt(String(nfseResponse[0]?.aliquota))
       .up()
       .up()
       .ele("IssRetido")
-      .txt(String(nfseResponse?.issRetido))
+      .txt(String(nfseResponse[0]?.issRetido))
       .up()
       .ele("ResponsavelRetencao")
-      .txt(String(nfseResponse?.responsavelRetencao))
+      .txt(String(nfseResponse[0]?.responsavelRetencao))
       .up()
       .ele("ItemListaServico")
-      .txt(String(nfseResponse?.itemListaServico))
+      .txt(String(nfseResponse[0]?.itemListaServico))
       .up()
       .ele("Discriminacao")
-      .txt(String(nfseResponse?.discriminacao))
+      .txt("Serviços de Manutenção, e Suporte Técnico")
       .up()
       .ele("CodigoMunicipio")
       .txt("3503406")
@@ -434,7 +444,7 @@ class NFSEController {
       .ele("IdentificacaoTomador")
       .ele("CpfCnpj")
       .ele(ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj")
-      .txt(String(ClientData?.cpf_cnpj))
+      .txt(String(ClientData?.cpf_cnpj.replace(/[^0-9]/g, "")))
       .up()
       .up()
       .up()
@@ -462,7 +472,7 @@ class NFSEController {
       .up()
       // .ele("CodigoPais").txt("1058").up()
       .ele("Cep")
-      .txt(String(ClientData?.cep))
+      .txt(String(ClientData?.cep.replace(/[^0-9]/g, "")))
       .up()
       .up()
       .ele("Contato")
@@ -483,50 +493,50 @@ class NFSEController {
       .up()
       .up()
       .up()
-      // .ele("username")
-      // .txt(rpsData?.cnpj)
-      // .up()
-      // .ele("password")
-      // .txt(rpsData?.senha)
-      // .up()
+      .ele("username")
+      .txt(process.env.MUNICIPIO_LOGIN || "")
+      .up()
+      .ele("password")
+      .txt(process.env.MUNICIPIO_SENHA || "")
+      .up()
       .up()
       .end({ pretty: false });
+      const xmlBuffer = Buffer.from(xml, 'utf8');
 
       const insertDatabase = NsfeData.create({
         login: rpsData?.login || "",
         numeroRps: nfseNumber || 0,
-        serieRps: nfseResponse?.serieRps || "",
-        tipoRps: nfseResponse?.tipoRps || 0,
+        serieRps: nfseResponse[0]?.serieRps || "",
+        tipoRps: nfseResponse[0]?.tipoRps || 0,
         dataEmissao: rpsData?.processamento ? new Date(rpsData.processamento) : new Date(),
         competencia: rpsData?.datavenc ? new Date(rpsData.datavenc) : new Date(),
         valorServico: Number(rpsData?.valor) || 0,
-        aliquota: nfseResponse?.aliquota || 0,
-        issRetido: nfseResponse?.issRetido || 0,
-        responsavelRetencao: nfseResponse?.responsavelRetencao || 0,
-        itemListaServico: nfseResponse?.itemListaServico || "",
-        discriminacao: nfseResponse?.discriminacao || "",
-        codigoMunicipio: nfseResponse?.codigoMunicipio || 0,
-        exigibilidadeIss: nfseResponse?.exigibilidadeIss || 0,
-        cnpjPrestador: nfseResponse?.cnpjPrestador || "",
-        inscricaoMunicipalPrestador: nfseResponse?.inscricaoMunicipalPrestador || "",
-        cpfTomador: ClientData?.cpf_cnpj || "",
+        aliquota: nfseResponse[0]?.aliquota || 0,
+        issRetido: nfseResponse[0]?.issRetido || 0,
+        responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
+        itemListaServico: nfseResponse[0]?.itemListaServico || "",
+        discriminacao: "Serviços de Manutenção, e Suporte Técnico",
+        codigoMunicipio: nfseResponse[0]?.codigoMunicipio || 0,
+        exigibilidadeIss: nfseResponse[0]?.exigibilidadeIss || 0,
+        cnpjPrestador: nfseResponse[0]?.cnpjPrestador || "",
+        inscricaoMunicipalPrestador: nfseResponse[0]?.inscricaoMunicipalPrestador || "",
+        cpfTomador: ClientData?.cpf_cnpj.replace(/[^0-9]/g, "") || "",
         razaoSocialTomador: ClientData?.nome || "",
         enderecoTomador: ClientData?.endereco || "",
         numeroEndereco: ClientData?.numero || "",
-        complemento: ClientData?.complemento || null,
+        complemento: ClientData?.complemento || undefined,
         bairro: ClientData?.bairro || "",
-        uf: nfseResponse?.uf || "",
-        cep: ClientData?.cep || "",
-        telefoneTomador: ClientData?.celular || null,
-        emailTomador: ClientData?.email || null,
+        uf: nfseResponse[0]?.uf || "",
+        cep: ClientData?.cep.replace(/[^0-9]/g, "") || "",
+        telefoneTomador: ClientData?.celular || undefined,
+        emailTomador: ClientData?.email || undefined,
         optanteSimplesNacional: 2,
         incentivoFiscal: 2,
     });
     
     await NsfeData.save(insertDatabase);
 
-
-    return xml;
+    return this.removeBOM(xmlBuffer.toString('utf8'));
   }
 
   public async BuscarNSFE(req: Request, res: Response) {
@@ -608,10 +618,10 @@ class NFSEController {
 
     rpsElement.addNextSibling(signatureElement);
 
-    const finalXml = signedDoc.toString();
+    const finalXml = signedDoc.toString().replace(/>\s+</g, '><').replace(/(\r\n|\n|\r)/g, '').trim();
 
     console.log(finalXml);
-
+  
     return finalXml;
   }
 
