@@ -34,17 +34,24 @@ class NFSEController {
 
   public iniciar = async (req: Request, res: Response) => {
     try {
-      const { password, clientsid } = req.body;
+      const { password, clientesSelecionados } = req.body;
+
+      console.log(clientesSelecionados);
 
       if (!password) {
         throw new Error("Senha do certificado não fornecida.");
       }
 
+      
+      
+
       const result = await this.gerarNFSE(
         password,
-        clientsid,
+        clientesSelecionados,
         "GerarNfseEnvio"
       );
+
+
       res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
     } catch (error) {
       console.error("Erro ao criar o RPS:", error);
@@ -52,7 +59,7 @@ class NFSEController {
     }
   };
 
-  public async gerarNFSE(password: string, id: string, SOAPAction: string) {
+  public async gerarNFSE(password: string, ids: string[], SOAPAction: string) {
     try {
       if (!fs.existsSync(this.TEMP_DIR)) {
         fs.mkdirSync(this.TEMP_DIR, { recursive: true });
@@ -93,33 +100,37 @@ class NFSEController {
         rejectUnauthorized: false,
       });
 
-      const xmlLoteRps = this.gerarXmlNfse(id);
-      const signedXml = this.assinarXml(
-        await xmlLoteRps,
-        certPathToUse,
-        password,
-        "InfDeclaracaoPrestacaoServico"
-      );
+      for (const id of ids) {
+        const xmlLoteRps = await this.gerarXmlNfse(id);
+        const signedXml = this.assinarXml(
+          xmlLoteRps,
+          certPathToUse,
+          password,
+          "InfDeclaracaoPrestacaoServico"
+        );
 
-      const response = await axios.post(this.WSDL_URL, signedXml, {
-        httpsAgent,
-        headers: {
-          "Content-Type": "text/xml;charset=utf-8",
-          SOAPAction: SOAPAction,
-        },
-      });
+        const response = await axios.post(this.WSDL_URL, signedXml, {
+          httpsAgent,
+          headers: {
+            "Content-Type": "text/xml;charset=utf-8",
+            SOAPAction: SOAPAction,
+          },
+        });
 
-      console.log(signedXml);
-
-      console.log("Resposta do servidor:", response.data);
+        console.log("XML Assinado para ID:", id);
+        console.log(signedXml);
+        console.log("Resposta do servidor para ID", id, ":", response.data);
+      }
 
       if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
       if (fs.existsSync(this.DECRYPTED_CERT_PATH))
         fs.unlinkSync(this.DECRYPTED_CERT_PATH);
+      
     } catch (error) {
       console.error("Erro ao enviar requisição:", error);
     }
   }
+
 
   // private async gerarXmlRecepcionarRps(id: string, password: string) {
   //   const builder = xmlbuilder;
@@ -336,6 +347,8 @@ class NFSEController {
       order: { [id]: "DESC" },
     });
 
+    const nfseNumber = nfseResponse && nfseResponse.numeroRps ? nfseResponse.numeroRps + 1 : 1;
+
     const xml = builder
       .create("soapenv:Envelope", {
         version: "1.0",
@@ -354,7 +367,7 @@ class NFSEController {
       .ele("Rps")
       .ele("IdentificacaoRps")
       .ele("Numero")
-      .txt(String(nfseResponse?.numeroRps))
+      .txt(String(nfseNumber))
       .up()
       .ele("Serie")
       .txt(String(nfseResponse?.serieRps))
@@ -478,6 +491,40 @@ class NFSEController {
       // .up()
       .up()
       .end({ pretty: false });
+
+      const insertDatabase = NsfeData.create({
+        login: rpsData?.login || "",
+        numeroRps: nfseNumber || 0,
+        serieRps: nfseResponse?.serieRps || "",
+        tipoRps: nfseResponse?.tipoRps || 0,
+        dataEmissao: rpsData?.processamento ? new Date(rpsData.processamento) : new Date(),
+        competencia: rpsData?.datavenc ? new Date(rpsData.datavenc) : new Date(),
+        valorServico: Number(rpsData?.valor) || 0,
+        aliquota: nfseResponse?.aliquota || 0,
+        issRetido: nfseResponse?.issRetido || 0,
+        responsavelRetencao: nfseResponse?.responsavelRetencao || 0,
+        itemListaServico: nfseResponse?.itemListaServico || "",
+        discriminacao: nfseResponse?.discriminacao || "",
+        codigoMunicipio: nfseResponse?.codigoMunicipio || 0,
+        exigibilidadeIss: nfseResponse?.exigibilidadeIss || 0,
+        cnpjPrestador: nfseResponse?.cnpjPrestador || "",
+        inscricaoMunicipalPrestador: nfseResponse?.inscricaoMunicipalPrestador || "",
+        cpfTomador: ClientData?.cpf_cnpj || "",
+        razaoSocialTomador: ClientData?.nome || "",
+        enderecoTomador: ClientData?.endereco || "",
+        numeroEndereco: ClientData?.numero || "",
+        complemento: ClientData?.complemento || null,
+        bairro: ClientData?.bairro || "",
+        uf: nfseResponse?.uf || "",
+        cep: ClientData?.cep || "",
+        telefoneTomador: ClientData?.celular || null,
+        emailTomador: ClientData?.email || null,
+        optanteSimplesNacional: 2,
+        incentivoFiscal: 2,
+    });
+    
+    await NsfeData.save(insertDatabase);
+
 
     return xml;
   }

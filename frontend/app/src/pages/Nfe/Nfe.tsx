@@ -80,7 +80,7 @@ export const Nfe = () => {
       console.log(clientesSelecionados);
 
       setDadosNFe(resposta.data);
-      setShowPopUp(false); // Fecha o PopUp ao concluir
+      setShowPopUp(false); 
     } catch (erro) {
       console.error("Erro ao emitir NF-e:", erro);
     }
@@ -113,23 +113,7 @@ export const Nfe = () => {
   };
 
 
-  const imprimirNota = async () => {
-      try {
-        const resposta = await axios.post(
-          `${process.env.REACT_APP_URL}/Nfe/ImprimirNota`,
-          { clientesSelecionados },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        console.log("Nota impressa:", resposta.data);
-      } catch (erro) {
-        console.error("Erro ao imprimir a nota:", erro);
-      }
-  }
+
 
   const handleSearch = async () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
