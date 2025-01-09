@@ -16,6 +16,7 @@ export const Nfe = () => {
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
+  const [aliquota, setAliquota] = useState("");
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     []
   );
@@ -68,7 +69,7 @@ export const Nfe = () => {
     try {
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/`,
-        { password, clientesSelecionados },
+        { password, clientesSelecionados, aliquota },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -111,9 +112,6 @@ export const Nfe = () => {
       console.error("Erro ao enviar o certificado:", erro);
     }
   };
-
-
-
 
   const handleSearch = async () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
@@ -255,6 +253,9 @@ export const Nfe = () => {
         >
           Emitir NF-e
         </button>
+        <input type="text" onChange={((e) => {
+          setAliquota(e.target.value);
+        })} placeholder="Digite a Aliquota" className="ring-2 ring-gray-500 p-2 rounded" />
       </div>
       {arquivo && (
         <p className="text-sm text-gray-500 m-5">

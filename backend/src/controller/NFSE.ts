@@ -35,7 +35,7 @@ class NFSEController {
 
   public iniciar = async (req: Request, res: Response) => {
     try {
-      const { password, clientesSelecionados } = req.body;
+      const { password, clientesSelecionados, aliquota } = req.body;
 
       console.log(clientesSelecionados);
 
@@ -49,7 +49,8 @@ class NFSEController {
       const result = await this.gerarNFSE(
         password,
         clientesSelecionados,
-        "EnviarLoteRpsSincronoEnvio"
+        "EnviarLoteRpsSincronoEnvio",
+        aliquota
       );
 
 
@@ -60,7 +61,7 @@ class NFSEController {
     }
   };
 
-  public async gerarNFSE(password: string, ids: string[], SOAPAction: string) {
+  public async gerarNFSE(password: string, ids: string[], SOAPAction: string, aliquota: string) {
     try {
       if (!fs.existsSync(this.TEMP_DIR)) {
         fs.mkdirSync(this.TEMP_DIR, { recursive: true });
@@ -102,7 +103,7 @@ class NFSEController {
       });
 
       for (const id of ids) {
-        const xmlLoteRps = await this.gerarXmlRecepcionarRps(id);
+        const xmlLoteRps = await this.gerarXmlRecepcionarRps(id, aliquota);
         const signedXml = this.assinarXml(
           xmlLoteRps,
           certPathToUse,
@@ -138,7 +139,7 @@ class NFSEController {
 
 
 
-  private async gerarXmlRecepcionarRps(id: string) {
+  private async gerarXmlRecepcionarRps(id: string, aliquota: string = "5") {
     const builder = xmlbuilder;
 
     const RPSQuery = MkauthSource.getRepository(Faturas);
@@ -167,6 +168,9 @@ class NFSEController {
       order: { id: "DESC" },  
       take: 1,  
     });
+
+    
+    console.log("ALIQUOTA " + aliquota);
     
 
     const nfseNumber = nfseResponse && nfseResponse[0].numeroRps ? nfseResponse[0].numeroRps + 1 : 1;
@@ -236,7 +240,7 @@ class NFSEController {
       .txt(String(rpsData?.valor))
       .up()
       .ele("Aliquota")
-      .txt(String(nfseResponse[0]?.aliquota))
+      .txt(aliquota)
       .up()
       .up()
       .ele("IssRetido")
