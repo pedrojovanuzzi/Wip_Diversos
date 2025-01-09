@@ -216,9 +216,7 @@ class NFSEController {
       .up()
       .ele("DataEmissao")
       .txt(
-        rpsData?.processamento
-          ? rpsData.processamento.toISOString().substring(0, 10)
-          : ""
+        new Date().toISOString().substring(0, 10)
       )
       .up()
       .ele("Status")
@@ -227,7 +225,9 @@ class NFSEController {
       .up()
       .ele("Competencia")
       .txt(
-        rpsData?.datavenc ? rpsData.datavenc.toISOString().substring(0, 10) : ""
+        rpsData?.processamento
+          ? rpsData.processamento.toISOString().substring(0, 10)
+          : ""
       )
       .up()
       .ele("Servico")
