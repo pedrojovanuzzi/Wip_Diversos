@@ -229,9 +229,7 @@ class NFSEController {
       .up()
       .ele("Competencia")
       .txt(
-        rpsData?.processamento
-          ? rpsData.processamento.toISOString().substring(0, 10)
-          : ""
+        new Date().toISOString().substring(0, 10)
       )
       .up()
       .ele("Servico")
@@ -316,11 +314,14 @@ class NFSEController {
       .up()
       .up()
       .up()
+      .ele("RegimeEspecialTributacao")
+      .txt("06")
+      .up()
       .ele("OptanteSimplesNacional")
-      .txt("2")
+      .txt(String(nfseResponse[0].optanteSimplesNacional))
       .up()
       .ele("IncentivoFiscal")
-      .txt("2")
+      .txt(String(nfseResponse[0].incentivoFiscal))
       .up()
       .up()
       .up()
