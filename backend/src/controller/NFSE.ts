@@ -16,6 +16,7 @@ import AppDataSource from "../database/DataSource";
 import { NFSE } from "../entities/NFSE";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
+import { DOMParser } from "xmldom";
 import {
   Between,
   Equal,
@@ -30,9 +31,8 @@ dotenv.config();
 
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  private WSDL_URL =
-    "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"; //HOMOLOGAÇÃO
-  // private WSDL_URL = "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl"; //PRODUÇÃO
+  // private WSDL_URL = "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"; //HOMOLOGAÇÃO
+  private WSDL_URL = "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl"; //PRODUÇÃO
   private TEMP_DIR = path.resolve(__dirname, "../files");
   private PASSWORD = "";
   private DECRYPTED_CERT_PATH = path.resolve(
@@ -133,10 +133,6 @@ class NFSEController {
     } catch (error) {
       console.error("Erro ao enviar requisição:", error);
     }
-  }
-
-  private removeBOM(xml: string): string {
-    return xml.charCodeAt(0) === 0xfeff ? xml.slice(1) : xml;
   }
 
   private async gerarXmlRecepcionarRps(id: string, aliquota: string = "5") {
@@ -245,8 +241,8 @@ class NFSEController {
     <soapenv:Body>
       <ws:recepcionarLoteRpsSincrono>
         ${envioSemAssinatura}
-        <username>01001001000113</username>
-        <password>123456</password>
+        <username>${process.env.MUNICIPIO_LOGIN}</username>
+        <password>${process.env.MUNICIPIO_SENHA}</password>
       </ws:recepcionarLoteRpsSincrono>
     </soapenv:Body>
   </soapenv:Envelope>
@@ -266,7 +262,7 @@ class NFSEController {
     <SignedInfo>
       <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
       <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-      <Reference URI="#lote1">
+      <Reference URI="#_${String(rpsData?.uuid_lanc)}">
         <Transforms>
           <Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
         </Transforms>
@@ -288,7 +284,7 @@ class NFSEController {
     <SignedInfo>
       <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
       <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-      <Reference URI="#envio1">
+      <Reference URI="#lote1">
         <Transforms>
           <Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
         </Transforms>
@@ -358,14 +354,15 @@ class NFSEController {
       incentivoFiscal: 2
     })
     await NsfeData.save(insertDatabase)
+
+    const soapComAssinaturasUnicaLinha = soapComAssinaturas.replace(/\s+/g, " ").trim();
+
   
-    console.log(soapComAssinaturas)
+    console.log(soapComAssinaturasUnicaLinha)
   
-    return this.removeBOM(xmlBuffer.toString("utf8"))
+    return soapComAssinaturasUnicaLinha
   }
   
-  
-
   private extrairCertificados(
     certPath: string,
     password: string,
@@ -373,67 +370,88 @@ class NFSEController {
     elementToSignTwo: string
   ): {
     parteOne: {
-      privateKeyPem: string;
-      x509Certificate: string;
-      digestValue: string;
-      signature: string;
-    };
+      privateKeyPem: string
+      x509Certificate: string
+      digestValue: string
+      signature: string
+    }
     parteTwo: {
-      privateKeyPem: string;
-      x509Certificate: string;
-      digestValue: string;
-      signature: string;
-    };
+      privateKeyPem: string
+      x509Certificate: string
+      digestValue: string
+      signature: string
+    }
   } {
-    const pfxBuffer = fs.readFileSync(certPath);
-    const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
-    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
-    let privateKeyPem = "";
-    let certificatePem = "";
+    const pfxBuffer = fs.readFileSync(certPath)
+    const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"))
+    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password)
+
+    let privateKeyPem = ""
+    let certificatePem = ""
+
     p12.safeContents.forEach((content) => {
       content.safeBags.forEach((bag) => {
         if (bag.type === forge.pki.oids.pkcs8ShroudedKeyBag && bag.key) {
-          privateKeyPem = forge.pki.privateKeyToPem(bag.key);
+          privateKeyPem = forge.pki.privateKeyToPem(bag.key)
         } else if (bag.type === forge.pki.oids.certBag && bag.cert) {
-          certificatePem = forge.pki.certificateToPem(bag.cert);
+          certificatePem = forge.pki.certificateToPem(bag.cert)
         }
-      });
-    });
+      })
+    })
+
     if (!privateKeyPem || !certificatePem) {
-      throw new Error("Falha ao extrair chave privada ou certificado.");
+      throw new Error("Falha ao extrair chave privada ou certificado.")
     }
+
     const x509Certificate = certificatePem
       .replace(/-----BEGIN CERTIFICATE-----/g, "")
       .replace(/-----END CERTIFICATE-----/g, "")
-      .replace(/\s+/g, "");
+      .replace(/\s+/g, "")
+
+    // Aplica canonicalização e só depois gera o digest
+    const canonicalOne = this.excC14n(elementToSignOne)
+    const canonicalTwo = this.excC14n(elementToSignTwo)
+
     const digestValueOne = crypto
       .createHash("sha1")
-      .update(elementToSignOne)
-      .digest("base64");
-    const signerOne = crypto.createSign("RSA-SHA1");
-    signerOne.update(elementToSignOne);
-    const signatureOne = signerOne.sign(privateKeyPem, "base64");
+      .update(canonicalOne)
+      .digest("base64")
+
+    const signerOne = crypto.createSign("RSA-SHA1")
+    signerOne.update(canonicalOne)
+    const signatureOne = signerOne.sign(privateKeyPem, "base64")
+
     const digestValueTwo = crypto
       .createHash("sha1")
-      .update(elementToSignTwo)
-      .digest("base64");
-    const signerTwo = crypto.createSign("RSA-SHA1");
-    signerTwo.update(elementToSignTwo);
-    const signatureTwo = signerTwo.sign(privateKeyPem, "base64");
+      .update(canonicalTwo)
+      .digest("base64")
+
+    const signerTwo = crypto.createSign("RSA-SHA1")
+    signerTwo.update(canonicalTwo)
+    const signatureTwo = signerTwo.sign(privateKeyPem, "base64")
+
     return {
       parteOne: {
         privateKeyPem,
         x509Certificate,
         digestValue: digestValueOne,
-        signature: signatureOne,
+        signature: signatureOne
       },
       parteTwo: {
         privateKeyPem,
         x509Certificate,
         digestValue: digestValueTwo,
-        signature: signatureTwo,
-      },
-    };
+        signature: signatureTwo
+      }
+    }
+  }
+
+  private excC14n(xml: string): string {
+    const doc = new DOMParser().parseFromString(xml, "text/xml")
+    const node = doc.documentElement
+    const c14n = new SignedXml();
+
+    return c14n.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#"
   }
 
   public async BuscarNSFE(req: Request, res: Response) {
