@@ -25,9 +25,8 @@ dotenv.config();
 
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  // private WSDL_URL =
-  //   "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"; //HOMOLOGAÇÃO
-  private WSDL_URL = "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl"; //PRODUÇÃO
+  private WSDL_URL = "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"; //HOMOLOGAÇÃO
+  // private WSDL_URL = "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl"; //PRODUÇÃO
   private TEMP_DIR = path.resolve(__dirname, "../files");
   private PASSWORD = "";
   private DECRYPTED_CERT_PATH = path.resolve(
@@ -171,9 +170,16 @@ class NFSEController {
     
     console.log("ALIQUOTA " + aliquota);
 
-    const certVariables = this.extrairCertificados(
+    const certVariablesParteOne = this.extrairCertificados(
       this.certPath,
       this.PASSWORD,
+      "<LoteRps>...</LoteRps>"
+    );
+
+    const certVariablesParteTwo = this.extrairCertificados(
+      this.certPath,
+      this.PASSWORD,
+      "<EnviarLoteRpsSincronoEnvio>...</EnviarLoteRpsSincronoEnvio>"
     );
     
 
@@ -337,17 +343,17 @@ class NFSEController {
       .ele("Transform" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up().up()
       .ele("DigestMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#sha1"}).up()
       .ele("DigestValue")
-      .txt(certVariables.digestValue)
+      .txt(certVariablesParteOne.digestValue)
       .up()
       .up()
       .up()
       .ele("SignatureValue")
-      .txt(certVariables.signature)
+      .txt(certVariablesParteOne.signature)
       .up()
       .ele("KeyInfo")
       .ele("X509Data")
       .ele("X509Certificate")
-      .txt(certVariables.x509Certificate)
+      .txt(certVariablesParteOne.x509Certificate)
       .up()
       .up()
       .up()
@@ -364,27 +370,29 @@ class NFSEController {
       .ele("Transform" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up().up()
       .ele("DigestMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#sha1"}).up()
       .ele("DigestValue")
-      .txt(certVariables.digestValue)
+      .txt(certVariablesParteTwo.digestValue)
       .up()
       .up()
       .up()
       .ele("SignatureValue")
-      .txt(certVariables.signature)
+      .txt(certVariablesParteTwo.signature)
       .up()
       .ele("KeyInfo")
       .ele("X509Data")
       .ele("X509Certificate")
-      .txt(certVariables.x509Certificate)
+      .txt(certVariablesParteTwo.x509Certificate)
       .up()
       .up()
       .up()
       .up()
       .up()
       .ele("username")
-      .txt(process.env.MUNICIPIO_LOGIN || "")
+      // .txt(process.env.MUNICIPIO_LOGIN || "")
+      .txt("01001001000113")
       .up()
       .ele("password")
-      .txt(process.env.MUNICIPIO_SENHA || "")
+      // .txt(process.env.MUNICIPIO_SENHA || "")
+      .txt("123456")
       .up()
       .end({ pretty: false });
       const xmlBuffer = Buffer.from(xml, 'utf8');
@@ -438,7 +446,8 @@ class NFSEController {
 
   private extrairCertificados(
     certPath: string,
-    password: string
+    password: string,
+    elementToSign: string // Conteúdo XML a ser assinado
   ): { privateKeyPem: string; x509Certificate: string; digestValue: string; signature: string } {
     const pfxBuffer = fs.readFileSync(certPath);
     const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
@@ -461,18 +470,18 @@ class NFSEController {
       throw new Error("Falha ao extrair chave privada ou certificado.");
     }
   
-    // Remove os delimitadores e espaços do certificado PEM para uso no XML
+    // Remove delimitadores do certificado PEM para uso no XML
     const x509Certificate = certificatePem
       .replace(/-----BEGIN CERTIFICATE-----/g, "")
       .replace(/-----END CERTIFICATE-----/g, "")
       .replace(/\s+/g, "");
   
-    // Placeholder para digestValue e assinatura
-    const placeholderToSign = "placeholder";
-    const digestValue = crypto.createHash("sha1").update(placeholderToSign).digest("base64");
+    // Calcula o DigestValue a partir do elemento XML a ser assinado
+    const digestValue = crypto.createHash("sha1").update(elementToSign).digest("base64");
   
+    // Gera a assinatura do mesmo elemento
     const signer = crypto.createSign("RSA-SHA1");
-    signer.update(placeholderToSign);
+    signer.update(elementToSign);
     const signature = signer.sign(privateKeyPem, "base64");
   
     return {
@@ -482,6 +491,7 @@ class NFSEController {
       signature,
     };
   }
+  
 
 
   public async uploadCertificado(req: Request, res: Response) {
