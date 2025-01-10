@@ -223,20 +223,24 @@ class NFSEController {
       </Rps>
     </ListaRps>
   </LoteRps>
-  `.trim()
+  `.replace(/\s+>/g, ">") 
+  .replace(/>\s+</g, "><")
+  .replace(/<\s+/g, "<")
+  .trim();
   
     const envioSemAssinatura = `
-  <EnviarLoteRpsSincronoEnvio Id="envio1" xmlns="http://www.abrasf.org.br/nfse.xsd">
+  <EnviarLoteRpsSincronoEnvio Id="#lote1" xmlns="http://www.abrasf.org.br/nfse.xsd">
     ${loteRpsSemAssinatura}
     <!-- A segunda assinatura deve ficar aqui -->
   </EnviarLoteRpsSincronoEnvio>
-  `.trim()
+  `.replace(/\s+>/g, ">") 
+  .replace(/>\s+</g, "><")
+  .replace(/<\s+/g, "<")
+  .trim();
   
     // Aqui criamos o SOAP final, mas sem as assinaturas
     const soapSemAssinatura = `
-  <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                    xmlns:ws="http://ws.issweb.fiorilli.com.br/"
-                    xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
+  <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
     <soapenv:Header/>
     <soapenv:Body>
       <ws:recepcionarLoteRpsSincrono>
@@ -246,14 +250,17 @@ class NFSEController {
       </ws:recepcionarLoteRpsSincrono>
     </soapenv:Body>
   </soapenv:Envelope>
-  `.trim()
+  `.replace(/\s+>/g, ">") 
+  .replace(/>\s+</g, "><")
+  .replace(/<\s+/g, "<")
+  .trim();
   
     // Agora geramos os digests e assinaturas
     const SignatureVariables = this.extrairCertificados(
       this.certPath,
       this.PASSWORD,
       loteRpsSemAssinatura, // referência #lote1
-      envioSemAssinatura    // referência #envio1
+      envioSemAssinatura    
     )
   
     // Primeira assinatura, ref #lote1
@@ -276,9 +283,12 @@ class NFSEController {
         <X509Certificate>${SignatureVariables.parteOne.x509Certificate}</X509Certificate>
       </X509Data>
     </KeyInfo>
-  </Signature>`.trim()
+  </Signature>`.replace(/\s+>/g, ">") 
+  .replace(/>\s+</g, "><")
+  .replace(/<\s+/g, "<")
+  .trim();
   
-    // Segunda assinatura, ref #envio1
+    
     const assinatura2 = `
   <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
     <SignedInfo>
@@ -298,7 +308,10 @@ class NFSEController {
         <X509Certificate>${SignatureVariables.parteTwo.x509Certificate}</X509Certificate>
       </X509Data>
     </KeyInfo>
-  </Signature>`.trim()
+  </Signature>`.replace(/\s+>/g, ">") 
+  .replace(/>\s+</g, "><")
+  .replace(/<\s+/g, "<")
+  .trim();
   
     // Injeta a primeira assinatura logo após <!-- A primeira assinatura deve ficar aqui -->
     const loteComAssinatura1 = loteRpsSemAssinatura.replace(
@@ -355,7 +368,13 @@ class NFSEController {
     })
     await NsfeData.save(insertDatabase)
 
-    const soapComAssinaturasUnicaLinha = soapComAssinaturas.replace(/\s+/g, " ").trim();
+    const soapComAssinaturasUnicaLinha = soapComAssinaturas
+    .replace(/\s+>/g, ">") 
+    .replace(/>\s+</g, "><")
+    .replace(/<\s+/g, "<")
+    .trim();
+
+
 
   
     console.log(soapComAssinaturasUnicaLinha)
