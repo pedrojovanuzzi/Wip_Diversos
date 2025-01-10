@@ -136,207 +136,168 @@ class NFSEController {
   }
 
   private async gerarXmlRecepcionarRps(id: string, aliquota: string = "5") {
-    const builder = xmlbuilder
     const RPSQuery = MkauthSource.getRepository(Faturas)
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } })
     const ClientRepository = MkauthSource.getRepository(ClientesEntities)
     const FaturasRepository = MkauthSource.getRepository(Faturas)
     const FaturasData = await FaturasRepository.findOne({ where: { id: Number(id) } })
     const ClientData = await ClientRepository.findOne({ where: { login: FaturasData?.login } })
-  
+
     const response = await axios.get(
       `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
     )
     const municipio = response.data.id
-  
+
     const NsfeData = AppDataSource.getRepository(NFSE)
     const nfseResponse = await NsfeData.find({ order: { id: "DESC" }, take: 1 })
-    const nfseNumber = nfseResponse && nfseResponse[0]?.numeroRps ? nfseResponse[0].numeroRps + 1 : 1
-  
-    const loteRpsSemAssinatura = `
-  <LoteRps Id="lote1" versao="2.01" xmlns="http://www.abrasf.org.br/nfse.xsd">
-    <NumeroLote>1</NumeroLote>
-    <CpfCnpj><Cnpj>20843290000142</Cnpj></CpfCnpj>
-    <InscricaoMunicipal>2195-00/14</InscricaoMunicipal>
-    <QuantidadeRps>1</QuantidadeRps>
-    <ListaRps>
-      <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
-        <InfDeclaracaoPrestacaoServico Id="_${String(rpsData?.uuid_lanc)}">
-          <Rps>
-            <IdentificacaoRps>
-              <Numero>${String(nfseNumber)}</Numero>
-              <Serie>${String(nfseResponse[0]?.serieRps)}</Serie>
-              <Tipo>${String(nfseResponse[0]?.tipoRps)}</Tipo>
-            </IdentificacaoRps>
-            <DataEmissao>${new Date().toISOString().substring(0, 10)}</DataEmissao>
-            <Status>1</Status>
-          </Rps>
-          <Competencia>${new Date().toISOString().substring(0, 10)}</Competencia>
-          <Servico>
-            <Valores>
-              <ValorServicos>${String(rpsData?.valor)}</ValorServicos>
-              <Aliquota>${aliquota}</Aliquota>
-            </Valores>
-            <IssRetido>${String(nfseResponse[0]?.issRetido)}</IssRetido>
-            <ResponsavelRetencao>${String(nfseResponse[0]?.responsavelRetencao)}</ResponsavelRetencao>
-            <ItemListaServico>${String(nfseResponse[0]?.itemListaServico)}</ItemListaServico>
-            <Discriminacao>Servicos de Manutencao, e Suporte Tecnico</Discriminacao>
-            <CodigoMunicipio>3503406</CodigoMunicipio>
-            <ExigibilidadeISS>1</ExigibilidadeISS>
-          </Servico>
-          <Prestador>
-            <CpfCnpj><Cnpj>20843290000142</Cnpj></CpfCnpj>
-            <InscricaoMunicipal>2195-00/14</InscricaoMunicipal>
-          </Prestador>
-          <Tomador>
-            <IdentificacaoTomador>
-              <CpfCnpj>
-                <${
-                  ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj"
-                }>${String(ClientData?.cpf_cnpj.replace(/[^0-9]/g, ""))}</${
+    const nfseNumber = nfseResponse && nfseResponse[0]?.numeroRps
+      ? nfseResponse[0].numeroRps + 1
+      : 1
+
+    /*
+      CONSTRUÇÃO DO RPS SEM ASSINATURA (primeiro iremos assinar esse RPS).
+      Observação: Essa parte deve ter o Id do RPS, ex: Id="_ABC123"
+    */
+    const rpsXmlSemAssinatura = `
+    <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
+      <InfDeclaracaoPrestacaoServico Id="_${String(rpsData?.uuid_lanc)}">
+        <Rps>
+          <IdentificacaoRps>
+            <Numero>${String(nfseNumber)}</Numero>
+            <Serie>${String(nfseResponse[0]?.serieRps)}</Serie>
+            <Tipo>${String(nfseResponse[0]?.tipoRps)}</Tipo>
+          </IdentificacaoRps>
+          <DataEmissao>${new Date().toISOString().substring(0, 10)}</DataEmissao>
+          <Status>1</Status>
+        </Rps>
+        <Competencia>${new Date().toISOString().substring(0, 10)}</Competencia>
+        <Servico>
+          <Valores>
+            <ValorServicos>${String(rpsData?.valor)}</ValorServicos>
+            <Aliquota>${aliquota}</Aliquota>
+          </Valores>
+          <IssRetido>${String(nfseResponse[0]?.issRetido)}</IssRetido>
+          <ResponsavelRetencao>${String(nfseResponse[0]?.responsavelRetencao)}</ResponsavelRetencao>
+          <ItemListaServico>${String(nfseResponse[0]?.itemListaServico)}</ItemListaServico>
+          <Discriminacao>Servicos de Manutencao, e Suporte Tecnico</Discriminacao>
+          <CodigoMunicipio>3503406</CodigoMunicipio>
+          <ExigibilidadeISS>1</ExigibilidadeISS>
+        </Servico>
+        <Prestador>
+          <CpfCnpj><Cnpj>20843290000142</Cnpj></CpfCnpj>
+          <InscricaoMunicipal>2195-00/14</InscricaoMunicipal>
+        </Prestador>
+        <Tomador>
+          <IdentificacaoTomador>
+            <CpfCnpj>
+              <${
+                ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj"
+              }>${String(ClientData?.cpf_cnpj.replace(/[^0-9]/g, ""))}</${
       ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj"
     }>
-              </CpfCnpj>
-            </IdentificacaoTomador>
-            <RazaoSocial>${String(ClientData?.nome)}</RazaoSocial>
-            <Endereco>
-              <Endereco>${String(ClientData?.endereco)}</Endereco>
-              <Numero>${String(ClientData?.numero)}</Numero>
-              <Complemento>${String(ClientData?.complemento)}</Complemento>
-              <Bairro>${String(ClientData?.bairro)}</Bairro>
-              <CodigoMunicipio>${municipio}</CodigoMunicipio>
-              <Uf>SP</Uf>
-              <Cep>${String(ClientData?.cep.replace(/[^0-9]/g, ""))}</Cep>
-            </Endereco>
-            <Contato>
-              <Telefone>${String(ClientData?.celular)}</Telefone>
-              <Email>${String(ClientData?.email)}</Email>
-            </Contato>
-          </Tomador>
-          <RegimeEspecialTributacao>06</RegimeEspecialTributacao>
-          <OptanteSimplesNacional>${
-            nfseResponse[0]?.optanteSimplesNacional || "2"
-          }</OptanteSimplesNacional>
-          <IncentivoFiscal>${nfseResponse[0]?.incentivoFiscal || "2"}</IncentivoFiscal>
-        </InfDeclaracaoPrestacaoServico>
-        <!-- A primeira assinatura deve ficar aqui -->
-      </Rps>
-    </ListaRps>
-  </LoteRps>
-  `.replace(/\s+>/g, ">") 
-  .replace(/>\s+</g, "><")
-  .replace(/<\s+/g, "<")
-  .trim();
-  
-    const envioSemAssinatura = `
-  <EnviarLoteRpsSincronoEnvio Id="#lote1" xmlns="http://www.abrasf.org.br/nfse.xsd">
-    ${loteRpsSemAssinatura}
-    <!-- A segunda assinatura deve ficar aqui -->
-  </EnviarLoteRpsSincronoEnvio>
-  `.replace(/\s+>/g, ">") 
-  .replace(/>\s+</g, "><")
-  .replace(/<\s+/g, "<")
-  .trim();
-  
-    // Aqui criamos o SOAP final, mas sem as assinaturas
-    const soapSemAssinatura = `
-  <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
-    <soapenv:Header/>
-    <soapenv:Body>
-      <ws:recepcionarLoteRpsSincrono>
-        ${envioSemAssinatura}
-        <username>${process.env.MUNICIPIO_LOGIN}</username>
-        <password>${process.env.MUNICIPIO_SENHA}</password>
-      </ws:recepcionarLoteRpsSincrono>
-    </soapenv:Body>
-  </soapenv:Envelope>
-  `.replace(/\s+>/g, ">") 
-  .replace(/>\s+</g, "><")
-  .replace(/<\s+/g, "<")
-  .trim();
-  
-    // Agora geramos os digests e assinaturas
-    const SignatureVariables = this.extrairCertificados(
-      this.certPath,
-      this.PASSWORD,
-      loteRpsSemAssinatura, // referência #lote1
-      envioSemAssinatura    
+            </CpfCnpj>
+          </IdentificacaoTomador>
+          <RazaoSocial>${String(ClientData?.nome)}</RazaoSocial>
+          <Endereco>
+            <Endereco>${String(ClientData?.endereco)}</Endereco>
+            <Numero>${String(ClientData?.numero)}</Numero>
+            <Complemento>${String(ClientData?.complemento)}</Complemento>
+            <Bairro>${String(ClientData?.bairro)}</Bairro>
+            <CodigoMunicipio>${municipio}</CodigoMunicipio>
+            <Uf>SP</Uf>
+            <Cep>${String(ClientData?.cep.replace(/[^0-9]/g, ""))}</Cep>
+          </Endereco>
+          <Contato>
+            <Telefone>${String(ClientData?.celular)}</Telefone>
+            <Email>${String(ClientData?.email)}</Email>
+          </Contato>
+        </Tomador>
+        <RegimeEspecialTributacao>06</RegimeEspecialTributacao>
+        <OptanteSimplesNacional>${
+          nfseResponse[0]?.optanteSimplesNacional || "2"
+        }</OptanteSimplesNacional>
+        <IncentivoFiscal>${nfseResponse[0]?.incentivoFiscal || "2"}</IncentivoFiscal>
+      </InfDeclaracaoPrestacaoServico>
+    </Rps>
+    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim()
+
+    /*
+      Agora aplicamos a primeira assinatura, referenciando o Id do RPS (ex: URI="#_ABC123").
+      Em seguida, anexa essa assinatura DENTRO do RPS (logo após o </InfDeclaracaoPrestacaoServico>).
+    */
+
+    // 1) Cria digest e assinatura do RPS
+    const SignatureRps = this.assinarXml(rpsXmlSemAssinatura, `_${String(rpsData?.uuid_lanc)}`)
+
+    // 2) Anexa a assinatura ao final do RPS (antes do fechamento do RpsXml)
+    const rpsXmlComAssinatura = rpsXmlSemAssinatura.replace(
+      /<\/Rps>$/,
+      `${SignatureRps}</Rps>`
     )
-  
-    // Primeira assinatura, ref #lote1
-    const assinatura1 = `
-  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
-    <SignedInfo>
-      <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
-      <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-      <Reference URI="#_${String(rpsData?.uuid_lanc)}">
-        <Transforms>
-          <Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
-        </Transforms>
-        <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
-        <DigestValue>${SignatureVariables.parteOne.digestValue}</DigestValue>
-      </Reference>
-    </SignedInfo>
-    <SignatureValue>${SignatureVariables.parteOne.signature}</SignatureValue>
-    <KeyInfo>
-      <X509Data>
-        <X509Certificate>${SignatureVariables.parteOne.x509Certificate}</X509Certificate>
-      </X509Data>
-    </KeyInfo>
-  </Signature>`.replace(/\s+>/g, ">") 
-  .replace(/>\s+</g, "><")
-  .replace(/<\s+/g, "<")
-  .trim();
-  
+
+    /*
+      CONSTRUÇÃO DO LOTE, agora incluindo o RPS já assinado.
+      Teremos Id="lote1" e iremos assinar também esse Lote.
+    */
+
+    const loteXmlSemAssinatura = `
+    <LoteRps versao="2.01" Id="lote1" xmlns="http://www.abrasf.org.br/nfse.xsd">
+      <NumeroLote>1</NumeroLote>
+      <CpfCnpj><Cnpj>20843290000142</Cnpj></CpfCnpj>
+      <InscricaoMunicipal>2195-00/14</InscricaoMunicipal>
+      <QuantidadeRps>1</QuantidadeRps>
+      <ListaRps>
+        ${rpsXmlComAssinatura}
+      </ListaRps>
+    </LoteRps>
+    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim()
+
+    // 3) Cria digest e assinatura do Lote, referenciando #lote1
+    const SignatureLote = this.assinarXml(loteXmlSemAssinatura, "lote1")
+
+    // 4) Anexa a assinatura do Lote dentro do Lote (logo após </ListaRps>)
+    const loteXmlComAssinatura = loteXmlSemAssinatura.replace(
+      /<\/LoteRps>$/,
+      `</LoteRps>${SignatureLote}`
+    );
     
-    const assinatura2 = `
-  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
-    <SignedInfo>
-      <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
-      <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-      <Reference URI="#lote1">
-        <Transforms>
-          <Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
-        </Transforms>
-        <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
-        <DigestValue>${SignatureVariables.parteTwo.digestValue}</DigestValue>
-      </Reference>
-    </SignedInfo>
-    <SignatureValue>${SignatureVariables.parteTwo.signature}</SignatureValue>
-    <KeyInfo>
-      <X509Data>
-        <X509Certificate>${SignatureVariables.parteTwo.x509Certificate}</X509Certificate>
-      </X509Data>
-    </KeyInfo>
-  </Signature>`.replace(/\s+>/g, ">") 
-  .replace(/>\s+</g, "><")
-  .replace(/<\s+/g, "<")
-  .trim();
-  
-    // Injeta a primeira assinatura logo após <!-- A primeira assinatura deve ficar aqui -->
-    const loteComAssinatura1 = loteRpsSemAssinatura.replace(
-      /<!-- A primeira assinatura deve ficar aqui -->/,
-      assinatura1
-    )
-  
-    // Injeta a segunda assinatura logo após <!-- A segunda assinatura deve ficar aqui -->
-    const envioComAssinatura2 = envioSemAssinatura
-      .replace(loteRpsSemAssinatura, loteComAssinatura1)
-      .replace(/<!-- A segunda assinatura must ficar aqui -->/i, assinatura2) // note case
-  
-    // Se o texto exato for "<!-- A segunda assinatura deve ficar aqui -->", substitua por ele:
-    const envioAssinado = envioComAssinatura2.replace(
-      /<!-- A segunda assinatura deve ficar aqui -->/,
-      assinatura2
-    )
-  
-    // Por fim, injeta tudo no soap
-    const soapComAssinaturas = soapSemAssinatura.replace(envioSemAssinatura, envioAssinado)
-  
-    const xmlBuffer = Buffer.from(soapComAssinaturas, "utf8")
-  
-    // Salva no banco
-    const insertDatabase = NsfeData.create({
+
+    /*
+      Agora construímos o "EnviarLoteRpsSincronoEnvio" SEM ASSINATURA SOAP — 
+      pois já assinamos RPS e Lote internamente. 
+    */
+
+    const envioXml = `
+    <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd" Id="envio1">
+      ${loteXmlComAssinatura}
+    </EnviarLoteRpsSincronoEnvio>
+    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim()
+
+    /*
+      Constrói o envelope SOAP (sem assinatura SOAP).
+      O município pode ou não exigir a assinatura SOAP, mas aqui vamos supor que basta 
+      assinar RPS e Lote internamente, como pedido.
+    */
+
+    const soapFinal = `
+    <?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+    xmlns:ws="http://ws.issweb.fiorilli.com.br/"
+    xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
+      <soapenv:Header/>
+      <soapenv:Body>
+        <ws:recepcionarLoteRpsSincrono>
+          ${envioXml}
+          <username>${process.env.MUNICIPIO_LOGIN || "01001001000113"}</username>
+          <password>${process.env.MUNICIPIO_SENHA || "123456"}</password>
+        </ws:recepcionarLoteRpsSincrono>
+      </soapenv:Body>
+    </soapenv:Envelope>
+    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim()
+
+    // Salva no banco (opcional)
+    const NsfeRepository = AppDataSource.getRepository(NFSE)
+    const insertDatabase = NsfeRepository.create({
       login: rpsData?.login || "",
       numeroRps: nfseNumber || 0,
       serieRps: nfseResponse[0]?.serieRps || "",
@@ -368,43 +329,14 @@ class NFSEController {
     })
     await NsfeData.save(insertDatabase)
 
-    const soapComAssinaturasUnicaLinha = soapComAssinaturas
-    .replace(/\s+>/g, ">") 
-    .replace(/>\s+</g, "><")
-    .replace(/<\s+/g, "<")
-    .trim();
-
-
-
-  
-    console.log(soapComAssinaturasUnicaLinha)
-  
-    return soapComAssinaturasUnicaLinha
+    console.log(soapFinal)
+    return soapFinal
   }
   
-  private extrairCertificados(
-    certPath: string,
-    password: string,
-    elementToSignOne: string,
-    elementToSignTwo: string
-  ): {
-    parteOne: {
-      privateKeyPem: string
-      x509Certificate: string
-      digestValue: string
-      signature: string
-    }
-    parteTwo: {
-      privateKeyPem: string
-      x509Certificate: string
-      digestValue: string
-      signature: string
-    }
-  } {
-    const pfxBuffer = fs.readFileSync(certPath)
+  private extrairChaveECertificado() {
+    const pfxBuffer = fs.readFileSync(this.certPath)
     const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"))
-    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password)
-
+    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, this.PASSWORD)
     let privateKeyPem = ""
     let certificatePem = ""
 
@@ -417,61 +349,80 @@ class NFSEController {
         }
       })
     })
-
     if (!privateKeyPem || !certificatePem) {
       throw new Error("Falha ao extrair chave privada ou certificado.")
     }
-
     const x509Certificate = certificatePem
       .replace(/-----BEGIN CERTIFICATE-----/g, "")
       .replace(/-----END CERTIFICATE-----/g, "")
       .replace(/\s+/g, "")
 
-    // Aplica canonicalização e só depois gera o digest
-    const canonicalOne = this.excC14n(elementToSignOne)
-    const canonicalTwo = this.excC14n(elementToSignTwo)
-
-    const digestValueOne = crypto
-      .createHash("sha1")
-      .update(canonicalOne)
-      .digest("base64")
-
-    const signerOne = crypto.createSign("RSA-SHA1")
-    signerOne.update(canonicalOne)
-    const signatureOne = signerOne.sign(privateKeyPem, "base64")
-
-    const digestValueTwo = crypto
-      .createHash("sha1")
-      .update(canonicalTwo)
-      .digest("base64")
-
-    const signerTwo = crypto.createSign("RSA-SHA1")
-    signerTwo.update(canonicalTwo)
-    const signatureTwo = signerTwo.sign(privateKeyPem, "base64")
-
     return {
-      parteOne: {
-        privateKeyPem,
-        x509Certificate,
-        digestValue: digestValueOne,
-        signature: signatureOne
-      },
-      parteTwo: {
-        privateKeyPem,
-        x509Certificate,
-        digestValue: digestValueTwo,
-        signature: signatureTwo
-      }
+      privateKeyPem,
+      x509Certificate
     }
   }
 
-  private excC14n(xml: string): string {
-    const doc = new DOMParser().parseFromString(xml, "text/xml")
-    const node = doc.documentElement
-    const c14n = new SignedXml();
 
-    return c14n.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#"
+  private assinarXml(xml: string, referenceId: string) {
+    // 1) canonicalizar e gerar digest
+    const canonical = this.excC14n(xml)
+    const digestValue = crypto
+      .createHash("sha1")
+      .update(canonical)
+      .digest("base64")
+
+    // 2) ler pfx e extrair chave e certificado
+    const { privateKeyPem, x509Certificate } = this.extrairChaveECertificado()
+
+    // 3) assinar
+    const signer = crypto.createSign("RSA-SHA1")
+    signer.update(canonical)
+    const signatureValue = signer.sign(privateKeyPem, "base64")
+
+    // 4) construir o nó <Signature>
+    return `
+<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+  <SignedInfo>
+    <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+    <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
+    <Reference URI="#${referenceId}">
+      <Transforms>
+        <Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+      </Transforms>
+      <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
+      <DigestValue>${digestValue}</DigestValue>
+    </Reference>
+  </SignedInfo>
+  <SignatureValue>${signatureValue}</SignatureValue>
+  <KeyInfo>
+    <X509Data>
+      <X509Certificate>${x509Certificate}</X509Certificate>
+    </X509Data>
+  </KeyInfo>
+</Signature>`.trim()
   }
+
+  private excC14n(xml: string): string {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, "application/xml");
+  
+    if (!doc.documentElement) {
+      throw new Error("Erro ao parsear o XML.");
+    }
+  
+    const signedXml = new SignedXml();
+    signedXml.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#";
+  
+    // getCanonXml exige: transforms, node, [options]
+    const transforms: readonly string[] = []; // ou algo como [{ algorithm: "http://www.w3.org/2001/10/xml-exc-c14n#" }]
+    const node = doc.documentElement; // nó XML
+  
+    const canonicalizedXml = signedXml.getCanonXml(transforms, node, {});
+  
+    return canonicalizedXml;
+  }
+  
 
   public async BuscarNSFE(req: Request, res: Response) {
     try {
