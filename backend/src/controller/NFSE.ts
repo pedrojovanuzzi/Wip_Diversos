@@ -241,7 +241,7 @@ class NFSEController {
     */
 
     const loteXmlSemAssinatura = `
-    <LoteRps versao="2.01" Id="lote1" xmlns="http://www.abrasf.org.br/nfse.xsd">
+    <LoteRps versao="2.01" Id="lote1">
       <NumeroLote>1</NumeroLote>
       <CpfCnpj><Cnpj>20843290000142</Cnpj></CpfCnpj>
       <InscricaoMunicipal>2195-00/14</InscricaoMunicipal>
@@ -253,7 +253,7 @@ class NFSEController {
     `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim()
 
     // 3) Cria digest e assinatura do Lote, referenciando #lote1
-    const SignatureLote = this.assinarXml(loteXmlSemAssinatura, "lote1")
+    const SignatureLote = this.assinarXml(loteXmlSemAssinatura, `lote1`)
 
     // 4) Anexa a assinatura do Lote dentro do Lote (logo após </ListaRps>)
     const loteXmlComAssinatura = loteXmlSemAssinatura.replace(
@@ -268,7 +268,7 @@ class NFSEController {
     */
 
     const envioXml = `
-    <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd" Id="envio1">
+    <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
       ${loteXmlComAssinatura}
     </EnviarLoteRpsSincronoEnvio>
     `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim()
