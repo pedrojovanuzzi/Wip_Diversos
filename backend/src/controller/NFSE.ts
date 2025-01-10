@@ -17,6 +17,8 @@ import { NFSE } from "../entities/NFSE";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
 import { Between, Equal, FindOptionsOrder, In, IsNull, MoreThanOrEqual } from "typeorm";
+import * as crypto from "crypto";
+
 
 dotenv.config();
 
@@ -27,6 +29,7 @@ class NFSEController {
   //   "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"; //HOMOLOGAÇÃO
   private WSDL_URL = "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl"; //PRODUÇÃO
   private TEMP_DIR = path.resolve(__dirname, "../files");
+  private PASSWORD = "";
   private DECRYPTED_CERT_PATH = path.resolve(
     this.TEMP_DIR,
     "decrypted_certificado.tmp"
@@ -36,6 +39,8 @@ class NFSEController {
   public iniciar = async (req: Request, res: Response) => {
     try {
       const { password, clientesSelecionados, aliquota } = req.body;
+
+      this.PASSWORD = password;
 
       console.log(clientesSelecionados);
 
@@ -104,14 +109,8 @@ class NFSEController {
 
       for (const id of ids) {
         const xmlLoteRps = await this.gerarXmlRecepcionarRps(id, aliquota);
-        const signedXml = this.assinarXml(
-          xmlLoteRps,
-          certPathToUse,
-          password,
-          "InfDeclaracaoPrestacaoServico"
-        );
 
-        const response = await axios.post(this.WSDL_URL, signedXml, {
+        const response = await axios.post(this.WSDL_URL, xmlLoteRps, {
           httpsAgent,
           headers: {
             "Content-Type": "text/xml; charset=UTF-8",
@@ -171,6 +170,11 @@ class NFSEController {
 
     
     console.log("ALIQUOTA " + aliquota);
+
+    const certVariables = this.extrairCertificados(
+      this.certPath,
+      this.PASSWORD,
+    );
     
 
     const nfseNumber = nfseResponse && nfseResponse[0].numeroRps ? nfseResponse[0].numeroRps + 1 : 1;
@@ -324,6 +328,32 @@ class NFSEController {
       .txt(String(nfseResponse[0].incentivoFiscal))
       .up()
       .up()
+      .ele("Signature", {xmlns:"http://www.w3.org/2000/09/xmldsig#"})
+      .ele("SignedInfo")
+      .ele("CanonicalizationMethod" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up()
+      .ele("SignatureMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#rsa-sha1"}).up()
+      .ele("Reference", {Id:String(rpsData?.uuid_lanc)})
+      .ele("Transforms")
+      .ele("Transform" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up()
+      .ele("DigestMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#sha1"}).up()
+      .ele("DigestValue")
+      .txt(certVariables.digestValue)
+      .up()
+      .up()
+      .up()
+      .ele("SignatureValue")
+      .txt(certVariables.signature)
+      .up()
+      .ele("KeyInfo")
+      .ele("X509Data")
+      .ele("X509Certificate")
+      .txt(certVariables.x509Certificate.replace(/[^0-9]/g, ""))
+      .up()
+      .up()
+      .up()
+      .up()
+      .up()
+      .up()
       .up()
       .up()
       .ele("Signature", {xmlns:"http://www.w3.org/2000/09/xmldsig#"})
@@ -335,17 +365,18 @@ class NFSEController {
       .ele("Transform" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up()
       .ele("DigestMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#sha1"}).up()
       .ele("DigestValue")
-      .txt(digestValue)
+      .txt(certVariables.digestValue)
       .up()
       .up()
       .up()
       .ele("SignatureValue")
-      .txt(signature)
+      .txt(certVariables.signature)
       .up()
       .ele("KeyInfo")
       .ele("X509Data")
       .ele("X509Certificate")
-      .txt(x509data)
+      .txt(certVariables.x509Certificate.replace(/[^0-9]/g, ""))
+      .up()
       .up()
       .up()
       .up()
@@ -405,19 +436,17 @@ class NFSEController {
     }
   }
 
-  private assinarXml(
-    xml: string,
+  private extrairCertificados(
     certPath: string,
-    password: string,
-    children: string
-  ): string {
+    password: string
+  ): { privateKeyPem: string; x509Certificate: string; digestValue: string; signature: string } {
     const pfxBuffer = fs.readFileSync(certPath);
     const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
     const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
-
+  
     let privateKeyPem = "";
     let certificatePem = "";
-
+  
     p12.safeContents.forEach((content) => {
       content.safeBags.forEach((bag) => {
         if (bag.type === forge.pki.oids.pkcs8ShroudedKeyBag && bag.key) {
@@ -427,60 +456,31 @@ class NFSEController {
         }
       });
     });
-
+  
     if (!privateKeyPem || !certificatePem) {
       throw new Error("Falha ao extrair chave privada ou certificado.");
     }
-
-    const signer = new SignedXml({
-      privateKey: privateKeyPem,
-      publicCert: certificatePem,
-    });
-
-    signer.addReference({
-      xpath: `//*[local-name(.)='${children}']`,
-      transforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"],
-      digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
-    });
-
-    signer.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
-    signer.canonicalizationAlgorithm =
-      "http://www.w3.org/2001/10/xml-exc-c14n#";
-
-    signer.computeSignature(xml);
-
-    const signedXml = signer.getSignedXml();
-    const signedDoc = libxmljs.parseXml(signedXml);
-
-    const rpsElement = signedDoc.get(
-      `//*[local-name(.)='${children}']`
-    ) as libxmljs.XMLElement | null;
-
-    if (!rpsElement) {
-      throw new Error("Elemento Rps não encontrado no XML.");
-    }
-
-    const signatureElement = signedDoc.get(
-      "//*[local-name(.)='Signature']"
-    ) as libxmljs.XMLElement | null;
-
-    // Move a assinatura existente, em vez de clonar ou criar uma nova
-    if (signatureElement) {
-      signatureElement.remove(); // Remove a assinatura duplicada do local errado
-      rpsElement.addChild(signatureElement); // Move para dentro de InfDeclaracaoPrestacaoServico
-    }
-
-    if (!signatureElement) {
-      throw new Error("Assinatura não encontrada.");
-    }
-
-    rpsElement.addNextSibling(signatureElement);
-
-    const finalXml = signedDoc.toString().replace(/>\s+</g, '><').replace(/(\r\n|\n|\r)/g, '').trim();
-
-    console.log(`\n\n\n ${finalXml}`);
   
-    return finalXml;
+    // Remove os delimitadores e espaços do certificado PEM para uso no XML
+    const x509Certificate = certificatePem
+      .replace(/-----BEGIN CERTIFICATE-----/g, "")
+      .replace(/-----END CERTIFICATE-----/g, "")
+      .replace(/\s+/g, "");
+  
+    // Placeholder para digestValue e assinatura
+    const placeholderToSign = "placeholder";
+    const digestValue = crypto.createHash("sha1").update(placeholderToSign).digest("base64");
+  
+    const signer = crypto.createSign("RSA-SHA1");
+    signer.update(placeholderToSign);
+    const signature = signer.sign(privateKeyPem, "base64");
+  
+    return {
+      privateKeyPem,
+      x509Certificate,
+      digestValue,
+      signature,
+    };
   }
 
 
