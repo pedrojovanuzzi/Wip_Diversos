@@ -16,16 +16,22 @@ import AppDataSource from "../database/DataSource";
 import { NFSE } from "../entities/NFSE";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
-import { Between, Equal, FindOptionsOrder, In, IsNull, MoreThanOrEqual } from "typeorm";
+import {
+  Between,
+  Equal,
+  FindOptionsOrder,
+  In,
+  IsNull,
+  MoreThanOrEqual,
+} from "typeorm";
 import * as crypto from "crypto";
-
 
 dotenv.config();
 
-
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  private WSDL_URL = "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"; //HOMOLOGAÇÃO
+  private WSDL_URL =
+    "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"; //HOMOLOGAÇÃO
   // private WSDL_URL = "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl"; //PRODUÇÃO
   private TEMP_DIR = path.resolve(__dirname, "../files");
   private PASSWORD = "";
@@ -47,16 +53,12 @@ class NFSEController {
         throw new Error("Senha do certificado não fornecida.");
       }
 
-      
-      
-
       const result = await this.gerarNFSE(
         password,
         clientesSelecionados,
         "EnviarLoteRpsSincronoEnvio",
         aliquota
       );
-
 
       res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
     } catch (error) {
@@ -65,7 +67,12 @@ class NFSEController {
     }
   };
 
-  public async gerarNFSE(password: string, ids: string[], SOAPAction: string, aliquota: string) {
+  public async gerarNFSE(
+    password: string,
+    ids: string[],
+    SOAPAction: string,
+    aliquota: string
+  ) {
     try {
       if (!fs.existsSync(this.TEMP_DIR)) {
         fs.mkdirSync(this.TEMP_DIR, { recursive: true });
@@ -117,345 +124,272 @@ class NFSEController {
           },
         });
 
-        
         console.log("Resposta do servidor para ID", id, ":", response.data);
       }
 
       if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
       if (fs.existsSync(this.DECRYPTED_CERT_PATH))
         fs.unlinkSync(this.DECRYPTED_CERT_PATH);
-      
     } catch (error) {
       console.error("Erro ao enviar requisição:", error);
     }
   }
 
   private removeBOM(xml: string): string {
-    return xml.charCodeAt(0) === 0xFEFF ? xml.slice(1) : xml;
+    return xml.charCodeAt(0) === 0xfeff ? xml.slice(1) : xml;
   }
-  
-
-
 
   private async gerarXmlRecepcionarRps(id: string, aliquota: string = "5") {
-    const builder = xmlbuilder;
-
-    const RPSQuery = MkauthSource.getRepository(Faturas);
-    const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
-
-    const ClientRepository = MkauthSource.getRepository(ClientesEntities);
-    const FaturasRepository = MkauthSource.getRepository(Faturas);
-    
-    const FaturasData = await FaturasRepository.findOne({ where: { id: Number(id) } });
-
-    const ClientData = await ClientRepository.findOne({
-      where: { login: FaturasData?.login },
-    });
-
-    ClientData?.cidade;
-
+    const builder = xmlbuilder
+    const RPSQuery = MkauthSource.getRepository(Faturas)
+    const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } })
+    const ClientRepository = MkauthSource.getRepository(ClientesEntities)
+    const FaturasRepository = MkauthSource.getRepository(Faturas)
+    const FaturasData = await FaturasRepository.findOne({ where: { id: Number(id) } })
+    const ClientData = await ClientRepository.findOne({ where: { login: FaturasData?.login } })
+  
     const response = await axios.get(
       `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
-    );    
-
-    const municipio = response.data.id;
-
-    const NsfeData = AppDataSource.getRepository(NFSE);
-
-    const nfseResponse = await NsfeData.find({
-      order: { id: "DESC" },  
-      take: 1,  
-    });
-
-    
-    console.log("ALIQUOTA " + aliquota);
-
-    const certVariablesParteOne = this.extrairCertificados(
+    )
+    const municipio = response.data.id
+  
+    const NsfeData = AppDataSource.getRepository(NFSE)
+    const nfseResponse = await NsfeData.find({ order: { id: "DESC" }, take: 1 })
+    const nfseNumber = nfseResponse && nfseResponse[0]?.numeroRps ? nfseResponse[0].numeroRps + 1 : 1
+  
+    const loteRpsSemAssinatura = `
+  <LoteRps Id="lote1" versao="2.01" xmlns="http://www.abrasf.org.br/nfse.xsd">
+    <NumeroLote>1</NumeroLote>
+    <CpfCnpj><Cnpj>20843290000142</Cnpj></CpfCnpj>
+    <InscricaoMunicipal>2195-00/14</InscricaoMunicipal>
+    <QuantidadeRps>1</QuantidadeRps>
+    <ListaRps>
+      <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
+        <InfDeclaracaoPrestacaoServico Id="_${String(rpsData?.uuid_lanc)}">
+          <Rps>
+            <IdentificacaoRps>
+              <Numero>${String(nfseNumber)}</Numero>
+              <Serie>${String(nfseResponse[0]?.serieRps)}</Serie>
+              <Tipo>${String(nfseResponse[0]?.tipoRps)}</Tipo>
+            </IdentificacaoRps>
+            <DataEmissao>${new Date().toISOString().substring(0, 10)}</DataEmissao>
+            <Status>1</Status>
+          </Rps>
+          <Competencia>${new Date().toISOString().substring(0, 10)}</Competencia>
+          <Servico>
+            <Valores>
+              <ValorServicos>${String(rpsData?.valor)}</ValorServicos>
+              <Aliquota>${aliquota}</Aliquota>
+            </Valores>
+            <IssRetido>${String(nfseResponse[0]?.issRetido)}</IssRetido>
+            <ResponsavelRetencao>${String(nfseResponse[0]?.responsavelRetencao)}</ResponsavelRetencao>
+            <ItemListaServico>${String(nfseResponse[0]?.itemListaServico)}</ItemListaServico>
+            <Discriminacao>Servicos de Manutencao, e Suporte Tecnico</Discriminacao>
+            <CodigoMunicipio>3503406</CodigoMunicipio>
+            <ExigibilidadeISS>1</ExigibilidadeISS>
+          </Servico>
+          <Prestador>
+            <CpfCnpj><Cnpj>20843290000142</Cnpj></CpfCnpj>
+            <InscricaoMunicipal>2195-00/14</InscricaoMunicipal>
+          </Prestador>
+          <Tomador>
+            <IdentificacaoTomador>
+              <CpfCnpj>
+                <${
+                  ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj"
+                }>${String(ClientData?.cpf_cnpj.replace(/[^0-9]/g, ""))}</${
+      ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj"
+    }>
+              </CpfCnpj>
+            </IdentificacaoTomador>
+            <RazaoSocial>${String(ClientData?.nome)}</RazaoSocial>
+            <Endereco>
+              <Endereco>${String(ClientData?.endereco)}</Endereco>
+              <Numero>${String(ClientData?.numero)}</Numero>
+              <Complemento>${String(ClientData?.complemento)}</Complemento>
+              <Bairro>${String(ClientData?.bairro)}</Bairro>
+              <CodigoMunicipio>${municipio}</CodigoMunicipio>
+              <Uf>SP</Uf>
+              <Cep>${String(ClientData?.cep.replace(/[^0-9]/g, ""))}</Cep>
+            </Endereco>
+            <Contato>
+              <Telefone>${String(ClientData?.celular)}</Telefone>
+              <Email>${String(ClientData?.email)}</Email>
+            </Contato>
+          </Tomador>
+          <RegimeEspecialTributacao>06</RegimeEspecialTributacao>
+          <OptanteSimplesNacional>${
+            nfseResponse[0]?.optanteSimplesNacional || "2"
+          }</OptanteSimplesNacional>
+          <IncentivoFiscal>${nfseResponse[0]?.incentivoFiscal || "2"}</IncentivoFiscal>
+        </InfDeclaracaoPrestacaoServico>
+        <!-- A primeira assinatura deve ficar aqui -->
+      </Rps>
+    </ListaRps>
+  </LoteRps>
+  `.trim()
+  
+    const envioSemAssinatura = `
+  <EnviarLoteRpsSincronoEnvio Id="envio1" xmlns="http://www.abrasf.org.br/nfse.xsd">
+    ${loteRpsSemAssinatura}
+    <!-- A segunda assinatura deve ficar aqui -->
+  </EnviarLoteRpsSincronoEnvio>
+  `.trim()
+  
+    // Aqui criamos o SOAP final, mas sem as assinaturas
+    const soapSemAssinatura = `
+  <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                    xmlns:ws="http://ws.issweb.fiorilli.com.br/"
+                    xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
+    <soapenv:Header/>
+    <soapenv:Body>
+      <ws:recepcionarLoteRpsSincrono>
+        ${envioSemAssinatura}
+        <username>01001001000113</username>
+        <password>123456</password>
+      </ws:recepcionarLoteRpsSincrono>
+    </soapenv:Body>
+  </soapenv:Envelope>
+  `.trim()
+  
+    // Agora geramos os digests e assinaturas
+    const SignatureVariables = this.extrairCertificados(
       this.certPath,
       this.PASSWORD,
-      "<LoteRps>...</LoteRps>"
-    );
-
-    const certVariablesParteTwo = this.extrairCertificados(
-      this.certPath,
-      this.PASSWORD,
-      "<EnviarLoteRpsSincronoEnvio>...</EnviarLoteRpsSincronoEnvio>"
-    );
-    
-
-    const nfseNumber = nfseResponse && nfseResponse[0].numeroRps ? nfseResponse[0].numeroRps + 1 : 1;
-
-    const xml = builder
-      .create("soapenv:Envelope", {
-        version: "1.0",
-        encoding: "UTF-8",
-      })
-      .att("xmlns:soapenv", "http://schemas.xmlsoap.org/soap/envelope/")
-      .att("xmlns:ws", "http://ws.issweb.fiorilli.com.br/")
-      .att("xmlns:xd", "http://www.w3.org/2000/09/xmldsig#")
-      .ele("soapenv:Header")
-      .up()
-      .ele("soapenv:Body")
-      .ele("ws:recepcionarLoteRpsSincrono")
-      .ele("EnviarLoteRpsSincronoEnvio", { xmlns: "http://www.abrasf.org.br/nfse.xsd" })
-      .ele("LoteRps", { versao:"2.01", Id:"lote1" })
-      .ele("NumeroLote")
-      .txt("1")
-      .up()
-      .ele("CpfCnpj")
-      .ele("Cnpj")
-      .txt("20843290000142")
-      .up()
-      .up()
-      .ele("InscricaoMunicipal")
-      .txt("2195-00/14")
-      .up()
-      .ele("QuantidadeRps")
-      .txt("1")
-      .up()
-      .ele("ListaRps")
-      .ele("Rps", {xmlns:"http://www.abrasf.org.br/nfse.xsd"})
-      .ele("InfDeclaracaoPrestacaoServico", { Id: `_` + String(rpsData?.uuid_lanc) })
-      .ele("Rps")
-      .ele("IdentificacaoRps")
-      .ele("Numero")
-      .txt(String(nfseNumber))
-      .up()
-      .ele("Serie")
-      .txt(String(nfseResponse[0]?.serieRps))
-      .up()
-      .ele("Tipo")
-      .txt(String(nfseResponse[0]?.tipoRps))
-      .up()
-      .up()
-      .ele("DataEmissao")
-      .txt(
-        new Date().toISOString().substring(0, 10)
-      )
-      .up()
-      .ele("Status")
-      .txt("1")
-      .up()
-      .up()
-      .ele("Competencia")
-      .txt(
-        new Date().toISOString().substring(0, 10)
-      )
-      .up()
-      .ele("Servico")
-      .ele("Valores")
-      .ele("ValorServicos")
-      .txt(String(rpsData?.valor))
-      .up()
-      .ele("Aliquota")
-      .txt(aliquota)
-      .up()
-      .up()
-      .ele("IssRetido")
-      .txt(String(nfseResponse[0]?.issRetido))
-      .up()
-      .ele("ResponsavelRetencao")
-      .txt(String(nfseResponse[0]?.responsavelRetencao))
-      .up()
-      .ele("ItemListaServico")
-      .txt(String(nfseResponse[0]?.itemListaServico))
-      .up()
-      .ele("Discriminacao")
-      .txt("Servicos de Manutencao, e Suporte Tecnico")
-      .up()
-      .ele("CodigoMunicipio")
-      .txt("3503406")
-      .up()
-      .ele("ExigibilidadeISS")
-      .txt("1")
-      .up()
-      .up()
-      .ele("Prestador")
-      .ele("CpfCnpj")
-      .ele("Cnpj")
-      .txt("20843290000142")
-      .up()
-      .up()
-      .ele("InscricaoMunicipal")
-      .txt("2195-00/14")
-      .up()
-      .up()
-      .ele("Tomador")
-      .ele("IdentificacaoTomador")
-      .ele("CpfCnpj")
-      .ele(ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj")
-      .txt(String(ClientData?.cpf_cnpj.replace(/[^0-9]/g, "")))
-      .up()
-      .up()
-      .up()
-      .ele("RazaoSocial")
-      .txt(String(ClientData?.nome))
-      .up()
-      .ele("Endereco")
-      .ele("Endereco")
-      .txt(String(ClientData?.endereco))
-      .up()
-      .ele("Numero")
-      .txt(String(ClientData?.numero))
-      .up()
-      .ele("Complemento")
-      .txt(String(ClientData?.complemento))
-      .up()
-      .ele("Bairro")
-      .txt(String(ClientData?.bairro))
-      .up()
-      .ele("CodigoMunicipio")
-      .txt(municipio)
-      .up()
-      .ele("Uf")
-      .txt("SP")
-      .up()
-      // .ele("CodigoPais").txt("1058").up()
-      .ele("Cep")
-      .txt(String(ClientData?.cep.replace(/[^0-9]/g, "")))
-      .up()
-      .up()
-      .ele("Contato")
-      .ele("Telefone")
-      .txt(String(ClientData?.celular))
-      .up()
-      .ele("Email")
-      .txt(String(ClientData?.email))
-      .up()
-      .up()
-      .up()
-      .ele("RegimeEspecialTributacao")
-      .txt("06")
-      .up()
-      .ele("OptanteSimplesNacional")
-      .txt(String(nfseResponse[0].optanteSimplesNacional))
-      .up()
-      .ele("IncentivoFiscal")
-      .txt(String(nfseResponse[0].incentivoFiscal))
-      .up()
-      .up()
-      .ele("Signature", {xmlns:"http://www.w3.org/2000/09/xmldsig#"})
-      .ele("SignedInfo")
-      .ele("CanonicalizationMethod" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up()
-      .ele("SignatureMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#rsa-sha1"}).up()
-      .ele("Reference", {URI:"#lote1"})
-      .ele("Transforms")
-      .ele("Transform" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up().up()
-      .ele("DigestMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#sha1"}).up()
-      .ele("DigestValue")
-      .txt(certVariablesParteOne.digestValue)
-      .up()
-      .up()
-      .up()
-      .ele("SignatureValue")
-      .txt(certVariablesParteOne.signature)
-      .up()
-      .ele("KeyInfo")
-      .ele("X509Data")
-      .ele("X509Certificate")
-      .txt(certVariablesParteOne.x509Certificate)
-      .up()
-      .up()
-      .up()
-      .up()
-      .up()
-      .up()
-      .up()
-      .ele("Signature", {xmlns:"http://www.w3.org/2000/09/xmldsig#"})
-      .ele("SignedInfo")
-      .ele("CanonicalizationMethod" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up()
-      .ele("SignatureMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#rsa-sha1"}).up()
-      .ele("Reference", {URI:"#lote1"})
-      .ele("Transforms")
-      .ele("Transform" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up().up()
-      .ele("DigestMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#sha1"}).up()
-      .ele("DigestValue")
-      .txt(certVariablesParteTwo.digestValue)
-      .up()
-      .up()
-      .up()
-      .ele("SignatureValue")
-      .txt(certVariablesParteTwo.signature)
-      .up()
-      .ele("KeyInfo")
-      .ele("X509Data")
-      .ele("X509Certificate")
-      .txt(certVariablesParteTwo.x509Certificate)
-      .up()
-      .up()
-      .up()
-      .up()
-      .up()
-      .ele("username")
-      // .txt(process.env.MUNICIPIO_LOGIN || "")
-      .txt("01001001000113")
-      .up()
-      .ele("password")
-      // .txt(process.env.MUNICIPIO_SENHA || "")
-      .txt("123456")
-      .up()
-      .end({ pretty: false });
-      const xmlBuffer = Buffer.from(xml, 'utf8');
-
-      const insertDatabase = NsfeData.create({
-        login: rpsData?.login || "",
-        numeroRps: nfseNumber || 0,
-        serieRps: nfseResponse[0]?.serieRps || "",
-        tipoRps: nfseResponse[0]?.tipoRps || 0,
-        dataEmissao: rpsData?.processamento ? new Date(rpsData.processamento) : new Date(),
-        competencia: rpsData?.datavenc ? new Date(rpsData.datavenc) : new Date(),
-        valorServico: Number(rpsData?.valor) || 0,
-        aliquota: nfseResponse[0]?.aliquota || 0,
-        issRetido: nfseResponse[0]?.issRetido || 0,
-        responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
-        itemListaServico: nfseResponse[0]?.itemListaServico || "",
-        discriminacao: "Serviços de Manutenção, e Suporte Técnico",
-        codigoMunicipio: nfseResponse[0]?.codigoMunicipio || 0,
-        exigibilidadeIss: nfseResponse[0]?.exigibilidadeIss || 0,
-        cnpjPrestador: nfseResponse[0]?.cnpjPrestador || "",
-        inscricaoMunicipalPrestador: nfseResponse[0]?.inscricaoMunicipalPrestador || "",
-        cpfTomador: ClientData?.cpf_cnpj.replace(/[^0-9]/g, "") || "",
-        razaoSocialTomador: ClientData?.nome || "",
-        enderecoTomador: ClientData?.endereco || "",
-        numeroEndereco: ClientData?.numero || "",
-        complemento: ClientData?.complemento || undefined,
-        bairro: ClientData?.bairro || "",
-        uf: nfseResponse[0]?.uf || "",
-        cep: ClientData?.cep.replace(/[^0-9]/g, "") || "",
-        telefoneTomador: ClientData?.celular || undefined,
-        emailTomador: ClientData?.email || undefined,
-        optanteSimplesNacional: 2,
-        incentivoFiscal: 2,
-    });
-    
-    await NsfeData.save(insertDatabase);
-
-    console.log(xml);
-    
-
-    return this.removeBOM(xmlBuffer.toString('utf8'));
+      loteRpsSemAssinatura, // referência #lote1
+      envioSemAssinatura    // referência #envio1
+    )
+  
+    // Primeira assinatura, ref #lote1
+    const assinatura1 = `
+  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+    <SignedInfo>
+      <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+      <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
+      <Reference URI="#lote1">
+        <Transforms>
+          <Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+        </Transforms>
+        <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
+        <DigestValue>${SignatureVariables.parteOne.digestValue}</DigestValue>
+      </Reference>
+    </SignedInfo>
+    <SignatureValue>${SignatureVariables.parteOne.signature}</SignatureValue>
+    <KeyInfo>
+      <X509Data>
+        <X509Certificate>${SignatureVariables.parteOne.x509Certificate}</X509Certificate>
+      </X509Data>
+    </KeyInfo>
+  </Signature>`.trim()
+  
+    // Segunda assinatura, ref #envio1
+    const assinatura2 = `
+  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+    <SignedInfo>
+      <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+      <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
+      <Reference URI="#envio1">
+        <Transforms>
+          <Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+        </Transforms>
+        <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
+        <DigestValue>${SignatureVariables.parteTwo.digestValue}</DigestValue>
+      </Reference>
+    </SignedInfo>
+    <SignatureValue>${SignatureVariables.parteTwo.signature}</SignatureValue>
+    <KeyInfo>
+      <X509Data>
+        <X509Certificate>${SignatureVariables.parteTwo.x509Certificate}</X509Certificate>
+      </X509Data>
+    </KeyInfo>
+  </Signature>`.trim()
+  
+    // Injeta a primeira assinatura logo após <!-- A primeira assinatura deve ficar aqui -->
+    const loteComAssinatura1 = loteRpsSemAssinatura.replace(
+      /<!-- A primeira assinatura deve ficar aqui -->/,
+      assinatura1
+    )
+  
+    // Injeta a segunda assinatura logo após <!-- A segunda assinatura deve ficar aqui -->
+    const envioComAssinatura2 = envioSemAssinatura
+      .replace(loteRpsSemAssinatura, loteComAssinatura1)
+      .replace(/<!-- A segunda assinatura must ficar aqui -->/i, assinatura2) // note case
+  
+    // Se o texto exato for "<!-- A segunda assinatura deve ficar aqui -->", substitua por ele:
+    const envioAssinado = envioComAssinatura2.replace(
+      /<!-- A segunda assinatura deve ficar aqui -->/,
+      assinatura2
+    )
+  
+    // Por fim, injeta tudo no soap
+    const soapComAssinaturas = soapSemAssinatura.replace(envioSemAssinatura, envioAssinado)
+  
+    const xmlBuffer = Buffer.from(soapComAssinaturas, "utf8")
+  
+    // Salva no banco
+    const insertDatabase = NsfeData.create({
+      login: rpsData?.login || "",
+      numeroRps: nfseNumber || 0,
+      serieRps: nfseResponse[0]?.serieRps || "",
+      tipoRps: nfseResponse[0]?.tipoRps || 0,
+      dataEmissao: rpsData?.processamento ? new Date(rpsData.processamento) : new Date(),
+      competencia: rpsData?.datavenc ? new Date(rpsData.datavenc) : new Date(),
+      valorServico: Number(rpsData?.valor) || 0,
+      aliquota: nfseResponse[0]?.aliquota || 0,
+      issRetido: nfseResponse[0]?.issRetido || 0,
+      responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
+      itemListaServico: nfseResponse[0]?.itemListaServico || "",
+      discriminacao: "Serviços de Manutenção, e Suporte Técnico",
+      codigoMunicipio: nfseResponse[0]?.codigoMunicipio || 0,
+      exigibilidadeIss: nfseResponse[0]?.exigibilidadeIss || 0,
+      cnpjPrestador: nfseResponse[0]?.cnpjPrestador || "",
+      inscricaoMunicipalPrestador: nfseResponse[0]?.inscricaoMunicipalPrestador || "",
+      cpfTomador: ClientData?.cpf_cnpj.replace(/[^0-9]/g, "") || "",
+      razaoSocialTomador: ClientData?.nome || "",
+      enderecoTomador: ClientData?.endereco || "",
+      numeroEndereco: ClientData?.numero || "",
+      complemento: ClientData?.complemento || undefined,
+      bairro: ClientData?.bairro || "",
+      uf: nfseResponse[0]?.uf || "",
+      cep: ClientData?.cep.replace(/[^0-9]/g, "") || "",
+      telefoneTomador: ClientData?.celular || undefined,
+      emailTomador: ClientData?.email || undefined,
+      optanteSimplesNacional: 2,
+      incentivoFiscal: 2
+    })
+    await NsfeData.save(insertDatabase)
+  
+    console.log(soapComAssinaturas)
+  
+    return this.removeBOM(xmlBuffer.toString("utf8"))
   }
-
-  public async BuscarNSFE(req: Request, res: Response) {
-    try {
-      const { clienteid } = req.body;
-    } catch (error) {
-      console.log("Erro ao buscar NFSE:", error);
-    }
-  }
+  
+  
 
   private extrairCertificados(
     certPath: string,
     password: string,
-    elementToSign: string // Conteúdo XML a ser assinado
-  ): { privateKeyPem: string; x509Certificate: string; digestValue: string; signature: string } {
+    elementToSignOne: string,
+    elementToSignTwo: string
+  ): {
+    parteOne: {
+      privateKeyPem: string;
+      x509Certificate: string;
+      digestValue: string;
+      signature: string;
+    };
+    parteTwo: {
+      privateKeyPem: string;
+      x509Certificate: string;
+      digestValue: string;
+      signature: string;
+    };
+  } {
     const pfxBuffer = fs.readFileSync(certPath);
     const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
     const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
-  
     let privateKeyPem = "";
     let certificatePem = "";
-  
     p12.safeContents.forEach((content) => {
       content.safeBags.forEach((bag) => {
         if (bag.type === forge.pki.oids.pkcs8ShroudedKeyBag && bag.key) {
@@ -465,34 +399,50 @@ class NFSEController {
         }
       });
     });
-  
     if (!privateKeyPem || !certificatePem) {
       throw new Error("Falha ao extrair chave privada ou certificado.");
     }
-  
-    // Remove delimitadores do certificado PEM para uso no XML
     const x509Certificate = certificatePem
       .replace(/-----BEGIN CERTIFICATE-----/g, "")
       .replace(/-----END CERTIFICATE-----/g, "")
       .replace(/\s+/g, "");
-  
-    // Calcula o DigestValue a partir do elemento XML a ser assinado
-    const digestValue = crypto.createHash("sha1").update(elementToSign).digest("base64");
-  
-    // Gera a assinatura do mesmo elemento
-    const signer = crypto.createSign("RSA-SHA1");
-    signer.update(elementToSign);
-    const signature = signer.sign(privateKeyPem, "base64");
-  
+    const digestValueOne = crypto
+      .createHash("sha1")
+      .update(elementToSignOne)
+      .digest("base64");
+    const signerOne = crypto.createSign("RSA-SHA1");
+    signerOne.update(elementToSignOne);
+    const signatureOne = signerOne.sign(privateKeyPem, "base64");
+    const digestValueTwo = crypto
+      .createHash("sha1")
+      .update(elementToSignTwo)
+      .digest("base64");
+    const signerTwo = crypto.createSign("RSA-SHA1");
+    signerTwo.update(elementToSignTwo);
+    const signatureTwo = signerTwo.sign(privateKeyPem, "base64");
     return {
-      privateKeyPem,
-      x509Certificate,
-      digestValue,
-      signature,
+      parteOne: {
+        privateKeyPem,
+        x509Certificate,
+        digestValue: digestValueOne,
+        signature: signatureOne,
+      },
+      parteTwo: {
+        privateKeyPem,
+        x509Certificate,
+        digestValue: digestValueTwo,
+        signature: signatureTwo,
+      },
     };
   }
-  
 
+  public async BuscarNSFE(req: Request, res: Response) {
+    try {
+      const { clienteid } = req.body;
+    } catch (error) {
+      console.log("Erro ao buscar NFSE:", error);
+    }
+  }
 
   public async uploadCertificado(req: Request, res: Response) {
     try {
@@ -509,7 +459,6 @@ class NFSEController {
     const { cpf, filters, dateFilter } = req.body;
 
     console.log(filters);
-    
 
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
 
@@ -518,7 +467,6 @@ class NFSEController {
     if (cpf) {
       whereConditions.cpf_cnpj = cpf;
     }
-
 
     // Processa outros filtros
     if (filters) {
@@ -603,7 +551,6 @@ class NFSEController {
           };
         })
         .filter((cliente) => cliente !== null); // Remove clientes sem fatura
-
 
       res.status(200).json(clientesComFaturas);
     } catch (error) {
