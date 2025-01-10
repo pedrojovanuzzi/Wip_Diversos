@@ -334,7 +334,7 @@ class NFSEController {
       .ele("SignatureMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#rsa-sha1"}).up()
       .ele("Reference", {Id:String(rpsData?.uuid_lanc)})
       .ele("Transforms")
-      .ele("Transform" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up()
+      .ele("Transform" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up().up()
       .ele("DigestMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#sha1"}).up()
       .ele("DigestValue")
       .txt(certVariables.digestValue)
@@ -348,7 +348,6 @@ class NFSEController {
       .ele("X509Data")
       .ele("X509Certificate")
       .txt(certVariables.x509Certificate.replace(/[^0-9]/g, ""))
-      .up()
       .up()
       .up()
       .up()
@@ -362,7 +361,7 @@ class NFSEController {
       .ele("SignatureMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#rsa-sha1"}).up()
       .ele("Reference", {Id:String(rpsData?.uuid_lanc)})
       .ele("Transforms")
-      .ele("Transform" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up()
+      .ele("Transform" , {Algorithm:"http://www.w3.org/2001/10/xml-exc-c14n#"}).up().up()
       .ele("DigestMethod", {Algorithm:"http://www.w3.org/2000/09/xmldsig#sha1"}).up()
       .ele("DigestValue")
       .txt(certVariables.digestValue)
@@ -375,8 +374,7 @@ class NFSEController {
       .ele("KeyInfo")
       .ele("X509Data")
       .ele("X509Certificate")
-      .txt(certVariables.x509Certificate.replace(/[^0-9]/g, ""))
-      .up()
+      .txt(certVariables.x509Certificate)
       .up()
       .up()
       .up()
@@ -387,7 +385,6 @@ class NFSEController {
       .up()
       .ele("password")
       .txt(process.env.MUNICIPIO_SENHA || "")
-      .up()
       .up()
       .end({ pretty: false });
       const xmlBuffer = Buffer.from(xml, 'utf8');
@@ -424,6 +421,9 @@ class NFSEController {
     });
     
     await NsfeData.save(insertDatabase);
+
+    console.log(xml);
+    
 
     return this.removeBOM(xmlBuffer.toString('utf8'));
   }
