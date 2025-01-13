@@ -148,7 +148,7 @@ class NFSEController {
         <Servico>
           <Valores>
             <ValorServicos>${String(rpsData?.valor)}</ValorServicos>
-            <Aliquota>${aliquota}</Aliquota>
+            <Aliquota>${aliquota || 5}</Aliquota>
           </Valores>
           <IssRetido>${String(nfseResponse[0]?.issRetido)}</IssRetido>
           <ResponsavelRetencao>${String(nfseResponse[0]?.responsavelRetencao)}</ResponsavelRetencao>
@@ -186,7 +186,7 @@ class NFSEController {
             <Email>${String(ClientData?.email)}</Email>
           </Contato>
         </Tomador>
-        <RegimeEspecialTributacao>06</RegimeEspecialTributacao>
+        <RegimeEspecialTributacao>6</RegimeEspecialTributacao>
         <OptanteSimplesNacional>${
           nfseResponse[0]?.optanteSimplesNacional || "2"
         }</OptanteSimplesNacional>
@@ -237,6 +237,8 @@ class NFSEController {
     </EnviarLoteRpsSincronoEnvio>
     `.trim();
 
+    // <username>${process.env.MUNICIPIO_LOGIN || process.env.MUNICIPIO_LOGIN_TEST}</username>
+    // <password>${process.env.MUNICIPIO_SENHA || process.env.MUNICIPIO_SENHA_TEST}</password>
 
     const soapFinal = `
     <?xml version="1.0" encoding="UTF-8"?>
@@ -247,8 +249,8 @@ class NFSEController {
       <soapenv:Body>
         <ws:recepcionarLoteRpsSincrono>
           ${envioXml}
-          <username>${process.env.MUNICIPIO_LOGIN || "01001001000113"}</username>
-          <password>${process.env.MUNICIPIO_SENHA || "123456"}</password>
+          <username>${process.env.MUNICIPIO_LOGIN_TEST}</username>
+          <password>${process.env.MUNICIPIO_SENHA_TEST}</password>
         </ws:recepcionarLoteRpsSincrono>
       </soapenv:Body>
     </soapenv:Envelope>
@@ -271,7 +273,7 @@ class NFSEController {
       dataEmissao: rpsData?.processamento ? new Date(rpsData.processamento) : new Date(),
       competencia: rpsData?.datavenc ? new Date(rpsData.datavenc) : new Date(),
       valorServico: Number(rpsData?.valor) || 0,
-      aliquota: nfseResponse[0]?.aliquota || 0,
+      aliquota: nfseResponse[0]?.aliquota || 5,
       issRetido: nfseResponse[0]?.issRetido || 0,
       responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
       itemListaServico: nfseResponse[0]?.itemListaServico || "",
@@ -335,17 +337,20 @@ class NFSEController {
   
     const signer = new SignedXml({
       privateKey: privateKeyPem,
+      implicitTransforms: ["http://www.w3.org/TR/2001/REC-xml-c14n-20010315"],
       publicCert: x509Certificate,
       signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
-      canonicalizationAlgorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#",
       getKeyInfoContent: () => keyInfoContent(x509Certificate)
     });
+
+    
   
     signer.addReference({
       xpath: `//*[@Id='${referenceId}']`,
       digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
       transforms: [  "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-  "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"]
+  "http://www.w3.org/2001/10/xml-exc-c14n#"]
     });
   
     // Computando a assinatura
