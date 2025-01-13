@@ -5,7 +5,7 @@ import * as https from "https";
 import { execSync } from "child_process";
 import axios from "axios";
 import * as dotenv from "dotenv";
-import { Request, Response } from "express";
+import e, { Request, response, Response } from "express";
 import { SignedXml } from "xml-crypto";
 import * as xmlbuilder from "xmlbuilder";
 import * as forge from "node-forge";
@@ -19,11 +19,8 @@ import { Faturas } from "../entities/Faturas";
 import { DOMParser } from "xmldom";
 import {
   Between,
-  Equal,
-  FindOptionsOrder,
   In,
-  IsNull,
-  MoreThanOrEqual,
+  IsNull
 } from "typeorm";
 import * as crypto from "crypto";
 
@@ -31,38 +28,25 @@ dotenv.config();
 
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  // private WSDL_URL = "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"; //HOMOLOGAÇÃO
-  private WSDL_URL = "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl"; //PRODUÇÃO
+  private WSDL_URL = "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
   private TEMP_DIR = path.resolve(__dirname, "../files");
   private PASSWORD = "";
-  private DECRYPTED_CERT_PATH = path.resolve(
-    this.TEMP_DIR,
-    "decrypted_certificado.tmp"
-  );
+  private DECRYPTED_CERT_PATH = path.resolve(this.TEMP_DIR, "decrypted_certificado.tmp");
   private NEW_CERT_PATH = path.resolve(this.TEMP_DIR, "new_certificado.pfx");
 
   public iniciar = async (req: Request, res: Response) => {
     try {
       const { password, clientesSelecionados, aliquota } = req.body;
-
       this.PASSWORD = password;
-
-      console.log(clientesSelecionados);
-
-      if (!password) {
-        throw new Error("Senha do certificado não fornecida.");
-      }
-
+      if (!password) throw new Error("Senha do certificado não fornecida.");
       const result = await this.gerarNFSE(
         password,
         clientesSelecionados,
         "EnviarLoteRpsSincronoEnvio",
         aliquota
       );
-
       res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
     } catch (error) {
-      console.error("Erro ao criar o RPS:", error);
       res.status(500).json({ erro: "Erro ao criar o RPS." });
     }
   };
@@ -74,13 +58,9 @@ class NFSEController {
     aliquota: string
   ) {
     try {
-      if (!fs.existsSync(this.TEMP_DIR)) {
-        fs.mkdirSync(this.TEMP_DIR, { recursive: true });
-      }
-
+      if (!fs.existsSync(this.TEMP_DIR)) fs.mkdirSync(this.TEMP_DIR, { recursive: true });
       const isLinux = os.platform() === "linux";
       const isWindows = os.platform() === "win32";
-
       if (isLinux) {
         execSync(
           `openssl pkcs12 -in "${this.certPath}" -nodes -legacy -passin pass:${password} -out "${this.DECRYPTED_CERT_PATH}"`,
@@ -96,26 +76,21 @@ class NFSEController {
           $bytes = $certificado.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12, '${password}');
           [System.IO.File]::WriteAllBytes('${this.NEW_CERT_PATH}', $bytes)
         `;
-        execSync(
-          `powershell -Command "${powershellCommand.replace(/\n/g, " ")}"`,
-          { stdio: "inherit" }
-        );
+        execSync(`powershell -Command "${powershellCommand.replace(/\n/g, " ")}"`, {
+          stdio: "inherit",
+        });
       }
-
       const certPathToUse = fs.existsSync(this.NEW_CERT_PATH)
         ? this.NEW_CERT_PATH
         : this.certPath;
       const pfxBuffer = fs.readFileSync(certPathToUse);
-
       const httpsAgent = new https.Agent({
         pfx: pfxBuffer,
         passphrase: password,
         rejectUnauthorized: false,
       });
-
       for (const id of ids) {
         const xmlLoteRps = await this.gerarXmlRecepcionarRps(id, aliquota);
-
         const response = await axios.post(this.WSDL_URL, xmlLoteRps, {
           httpsAgent,
           headers: {
@@ -124,40 +99,36 @@ class NFSEController {
           },
         });
 
-        console.log("Resposta do servidor para ID", id, ":", response.data);
+        console.log(response);
       }
 
+      
+      
+      
       if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
-      if (fs.existsSync(this.DECRYPTED_CERT_PATH))
-        fs.unlinkSync(this.DECRYPTED_CERT_PATH);
+      if (fs.existsSync(this.DECRYPTED_CERT_PATH)) fs.unlinkSync(this.DECRYPTED_CERT_PATH);
     } catch (error) {
-      console.error("Erro ao enviar requisição:", error);
+      console.log(error);
+      
     }
   }
 
   private async gerarXmlRecepcionarRps(id: string, aliquota: string = "5") {
-    const RPSQuery = MkauthSource.getRepository(Faturas)
-    const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } })
-    const ClientRepository = MkauthSource.getRepository(ClientesEntities)
-    const FaturasRepository = MkauthSource.getRepository(Faturas)
-    const FaturasData = await FaturasRepository.findOne({ where: { id: Number(id) } })
-    const ClientData = await ClientRepository.findOne({ where: { login: FaturasData?.login } })
-
+    const RPSQuery = MkauthSource.getRepository(Faturas);
+    const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
+    const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+    const FaturasRepository = MkauthSource.getRepository(Faturas);
+    const FaturasData = await FaturasRepository.findOne({ where: { id: Number(id) } });
+    const ClientData = await ClientRepository.findOne({ where: { login: FaturasData?.login } });
     const response = await axios.get(
       `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
-    )
-    const municipio = response.data.id
-
-    const NsfeData = AppDataSource.getRepository(NFSE)
-    const nfseResponse = await NsfeData.find({ order: { id: "DESC" }, take: 1 })
+    );
+    const municipio = response.data.id;
+    const NsfeData = AppDataSource.getRepository(NFSE);
+    const nfseResponse = await NsfeData.find({ order: { id: "DESC" }, take: 1 });
     const nfseNumber = nfseResponse && nfseResponse[0]?.numeroRps
       ? nfseResponse[0].numeroRps + 1
-      : 1
-
-    /*
-      CONSTRUÇÃO DO RPS SEM ASSINATURA (primeiro iremos assinar esse RPS).
-      Observação: Essa parte deve ter o Id do RPS, ex: Id="_ABC123"
-    */
+      : 1;
     const rpsXmlSemAssinatura = `
     <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
       <InfDeclaracaoPrestacaoServico Id="_${String(rpsData?.uuid_lanc)}">
@@ -179,13 +150,13 @@ class NFSEController {
           <IssRetido>${String(nfseResponse[0]?.issRetido)}</IssRetido>
           <ResponsavelRetencao>${String(nfseResponse[0]?.responsavelRetencao)}</ResponsavelRetencao>
           <ItemListaServico>${String(nfseResponse[0]?.itemListaServico)}</ItemListaServico>
-          <Discriminacao>Servicos de Manutencao, e Suporte Tecnico</Discriminacao>
+          <Discriminacao>Servico de Suporte Tecnico</Discriminacao>
           <CodigoMunicipio>3503406</CodigoMunicipio>
-          <ExigibilidadeISS>1</ExigibilidadeISS>
+          <ExigibilidadeISS>${String(nfseResponse[0]?.exigibilidadeIss)}</ExigibilidadeISS>
         </Servico>
         <Prestador>
-          <CpfCnpj><Cnpj>20843290000142</Cnpj></CpfCnpj>
-          <InscricaoMunicipal>2195-00/14</InscricaoMunicipal>
+          <CpfCnpj><Cnpj>01001001000113</Cnpj></CpfCnpj>
+          <InscricaoMunicipal>1.000.10</InscricaoMunicipal>
         </Prestador>
         <Tomador>
           <IdentificacaoTomador>
@@ -219,66 +190,35 @@ class NFSEController {
         <IncentivoFiscal>${nfseResponse[0]?.incentivoFiscal || "2"}</IncentivoFiscal>
       </InfDeclaracaoPrestacaoServico>
     </Rps>
-    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim()
-
-    /*
-      Agora aplicamos a primeira assinatura, referenciando o Id do RPS (ex: URI="#_ABC123").
-      Em seguida, anexa essa assinatura DENTRO do RPS (logo após o </InfDeclaracaoPrestacaoServico>).
-    */
-
-    // 1) Cria digest e assinatura do RPS
-    const SignatureRps = this.assinarXml(rpsXmlSemAssinatura, `_${String(rpsData?.uuid_lanc)}`)
-
-    // 2) Anexa a assinatura ao final do RPS (antes do fechamento do RpsXml)
+    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim();
+    const SignatureRps = this.assinarXml(rpsXmlSemAssinatura, `_${String(rpsData?.uuid_lanc)}`);
     const rpsXmlComAssinatura = rpsXmlSemAssinatura.replace(
       /<\/Rps>$/,
       `${SignatureRps}</Rps>`
-    )
-
-    /*
-      CONSTRUÇÃO DO LOTE, agora incluindo o RPS já assinado.
-      Teremos Id="lote1" e iremos assinar também esse Lote.
-    */
-
+    );
     const loteXmlSemAssinatura = `
     <LoteRps versao="2.01" Id="lote1">
       <NumeroLote>1</NumeroLote>
-      <CpfCnpj><Cnpj>20843290000142</Cnpj></CpfCnpj>
-      <InscricaoMunicipal>2195-00/14</InscricaoMunicipal>
+      <CpfCnpj><Cnpj>01001001000113</Cnpj></CpfCnpj>
+      <InscricaoMunicipal>1.000.10</InscricaoMunicipal>
       <QuantidadeRps>1</QuantidadeRps>
       <ListaRps>
         ${rpsXmlComAssinatura}
       </ListaRps>
     </LoteRps>
-    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim()
+    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim();
+    const assinaturaLote  = this.assinarXml(loteXmlSemAssinatura, `lote1`);
 
-    // 3) Cria digest e assinatura do Lote, referenciando #lote1
-    const SignatureLote = this.assinarXml(loteXmlSemAssinatura, `lote1`)
-
-    // 4) Anexa a assinatura do Lote dentro do Lote (logo após </ListaRps>)
-    const loteXmlComAssinatura = loteXmlSemAssinatura.replace(
-      /<\/LoteRps>$/,
-      `</LoteRps>${SignatureLote}`
-    );
-    
-
-    /*
-      Agora construímos o "EnviarLoteRpsSincronoEnvio" SEM ASSINATURA SOAP — 
-      pois já assinamos RPS e Lote internamente. 
-    */
-
+    const loteXmlComAssinatura = `
+    ${loteXmlSemAssinatura}
+    ${assinaturaLote}
+  `.trim();
+  
     const envioXml = `
     <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
       ${loteXmlComAssinatura}
     </EnviarLoteRpsSincronoEnvio>
-    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim()
-
-    /*
-      Constrói o envelope SOAP (sem assinatura SOAP).
-      O município pode ou não exigir a assinatura SOAP, mas aqui vamos supor que basta 
-      assinar RPS e Lote internamente, como pedido.
-    */
-
+    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim();
     const soapFinal = `
     <?xml version="1.0" encoding="UTF-8"?>
     <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
@@ -293,10 +233,17 @@ class NFSEController {
         </ws:recepcionarLoteRpsSincrono>
       </soapenv:Body>
     </soapenv:Envelope>
-    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim()
+    `.replace(/[\r\n]+/g, "")        // Remove quebras de linha
+    .replace(/\s{2,}/g, " ")        // Substitui múltiplos espaços por um único
+    .replace(/>\s+</g, "><")        // Remove espaços entre tags
+    .replace(/<\s+/g, "<")          // Remove espaços após '<'
+    .replace(/\s+>/g, ">")          // Remove espaços antes de '>'
+    .trim();                        // Remove espaços no início e fim
 
-    // Salva no banco (opcional)
-    const NsfeRepository = AppDataSource.getRepository(NFSE)
+
+  
+
+    const NsfeRepository = AppDataSource.getRepository(NFSE);
     const insertDatabase = NsfeRepository.create({
       login: rpsData?.login || "",
       numeroRps: nfseNumber || 0,
@@ -309,7 +256,7 @@ class NFSEController {
       issRetido: nfseResponse[0]?.issRetido || 0,
       responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
       itemListaServico: nfseResponse[0]?.itemListaServico || "",
-      discriminacao: "Serviços de Manutenção, e Suporte Técnico",
+      discriminacao: "Serviço de Suporte Técnico",
       codigoMunicipio: nfseResponse[0]?.codigoMunicipio || 0,
       exigibilidadeIss: nfseResponse[0]?.exigibilidadeIss || 0,
       cnpjPrestador: nfseResponse[0]?.cnpjPrestador || "",
@@ -326,223 +273,136 @@ class NFSEController {
       emailTomador: ClientData?.email || undefined,
       optanteSimplesNacional: 2,
       incentivoFiscal: 2
-    })
-    await NsfeData.save(insertDatabase)
+    });
+    await NsfeData.save(insertDatabase);
 
-    console.log(soapFinal)
-    return soapFinal
+    console.log(soapFinal);
+    
+
+    return soapFinal;
   }
-  
-  private extrairChaveECertificado() {
-    const pfxBuffer = fs.readFileSync(this.certPath)
-    const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"))
-    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, this.PASSWORD)
-    let privateKeyPem = ""
-    let certificatePem = ""
 
+  private extrairChaveECertificado() {
+    const pfxBuffer = fs.readFileSync(this.certPath);
+    const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
+    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, this.PASSWORD);
+    let privateKeyPem = "";
+    let certificatePem = "";
     p12.safeContents.forEach((content) => {
       content.safeBags.forEach((bag) => {
         if (bag.type === forge.pki.oids.pkcs8ShroudedKeyBag && bag.key) {
-          privateKeyPem = forge.pki.privateKeyToPem(bag.key)
+          privateKeyPem = forge.pki.privateKeyToPem(bag.key);
         } else if (bag.type === forge.pki.oids.certBag && bag.cert) {
-          certificatePem = forge.pki.certificateToPem(bag.cert)
+          certificatePem = forge.pki.certificateToPem(bag.cert);
         }
-      })
-    })
+      });
+    });
     if (!privateKeyPem || !certificatePem) {
-      throw new Error("Falha ao extrair chave privada ou certificado.")
+      throw new Error("Falha ao extrair chave privada ou certificado.");
     }
     const x509Certificate = certificatePem
       .replace(/-----BEGIN CERTIFICATE-----/g, "")
       .replace(/-----END CERTIFICATE-----/g, "")
-      .replace(/\s+/g, "")
-
-    return {
-      privateKeyPem,
-      x509Certificate
-    }
+      .replace(/\s+/g, "");
+    return { privateKeyPem, x509Certificate };
   }
 
+  private assinarXml(xml: string, referenceId: string): string {
+    const { privateKeyPem, x509Certificate } = this.extrairChaveECertificado();
 
-  private assinarXml(xml: string, referenceId: string) {
-    // 1) canonicalizar e gerar digest
-    const canonical = this.excC14n(xml)
-    const digestValue = crypto
-      .createHash("sha1")
-      .update(canonical)
-      .digest("base64")
-
-    // 2) ler pfx e extrair chave e certificado
-    const { privateKeyPem, x509Certificate } = this.extrairChaveECertificado()
-
-    // 3) assinar
-    const signer = crypto.createSign("RSA-SHA1")
-    signer.update(canonical)
-    const signatureValue = signer.sign(privateKeyPem, "base64")
-
-    // 4) construir o nó <Signature>
-    return `
-<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
-  <SignedInfo>
-    <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
-    <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-    <Reference URI="#${referenceId}">
-      <Transforms>
-        <Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
-      </Transforms>
-      <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
-      <DigestValue>${digestValue}</DigestValue>
-    </Reference>
-  </SignedInfo>
-  <SignatureValue>${signatureValue}</SignatureValue>
-  <KeyInfo>
-    <X509Data>
-      <X509Certificate>${x509Certificate}</X509Certificate>
-    </X509Data>
-  </KeyInfo>
-</Signature>`.trim()
-  }
-
-  private excC14n(xml: string): string {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xml, "application/xml");
-  
-    if (!doc.documentElement) {
-      throw new Error("Erro ao parsear o XML.");
+    function keyInfoContent(key : string) {
+      return `<X509Data><X509Certificate>${key}</X509Certificate></X509Data>`;
     }
   
-    const signedXml = new SignedXml();
-    signedXml.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#";
+    const signer = new SignedXml({
+      privateKey: privateKeyPem,
+      publicCert: x509Certificate,
+      signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
+      canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#",
+      getKeyInfoContent: () => keyInfoContent(x509Certificate)
+    });
   
-    // getCanonXml exige: transforms, node, [options]
-    const transforms: readonly string[] = []; // ou algo como [{ algorithm: "http://www.w3.org/2001/10/xml-exc-c14n#" }]
-    const node = doc.documentElement; // nó XML
+    signer.addReference({
+      xpath: `//*[@Id='${referenceId}']`,
+      digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
+      transforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"]
+    });
   
-    const canonicalizedXml = signedXml.getCanonXml(transforms, node, {});
+    // Computando a assinatura
+    signer.computeSignature(xml);
   
-    return canonicalizedXml;
+    return signer.getSignatureXml();
   }
   
 
   public async BuscarNSFE(req: Request, res: Response) {
     try {
       const { clienteid } = req.body;
-    } catch (error) {
-      console.log("Erro ao buscar NFSE:", error);
-    }
+    } catch (error) {}
   }
 
   public async uploadCertificado(req: Request, res: Response) {
     try {
       res.status(200).json({ mensagem: "Certificado enviado com sucesso." });
     } catch (error) {
-      // console.error("Erro ao processar o upload:", error);
-      res
-        .status(500)
-        .json({ erro: "Erro ao processar o upload do certificado." });
+      res.status(500).json({ erro: "Erro ao processar o upload do certificado." });
     }
   }
 
   public async BuscarClientes(req: Request, res: Response) {
     const { cpf, filters, dateFilter } = req.body;
-
-    console.log(filters);
-
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
-
     const whereConditions: any = {};
-
-    if (cpf) {
-      whereConditions.cpf_cnpj = cpf;
-    }
-
-    // Processa outros filtros
+    if (cpf) whereConditions.cpf_cnpj = cpf;
     if (filters) {
       const { plano, vencimento, cli_ativado, nova_nfe } = filters;
-
-      if (plano?.length) {
-        whereConditions.plano = In(plano);
-      }
-      if (vencimento?.length) {
-        whereConditions.venc = In(vencimento);
-      }
-      if (cli_ativado?.length) {
-        whereConditions.cli_ativado = In(["s"]);
-      }
-      if (nova_nfe?.length) {
-        whereConditions.tags = In(nova_nfe);
-      }
+      if (plano?.length) whereConditions.plano = In(plano);
+      if (vencimento?.length) whereConditions.venc = In(vencimento);
+      if (cli_ativado?.length) whereConditions.cli_ativado = In(["s"]);
+      if (nova_nfe?.length) whereConditions.tags = In(nova_nfe);
     }
-
     try {
       const clientesResponse = await ClientRepository.find({
         where: whereConditions,
-        select: {
-          login: true,
-          cpf_cnpj: true,
-          cli_ativado: true,
-        },
+        select: { login: true, cpf_cnpj: true, cli_ativado: true },
       });
-
       const faturasData = MkauthSource.getRepository(Faturas);
-
       const now = new Date();
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-      const startDate = dateFilter
-        ? new Date(dateFilter.start)
-        : firstDayOfMonth;
+      const startDate = dateFilter ? new Date(dateFilter.start) : firstDayOfMonth;
       const endDate = dateFilter ? new Date(dateFilter.end) : lastDayOfMonth;
-
       startDate.setHours(startDate.getHours() + 3);
       endDate.setHours(endDate.getHours() + 3);
-
       const faturasResponse = await faturasData.find({
         where: {
           login: In(clientesResponse.map((cliente) => cliente.login)),
           datavenc: Between(startDate, endDate),
           datadel: IsNull(),
         },
-        select: {
-          id: true,
-          login: true,
-          datavenc: true,
-          tipo: true,
-          valor: true,
-        },
-        order: {
-          datavenc: "DESC",
-        },
+        select: { id: true, login: true, datavenc: true, tipo: true, valor: true },
+        order: { datavenc: "DESC" },
       });
-
       const clientesComFaturas = clientesResponse
         .map((cliente) => {
-          const fatura = faturasResponse.filter(
-            (f) => f.login === cliente.login
-          );
-
+          const fatura = faturasResponse.filter((f) => f.login === cliente.login);
           if (fatura.length === 0) return null;
-
           return {
             ...cliente,
             fatura: {
               titulo: fatura.map((f) => f.id).join(", ") || null,
               login: fatura.map((f) => f.login).join(", ") || null,
               datavenc:
-                fatura
-                  .map((f) => new Date(f.datavenc).toLocaleDateString("pt-BR"))
-                  .join(", ") || null,
+                fatura.map((f) => new Date(f.datavenc).toLocaleDateString("pt-BR")).join(", ") ||
+                null,
               tipo: fatura.map((f) => f.tipo).join(", ") || null,
               valor: fatura.map((f) => f.valor).join(", ") || null,
             },
           };
         })
-        .filter((cliente) => cliente !== null); // Remove clientes sem fatura
-
+        .filter((cliente) => cliente !== null);
       res.status(200).json(clientesComFaturas);
     } catch (error) {
-      console.error("Erro ao buscar clientes:", error);
       res.status(500).json({ message: "Erro ao buscar clientes" });
     }
   }
