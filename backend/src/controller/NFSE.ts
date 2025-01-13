@@ -129,9 +129,12 @@ class NFSEController {
     const nfseNumber = nfseResponse && nfseResponse[0]?.numeroRps
       ? nfseResponse[0].numeroRps + 1
       : 1;
+
+
+
     const rpsXmlSemAssinatura = `
     <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
-      <InfDeclaracaoPrestacaoServico Id="_${String(rpsData?.uuid_lanc)}">
+      <InfDeclaracaoPrestacaoServico Id="RPS${String(rpsData?.uuid_lanc)}">
         <Rps>
           <IdentificacaoRps>
             <Numero>${String(nfseNumber)}</Numero>
@@ -190,14 +193,22 @@ class NFSEController {
         <IncentivoFiscal>${nfseResponse[0]?.incentivoFiscal || "2"}</IncentivoFiscal>
       </InfDeclaracaoPrestacaoServico>
     </Rps>
-    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim();
-    const SignatureRps = this.assinarXml(rpsXmlSemAssinatura, `_${String(rpsData?.uuid_lanc)}`);
+    `  .replace(/[\r\n]+/g, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/>\s+</g, "><")
+    .replace(/<\s+/g, "<")
+    .replace(/\s+>/g, ">")
+    .trim();
+
+    const SignatureRps = this.assinarXml(rpsXmlSemAssinatura, `RPS${String(rpsData?.uuid_lanc)}`);
+
     const rpsXmlComAssinatura = rpsXmlSemAssinatura.replace(
       /<\/Rps>$/,
       `${SignatureRps}</Rps>`
     );
+
     const loteXmlSemAssinatura = `
-    <LoteRps versao="2.01" Id="lote1">
+    <LoteRps versao="2.01" Id="lote${nfseNumber}">
       <NumeroLote>1</NumeroLote>
       <CpfCnpj><Cnpj>01001001000113</Cnpj></CpfCnpj>
       <InscricaoMunicipal>1.000.10</InscricaoMunicipal>
@@ -206,8 +217,14 @@ class NFSEController {
         ${rpsXmlComAssinatura}
       </ListaRps>
     </LoteRps>
-    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim();
-    const assinaturaLote  = this.assinarXml(loteXmlSemAssinatura, `lote1`);
+    `  .replace(/[\r\n]+/g, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/>\s+</g, "><")
+    .replace(/<\s+/g, "<")
+    .replace(/\s+>/g, ">")
+    .trim();
+
+    const assinaturaLote  = this.assinarXml(loteXmlSemAssinatura, `lote${nfseNumber}`);
 
     const loteXmlComAssinatura = `
     ${loteXmlSemAssinatura}
@@ -218,7 +235,9 @@ class NFSEController {
     <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
       ${loteXmlComAssinatura}
     </EnviarLoteRpsSincronoEnvio>
-    `.replace(/\s+>/g, ">").replace(/>\s+</g, "><").replace(/<\s+/g, "<").trim();
+    `.trim();
+
+
     const soapFinal = `
     <?xml version="1.0" encoding="UTF-8"?>
     <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
@@ -318,14 +337,15 @@ class NFSEController {
       privateKey: privateKeyPem,
       publicCert: x509Certificate,
       signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
-      canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#",
+      canonicalizationAlgorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
       getKeyInfoContent: () => keyInfoContent(x509Certificate)
     });
   
     signer.addReference({
       xpath: `//*[@Id='${referenceId}']`,
       digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
-      transforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"]
+      transforms: [  "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+  "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"]
     });
   
     // Computando a assinatura
