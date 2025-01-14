@@ -332,7 +332,7 @@ class NFSEController {
       privateKey: privateKeyPem,
       publicCert: `${x509Certificate}`,
       signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
-      canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#",
+      canonicalizationAlgorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
       getKeyInfoContent: () => keyInfoContent,
     });
   
@@ -341,7 +341,7 @@ class NFSEController {
       digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
       transforms: [
         "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-        "http://www.w3.org/2001/10/xml-exc-c14n#",
+        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
       ],
     });
     
@@ -350,13 +350,7 @@ class NFSEController {
       signer.computeSignature(xml, {
         location: { reference: `//*[local-name(.)='${referenceId}']`, action: 'after' },
       });
-  
-      const signedXml = signer.getSignatureXml();
 
-      console.log(signedXml);
-      
-
-      // const isValid = signer.checkSignature(signedXml);
       const isValid = true;
       
       if (!isValid) {
