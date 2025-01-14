@@ -335,7 +335,7 @@ class NFSEController {
   
     const signer = new SignedXml({
       privateKey: privateKeyPem,
-      publicCert: x509Certificate,
+      publicCert: `-----BEGIN CERTIFICATE-----\n${x509Certificate}\n-----END CERTIFICATE-----`,
       signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
       canonicalizationAlgorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
       getKeyInfoContent: () => keyInfoContent,
@@ -356,7 +356,12 @@ class NFSEController {
       });
   
       const signedXml = signer.getSignatureXml();
+
+      console.log(signedXml);
+      
+
       const isValid = signer.checkSignature(signedXml);
+      
       if (!isValid) {
         throw new Error(`Signature validation failed`);
       }
