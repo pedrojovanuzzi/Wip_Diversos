@@ -330,33 +330,42 @@ class NFSEController {
 
   private assinarXml(xml: string, referenceId: string): string {
     const { privateKeyPem, x509Certificate } = this.extrairChaveECertificado();
-
-    function keyInfoContent(key : string) {
-      return `<X509Data><X509Certificate>${key}</X509Certificate></X509Data>`;
-    }
+  
+    const keyInfoContent = `<X509Data><X509Certificate>${x509Certificate}</X509Certificate></X509Data>`;
   
     const signer = new SignedXml({
       privateKey: privateKeyPem,
-      implicitTransforms: ["http://www.w3.org/TR/2001/REC-xml-c14n-20010315"],
       publicCert: x509Certificate,
       signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
-      canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#",
-      getKeyInfoContent: () => keyInfoContent(x509Certificate)
+      canonicalizationAlgorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      getKeyInfoContent: () => keyInfoContent,
     });
-
-    
   
     signer.addReference({
       xpath: `//*[@Id='${referenceId}']`,
       digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
-      transforms: [  "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-  "http://www.w3.org/2001/10/xml-exc-c14n#"]
+      transforms: [
+        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      ],
     });
   
-    // Computando a assinatura
-    signer.computeSignature(xml);
+    try {
+      signer.computeSignature(xml, {
+        location: { reference: `//*[@Id='${referenceId}']`, action: 'append' },
+      });
   
-    return signer.getSignatureXml();
+      const signedXml = signer.getSignatureXml();
+      const isValid = signer.checkSignature(signedXml);
+      if (!isValid) {
+        throw new Error(`Signature validation failed`);
+      }
+      console.log("Signature is valid:", isValid);
+      return signedXml;
+    } catch (error) {
+      console.error("An error occurred during XML signing:", error);
+      throw error;
+    }
   }
   
 
