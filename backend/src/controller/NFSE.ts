@@ -91,7 +91,7 @@ class NFSEController {
         rejectUnauthorized: false,
       });
       for (const id of ids) {
-        const xmlLoteRps = await this.gerarXmlRecepcionarRps(id, Number(aliquota).toFixed(1));
+        const xmlLoteRps = await this.gerarXmlRecepcionarRps(id, String(aliquota).padStart(2, '0') + '.00');
         const response = await axios.post(this.WSDL_URL, xmlLoteRps, {
           httpsAgent,
           headers: {
@@ -114,7 +114,7 @@ class NFSEController {
     }
   }
 
-  private async gerarXmlRecepcionarRps(id: string, aliquota: string = "5.0") {
+  private async gerarXmlRecepcionarRps(id: string, aliquota: string = "05.00") {
     const RPSQuery = MkauthSource.getRepository(Faturas);
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
@@ -147,7 +147,7 @@ class NFSEController {
         <Servico>
           <Valores>
             <ValorServicos>${String(rpsData?.valor)}</ValorServicos>
-            <Aliquota>${aliquota || "5.0"}</Aliquota>
+            <Aliquota>${aliquota || "05.00"}</Aliquota>
           </Valores>
           <IssRetido>${String(nfseResponse[0]?.issRetido)}</IssRetido>
           <ResponsavelRetencao>${String(nfseResponse[0]?.responsavelRetencao)}</ResponsavelRetencao>
@@ -199,21 +199,16 @@ class NFSEController {
     .replace(/\s+>/g, ">")
     .trim();
 
-    const SignatureRps = this.assinarXml(rpsXmlSemAssinatura, `RPS${String(rpsData?.uuid_lanc)}`);
-
-    const rpsXmlComAssinatura = rpsXmlSemAssinatura.replace(
-      /<\/Rps>$/,
-      `${SignatureRps}</Rps>`
-    );
+    
 
     const loteXmlSemAssinatura = `
-    <LoteRps versao="2.01" Id="lote${nfseNumber}">
+    <LoteRps versao="2.02" Id="lote${nfseNumber}">
       <NumeroLote>1</NumeroLote>
       <CpfCnpj><Cnpj>01001001000113</Cnpj></CpfCnpj>
       <InscricaoMunicipal>15000</InscricaoMunicipal>
       <QuantidadeRps>1</QuantidadeRps>
       <ListaRps>
-        ${rpsXmlComAssinatura}
+        ${rpsXmlSemAssinatura}
       </ListaRps>
     </LoteRps>
     `  .replace(/[\r\n]+/g, "")
@@ -223,10 +218,12 @@ class NFSEController {
     .replace(/\s+>/g, ">")
     .trim();
 
-    const assinaturaLote  = this.assinarXml(loteXmlSemAssinatura, `lote${nfseNumber}`);
+    const SignatureRps = this.assinarXml(loteXmlSemAssinatura, `InfDeclaracaoPrestacaoServico`);
+
+ 
 
     const loteXmlComAssinatura = `
-    ${loteXmlSemAssinatura}
+    ${SignatureRps}
   `.trim();
   
     const envioXml = `
@@ -333,24 +330,25 @@ class NFSEController {
   
     const signer = new SignedXml({
       privateKey: privateKeyPem,
-      publicCert: `-----BEGIN CERTIFICATE-----\n${x509Certificate}\n-----END CERTIFICATE-----`,
+      publicCert: `${x509Certificate}`,
       signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
-      canonicalizationAlgorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#",
       getKeyInfoContent: () => keyInfoContent,
     });
   
     signer.addReference({
-      xpath: `//*[@Id='${referenceId}']`,
+      xpath: `//*[local-name(.)='${referenceId}']`,
       digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
       transforms: [
         "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+        "http://www.w3.org/2001/10/xml-exc-c14n#",
       ],
     });
+    
   
     try {
       signer.computeSignature(xml, {
-        location: { reference: `//*[@Id='${referenceId}']`, action: 'append' },
+        location: { reference: `//*[local-name(.)='${referenceId}']`, action: 'after' },
       });
   
       const signedXml = signer.getSignatureXml();
@@ -365,7 +363,7 @@ class NFSEController {
         throw new Error(`Signature validation failed`);
       }
       // console.log("Signature is valid:", isValid);
-      return signedXml;
+      return signer.getSignedXml();
     } catch (error) {
       console.error("An error occurred during XML signing:", error);
       throw error;
