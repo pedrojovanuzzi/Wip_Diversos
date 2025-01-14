@@ -91,7 +91,7 @@ class NFSEController {
         rejectUnauthorized: false,
       });
       for (const id of ids) {
-        const xmlLoteRps = await this.gerarXmlRecepcionarRps(id, aliquota);
+        const xmlLoteRps = await this.gerarXmlRecepcionarRps(id, Number(aliquota).toFixed(1));
         const response = await axios.post(this.WSDL_URL, xmlLoteRps, {
           httpsAgent,
           headers: {
@@ -114,7 +114,7 @@ class NFSEController {
     }
   }
 
-  private async gerarXmlRecepcionarRps(id: string, aliquota: string = "5") {
+  private async gerarXmlRecepcionarRps(id: string, aliquota: string = "5.0") {
     const RPSQuery = MkauthSource.getRepository(Faturas);
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
@@ -130,8 +130,6 @@ class NFSEController {
     const nfseNumber = nfseResponse && nfseResponse[0]?.numeroRps
       ? nfseResponse[0].numeroRps + 1
       : 1;
-
-
 
     const rpsXmlSemAssinatura = `
     <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
@@ -149,7 +147,7 @@ class NFSEController {
         <Servico>
           <Valores>
             <ValorServicos>${String(rpsData?.valor)}</ValorServicos>
-            <Aliquota>${aliquota || 5}</Aliquota>
+            <Aliquota>${aliquota || "5.0"}</Aliquota>
           </Valores>
           <IssRetido>${String(nfseResponse[0]?.issRetido)}</IssRetido>
           <ResponsavelRetencao>${String(nfseResponse[0]?.responsavelRetencao)}</ResponsavelRetencao>
