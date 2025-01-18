@@ -58,8 +58,8 @@ export class NfseMigration1736171904366 implements MigrationInterface {
                     {
                         name: 'aliquota',
                         type: 'decimal',
-                        precision: 5,
-                        scale: 2,
+                        precision: 9,
+                        scale: 4,
                         isNullable: true,
                     },
                     {

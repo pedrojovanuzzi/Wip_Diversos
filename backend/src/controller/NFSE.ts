@@ -279,7 +279,7 @@ class NFSEController {
       dataEmissao: rpsData?.processamento ? new Date(rpsData.processamento) : new Date(),
       competencia: rpsData?.datavenc ? new Date(rpsData.datavenc) : new Date(),
       valorServico: Number(rpsData?.valor) || 0,
-      aliquota: Number(Number(aliquota).toFixed(2)),
+      aliquota: Number(Number(aliquota).toFixed(4)),
       issRetido: nfseResponse[0]?.issRetido || 0,
       responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
       itemListaServico: nfseResponse[0]?.itemListaServico || "",
