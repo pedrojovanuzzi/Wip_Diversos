@@ -304,9 +304,6 @@ class NFSEController {
 
    if(await this.verificaRps(nfseNumber, this.PASSWORD)){
       await NsfeData.save(insertDatabase);
-
-      console.log(soapFinal);
-
       return soapFinal;
    }
    else{
