@@ -88,15 +88,19 @@ class NFSEController {
           stdio: "inherit",
         });
       }
+
       const certPathToUse = fs.existsSync(this.NEW_CERT_PATH)
         ? this.NEW_CERT_PATH
         : this.certPath;
+
       const pfxBuffer = fs.readFileSync(certPathToUse);
+
       const httpsAgent = new https.Agent({
         pfx: pfxBuffer,
         passphrase: password,
         rejectUnauthorized: false,
       });
+
       for (const id of ids) {
         const xmlLoteRps = await this.gerarXmlRecepcionarRps(id, Number(aliquota).toFixed(4));
         const response = await axios.post(this.WSDL_URL, xmlLoteRps, {
@@ -275,7 +279,7 @@ class NFSEController {
       dataEmissao: rpsData?.processamento ? new Date(rpsData.processamento) : new Date(),
       competencia: rpsData?.datavenc ? new Date(rpsData.datavenc) : new Date(),
       valorServico: Number(rpsData?.valor) || 0,
-      aliquota: nfseResponse[0]?.aliquota || 5,
+      aliquota: Number(Number(aliquota).toFixed(2)),
       issRetido: nfseResponse[0]?.issRetido || 0,
       responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
       itemListaServico: nfseResponse[0]?.itemListaServico || "",
@@ -297,12 +301,17 @@ class NFSEController {
       optanteSimplesNacional: 1,
       incentivoFiscal: 2
     });
-    await NsfeData.save(insertDatabase);
 
-    console.log(soapFinal);
-    
+   if(await this.verificaRps(nfseNumber, this.PASSWORD)){
+      await NsfeData.save(insertDatabase);
 
-    return soapFinal;
+      console.log(soapFinal);
+
+      return soapFinal;
+   }
+   else{
+      return "ERRO NA CONSULTA DE RPS";
+   }
   }
 
   private extrairChaveECertificado() {
@@ -329,6 +338,33 @@ class NFSEController {
       .replace(/\s+/g, "");
     return { privateKeyPem, x509Certificate };
   }
+
+
+  private async verificaRps(rpsNumber: string | number, password: string): Promise<boolean> {
+    const dados = `<Prestador><CpfCnpj><Cnpj>${process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj><InscricaoMunicipal>${process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal></Prestador><NumeroNfse>${rpsNumber}</NumeroNfse><Pagina>1</Pagina>`.trim();
+    const envioXml = `<ConsultarNfseServicoPrestadoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseServicoPrestadoEnvio>`.trim();
+    const soapFinal = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:consultarNfseServicoPrestado>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:consultarNfseServicoPrestado></soapenv:Body></soapenv:Envelope>`
+      .replace(/[\r\n]+/g, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/>\s+</g, "><")
+      .replace(/<\s+/g, "<")
+      .replace(/\s+>/g, ">")
+      .trim();
+  
+    const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
+    const pfxBuffer = fs.readFileSync(certPathToUse);
+    const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: password, rejectUnauthorized: false });
+  
+    const response = await axios.post(this.WSDL_URL, soapFinal, {
+      httpsAgent,
+      headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction: "ConsultarNfseServicoPrestadoEnvio" },
+    });
+  
+    if (response.data.includes(`<ns2:Numero>${rpsNumber}</ns2:Numero>`)) return false;
+    if (response.data.includes("<ns2:Codigo>E212</ns2:Codigo>")) return true;
+    return false;
+  }
+  
 
   private assinarXml(xml: string, referenceId: string): string {
     const { privateKeyPem, x509Certificate } = this.extrairChaveECertificado();
