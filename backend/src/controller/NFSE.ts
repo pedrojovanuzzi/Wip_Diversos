@@ -28,8 +28,8 @@ dotenv.config();
 
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  // private WSDL_URL = "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
-  private WSDL_URL = "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS";
+  private WSDL_URL = "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
+  // private WSDL_URL = "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS";
   private TEMP_DIR = path.resolve(__dirname, "../files");
   private PASSWORD = "";
   private DECRYPTED_CERT_PATH = path.resolve(this.TEMP_DIR, "decrypted_certificado.tmp");
@@ -37,8 +37,12 @@ class NFSEController {
 
   public iniciar = async (req: Request, res: Response) => {
     try {
-      const { password, clientesSelecionados, aliquota } = req.body;
+      let { password, clientesSelecionados, aliquota } = req.body;
       this.PASSWORD = password;
+
+      aliquota = aliquota && aliquota.trim() !== "" ? aliquota : "4.4269";
+
+
       if (!password) throw new Error("Senha do certificado não fornecida.");
       const result = await this.gerarNFSE(
         password,
@@ -91,7 +95,7 @@ class NFSEController {
         rejectUnauthorized: false,
       });
       for (const id of ids) {
-        const xmlLoteRps = await this.gerarXmlRecepcionarRps(id, String(aliquota).padStart(2, '0') + '.00');
+        const xmlLoteRps = await this.gerarXmlRecepcionarRps(id, Number(aliquota).toFixed(4));
         const response = await axios.post(this.WSDL_URL, xmlLoteRps, {
           httpsAgent,
           headers: {
@@ -114,7 +118,7 @@ class NFSEController {
     }
   }
 
-  private async gerarXmlRecepcionarRps(id: string, aliquota: string = "05.00") {
+  private async gerarXmlRecepcionarRps(id: string, aliquota: string) {
     const RPSQuery = MkauthSource.getRepository(Faturas);
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
@@ -147,7 +151,7 @@ class NFSEController {
         <Servico>
           <Valores>
             <ValorServicos>${String(rpsData?.valor)}</ValorServicos>
-            <Aliquota>${aliquota || "05.00"}</Aliquota>
+            <Aliquota>${aliquota || "4.4269"}</Aliquota>
           </Valores>
           <IssRetido>${String(nfseResponse[0]?.issRetido)}</IssRetido>
           <ResponsavelRetencao>${String(nfseResponse[0]?.responsavelRetencao)}</ResponsavelRetencao>
@@ -157,8 +161,8 @@ class NFSEController {
           <ExigibilidadeISS>${String(nfseResponse[0]?.exigibilidadeIss)}</ExigibilidadeISS>
         </Servico>
         <Prestador>
-          <CpfCnpj><Cnpj>01001001000113</Cnpj></CpfCnpj>
-          <InscricaoMunicipal>15000</InscricaoMunicipal>
+          <CpfCnpj><Cnpj>${ process.env.MUNICIPIO_LOGIN || "01001001000113"}</Cnpj></CpfCnpj>
+          <InscricaoMunicipal>${ process.env.MUNICIPIO_INCRICAO || "15000"}</InscricaoMunicipal>
         </Prestador>
         <Tomador>
           <IdentificacaoTomador>
@@ -187,7 +191,7 @@ class NFSEController {
         </Tomador>
         <RegimeEspecialTributacao>6</RegimeEspecialTributacao>
         <OptanteSimplesNacional>${
-          nfseResponse[0]?.optanteSimplesNacional || "2"
+          nfseResponse[0]?.optanteSimplesNacional || "1"
         }</OptanteSimplesNacional>
         <IncentivoFiscal>${nfseResponse[0]?.incentivoFiscal || "2"}</IncentivoFiscal>
       </InfDeclaracaoPrestacaoServico>
@@ -202,10 +206,10 @@ class NFSEController {
     
 
     const loteXmlSemAssinatura = `
-    <LoteRps versao="2.02" Id="lote${nfseNumber}">
+    <LoteRps versao="2.01" Id="lote${nfseNumber}">
       <NumeroLote>1</NumeroLote>
-      <CpfCnpj><Cnpj>01001001000113</Cnpj></CpfCnpj>
-      <InscricaoMunicipal>15000</InscricaoMunicipal>
+      <CpfCnpj><Cnpj>${ process.env.MUNICIPIO_LOGIN || "01001001000113"}</Cnpj></CpfCnpj>
+      <InscricaoMunicipal>${ process.env.MUNICIPIO_INCRICAO || "15000"}</InscricaoMunicipal>
       <QuantidadeRps>1</QuantidadeRps>
       <ListaRps>
         ${rpsXmlSemAssinatura}
@@ -287,7 +291,7 @@ class NFSEController {
       cep: ClientData?.cep.replace(/[^0-9]/g, "") || "",
       telefoneTomador: ClientData?.celular || undefined,
       emailTomador: ClientData?.email || undefined,
-      optanteSimplesNacional: 2,
+      optanteSimplesNacional: 1,
       incentivoFiscal: 2
     });
     await NsfeData.save(insertDatabase);
@@ -329,10 +333,11 @@ class NFSEController {
     const keyInfoContent = `<X509Data><X509Certificate>${x509Certificate}</X509Certificate></X509Data>`;
   
     const signer = new SignedXml({
+      implicitTransforms: ["http://www.w3.org/TR/2001/REC-xml-c14n-20010315"],
       privateKey: privateKeyPem,
       publicCert: `${x509Certificate}`,
       signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
-      canonicalizationAlgorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#",
       getKeyInfoContent: () => keyInfoContent,
     });
   
@@ -341,7 +346,7 @@ class NFSEController {
       digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
       transforms: [
         "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+        "http://www.w3.org/2001/10/xml-exc-c14n#",
       ],
     });
     
