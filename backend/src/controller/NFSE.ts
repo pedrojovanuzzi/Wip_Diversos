@@ -44,6 +44,8 @@ class NFSEController {
       aliquota = aliquota.replace(",", ".");
       aliquota = aliquota.replace("%", "");
 
+      //Função de Gerar Nota Funcionando
+
       if (!password) throw new Error("Senha do certificado não fornecida.");
       const result = await this.gerarNFSE(
         password,
