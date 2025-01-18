@@ -244,7 +244,7 @@ export const Nfe = () => {
       <main className="flex justify-center mt-20">
       </main>
       <div className="relative">
-        <span className="absolute translate-x-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
+        <span className="absolute translate-x-8 top-11 text-gray-200 -translate-y-1/2 text-4xl">
           <BsFiletypeDoc />
         </span>
         <button
@@ -255,7 +255,7 @@ export const Nfe = () => {
         </button>
         <input type="text" onChange={((e) => {
           setAliquota(e.target.value);
-        })} placeholder="Digite a Aliquota" className="ring-2 ring-gray-500 p-2 rounded" />
+        })} placeholder="Exemplo 4,4249%" className="ring-2 ring-gray-500 p-2 rounded m-5" />
       </div>
       {arquivo && (
         <p className="text-sm text-gray-500 m-5">

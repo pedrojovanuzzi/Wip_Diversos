@@ -41,7 +41,8 @@ class NFSEController {
       this.PASSWORD = password;
 
       aliquota = aliquota && aliquota.trim() !== "" ? aliquota : "4.4269";
-
+      aliquota = aliquota.replace(",", ".");
+      aliquota = aliquota.replace("%", "");
 
       if (!password) throw new Error("Senha do certificado não fornecida.");
       const result = await this.gerarNFSE(

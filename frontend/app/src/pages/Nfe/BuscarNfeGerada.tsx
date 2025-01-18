@@ -63,30 +63,6 @@ export const BuscarNfeGerada = () => {
     }
   };
   
-  
-
-  const emitirNFe = async () => {
-    try {
-      const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/`,
-        { password, clientesSelecionados },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      console.log("NF-e emitida:", resposta.data);
-      console.log(clientesSelecionados);
-
-      setDadosNFe(resposta.data);
-      setShowPopUp(false); // Fecha o PopUp ao concluir
-    } catch (erro) {
-      console.error("Erro ao emitir NF-e:", erro);
-    }
-  };
-
   const enviarCertificado = async () => {
     if (!arquivo) {
       alert("Selecione um arquivo para enviar.");
@@ -112,25 +88,6 @@ export const BuscarNfeGerada = () => {
       console.error("Erro ao enviar o certificado:", erro);
     }
   };
-
-
-  const imprimirNota = async () => {
-      try {
-        const resposta = await axios.post(
-          `${process.env.REACT_APP_URL}/Nfe/ImprimirNota`,
-          { clientesSelecionados },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        console.log("Nota impressa:", resposta.data);
-      } catch (erro) {
-        console.error("Erro ao imprimir a nota:", erro);
-      }
-  }
 
   const handleSearch = async () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");

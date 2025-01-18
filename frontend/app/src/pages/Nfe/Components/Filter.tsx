@@ -143,14 +143,14 @@ export default function Filter({
       <Disclosure
         as="section"
         aria-labelledby="filter-heading"
-        className="grid items-center border-b border-t border-gray-200"
+        className="grid items-center border-b border-t "
       >
         <h2 id="filter-heading" className="sr-only">
           Filtros
         </h2>
         <div className="relative col-start-1 row-start-1 py-4">
-          <div className="mx-auto flex items-center justify-between gap-5 max-w-7xl space-x-6 divide-x divide-gray-200 px-4 text-sm sm:px-6 lg:px-8">
-            <div className="flex items-center gap-6">
+          <div className="mx-auto flex flex-col sm:flex-row items-center justify-between gap-5 max-w-7xl space-x-6 px-4 text-sm sm:px-6 lg:px-8">
+            <div className="flex flex-col sm:flex-row items-center gap-6">
               <DisclosureButton className="group flex items-center font-medium text-gray-700">
                 <FunnelIcon
                   aria-hidden="true"
@@ -167,7 +167,7 @@ export default function Filter({
               </button>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex flex-col sm:flex-row items-center gap-6">
               <label className="relative ring-1 ring-black ring-opacity-5 bg-slate-500 text-gray-200 py-6 px-8 rounded hover:bg-slate-400 transition-all cursor-pointer">
                 <span className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 text-4xl">
                   <CiCirclePlus />
@@ -200,8 +200,8 @@ export default function Filter({
         <DisclosurePanel className="border-t border-gray-200">
           <Calendar setDateFilter={setDate} />
           <Line />
-          <div className="mx-auto grid max-w-7xl mt-10 grid-cols-3 gap-4 px-4 text-sm sm:px-6 md:gap-x-6 lg:px-8">
-            <fieldset>
+          <div className="mx-auto flex flex-col items-center sm:grid sm:items-baseline sm:place-items-center max-w-7xl my-10 grid-cols-3 sm:gap-4 sm:px-6 text-sm md:gap-x-6 lg:px-8">
+            <fieldset className="my-5">
               <legend className="block font-medium">Plano</legend>
               <div className="space-y-6 p-10 sm:space-y-4 sm:pt-4">
                 {filters.plano.map((option, optionIdx) => (
@@ -249,7 +249,7 @@ export default function Filter({
                 ))}
               </div>
             </fieldset>
-            <fieldset>
+            <fieldset className="my-5">
               <legend className="block font-medium">Outros</legend>
               <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
                 {filters.cli_ativado.map((option, optionIdx) => (
@@ -340,7 +340,7 @@ export default function Filter({
                 ))}
               </div>
             </fieldset>
-            <fieldset>
+            <fieldset className="my-5">
               <legend className="block font-medium">Vencimento</legend>
               <div className="space-y-6 pt-6 sm:space-y-4 sm:pt-4">
                 {filters.vencimento.map((option, optionIdx) => (
