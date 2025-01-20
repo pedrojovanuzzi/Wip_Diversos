@@ -28,8 +28,8 @@ dotenv.config();
 
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  private WSDL_URL = "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
-  // private WSDL_URL = "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS";
+  private homologacao = true;
+  private WSDL_URL = this.homologacao === true ? "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS" : "http://nfe.arealva.sp.gov.br:5661/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
   private TEMP_DIR = path.resolve(__dirname, "../files");
   private PASSWORD = "";
   private DECRYPTED_CERT_PATH = path.resolve(this.TEMP_DIR, "decrypted_certificado.tmp");
@@ -138,9 +138,11 @@ class NFSEController {
     const municipio = response.data.id;
     const NsfeData = AppDataSource.getRepository(NFSE);
     const nfseResponse = await NsfeData.find({ order: { id: "DESC" }, take: 1 });
-    const nfseNumber = nfseResponse && nfseResponse[0]?.numeroRps
+    let nfseNumber = nfseResponse && nfseResponse[0]?.numeroRps
       ? nfseResponse[0].numeroRps + 1
       : 1;
+
+    nfseNumber = nfseNumber === 9999999 ? 9999999 + 1 : nfseNumber; //Por causa de um Teste Realizado
 
     const rpsXmlSemAssinatura = `
     <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
@@ -168,8 +170,8 @@ class NFSEController {
           <ExigibilidadeISS>${String(nfseResponse[0]?.exigibilidadeIss)}</ExigibilidadeISS>
         </Servico>
         <Prestador>
-          <CpfCnpj><Cnpj>${ process.env.MUNICIPIO_LOGIN || "01001001000113"}</Cnpj></CpfCnpj>
-          <InscricaoMunicipal>${ process.env.MUNICIPIO_INCRICAO || "15000"}</InscricaoMunicipal>
+          <CpfCnpj><Cnpj>${ this.homologacao === true ? process.env.MUNICIPIO_LOGIN_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj>
+          <InscricaoMunicipal>${ this.homologacao === true ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal>
         </Prestador>
         <Tomador>
           <IdentificacaoTomador>
@@ -192,7 +194,7 @@ class NFSEController {
             <Cep>${String(ClientData?.cep.replace(/[^0-9]/g, ""))}</Cep>
           </Endereco>
           <Contato>
-            <Telefone>${String(ClientData?.celular)}</Telefone>
+            <Telefone>${String(ClientData?.celular.replace(/[^0-9]/g, ""))}</Telefone>
             <Email>${String(ClientData?.email)}</Email>
           </Contato>
         </Tomador>
@@ -215,8 +217,8 @@ class NFSEController {
     const loteXmlSemAssinatura = `
     <LoteRps versao="2.01" Id="lote${nfseNumber}">
       <NumeroLote>1</NumeroLote>
-      <CpfCnpj><Cnpj>${ process.env.MUNICIPIO_LOGIN || "01001001000113"}</Cnpj></CpfCnpj>
-      <InscricaoMunicipal>${ process.env.MUNICIPIO_INCRICAO || "15000"}</InscricaoMunicipal>
+      <CpfCnpj><Cnpj>${ this.homologacao === true ? process.env.MUNICIPIO_LOGIN_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj>
+      <InscricaoMunicipal>${ this.homologacao === true ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal>
       <QuantidadeRps>1</QuantidadeRps>
       <ListaRps>
         ${rpsXmlSemAssinatura}
@@ -243,9 +245,6 @@ class NFSEController {
     </EnviarLoteRpsSincronoEnvio>
     `.trim();
 
-    // <username>${process.env.MUNICIPIO_LOGIN || process.env.MUNICIPIO_LOGIN_TEST}</username>
-    // <password>${process.env.MUNICIPIO_SENHA || process.env.MUNICIPIO_SENHA_TEST}</password>
-
     const soapFinal = `
     <?xml version="1.0" encoding="UTF-8"?>
     <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
@@ -255,8 +254,8 @@ class NFSEController {
       <soapenv:Body>
         <ws:recepcionarLoteRpsSincrono>
           ${envioXml}
-          <username>${process.env.MUNICIPIO_LOGIN_TEST}</username>
-          <password>${process.env.MUNICIPIO_SENHA_TEST}</password>
+          <username>${this.homologacao === true ? process.env.MUNICIPIO_LOGIN_TEST : process.env.MUNICIPIO_LOGIN}</username>
+          <password>${this.homologacao === true ? process.env.MUNICIPIO_SENHA_TEST : process.env.MUNICIPIO_SENHA}</password>
         </ws:recepcionarLoteRpsSincrono>
       </soapenv:Body>
     </soapenv:Envelope>
@@ -296,7 +295,7 @@ class NFSEController {
       bairro: ClientData?.bairro || "",
       uf: nfseResponse[0]?.uf || "",
       cep: ClientData?.cep.replace(/[^0-9]/g, "") || "",
-      telefoneTomador: ClientData?.celular || undefined,
+      telefoneTomador: ClientData?.celular.replace(/[^0-9]/g, "") || undefined,
       emailTomador: ClientData?.email || undefined,
       optanteSimplesNacional: 1,
       incentivoFiscal: 2
@@ -338,7 +337,7 @@ class NFSEController {
 
 
   private async verificaRps(rpsNumber: string | number, password: string): Promise<boolean> {
-    const dados = `<Prestador><CpfCnpj><Cnpj>${process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj><InscricaoMunicipal>${process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal></Prestador><NumeroNfse>${rpsNumber}</NumeroNfse><Pagina>1</Pagina>`.trim();
+    const dados = `<Prestador><CpfCnpj><Cnpj>${this.homologacao === true ? process.env.MUNICIPIO_LOGIN_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj><InscricaoMunicipal>${this.homologacao === true ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal></Prestador><NumeroNfse>${rpsNumber}</NumeroNfse><Pagina>1</Pagina>`.trim();
     const envioXml = `<ConsultarNfseServicoPrestadoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseServicoPrestadoEnvio>`.trim();
     const soapFinal = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:consultarNfseServicoPrestado>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:consultarNfseServicoPrestado></soapenv:Body></soapenv:Envelope>`
       .replace(/[\r\n]+/g, "")
