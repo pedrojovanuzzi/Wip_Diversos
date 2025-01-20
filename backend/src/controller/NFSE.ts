@@ -217,7 +217,7 @@ class NFSEController {
     const loteXmlSemAssinatura = `
     <LoteRps versao="2.01" Id="lote${nfseNumber}">
       <NumeroLote>1</NumeroLote>
-      <CpfCnpj><Cnpj>${ this.homologacao === true ? process.env.MUNICIPIO_LOGIN_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj>
+      <CpfCnpj><Cnpj>${ this.homologacao === true ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj>
       <InscricaoMunicipal>${ this.homologacao === true ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal>
       <QuantidadeRps>1</QuantidadeRps>
       <ListaRps>
@@ -302,7 +302,9 @@ class NFSEController {
     });
 
    if(await this.verificaRps(nfseNumber, this.PASSWORD)){
-      await NsfeData.save(insertDatabase);
+      if(!this.homologacao){
+        await NsfeData.save(insertDatabase);
+      }
       return soapFinal;
    }
    else{
@@ -337,7 +339,7 @@ class NFSEController {
 
 
   private async verificaRps(rpsNumber: string | number, password: string): Promise<boolean> {
-    const dados = `<Prestador><CpfCnpj><Cnpj>${this.homologacao === true ? process.env.MUNICIPIO_LOGIN_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj><InscricaoMunicipal>${this.homologacao === true ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal></Prestador><NumeroNfse>${rpsNumber}</NumeroNfse><Pagina>1</Pagina>`.trim();
+    const dados = `<Prestador><CpfCnpj><Cnpj>${this.homologacao === true ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj><InscricaoMunicipal>${this.homologacao === true ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal></Prestador><NumeroNfse>${rpsNumber}</NumeroNfse><Pagina>1</Pagina>`.trim();
     const envioXml = `<ConsultarNfseServicoPrestadoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseServicoPrestadoEnvio>`.trim();
     const soapFinal = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:consultarNfseServicoPrestado>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:consultarNfseServicoPrestado></soapenv:Body></soapenv:Envelope>`
       .replace(/[\r\n]+/g, "")
@@ -350,6 +352,10 @@ class NFSEController {
     const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
     const pfxBuffer = fs.readFileSync(certPathToUse);
     const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: password, rejectUnauthorized: false });
+
+
+    console.log(soapFinal);
+    
   
     const response = await axios.post(this.WSDL_URL, soapFinal, {
       httpsAgent,
