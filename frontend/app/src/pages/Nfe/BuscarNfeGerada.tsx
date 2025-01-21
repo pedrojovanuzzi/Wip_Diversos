@@ -56,11 +56,11 @@ export const BuscarNfeGerada = () => {
     if (clientesSelecionados.length === clientes.length) {
       setClientesSelecionados([]);
     } else {
-      const titulosValidos = clientes
-        .filter((cliente) => cliente.fatura && cliente.fatura.titulo)
-        .map((cliente) => cliente.fatura.titulo);
+      const numeroRpsValidos = clientes
+        .filter((cliente) => cliente.nfse && cliente.nfse.numero_rps)
+        .map((cliente) => cliente.nfse.numero_rps);
   
-      setClientesSelecionados(titulosValidos);
+      setClientesSelecionados(numeroRpsValidos);
     }
   };
 
