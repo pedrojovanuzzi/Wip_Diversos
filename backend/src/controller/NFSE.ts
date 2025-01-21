@@ -366,7 +366,31 @@ class NFSEController {
     if (response.data.includes("<ns2:Codigo>E212</ns2:Codigo>")) return true;
     return false;
   }
+
+  public async cancelarNfse(req : Request, res: Response){
+    const { rpsNumber, password } = req.body;
+    const dados = `<Pedido><InfPedidoCancelamento Id=CANCEL${rpsNumber}><IdentificacaoNfse><Numero>${rpsNumber}</Numero><CpfCnpj><Cnpj>${this.homologacao === true ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj><InscricaoMunicipal>${this.homologacao === true ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal><CodigoMunicipio>3503406</CodigoMunicipio></IdentificacaoNfse><CodigoCancelamento>2</CodigoCancelamento></InfPedidoCancelamento>`.trim();
+    const envioXml = `<CancelarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</CancelarNfseEnvio>`.trim();
+    const envioXmlAssinado = this.assinarXml(envioXml, "InfPedidoCancelamento");
+    const soapFinal = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:cancelarNfse>${envioXmlAssinado}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:cancelarNfse></soapenv:Body></soapenv:Envelope>`
+      .replace(/[\r\n]+/g, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/>\s+</g, "><")
+      .replace(/<\s+/g, "<")
+      .replace(/\s+>/g, ">")
+      .trim();
   
+    const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
+    const pfxBuffer = fs.readFileSync(certPathToUse);
+    const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: password, rejectUnauthorized: false });
+  
+    const response = await axios.post(this.WSDL_URL, soapFinal, {
+      httpsAgent,
+      headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction: "ConsultarNfseServicoPrestadoEnvio" },
+    }); 
+
+    console.log(response);
+  }
 
   private assinarXml(xml: string, referenceId: string): string {
     const { privateKeyPem, x509Certificate } = this.extrairChaveECertificado();
