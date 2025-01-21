@@ -152,7 +152,7 @@ export const BuscarNfeGerada = () => {
                     scope="col"
                     className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
-                    Titulo
+                    RPS
                   </th>
                   <th
                     scope="col"
@@ -170,7 +170,7 @@ export const BuscarNfeGerada = () => {
                     scope="col"
                     className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
-                    Tipo
+                    Aliquota
                   </th>
                   <th
                     scope="col"
@@ -193,15 +193,15 @@ export const BuscarNfeGerada = () => {
                       <input
                       className="cursor-pointer"
                         type="checkbox"
-                        checked={clientesSelecionados.includes(cliente.fatura.titulo)}
-                        onChange={() => handleCheckboxChange(cliente.fatura.titulo)}
+                        checked={clientesSelecionados.includes(cliente.nfse.id)}
+                        onChange={() => handleCheckboxChange(cliente.nfse.id)}
                       />
                     </td>
-                    <td className="px-6 py-4">{cliente.fatura.titulo}</td>
+                    <td className="px-6 py-4">{cliente.nfse.numero_rps}</td>
                     <td className="px-6 py-4">{cliente.login}</td>
-                    <td className="px-6 py-4">{cliente.fatura.datavenc}</td>
-                    <td className="px-6 py-4">{cliente.fatura.tipo}</td>
-                    <td className="px-6 py-4">{cliente.fatura.valor}</td>
+                    <td className="px-6 py-4">{cliente.nfse.competencia}</td>
+                    <td className="px-6 py-4">{cliente.nfse.aliquota}</td>
+                    <td className="px-6 py-4">{cliente.nfse.valor_servico}</td>
                     <td className="px-6 py-4">
                       {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
                     </td>
