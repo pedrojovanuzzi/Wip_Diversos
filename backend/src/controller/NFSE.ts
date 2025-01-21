@@ -367,35 +367,60 @@ class NFSEController {
     return false;
   }
 
-  public async cancelarNfse(req : Request, res: Response){
-    try{
+  public async cancelarNfse(req: Request, res: Response) {
+    try {
       const { rpsNumber, password } = req.body;
-    const dados = `<Pedido><InfPedidoCancelamento Id=CANCEL${rpsNumber}><IdentificacaoNfse><Numero>${rpsNumber}</Numero><CpfCnpj><Cnpj>${this.homologacao === true ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj><InscricaoMunicipal>${this.homologacao === true ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal><CodigoMunicipio>3503406</CodigoMunicipio></IdentificacaoNfse><CodigoCancelamento>2</CodigoCancelamento></InfPedidoCancelamento>`.trim();
-    const envioXml = `<CancelarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</CancelarNfseEnvio>`.trim();
-    const envioXmlAssinado = this.assinarXml(envioXml, "InfPedidoCancelamento");
-    const soapFinal = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:cancelarNfse>${envioXmlAssinado}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:cancelarNfse></soapenv:Body></soapenv:Envelope>`
-      .replace(/[\r\n]+/g, "")
-      .replace(/\s{2,}/g, " ")
-      .replace(/>\s+</g, "><")
-      .replace(/<\s+/g, "<")
-      .replace(/\s+>/g, ">")
-      .trim();
   
-    const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
-    const pfxBuffer = fs.readFileSync(certPathToUse);
-    const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: password, rejectUnauthorized: false });
+      if (!Array.isArray(rpsNumber)) {
+        res.status(400).json({ error: "rpsNumber must be an array" });
+        return;
+      }
   
-    const response = await axios.post(this.WSDL_URL, soapFinal, {
-      httpsAgent,
-      headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction: "ConsultarNfseServicoPrestadoEnvio" },
-    }); 
-
-    console.log(response);
-    }
-    catch(error){
-      console.log(error);
+      const responses = await Promise.all(
+        rpsNumber.map(async (rps: string | number) => {
+          try {
+            const dados = `<Pedido><InfPedidoCancelamento Id=CANCEL${rps}><IdentificacaoNfse><Numero>${rps}</Numero><CpfCnpj><Cnpj>${this.homologacao === true ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj><InscricaoMunicipal>${this.homologacao === true ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal><CodigoMunicipio>3503406</CodigoMunicipio></IdentificacaoNfse><CodigoCancelamento>2</CodigoCancelamento></InfPedidoCancelamento>`.trim();
+            const envioXml = `<CancelarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</CancelarNfseEnvio>`.trim();
+            const envioXmlAssinado = this.assinarXml(envioXml, "InfPedidoCancelamento");
+            const soapFinal = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:cancelarNfse>${envioXmlAssinado}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:cancelarNfse></soapenv:Body></soapenv:Envelope>`
+              .replace(/[\r\n]+/g, "")
+              .replace(/\s{2,}/g, " ")
+              .replace(/>\s+</g, "><")
+              .replace(/<\s+/g, "<")
+              .replace(/\s+>/g, ">")
+              .trim();
+  
+            const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
+            const pfxBuffer = fs.readFileSync(certPathToUse);
+            const httpsAgent = new https.Agent({
+              pfx: pfxBuffer,
+              passphrase: password,
+              rejectUnauthorized: false,
+            });
+  
+            const response = await axios.post(this.WSDL_URL, soapFinal, {
+              httpsAgent,
+              headers: {
+                "Content-Type": "text/xml; charset=UTF-8",
+                SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
+              },
+            });
+  
+            return { rps, success: true, response: response.data };
+          } catch (error) {
+            console.error(`Error processing RPS ${rps}:`, error);
+            return { rps, success: false, error: error };
+          }
+        })
+      );
+  
+      res.status(200).json(responses);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Internal Server Error" });
     }
   }
+  
 
   private assinarXml(xml: string, referenceId: string): string {
     const { privateKeyPem, x509Certificate } = this.extrairChaveECertificado();

@@ -33,7 +33,7 @@ router.post('/', NFSE.iniciar.bind(NFSE));
 
 router.post("/BuscarClientes", AuthGuard, NFSE.BuscarClientes);
 
-router.post("/cancelarNfse", AuthGuard, NFSE.cancelarNfse);
+router.post("/cancelarNfse", AuthGuard, NFSE.cancelarNfse.bind(NFSE));
 
 router.post("/BuscarNSFE", AuthGuard, NFSE.BuscarNSFE);
 

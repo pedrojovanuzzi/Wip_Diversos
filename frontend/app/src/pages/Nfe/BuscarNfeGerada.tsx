@@ -11,6 +11,7 @@ import { IoArrowUpCircleOutline } from "react-icons/io5";
 import PopUpButton from "./Components/PopUpButton";
 import { PiPrinter } from "react-icons/pi";
 import Stacked2 from "./Components/Stacked2";
+import PopUpCancelNFSE from "./Components/PopUpCancelNFSE";
 
 export const BuscarNfeGerada = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -60,6 +61,32 @@ export const BuscarNfeGerada = () => {
         .map((cliente) => cliente.fatura.titulo);
   
       setClientesSelecionados(titulosValidos);
+    }
+  };
+
+  const imprimir = () => {
+    console.log("Imprimindo...");
+  };
+
+  const cancelNFSE = async () => {
+    try {
+      const resposta = await axios.post(
+        `${process.env.REACT_APP_URL}/Nfe/cancelarNfse`,
+        {
+          rpsNumber: clientesSelecionados,
+          password: password,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      console.log("Notas Canceladas:", resposta.data);
+    } catch (erro) {
+      console.error("Erro ao Buscar Clientes:", erro);
     }
   };
   
@@ -193,8 +220,8 @@ export const BuscarNfeGerada = () => {
                       <input
                       className="cursor-pointer"
                         type="checkbox"
-                        checked={clientesSelecionados.includes(cliente.nfse.id)}
-                        onChange={() => handleCheckboxChange(cliente.nfse.id)}
+                        checked={clientesSelecionados.includes(cliente.nfse.numero_rps)}
+                        onChange={() => handleCheckboxChange(cliente.nfse.numero_rps)}
                       />
                     </td>
                     <td className="px-6 py-4">{cliente.nfse.numero_rps}</td>
@@ -225,7 +252,7 @@ export const BuscarNfeGerada = () => {
         </span>
         <button
           className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
-          onClick={() => setShowPopUp(true)}
+          onClick={() => imprimir()}
         >
           Imprimir Nota
         </button>
@@ -239,6 +266,21 @@ export const BuscarNfeGerada = () => {
           Cancelar Nota
         </button>
       </div>
+            {arquivo && (
+              <p className="text-sm text-gray-500 m-5">
+                Arquivo selecionado:{" "}
+                <span className="font-semibold">{arquivo.name}</span>
+              </p>
+            )}
+            {showPopUp && (
+              <PopUpCancelNFSE
+                setShowPopUp={setShowPopUp}
+                showPopUp={showPopUp}
+                setPassword={setPassword}
+                password={password}
+                cancelNFSE={cancelNFSE}
+              />
+            )}
     </div>
   );
 };
