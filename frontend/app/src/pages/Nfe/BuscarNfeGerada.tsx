@@ -248,7 +248,7 @@ export const BuscarNfeGerada = () => {
       </main>
       <div className="relative">
         <span className="absolute translate-x-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
-          <BsFiletypeDoc />
+          <BsFiletypeDoc className="cursor-pointer" onClick={() => imprimir()} />
         </span>
         <button
           className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
@@ -257,7 +257,7 @@ export const BuscarNfeGerada = () => {
           Imprimir Nota
         </button>
         <span className="absolute translate-x-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
-        <CiNoWaitingSign />
+        <CiNoWaitingSign className="cursor-pointer" onClick={() => setShowPopUp(true)} />
         </span>
         <button
           className="bg-red-600 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-red-400 transition-all"

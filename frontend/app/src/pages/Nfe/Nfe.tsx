@@ -245,7 +245,7 @@ export const Nfe = () => {
       </main>
       <div className="relative">
         <span className="absolute translate-x-8 top-11 text-gray-200 -translate-y-1/2 text-4xl">
-          <BsFiletypeDoc />
+          <BsFiletypeDoc className="cursor-pointer" onClick={() => setShowPopUp(true)} />
         </span>
         <button
           className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
