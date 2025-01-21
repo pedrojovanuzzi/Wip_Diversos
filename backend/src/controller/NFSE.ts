@@ -368,7 +368,8 @@ class NFSEController {
   }
 
   public async cancelarNfse(req : Request, res: Response){
-    const { rpsNumber, password } = req.body;
+    try{
+      const { rpsNumber, password } = req.body;
     const dados = `<Pedido><InfPedidoCancelamento Id=CANCEL${rpsNumber}><IdentificacaoNfse><Numero>${rpsNumber}</Numero><CpfCnpj><Cnpj>${this.homologacao === true ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj><InscricaoMunicipal>${this.homologacao === true ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal><CodigoMunicipio>3503406</CodigoMunicipio></IdentificacaoNfse><CodigoCancelamento>2</CodigoCancelamento></InfPedidoCancelamento>`.trim();
     const envioXml = `<CancelarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</CancelarNfseEnvio>`.trim();
     const envioXmlAssinado = this.assinarXml(envioXml, "InfPedidoCancelamento");
@@ -390,6 +391,10 @@ class NFSEController {
     }); 
 
     console.log(response);
+    }
+    catch(error){
+      console.log(error);
+    }
   }
 
   private assinarXml(xml: string, referenceId: string): string {
@@ -437,7 +442,90 @@ class NFSEController {
 
   public async BuscarNSFE(req: Request, res: Response) {
     try {
-      const { clienteid } = req.body;
+      const { cpf, filters, dateFilter } = req.body;
+
+      const whereConditions: any = {};
+
+      if (cpf) whereConditions.cpf_cnpj = cpf;
+
+      if (filters) {
+        const { plano, vencimento, cli_ativado, nova_nfe } = filters;
+        if (plano?.length) whereConditions.plano = In(plano);
+        if (vencimento?.length) whereConditions.venc = In(vencimento);
+        if (cli_ativado?.length) whereConditions.cli_ativado = In(["s"]);
+        if (nova_nfe?.length) whereConditions.tags = In(nova_nfe);
+      }
+
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const startDate = dateFilter ? new Date(dateFilter.start) : firstDayOfMonth;
+      const endDate = dateFilter ? new Date(dateFilter.end) : lastDayOfMonth;
+      startDate.setHours(startDate.getHours() + 3);
+      endDate.setHours(endDate.getHours() + 3);
+
+      const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+      const clientesResponse = await ClientRepository.find({
+        where: whereConditions,
+        select: { login: true, cpf_cnpj: true, cli_ativado: true },
+      });
+
+      const nfseData = AppDataSource.getRepository(NFSE);
+
+      const nfseResponse = await nfseData.find({
+        where: {
+          login: In(clientesResponse.map((cliente) => cliente.login)),
+          
+        },
+        order: { dataEmissao: "DESC" },
+      });
+
+      const clientesComNfse = clientesResponse.map((cliente) => {
+        const nfseDoCliente = nfseResponse.filter((nf) => nf.login === cliente.login);
+        if (nfseDoCliente.length === 0) return null;
+      
+        return {
+          ...cliente,
+          nfse: {
+            id: nfseDoCliente.map((nf) => nf.id).join(", ") || null,
+            login: nfseDoCliente.map((nf) => nf.login).join(", ") || null,
+            numero_rps: nfseDoCliente.map((nf) => nf.numeroRps).join(", ") || null,
+            serie_rps: nfseDoCliente.map((nf) => nf.serieRps).join(", ") || null,
+            tipo_rps: nfseDoCliente.map((nf) => nf.tipoRps).join(", ") || null,
+            data_emissao: nfseDoCliente.map((nf) => nf.dataEmissao).join(", ") || null,
+            competencia: nfseDoCliente.map((nf) => nf.competencia).join(", ") || null,
+            valor_servico: nfseDoCliente.map((nf) => nf.valorServico).join(", ") || null,
+            aliquota: nfseDoCliente.map((nf) => nf.aliquota).join(", ") || null,
+            iss_retido: nfseDoCliente.map((nf) => nf.issRetido).join(", ") || null,
+            responsavel_retecao: nfseDoCliente.map((nf) => nf.responsavelRetencao).join(", ") || null,
+            item_lista_servico: nfseDoCliente.map((nf) => nf.itemListaServico).join(", ") || null,
+            discriminacao: nfseDoCliente.map((nf) => nf.discriminacao).join(", ") || null,
+            codigo_municipio: nfseDoCliente.map((nf) => nf.codigoMunicipio).join(", ") || null,
+            exigibilidade_iss: nfseDoCliente.map((nf) => nf.exigibilidadeIss).join(", ") || null,
+            cnpj_prestador: nfseDoCliente.map((nf) => nf.cnpjPrestador).join(", ") || null,
+            inscricao_municipal_prestador: nfseDoCliente
+              .map((nf) => nf.inscricaoMunicipalPrestador)
+              .join(", ") || null,
+            cpf_tomador: nfseDoCliente.map((nf) => nf.cpfTomador).join(", ") || null,
+            razao_social_tomador: nfseDoCliente.map((nf) => nf.razaoSocialTomador).join(", ") || null,
+            endereco_tomador: nfseDoCliente.map((nf) => nf.enderecoTomador).join(", ") || null,
+            numero_endereco: nfseDoCliente.map((nf) => nf.numeroEndereco).join(", ") || null,
+            complemento: nfseDoCliente.map((nf) => nf.complemento).join(", ") || null,
+            bairro: nfseDoCliente.map((nf) => nf.bairro).join(", ") || null,
+            uf: nfseDoCliente.map((nf) => nf.uf).join(", ") || null,
+            cep: nfseDoCliente.map((nf) => nf.cep).join(", ") || null,
+            telefone_tomador: nfseDoCliente.map((nf) => nf.telefoneTomador).join(", ") || null,
+            email_tomador: nfseDoCliente.map((nf) => nf.emailTomador).join(", ") || null,
+            optante_simples_nacional: nfseDoCliente
+              .map((nf) => nf.optanteSimplesNacional)
+              .join(", ") || null,
+            incentivo_fiscal: nfseDoCliente.map((nf) => nf.incentivoFiscal).join(", ") || null,
+          },
+        };
+      }).filter((cliente) => cliente !== null);
+      
+      res.status(200).json(clientesComNfse);
+
     } catch (error) {}
   }
 

@@ -3,7 +3,7 @@ import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import Stacked from "./Components/Stacked";
 import Filter from "./Components/Filter";
-import { CiCirclePlus } from "react-icons/ci";
+import { CiCirclePlus, CiNoWaitingSign } from "react-icons/ci";
 import { TypedUseSelectorHook, useSelector } from "react-redux";
 import { RootState } from "../../types";
 import { BsFiletypeDoc } from "react-icons/bs";
@@ -228,6 +228,15 @@ export const BuscarNfeGerada = () => {
           onClick={() => setShowPopUp(true)}
         >
           Imprimir Nota
+        </button>
+        <span className="absolute translate-x-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
+        <CiNoWaitingSign />
+        </span>
+        <button
+          className="bg-red-600 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-red-400 transition-all"
+          onClick={() => setShowPopUp(true)}
+        >
+          Cancelar Nota
         </button>
       </div>
     </div>
