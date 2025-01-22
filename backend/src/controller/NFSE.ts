@@ -441,6 +441,9 @@ class NFSEController {
           SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
         },
       });
+
+      // console.log(response.data);
+      
       
       if (response.data.includes("<ns2:Codigo>E92</ns2:Codigo>")) return true;
       return false;
