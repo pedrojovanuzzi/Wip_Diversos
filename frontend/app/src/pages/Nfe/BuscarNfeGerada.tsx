@@ -209,7 +209,7 @@ export const BuscarNfeGerada = () => {
                     scope="col"
                     className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
-                    Status
+                    Status NFSE
                   </th>
                 </tr>
               </thead>
@@ -230,7 +230,7 @@ export const BuscarNfeGerada = () => {
                     <td className="px-6 py-4">{cliente.nfse.aliquota}</td>
                     <td className="px-6 py-4">{cliente.nfse.valor_servico}</td>
                     <td className="px-6 py-4">
-                      {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
+                      {cliente.nfse.status}
                     </td>
                   </tr>
                 ))}

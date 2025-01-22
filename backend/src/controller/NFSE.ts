@@ -23,6 +23,7 @@ import * as crypto from "crypto";
 dotenv.config();
 
 class NFSEController {
+  
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
   private homologacao = false;
   private WSDL_URL =
@@ -453,8 +454,6 @@ class NFSEController {
     }
   }
 
-
-
   public async cancelarNfse(req: Request, res: Response) {
     try {
       const { rpsNumber, password } = req.body;
@@ -602,6 +601,8 @@ class NFSEController {
     }
   }
 
+
+
   private assinarXml(xml: string, referenceId: string): string {
     const { privateKeyPem, x509Certificate } = this.extrairChaveECertificado();
 
@@ -646,131 +647,161 @@ class NFSEController {
     }
   }
 
+  private async setNfseStatus(
+    rpsNumber: string | number,
+    serie: string = "1",
+    tipo: string = "1"
+  ) {
+    try {
+      const dados = `<IdentificacaoRps>
+                    <Numero>${rpsNumber}</Numero>
+                    <Serie>${serie}</Serie>
+                    <Tipo>${tipo}</Tipo>
+                    </IdentificacaoRps>
+                    <Prestador>
+                    <CpfCnpj>
+                        <Cnpj>${
+                          this.homologacao === true
+                            ? process.env.MUNICIPIO_CNPJ_TEST
+                            : process.env.MUNICIPIO_LOGIN
+                        }</Cnpj>
+                    </CpfCnpj>
+                    <InscricaoMunicipal>${
+                      this.homologacao === true
+                        ? process.env.MUNICIPIO_INCRICAO_TEST
+                        : process.env.MUNICIPIO_INCRICAO
+                    }</InscricaoMunicipal>
+                    </Prestador>`.trim();
+
+      const envioXml =
+        `<ConsultarNfseRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseRpsEnvio>`.trim();
+      const soapFinal =
+        `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:consultarNfsePorRps>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:consultarNfsePorRps></soapenv:Body></soapenv:Envelope>`
+          .replace(/[\r\n]+/g, "")
+          .replace(/\s{2,}/g, " ")
+          .replace(/>\s+</g, "><")
+          .replace(/<\s+/g, "<")
+          .replace(/\s+>/g, ">")
+          .trim();
+
+      const certPathToUse = fs.existsSync(this.NEW_CERT_PATH)
+        ? this.NEW_CERT_PATH
+        : this.certPath;
+      const pfxBuffer = fs.readFileSync(certPathToUse);
+
+      const httpsAgent = new https.Agent({
+        pfx: pfxBuffer,
+        passphrase: this.PASSWORD,
+        rejectUnauthorized: false,
+      });
+
+      const response = await axios.post(this.WSDL_URL, soapFinal, {
+        httpsAgent,
+        headers: {
+          "Content-Type": "text/xml; charset=UTF-8",
+          SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
+        },
+      });
+
+      if (response.data.includes("<ns2:NfseCancelamento>")) {
+        return false; // Encontrado NfseCancelamento
+      } else {
+        return true; // Não encontrado NfseCancelamento
+      }
+    } catch (error) {
+      console.log(error);
+      return false; // Em caso de erro, retorna false
+    }
+  }
+
   public async BuscarNSFE(req: Request, res: Response) {
     try {
-      const { cpf, filters, dateFilter } = req.body;
-
-      const whereConditions: any = {};
-
-      if (cpf) whereConditions.cpf_cnpj = cpf;
-
+      const { cpf, filters, dateFilter } = req.body
+      const whereConditions: any = {}
+  
+      if (cpf) whereConditions.cpf_cnpj = cpf
       if (filters) {
-        const { plano, vencimento, cli_ativado, nova_nfe } = filters;
-        if (plano?.length) whereConditions.plano = In(plano);
-        if (vencimento?.length) whereConditions.venc = In(vencimento);
-        if (cli_ativado?.length) whereConditions.cli_ativado = In(["s"]);
-        if (nova_nfe?.length) whereConditions.tags = In(nova_nfe);
+        const { plano, vencimento, cli_ativado, nova_nfe } = filters
+        if (plano?.length) whereConditions.plano = In(plano)
+        if (vencimento?.length) whereConditions.venc = In(vencimento)
+        if (cli_ativado?.length) whereConditions.cli_ativado = In(["s"])
+        if (nova_nfe?.length) whereConditions.tags = In(nova_nfe)
       }
-
-      const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      const startDate = dateFilter
-        ? new Date(dateFilter.start)
-        : firstDayOfMonth;
-      const endDate = dateFilter ? new Date(dateFilter.end) : lastDayOfMonth;
-      startDate.setHours(startDate.getHours() + 3);
-      endDate.setHours(endDate.getHours() + 3);
-
-      const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+  
+      const now = new Date()
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      const startDate = dateFilter ? new Date(dateFilter.start) : firstDayOfMonth
+      const endDate = dateFilter ? new Date(dateFilter.end) : lastDayOfMonth
+      startDate.setHours(startDate.getHours() + 3)
+      endDate.setHours(endDate.getHours() + 3)
+  
+      const ClientRepository = MkauthSource.getRepository(ClientesEntities)
       const clientesResponse = await ClientRepository.find({
         where: whereConditions,
         select: { login: true, cpf_cnpj: true, cli_ativado: true },
-      });
-
-      const nfseData = AppDataSource.getRepository(NFSE);
-
+      })
+  
+      const nfseData = AppDataSource.getRepository(NFSE)
       const nfseResponse = await nfseData.find({
-        where: {
-          login: In(clientesResponse.map((cliente) => cliente.login)),
-        },
+        where: { login: In(clientesResponse.map((c) => c.login)) },
         order: { dataEmissao: "DESC" },
-      });
-
+      })
+  
       const clientesComNfse = clientesResponse
-        .map((cliente) => {
-          const nfseDoCliente = nfseResponse.filter(
-            (nf) => nf.login === cliente.login
-          );
-          if (nfseDoCliente.length === 0) return null;
-
+        .map(async (cliente) => {
+          const nfseDoCliente = nfseResponse.filter((nf) => nf.login === cliente.login)
+          if (!nfseDoCliente.length) return null
+  
+          const statusArray = await Promise.all(
+            nfseDoCliente.map(async (nf) => {
+              const cancelada = await this.setNfseStatus(nf.numeroRps)
+              return cancelada ? "Ativa" : "Cancelada"
+            })
+          )
+  
           return {
             ...cliente,
             nfse: {
               id: nfseDoCliente.map((nf) => nf.id).join(", ") || null,
               login: nfseDoCliente.map((nf) => nf.login).join(", ") || null,
-              numero_rps:
-                nfseDoCliente.map((nf) => nf.numeroRps).join(", ") || null,
-              serie_rps:
-                nfseDoCliente.map((nf) => nf.serieRps).join(", ") || null,
-              tipo_rps:
-                nfseDoCliente.map((nf) => nf.tipoRps).join(", ") || null,
-              data_emissao:
-                nfseDoCliente.map((nf) => nf.dataEmissao).join(", ") || null,
-              competencia:
-                nfseDoCliente.map((nf) => nf.competencia).join(", ") || null,
-              valor_servico:
-                nfseDoCliente.map((nf) => nf.valorServico).join(", ") || null,
-              aliquota:
-                nfseDoCliente.map((nf) => nf.aliquota).join(", ") || null,
-              iss_retido:
-                nfseDoCliente.map((nf) => nf.issRetido).join(", ") || null,
-              responsavel_retecao:
-                nfseDoCliente.map((nf) => nf.responsavelRetencao).join(", ") ||
-                null,
-              item_lista_servico:
-                nfseDoCliente.map((nf) => nf.itemListaServico).join(", ") ||
-                null,
-              discriminacao:
-                nfseDoCliente.map((nf) => nf.discriminacao).join(", ") || null,
-              codigo_municipio:
-                nfseDoCliente.map((nf) => nf.codigoMunicipio).join(", ") ||
-                null,
-              exigibilidade_iss:
-                nfseDoCliente.map((nf) => nf.exigibilidadeIss).join(", ") ||
-                null,
-              cnpj_prestador:
-                nfseDoCliente.map((nf) => nf.cnpjPrestador).join(", ") || null,
-              inscricao_municipal_prestador:
-                nfseDoCliente
-                  .map((nf) => nf.inscricaoMunicipalPrestador)
-                  .join(", ") || null,
-              cpf_tomador:
-                nfseDoCliente.map((nf) => nf.cpfTomador).join(", ") || null,
-              razao_social_tomador:
-                nfseDoCliente.map((nf) => nf.razaoSocialTomador).join(", ") ||
-                null,
-              endereco_tomador:
-                nfseDoCliente.map((nf) => nf.enderecoTomador).join(", ") ||
-                null,
-              numero_endereco:
-                nfseDoCliente.map((nf) => nf.numeroEndereco).join(", ") || null,
-              complemento:
-                nfseDoCliente.map((nf) => nf.complemento).join(", ") || null,
+              numero_rps: nfseDoCliente.map((nf) => nf.numeroRps).join(", ") || null,
+              serie_rps: nfseDoCliente.map((nf) => nf.serieRps).join(", ") || null,
+              tipo_rps: nfseDoCliente.map((nf) => nf.tipoRps).join(", ") || null,
+              data_emissao: nfseDoCliente.map((nf) => nf.dataEmissao).join(", ") || null,
+              competencia: nfseDoCliente.map((nf) => nf.competencia).join(", ") || null,
+              valor_servico: nfseDoCliente.map((nf) => nf.valorServico).join(", ") || null,
+              aliquota: nfseDoCliente.map((nf) => nf.aliquota).join(", ") || null,
+              iss_retido: nfseDoCliente.map((nf) => nf.issRetido).join(", ") || null,
+              responsavel_retecao: nfseDoCliente.map((nf) => nf.responsavelRetencao).join(", ") || null,
+              item_lista_servico: nfseDoCliente.map((nf) => nf.itemListaServico).join(", ") || null,
+              discriminacao: nfseDoCliente.map((nf) => nf.discriminacao).join(", ") || null,
+              codigo_municipio: nfseDoCliente.map((nf) => nf.codigoMunicipio).join(", ") || null,
+              exigibilidade_iss: nfseDoCliente.map((nf) => nf.exigibilidadeIss).join(", ") || null,
+              cnpj_prestador: nfseDoCliente.map((nf) => nf.cnpjPrestador).join(", ") || null,
+              inscricao_municipal_prestador: nfseDoCliente.map((nf) => nf.inscricaoMunicipalPrestador).join(", ") || null,
+              cpf_tomador: nfseDoCliente.map((nf) => nf.cpfTomador).join(", ") || null,
+              razao_social_tomador: nfseDoCliente.map((nf) => nf.razaoSocialTomador).join(", ") || null,
+              endereco_tomador: nfseDoCliente.map((nf) => nf.enderecoTomador).join(", ") || null,
+              numero_endereco: nfseDoCliente.map((nf) => nf.numeroEndereco).join(", ") || null,
+              complemento: nfseDoCliente.map((nf) => nf.complemento).join(", ") || null,
               bairro: nfseDoCliente.map((nf) => nf.bairro).join(", ") || null,
               uf: nfseDoCliente.map((nf) => nf.uf).join(", ") || null,
               cep: nfseDoCliente.map((nf) => nf.cep).join(", ") || null,
-              telefone_tomador:
-                nfseDoCliente.map((nf) => nf.telefoneTomador).join(", ") ||
-                null,
-              email_tomador:
-                nfseDoCliente.map((nf) => nf.emailTomador).join(", ") || null,
-              optante_simples_nacional:
-                nfseDoCliente
-                  .map((nf) => nf.optanteSimplesNacional)
-                  .join(", ") || null,
-              incentivo_fiscal:
-                nfseDoCliente.map((nf) => nf.incentivoFiscal).join(", ") ||
-                null,
+              telefone_tomador: nfseDoCliente.map((nf) => nf.telefoneTomador).join(", ") || null,
+              email_tomador: nfseDoCliente.map((nf) => nf.emailTomador).join(", ") || null,
+              optante_simples_nacional: nfseDoCliente.map((nf) => nf.optanteSimplesNacional).join(", ") || null,
+              incentivo_fiscal: nfseDoCliente.map((nf) => nf.incentivoFiscal).join(", ") || null,
+              status: statusArray.join(", ") || null,
             },
-          };
+          }
         })
-        .filter((cliente) => cliente !== null);
-
-      res.status(200).json(clientesComNfse);
+        .filter((item) => item !== null)
+  
+      res.status(200).json(clientesComNfse)
     } catch (error) {}
   }
-
+  
   public async uploadCertificado(req: Request, res: Response) {
     try {
       res.status(200).json({ mensagem: "Certificado enviado com sucesso." });
