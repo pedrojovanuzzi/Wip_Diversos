@@ -23,7 +23,7 @@ import * as crypto from "crypto";
 dotenv.config();
 
 class NFSEController {
-  
+
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
   private homologacao = false;
   private WSDL_URL =
@@ -37,6 +37,11 @@ class NFSEController {
     "decrypted_certificado.tmp"
   );
   private NEW_CERT_PATH = path.resolve(this.TEMP_DIR, "new_certificado.pfx");
+
+  constructor() {
+    this.setNfseStatus = this.setNfseStatus.bind(this);
+    this.BuscarNSFE = this.BuscarNSFE.bind(this);
+  }
 
   public iniciar = async (req: Request, res: Response) => {
     try {
@@ -702,11 +707,12 @@ class NFSEController {
           SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
         },
       });
+      
 
-      if (response.data.includes("<ns2:NfseCancelamento>")) {
-        return false; // Encontrado NfseCancelamento
+      if (response.data.includes('<ns2:NfseCancelamento versao="2.0">')) {
+        return true; // Encontrado NfseCancelamento
       } else {
-        return true; // Não encontrado NfseCancelamento
+        return false; // Não encontrado NfseCancelamento
       }
     } catch (error) {
       console.log(error);
@@ -755,10 +761,16 @@ class NFSEController {
   
           const statusArray = await Promise.all(
             nfseDoCliente.map(async (nf) => {
-              const cancelada = await this.setNfseStatus(nf.numeroRps)
-              return cancelada ? "Ativa" : "Cancelada"
+              console.log(this);
+              const cancelada = await this.setNfseStatus.bind(this)(nf.numeroRps)
+              console.log('Resultado de setNfseStatus:', cancelada);
+
+              return cancelada ? "Cancelada" : "Ativa"
             })
           )
+
+          console.log(statusArray);
+          
   
           return {
             ...cliente,
@@ -797,7 +809,9 @@ class NFSEController {
           }
         })
         .filter((item) => item !== null)
-  
+        
+      console.log(clientesComNfse);
+      
       res.status(200).json(clientesComNfse)
     } catch (error) {}
   }
