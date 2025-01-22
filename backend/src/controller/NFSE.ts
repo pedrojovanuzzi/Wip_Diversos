@@ -754,24 +754,23 @@ class NFSEController {
         order: { dataEmissao: "DESC" },
       })
   
-      const clientesComNfse = clientesResponse
-        .map(async (cliente) => {
-          const nfseDoCliente = nfseResponse.filter((nf) => nf.login === cliente.login)
-          if (!nfseDoCliente.length) return null
-  
+      const clientesComNfse = await Promise.all(
+        clientesResponse.map(async (cliente) => {
+          const nfseDoCliente = nfseResponse.filter((nf) => nf.login === cliente.login);
+          if (!nfseDoCliente.length) return null;
+      
           const statusArray = await Promise.all(
             nfseDoCliente.map(async (nf) => {
               console.log(this);
-              const cancelada = await this.setNfseStatus.bind(this)(nf.numeroRps)
+              const cancelada = await this.setNfseStatus(nf.numeroRps);
               console.log('Resultado de setNfseStatus:', cancelada);
-
-              return cancelada ? "Cancelada" : "Ativa"
+      
+              return cancelada ? "Cancelada" : "Ativa";
             })
-          )
-
+          );
+      
           console.log(statusArray);
-          
-  
+      
           return {
             ...cliente,
             nfse: {
@@ -806,13 +805,14 @@ class NFSEController {
               incentivo_fiscal: nfseDoCliente.map((nf) => nf.incentivoFiscal).join(", ") || null,
               status: statusArray.join(", ") || null,
             },
-          }
+          };
         })
-        .filter((item) => item !== null)
-        
-      console.log(clientesComNfse);
+      )
       
-      res.status(200).json(clientesComNfse)
+      const resolvedClientesComNfse = clientesComNfse.filter((item) => item !== null);
+      // console.log(resolvedClientesComNfse);
+      
+      res.status(200).json(resolvedClientesComNfse)
     } catch (error) {}
   }
   
