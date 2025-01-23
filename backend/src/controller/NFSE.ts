@@ -19,6 +19,8 @@ import { Faturas } from "../entities/Faturas";
 import { DOMParser } from "xmldom";
 import { Between, In, IsNull } from "typeorm";
 import * as crypto from "crypto";
+import moment from 'moment-timezone';
+
 
 dotenv.config();
 
@@ -735,14 +737,6 @@ class NFSEController {
         if (nova_nfe?.length) whereConditions.tags = In(nova_nfe)
       }
   
-      const now = new Date()
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-      const startDate = dateFilter ? new Date(dateFilter.start) : firstDayOfMonth
-      const endDate = dateFilter ? new Date(dateFilter.end) : lastDayOfMonth
-      startDate.setHours(startDate.getHours() + 3)
-      endDate.setHours(endDate.getHours() + 3)
-  
       const ClientRepository = MkauthSource.getRepository(ClientesEntities)
       const clientesResponse = await ClientRepository.find({
         where: whereConditions,
@@ -789,8 +783,8 @@ class NFSEController {
               numero_rps: nfseDoCliente.map((nf) => nf.numeroRps).join(", ") || null,
               serie_rps: nfseDoCliente.map((nf) => nf.serieRps).join(", ") || null,
               tipo_rps: nfseDoCliente.map((nf) => nf.tipoRps).join(", ") || null,
-              data_emissao: nfseDoCliente.map((nf) => new Date(nf.dataEmissao).toLocaleDateString("pt-BR") ).join(", ") || null,
-              competencia: nfseDoCliente.map((nf) => new Date(nf.competencia).toLocaleDateString("pt-BR") ).join(", ") || null,
+              data_emissao: nfseDoCliente.map((nf) => moment.tz(nf.dataEmissao, 'America/Sao_Paulo').format('DD/MM/YYYY')).join(", ") || null,
+              competencia: nfseDoCliente.map((nf) => moment.tz(nf.competencia, 'America/Sao_Paulo').format('DD/MM/YYYY')).join(", ") || null,
               valor_servico: nfseDoCliente.map((nf) => nf.valorServico).join(", ") || null,
               aliquota: nfseDoCliente.map((nf) => nf.aliquota).join(", ") || null,
               iss_retido: nfseDoCliente.map((nf) => nf.issRetido).join(", ") || null,
