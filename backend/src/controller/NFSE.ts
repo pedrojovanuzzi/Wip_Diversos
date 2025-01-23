@@ -24,6 +24,10 @@ import moment from 'moment-timezone';
 
 dotenv.config();
 
+interface NFSENode {
+  [key: string]: string; 
+}
+
 class NFSEController {
 
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
@@ -395,6 +399,17 @@ class NFSEController {
     return { privateKeyPem, x509Certificate };
   }
 
+  public imprimirNFSE = async (req: Request, res: Response) => {
+    const {rpsNumber} = req.body;
+    console.log(rpsNumber);
+    
+    rpsNumber.map(async (rps: string | number) => {
+      const dados  = await Promise.all(rpsNumber.map((rps: string | number) => this.BuscarNSFEDetalhes(rps)));
+      return dados;
+      });
+
+  }
+
   private async verificaRps(
     rpsNumber: string | number,
     serie: string = "1",
@@ -609,8 +624,6 @@ class NFSEController {
     }
   }
 
-
-
   private assinarXml(xml: string, referenceId: string): string {
     const { privateKeyPem, x509Certificate } = this.extrairChaveECertificado();
 
@@ -819,6 +832,126 @@ class NFSEController {
       
       res.status(200).json(resolvedClientesComNfse)
     } catch (error) {}
+  }
+
+  public async BuscarNSFEDetalhes(rpsNumber: string | number, serie: string = "1", tipo: string = "1") {
+    try {
+      const dados = `<IdentificacaoRps>
+                      <Numero>${rpsNumber}</Numero>
+                      <Serie>${serie}</Serie>
+                      <Tipo>${tipo}</Tipo>
+                     </IdentificacaoRps>
+                     <Prestador>
+                      <CpfCnpj>
+                        <Cnpj>${
+                          this.homologacao
+                            ? process.env.MUNICIPIO_CNPJ_TEST
+                            : process.env.MUNICIPIO_LOGIN
+                        }</Cnpj>
+                      </CpfCnpj>
+                      <InscricaoMunicipal>${
+                        this.homologacao
+                          ? process.env.MUNICIPIO_INCRICAO_TEST
+                          : process.env.MUNICIPIO_INCRICAO
+                      }</InscricaoMunicipal>
+                     </Prestador>`.trim();
+  
+      const envioXml = `<ConsultarNfseRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseRpsEnvio>`.trim();
+  
+      const soapFinal = `<?xml version="1.0" encoding="UTF-8"?>
+        <soapenv:Envelope 
+          xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
+          xmlns:ws="http://ws.issweb.fiorilli.com.br/" 
+          xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
+          <soapenv:Header/>
+          <soapenv:Body>
+            <ws:consultarNfsePorRps>
+              ${envioXml}
+              <username>${process.env.MUNICIPIO_LOGIN}</username>
+              <password>${process.env.MUNICIPIO_SENHA}</password>
+            </ws:consultarNfsePorRps>
+          </soapenv:Body>
+        </soapenv:Envelope>`
+        .replace(/[\r\n]+/g, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/>\s+</g, "><")
+        .replace(/<\s+/g, "<")
+        .replace(/\s+>/g, ">")
+        .trim();
+  
+      const certPathToUse = fs.existsSync(this.NEW_CERT_PATH)
+        ? this.NEW_CERT_PATH
+        : this.certPath;
+  
+      const pfxBuffer = fs.readFileSync(certPathToUse);
+  
+      const httpsAgent = new https.Agent({
+        pfx: pfxBuffer,
+        passphrase: this.PASSWORD,
+        rejectUnauthorized: false,
+      });
+  
+      const response = await axios.post(this.WSDL_URL, soapFinal, {
+        httpsAgent,
+        headers: {
+          "Content-Type": "text/xml; charset=UTF-8",
+          SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
+        },
+      });
+  
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(response.data, "text/xml");
+  
+      const nfseNodes = xmlDoc.getElementsByTagName('ns2:CompNfse');
+  
+      if (nfseNodes.length > 0) {
+        const nfseNode = nfseNodes[0];
+        const extractedData: Record<string, any> = {};
+  
+        // Recursivamente extrair dados e suas respectivas tags
+        const extractChildren = (node: Element): Record<string, any> => {
+          const result: Record<string, any> = {};
+          for (let i = 0; i < node.childNodes.length; i++) {
+            const child = node.childNodes[i];
+            if (child.nodeType === 1) { // Verifica se é um elemento
+              const element = child as Element;
+              const textContent = element.textContent?.trim() || '';
+              if (element.childNodes.length > 0 && Array.from(element.childNodes).some(c => c.nodeType === 1)) {
+                result[element.tagName] = extractChildren(element); // Extrair filhos recursivamente
+              } else {
+                result[element.tagName] = textContent; // Armazena texto diretamente
+              }
+            }
+          }
+          return result;
+        };
+        
+        
+  
+        extractedData[nfseNode.tagName] = extractChildren(nfseNode);
+  
+        console.log("Dados extraídos:", JSON.stringify(extractedData, null, 2));
+
+  
+        return {
+          status: "success",
+          data: extractedData,
+        };
+      } else {
+        console.log("InfNfse element not found in XML.");
+        return {
+          status: "error",
+          message: "InfNfse element not found in XML.",
+        };
+      }
+    } catch (error) {
+      console.error("Erro ao buscar detalhes da NFSE:", error);
+      return {
+        status: "error",
+        message: "Erro ao buscar detalhes da NFSE.",
+        error: error,
+      };
+    }
   }
   
   public async uploadCertificado(req: Request, res: Response) {

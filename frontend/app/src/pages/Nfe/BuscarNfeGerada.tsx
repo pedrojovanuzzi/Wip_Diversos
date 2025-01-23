@@ -12,6 +12,8 @@ import PopUpButton from "./Components/PopUpButton";
 import { PiPrinter } from "react-icons/pi";
 import Stacked2 from "./Components/Stacked2";
 import PopUpCancelNFSE from "./Components/PopUpCancelNFSE";
+import { useReactToPrint } from "react-to-print";
+import { useRef } from "react";
 
 export const BuscarNfeGerada = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -42,6 +44,7 @@ export const BuscarNfeGerada = () => {
   const user = useTypedSelector((state: RootState) => state.auth.user);
   const token = user.token;
 
+
   const handleCheckboxChange = (clienteId: number) => {
     setClientesSelecionados((prevSelecionados) => {
       if (prevSelecionados.includes(clienteId)) {
@@ -64,8 +67,29 @@ export const BuscarNfeGerada = () => {
     }
   };
 
-  const imprimir = () => {
-    console.log("Imprimindo...");
+  const imprimir = async () => {
+    try {
+      const resposta = await axios.post(
+        `${process.env.REACT_APP_URL}/Nfe/imprimirNFSE`,
+        {
+          rpsNumber: clientesSelecionados,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      console.log("Notas Canceladas:", resposta.data);
+
+      const dados = resposta.data;
+
+
+    } catch (erro) {
+      console.error("Erro ao Buscar Clientes:", erro);
+    }
   };
 
   const cancelNFSE = async () => {
