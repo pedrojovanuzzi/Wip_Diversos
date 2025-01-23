@@ -10,9 +10,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
     <div ref={ref}>
       {dados.map((item, i) => (
         <div key={i}>
-          <p>{item.nfse?.numeroNfse}</p>
-          <p>{item.nfse?.valor_servico}</p>
-          <p>{item.nfse?.aliquota}</p>
+          <p>{item.data?.CompNfse.Nfse.InfNfse.CodigoVerificacao}</p>
         </div>
       ))}
     </div>

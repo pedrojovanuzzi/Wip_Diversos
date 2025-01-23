@@ -94,13 +94,15 @@ export const BuscarNfeGerada = () => {
       const dados = resposta.data;
       setPdfDados(dados);
 
+      console.log(dados);
+      
     } catch (erro) {
       console.error("Erro ao Buscar Clientes:", erro);
     }
   };
 
   const handlePrint = useReactToPrint({
-    documentTitle: "SuperFileName",
+    documentTitle: "NFSE",
   });
 
   const cancelNFSE = async () => {
@@ -318,6 +320,8 @@ export const BuscarNfeGerada = () => {
               />
             )}
             <PDFNFSE ref={componentRef} dados={pdfDados} />
+
+            {/* {pdfDados && <h1>{String(JSON.stringify(pdfDados))}</h1>} */}
     </div>
   );
 };

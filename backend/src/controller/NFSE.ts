@@ -400,15 +400,11 @@ class NFSEController {
   }
 
   public imprimirNFSE = async (req: Request, res: Response) => {
-    const {rpsNumber} = req.body;
-    console.log(rpsNumber);
-    
-    rpsNumber.map(async (rps: string | number) => {
-      const dados  = await Promise.all(rpsNumber.map((rps: string | number) => this.BuscarNSFEDetalhes(rps)));
-      return dados;
-      });
-
-  }
+    const { rpsNumber } = req.body;
+    const result = await Promise.all(rpsNumber.map((rps: string | number) => this.BuscarNSFEDetalhes(rps)));
+    res.status(200).json(result);
+  };
+  
 
   private async verificaRps(
     rpsNumber: string | number,
@@ -837,23 +833,23 @@ class NFSEController {
   public async BuscarNSFEDetalhes(rpsNumber: string | number, serie: string = "1", tipo: string = "1") {
     try {
       const dados = `<IdentificacaoRps>
-                      <Numero>${rpsNumber}</Numero>
-                      <Serie>${serie}</Serie>
-                      <Tipo>${tipo}</Tipo>
+                       <Numero>${rpsNumber}</Numero>
+                       <Serie>${serie}</Serie>
+                       <Tipo>${tipo}</Tipo>
                      </IdentificacaoRps>
                      <Prestador>
-                      <CpfCnpj>
-                        <Cnpj>${
-                          this.homologacao
-                            ? process.env.MUNICIPIO_CNPJ_TEST
-                            : process.env.MUNICIPIO_LOGIN
-                        }</Cnpj>
-                      </CpfCnpj>
-                      <InscricaoMunicipal>${
-                        this.homologacao
-                          ? process.env.MUNICIPIO_INCRICAO_TEST
-                          : process.env.MUNICIPIO_INCRICAO
-                      }</InscricaoMunicipal>
+                       <CpfCnpj>
+                         <Cnpj>${
+                           this.homologacao
+                             ? process.env.MUNICIPIO_CNPJ_TEST
+                             : process.env.MUNICIPIO_LOGIN
+                         }</Cnpj>
+                       </CpfCnpj>
+                       <InscricaoMunicipal>${
+                         this.homologacao
+                           ? process.env.MUNICIPIO_INCRICAO_TEST
+                           : process.env.MUNICIPIO_INCRICAO
+                       }</InscricaoMunicipal>
                      </Prestador>`.trim();
   
       const envioXml = `<ConsultarNfseRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseRpsEnvio>`.trim();
@@ -879,10 +875,7 @@ class NFSEController {
         .replace(/\s+>/g, ">")
         .trim();
   
-      const certPathToUse = fs.existsSync(this.NEW_CERT_PATH)
-        ? this.NEW_CERT_PATH
-        : this.certPath;
-  
+      const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
       const pfxBuffer = fs.readFileSync(certPathToUse);
   
       const httpsAgent = new https.Agent({
@@ -901,58 +894,51 @@ class NFSEController {
   
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(response.data, "text/xml");
-  
-      const nfseNodes = xmlDoc.getElementsByTagName('ns2:CompNfse');
+      const nfseNodes = xmlDoc.getElementsByTagName("ns2:CompNfse");
   
       if (nfseNodes.length > 0) {
         const nfseNode = nfseNodes[0];
         const extractedData: Record<string, any> = {};
   
-        // Recursivamente extrair dados e suas respectivas tags
         const extractChildren = (node: Element): Record<string, any> => {
           const result: Record<string, any> = {};
           for (let i = 0; i < node.childNodes.length; i++) {
             const child = node.childNodes[i];
-            if (child.nodeType === 1) { // Verifica se é um elemento
+            if (child.nodeType === 1) {
               const element = child as Element;
-              const textContent = element.textContent?.trim() || '';
-              if (element.childNodes.length > 0 && Array.from(element.childNodes).some(c => c.nodeType === 1)) {
-                result[element.tagName] = extractChildren(element); // Extrair filhos recursivamente
+              const key = element.localName;
+              const text = element.textContent?.trim() || "";
+              if (
+                element.childNodes.length > 0 &&
+                Array.from(element.childNodes).some((c) => c.nodeType === 1)
+              ) {
+                result[key] = extractChildren(element);
               } else {
-                result[element.tagName] = textContent; // Armazena texto diretamente
+                result[key] = text;
               }
             }
           }
           return result;
         };
-        
-        
   
-        extractedData[nfseNode.tagName] = extractChildren(nfseNode);
-  
+        extractedData[nfseNode.localName] = extractChildren(nfseNode);
         console.log("Dados extraídos:", JSON.stringify(extractedData, null, 2));
-
   
-        return {
-          status: "success",
-          data: extractedData,
-        };
+        return { status: "success", data: extractedData };
       } else {
         console.log("InfNfse element not found in XML.");
-        return {
-          status: "error",
-          message: "InfNfse element not found in XML.",
-        };
+        return { status: "error", message: "InfNfse element not found in XML." };
       }
     } catch (error) {
       console.error("Erro ao buscar detalhes da NFSE:", error);
       return {
         status: "error",
         message: "Erro ao buscar detalhes da NFSE.",
-        error: error,
+        error,
       };
     }
   }
+  
   
   public async uploadCertificado(req: Request, res: Response) {
     try {
