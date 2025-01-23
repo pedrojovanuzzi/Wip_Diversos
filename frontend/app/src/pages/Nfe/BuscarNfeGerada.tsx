@@ -288,8 +288,8 @@ export const BuscarNfeGerada = () => {
 
       <main className="flex justify-center mt-20">
       </main>
-      <div className="relative">
-        <span className="absolute translate-x-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
+      <div className="relative flex flex-col sm:block">
+        <span className="absolute translate-x-8 top-1/4 sm:top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
           <BsFiletypeDoc className="cursor-pointer" onClick={() => {imprimir(reactToPrintContent);}} />
         </span>
         <button
@@ -298,7 +298,7 @@ export const BuscarNfeGerada = () => {
         >
           Imprimir Nota
         </button>
-        <span className="absolute translate-x-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
+        <span className="absolute translate-x-8 bottom-1/2 sm:top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
         <CiNoWaitingSign className="cursor-pointer" onClick={() => setShowPopUp(true)} />
         </span>
         <button
