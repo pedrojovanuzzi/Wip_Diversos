@@ -179,7 +179,7 @@ export const BuscarNfeGerada = () => {
                     scope="col"
                     className="px-6 py-3 text-sm font-semibold text-gray-900"
                   >
-                    RPS
+                    Nº NFSE
                   </th>
                   <th
                     scope="col"
@@ -224,7 +224,7 @@ export const BuscarNfeGerada = () => {
                         onChange={() => handleCheckboxChange(cliente.nfse.numero_rps)}
                       />
                     </td>
-                    <td className="px-6 py-4">{cliente.nfse.numero_rps}</td>
+                    <td className="px-6 py-4">{cliente.nfse.numeroNfse}</td>
                     <td className="px-6 py-4">{cliente.login}</td>
                     <td className="px-6 py-4">{cliente.nfse.competencia}</td>
                     <td className="px-6 py-4">{cliente.nfse.aliquota}</td>

@@ -40,6 +40,7 @@ class NFSEController {
 
   constructor() {
     this.setNfseStatus = this.setNfseStatus.bind(this);
+    this.setNfseNumber = this.setNfseNumber.bind(this);
     this.BuscarNSFE = this.BuscarNSFE.bind(this);
   }
 
@@ -761,15 +762,24 @@ class NFSEController {
       
           const statusArray = await Promise.all(
             nfseDoCliente.map(async (nf) => {
-              console.log(this);
+              // console.log(this);
               const cancelada = await this.setNfseStatus(nf.numeroRps);
-              console.log('Resultado de setNfseStatus:', cancelada);
+              // console.log('Resultado de setNfseStatus:', cancelada);
       
               return cancelada ? "Cancelada" : "Ativa";
             })
           );
+
+          const nfseNumberArray = await Promise.all(
+            nfseDoCliente.map(async (nf) => {
+              // console.log(this);
+              const cancelada = await this.setNfseNumber(nf.numeroRps);
+              // console.log('Resultado de setNfseStatus:', cancelada);
+              return cancelada;
+            })
+          );
       
-          console.log(statusArray);
+          // console.log(statusArray);
       
           return {
             ...cliente,
@@ -804,6 +814,7 @@ class NFSEController {
               optante_simples_nacional: nfseDoCliente.map((nf) => nf.optanteSimplesNacional).join(", ") || null,
               incentivo_fiscal: nfseDoCliente.map((nf) => nf.incentivoFiscal).join(", ") || null,
               status: statusArray.join(", ") || null,
+              numeroNfse: nfseNumberArray.join(", ") || null,
             },
           };
         })
