@@ -97,6 +97,8 @@ export const BuscarNfeGerada = () => {
       setTimeout(() => {
         handlePrint && handlePrint(reactToPrintContent);
       }, 0);
+
+      setClientesSelecionados([]);
       
     } catch (erro) {
       console.error("Erro ao Buscar Clientes:", erro);
