@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import Stacked from "./Components/Stacked";
@@ -12,14 +12,21 @@ import PopUpButton from "./Components/PopUpButton";
 import { PiPrinter } from "react-icons/pi";
 import Stacked2 from "./Components/Stacked2";
 import PopUpCancelNFSE from "./Components/PopUpCancelNFSE";
+import PDFNFSE from "./Components/PDFNFSE";
 import { useReactToPrint } from "react-to-print";
-import { useRef } from "react";
+
 
 export const BuscarNfeGerada = () => {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
+  const [pdfDados, setPdfDados] = useState<any[]>([]);
+  const componentRef = React.useRef(null);
+  const reactToPrintContent = () => {
+    return componentRef.current;
+  };
+
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     []
   );
@@ -85,12 +92,16 @@ export const BuscarNfeGerada = () => {
       console.log("Notas Canceladas:", resposta.data);
 
       const dados = resposta.data;
-
+      setPdfDados(dados);
 
     } catch (erro) {
       console.error("Erro ao Buscar Clientes:", erro);
     }
   };
+
+  const handlePrint = useReactToPrint({
+    documentTitle: "SuperFileName",
+  });
 
   const cancelNFSE = async () => {
     try {
@@ -171,6 +182,7 @@ export const BuscarNfeGerada = () => {
   return (
     <div>
       <NavBar />
+      
       <Stacked2 setSearchCpf={setSearchCpf} onSearch={handleSearch} />
       <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={enviarCertificado} BuscarNfe={false}/>
       {clientes.length > 0 && (
@@ -272,11 +284,11 @@ export const BuscarNfeGerada = () => {
       </main>
       <div className="relative">
         <span className="absolute translate-x-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
-          <BsFiletypeDoc className="cursor-pointer" onClick={() => imprimir()} />
+          <BsFiletypeDoc className="cursor-pointer" onClick={() => {imprimir();  handlePrint(reactToPrintContent);}} />
         </span>
         <button
           className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
-          onClick={() => imprimir()}
+          onClick={() => {imprimir();  handlePrint(reactToPrintContent);}}
         >
           Imprimir Nota
         </button>
@@ -305,6 +317,7 @@ export const BuscarNfeGerada = () => {
                 cancelNFSE={cancelNFSE}
               />
             )}
+            <PDFNFSE ref={componentRef} dados={pdfDados} />
     </div>
   );
 };

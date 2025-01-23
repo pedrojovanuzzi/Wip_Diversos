@@ -13,7 +13,6 @@ import { Nfe } from './pages/Nfe/Nfe';
 import { BuscarNfeGerada } from './pages/Nfe/BuscarNfeGerada';
 
 
-
 function App() {
   const { auth, loading } = useAuth();
 
