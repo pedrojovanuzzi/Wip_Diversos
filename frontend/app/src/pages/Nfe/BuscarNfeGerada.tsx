@@ -74,7 +74,7 @@ export const BuscarNfeGerada = () => {
     }
   };
 
-  const imprimir = async () => {
+  const imprimir = async (reactToPrintContent : any) => {
     try {
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/imprimirNFSE`,
@@ -94,7 +94,9 @@ export const BuscarNfeGerada = () => {
       const dados = resposta.data;
       setPdfDados(dados);
 
-      console.log(dados);
+      setTimeout(() => {
+        handlePrint && handlePrint(reactToPrintContent);
+      }, 0);
       
     } catch (erro) {
       console.error("Erro ao Buscar Clientes:", erro);
@@ -286,11 +288,11 @@ export const BuscarNfeGerada = () => {
       </main>
       <div className="relative">
         <span className="absolute translate-x-8 top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
-          <BsFiletypeDoc className="cursor-pointer" onClick={() => {imprimir();  handlePrint(reactToPrintContent);}} />
+          <BsFiletypeDoc className="cursor-pointer" onClick={() => {imprimir(reactToPrintContent);}} />
         </span>
         <button
           className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
-          onClick={() => {imprimir();  handlePrint(reactToPrintContent);}}
+          onClick={() => {imprimir(reactToPrintContent);}}
         >
           Imprimir Nota
         </button>
@@ -319,9 +321,10 @@ export const BuscarNfeGerada = () => {
                 cancelNFSE={cancelNFSE}
               />
             )}
+            <div>
             <PDFNFSE ref={componentRef} dados={pdfDados} />
+            </div>
 
-            {/* {pdfDados && <h1>{String(JSON.stringify(pdfDados))}</h1>} */}
     </div>
   );
 };

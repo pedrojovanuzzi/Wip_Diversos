@@ -7,7 +7,7 @@ interface PDFNFSEProps {
 
 const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
   return (
-    <div ref={ref}>
+    <div  className="hidden print:block" ref={ref}>
       {dados.map((item, i) => (
         <div key={i}>
           <p>{item.data?.CompNfse.Nfse.InfNfse.CodigoVerificacao}</p>
