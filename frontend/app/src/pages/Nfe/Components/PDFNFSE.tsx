@@ -203,6 +203,22 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
               </p>
             </div>
           </div>
+          // Serviço{" "}
+          <div className="ring-1 text-sm ring-black grid grid-cols-6">
+            <div className="flex flex-col justify-center relative border-x p-5 col-span-6 border-black">
+              <p className="text-center self-center absolute top-2">
+                Serviço
+              </p>
+              <p>
+                <strong>
+                  {
+                    item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico.InfDeclaracaoPrestacaoServico.
+                    Servico.Discriminacao
+                  }
+                </strong>
+              </p>
+            </div>
+          </div>
         </div>
       ))}
     </div>
