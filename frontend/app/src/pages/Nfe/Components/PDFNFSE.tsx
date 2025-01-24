@@ -33,37 +33,23 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                   <p>
                     Exigibilidade do ISS:<br></br>{" "}
                     <strong>
-                      {
-                        item.data?.CompNfse.Nfse.InfNfse
-                          .DeclaracaoPrestacaoServico
-                          .InfDeclaracaoPrestacaoServico.Servico
-                          .ExigibilidadeISS === "1" ? "Exigível" : "Não Exigível"
-                      }
+                      {item.data?.CompNfse.Nfse.InfNfse
+                        .DeclaracaoPrestacaoServico
+                        .InfDeclaracaoPrestacaoServico.Servico
+                        .ExigibilidadeISS === "1"
+                        ? "Exigível"
+                        : "Não Exigível"}
                     </strong>
                   </p>
                   <p>
-                    Número do Processo:<br></br>{" "}
-                    <strong>
-                      {
-                       ""
-                      }
-                    </strong>
+                    Número do Processo:<br></br> <strong>{""}</strong>
                   </p>
                   <p>
                     Município de Incidência do ISS:<br></br>{" "}
-                    <strong>
-                      {
-                        "Arealva-SP"
-                      }
-                    </strong>
+                    <strong>{"Arealva-SP"}</strong>
                   </p>
                   <p>
-                    Local da Prestação:<br></br>{" "}
-                    <strong>
-                      {
-                        "Arealva-SP"
-                      }
-                    </strong>
+                    Local da Prestação:<br></br> <strong>{"Arealva-SP"}</strong>
                   </p>
                 </div>
                 <div className="grid-span-1">
@@ -73,8 +59,8 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                       {
                         item.data?.CompNfse.Nfse.InfNfse
                           .DeclaracaoPrestacaoServico
-                          .InfDeclaracaoPrestacaoServico.Rps
-                          .IdentificacaoRps.Numero
+                          .InfDeclaracaoPrestacaoServico.Rps.IdentificacaoRps
+                          .Numero
                       }
                     </strong>
                   </p>
@@ -83,21 +69,21 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                     <strong>
                       {
                         item.data?.CompNfse.Nfse.InfNfse
-                        .DeclaracaoPrestacaoServico
-                        .InfDeclaracaoPrestacaoServico.Rps
-                        .IdentificacaoRps.Serie
+                          .DeclaracaoPrestacaoServico
+                          .InfDeclaracaoPrestacaoServico.Rps.IdentificacaoRps
+                          .Serie
                       }
                     </strong>
                   </p>
                   <p>
                     Tipo do RPS:<br></br>{" "}
                     <strong>
-                      {
-                        item.data?.CompNfse.Nfse.InfNfse
+                      {item.data?.CompNfse.Nfse.InfNfse
                         .DeclaracaoPrestacaoServico
-                        .InfDeclaracaoPrestacaoServico.Rps
-                        .IdentificacaoRps.Tipo === "1" ? "RPS" : ""
-                      }
+                        .InfDeclaracaoPrestacaoServico.Rps.IdentificacaoRps
+                        .Tipo === "1"
+                        ? "RPS"
+                        : ""}
                     </strong>
                   </p>
                   <p>
@@ -105,9 +91,8 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                     <strong>
                       {
                         item.data?.CompNfse.Nfse.InfNfse
-                        .DeclaracaoPrestacaoServico
-                        .InfDeclaracaoPrestacaoServico.Rps
-                        .DataEmissao                        
+                          .DeclaracaoPrestacaoServico
+                          .InfDeclaracaoPrestacaoServico.Rps.DataEmissao
                       }
                     </strong>
                   </p>
@@ -116,8 +101,8 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                     <strong>
                       {
                         item.data?.CompNfse.Nfse.InfNfse
-                        .DeclaracaoPrestacaoServico
-                        .InfDeclaracaoPrestacaoServico.Competencia
+                          .DeclaracaoPrestacaoServico
+                          .InfDeclaracaoPrestacaoServico.Competencia
                       }
                     </strong>
                   </p>
@@ -126,43 +111,37 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                   <p>
                     Optante Simples Nacional:<br></br>{" "}
                     <strong>
-                      {
-                        item.data?.CompNfse.Nfse.InfNfse
-                          .DeclaracaoPrestacaoServico
-                          .InfDeclaracaoPrestacaoServico
-                          .OptanteSimplesNacional === "1" ? "Sim" : "Não"
-                      }
+                      {item.data?.CompNfse.Nfse.InfNfse
+                        .DeclaracaoPrestacaoServico
+                        .InfDeclaracaoPrestacaoServico
+                        .OptanteSimplesNacional === "1"
+                        ? "Sim"
+                        : "Não"}
                     </strong>
                   </p>
                   <p>
                     Incentivo Fiscal:<br></br>{" "}
                     <strong>
-                      {
-                        item.data?.CompNfse.Nfse.InfNfse
+                      {item.data?.CompNfse.Nfse.InfNfse
                         .DeclaracaoPrestacaoServico
-                        .InfDeclaracaoPrestacaoServico
-                        .IncentivoFiscal === "1" ? "Sim" : "Não"
-                      }
+                        .InfDeclaracaoPrestacaoServico.IncentivoFiscal === "1"
+                        ? "Sim"
+                        : "Não"}
                     </strong>
                   </p>
                   <p>
                     Regime Especial Tributação:<br></br>{" "}
                     <strong>
-                      {
-                        item.data?.CompNfse.Nfse.InfNfse
+                      {item.data?.CompNfse.Nfse.InfNfse
                         .DeclaracaoPrestacaoServico
                         .InfDeclaracaoPrestacaoServico
-                        .RegimeEspecialTributacao === "6" ? "Microempresário e Empresa de Pequeno Porte (ME EPP)" : ""
-                      }
+                        .RegimeEspecialTributacao === "6"
+                        ? "Microempresário e Empresa de Pequeno Porte (ME EPP)"
+                        : ""}
                     </strong>
                   </p>
                   <p>
-                    Tipo ISS:<br></br>{" "}
-                    <strong>
-                      {
-                        "Não Possui ISSQN"
-                      }
-                    </strong>
+                    Tipo ISS:<br></br> <strong>{"Não Possui ISSQN"}</strong>
                   </p>
                 </div>
               </div>
@@ -280,7 +259,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
           <div className="ring-1 text-sm ring-black border-x grid grid-cols-3">
             <div className="relative p-5 col-span-1 border-black">
               <p>
-                Nome/Razão Social:{" "}<br></br>
+                Nome/Razão Social: <br></br>
                 <strong>
                   {
                     item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
@@ -289,7 +268,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                 </strong>
               </p>
               <p>
-                CPF/CNPJ:{" "}<br></br>
+                CPF/CNPJ: <br></br>
                 <strong>
                   {item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
                     .InfDeclaracaoPrestacaoServico.Tomador.IdentificacaoTomador
@@ -300,7 +279,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                 </strong>
               </p>
               <p>
-                Cod. IBGE:{" "}<br></br>
+                Cod. IBGE: <br></br>
                 <strong>
                   {
                     item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
@@ -312,7 +291,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
             </div>
             <div className="relative p-5 col-span-1 border-black">
               <p>
-                Telefone:{" "}<br></br>
+                Telefone: <br></br>
                 <strong>
                   {
                     item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
@@ -321,7 +300,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                 </strong>
               </p>
               <p>
-                Cidade:{" "}<br></br>
+                Cidade: <br></br>
                 <strong>
                   {item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
                     .InfDeclaracaoPrestacaoServico.Tomador.Endereco.Cidade +
@@ -331,7 +310,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                 </strong>
               </p>
               <p>
-                CEP:{" "}<br></br>
+                CEP: <br></br>
                 <strong>
                   {
                     item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
@@ -342,7 +321,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
             </div>
             <div className="relative p-5 col-span-1 border-black">
               <p>
-                Complemento:{" "}<br></br>
+                Complemento: <br></br>
                 <strong>
                   {item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
                     .InfDeclaracaoPrestacaoServico.Tomador.Endereco
@@ -355,7 +334,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                 </strong>
               </p>
               <p>
-                Bairro:{" "}<br></br>
+                Bairro: <br></br>
                 <strong>
                   {
                     item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
@@ -364,7 +343,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                 </strong>
               </p>
               <p>
-                Logradouro:{" "}<br></br>
+                Logradouro: <br></br>
                 <strong>
                   {
                     item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
@@ -377,7 +356,6 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
           // Serviço{" "}
           <div className="ring-1 text-sm ring-black grid grid-cols-6">
             <div className="flex flex-col justify-center relative border-x p-5 col-span-6 border-black">
-              <p className="text-center self-center absolute top-2">Serviço</p>
               <p>
                 <strong>
                   {
@@ -389,12 +367,102 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
             </div>
           </div>
           <div className="grid grid-cols-2">
-          <h1 className="bg-slate-600 w-screen indent-2 p-2 text-gray-200 grid-span-1">
-            Imposto Sobre Serviços de Qualquer Natureza - ISS
-          </h1>
-          <h1 className="bg-slate-600 w-screen indent-2 p-2 text-gray-200 grid-span-1">
-          Construção Civil
-          </h1>
+            <div>
+              <h1 className="bg-slate-600 w-screen indent-2 p-2 text-gray-200 grid-span-1">
+                Imposto Sobre Serviços de Qualquer Natureza - ISS
+              </h1>
+              <p>
+                LC 116/2003:<br></br>
+                <strong>
+                  {
+                    item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                      .InfDeclaracaoPrestacaoServico.Servico.ItemListaServico
+                  }
+                </strong>
+              </p>
+              <p>
+                Alíquota:<br></br>
+                <strong>
+                  {
+                    item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                      .InfDeclaracaoPrestacaoServico.Servico.Valores.Aliquota
+                  }
+                </strong>
+              </p>
+              <p>
+                Atividade Município:<br></br>
+                <strong>
+                  {
+                    item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                      .InfDeclaracaoPrestacaoServico.Servico.CodigoTributacaoMunicipio
+                  }
+                </strong>
+              </p>
+            </div>
+            <div>
+              <h1 className="bg-slate-600 w-screen indent-2 p-2 text-gray-200 grid-span-1">
+                Construção Civil
+              </h1>
+              <p>
+                Código CNAE:<br></br>
+                <strong>
+                  {
+                    item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                      .InfDeclaracaoPrestacaoServico.Servico.Discriminacao
+                  }
+                </strong>
+              </p>
+              <p>
+                Código da Obra:<br></br>
+                <strong>
+                  {
+                    item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                      .InfDeclaracaoPrestacaoServico.Servico.Discriminacao
+                  }
+                </strong>
+              </p>
+              <p>
+                Código ART:<br></br>
+                <strong>
+                  {
+                    item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                      .InfDeclaracaoPrestacaoServico.Servico.Discriminacao
+                  }
+                </strong>
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2">
+            <div className="grid-span-2">
+              <p>Valor Total dos Serviços:<br></br><strong>{
+                    "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                      .InfDeclaracaoPrestacaoServico.Servico.Valores.ValorServicos
+                  }</strong></p>
+              <p>Desconto Incondicionado:<br></br><strong>{
+                    "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                      .InfDeclaracaoPrestacaoServico.Servico.Valores.DescontoIncondicionado
+                  }</strong></p>
+              <p>Deduções Base Cálculo:<br></br><strong>{
+                    "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                      .InfDeclaracaoPrestacaoServico.Servico.Valores.ValorDeducoes
+                  }</strong></p>
+              <p>Base de Cálculo:<br></br><strong>{
+                    "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                      .InfDeclaracaoPrestacaoServico.Servico.Valores.ValorServicos
+                  }</strong></p>
+              <p>Total do ISS:<br></br><strong>{
+                    "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                    .InfDeclaracaoPrestacaoServico.Servico.Valores.ValorIss
+                  }</strong></p>
+              <p>ISS Retido:<br></br><strong>{
+                    item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                      .InfDeclaracaoPrestacaoServico.Servico.IssRetido === "1" ? "Não" : "Sim"
+                  }</strong></p>
+              <p>Desconto Condicionado:<br></br><strong>{
+                    "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+                      .InfDeclaracaoPrestacaoServico.Servico.Valores.DescontoCondicionado
+                  }</strong></p>
+            </div>
           </div>
         </div>
       ))}
