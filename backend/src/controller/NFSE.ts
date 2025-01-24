@@ -402,6 +402,7 @@ class NFSEController {
   public imprimirNFSE = async (req: Request, res: Response) => {
     const { rpsNumber } = req.body;
     const result = await Promise.all(rpsNumber.map((rps: string | number) => this.BuscarNSFEDetalhes(rps)));
+
     res.status(200).json(result);
   };
   
@@ -817,6 +818,7 @@ class NFSEController {
               optante_simples_nacional: nfseDoCliente.map((nf) => nf.optanteSimplesNacional).join(", ") || null,
               incentivo_fiscal: nfseDoCliente.map((nf) => nf.incentivoFiscal).join(", ") || null,
               status: statusArray.join(", ") || null,
+
               numeroNfse: nfseNumberArray.join(", ") || null,
             },
           };
@@ -826,7 +828,7 @@ class NFSEController {
       const resolvedClientesComNfse = clientesComNfse.filter((item) => item !== null);
       // console.log(resolvedClientesComNfse);
       
-      res.status(200).json(resolvedClientesComNfse)
+      res.status(200).json(resolvedClientesComNfse);
     } catch (error) {}
   }
 
@@ -922,15 +924,24 @@ class NFSEController {
         };
   
         extractedData[nfseNode.localName] = extractChildren(nfseNode);
-        console.log("Dados extraídos:", JSON.stringify(extractedData, null, 2));
+  
+        const uf =
+          extractedData.CompNfse?.Nfse?.InfNfse?.DeclaracaoPrestacaoServico
+            ?.InfDeclaracaoPrestacaoServico?.Tomador?.Endereco?.CodigoMunicipio;
+  
+        if (uf) {
+          const ibgeResponse = await axios.get(
+            `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${uf}`
+          );
+          extractedData.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico.InfDeclaracaoPrestacaoServico
+            .Tomador.Endereco.Cidade = ibgeResponse.data.nome;
+        }
   
         return { status: "success", data: extractedData };
       } else {
-        console.log("InfNfse element not found in XML.");
         return { status: "error", message: "InfNfse element not found in XML." };
       }
     } catch (error) {
-      console.error("Erro ao buscar detalhes da NFSE:", error);
       return {
         status: "error",
         message: "Erro ao buscar detalhes da NFSE.",
@@ -938,6 +949,7 @@ class NFSEController {
       };
     }
   }
+  
   
   
   public async uploadCertificado(req: Request, res: Response) {
