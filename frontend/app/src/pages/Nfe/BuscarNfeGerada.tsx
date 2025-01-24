@@ -298,7 +298,7 @@ export const BuscarNfeGerada = () => {
         >
           Imprimir Nota
         </button>
-        <span className="absolute translate-x-8 bottom-1/2 sm:top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
+        <span className="absolute translate-x-8 bottom-1/4 sm:top-1/2 sm:bottom-0 text-gray-200 translate-y-1/2 sm:-translate-y-1/2 text-4xl">
         <CiNoWaitingSign className="cursor-pointer" onClick={() => setShowPopUp(true)} />
         </span>
         <button
