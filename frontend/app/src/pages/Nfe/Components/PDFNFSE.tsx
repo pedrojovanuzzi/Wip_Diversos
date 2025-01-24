@@ -171,7 +171,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
           {/* // Prestador{" "} */}
           <div className="ring-1 text-sm ring-black grid grid-cols-6">
             <div className="flex justify-start items-center col-span-1  border-black">
-              <img src={logo} className="w-72 h-32" />
+              <img src={logo} className="w-52 h-22" />
             </div>
             <div className="flex flex-col justify-center relative border-x p-5 col-span-3 border-black">
               <p className="text-center self-center absolute top-2">
@@ -387,6 +387,14 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                 </strong>
               </p>
             </div>
+          </div>
+          <div className="grid grid-cols-2">
+          <h1 className="bg-slate-600 w-screen indent-2 p-2 text-gray-200 grid-span-1">
+            Imposto Sobre Serviços de Qualquer Natureza - ISS
+          </h1>
+          <h1 className="bg-slate-600 w-screen indent-2 p-2 text-gray-200 grid-span-1">
+          Construção Civil
+          </h1>
           </div>
         </div>
       ))}

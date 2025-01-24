@@ -932,7 +932,7 @@ class NFSEController {
         if (uf) {
           const ibgeResponse = await axios.get(
             `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${uf}`,
-            { timeout: 10000 }
+            { timeout: 1000 }
           ).catch(() => ({ data: { nome: "" } }));
           extractedData.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico.InfDeclaracaoPrestacaoServico
             .Tomador.Endereco.Cidade = ibgeResponse.data.nome;
