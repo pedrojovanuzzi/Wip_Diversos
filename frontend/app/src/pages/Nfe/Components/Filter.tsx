@@ -167,7 +167,7 @@ export default function Filter({
               </button>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-6">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-6">
               <label className="relative ring-1 ring-black ring-opacity-5 bg-slate-500 text-gray-200 py-6 px-8 rounded hover:bg-slate-400 transition-all cursor-pointer">
                 <span className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 text-4xl">
                   <CiCirclePlus />
