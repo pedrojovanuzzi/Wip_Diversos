@@ -160,7 +160,9 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                 </strong>
               </p>
               <p>
-                Cidade: <strong>{"AREALVA-SP"}</strong>
+                Cidade: <strong>{item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico.InfDeclaracaoPrestacaoServico
+                    .Tomador.Endereco.Cidade + ` ` + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico.InfDeclaracaoPrestacaoServico
+                    .Tomador.Endereco.Uf}</strong>
               </p>
               <p>
                 CEP:{" "}
@@ -176,6 +178,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                 <strong>
                   {
                     item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico.InfDeclaracaoPrestacaoServico
+                    .Tomador.Endereco.Complemento === "null" ? "" : item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico.InfDeclaracaoPrestacaoServico
                     .Tomador.Endereco.Complemento
                   }
                 </strong>
