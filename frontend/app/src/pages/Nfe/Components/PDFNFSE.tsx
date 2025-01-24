@@ -432,12 +432,12 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-2">
-            <div className="grid-span-2">
+          <div className="grid grid-cols-6">
+            <div className="grid-span-3">
               <p>Valor Total dos Serviços:<br></br><strong>{
                     "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
                       .InfDeclaracaoPrestacaoServico.Servico.Valores.ValorServicos
-                  }</strong></p>
+                  }</strong></p>              
               <p>Desconto Incondicionado:<br></br><strong>{
                     "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
                       .InfDeclaracaoPrestacaoServico.Servico.Valores.DescontoIncondicionado
@@ -450,6 +450,8 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                     "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
                       .InfDeclaracaoPrestacaoServico.Servico.Valores.ValorServicos
                   }</strong></p>
+              </div>
+            <div className="grid-span-3">
               <p>Total do ISS:<br></br><strong>{
                     "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
                     .InfDeclaracaoPrestacaoServico.Servico.Valores.ValorIss
@@ -462,7 +464,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                     "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
                       .InfDeclaracaoPrestacaoServico.Servico.Valores.DescontoCondicionado
                   }</strong></p>
-            </div>
+              </div>
           </div>
         </div>
       ))}
