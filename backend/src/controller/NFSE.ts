@@ -68,6 +68,8 @@ class NFSEController {
         "EnviarLoteRpsSincronoEnvio",
         aliquota
       );
+      
+
       if(result?.status === "200"){
         res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
       }
@@ -88,8 +90,10 @@ class NFSEController {
     try {
       if (!fs.existsSync(this.TEMP_DIR))
         fs.mkdirSync(this.TEMP_DIR, { recursive: true });
+  
       const isLinux = os.platform() === "linux";
       const isWindows = os.platform() === "win32";
+  
       if (isLinux) {
         execSync(
           `openssl pkcs12 -in "${this.certPath}" -nodes -legacy -passin pass:${password} -out "${this.DECRYPTED_CERT_PATH}"`,
@@ -101,30 +105,40 @@ class NFSEController {
         );
       } else if (isWindows) {
         const powershellCommand = `
-          $certificado = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('${this.certPath}', '${password}', [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable);
-          $bytes = $certificado.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12, '${password}');
-          [System.IO.File]::WriteAllBytes('${this.NEW_CERT_PATH}', $bytes)
-        `;
-        execSync(
-          `powershell -Command "${powershellCommand.replace(/\n/g, " ")}"`,
-          {
-            stdio: "inherit",
+          try {
+            $certificado = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('${this.certPath}', '${password}', [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable);
+            $bytes = $certificado.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12, '${password}');
+            [System.IO.File]::WriteAllBytes('${this.NEW_CERT_PATH}', $bytes)
+          } catch {
+            Write-Error $_.Exception.Message
+            exit 1
           }
-        );
+        `;
+        try {
+          execSync(
+            `powershell -Command "${powershellCommand.replace(/\n/g, " ")}"`,
+            {
+              stdio: ["ignore", "inherit", "pipe"], // Captura stderr
+            }
+          );
+        } catch (error: any) {
+          console.error("Erro no PowerShell:", error.stderr || error.message || error);
+          return { status: "500", response: error.stderr || "Erro desconhecido" };
+        }
       }
-
+  
       const certPathToUse = fs.existsSync(this.NEW_CERT_PATH)
         ? this.NEW_CERT_PATH
         : this.certPath;
-
+  
       const pfxBuffer = fs.readFileSync(certPathToUse);
-
+  
       const httpsAgent = new https.Agent({
         pfx: pfxBuffer,
         passphrase: password,
         rejectUnauthorized: false,
       });
-
+  
       for (const id of ids) {
         const xmlLoteRps = await this.gerarXmlRecepcionarRps(
           id,
@@ -138,21 +152,25 @@ class NFSEController {
           },
         });
 
-        if(response.data.status === "200"){
+        console.log(response);
+        
+  
+        if (response.status === 200) {
           return { status: "200", response: response.data };
-        }
-        else{
+        } else {
           return { status: "500", response: "Error" };
-        }   
+        }
       }
-
+  
       if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
       if (fs.existsSync(this.DECRYPTED_CERT_PATH))
         fs.unlinkSync(this.DECRYPTED_CERT_PATH);
-    } catch (error) {
-      console.log(error);
+    } catch (error: any) {
+      console.error("Erro geral no gerarNFSE:", error);
+      return { status: "500", response: error.message || "Senha Inválida" };
     }
   }
+  
 
   private async gerarXmlRecepcionarRps(id: string, aliquota: string) {
     try {
@@ -488,7 +506,7 @@ class NFSEController {
       return false;
 
     } catch (error) {
-      console.log(error);
+      return error;
     }
   }
 
@@ -635,7 +653,7 @@ class NFSEController {
         return null; // Retorna null caso o número não seja encontrado
       }
     } catch (error) {
-      console.log(error);
+      return error;
     }
   }
 
@@ -679,7 +697,7 @@ class NFSEController {
       return signer.getSignedXml();
     } catch (error) {
       console.error("An error occurred during XML signing:", error);
-      throw error;
+      return String(error);
     }
   }
 

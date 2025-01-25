@@ -72,6 +72,10 @@ export const Nfe = () => {
 
   const emitirNFe = async () => {
     try {
+
+      setError(''); // Limpa qualquer mensagem de erro anterior
+      setSuccess('');
+
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/`,
         { password, clientesSelecionados, aliquota },
@@ -90,8 +94,12 @@ export const Nfe = () => {
 
     } catch (erro) {
       console.error("Erro ao emitir NF-e:", erro);
-      setError(String(erro));
-      return;    
+      // Verifica se a resposta do erro está disponível
+    if (axios.isAxiosError(erro) && erro.response && erro.response.data && erro.response.data.erro) {
+      setError(`Erro ao emitir NF-e: ${erro.response.data.erro}`);
+    } else {
+      setError("Erro desconhecido ao emitir NF-e.");
+    }
     }
       finally {
         setShowPopUp(false);

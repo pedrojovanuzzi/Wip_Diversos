@@ -13,11 +13,6 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
         <div key={i}>
           {/* // Municipio de Arealva{" "} */}
           <div className="ring-1 text-sm ring-black grid grid-cols-6">
-            <div className="flex flex-col justify-center relative border-x p-5 col-span-6 border-black">
-              <p className="text-center self-center absolute top-2">
-                Municipio de Arealva
-              </p>
-            </div>
           </div>
           {/* Informações Fiscais */}
           <div>
@@ -255,8 +250,10 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
               </h1>
             </div>
           </div>
-          // Tomador{" "}
-          <div className="ring-1 text-sm ring-black border-x grid grid-cols-3">
+          <h1 className="bg-slate-600 w-screen indent-2 p-2 text-gray-200 grid-span-1">
+          Tomador
+            </h1>
+          <div className=" text-sm grid grid-cols-3">
             <div className="relative p-5 col-span-1 border-black">
               <p>
                 Nome/Razão Social: <br></br>
@@ -353,9 +350,11 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
               </p>
             </div>
           </div>
-          // Serviço{" "}
-          <div className="ring-1 text-sm ring-black grid grid-cols-6">
-            <div className="flex flex-col justify-center relative border-x p-5 col-span-6 border-black">
+          <h1 className="bg-slate-600 w-screen indent-2 p-2 text-gray-200 grid-span-1">
+              Serviço
+            </h1>
+          <div className="text-sm grid grid-cols-6">
+            <div className="flex flex-col justify-center relative p-5 col-span-6">
               <p>
                 <strong>
                   {
@@ -366,11 +365,16 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-2">
-            <div>
-              <h1 className="bg-slate-600 w-screen indent-2 p-2 text-gray-200 grid-span-1">
+          <div className="flex justify-around">
+          <h1 className="bg-slate-600 w-screen indent-2 p-2 text-gray-200 grid-span-1">
                 Imposto Sobre Serviços de Qualquer Natureza - ISS
               </h1>
+              <h1 className="bg-slate-600 w-screen indent-2 p-2 text-gray-200 grid-span-1">
+                Construção Civil
+              </h1>
+          </div>
+          <div>
+            <div className="flex justify-evenly gap-5">
               <p>
                 LC 116/2003:<br></br>
                 <strong>
@@ -398,11 +402,6 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                   }
                 </strong>
               </p>
-            </div>
-            <div>
-              <h1 className="bg-slate-600 w-screen indent-2 p-2 text-gray-200 grid-span-1">
-                Construção Civil
-              </h1>
               <p>
                 Código CNAE:<br></br>
                 <strong>
@@ -428,10 +427,8 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                 </strong>
               </p>
             </div>
-          </div>
-          <div className="grid grid-cols-2 border-t-gray-700 border border-transparent mt-2">
-            <div className="grid-span-1 mt-2">
-              <p>Valor Total dos Serviços:<br></br><strong>{
+            <div className="flex justify-evenly gap-5">
+            <p>Valor Total dos Serviços:<br></br><strong>{
                     "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
                       .InfDeclaracaoPrestacaoServico.Servico.Valores.ValorServicos
                   }</strong></p>              
@@ -447,9 +444,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                     "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
                       .InfDeclaracaoPrestacaoServico.Servico.Valores.ValorServicos
                   }</strong></p>
-              </div>
-            <div className="grid-span-1 mt-2">
-              <p>Total do ISS:<br></br><strong>{
+                  <p>Total do ISS:<br></br><strong>{
                     "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
                     .InfDeclaracaoPrestacaoServico.Servico.Valores.ValorIss
                   }</strong></p>
@@ -480,9 +475,9 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
               <p>Outras Retenções:<br></br><strong>{item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
              .InfDeclaracaoPrestacaoServico.Servico.Valores.OutrasRetencoes}</strong></p>
             </div>
-            <h1 className="border border-transparent border-t-gray-600">Valor Liquido da NFS-e: R$ <strong>{item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+            <h1 className="">Valor Liquido da NFS-e: R$ <strong>{item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
              .InfDeclaracaoPrestacaoServico.Servico.Valores.ValorServicos}</strong></h1> 
-             <div className="flex justify-around border broder-gray-600">
+             <div className="flex justify-around">
               <div>
               <h1 className="text-center">RECEBI(EMOS) DE <strong>{item.data?.CompNfse.Nfse.InfNfse.PrestadorServico
                       .RazaoSocial}</strong> O SERVIÇO CONSTANTE DA NFS-e DE NÚMERO <strong>{item.data?.CompNfse.Nfse.InfNfse
