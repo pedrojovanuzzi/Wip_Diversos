@@ -133,7 +133,7 @@ class NFSEController {
           },
         });
 
-        console.log(response);
+        return response.data;
       }
 
       if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
@@ -366,7 +366,11 @@ class NFSEController {
 
     if (await this.verificaRps(nfseNumber)) {
       if (!this.homologacao) {
-        await NsfeData.save(insertDatabase);
+        try {
+          await NsfeData.save(insertDatabase);
+        } catch (error) {
+          return "Erro ao salvar no banco de dados";
+        }
       }
       return soapFinal;
     } else {
@@ -829,7 +833,9 @@ class NFSEController {
       // console.log(resolvedClientesComNfse);
       
       res.status(200).json(resolvedClientesComNfse);
-    } catch (error) {}
+    } catch (error) {
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   }
 
   public async BuscarNSFEDetalhes(rpsNumber: string | number, serie: string = "1", tipo: string = "1") {

@@ -10,6 +10,9 @@ import { BsFiletypeDoc } from "react-icons/bs";
 import { IoArrowUpCircleOutline } from "react-icons/io5";
 import PopUpButton from "./Components/PopUpButton";
 import { PiPrinter } from "react-icons/pi";
+import Error from "./Components/Error";
+import Success from "./Components/Success";
+
 
 export const Nfe = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -17,6 +20,8 @@ export const Nfe = () => {
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
   const [aliquota, setAliquota] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     []
   );
@@ -77,10 +82,17 @@ export const Nfe = () => {
           },
         }
       );
-      console.log("NF-e emitida:", resposta.data);
-      console.log(clientesSelecionados);
 
-      setDadosNFe(resposta.data);
+      if(resposta.data.erro) {
+        console.error("Erro ao emitir NF-e:", resposta.data.erro);
+        setError(resposta.data.erro);
+        return;
+      }
+      else{
+        setDadosNFe(resposta.data);
+        setSuccess("NF-e emitida com sucesso.");     
+      }
+
       setShowPopUp(false); 
     } catch (erro) {
       console.error("Erro ao emitir NF-e:", erro);
@@ -134,10 +146,20 @@ export const Nfe = () => {
         }
       );
 
+      setError(''); // Limpa qualquer mensagem de erro anterior
       console.log("Clientes encontrados:", resposta.data);
       setClientes(resposta.data); // Armazena os clientes no estado
     } catch (erro) {
       console.error("Erro ao Buscar Clientes:", erro);
+      if (axios.isAxiosError(erro) && erro.response && erro.response.status === 500) {
+        setError('Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde.');
+      } else if (axios.isAxiosError(erro) && erro.response) {
+        // Outros erros baseados no status HTTP
+        setError(`Erro: ${erro.response.data.error || 'Algo deu errado.'}`);
+      } else {
+        // Erros de rede ou outros tipos de erros
+        setError('Erro de rede. Verifique sua conexão e tente novamente.');
+      }
     }
   };
 
@@ -146,6 +168,8 @@ export const Nfe = () => {
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
       <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={enviarCertificado}/>
+      {error && <Error message={error}/>}
+      {success && <Success message={success}/>}
       {clientes.length > 0 && (
         <h1 className="text-center mt-5 self-center text-2xl font-semibold text-gray-900">
           Total de Resultados: {clientes.length}
