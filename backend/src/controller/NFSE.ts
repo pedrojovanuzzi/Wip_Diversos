@@ -68,7 +68,12 @@ class NFSEController {
         "EnviarLoteRpsSincronoEnvio",
         aliquota
       );
-      res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
+      if(result?.status === "200"){
+        res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
+      }
+      else{
+        res.status(500).json({ erro: "Erro ao criar o RPS." });
+      }     
     } catch (error) {
       res.status(500).json({ erro: "Erro ao criar o RPS." });
     }
@@ -133,7 +138,12 @@ class NFSEController {
           },
         });
 
-        return response.data;
+        if(response.data.status === "200"){
+          return { status: "200", response: response.data };
+        }
+        else{
+          return { status: "500", response: "Error" };
+        }   
       }
 
       if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
@@ -145,7 +155,8 @@ class NFSEController {
   }
 
   private async gerarXmlRecepcionarRps(id: string, aliquota: string) {
-    const RPSQuery = MkauthSource.getRepository(Faturas);
+    try {
+      const RPSQuery = MkauthSource.getRepository(Faturas);
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const FaturasRepository = MkauthSource.getRepository(Faturas);
@@ -375,6 +386,9 @@ class NFSEController {
       return soapFinal;
     } else {
       return "ERRO NA CONSULTA DE RPS";
+    }
+    } catch (error) {
+      return "Error " + error;
     }
   }
 

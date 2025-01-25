@@ -83,20 +83,19 @@ export const Nfe = () => {
         }
       );
 
-      if(resposta.data.erro) {
-        console.error("Erro ao emitir NF-e:", resposta.data.erro);
-        setError(resposta.data.erro);
-        return;
-      }
-      else{
-        setDadosNFe(resposta.data);
-        setSuccess("NF-e emitida com sucesso.");     
-      }
 
-      setShowPopUp(false); 
+      setDadosNFe(resposta.data);
+      setSuccess("NF-e emitida com sucesso.");     
+      
+
     } catch (erro) {
       console.error("Erro ao emitir NF-e:", erro);
+      setError(String(erro));
+      return;    
     }
+      finally {
+        setShowPopUp(false);
+      }
   };
 
   const enviarCertificado = async () => {
