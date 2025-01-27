@@ -293,8 +293,13 @@ export const Nfe = () => {
       </div>
       <h2>Digite o Serviço realizado:</h2>
       <input type="text" onChange={((e) => {
-          setService(e.target.value);
-        })} placeholder="Serviço de Manutenção" className="ring-2 ring-gray-500 p-2 h-20 rounded m-5" />
+          setService(
+            e.target.value
+              .normalize("NFD") // Separa caracteres acentuados em base + diacrítico
+              .replace(/[\u0300-\u036f]/g, "") // Remove os diacríticos
+              .replace(/[^a-zA-Z0-9 ]/g, "") // Remove outros caracteres especiais
+          );          
+        })} placeholder="Servico de Manutencao" className="ring-2 ring-gray-500 p-2 h-20 rounded m-5" />
       {arquivo && (
         <p className="text-sm text-gray-500 m-5">
           Arquivo selecionado:{" "}
