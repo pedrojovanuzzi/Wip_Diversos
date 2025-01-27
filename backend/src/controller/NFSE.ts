@@ -69,6 +69,10 @@ class NFSEController {
         aliquota,
         service
       );
+
+      if(!service){
+        service = "Servico de Suporte Tecnico";
+      }
       
 
       if(result?.status === "200"){

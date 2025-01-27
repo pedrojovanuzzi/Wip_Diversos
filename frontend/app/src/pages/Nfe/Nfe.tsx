@@ -137,9 +137,7 @@ export const Nfe = () => {
 
   const handleSearch = async () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
-    alert(service);
-
-    if(service !== "") {
+    
       try {
         const resposta = await axios.post(
           `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
@@ -171,12 +169,20 @@ export const Nfe = () => {
           setError('Erro de rede. Verifique sua conexão e tente novamente.');
         }
       }
-    }
-  };
+    }    
+
 
   return (
     <div>
-      <form onSubmit={handleSearch}>
+      <form onSubmit={(e) => {
+          if (!e.currentTarget.checkValidity()) {
+            e.preventDefault();
+            return;
+          }
+          e.preventDefault();
+          handleSearch();
+        }}
+      >
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
       <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={enviarCertificado}/>
