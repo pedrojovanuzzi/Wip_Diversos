@@ -20,7 +20,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
               NOTA FISCAL DE SERVIÇOS ELETRÔNICA - NFS-e
             </p>
             <p>
-              <h1 className="bg-white border border-black  w-screen indent-2 p-2 text-gray-900">
+              <h1 className="bg-white border border-black  w-screen indent-1 p-1 text-gray-900">
                 Informações Fiscais
               </h1>
               <div className="grid grid-cols-3 mx-3">
@@ -147,7 +147,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
             <div className="flex justify-start items-center col-span-1  border-black">
               <img src={logo} className="w-52 h-22" />
             </div>
-            <div className="flex flex-col justify-center relative border-x p-2 col-span-3 border-black">
+            <div className="flex flex-col text-xs justify-center relative border-x p-2 col-span-3 border-black">
               <p className="text-center self-center absolute top-2">
                 Prestador
               </p>
@@ -250,7 +250,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
               </h1>
             </div>
           </div>
-          <h1 className="bg-white border border-black  w-screen indent-2 p-2 text-gray-900 grid-span-1">
+          <h1 className="bg-white border border-black  w-screen indent-1 p-1 text-gray-900 grid-span-1">
           Tomador
             </h1>
           <div className=" text-xs mx-3 grid grid-cols-3">
@@ -350,7 +350,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
               </p>
             </div>
           </div>
-          <h1 className="bg-white border border-black  w-screen indent-2 p-2 text-gray-900 grid-span-1">
+          <h1 className="bg-white border border-black  w-screen indent-1 p-1 text-gray-900 grid-span-1">
               Serviço
             </h1>
           <div className="text-sm grid grid-cols-6">
@@ -365,16 +365,16 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
               </p>
             </div>
           </div>
-          <div className="flex justify-around">
-          <h1 className="bg-white border border-black  w-screen indent-2 p-2 text-gray-900 grid-span-1">
+          <div className="flex justify-between mx-1">
+          <h1 className="bg-white border-l border-y border-black  w-screen indent-1 py-1 text-gray-900 grid-span-1">
                 Imposto Sobre Serviços de Qualquer Natureza - ISS
               </h1>
-              <h1 className="bg-white border border-black  w-screen indent-2 p-2 text-gray-900 grid-span-1">
+              <h1 className="bg-white border-r border-y border-black  w-screen indent-1 py-1 text-gray-900 grid-span-1">
                 Construção Civil
               </h1>
           </div>
           <div>
-            <div className="flex justify-between gap-1 mx-3">
+            <div className="flex justify-between gap-1 text-xs mx-3">
               <p>
                 LC 116/2003:<br></br>
                 <strong>
@@ -427,6 +427,14 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                 </strong>
               </p>
             </div>
+            <div>
+            <div aria-hidden="true" className="inset-0 flex items-center">
+              <div className="w-full border-t border-gray-900 opacity-55" />
+            </div>
+            <div className="relative flex justify-center">
+            </div>
+            </div>
+
             <div className="flex justify-between mt-2 gap-1 mx-3">
             <p>Valor Total dos Serviços:<br></br><strong>{
                     "R$ " + item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
@@ -458,7 +466,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
                   }</strong></p>
               </div>
           </div>
-            <h1 className="bg-white border border-black  w-screen indent-2 p-2 text-gray-900 grid-span-1">
+            <h1 className="bg-white border border-black  w-screen indent-1 p-1 text-gray-900 grid-span-1">
                 Retenções de Impostos
             </h1>
             <div className="flex justify-around">
@@ -482,7 +490,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
             <div className="relative flex justify-center">
             </div>
             </div>
-            <h1 className="mx-3">Valor Liquido da NFS-e: R$ <strong>{item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+            <h1 className="mx-3 mt-5">Valor Liquido da NFS-e: R$ <strong>{item.data?.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
              .InfDeclaracaoPrestacaoServico.Servico.Valores.ValorServicos}</strong></h1> 
              <div className="flex justify-around mx-3 mt-5">
               <div>
