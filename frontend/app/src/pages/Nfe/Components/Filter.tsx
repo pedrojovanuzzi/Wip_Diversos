@@ -136,6 +136,7 @@ export default function Filter({
 
   const clearFilter = () => {
     setFilter([]);
+    setActiveFilters([]);
   };
 
   return (
