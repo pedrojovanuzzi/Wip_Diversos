@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import Stacked from "./Components/Stacked";
@@ -68,7 +68,9 @@ export const Nfe = () => {
     }
   };
   
-  
+  useEffect(() => {
+    handleSearch();
+  }, []);
 
   const emitirNFe = async () => {
     try {

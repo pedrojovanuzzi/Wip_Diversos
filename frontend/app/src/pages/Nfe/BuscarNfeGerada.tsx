@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import Stacked from "./Components/Stacked";
@@ -193,6 +193,10 @@ export const BuscarNfeGerada = () => {
       console.error("Erro ao Buscar Clientes:", erro);
     }
   };
+
+  useEffect(() => {
+      handleSearch();
+    }, []);
 
   return (
     <div>
