@@ -31,7 +31,7 @@ interface NFSENode {
 class NFSEController {
 
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  private homologacao = false;
+  private homologacao = true;
   private WSDL_URL =
     this.homologacao === true
       ? "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"
@@ -274,7 +274,9 @@ class NFSEController {
             <Telefone>${String(
               ClientData?.celular.replace(/[^0-9]/g, "")
             )}</Telefone>
-            <Email>${String(ClientData?.email)}</Email>
+            <Email>${this.homologacao === true
+            ? "teste24542frsgwr@gmail.com"
+            : String(ClientData?.email )}</Email>
           </Contato>
         </Tomador>
         <RegimeEspecialTributacao>6</RegimeEspecialTributacao>

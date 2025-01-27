@@ -138,6 +138,7 @@ export const Nfe = () => {
   const handleSearch = async () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
     
+    
       try {
         const resposta = await axios.post(
           `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
@@ -174,7 +175,6 @@ export const Nfe = () => {
 
   return (
     <div>
-      <form>
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
       <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={enviarCertificado}/>
@@ -295,7 +295,6 @@ export const Nfe = () => {
       <input type="text" onChange={((e) => {
           setService(e.target.value);
         })} placeholder="Serviço de Manutenção" className="ring-2 ring-gray-500 p-2 h-20 rounded m-5" />
-      </form>
       {arquivo && (
         <p className="text-sm text-gray-500 m-5">
           Arquivo selecionado:{" "}
