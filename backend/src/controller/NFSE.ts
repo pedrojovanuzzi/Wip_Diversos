@@ -331,11 +331,23 @@ class NFSEController {
     ${SignatureRps}
   `.trim();
 
-    const envioXml = `
+  let envioXml = "";
+
+  // if(this.homologacao){
+  //   envioXml = `
+  //   <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
+  //     ${loteXmlSemAssinatura}
+  //   </EnviarLoteRpsSincronoEnvio>
+  //   `.trim();
+  // }
+  // else{
+    envioXml = `
     <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
       ${loteXmlComAssinatura}
     </EnviarLoteRpsSincronoEnvio>
     `.trim();
+  // }
+    
 
     const soapFinal = `
     <?xml version="1.0" encoding="UTF-8"?>
