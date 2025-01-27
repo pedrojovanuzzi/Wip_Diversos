@@ -573,10 +573,15 @@ class NFSEController {
 
             console.log(response);
 
-            return { rps, success: true, response: response.data };
+            setTimeout(() => {
+            }, 5000);
+
+            res.status(200).json({ rps, success: true, response: response.data });
+            return;
           } catch (error) {
             console.error(`Error processing RPS ${rps}:`, error);
-            return { rps, success: false, error: error };
+            res.status(500).json({ rps, success: false, error: error });
+            return; 
           }
         })
       );
@@ -792,7 +797,7 @@ class NFSEController {
       const nfseData = AppDataSource.getRepository(NFSE)
       const nfseResponse = await nfseData.find({
         where: { login: In(clientesResponse.map((c) => c.login)) },
-        order: { dataEmissao: "DESC" },
+        order: { id: "DESC" },
       })
   
       const clientesComNfse = await Promise.all(
@@ -861,7 +866,7 @@ class NFSEController {
         })
       )
       
-      const resolvedClientesComNfse = clientesComNfse.filter((item) => item !== null);
+      const resolvedClientesComNfse = clientesComNfse.filter((item) => item !== null).sort((a, b) => (b.nfse.id || "").localeCompare(a.nfse.id || "")); // Ordenação por título      ;
       // console.log(resolvedClientesComNfse);
       
       res.status(200).json(resolvedClientesComNfse);
@@ -1017,6 +1022,7 @@ class NFSEController {
       const clientesResponse = await ClientRepository.find({
         where: whereConditions,
         select: { login: true, cpf_cnpj: true, cli_ativado: true },
+        order: {id: "DESC"}
       });
       const faturasData = MkauthSource.getRepository(Faturas);
       const now = new Date();
@@ -1041,7 +1047,7 @@ class NFSEController {
           tipo: true,
           valor: true,
         },
-        order: { datavenc: "DESC" },
+        order: {id: "DESC"}
       });
       const clientesComFaturas = clientesResponse
         .map((cliente) => {
@@ -1063,7 +1069,9 @@ class NFSEController {
             },
           };
         })
-        .filter((cliente) => cliente !== null);
+        .filter((cliente) => cliente !== null)
+        .sort((a, b) => (b.fatura.titulo || "").localeCompare(a.fatura.titulo || "")); // Ordenação por título
+        ;
       res.status(200).json(clientesComFaturas);
     } catch (error) {
       res.status(500).json({ message: "Erro ao buscar clientes" });

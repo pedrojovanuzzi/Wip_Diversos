@@ -14,7 +14,8 @@ import Stacked2 from "./Components/Stacked2";
 import PopUpCancelNFSE from "./Components/PopUpCancelNFSE";
 import PDFNFSE from "./Components/PDFNFSE";
 import { useReactToPrint } from "react-to-print";
-
+import Success from "./Components/Success";
+import Error from "./Components/Error";
 
 export const BuscarNfeGerada = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -22,6 +23,8 @@ export const BuscarNfeGerada = () => {
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
   const [pdfDados, setPdfDados] = useState<any[]>([]);
+  const [error, setError] = useState<string>("");
+  const [success, setSuccess] = useState<string>("");
   const componentRef = React.useRef(null);
   const reactToPrintContent = () => {
     return componentRef.current;
@@ -124,10 +127,16 @@ export const BuscarNfeGerada = () => {
           },
         }
       );
-
+      setSuccess("Notas Canceladas com Sucesso!");
+      window.location.reload();
       console.log("Notas Canceladas:", resposta.data);
+      
     } catch (erro) {
+      setError("Erro ao Cancelar Notas!");
       console.error("Erro ao Buscar Clientes:", erro);
+    }
+    finally {
+      setShowPopUp(false);
     }
   };
   
@@ -191,6 +200,8 @@ export const BuscarNfeGerada = () => {
       
       <Stacked2 setSearchCpf={setSearchCpf} onSearch={handleSearch} />
       <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={enviarCertificado} BuscarNfe={false}/>
+      {error && <Error message={error} />}
+      {success && <Success message={success} />}
       {clientes.length > 0 && (
         <h1 className="text-center mt-5 self-center text-2xl font-semibold text-gray-900">
           Total de Resultados: {clientes.length}
