@@ -174,15 +174,7 @@ export const Nfe = () => {
 
   return (
     <div>
-      <form onSubmit={(e) => {
-          if (!e.currentTarget.checkValidity()) {
-            e.preventDefault();
-            return;
-          }
-          e.preventDefault();
-          handleSearch();
-        }}
-      >
+      <form>
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
       <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={enviarCertificado}/>
@@ -300,7 +292,7 @@ export const Nfe = () => {
         })} placeholder="Exemplo 4,4249%" className="ring-2 ring-gray-500 p-2 rounded m-5" />
       </div>
       <h2>Digite o Serviço realizado:</h2>
-      <input type="text" required onChange={((e) => {
+      <input type="text" onChange={((e) => {
           setService(e.target.value);
         })} placeholder="Serviço de Manutenção" className="ring-2 ring-gray-500 p-2 h-20 rounded m-5" />
       </form>
