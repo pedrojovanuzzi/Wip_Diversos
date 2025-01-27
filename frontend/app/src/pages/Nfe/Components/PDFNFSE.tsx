@@ -8,11 +8,11 @@ interface PDFNFSEProps {
 
 const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
   return (
-    <div className="hidden print:block text-xs border border-black" ref={ref}>
+    <div className="hidden print:block text-xs border border-black m-1" ref={ref}>
       {dados.map((item, i) => (
         <div key={i}>
           {/* // Municipio de Arealva{" "} */}
-          <div className="ring-1 text-sm ring-black grid grid-cols-6">
+          <div className="text-xs grid grid-cols-6">
           </div>
           {/* Informações Fiscais */}
           <div>
@@ -354,7 +354,7 @@ const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
               Serviço
             </h1>
           <div className="text-sm grid grid-cols-6">
-            <div className="flex relative mx-3 text-xs h-36 col-span-6">
+            <div className="flex relative mx-3 text-xs h-32 col-span-6">
               <p>
                 <strong>
                   {
