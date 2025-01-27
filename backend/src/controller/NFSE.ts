@@ -52,7 +52,7 @@ class NFSEController {
 
   public iniciar = async (req: Request, res: Response) => {
     try {
-      let { password, clientesSelecionados, aliquota } = req.body;
+      let { password, clientesSelecionados, aliquota, service } = req.body;
       this.PASSWORD = password;
 
       aliquota = aliquota && aliquota.trim() !== "" ? aliquota : "4.4269";
@@ -66,7 +66,8 @@ class NFSEController {
         password,
         clientesSelecionados,
         "EnviarLoteRpsSincronoEnvio",
-        aliquota
+        aliquota,
+        service
       );
       
 
@@ -85,7 +86,8 @@ class NFSEController {
     password: string,
     ids: string[],
     SOAPAction: string,
-    aliquota: string
+    aliquota: string,
+    service : string
   ) {
     try {
       if (!fs.existsSync(this.TEMP_DIR))
@@ -142,7 +144,8 @@ class NFSEController {
       for (const id of ids) {
         const xmlLoteRps = await this.gerarXmlRecepcionarRps(
           id,
-          Number(aliquota).toFixed(4)
+          Number(aliquota).toFixed(4),
+          service
         );
         const response = await axios.post(this.WSDL_URL, xmlLoteRps, {
           httpsAgent,
@@ -172,7 +175,7 @@ class NFSEController {
   }
   
 
-  private async gerarXmlRecepcionarRps(id: string, aliquota: string) {
+  private async gerarXmlRecepcionarRps(id: string, aliquota: string, service : string) {
     try {
       const RPSQuery = MkauthSource.getRepository(Faturas);
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
@@ -227,7 +230,7 @@ class NFSEController {
           <ItemListaServico>${String(
             nfseResponse[0]?.itemListaServico
           )}</ItemListaServico>
-          <Discriminacao>Servico de Suporte Tecnico</Discriminacao>
+          <Discriminacao>${service}</Discriminacao>
           <CodigoMunicipio>3503406</CodigoMunicipio>
           <ExigibilidadeISS>${String(
             nfseResponse[0]?.exigibilidadeIss
@@ -373,7 +376,7 @@ class NFSEController {
       issRetido: nfseResponse[0]?.issRetido || 0,
       responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
       itemListaServico: nfseResponse[0]?.itemListaServico || "",
-      discriminacao: "Serviço de Suporte Técnico",
+      discriminacao: service,
       codigoMunicipio: nfseResponse[0]?.codigoMunicipio || 0,
       exigibilidadeIss: nfseResponse[0]?.exigibilidadeIss || 0,
       cnpjPrestador: nfseResponse[0]?.cnpjPrestador || "",

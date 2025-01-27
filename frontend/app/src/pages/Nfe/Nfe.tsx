@@ -22,6 +22,7 @@ export const Nfe = () => {
   const [aliquota, setAliquota] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [service, setService] = useState("");
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     []
   );
@@ -80,7 +81,7 @@ export const Nfe = () => {
 
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/`,
-        { password, clientesSelecionados, aliquota },
+        { password, clientesSelecionados, aliquota, service },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -136,44 +137,46 @@ export const Nfe = () => {
 
   const handleSearch = async () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
+    alert(service);
 
-    console.log("Buscando por:", searchCpfRegex, activeFilters);
-
-    try {
-      const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
-        {
-          cpf: searchCpfRegex,
-          filters: activeFilters,
-          dateFilter: dateFilter,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
+    if(service !== "") {
+      try {
+        const resposta = await axios.post(
+          `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
+          {
+            cpf: searchCpfRegex,
+            filters: activeFilters,
+            dateFilter: dateFilter,
           },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+  
+        setError(''); // Limpa qualquer mensagem de erro anterior
+        console.log("Clientes encontrados:", resposta.data);
+        setClientes(resposta.data); // Armazena os clientes no estado
+      } catch (erro) {
+        console.error("Erro ao Buscar Clientes:", erro);
+        if (axios.isAxiosError(erro) && erro.response && erro.response.status === 500) {
+          setError('Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde.');
+        } else if (axios.isAxiosError(erro) && erro.response) {
+          // Outros erros baseados no status HTTP
+          setError(`Erro: ${erro.response.data.error || 'Algo deu errado.'}`);
+        } else {
+          // Erros de rede ou outros tipos de erros
+          setError('Erro de rede. Verifique sua conexão e tente novamente.');
         }
-      );
-
-      setError(''); // Limpa qualquer mensagem de erro anterior
-      console.log("Clientes encontrados:", resposta.data);
-      setClientes(resposta.data); // Armazena os clientes no estado
-    } catch (erro) {
-      console.error("Erro ao Buscar Clientes:", erro);
-      if (axios.isAxiosError(erro) && erro.response && erro.response.status === 500) {
-        setError('Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde.');
-      } else if (axios.isAxiosError(erro) && erro.response) {
-        // Outros erros baseados no status HTTP
-        setError(`Erro: ${erro.response.data.error || 'Algo deu errado.'}`);
-      } else {
-        // Erros de rede ou outros tipos de erros
-        setError('Erro de rede. Verifique sua conexão e tente novamente.');
       }
     }
   };
 
   return (
     <div>
+      <form onSubmit={handleSearch}>
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
       <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={enviarCertificado}/>
@@ -290,6 +293,11 @@ export const Nfe = () => {
           setAliquota(e.target.value);
         })} placeholder="Exemplo 4,4249%" className="ring-2 ring-gray-500 p-2 rounded m-5" />
       </div>
+      <h2>Digite o Serviço realizado:</h2>
+      <input type="text" required onChange={((e) => {
+          setService(e.target.value);
+        })} placeholder="Serviço de Manutenção" className="ring-2 ring-gray-500 p-2 h-20 rounded m-5" />
+      </form>
       {arquivo && (
         <p className="text-sm text-gray-500 m-5">
           Arquivo selecionado:{" "}
