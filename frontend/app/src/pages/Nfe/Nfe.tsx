@@ -23,6 +23,7 @@ export const Nfe = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [service, setService] = useState("");
+  const [reducao, setReducao] = useState("");
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     []
   );
@@ -81,7 +82,7 @@ export const Nfe = () => {
 
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/`,
-        { password, clientesSelecionados, aliquota, service },
+        { password, clientesSelecionados, aliquota, service, reducao },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -291,7 +292,7 @@ export const Nfe = () => {
           setAliquota(e.target.value);
         })} placeholder="Exemplo 4,4249%" className="ring-2 ring-gray-500 p-2 rounded m-5" />
       </div>
-      <h2>Digite o Serviço realizado:</h2>
+      <div className="relative">
       <input type="text" onChange={((e) => {
           setService(
             e.target.value
@@ -299,7 +300,17 @@ export const Nfe = () => {
               .replace(/[\u0300-\u036f]/g, "") // Remove os diacríticos
               .replace(/[^a-zA-Z0-9 ]/g, "") // Remove outros caracteres especiais
           );          
-        })} placeholder="Servico de Manutencao" className="ring-2 ring-gray-500 p-2 h-20 rounded m-5" />
+        })} placeholder="Servico de Manutencao" className="ring-2 ring-gray-500 p-2 rounded m-5" />
+        <input type="text" onChange={((e) => {
+          setReducao(
+            e.target.value
+              .normalize("NFD") // Separa caracteres acentuados em base + diacrítico
+              .replace(/[\u0300-\u036f]/g, "") // Remove os diacríticos
+              .replace(/[^a-zA-Z0-9 ]/g, "") // Remove outros caracteres especiais
+          );          
+        })} placeholder="Redução" className="ring-2 ring-gray-500 p-2 rounded m-5" />
+      </div>
+      
       {arquivo && (
         <p className="text-sm text-gray-500 m-5">
           Arquivo selecionado:{" "}

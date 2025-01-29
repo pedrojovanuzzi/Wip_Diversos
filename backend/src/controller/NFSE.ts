@@ -52,18 +52,23 @@ class NFSEController {
 
   public iniciar = async (req: Request, res: Response) => {
     try {
-      let { password, clientesSelecionados, aliquota, service } = req.body;
+      let { password, clientesSelecionados, aliquota, service, reducao } = req.body;
       this.PASSWORD = password;
 
       aliquota = aliquota && aliquota.trim() !== "" ? aliquota : "4.4269";
       aliquota = aliquota.replace(",", ".");
       aliquota = aliquota.replace("%", "");
+      
 
       if(service === "" || undefined || null){
         service = "Servico de Suporte Tecnico";
       }
+      
+      if(reducao === "" || undefined || null){
+        reducao = 60;
+      }
 
-      //Função de Gerar Nota Funcionando
+      reducao = reducao / 100;
 
       if (!password) throw new Error("Senha do certificado não fornecida.");
       const result = await this.gerarNFSE(
@@ -71,7 +76,8 @@ class NFSEController {
         clientesSelecionados,
         "EnviarLoteRpsSincronoEnvio",
         aliquota,
-        service
+        service,
+        reducao
       );      
 
       if(result?.status === "200"){
@@ -90,7 +96,8 @@ class NFSEController {
     ids: string[],
     SOAPAction: string,
     aliquota: string,
-    service : string = "Servico de Suporte Tecnico"
+    service : string = "Servico de Suporte Tecnico",
+    reducao : number | string = 60,
   ) {
     try {
       if (!fs.existsSync(this.TEMP_DIR))
@@ -148,7 +155,8 @@ class NFSEController {
         const xmlLoteRps = await this.gerarXmlRecepcionarRps(
           id,
           Number(aliquota).toFixed(4),
-          service
+          service,
+          reducao
         );
         const response = await axios.post(this.WSDL_URL, xmlLoteRps, {
           httpsAgent,
@@ -178,7 +186,7 @@ class NFSEController {
   }
   
 
-  private async gerarXmlRecepcionarRps(id: string, aliquota: string, service : string) {
+  private async gerarXmlRecepcionarRps(id: string, aliquota: string, service : string, reducao : number | string) {
     try {
       const RPSQuery = MkauthSource.getRepository(Faturas);
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
@@ -205,6 +213,7 @@ class NFSEController {
         : 1;
 
     nfseNumber = nfseNumber === 9999999 ? 9999999 + 1 : nfseNumber; //Por causa de um Teste Realizado
+    const valorReduzido = Number(rpsData?.valor) * Number(reducao);
 
     const rpsXmlSemAssinatura = `
     <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
@@ -223,7 +232,7 @@ class NFSEController {
         <Competencia>${new Date().toISOString().substring(0, 10)}</Competencia>
         <Servico>
           <Valores>
-            <ValorServicos>${String(rpsData?.valor)}</ValorServicos>
+            <ValorServicos>${String(valorReduzido)}</ValorServicos>
             <Aliquota>${this.homologacao === true ? "2.00" : aliquota || "4.4269"}</Aliquota>
           </Valores>
           <IssRetido>${String(nfseResponse[0]?.issRetido)}</IssRetido>
