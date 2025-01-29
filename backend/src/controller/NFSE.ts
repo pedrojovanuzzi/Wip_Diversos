@@ -31,7 +31,7 @@ interface NFSENode {
 class NFSEController {
 
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  private homologacao = true;
+  private homologacao = process.env.SERVIDOR_HOMOLOGACAO === 'true';
   private WSDL_URL =
     this.homologacao === true
       ? "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"
@@ -415,6 +415,10 @@ class NFSEController {
       .replace(/\s+>/g, ">") // Remove espaços antes de '>'
       .trim(); // Remove espaços no início e fim
 
+      if(this.homologacao){
+        aliquota = "2.00";
+      }
+
     const NsfeRepository = AppDataSource.getRepository(NFSE);
     const insertDatabase = NsfeRepository.create({
       login: rpsData?.login || "",
@@ -666,8 +670,6 @@ class NFSEController {
           }
         })
       );
-
-      res.status(200).json(responses);
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Internal Server Error" });
