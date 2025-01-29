@@ -31,7 +31,7 @@ interface NFSENode {
 class NFSEController {
 
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  private homologacao = false;
+  private homologacao = true;
   private WSDL_URL =
     this.homologacao === true
       ? "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"
@@ -224,13 +224,13 @@ class NFSEController {
         <Servico>
           <Valores>
             <ValorServicos>${String(rpsData?.valor)}</ValorServicos>
-            <Aliquota>${aliquota || "4.4269"}</Aliquota>
+            <Aliquota>${this.homologacao === true ? "2.00" : aliquota || "4.4269"}</Aliquota>
           </Valores>
           <IssRetido>${String(nfseResponse[0]?.issRetido)}</IssRetido>
           <ResponsavelRetencao>${String(
             nfseResponse[0]?.responsavelRetencao
           )}</ResponsavelRetencao>
-          <ItemListaServico>${String(
+          <ItemListaServico>${this.homologacao === true ? "17.01" : String(
             nfseResponse[0]?.itemListaServico
           )}</ItemListaServico>
           <Discriminacao>${service}</Discriminacao>
@@ -242,7 +242,7 @@ class NFSEController {
         <Prestador>
           <CpfCnpj><Cnpj>${
             this.homologacao === true
-              ? process.env.MUNICIPIO_LOGIN_TEST
+              ? process.env.MUNICIPIO_CNPJ_TEST
               : process.env.MUNICIPIO_LOGIN
           }</Cnpj></CpfCnpj>
           <InscricaoMunicipal>${
@@ -278,9 +278,9 @@ class NFSEController {
             : String(ClientData?.email )}</Email>
           </Contato>
         </Tomador>
-        <RegimeEspecialTributacao>6</RegimeEspecialTributacao>
+        ${this.homologacao === true ? "" : "<RegimeEspecialTributacao>6</RegimeEspecialTributacao>"}
         <OptanteSimplesNacional>${
-          nfseResponse[0]?.optanteSimplesNacional || "1"
+          this.homologacao === true ? "2" : nfseResponse[0]?.optanteSimplesNacional || "1"
         }</OptanteSimplesNacional>
         <IncentivoFiscal>${
           nfseResponse[0]?.incentivoFiscal || "2"
@@ -321,6 +321,17 @@ class NFSEController {
       .replace(/\s+>/g, ">")
       .trim();
 
+
+      const GerarNfseHomologacao = `
+        ${rpsXmlSemAssinatura}
+    `
+      .replace(/[\r\n]+/g, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/>\s+</g, "><")
+      .replace(/<\s+/g, "<")
+      .replace(/\s+>/g, ">")
+      .trim();
+
     const SignatureRps = this.assinarXml(
       loteXmlSemAssinatura,
       `InfDeclaracaoPrestacaoServico`
@@ -334,9 +345,9 @@ class NFSEController {
 
   if(this.homologacao){
     envioXml = `
-    <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
-      ${loteXmlSemAssinatura}
-    </EnviarLoteRpsSincronoEnvio>
+    <GerarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
+      ${GerarNfseHomologacao}
+    </GerarNfseEnvio>
     `.trim();
   }
   else{
@@ -371,6 +382,32 @@ class NFSEController {
       </soapenv:Body>
     </soapenv:Envelope>
     `
+
+    const soapFinalHomologacao = `
+    <?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+    xmlns:ws="http://ws.issweb.fiorilli.com.br/"
+    xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
+      <soapenv:Header/>
+      <soapenv:Body>
+        <ws:gerarNfse>
+          ${envioXml}
+          <username>${
+            this.homologacao === true
+              ? process.env.MUNICIPIO_LOGIN_TEST
+              : process.env.MUNICIPIO_LOGIN
+          }</username>
+          <password>${
+            this.homologacao === true
+              ? process.env.MUNICIPIO_SENHA_TEST
+              : process.env.MUNICIPIO_SENHA
+          }</password>
+        </ws:gerarNfse>
+      </soapenv:Body>
+    </soapenv:Envelope>
+    `
+
+
       .replace(/[\r\n]+/g, "") // Remove quebras de linha
       .replace(/\s{2,}/g, " ") // Substitui múltiplos espaços por um único
       .replace(/>\s+</g, "><") // Remove espaços entre tags
@@ -421,6 +458,11 @@ class NFSEController {
           return "Erro ao salvar no banco de dados";
         }
       }
+
+      if(this.homologacao){
+        return soapFinalHomologacao;
+      }
+
       return soapFinal;
     } else {
       return "ERRO NA CONSULTA DE RPS";
