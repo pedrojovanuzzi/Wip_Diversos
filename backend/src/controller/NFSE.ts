@@ -451,17 +451,12 @@ class NFSEController {
     });
 
     if (await this.verificaRps(nfseNumber)) {
-      if (!this.homologacao) {
-        try {
-          await NsfeData.save(insertDatabase);
-        } catch (error) {
-          return "Erro ao salvar no banco de dados";
-        }
-      }
 
-      if(this.homologacao){
-        return soapFinalHomologacao;
-      }
+      await NsfeData.save(insertDatabase);
+      
+    if(this.homologacao){
+      return soapFinalHomologacao;
+    }
 
       return soapFinal;
     } else {
@@ -602,6 +597,7 @@ class NFSEController {
               }</InscricaoMunicipal><CodigoMunicipio>3503406</CodigoMunicipio></IdentificacaoNfse><CodigoCancelamento>2</CodigoCancelamento></InfPedidoCancelamento></Pedido>`.trim();
             const envioXml =
               `<CancelarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</CancelarNfseEnvio>`.trim();
+             
             const envioXmlAssinado = this.assinarXml(
               envioXml,
               "InfPedidoCancelamento"
@@ -615,6 +611,15 @@ class NFSEController {
                 .replace(/\s+>/g, ">")
                 .trim();
 
+            const soapFinalHomologacao = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:cancelarNfse>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:cancelarNfse></soapenv:Body></soapenv:Envelope>`
+                .replace(/[\r\n]+/g, "")
+                .replace(/\s{2,}/g, " ")
+                .replace(/>\s+</g, "><")
+                .replace(/<\s+/g, "<")
+                .replace(/\s+>/g, ">")
+                .trim();
+
+
             const certPathToUse = fs.existsSync(this.NEW_CERT_PATH)
               ? this.NEW_CERT_PATH
               : this.certPath;
@@ -625,13 +630,27 @@ class NFSEController {
               rejectUnauthorized: false,
             });
 
-            const response = await axios.post(this.WSDL_URL, soapFinal, {
-              httpsAgent,
-              headers: {
-                "Content-Type": "text/xml; charset=UTF-8",
-                SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
-              },
-            });
+            let response = null;
+
+            if(this.homologacao){
+              response = await axios.post(this.WSDL_URL, soapFinalHomologacao, {
+                httpsAgent,
+                headers: {
+                  "Content-Type": "text/xml; charset=UTF-8",
+                  SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
+                },
+              });
+            }
+            else{
+              response = await axios.post(this.WSDL_URL, soapFinal, {
+                httpsAgent,
+                headers: {
+                  "Content-Type": "text/xml; charset=UTF-8",
+                  SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
+                },
+              });
+            }
+            
 
             console.log(response);
 
