@@ -31,7 +31,7 @@ interface NFSENode {
 class NFSEController {
 
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  private homologacao = true;
+  private homologacao = false;
   private WSDL_URL =
     this.homologacao === true
       ? "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS"
@@ -59,6 +59,10 @@ class NFSEController {
       aliquota = aliquota.replace(",", ".");
       aliquota = aliquota.replace("%", "");
 
+      if(service === "" || undefined || null){
+        service = "Servico de Suporte Tecnico";
+      }
+
       //Função de Gerar Nota Funcionando
 
       if (!password) throw new Error("Senha do certificado não fornecida.");
@@ -68,12 +72,7 @@ class NFSEController {
         "EnviarLoteRpsSincronoEnvio",
         aliquota,
         service
-      );
-
-      if(!service){
-        service = "Servico de Suporte Tecnico";
-      }
-      
+      );      
 
       if(result?.status === "200"){
         res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
@@ -91,7 +90,7 @@ class NFSEController {
     ids: string[],
     SOAPAction: string,
     aliquota: string,
-    service : string
+    service : string = "Servico de Suporte Tecnico"
   ) {
     try {
       if (!fs.existsSync(this.TEMP_DIR))
@@ -333,20 +332,20 @@ class NFSEController {
 
   let envioXml = "";
 
-  // if(this.homologacao){
-  //   envioXml = `
-  //   <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
-  //     ${loteXmlSemAssinatura}
-  //   </EnviarLoteRpsSincronoEnvio>
-  //   `.trim();
-  // }
-  // else{
+  if(this.homologacao){
+    envioXml = `
+    <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
+      ${loteXmlSemAssinatura}
+    </EnviarLoteRpsSincronoEnvio>
+    `.trim();
+  }
+  else{
     envioXml = `
     <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
       ${loteXmlComAssinatura}
     </EnviarLoteRpsSincronoEnvio>
     `.trim();
-  // }
+  }
     
 
     const soapFinal = `
