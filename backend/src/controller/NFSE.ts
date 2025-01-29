@@ -381,7 +381,12 @@ class NFSEController {
         </ws:recepcionarLoteRpsSincrono>
       </soapenv:Body>
     </soapenv:Envelope>
-    `
+    `.replace(/[\r\n]+/g, "") // Remove quebras de linha
+    .replace(/\s{2,}/g, " ") // Substitui múltiplos espaços por um único
+    .replace(/>\s+</g, "><") // Remove espaços entre tags
+    .replace(/<\s+/g, "<") // Remove espaços após '<'
+    .replace(/\s+>/g, ">") // Remove espaços antes de '>'
+    .trim(); // Remove espaços no início e fim
 
     const soapFinalHomologacao = `
     <?xml version="1.0" encoding="UTF-8"?>
@@ -405,10 +410,7 @@ class NFSEController {
         </ws:gerarNfse>
       </soapenv:Body>
     </soapenv:Envelope>
-    `
-
-
-      .replace(/[\r\n]+/g, "") // Remove quebras de linha
+    `.replace(/[\r\n]+/g, "") // Remove quebras de linha
       .replace(/\s{2,}/g, " ") // Substitui múltiplos espaços por um único
       .replace(/>\s+</g, "><") // Remove espaços entre tags
       .replace(/<\s+/g, "<") // Remove espaços após '<'
