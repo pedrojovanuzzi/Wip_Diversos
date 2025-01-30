@@ -17,7 +17,7 @@ import { NFSE } from "../entities/NFSE";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
 import { DOMParser } from "xmldom";
-import { Between, In, IsNull } from "typeorm";
+import { And, Between, In, IsNull } from "typeorm";
 import * as crypto from "crypto";
 import moment from 'moment-timezone';
 
@@ -872,7 +872,6 @@ class NFSEController {
     try {
       const { cpf, filters, dateFilter } = req.body
       const whereConditions: any = {}
-  
       if (cpf) whereConditions.cpf_cnpj = cpf
       if (filters) {
         const { plano, vencimento, cli_ativado, nova_nfe } = filters
@@ -881,45 +880,42 @@ class NFSEController {
         if (cli_ativado?.length) whereConditions.cli_ativado = In(["s"])
         if (nova_nfe?.length) whereConditions.tags = In(nova_nfe)
       }
-  
       const ClientRepository = MkauthSource.getRepository(ClientesEntities)
       const clientesResponse = await ClientRepository.find({
         where: whereConditions,
         select: { login: true, cpf_cnpj: true, cli_ativado: true },
       })
-  
+      const faturasData = MkauthSource.getRepository(Faturas)
+      const now = new Date()
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      const startDate = dateFilter ? new Date(dateFilter.start) : firstDayOfMonth
+      const endDate = dateFilter ? new Date(dateFilter.end) : lastDayOfMonth
+      startDate.setHours(startDate.getHours() + 3)
+      endDate.setHours(endDate.getHours() + 3)
+
       const nfseData = AppDataSource.getRepository(NFSE)
       const nfseResponse = await nfseData.find({
-        where: { login: In(clientesResponse.map((c) => c.login)) },
+        where: { login: In(clientesResponse.map((c) => c.login)) ,
+        competencia: Between(startDate, endDate),},
         order: { id: "DESC" },
       })
-  
       const clientesComNfse = await Promise.all(
         clientesResponse.map(async (cliente) => {
-          const nfseDoCliente = nfseResponse.filter((nf) => nf.login === cliente.login);
-          if (!nfseDoCliente.length) return null;
-      
+          const nfseDoCliente = nfseResponse.filter((nf) => nf.login === cliente.login)
+          if (!nfseDoCliente.length) return null
           const statusArray = await Promise.all(
             nfseDoCliente.map(async (nf) => {
-              // console.log(this);
-              const cancelada = await this.setNfseStatus(nf.numeroRps);
-              // console.log('Resultado de setNfseStatus:', cancelada);
-      
-              return cancelada ? "Cancelada" : "Ativa";
+              const cancelada = await this.setNfseStatus(nf.numeroRps)
+              return cancelada ? "Cancelada" : "Ativa"
             })
-          );
-
+          )
           const nfseNumberArray = await Promise.all(
             nfseDoCliente.map(async (nf) => {
-              // console.log(this);
-              const cancelada = await this.setNfseNumber(nf.numeroRps);
-              // console.log('Resultado de setNfseStatus:', cancelada);
-              return cancelada;
+              const cancelada = await this.setNfseNumber(nf.numeroRps)
+              return cancelada
             })
-          );
-      
-          // console.log(statusArray);
-      
+          )
           return {
             ...cliente,
             nfse: {
@@ -928,8 +924,12 @@ class NFSEController {
               numero_rps: nfseDoCliente.map((nf) => nf.numeroRps).join(", ") || null,
               serie_rps: nfseDoCliente.map((nf) => nf.serieRps).join(", ") || null,
               tipo_rps: nfseDoCliente.map((nf) => nf.tipoRps).join(", ") || null,
-              data_emissao: nfseDoCliente.map((nf) => moment.tz(nf.dataEmissao, 'America/Sao_Paulo').format('DD/MM/YYYY')).join(", ") || null,
-              competencia: nfseDoCliente.map((nf) => moment.tz(nf.competencia, 'America/Sao_Paulo').format('DD/MM/YYYY')).join(", ") || null,
+              data_emissao: nfseDoCliente.map((nf) =>
+                moment.tz(nf.dataEmissao, "America/Sao_Paulo").format("DD/MM/YYYY")
+              ).join(", ") || null,
+              competencia: nfseDoCliente.map((nf) =>
+                moment.tz(nf.competencia, "America/Sao_Paulo").format("DD/MM/YYYY")
+              ).join(", ") || null,
               valor_servico: nfseDoCliente.map((nf) => nf.valorServico).join(", ") || null,
               aliquota: nfseDoCliente.map((nf) => nf.aliquota).join(", ") || null,
               iss_retido: nfseDoCliente.map((nf) => nf.issRetido).join(", ") || null,
@@ -953,19 +953,17 @@ class NFSEController {
               optante_simples_nacional: nfseDoCliente.map((nf) => nf.optanteSimplesNacional).join(", ") || null,
               incentivo_fiscal: nfseDoCliente.map((nf) => nf.incentivoFiscal).join(", ") || null,
               status: statusArray.join(", ") || null,
-
               numeroNfse: nfseNumberArray.join(", ") || null,
             },
-          };
+          }
         })
       )
-      
-      const resolvedClientesComNfse = clientesComNfse.filter((item) => item !== null).sort((a, b) => (b.nfse.id || "").localeCompare(a.nfse.id || "")); // Ordenação por título      ;
-      // console.log(resolvedClientesComNfse);
-      
-      res.status(200).json(resolvedClientesComNfse);
-    } catch (error) {
-      res.status(500).json({ error: "Internal Server Error" });
+      const resolvedClientesComNfse = clientesComNfse
+        .filter((item) => item !== null)
+        .sort((a, b) => (b.nfse.id || "").localeCompare(a.nfse.id || ""))
+      res.status(200).json(resolvedClientesComNfse)
+    } catch {
+      res.status(500).json({ error: "Internal Server Error" })
     }
   }
 
