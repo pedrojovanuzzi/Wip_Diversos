@@ -213,7 +213,9 @@ class NFSEController {
         : 1;
 
     nfseNumber = nfseNumber === 9999999 ? 9999999 + 1 : nfseNumber; //Por causa de um Teste Realizado
-    const valorReduzido = Number(rpsData?.valor) * Number(reducao);
+    let valorReduzido = Number(rpsData?.valor) * Number(reducao);
+
+    valorReduzido = Number(valorReduzido.toFixed(2));
 
     const rpsXmlSemAssinatura = `
     <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
@@ -885,7 +887,7 @@ class NFSEController {
         where: whereConditions,
         select: { login: true, cpf_cnpj: true, cli_ativado: true },
       })
-      const faturasData = MkauthSource.getRepository(Faturas)
+
       const now = new Date()
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
