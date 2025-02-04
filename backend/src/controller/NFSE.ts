@@ -65,7 +65,7 @@ class NFSEController {
       }
       
       if(reducao === "" || undefined || null){
-        reducao = 60;
+        reducao = 40;
       }
 
       reducao = reducao / 100;
@@ -97,7 +97,7 @@ class NFSEController {
     SOAPAction: string,
     aliquota: string,
     service : string = "Servico de Suporte Tecnico",
-    reducao : number | string = 60,
+    reducao : number | string = 40,
   ) {
     try {
       if (!fs.existsSync(this.TEMP_DIR))
@@ -212,8 +212,13 @@ class NFSEController {
         ? nfseResponse[0].numeroRps + 1
         : 1;
 
-    nfseNumber = nfseNumber === 9999999 ? 9999999 + 1 : nfseNumber; //Por causa de um Teste Realizado
-    let valorReduzido = Number(rpsData?.valor) * Number(reducao);
+    nfseNumber = nfseNumber === 9999999 ? 9999999 + 1 : nfseNumber; //Por causa de um Teste Realizado]
+
+    let valorMenosDesconto = 0;
+
+    ClientData?.desconto ? valorMenosDesconto =(Number(rpsData?.valor) - Number(ClientData?.desconto)) : valorMenosDesconto = Number(rpsData?.valor);
+
+    let valorReduzido = Number(valorMenosDesconto) * Number(reducao);
 
     valorReduzido = Number(valorReduzido.toFixed(2));
 
@@ -442,7 +447,7 @@ class NFSEController {
         ? new Date(rpsData.processamento)
         : new Date(),
       competencia: rpsData?.datavenc ? new Date(rpsData.datavenc) : new Date(),
-      valorServico: Number(rpsData?.valor) || 0,
+      valorServico: valorReduzido || 0,
       aliquota: Number(Number(aliquota).toFixed(4)),
       issRetido: nfseResponse[0]?.issRetido || 0,
       responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
@@ -1115,7 +1120,7 @@ class NFSEController {
     try {
       const clientesResponse = await ClientRepository.find({
         where: whereConditions,
-        select: { login: true, cpf_cnpj: true, cli_ativado: true },
+        select: { login: true, cpf_cnpj: true, cli_ativado: true, desconto: true },
         order: {id: "DESC"}
       });
       const faturasData = MkauthSource.getRepository(Faturas);
@@ -1159,7 +1164,7 @@ class NFSEController {
                   .map((f) => new Date(f.datavenc).toLocaleDateString("pt-BR"))
                   .join(", ") || null,
               tipo: fatura.map((f) => f.tipo).join(", ") || null,
-              valor: fatura.map((f) => f.valor).join(", ") || null,
+              valor: fatura.map((f) => (Number(f.valor) - (cliente.desconto || 0)).toFixed(2)).join(", ") || null,
             },
           };
         })
