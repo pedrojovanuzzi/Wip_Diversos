@@ -35,6 +35,12 @@ export class PrefeituraUserMigration1740149821773 implements MigrationInterface 
                         length: '255',
                     },
                     {
+                        name: 'ip',
+                        type: 'varchar',
+                        isNullable: false,
+                        length: '40',
+                    },
+                    {
                         name: "created_at",
                         type: "timestamp",
                         default: "now()",

@@ -11,8 +11,10 @@ export class PrefeituraUser {
     @Column({nullable: true})
     email?: string
     
-
     @Column()
     cpf?: string
+
+    @Column()
+    ip?: string
 
 }

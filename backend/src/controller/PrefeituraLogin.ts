@@ -6,13 +6,16 @@ class PrefeituraLogin {
     
   async login(req: Request, res: Response) {
     const { name, email, cpf } = req.body;
-
+    console.log(req.socket.remoteAddress);
+    const ip = String(req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress);
+    
     const prefUserRepository = DataSource.getRepository(PrefeituraUser);
 
     const newLogin = prefUserRepository.create({
         name,
         email,
-        cpf
+        cpf,
+        ip
       });
 
       if(cpf){
@@ -57,6 +60,8 @@ class PrefeituraLogin {
     
         return true;
     }
+
+
 
 }
 

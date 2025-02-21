@@ -3,10 +3,13 @@ import icon_prefeitura from "../../assets/Brasao_Arealva.jpg";
 import { MdOutlineSignalWifi4BarLock } from "react-icons/md";
 import axios from "axios";
 import { useState } from "react";
+import { Navigate } from "react-router-dom";
 
 export default function PrefeituraLogin() {
   const [error, setError] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
+  const [redirecionado, setRedirecionado] = useState<string | null>(null);
+  const [tempo, setTempo] = useState<number | null>(5);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
    try {
@@ -25,6 +28,18 @@ export default function PrefeituraLogin() {
       .then((response) => {
         console.log(response);
         setSucesso(response.data.sucesso);
+
+        setTempo(5);
+        setRedirecionado(`Você será redirecionado para o Google em ${tempo} segundos`);	
+        
+        setInterval(() => {
+            setTempo((prev) => prev ? prev - 1 : 0);
+        }, 1000);
+        
+        setTimeout(() => {
+            window.location.href = "https://www.google.com";
+        }, 5000);
+        
         setError(null);
       })
       .catch((error) => {
@@ -122,6 +137,7 @@ export default function PrefeituraLogin() {
               </div>
               {error && <p className="text-red-500 mt-2">{error}</p>}
               {sucesso && <p className="text-green-500 mt-2">{sucesso}</p>}
+             {redirecionado && <p className="text-orange-700 mt-2">{redirecionado}</p>}
             </div>
 
             <div>
