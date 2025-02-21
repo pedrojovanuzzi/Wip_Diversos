@@ -2,8 +2,7 @@ import icon from "../../assets/icon.png";
 import icon_prefeitura from "../../assets/Brasao_Arealva.jpg";
 import { MdOutlineSignalWifi4BarLock } from "react-icons/md";
 import axios from "axios";
-import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 
 export default function PrefeituraLogin() {
   const [error, setError] = useState<string | null>(null);
@@ -11,52 +10,61 @@ export default function PrefeituraLogin() {
   const [redirecionado, setRedirecionado] = useState<string | null>(null);
   const [tempo, setTempo] = useState<number | null>(5);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-   try {
+  useEffect(() => {
+    if (tempo && tempo > 0) {
+      const timer = setTimeout(() => setTempo((prev) => (prev ? prev - 1 : 0)), 1000);
+      return () => clearTimeout(timer);
+    } else if (tempo === 0) {
+      fazerLoginNoHotspot();
+    }
+  }, [tempo]);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    data.forEach((value, key) => {
-      console.log(key, value);
-    });
 
-    axios
-      .post(`${process.env.REACT_APP_URL}/Prefeitura/Login`, {
+    try {
+      const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Login`, {
         name: data.get("name"),
         email: data.get("email"),
         cpf: data.get("cpf"),
-      })
-      .then((response) => {
-        console.log(response);
-        setSucesso(response.data.sucesso);
+      });
 
-        setTempo(5);
-        setRedirecionado(`Você será redirecionado para o Google em ${tempo} segundos`);	
-        
-        setInterval(() => {
-            setTempo((prev) => prev ? prev - 1 : 0);
-        }, 1000);
-        
-        setTimeout(() => {
-            window.location.href = "https://www.google.com";
-        }, 5000);
-        
-        setError(null);
-      })
-      .catch((error) => {
-        console.log(error);
-        setError(error.response.data.error || String(error.message));
-        setSucesso(null);
-    });
+      console.log(response);
+      setSucesso(response.data.sucesso);
+      setError(null);
+      setRedirecionado(`Você será redirecionado para o Hotspot em ${tempo} segundos`);
+      setTempo(5); // Inicia a contagem regressiva
 
-    event.currentTarget.reset();
-   } catch (error) {
-    setError("Erro ao enviar os dados");
-   }
+    } catch (error: any) {
+      console.log(error);
+      setError(error.response?.data?.error || "Erro ao fazer login");
+      setSucesso(null);
+    }
+  };
+
+  const fazerLoginNoHotspot = () => {
+    const hotspotUrl = "http://192.168.88.1/login"; // 🔹 Alterar para o IP correto do Mikrotik
+    const redirectUrl = "http://www.google.com"; // 🔹 Para onde o Mikrotik redirecionará após login
+
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = hotspotUrl;
+
+    form.innerHTML = `
+      <input type="hidden" name="username" value="${process.env.REACT_APP_USER}" />
+      <input type="hidden" name="password" value="" />
+      <input type="hidden" name="dst" value="${redirectUrl}" />
+      <input type="hidden" name="popup" value="true" />
+    `;
+
+    document.body.appendChild(form);
+    form.submit();
   };
 
   return (
     <>
-      <div className="flex min-h-full mt-5 flex-1 flex-row justify-center ">
+      <div className="flex min-h-full mt-5 flex-1 flex-row justify-center">
         <div className="self-center">
           <img alt="Wip Telecom" src={icon} className="mx-auto h-28 w-auto" />
           <h2 className="mt-10 text-center text-2xl/9 font-bold tracking-tight font-Atkinson text-gray-900">
@@ -77,14 +85,11 @@ export default function PrefeituraLogin() {
           </h2>
         </div>
       </div>
-      <div className="flex min-h-full flex-1 flex-row justify-center ">
+      <div className="flex min-h-full flex-1 flex-row justify-center">
         <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
           <form onSubmit={handleSubmit} method="POST" className="space-y-6">
             <div>
-              <label
-                htmlFor="name"
-                className="block text-sm/6 font-medium text-gray-900"
-              >
+              <label htmlFor="name" className="block text-sm/6 font-medium text-gray-900">
                 Digite seu Nome Completo <span className="text-red-500">*</span>
               </label>
               <div className="mt-2">
@@ -100,10 +105,7 @@ export default function PrefeituraLogin() {
             </div>
 
             <div>
-              <label
-                htmlFor="email"
-                className="block text-left text-sm/6 font-medium text-gray-900"
-              >
+              <label htmlFor="email" className="block text-left text-sm/6 font-medium text-gray-900">
                 Digite seu Email
               </label>
               <div className="mt-2">
@@ -119,10 +121,7 @@ export default function PrefeituraLogin() {
 
             <div>
               <div className="flex items-center justify-between">
-                <label
-                  htmlFor="cpf"
-                  className="block text-sm/6 font-medium text-gray-900"
-                >
+                <label htmlFor="cpf" className="block text-sm/6 font-medium text-gray-900">
                   Digite seu CPF <span className="text-red-500">*</span>
                 </label>
               </div>
@@ -137,7 +136,8 @@ export default function PrefeituraLogin() {
               </div>
               {error && <p className="text-red-500 mt-2">{error}</p>}
               {sucesso && <p className="text-green-500 mt-2">{sucesso}</p>}
-             {redirecionado && <p className="text-orange-700 mt-2">{redirecionado}</p>}
+              {redirecionado && <p className="text-orange-700 mt-2">{redirecionado}</p>}
+              {tempo !== null && tempo > 0 && <p className="text-orange-700 mt-2">Tempo restante: {tempo}s</p>}
             </div>
 
             <div>
