@@ -8,8 +8,18 @@ export default function PrefeituraLogin() {
   const [error, setError] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
   const [redirecionado, setRedirecionado] = useState<string | null>(null);
-  const [tempo, setTempo] = useState<number | null>(5);
+  const [hotspotLoginUrl, setHotspotLoginUrl] = useState<string | null>(null);
+  const [hotspotRedirectUrl, setHotspotRedirectUrl] = useState<string | null>(null);
 
+  useEffect(() => {
+    // Pegando os parâmetros do Hotspot Mikrotik
+    const params = new URLSearchParams(window.location.search);
+    const linkLoginOnly = params.get("link-login-only");
+    const linkRedirect = params.get("link-redirect");
+
+    if (linkLoginOnly) setHotspotLoginUrl(linkLoginOnly);
+    if (linkRedirect) setHotspotRedirectUrl(linkRedirect);
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -25,9 +35,10 @@ export default function PrefeituraLogin() {
       console.log(response);
       setSucesso(response.data.sucesso);
       setError(null);
-      fazerLoginNoHotspot();
-      setRedirecionado(`Você será redirecionado para o Hotspot em ${tempo} segundos`);
-      setTempo(5); // Inicia a contagem regressiva
+      setRedirecionado("Você será redirecionado para a internet agora!");
+
+      // Faz login no Hotspot imediatamente após sucesso
+      fazerLoginNoHotspot(data.get("cpf") as string);
 
     } catch (error: any) {
       console.log(error);
@@ -36,18 +47,20 @@ export default function PrefeituraLogin() {
     }
   };
 
-  const fazerLoginNoHotspot = () => {
-    const hotspotUrl = "http://192.168.88.1/login"; // 🔹 Alterar para o IP correto do Mikrotik
-    const redirectUrl = "http://www.google.com"; // 🔹 Para onde o Mikrotik redirecionará após login
+  const fazerLoginNoHotspot = (username: string) => {
+    if (!hotspotLoginUrl) {
+      console.error("Erro: Hotspot URL não encontrado.");
+      return;
+    }
 
     const form = document.createElement("form");
     form.method = "POST";
-    form.action = hotspotUrl;
+    form.action = hotspotLoginUrl;
 
     form.innerHTML = `
-      <input type="hidden" name="username" value="${process.env.REACT_APP_USER}" />
+      <input type="hidden" name="username" value="${username}" />
       <input type="hidden" name="password" value="" />
-      <input type="hidden" name="dst" value="${redirectUrl}" />
+      <input type="hidden" name="dst" value="${hotspotRedirectUrl || 'http://www.google.com'}" />
       <input type="hidden" name="popup" value="true" />
     `;
 
@@ -135,7 +148,7 @@ export default function PrefeituraLogin() {
             <div>
               <button
                 type="submit"
-                className="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm/6 font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm/6 font-semibold text-white shadow-sm hover:bg-indigo-500"
               >
                 Conectar
               </button>
