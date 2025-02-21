@@ -10,14 +10,6 @@ export default function PrefeituraLogin() {
   const [redirecionado, setRedirecionado] = useState<string | null>(null);
   const [tempo, setTempo] = useState<number | null>(5);
 
-  useEffect(() => {
-    if (tempo && tempo > 0) {
-      const timer = setTimeout(() => setTempo((prev) => (prev ? prev - 1 : 0)), 1000);
-      return () => clearTimeout(timer);
-    } else if (tempo === 0) {
-      fazerLoginNoHotspot();
-    }
-  }, [tempo]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -33,6 +25,7 @@ export default function PrefeituraLogin() {
       console.log(response);
       setSucesso(response.data.sucesso);
       setError(null);
+      fazerLoginNoHotspot();
       setRedirecionado(`Você será redirecionado para o Hotspot em ${tempo} segundos`);
       setTempo(5); // Inicia a contagem regressiva
 
@@ -137,7 +130,6 @@ export default function PrefeituraLogin() {
               {error && <p className="text-red-500 mt-2">{error}</p>}
               {sucesso && <p className="text-green-500 mt-2">{sucesso}</p>}
               {redirecionado && <p className="text-orange-700 mt-2">{redirecionado}</p>}
-              {tempo !== null && tempo > 0 && <p className="text-orange-700 mt-2">Tempo restante: {tempo}s</p>}
             </div>
 
             <div>
