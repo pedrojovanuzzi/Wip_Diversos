@@ -1,9 +1,44 @@
 import icon from "../../assets/icon.png";
 import icon_prefeitura from "../../assets/Brasao_Arealva.jpg";
 import { MdOutlineSignalWifi4BarLock } from "react-icons/md";
-
+import axios from "axios";
+import { useState } from "react";
 
 export default function PrefeituraLogin() {
+  const [error, setError] = useState<string | null>(null);
+  const [sucesso, setSucesso] = useState<string | null>(null);
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+   try {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    data.forEach((value, key) => {
+      console.log(key, value);
+    });
+
+    axios
+      .post(`${process.env.REACT_APP_URL}/Prefeitura/Login`, {
+        name: data.get("name"),
+        email: data.get("email"),
+        cpf: data.get("cpf"),
+      })
+      .then((response) => {
+        console.log(response);
+        setSucesso(response.data.sucesso);
+        setError(null);
+      })
+      .catch((error) => {
+        console.log(error);
+        setError(error.response.data.error || String(error.message));
+        setSucesso(null);
+    });
+
+    event.currentTarget.reset();
+   } catch (error) {
+    setError("Erro ao enviar os dados");
+   }
+  };
+
   return (
     <>
       <div className="flex min-h-full mt-5 flex-1 flex-row justify-center ">
@@ -14,18 +49,22 @@ export default function PrefeituraLogin() {
           </h2>
         </div>
         <div className="self-center p-5 text-2xl text-indigo-600">
-        <MdOutlineSignalWifi4BarLock />
+          <MdOutlineSignalWifi4BarLock />
         </div>
         <div className="self-center">
-          <img alt="Wip Telecom" src={icon_prefeitura} className="mx-auto h-28 w-auto" />
+          <img
+            alt="Wip Telecom"
+            src={icon_prefeitura}
+            className="mx-auto h-28 w-auto"
+          />
           <h2 className="mt-10 text-center text-2xl/9 font-bold tracking-tight font-Atkinson text-gray-900">
             Prefeitura
           </h2>
         </div>
-        </div>
-        <div className="flex min-h-full flex-1 flex-row justify-center ">
+      </div>
+      <div className="flex min-h-full flex-1 flex-row justify-center ">
         <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
-          <form action="#" method="POST" className="space-y-6">
+          <form onSubmit={handleSubmit} method="POST" className="space-y-6">
             <div>
               <label
                 htmlFor="name"
@@ -81,6 +120,8 @@ export default function PrefeituraLogin() {
                   className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
                 />
               </div>
+              {error && <p className="text-red-500 mt-2">{error}</p>}
+              {sucesso && <p className="text-green-500 mt-2">{sucesso}</p>}
             </div>
 
             <div>
@@ -93,7 +134,7 @@ export default function PrefeituraLogin() {
             </div>
           </form>
         </div>
-        </div>
+      </div>
     </>
   );
 }
