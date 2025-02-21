@@ -11,6 +11,7 @@ import FeedbackPage from './pages/feedback/FeedbackPage';
 import { Opnion } from './pages/feedback/Opnion';
 import { Nfe } from './pages/Nfe/Nfe';
 import { BuscarNfeGerada } from './pages/Nfe/BuscarNfeGerada';
+import PrefeituraLogin from './pages/prefeitura_login/PrefeituraLogin';
 
 
 function App() {
@@ -48,6 +49,8 @@ function App() {
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
           <Route path="/Nfe" element={auth ? <Nfe /> : <Navigate to="/auth/login" />} />
           <Route path="/BuscarNfeGerada" element={auth ? <BuscarNfeGerada /> : <Navigate to="/auth/login" />} />
+          <Route path="/Prefeitura/Login" element={<PrefeituraLogin />} />
+          <Route path="*" element={auth ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>
     </BrowserRouter>

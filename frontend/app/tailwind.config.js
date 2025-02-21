@@ -6,6 +6,7 @@ module.exports = {
       fontFamily: {
         'Gummy' : ['Sour Gummy'],
         'Park' : ['Parkinsans'],
+        'Atkinson' : ['Atkinson Hyperlegible Next'],
       }
     },
   },
