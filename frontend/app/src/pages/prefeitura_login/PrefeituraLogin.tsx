@@ -39,7 +39,7 @@ export default function PrefeituraLogin() {
       console.log("✅ Enviando dados para a API do backend...");
 
       axios
-        .post("https://wipdiversos.wiptelecomunicacoes.com.br/api/Prefeitura/redirect_2", {
+        .post(`${process.env.REACT_APP_URL}/Prefeitura/redirect_2`, {
           username: dadosHotspot.username,
           password: dadosHotspot.password,
           dst: dadosHotspot.linkOrig || "http://www.google.com",
