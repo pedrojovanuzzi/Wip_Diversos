@@ -6,8 +6,8 @@ const router: Router = Router()
 router.post("/Login", PrefeituraLogin.login);
 router.post("/redirect", PrefeituraLogin.redirect);
 router.get("/redirect", PrefeituraLogin.redirect);
-router.post("/redirect", PrefeituraLogin.redirect_2);
-router.get("/redirect", PrefeituraLogin.redirect_2);
+router.post("/redirect_2", PrefeituraLogin.redirect_2);
+router.get("/redirect_2", PrefeituraLogin.redirect_2);
 router.get("/SendOtp", PrefeituraLogin.SendOtp);
 
 
