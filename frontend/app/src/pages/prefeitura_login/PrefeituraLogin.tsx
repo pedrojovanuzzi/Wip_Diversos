@@ -26,11 +26,11 @@ export default function PrefeituraLogin() {
     const linkOrig = searchParams.get("link-orig");
     const errorMsg = searchParams.get("error");
 
-    if (mac && ip && username && linkLogin) {
-      const dados = { mac, ip, username, password, linkLogin, linkOrig, error: errorMsg };
-      setDadosHotspot(dados);
-      console.log("🔹 Dados do Hotspot:", dados);
-    }
+
+    const dados = { mac, ip, username, password, linkLogin, linkOrig, error: errorMsg };
+    setDadosHotspot(dados);
+    console.log("🔹 Dados do Hotspot:", dados);
+    
 
   }, [searchParams]);
 
