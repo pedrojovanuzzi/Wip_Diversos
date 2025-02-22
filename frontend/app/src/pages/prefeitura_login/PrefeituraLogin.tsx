@@ -10,7 +10,6 @@ import { v4 as uuidv4 } from "uuid";
 export default function PrefeituraLogin() {
   const [error, setError] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
-  const [redirecionado, setRedirecionado] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const [dadosHotspot, setDadosHotspot] = useState<any>(null);
   const [loginAutorizado, setLoginAutorizado] = useState<boolean>(false);
@@ -64,6 +63,9 @@ export default function PrefeituraLogin() {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
 
+    const newOtp = uuidv4().replace(/-/g, "").substring(0, 8).toUpperCase(); // Exemplo: "A1B2C3D4"
+    setGeneratedOtp(newOtp);
+
     try {
       setCelular(data.get("celular") as string);
       const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Login`, {
@@ -78,7 +80,6 @@ export default function PrefeituraLogin() {
       console.log("✅ Login aprovado:", response);
       setSucesso(response.data.sucesso);
       setError(null);
-      setRedirecionado("Você será conectado à internet agora!");
 
       setLoginAutorizado(true); // 🔹 Ativar login no Hotspot após sucesso
 
@@ -144,12 +145,11 @@ export default function PrefeituraLogin() {
                 />
               </div>
             </div>
-            {error && <p className="text-red-500 mt-2">{error}</p>}
-            {sucesso && <p className="text-green-500 mt-2">{sucesso}</p>}
-            {redirecionado && <p className="text-orange-700 mt-2">{redirecionado}</p>}
+            {error && <p className="text-red-500 m-2">{error}</p>}
+            {sucesso && <p className="text-green-500 m-2">{sucesso}</p>}
 
             <button type="submit"
-              className="w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-white shadow-sm">
+              className="w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 mb-5 text-white shadow-sm">
               Conectar
             </button>
           </form>
