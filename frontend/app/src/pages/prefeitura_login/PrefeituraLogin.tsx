@@ -112,6 +112,13 @@ export default function PrefeituraLogin() {
 
       setLoginAutorizado(true); // 🔹 Ativar login no Hotspot após sucesso
 
+      const sendotp = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/SendOtp`, {
+        celular: data.get("celular"),
+        otp: generatedOtp,
+      });
+
+      console.log("✅ OTP enviado:", sendotp);
+
     } catch (error: any) {
       console.log("❌ Erro ao fazer login:", error);
       setError(error.response?.data?.error || "Erro ao fazer login");
