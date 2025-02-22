@@ -38,6 +38,14 @@ class PrefeituraLogin {
       }
     }
 
+  async redirect(req: Request, res: Response) {
+    const { mac, ip, username, "link-login": linkLogin, "link-orig": linkOrig, error } = req.body;
+
+    console.log("Dados recebidos do Hotspot:", { mac, ip, username, linkLogin, linkOrig, error });
+  
+    res.redirect(`https://wipdiversos.wiptelecomunicacoes.com.br/Prefeitura/Login?mac=${mac}&ip=${ip}&username=${username}&link-login=${linkLogin}&link-orig=${linkOrig}&error=${error}`);
+  }
+
     static validarCPF(cpf: string): boolean {
         cpf = cpf.replace(/\D/g, ""); // Remove caracteres não numéricos
     

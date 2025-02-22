@@ -3,23 +3,30 @@ import icon_prefeitura from "../../assets/Brasao_Arealva.jpg";
 import { MdOutlineSignalWifi4BarLock } from "react-icons/md";
 import axios from "axios";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 
 export default function PrefeituraLogin() {
   const [error, setError] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
   const [redirecionado, setRedirecionado] = useState<string | null>(null);
-  const [hotspotLoginUrl, setHotspotLoginUrl] = useState<string | null>(null);
-  const [hotspotRedirectUrl, setHotspotRedirectUrl] = useState<string | null>(null);
-
+  const [searchParams] = useSearchParams();
+  const [dadosHotspot, setDadosHotspot] = useState<any>(null);
+  
   useEffect(() => {
-    // Pegando os parâmetros do Hotspot Mikrotik
-    const params = new URLSearchParams(window.location.search);
-    const linkLoginOnly = params.get("link-login-only");
-    const linkRedirect = params.get("link-redirect");
+    const mac = searchParams.get("mac");
+    const ip = searchParams.get("ip");
+    const username = searchParams.get("username");
+    const linkLogin = searchParams.get("link-login");
+    const linkOrig = searchParams.get("link-orig");
+    const errorMsg = searchParams.get("error");
 
-    if (linkLoginOnly) setHotspotLoginUrl(linkLoginOnly);
-    if (linkRedirect) setHotspotRedirectUrl(linkRedirect);
-  }, []);
+    if (mac && ip && username) {
+      const dados = { mac, ip, username, linkLogin, linkOrig, error: errorMsg };
+      setDadosHotspot(dados);
+      console.log(dados);
+      
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -37,35 +44,12 @@ export default function PrefeituraLogin() {
       setError(null);
       setRedirecionado("Você será redirecionado para a internet agora!");
 
-      // Faz login no Hotspot imediatamente após sucesso
-      fazerLoginNoHotspot(data.get("cpf") as string);
 
     } catch (error: any) {
       console.log(error);
       setError(error.response?.data?.error || "Erro ao fazer login");
       setSucesso(null);
     }
-  };
-
-  const fazerLoginNoHotspot = (username: string) => {
-    if (!hotspotLoginUrl) {
-      console.error("Erro: Hotspot URL não encontrado.");
-      return;
-    }
-
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = hotspotLoginUrl;
-
-    form.innerHTML = `
-      <input type="hidden" name="username" value="${username}" />
-      <input type="hidden" name="password" value="" />
-      <input type="hidden" name="dst" value="${hotspotRedirectUrl || 'http://www.google.com'}" />
-      <input type="hidden" name="popup" value="true" />
-    `;
-
-    document.body.appendChild(form);
-    form.submit();
   };
 
   return (
