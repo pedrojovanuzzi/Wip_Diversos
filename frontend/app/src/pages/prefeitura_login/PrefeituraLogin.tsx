@@ -60,7 +60,7 @@ export default function PrefeituraLogin() {
     }
     
     
-    if (loginAutorizado && dadosHotspot) {
+    if (loginAutorizado) {
       console.log("✅ Enviando dados para a API do backend...");
 
       axios
