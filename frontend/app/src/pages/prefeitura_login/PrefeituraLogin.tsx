@@ -15,6 +15,7 @@ export default function PrefeituraLogin() {
   const [loginAutorizado, setLoginAutorizado] = useState<boolean>(false);
   const [generatedOtp, setGeneratedOtp] = useState<string>(""); // Código OTP gerado automaticamente
   const [celular, setCelular] = useState<string>("");
+  const REACT_APP_HOMOLOGACAO = process.env.REACT_APP_HOMOLOGACAO === "true";
 
   useEffect(() => {
     const mac = searchParams.get("mac");
@@ -34,6 +35,31 @@ export default function PrefeituraLogin() {
   }, [searchParams]);
 
   useEffect(() => {
+    console.log("🔹 Login autorizado:", loginAutorizado);
+    console.log("🔹 Dados do Hotspot:", dadosHotspot);
+
+    if(REACT_APP_HOMOLOGACAO){
+      axios
+        .post(`${process.env.REACT_APP_URL}/Prefeitura/redirect_2`, {
+          username: "localhost",
+          password: "localhost",
+          dst: "http://www.google.com",
+          mac: "localhost",
+          ip: "localhost",
+        })
+        .then((response) => {
+          console.log("✅ Resposta da API:", response.data);
+          if (response.data.redirectUrl) {
+            window.location.href = response.data.redirectUrl; // 🔹 Redireciona para a URL retornada
+          }
+        })
+        .catch((error) => {
+          console.error("❌ Erro ao enviar para a API:", error);
+        });
+        return;
+    }
+    
+    
     if (loginAutorizado && dadosHotspot) {
       console.log("✅ Enviando dados para a API do backend...");
 

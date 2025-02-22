@@ -115,7 +115,7 @@ export default function CodeOtp() {
               <div className="mt-2">
                 <input id="otp" name="otp" type="text" required
                   value={authCode} onChange={(e) => setAuthCode(e.target.value)}
-                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900"
+                  className="block w-full rounded-md ring-1 ring-black bg-white px-3 py-1.5 text-base text-gray-900"
                 />
               </div>
             </div>
