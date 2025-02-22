@@ -5,9 +5,8 @@ import { Request, Response } from 'express';
 class PrefeituraLogin {
     
   async login(req: Request, res: Response) {
-    const { name, email, cpf } = req.body;
+    const { name, email, cpf, ip } = req.body;
     console.log(req.socket.remoteAddress);
-    const ip = String(req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress);
     
     const prefUserRepository = DataSource.getRepository(PrefeituraUser);
 

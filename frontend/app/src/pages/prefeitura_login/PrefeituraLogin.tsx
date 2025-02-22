@@ -11,22 +11,51 @@ export default function PrefeituraLogin() {
   const [redirecionado, setRedirecionado] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const [dadosHotspot, setDadosHotspot] = useState<any>(null);
-  
+  const [loginAutorizado, setLoginAutorizado] = useState<boolean>(false);
+
   useEffect(() => {
     const mac = searchParams.get("mac");
     const ip = searchParams.get("ip");
-    const username = searchParams.get("username");
+    const username = searchParams.get("username") || "cliente"; // Usuário padrão
+    const password = ""; // Senha vazia
     const linkLogin = searchParams.get("link-login");
     const linkOrig = searchParams.get("link-orig");
     const errorMsg = searchParams.get("error");
 
-    if (mac && ip && username) {
-      const dados = { mac, ip, username, linkLogin, linkOrig, error: errorMsg };
+    if (mac && ip && username && linkLogin) {
+      const dados = { mac, ip, username, password, linkLogin, linkOrig, error: errorMsg };
       setDadosHotspot(dados);
-      console.log(dados);
-      
+      console.log("🔹 Dados do Hotspot:", dados);
     }
   }, [searchParams]);
+
+  // 🔹 Envia o login para o Hotspot somente quando `loginAutorizado` for true
+  useEffect(() => {
+    if (loginAutorizado && dadosHotspot) {
+      console.log("✅ Enviando login automático para o Hotspot...");
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = dadosHotspot.linkLogin;
+      form.style.display = "none"; // Formulário oculto
+
+      // Criar campos ocultos
+      function addHiddenField(name: string, value: string) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+
+      addHiddenField("username", dadosHotspot.username);
+      addHiddenField("password", dadosHotspot.password);
+      addHiddenField("dst", dadosHotspot.linkOrig || "http://www.google.com");
+      addHiddenField("popup", "true");
+
+      document.body.appendChild(form);
+      form.submit();
+    }
+  }, [loginAutorizado, dadosHotspot]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -39,16 +68,18 @@ export default function PrefeituraLogin() {
         cpf: data.get("cpf"),
       });
 
-      console.log(response);
+      console.log("✅ Login aprovado:", response);
       setSucesso(response.data.sucesso);
       setError(null);
-      setRedirecionado("Você será redirecionado para a internet agora!");
+      setRedirecionado("Você será conectado à internet agora!");
 
-
+      // 🔹 Ativar login no Hotspot após sucesso
+      setLoginAutorizado(true);
     } catch (error: any) {
-      console.log(error);
+      console.log("❌ Erro ao fazer login:", error);
       setError(error.response?.data?.error || "Erro ao fazer login");
       setSucesso(null);
+      setLoginAutorizado(false);
     }
   };
 
@@ -65,11 +96,7 @@ export default function PrefeituraLogin() {
           <MdOutlineSignalWifi4BarLock />
         </div>
         <div className="self-center">
-          <img
-            alt="Wip Telecom"
-            src={icon_prefeitura}
-            className="mx-auto h-28 w-auto"
-          />
+          <img alt="Wip Telecom" src={icon_prefeitura} className="mx-auto h-28 w-auto" />
           <h2 className="mt-10 text-center text-2xl/9 font-bold tracking-tight font-Atkinson text-gray-900">
             Prefeitura
           </h2>
