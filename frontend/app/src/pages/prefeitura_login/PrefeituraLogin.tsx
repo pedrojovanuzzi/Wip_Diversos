@@ -66,6 +66,7 @@ export default function PrefeituraLogin() {
         name: data.get("name"),
         email: data.get("email"),
         cpf: data.get("cpf"),
+        ip: dadosHotspot.ip,
       });
 
       console.log("✅ Login aprovado:", response);
