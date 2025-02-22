@@ -114,18 +114,18 @@ export default function PrefeituraLogin() {
               </label>
               <div className="mt-2">
                 <input id="name" name="name" type="text" required autoComplete="name"
-                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900"
+                  className="block w-full ring-1 ring-black rounded-md bg-white px-3 py-1.5 text-base text-gray-900"
                 />
               </div>
             </div>
 
             <div>
               <label htmlFor="celular" className="block text-sm/6 font-medium text-gray-900">
-                Celular
+                Celular <span className="text-red-500">*</span>
               </label>
               <div className="mt-2">
                 <input id="celular" name="celular" type="text" autoComplete="celular" required
-                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900"
+                  className="block w-full ring-1 ring-black rounded-md bg-white px-3 py-1.5 text-base text-gray-900"
                 />
               </div>
             </div>
@@ -136,7 +136,7 @@ export default function PrefeituraLogin() {
               </label>
               <div className="mt-2">
                 <input id="cpf" name="cpf" type="text" required
-                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900"
+                  className="block w-full ring-1 ring-black rounded-md bg-white px-3 py-1.5 text-base text-gray-900"
                 />
               </div>
             </div>
