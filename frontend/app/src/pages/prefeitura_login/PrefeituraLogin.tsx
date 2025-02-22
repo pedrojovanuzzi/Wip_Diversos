@@ -37,7 +37,7 @@ export default function PrefeituraLogin() {
   useEffect(() => {
     if (loginAutorizado && dadosHotspot) {
       console.log("✅ Enviando dados para a API do backend...");
-  
+
       axios
         .post("https://wipdiversos.wiptelecomunicacoes.com.br/api/Prefeitura/redirect_2", {
           username: dadosHotspot.username,
@@ -49,12 +49,16 @@ export default function PrefeituraLogin() {
         })
         .then((response) => {
           console.log("✅ Resposta da API:", response.data);
+          if (response.data.redirectUrl) {
+            window.location.href = response.data.redirectUrl; // 🔹 Redireciona para a URL retornada
+          }
         })
         .catch((error) => {
           console.error("❌ Erro ao enviar para a API:", error);
         });
     }
   }, [loginAutorizado, dadosHotspot]);
+
   
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

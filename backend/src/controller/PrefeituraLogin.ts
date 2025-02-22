@@ -61,11 +61,14 @@ class PrefeituraLogin {
 
   async redirect_2(req: Request, res: Response) {
     const { mac, ip, username, "link-login": linkLogin, "link-orig": linkOrig, error } = req.body;
-
+  
     console.log("Dados recebidos do Hotspot:", { mac, ip, username, linkLogin, linkOrig, error });
   
-    res.redirect(`https://wipdiversos.wiptelecomunicacoes.com.br/Prefeitura/CodeOtp?mac=${mac}&ip=${ip}&username=${username}&link-login=${linkLogin}&link-orig=${linkOrig}&error=${error}`);
+    const redirectUrl = `https://wipdiversos.wiptelecomunicacoes.com.br/Prefeitura/CodeOtp?mac=${mac}&ip=${ip}&username=${username}&link-login=${linkLogin}&link-orig=${linkOrig}&error=${error}`;
+  
+    res.json({ redirectUrl }); // 🔹 Retorna a URL no JSON
   }
+  
 
   async AuthCode(req: Request, res: Response) {
     const {uuid} = req.body;
