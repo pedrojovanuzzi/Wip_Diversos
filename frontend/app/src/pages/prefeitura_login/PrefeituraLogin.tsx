@@ -42,7 +42,6 @@ export default function PrefeituraLogin() {
           username: dadosHotspot.username,
           password: dadosHotspot.password,
           dst: dadosHotspot.linkOrig || "http://www.google.com",
-          popup: "true",
           mac: dadosHotspot.mac,
           ip: dadosHotspot.ip,
         })
@@ -58,13 +57,17 @@ export default function PrefeituraLogin() {
     }
   }, [loginAutorizado, dadosHotspot]);
 
+
+  useEffect(() => {
+    const newOtp = uuidv4().replace(/-/g, "").substring(0, 8).toUpperCase(); // Exemplo: "A1B2C3D4"
+    setGeneratedOtp(newOtp);
+  }
+    , []);
+
   
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-
-    const newOtp = uuidv4().replace(/-/g, "").substring(0, 8).toUpperCase(); // Exemplo: "A1B2C3D4"
-    setGeneratedOtp(newOtp);
 
     try {
       setCelular(data.get("celular") as string);

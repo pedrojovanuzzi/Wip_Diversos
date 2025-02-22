@@ -1,20 +1,31 @@
+import dotenv from "dotenv";
+import { Request, Response } from 'express';
 import DataSource from "../database/DataSource";
 import { PrefeituraUser } from "../entities/PrefeituraUser";
-import { Request, Response } from 'express';
 import axios from "axios";
-import dotenv from "dotenv";
+
 dotenv.config();
+
+const homologacao = process.env.SERVIDOR_HOMOLOGACAO === 'true';
+const url = `https://graph.facebook.com/v20.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
+const urlMedia = `https://graph.facebook.com/v20.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
+const token = process.env.CLOUD_API_ACCESS_TOKEN;
+
 
 class PrefeituraLogin {
 
-  private url = `https://graph.facebook.com/v20.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
-  private urlMedia = `https://graph.facebook.com/v20.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
-  private token = process.env.CLOUD_API_ACCESS_TOKEN;
 
+  
     
   async login(req: Request, res: Response) {
-    const { name, celular, cpf, ip, mac, uuid } = req.body;
+    let { name, celular, cpf, ip, mac, uuid } = req.body;
+
     
+    if(homologacao){
+      ip = "localhost";
+      mac = "00:00:00:00:00:00";
+    }
+
     const prefUserRepository = DataSource.getRepository(PrefeituraUser);
 
     const newLogin = prefUserRepository.create({
@@ -75,7 +86,7 @@ class PrefeituraLogin {
     const prefUserRepository = DataSource.getRepository(PrefeituraUser);
     const user = await prefUserRepository.findOne({where: {uuid}});
     if(user){
-      res.status(200).json({ sucesso: "Sucesso Pode Fechar a Página" });
+      res.status(200).json({ sucesso: "Sucesso" });
       return;
     }else{
       res.status(400).json({ error: "Código de Verificação Inválido" });
@@ -87,7 +98,7 @@ class PrefeituraLogin {
     const { otp, celular } = req.body;
     const msg = `Seu código de verificação é: ${otp}`;
     await this.MensagensComuns(celular, msg);
-    res.status(200).json({ sucesso: "Sucesso Pode Fechar a Página" });
+    res.status(200).json({ sucesso: "Sucesso" });
   }
 
   static validarCPF(cpf: string): boolean {
@@ -123,7 +134,7 @@ class PrefeituraLogin {
         console.log("Número de TEST_PHONE:", process.env.TEST_PHONE);
         console.log("Número de recipient_number:", recipient_number);
       const response = await axios.post(
-        this.url,
+        url,
         {
           messaging_product: "whatsapp",
           recipient_type: "individual",
@@ -136,7 +147,7 @@ class PrefeituraLogin {
         },
         {
           headers: {
-            Authorization: `Bearer ${this.token}`,
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
         }
