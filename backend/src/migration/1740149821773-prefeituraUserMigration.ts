@@ -23,9 +23,9 @@ export class PrefeituraUserMigration1740149821773 implements MigrationInterface 
                         length: '90',
                     },
                     {
-                        name: 'email',
+                        name: 'celular',
                         type: 'varchar',
-                        isNullable: true,
+                        isNullable: false,
                         length: '255',
                     },
                     {
@@ -39,6 +39,18 @@ export class PrefeituraUserMigration1740149821773 implements MigrationInterface 
                         type: 'varchar',
                         isNullable: false,
                         length: '40',
+                    },
+                    {
+                        name: 'mac',
+                        type: 'varchar',
+                        isNullable: false,
+                        length: '80',
+                    },
+                    {
+                        name: 'uuid',
+                        type: 'varchar',
+                        isNullable: false,
+                        length: '80',
                     },
                     {
                         name: "created_at",

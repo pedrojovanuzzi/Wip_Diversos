@@ -12,6 +12,7 @@ import { Opnion } from './pages/feedback/Opnion';
 import { Nfe } from './pages/Nfe/Nfe';
 import { BuscarNfeGerada } from './pages/Nfe/BuscarNfeGerada';
 import PrefeituraLogin from './pages/prefeitura_login/PrefeituraLogin';
+import CodeOtp from './pages/prefeitura_login/CodeOtp';
 
 
 function App() {
@@ -50,6 +51,7 @@ function App() {
           <Route path="/Nfe" element={auth ? <Nfe /> : <Navigate to="/auth/login" />} />
           <Route path="/BuscarNfeGerada" element={auth ? <BuscarNfeGerada /> : <Navigate to="/auth/login" />} />
           <Route path="/Prefeitura/Login" element={<PrefeituraLogin />} />
+          <Route path="/Prefeitura/CodeOtp" element={<CodeOtp />} />
           <Route path="*" element={auth ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>

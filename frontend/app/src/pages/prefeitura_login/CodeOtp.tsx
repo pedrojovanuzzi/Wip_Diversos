@@ -7,15 +7,14 @@ import { useSearchParams } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 
 
-export default function PrefeituraLogin() {
+export default function CodeOtp() {
   const [error, setError] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
   const [redirecionado, setRedirecionado] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const [dadosHotspot, setDadosHotspot] = useState<any>(null);
   const [loginAutorizado, setLoginAutorizado] = useState<boolean>(false);
-  const [generatedOtp, setGeneratedOtp] = useState<string>(""); // Código OTP gerado automaticamente
-  const [celular, setCelular] = useState<string>("");
+  const [authCode, setAuthCode] = useState<string>(""); // Código OTP gerado automaticamente
 
   useEffect(() => {
     const mac = searchParams.get("mac");
@@ -36,39 +35,40 @@ export default function PrefeituraLogin() {
 
   useEffect(() => {
     if (loginAutorizado && dadosHotspot) {
-      console.log("✅ Enviando dados para a API do backend...");
-  
-      axios
-        .post("https://wipdiversos.wiptelecomunicacoes.com.br/api/Prefeitura/redirect_2", {
-          username: dadosHotspot.username,
-          password: dadosHotspot.password,
-          dst: dadosHotspot.linkOrig || "http://www.google.com",
-          popup: "true",
-          mac: dadosHotspot.mac,
-          ip: dadosHotspot.ip,
-        })
-        .then((response) => {
-          console.log("✅ Resposta da API:", response.data);
-        })
-        .catch((error) => {
-          console.error("❌ Erro ao enviar para a API:", error);
-        });
+      console.log("✅ Enviando login automático para o Hotspot...");
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = dadosHotspot.linkLogin;
+      form.style.display = "none";
+
+      function addHiddenField(name: string, value: string) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+
+      addHiddenField("username", dadosHotspot.username);
+      addHiddenField("password", dadosHotspot.password);
+      addHiddenField("dst", dadosHotspot.linkOrig || "http://www.google.com");
+      addHiddenField("popup", "true");
+
+      document.body.appendChild(form);
+      form.submit();
+
     }
   }, [loginAutorizado, dadosHotspot]);
-  
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
 
+
     try {
-      setCelular(data.get("celular") as string);
-      const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Login`, {
-        name: data.get("name"),
-        celular: data.get("celular"),
-        cpf: data.get("cpf"),
-        ip: dadosHotspot?.ip,
-        mac: dadosHotspot?.mac,
-        uuid: generatedOtp,
+      setAuthCode(data.get("celular") as string);
+      const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/AuthCode`, {
+        uuid: authCode,
       });
 
       console.log("✅ Login aprovado:", response);
@@ -109,33 +109,12 @@ export default function PrefeituraLogin() {
         <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
           <form onSubmit={handleSubmit} method="POST" className="space-y-6">
             <div>
-              <label htmlFor="name" className="block text-sm/6 font-medium text-gray-900">
-                Nome Completo <span className="text-red-500">*</span>
+              <label htmlFor="otp" className="block text-sm/6 font-medium text-gray-900">
+                Código de Verificação (OTP) <span className="text-red-500">*</span>
               </label>
               <div className="mt-2">
-                <input id="name" name="name" type="text" required autoComplete="name"
-                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="celular" className="block text-sm/6 font-medium text-gray-900">
-                Celular
-              </label>
-              <div className="mt-2">
-                <input id="celular" name="celular" type="text" autoComplete="celular" required
-                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="cpf" className="block text-sm/6 font-medium text-gray-900">
-                CPF <span className="text-red-500">*</span>
-              </label>
-              <div className="mt-2">
-                <input id="cpf" name="cpf" type="text" required
+                <input id="otp" name="otp" type="text" required
+                  value={authCode} onChange={(e) => setAuthCode(e.target.value)}
                   className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900"
                 />
               </div>

@@ -9,12 +9,18 @@ export class PrefeituraUser {
     name?: string
 
     @Column({nullable: true})
-    email?: string
+    celular?: string
     
     @Column()
     cpf?: string
 
     @Column()
     ip?: string
+
+    @Column()
+    mac?: string
+
+    @Column()
+    uuid?: string
 
 }
