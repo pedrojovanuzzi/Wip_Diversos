@@ -37,55 +37,47 @@ export default function PrefeituraLogin() {
     console.log("🔹 Login autorizado:", loginAutorizado);
     console.log("🔹 Dados do Hotspot:", dadosHotspot);
 
-    // if(process.env.REACT_APP_HOMOLOGACAO){
-    //   axios
-    //     .post(`${process.env.REACT_APP_URL}/Prefeitura/redirect_2`, {
-    //       username: "localhost",
-    //       password: "localhost",
-    //       dst: "http://www.google.com",
-    //       mac: "localhost",
-    //       ip: "localhost",
-    //     })
-    //     .then((response) => {
-    //       console.log("✅ Resposta da API:", response.data);
-    //       if (response.data.redirectUrl) {
-    //         window.location.href = response.data.redirectUrl; // 🔹 Redireciona para a URL retornada
-    //       }
-    //     })
-    //     .catch((error) => {
-    //       console.error("❌ Erro ao enviar para a API:", error);
-    //     });
-    //     return;
-    // }
-    
-    
-    if (loginAutorizado && dadosHotspot.ip && dadosHotspot.mac) {
-      console.log("✅ Enviando dados para a API do backend...");      
-
-      axios
-        .post(`${process.env.REACT_APP_URL}/Prefeitura/redirect_2`, {
-          username: dadosHotspot.username,
-          password: dadosHotspot.password,
-          dst: dadosHotspot.linkOrig || "http://www.google.com",
-          mac: dadosHotspot.mac,
-          ip: dadosHotspot.ip,
-        })
-        .then((response) => {
-          console.log("✅ Resposta da API:", response.data);
-          if (response.data.redirectUrl) {
-            window.location.href = response.data.redirectUrl; // 🔹 Redireciona para a URL retornada
-          }
-        })
-        .catch((error) => {
-          console.error("❌ Erro ao enviar para a API:", error);
-        });
+    const fetchData = async () => {
+      if (loginAutorizado && dadosHotspot.ip && dadosHotspot.mac) {
+        console.log("✅ Enviando dados para a API do backend...");      
+  
+        await axios
+          .post(`${process.env.REACT_APP_URL}/Prefeitura/redirect_2`, {
+            username: dadosHotspot.username,
+            password: dadosHotspot.password,
+            dst: dadosHotspot.linkOrig || "http://www.google.com",
+            mac: dadosHotspot.mac,
+            ip: dadosHotspot.ip,
+          })
+          .then((response) => {
+            console.log("✅ Resposta da API:", response.data);
+            if (response.data.redirectUrl) {
+              window.location.href = response.data.redirectUrl; // 🔹 Redireciona para a URL retornada
+            }
+          })
+          .catch((error) => {
+            console.error("❌ Erro ao enviar para a API:", error);
+          });
+      }
     }
+
+    fetchData();
+
   }, [loginAutorizado, dadosHotspot]);
 
 
   useEffect(() => {
     const newOtp = uuidv4().replace(/-/g, "").substring(0, 8).toUpperCase(); // Exemplo: "A1B2C3D4"
     setGeneratedOtp(newOtp);
+
+    const fetchData = async () => {
+      console.log(dadosHotspot);
+    const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Login`, {
+      dadosHotspot,
+    });
+    console.log(response.data);
+    }
+    fetchData();
   }
     , []);
 

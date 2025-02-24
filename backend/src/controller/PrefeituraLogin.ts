@@ -79,6 +79,11 @@ class PrefeituraLogin {
   
     res.json({ redirectUrl }); // 🔹 Retorna a URL no JSON
   }
+
+  async debug(req: Request, res: Response) {
+    console.log(req.body);
+    res.json({ success: true });
+  }
   
 
   async AuthCode(req: Request, res: Response) {
@@ -94,7 +99,7 @@ class PrefeituraLogin {
     }
   }
 
-  
+
   async SendOtp(req: Request, res: Response) {
     const { otp, celular } = req.body;
     const msg = `Seu código de verificação é: ${otp}`;
