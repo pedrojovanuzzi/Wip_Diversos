@@ -170,7 +170,7 @@ class PrefeituraLogin {
         }
       );
   
-      console.log("✅ Mensagem enviada com sucesso!", response.data);
+      console.log("✅ Mensagem enviada com sucesso!", response);
     } catch (error: any) {
       console.error("❌ Erro ao enviar mensagem:", error.response?.data || error.message);
     }
