@@ -67,7 +67,7 @@ class PrefeituraLogin {
 
     console.log("Dados recebidos do Hotspot:", { mac, ip, username, linkLogin, linkOrig, error });
   
-    res.redirect(`https://wipdiversos.wiptelecomunicacoes.com.br/Prefeitura/Login?mac=${mac}&ip=${ip}&username=${username}&link-login=${linkLogin}&link-orig=${linkOrig}&error=${error}`);
+    res.redirect(`${process.env.URL}/Prefeitura/Login?mac=${mac}&ip=${ip}&username=${username}&link-login=${linkLogin}&link-orig=${linkOrig}&error=${error}`);
   }
 
   async redirect_2(req: Request, res: Response) {
@@ -75,7 +75,7 @@ class PrefeituraLogin {
   
     console.log("Dados recebidos do Hotspot 2:", { mac, ip, username, linkLogin, linkOrig, error });
   
-    const redirectUrl = `https://wipdiversos.wiptelecomunicacoes.com.br/Prefeitura/CodeOtp?mac=${mac}&ip=${ip}&username=${username}&link-login=${linkLogin}&link-orig=${linkOrig}&error=${error}`;
+    const redirectUrl = `${process.env.URL}/Prefeitura/CodeOtp?mac=${mac}&ip=${ip}&username=${username}&link-login=${linkLogin}&link-orig=${linkOrig}&error=${error}`;
   
     res.json({ redirectUrl }); // 🔹 Retorna a URL no JSON
   }
