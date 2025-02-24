@@ -71,9 +71,11 @@ export default function PrefeituraLogin() {
         const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/redirect_2`, {
           username: dadosHotspot.username,
           password: dadosHotspot.password,
-          dst: dadosHotspot.linkOrig || "http://www.google.com",
           mac: dadosHotspot.mac,
           ip: dadosHotspot.ip,
+          linkOrig: dadosHotspot.linkOrig,
+          error: dadosHotspot.error,
+          linkLogin: dadosHotspot.linkLogin,
         });
   
         console.log("✅ Resposta da API:", response.data);
