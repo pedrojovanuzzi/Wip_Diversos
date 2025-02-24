@@ -94,12 +94,14 @@ class PrefeituraLogin {
     }
   }
 
+  
   async SendOtp(req: Request, res: Response) {
     const { otp, celular } = req.body;
     const msg = `Seu código de verificação é: ${otp}`;
-    await this.MensagensComuns(celular, msg);
+    await this.MensagensComuns.bind(this)(celular, msg);
     res.status(200).json({ sucesso: "Sucesso" });
   }
+  
 
   static validarCPF(cpf: string): boolean {
       cpf = cpf.replace(/\D/g, ""); // Remove caracteres não numéricos
