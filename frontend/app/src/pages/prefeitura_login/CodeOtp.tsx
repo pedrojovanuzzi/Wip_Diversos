@@ -82,7 +82,7 @@ export default function CodeOtp() {
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_URL}/Prefeitura/SendOtp`,
+        `${process.env.REACT_APP_URL}/Prefeitura/AuthCode`,
         {
           uuid: authCode,
         }
