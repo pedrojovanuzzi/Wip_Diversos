@@ -110,7 +110,7 @@ class PrefeituraLogin {
     }
   
     const msg = `Seu código de verificação é: ${otp}`;
-    await PrefeituraLogin.MensagensComuns(celular, msg);
+    await PrefeituraLogin.mensagens_templates(celular, msg, otp);
     res.status(200).json({ sucesso: "Sucesso" });
   }
   
@@ -142,6 +142,57 @@ class PrefeituraLogin {
   static validarNumeroCelular(numero: string): boolean {
     const regexCelular = /^(\+55\s?)?\(?\d{2}\)?\s?(9\d{4})-?(\d{4})$/;
     return regexCelular.test(numero);
+  }
+
+  static async mensagens_templates(receivenumber : string, msg: string, code : string) {
+    try {
+      const response = await axios.post(
+        url,
+        {
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: receivenumber,
+          type: "template",
+          template: {
+            name: "codigo_otp_prefeitura",
+            language: {
+              code: "pt_BR",
+            },
+            components: [
+              {
+                "type": "body",
+                "parameters": [
+                  {
+                    "type": "text",
+                    "text": msg,
+                  },
+                ]
+              },
+              {
+                "type": "button",
+                "sub_type": "quick_reply",
+                "index": "0",
+                "parameters": [
+                  {
+                    "type": "payload",
+                    "payload": String(code),
+                  }
+                ]
+              },
+            ],
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      console.log("✅ Mensagem enviada com sucesso!", response);
+    } catch (error) {
+      console.error("Error sending template message:", error);
+    }
   }
 
   static async MensagensComuns(recipient_number: string, msg: string) {
