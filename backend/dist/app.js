@@ -9,6 +9,9 @@ const Chamados_Routes_1 = __importDefault(require("./routes/Chamados.Routes")); 
 const Home_Routes_1 = __importDefault(require("./routes/Home.Routes"));
 const Auth_Routes_1 = __importDefault(require("./routes/Auth.Routes"));
 const cors_1 = __importDefault(require("cors"));
+const Feedback_routes_1 = __importDefault(require("./routes/Feedback.routes"));
+const NFSE_routes_1 = __importDefault(require("./routes/NFSE.routes"));
+const PrefeituraUser_routes_1 = __importDefault(require("./routes/PrefeituraUser.routes"));
 class App {
     constructor() {
         this.server = (0, express_1.default)();
@@ -17,12 +20,16 @@ class App {
     }
     middleware() {
         this.server.use(express_1.default.json());
+        this.server.use(express_1.default.urlencoded({ extended: true }));
         this.server.use((0, cors_1.default)({ origin: process.env.URL }));
     }
     router() {
         this.server.use("/api/chamados", Chamados_Routes_1.default);
         this.server.use("/api/", Home_Routes_1.default);
         this.server.use("/api/auth", Auth_Routes_1.default);
+        this.server.use("/api/feedback", Feedback_routes_1.default);
+        this.server.use("/api/Nfe", NFSE_routes_1.default);
+        this.server.use("/api/Prefeitura", PrefeituraUser_routes_1.default);
     }
 }
 exports.App = App;

@@ -127,6 +127,7 @@ export default function CodeOtp() {
               className="w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-white shadow-sm">
               Conectar
             </button>
+            <footer className="text-gray-200 text-sm">© 2025 Prefeitura de Arealva, Wip Telecom Multimia Eirelli, Pedro Artur Jovanuzzi.</footer>
           </form>
         </div>
       </div>
