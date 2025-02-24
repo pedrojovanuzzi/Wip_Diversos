@@ -7,8 +7,8 @@ import axios from "axios";
 dotenv.config();
 
 const homologacao = process.env.SERVIDOR_HOMOLOGACAO === 'true';
-const url = `https://graph.facebook.com/v20.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
-const urlMedia = `https://graph.facebook.com/v20.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
+const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
+const urlMedia = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
 const token = process.env.CLOUD_API_ACCESS_TOKEN;
 
 
