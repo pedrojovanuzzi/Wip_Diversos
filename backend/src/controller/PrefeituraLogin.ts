@@ -3,8 +3,16 @@ import { Request, Response } from 'express';
 import DataSource from "../database/DataSource";
 import { PrefeituraUser } from "../entities/PrefeituraUser";
 import axios from "axios";
+import twilio from "twilio";
 
 dotenv.config();
+
+
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER // Exemplo: "+15017122661"
+
+const client = twilio(accountSid, authToken);
 
 const homologacao = process.env.SERVIDOR_HOMOLOGACAO === 'true';
 const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
@@ -110,7 +118,7 @@ class PrefeituraLogin {
     }
   
     const msg = `Seu código de verificação é: ${otp}`;
-    await PrefeituraLogin.mensagens_templates(celular, msg, otp);
+    await PrefeituraLogin.SMS(celular, msg);
     res.status(200).json({ sucesso: "Sucesso" });
   }
   
@@ -144,91 +152,20 @@ class PrefeituraLogin {
     return regexCelular.test(numero);
   }
 
-  static async mensagens_templates(receivenumber : string, msg: string, code : string) {
+  static async SMS(celular : string, msg : string){
     try {
-      const response = await axios.post(
-        url,
-        {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: receivenumber,
-          type: "template",
-          template: {
-            name: "codigo_otp_prefeitura",
-            language: {
-              code: "pt_BR",
-            },
-            components: [
-              {
-                "type": "body",
-                "parameters": [
-                  {
-                    "type": "text",
-                    "text": msg,
-                  },
-                ]
-              },
-              {
-                "type": "button",
-                "sub_type": "quick_reply",
-                "index": "0",
-                "parameters": [
-                  {
-                    "type": "payload",
-                    "payload": String(code),
-                  }
-                ]
-              },
-            ],
-          },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      console.log("✅ Mensagem enviada com sucesso!", response);
-    } catch (error) {
-      console.error("Error sending template message:", error);
-    }
+      const response = await client.messages.create({
+          body: msg,
+          from: twilioPhoneNumber,
+          to: celular, // Número do destinatário com código do país, ex: "+5511987654321"
+      });
+
+      console.log("✅ SMS enviado com sucesso:", response.sid);
+  } catch (error) {
+      console.error("❌ Erro ao enviar SMS:", error);
   }
-
-  static async MensagensComuns(recipient_number: string, msg: string) {
-    try {
-      console.log("🔹 Enviando mensagem para:", recipient_number);
-      console.log("🔹 Mensagem:", msg);
-      console.log("🔹 Token de autorização:", token ? "Token presente" : "Token ausente!");
-  
-      const response = await axios.post(
-        url,
-        {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: String(recipient_number),
-          type: "text",
-          text: {
-            preview_url: false,
-            body: String(msg),
-          },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-  
-      console.log("✅ Mensagem enviada com sucesso!", response);
-    } catch (error: any) {
-      console.error("❌ Erro ao enviar mensagem:", error.response?.data || error.message);
-    }
+      
   }
-  
-
-
 }
 
 export default new PrefeituraLogin();
