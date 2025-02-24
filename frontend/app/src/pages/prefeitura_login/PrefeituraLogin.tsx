@@ -200,7 +200,7 @@ export default function PrefeituraLogin() {
         </div>
       </div>
       <div className="relative p-10 mt-10">
-      <footer className="absolute left-1/2 -translate-x-1/2 bottom-0 text-gray-400 text-sm mx-2">© 2025 Prefeitura de Arealva, Wip Telecom Multimia Eirelli, Pedro Artur Jovanuzzi.</footer>
+      <footer className="absolute mb-1 left-1/2 -translate-x-1/2 bottom-0 text-gray-400 text-sm">© 2025 Prefeitura de Arealva, Wip Telecom Multimia Eirelli, Pedro Artur Jovanuzzi.</footer>
       </div>
     </>
   );
