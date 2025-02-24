@@ -128,7 +128,6 @@ export default function PrefeituraLogin() {
 
   return (
     <>
-    <h1>Dados {String(dadosHotspot.linkLogin)}</h1>
       <div className="flex min-h-full mt-5 flex-1 flex-row justify-center">
         <div className="self-center">
           <img alt="Wip Telecom" src={icon} className="mx-auto h-28 w-auto" />
