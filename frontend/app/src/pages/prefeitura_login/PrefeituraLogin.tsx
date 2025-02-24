@@ -118,12 +118,12 @@ export default function PrefeituraLogin() {
       setSucesso(response.data.sucesso);
       setError(null);
 
-      setLoginAutorizado(true); // 🔹 Ativar login no Hotspot após sucesso
-
       const sendotp = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/SendOtp`, {
         celular: data.get("celular"),
         otp: generatedOtp,
       });
+
+      setLoginAutorizado(true); // 🔹 Ativar login no Hotspot após sucesso
 
       console.log("✅ OTP enviado:", sendotp);
 
@@ -199,7 +199,9 @@ export default function PrefeituraLogin() {
           </form>
         </div>
       </div>
-      <footer className="absolute bottom-2 text-gray-400 text-sm mx-2">© 2025 Prefeitura de Arealva, Wip Telecom Multimia Eirelli, Pedro Artur Jovanuzzi.</footer>
+      <div className="relative p-10 mt-10">
+      <footer className="absolute left-1/2 -translate-x-1/2 bottom-0 text-gray-400 text-sm mx-2">© 2025 Prefeitura de Arealva, Wip Telecom Multimia Eirelli, Pedro Artur Jovanuzzi.</footer>
+      </div>
     </>
   );
 }

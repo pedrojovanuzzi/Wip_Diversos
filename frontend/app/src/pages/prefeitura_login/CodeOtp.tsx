@@ -91,7 +91,6 @@ export default function CodeOtp() {
       console.log("✅ Login aprovado:", response);
       setSucesso(response.data.sucesso);
       setError(null);
-      setRedirecionado("Você será conectado à internet agora!");
 
       setLoginAutorizado(true); // 🔹 Ativar login no Hotspot após sucesso
     } catch (error: any) {
@@ -163,10 +162,9 @@ export default function CodeOtp() {
           </form>
         </div>
       </div>
-      <footer className="absolute bottom-2 text-gray-400 text-sm mx-2">
-        © 2025 Prefeitura de Arealva, Wip Telecom Multimia Eirelli, Pedro Artur
-        Jovanuzzi.
-      </footer>
+      <div className="relative p-10 mt-10">
+      <footer className="absolute left-1/2 -translate-x-1/2 bottom-0 text-gray-400 text-sm mx-2">© 2025 Prefeitura de Arealva, Wip Telecom Multimia Eirelli, Pedro Artur Jovanuzzi.</footer>
+      </div>
     </>
   );
 }

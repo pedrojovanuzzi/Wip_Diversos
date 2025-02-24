@@ -145,7 +145,7 @@ class PrefeituraLogin {
         {
           messaging_product: "whatsapp",
           recipient_type: "individual",
-          to: recipient_number,
+          to: String(recipient_number),
           type: "text",
           text: {
             preview_url: false,
