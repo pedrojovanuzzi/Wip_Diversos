@@ -52,17 +52,17 @@ export default function PrefeituraLogin() {
     }
 
 
-        const fetchDataDebug = async () => {
-      try {
-        console.log("Enviando dados para debug:", dadosHotspot);
-        const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Debug`, { dadosHotspot });
-        console.log("Resposta do servidor:", response.data);
-      } catch (error) {
-        console.error("Erro ao enviar dados:", error);
-      }
-    };
+    //     const fetchDataDebug = async () => {
+    //   try {
+    //     console.log("Enviando dados para debug:", dadosHotspot);
+    //     const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Debug`, { dadosHotspot });
+    //     console.log("Resposta do servidor:", response.data);
+    //   } catch (error) {
+    //     console.error("Erro ao enviar dados:", error);
+    //   }
+    // };
   
-    fetchDataDebug();
+    // fetchDataDebug();
   
     const fetchData = async () => { 
       try {
