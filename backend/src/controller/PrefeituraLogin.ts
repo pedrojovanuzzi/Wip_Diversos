@@ -71,7 +71,7 @@ class PrefeituraLogin {
   }
 
   async redirect_2(req: Request, res: Response) {
-    const { mac, ip, username, "link-login": linkLogin, "link-orig": linkOrig, error } = req.body;
+    const { mac, ip, username, linkLogin, linkOrig, error } = req.body;
   
     console.log("Dados recebidos do Hotspot 2:", { mac, ip, username, linkLogin, linkOrig, error });
   
