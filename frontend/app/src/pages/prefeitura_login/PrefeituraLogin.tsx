@@ -72,14 +72,13 @@ export default function PrefeituraLogin() {
 
     const fetchData = async () => {
       console.log(dadosHotspot);
-    const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Login`, {
+    const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Debug`, {
       dadosHotspot,
     });
     console.log(response.data);
     }
     fetchData();
-  }
-    , []);
+  }, []);
 
   
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
