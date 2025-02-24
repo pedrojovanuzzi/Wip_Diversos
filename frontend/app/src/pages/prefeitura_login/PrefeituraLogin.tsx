@@ -189,8 +189,8 @@ export default function PrefeituraLogin() {
             </button>
           </form>
         </div>
-        <footer className="absolute bottom-2 text-gray-400 text-sm mx-2">© 2025 Prefeitura de Arealva, Wip Telecom Multimia Eirelli, Pedro Artur Jovanuzzi.</footer>
       </div>
+      <footer className="absolute bottom-2 text-gray-400 text-sm mx-2">© 2025 Prefeitura de Arealva, Wip Telecom Multimia Eirelli, Pedro Artur Jovanuzzi.</footer>
     </>
   );
 }
