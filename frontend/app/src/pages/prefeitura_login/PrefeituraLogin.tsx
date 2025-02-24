@@ -19,35 +19,36 @@ export default function PrefeituraLogin() {
   useEffect(() => {
     const mac = searchParams.get("mac");
     const ip = searchParams.get("ip");
-    const username = searchParams.get("username") || "cliente"; // Usuário padrão
-    const password = ""; // Senha vazia
+    const username = searchParams.get("username") || "cliente";
+    const password = "";
     const linkLogin = searchParams.get("link-login");
     const linkOrig = searchParams.get("link-orig");
     const errorMsg = searchParams.get("error");
-
-
+  
     const dados = { mac, ip, username, password, linkLogin, linkOrig, error: errorMsg };
     setDadosHotspot(dados);
     console.log("🔹 Dados do Hotspot:", dados);
-
+  
     const fetchData = async () => {
-      console.log(dadosHotspot);
-    const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Debug`, {
-      dadosHotspot,
-    });
-    console.log(response.data);
-    }
+      try {
+        console.log("Enviando dados para debug:", dados);
+        const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Debug`, { dados });
+        console.log("Resposta do servidor:", response.data);
+      } catch (error) {
+        console.error("Erro ao enviar dados:", error);
+      }
+    };
+  
     fetchData();
-    
-
-  }, [searchParams]);
+  }, [searchParams]); // Dependência correta
+  
 
   useEffect(() => {
     console.log("🔹 Login autorizado:", loginAutorizado);
     console.log("🔹 Dados do Hotspot:", dadosHotspot);
 
     const fetchData = async () => {
-      if (loginAutorizado && dadosHotspot.ip && dadosHotspot.mac) {
+      if (loginAutorizado && dadosHotspot.ip && dadosHotspot.mac && dadosHotspot.linkOrig) {
         console.log("✅ Enviando dados para a API do backend...");      
   
         await axios
