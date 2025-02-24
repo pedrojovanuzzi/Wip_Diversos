@@ -50,6 +50,19 @@ export default function PrefeituraLogin() {
     if (!loginAutorizado || !dadosHotspot.ip || !dadosHotspot.mac || !dadosHotspot.linkOrig) {
       return; // Se faltar alguma informação, não executa a requisição
     }
+
+
+        const fetchDataDebug = async () => {
+      try {
+        console.log("Enviando dados para debug:", dadosHotspot);
+        const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Debug`, { dadosHotspot });
+        console.log("Resposta do servidor:", response.data);
+      } catch (error) {
+        console.error("Erro ao enviar dados:", error);
+      }
+    };
+  
+    fetchDataDebug();
   
     const fetchData = async () => { 
       try {

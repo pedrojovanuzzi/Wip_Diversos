@@ -103,7 +103,7 @@ class PrefeituraLogin {
   async SendOtp(req: Request, res: Response) {
     const { otp, celular } = req.body;
     const msg = `Seu código de verificação é: ${otp}`;
-    await this.MensagensComuns.bind(this)(celular, msg);
+    await PrefeituraLogin.MensagensComuns(celular, msg);
     res.status(200).json({ sucesso: "Sucesso" });
   }
   
@@ -136,7 +136,7 @@ class PrefeituraLogin {
     return regexCelular.test(numero);
   }
 
-  async MensagensComuns(recipient_number : string, msg : string) {
+  static async MensagensComuns(recipient_number : string, msg : string) {
     try {
         console.log("Número de TEST_PHONE:", process.env.TEST_PHONE);
         console.log("Número de recipient_number:", recipient_number);
