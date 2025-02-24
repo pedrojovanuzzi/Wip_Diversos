@@ -8,7 +8,7 @@ router.post("/redirect", PrefeituraLogin.redirect);
 router.get("/redirect", PrefeituraLogin.redirect);
 router.post("/redirect_2", PrefeituraLogin.redirect_2);
 router.get("/redirect_2", PrefeituraLogin.redirect_2);
-// router.post("/SendOtp", PrefeituraLogin.SendOtp);
+router.post("/SendOtp", PrefeituraLogin.SendOtp);
 
 
 export default router;
