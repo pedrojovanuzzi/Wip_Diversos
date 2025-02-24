@@ -102,10 +102,18 @@ class PrefeituraLogin {
 
   async SendOtp(req: Request, res: Response) {
     const { otp, celular } = req.body;
+    console.log("🔹 Recebido no SendOtp:", { otp, celular });
+  
+    if (!otp || !celular) {
+      res.status(400).json({ error: "OTP ou celular ausente" });
+      return;
+    }
+  
     const msg = `Seu código de verificação é: ${otp}`;
     await PrefeituraLogin.MensagensComuns(celular, msg);
     res.status(200).json({ sucesso: "Sucesso" });
   }
+  
   
 
   static validarCPF(cpf: string): boolean {
@@ -136,10 +144,12 @@ class PrefeituraLogin {
     return regexCelular.test(numero);
   }
 
-  static async MensagensComuns(recipient_number : string, msg : string) {
+  static async MensagensComuns(recipient_number: string, msg: string) {
     try {
-        console.log("Número de TEST_PHONE:", process.env.TEST_PHONE);
-        console.log("Número de recipient_number:", recipient_number);
+      console.log("🔹 Enviando mensagem para:", recipient_number);
+      console.log("🔹 Mensagem:", msg);
+      console.log("🔹 Token de autorização:", token ? "Token presente" : "Token ausente!");
+  
       const response = await axios.post(
         url,
         {
@@ -159,12 +169,13 @@ class PrefeituraLogin {
           },
         }
       );
-
-      console.log(response.data);
-    } catch (error) {
-      console.error("Error sending message:", error);
+  
+      console.log("✅ Mensagem enviada com sucesso!", response.data);
+    } catch (error: any) {
+      console.error("❌ Erro ao enviar mensagem:", error.response?.data || error.message);
     }
   }
+  
 
 
 }
