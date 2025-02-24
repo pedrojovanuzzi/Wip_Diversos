@@ -29,6 +29,15 @@ export default function PrefeituraLogin() {
     const dados = { mac, ip, username, password, linkLogin, linkOrig, error: errorMsg };
     setDadosHotspot(dados);
     console.log("🔹 Dados do Hotspot:", dados);
+
+    const fetchData = async () => {
+      console.log(dadosHotspot);
+    const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Debug`, {
+      dadosHotspot,
+    });
+    console.log(response.data);
+    }
+    fetchData();
     
 
   }, [searchParams]);
@@ -69,15 +78,6 @@ export default function PrefeituraLogin() {
   useEffect(() => {
     const newOtp = uuidv4().replace(/-/g, "").substring(0, 8).toUpperCase(); // Exemplo: "A1B2C3D4"
     setGeneratedOtp(newOtp);
-
-    const fetchData = async () => {
-      console.log(dadosHotspot);
-    const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Debug`, {
-      dadosHotspot,
-    });
-    console.log(response.data);
-    }
-    fetchData();
   }, []);
 
   
