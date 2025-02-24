@@ -29,51 +29,53 @@ export default function PrefeituraLogin() {
     setDadosHotspot(dados);
     console.log("🔹 Dados do Hotspot:", dados);
   
-    const fetchData = async () => {
-      try {
-        console.log("Enviando dados para debug:", dados);
-        const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Debug`, { dados });
-        console.log("Resposta do servidor:", response.data);
-      } catch (error) {
-        console.error("Erro ao enviar dados:", error);
-      }
-    };
+    // const fetchData = async () => {
+    //   try {
+    //     console.log("Enviando dados para debug:", dados);
+    //     const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/Debug`, { dados });
+    //     console.log("Resposta do servidor:", response.data);
+    //   } catch (error) {
+    //     console.error("Erro ao enviar dados:", error);
+    //   }
+    // };
   
-    fetchData();
+    // fetchData();
   }, [searchParams]); // Dependência correta
   
 
   useEffect(() => {
-    console.log("🔹 Login autorizado:", loginAutorizado);
-    console.log("🔹 Dados do Hotspot:", dadosHotspot);
-
-    const fetchData = async () => {
-      if (loginAutorizado && dadosHotspot.ip && dadosHotspot.mac && dadosHotspot.linkOrig) {
-        console.log("✅ Enviando dados para a API do backend...");      
+    console.log("🔹 Login autorizado:", loginAutorizado); 
+    console.log("🔹 Dados do Hotspot:", dadosHotspot); 
   
-        await axios
-          .post(`${process.env.REACT_APP_URL}/Prefeitura/redirect_2`, {
-            username: dadosHotspot.username,
-            password: dadosHotspot.password,
-            dst: dadosHotspot.linkOrig || "http://www.google.com",
-            mac: dadosHotspot.mac,
-            ip: dadosHotspot.ip,
-          })
-          .then((response) => {
-            console.log("✅ Resposta da API:", response.data);
-            if (response.data.redirectUrl) {
-              window.location.href = response.data.redirectUrl; // 🔹 Redireciona para a URL retornada
-            }
-          })
-          .catch((error) => {
-            console.error("❌ Erro ao enviar para a API:", error);
-          });
-      }
+    if (!loginAutorizado || !dadosHotspot.ip || !dadosHotspot.mac || !dadosHotspot.linkOrig) {
+      return; // Se faltar alguma informação, não executa a requisição
     }
-
+  
+    const fetchData = async () => { 
+      try {
+        console.log("✅ Enviando dados para a API do backend...");       
+  
+        const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/redirect_2`, {
+          username: dadosHotspot.username,
+          password: dadosHotspot.password,
+          dst: dadosHotspot.linkOrig || "http://www.google.com",
+          mac: dadosHotspot.mac,
+          ip: dadosHotspot.ip,
+        });
+  
+        console.log("✅ Resposta da API:", response.data);
+        
+        if (response.data.redirectUrl) {
+          window.location.href = response.data.redirectUrl; // 🔹 Redireciona para a URL retornada
+        }
+      } catch (error) {
+        console.error("❌ Erro ao enviar para a API:", error);
+      }
+    };
+  
     fetchData();
-
-  }, [loginAutorizado, dadosHotspot]);
+  }, [loginAutorizado, dadosHotspot]); // 🔹 Executa sempre que `loginAutorizado` ou `dadosHotspot` mudar
+  
 
 
   useEffect(() => {
