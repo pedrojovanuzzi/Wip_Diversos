@@ -54,22 +54,11 @@ class NFSEController {
     try {
       let { password, clientesSelecionados, aliquota, service, reducao } = req.body;
       this.PASSWORD = password;
-
       aliquota = aliquota && aliquota.trim() !== "" ? aliquota : "4.4269";
-      aliquota = aliquota.replace(",", ".");
-      aliquota = aliquota.replace("%", "");
-      
-
-      if(service === "" || undefined || null){
-        service = "Servico de Suporte Tecnico";
-      }
-      
-      if(reducao === "" || undefined || null){
-        reducao = 40;
-      }
-
+      aliquota = aliquota.replace(",", ".").replace("%", "");
+      if (!service) service = "Servico de Suporte Tecnico";
+      if (!reducao) reducao = 40;
       reducao = reducao / 100;
-
       if (!password) throw new Error("Senha do certificado não fornecida.");
       const result = await this.gerarNFSE(
         password,
@@ -78,415 +67,262 @@ class NFSEController {
         aliquota,
         service,
         reducao
-      );      
-
-      if(result?.status === "200"){
-        res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
+      );
+      if (Array.isArray(result)) {
+        const allSuccess = result.every(r => r.status === "200");
+        if (allSuccess)
+          res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
+        else res.status(500).json({ erro: "Erro ao criar o RPS." });
+      } else {
+        if (result?.status === "200")
+          res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
+        else res.status(500).json({ erro: "Erro ao criar o RPS." });
       }
-      else{
-        res.status(500).json({ erro: "Erro ao criar o RPS." });
-      }     
     } catch (error) {
       res.status(500).json({ erro: "Erro ao criar o RPS." });
     }
   };
+  
+  
 
   public async gerarNFSE(
     password: string,
     ids: string[],
     SOAPAction: string,
     aliquota: string,
-    service : string = "Servico de Suporte Tecnico",
-    reducao : number | string = 40,
+    service: string = "Servico de Suporte Tecnico",
+    reducao: number | string = 40,
   ) {
     try {
       if (!fs.existsSync(this.TEMP_DIR))
         fs.mkdirSync(this.TEMP_DIR, { recursive: true });
-  
       const isLinux = os.platform() === "linux";
       const isWindows = os.platform() === "win32";
-  
       if (isLinux) {
-        execSync(
-          `openssl pkcs12 -in "${this.certPath}" -nodes -legacy -passin pass:${password} -out "${this.DECRYPTED_CERT_PATH}"`,
-          { stdio: "inherit" }
-        );
-        execSync(
-          `openssl pkcs12 -in "${this.DECRYPTED_CERT_PATH}" -export -out "${this.NEW_CERT_PATH}" -passout pass:${password}`,
-          { stdio: "inherit" }
-        );
+        execSync(`openssl pkcs12 -in "${this.certPath}" -nodes -legacy -passin pass:${password} -out "${this.DECRYPTED_CERT_PATH}"`, { stdio: "inherit" });
+        execSync(`openssl pkcs12 -in "${this.DECRYPTED_CERT_PATH}" -export -out "${this.NEW_CERT_PATH}" -passout pass:${password}`, { stdio: "inherit" });
       } else if (isWindows) {
         const powershellCommand = `
-          try {
-            $certificado = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('${this.certPath}', '${password}', [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable);
-            $bytes = $certificado.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12, '${password}');
-            [System.IO.File]::WriteAllBytes('${this.NEW_CERT_PATH}', $bytes)
-          } catch {
-            Write-Error $_.Exception.Message
-            exit 1
-          }
-        `;
-        try {
-          execSync(
-            `powershell -Command "${powershellCommand.replace(/\n/g, " ")}"`,
-            {
-              stdio: ["ignore", "inherit", "pipe"], // Captura stderr
+            try {
+              $certificado = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('${this.certPath}', '${password}', [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable);
+              $bytes = $certificado.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12, '${password}');
+              [System.IO.File]::WriteAllBytes('${this.NEW_CERT_PATH}', $bytes)
+            } catch {
+              Write-Error $_.Exception.Message
+              exit 1
             }
-          );
+          `;
+        try {
+          execSync(`powershell -Command "${powershellCommand.replace(/\n/g, " ")}"`, { stdio: ["ignore", "inherit", "pipe"] });
         } catch (error: any) {
-          console.error("Erro no PowerShell:", error.stderr || error.message || error);
           return { status: "500", response: error.stderr || "Erro desconhecido" };
         }
       }
-  
-      const certPathToUse = fs.existsSync(this.NEW_CERT_PATH)
-        ? this.NEW_CERT_PATH
-        : this.certPath;
-  
+      const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
       const pfxBuffer = fs.readFileSync(certPathToUse);
-  
-      const httpsAgent = new https.Agent({
-        pfx: pfxBuffer,
-        passphrase: password,
-        rejectUnauthorized: false,
-      });
-  
-      for (const id of ids) {
-        const xmlLoteRps = await this.gerarXmlRecepcionarRps(
-          id,
-          Number(aliquota).toFixed(4),
-          service,
-          reducao
-        );
-        const response = await axios.post(this.WSDL_URL, xmlLoteRps, {
+      const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: password, rejectUnauthorized: false });
+      const NsfeData = AppDataSource.getRepository(NFSE);
+      const nfseResponse = await NsfeData.find({ order: { id: "DESC" }, take: 1 });
+      let nfseNumber = nfseResponse && nfseResponse[0]?.numeroRps ? nfseResponse[0].numeroRps + 1 : 1;
+      let responses: any[] = [];
+      for (let i = 0; i < ids.length; i += 50) {
+        const batch = ids.slice(i, i + 50);
+        let rpsXmls = "";
+        for (const id of batch) {
+          const xmlRps = await this.gerarRpsXml(id, Number(aliquota).toFixed(4), service, reducao, nfseNumber, nfseResponse[0]);
+          rpsXmls += xmlRps;
+          nfseNumber++;
+        }
+        let loteXmlSemAssinatura = `
+          <LoteRps versao="2.01" Id="lote${nfseNumber}">
+            <NumeroLote>1</NumeroLote>
+            <CpfCnpj><Cnpj>${this.homologacao ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj>
+            <InscricaoMunicipal>${this.homologacao ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal>
+            <QuantidadeRps>${batch.length}</QuantidadeRps>
+            <ListaRps>
+              ${rpsXmls}
+            </ListaRps>
+          </LoteRps>
+        `.replace(/[\r\n]+/g, "").replace(/\s{2,}/g, " ").replace(/>\s+</g, "><").replace(/<\s+/g, "<").replace(/\s+>/g, ">").trim();
+        const signedLote = this.assinarXml(loteXmlSemAssinatura, `InfDeclaracaoPrestacaoServico`);
+        let envioXml = "";
+        let soapXml = "";
+        if (this.homologacao) {
+          envioXml = `
+            <GerarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
+              ${signedLote}
+            </GerarNfseEnvio>
+          `.trim();
+          soapXml = `
+            <?xml version="1.0" encoding="UTF-8"?>
+            <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
+              <soapenv:Header/>
+              <soapenv:Body>
+                <ws:gerarNfse>
+                  ${envioXml}
+                  <username>${process.env.MUNICIPIO_LOGIN_TEST}</username>
+                  <password>${process.env.MUNICIPIO_SENHA_TEST}</password>
+                </ws:gerarNfse>
+              </soapenv:Body>
+            </soapenv:Envelope>
+          `.replace(/[\r\n]+/g, "").replace(/\s{2,}/g, " ").replace(/>\s+</g, "><").replace(/<\s+/g, "<").replace(/\s+>/g, ">").trim();
+        } else {
+          envioXml = `
+            <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
+              ${signedLote}
+            </EnviarLoteRpsSincronoEnvio>
+          `.trim();
+          soapXml = `
+            <?xml version="1.0" encoding="UTF-8"?>
+            <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
+              <soapenv:Header/>
+              <soapenv:Body>
+                <ws:recepcionarLoteRpsSincrono>
+                  ${envioXml}
+                  <username>${process.env.MUNICIPIO_LOGIN}</username>
+                  <password>${process.env.MUNICIPIO_SENHA}</password>
+                </ws:recepcionarLoteRpsSincrono>
+              </soapenv:Body>
+            </soapenv:Envelope>
+          `.replace(/[\r\n]+/g, "").replace(/\s{2,}/g, " ").replace(/>\s+</g, "><").replace(/<\s+/g, "<").replace(/\s+>/g, ">").trim();
+        }
+        console.log("SOAP XML:", soapXml);
+        const response = await axios.post(this.WSDL_URL, soapXml, {
           httpsAgent,
           headers: {
             "Content-Type": "text/xml; charset=UTF-8",
             SOAPAction: SOAPAction,
           },
         });
-
-        console.log(response);
-        
-  
-        if (response.status === 200) {
-          return { status: "200", response: response.data };
+        const firstId = batch[0];
+        const RPSQuery = MkauthSource.getRepository(Faturas);
+        const rpsData = await RPSQuery.findOne({ where: { id: Number(firstId) } });
+        const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+        const FaturasRepository = MkauthSource.getRepository(Faturas);
+        const FaturasData = await FaturasRepository.findOne({ where: { id: Number(firstId) } });
+        const ClientData = await ClientRepository.findOne({ where: { login: FaturasData?.login } });
+        const resp = await axios.get(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`);
+        const municipio = resp.data.id;
+        let valorMenosDesconto = 0;
+        ClientData?.desconto ? valorMenosDesconto = Number(rpsData?.valor) - Number(ClientData?.desconto) : valorMenosDesconto = Number(rpsData?.valor);
+        let valorReduzido = Number(valorMenosDesconto) * Number(reducao);
+        valorReduzido = Number(valorReduzido.toFixed(2));
+        const insertDatabase = NsfeData.create({
+          login: rpsData?.login || "",
+          numeroRps: nfseNumber,
+          serieRps: nfseResponse[0]?.serieRps || "",
+          tipoRps: nfseResponse[0]?.tipoRps || 0,
+          dataEmissao: rpsData?.processamento ? new Date(rpsData.processamento) : new Date(),
+          competencia: rpsData?.datavenc ? new Date(rpsData.datavenc) : new Date(),
+          valorServico: valorReduzido || 0,
+          aliquota: Number(Number(aliquota).toFixed(4)),
+          issRetido: nfseResponse[0]?.issRetido || 0,
+          responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
+          itemListaServico: nfseResponse[0]?.itemListaServico || "",
+          discriminacao: service,
+          codigoMunicipio: nfseResponse[0]?.codigoMunicipio || 0,
+          exigibilidadeIss: nfseResponse[0]?.exigibilidadeIss || 0,
+          cnpjPrestador: nfseResponse[0]?.cnpjPrestador || "",
+          inscricaoMunicipalPrestador: nfseResponse[0]?.inscricaoMunicipalPrestador || "",
+          cpfTomador: ClientData?.cpf_cnpj.replace(/[^0-9]/g, "") || "",
+          razaoSocialTomador: ClientData?.nome || "",
+          enderecoTomador: ClientData?.endereco || "",
+          numeroEndereco: ClientData?.numero || "",
+          complemento: ClientData?.complemento || undefined,
+          bairro: ClientData?.bairro || "",
+          uf: nfseResponse[0]?.uf || "",
+          cep: ClientData?.cep.replace(/[^0-9]/g, "") || "",
+          telefoneTomador: ClientData?.celular.replace(/[^0-9]/g, "") || undefined,
+          emailTomador: ClientData?.email || undefined,
+          optanteSimplesNacional: 1,
+          incentivoFiscal: 2,
+        });
+        if (await this.verificaRps(nfseNumber)) {
+          await NsfeData.save(insertDatabase);
+          responses.push({ status: "200", response: soapXml });
         } else {
-          return { status: "500", response: "Error" };
+          responses.push({ status: "500", response: "ERRO NA CONSULTA DE RPS" });
         }
       }
-  
       if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
-      if (fs.existsSync(this.DECRYPTED_CERT_PATH))
-        fs.unlinkSync(this.DECRYPTED_CERT_PATH);
+      if (fs.existsSync(this.DECRYPTED_CERT_PATH)) fs.unlinkSync(this.DECRYPTED_CERT_PATH);
+      return responses;
     } catch (error: any) {
-      console.error("Erro geral no gerarNFSE:", error);
       return { status: "500", response: error.message || "Senha Inválida" };
     }
   }
   
-
-  private async gerarXmlRecepcionarRps(id: string, aliquota: string, service : string, reducao : number | string) {
-    try {
-      const RPSQuery = MkauthSource.getRepository(Faturas);
+  
+  private async gerarRpsXml(id: string, aliquota: string, service: string, reducao: number | string, nfseNumber: number, nfseBase: any): Promise<string> {
+    const RPSQuery = MkauthSource.getRepository(Faturas);
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const FaturasRepository = MkauthSource.getRepository(Faturas);
-    const FaturasData = await FaturasRepository.findOne({
-      where: { id: Number(id) },
-    });
-    const ClientData = await ClientRepository.findOne({
-      where: { login: FaturasData?.login },
-    });
-    const response = await axios.get(
-      `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
-    );
-    const municipio = response.data.id;
-    const NsfeData = AppDataSource.getRepository(NFSE);
-    const nfseResponse = await NsfeData.find({
-      order: { id: "DESC" },
-      take: 1,
-    });
-    let nfseNumber =
-      nfseResponse && nfseResponse[0]?.numeroRps
-        ? nfseResponse[0].numeroRps + 1
-        : 1;
-
-    nfseNumber = nfseNumber === 9999999 ? 9999999 + 1 : nfseNumber; //Por causa de um Teste Realizado]
-
+    const FaturasData = await FaturasRepository.findOne({ where: { id: Number(id) } });
+    const ClientData = await ClientRepository.findOne({ where: { login: FaturasData?.login } });
+    const resp = await axios.get(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`);
+    const municipio = resp.data.id;
     let valorMenosDesconto = 0;
-
-    ClientData?.desconto ? valorMenosDesconto =(Number(rpsData?.valor) - Number(ClientData?.desconto)) : valorMenosDesconto = Number(rpsData?.valor);
-
+    ClientData?.desconto ? valorMenosDesconto = Number(rpsData?.valor) - Number(ClientData?.desconto) : valorMenosDesconto = Number(rpsData?.valor);
     let valorReduzido = Number(valorMenosDesconto) * Number(reducao);
-
     valorReduzido = Number(valorReduzido.toFixed(2));
-
-    const rpsXmlSemAssinatura = `
-    <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
-      <InfDeclaracaoPrestacaoServico Id="RPS${String(rpsData?.uuid_lanc)}">
-        <Rps>
-          <IdentificacaoRps>
-            <Numero>${String(nfseNumber)}</Numero>
-            <Serie>${String(nfseResponse[0]?.serieRps)}</Serie>
-            <Tipo>${String(nfseResponse[0]?.tipoRps)}</Tipo>
-          </IdentificacaoRps>
-          <DataEmissao>${new Date()
-            .toISOString()
-            .substring(0, 10)}</DataEmissao>
-          <Status>1</Status>
-        </Rps>
-        <Competencia>${new Date().toISOString().substring(0, 10)}</Competencia>
-        <Servico>
-          <Valores>
-            <ValorServicos>${String(valorReduzido)}</ValorServicos>
-            <Aliquota>${this.homologacao === true ? "2.00" : aliquota || "4.4269"}</Aliquota>
-          </Valores>
-          <IssRetido>${String(nfseResponse[0]?.issRetido)}</IssRetido>
-          <ResponsavelRetencao>${String(
-            nfseResponse[0]?.responsavelRetencao
-          )}</ResponsavelRetencao>
-          <ItemListaServico>${this.homologacao === true ? "17.01" : String(
-            nfseResponse[0]?.itemListaServico
-          )}</ItemListaServico>
-          <Discriminacao>${service}</Discriminacao>
-          <CodigoMunicipio>3503406</CodigoMunicipio>
-          <ExigibilidadeISS>${String(
-            nfseResponse[0]?.exigibilidadeIss
-          )}</ExigibilidadeISS>
-        </Servico>
-        <Prestador>
-          <CpfCnpj><Cnpj>${
-            this.homologacao === true
-              ? process.env.MUNICIPIO_CNPJ_TEST
-              : process.env.MUNICIPIO_LOGIN
-          }</Cnpj></CpfCnpj>
-          <InscricaoMunicipal>${
-            this.homologacao === true
-              ? process.env.MUNICIPIO_INCRICAO_TEST
-              : process.env.MUNICIPIO_INCRICAO
-          }</InscricaoMunicipal>
-        </Prestador>
-        <Tomador>
-          <IdentificacaoTomador>
-            <CpfCnpj>
-              <${ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj"}>${String(
-      ClientData?.cpf_cnpj.replace(/[^0-9]/g, "")
-    )}</${ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj"}>
-            </CpfCnpj>
-          </IdentificacaoTomador>
-          <RazaoSocial>${String(ClientData?.nome)}</RazaoSocial>
-          <Endereco>
-            <Endereco>${String(ClientData?.endereco)}</Endereco>
-            <Numero>${String(ClientData?.numero)}</Numero>
-            <Complemento>${String(ClientData?.complemento)}</Complemento>
-            <Bairro>${String(ClientData?.bairro)}</Bairro>
-            <CodigoMunicipio>${municipio}</CodigoMunicipio>
-            <Uf>SP</Uf>
-            <Cep>${String(ClientData?.cep.replace(/[^0-9]/g, ""))}</Cep>
-          </Endereco>
-          <Contato>
-            <Telefone>${String(
-              ClientData?.celular.replace(/[^0-9]/g, "")
-            )}</Telefone>
-            <Email>${this.homologacao === true
-            ? "teste24542frsgwr@gmail.com"
-            : String(ClientData?.email )}</Email>
-          </Contato>
-        </Tomador>
-        ${this.homologacao === true ? "" : "<RegimeEspecialTributacao>6</RegimeEspecialTributacao>"}
-        <OptanteSimplesNacional>${
-          this.homologacao === true ? "2" : nfseResponse[0]?.optanteSimplesNacional || "1"
-        }</OptanteSimplesNacional>
-        <IncentivoFiscal>${
-          nfseResponse[0]?.incentivoFiscal || "2"
-        }</IncentivoFiscal>
-      </InfDeclaracaoPrestacaoServico>
-    </Rps>
-    `
-      .replace(/[\r\n]+/g, "")
-      .replace(/\s{2,}/g, " ")
-      .replace(/>\s+</g, "><")
-      .replace(/<\s+/g, "<")
-      .replace(/\s+>/g, ">")
-      .trim();
-
-    const loteXmlSemAssinatura = `
-    <LoteRps versao="2.01" Id="lote${nfseNumber}">
-      <NumeroLote>1</NumeroLote>
-      <CpfCnpj><Cnpj>${
-        this.homologacao === true
-          ? process.env.MUNICIPIO_CNPJ_TEST
-          : process.env.MUNICIPIO_LOGIN
-      }</Cnpj></CpfCnpj>
-      <InscricaoMunicipal>${
-        this.homologacao === true
-          ? process.env.MUNICIPIO_INCRICAO_TEST
-          : process.env.MUNICIPIO_INCRICAO
-      }</InscricaoMunicipal>
-      <QuantidadeRps>1</QuantidadeRps>
-      <ListaRps>
-        ${rpsXmlSemAssinatura}
-      </ListaRps>
-    </LoteRps>
-    `
-      .replace(/[\r\n]+/g, "")
-      .replace(/\s{2,}/g, " ")
-      .replace(/>\s+</g, "><")
-      .replace(/<\s+/g, "<")
-      .replace(/\s+>/g, ">")
-      .trim();
-
-
-      const GerarNfseHomologacao = `
-        ${rpsXmlSemAssinatura}
-    `
-      .replace(/[\r\n]+/g, "")
-      .replace(/\s{2,}/g, " ")
-      .replace(/>\s+</g, "><")
-      .replace(/<\s+/g, "<")
-      .replace(/\s+>/g, ">")
-      .trim();
-
-    const SignatureRps = this.assinarXml(
-      loteXmlSemAssinatura,
-      `InfDeclaracaoPrestacaoServico`
-    );
-
-    const loteXmlComAssinatura = `
-    ${SignatureRps}
-  `.trim();
-
-  let envioXml = "";
-
-  if(this.homologacao){
-    envioXml = `
-    <GerarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
-      ${GerarNfseHomologacao}
-    </GerarNfseEnvio>
-    `.trim();
-  }
-  else{
-    envioXml = `
-    <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
-      ${loteXmlComAssinatura}
-    </EnviarLoteRpsSincronoEnvio>
-    `.trim();
-  }
-    
-
-    const soapFinal = `
-    <?xml version="1.0" encoding="UTF-8"?>
-    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-    xmlns:ws="http://ws.issweb.fiorilli.com.br/"
-    xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
-      <soapenv:Header/>
-      <soapenv:Body>
-        <ws:recepcionarLoteRpsSincrono>
-          ${envioXml}
-          <username>${
-            this.homologacao === true
-              ? process.env.MUNICIPIO_LOGIN_TEST
-              : process.env.MUNICIPIO_LOGIN
-          }</username>
-          <password>${
-            this.homologacao === true
-              ? process.env.MUNICIPIO_SENHA_TEST
-              : process.env.MUNICIPIO_SENHA
-          }</password>
-        </ws:recepcionarLoteRpsSincrono>
-      </soapenv:Body>
-    </soapenv:Envelope>
-    `.replace(/[\r\n]+/g, "") // Remove quebras de linha
-    .replace(/\s{2,}/g, " ") // Substitui múltiplos espaços por um único
-    .replace(/>\s+</g, "><") // Remove espaços entre tags
-    .replace(/<\s+/g, "<") // Remove espaços após '<'
-    .replace(/\s+>/g, ">") // Remove espaços antes de '>'
-    .trim(); // Remove espaços no início e fim
-
-    const soapFinalHomologacao = `
-    <?xml version="1.0" encoding="UTF-8"?>
-    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-    xmlns:ws="http://ws.issweb.fiorilli.com.br/"
-    xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
-      <soapenv:Header/>
-      <soapenv:Body>
-        <ws:gerarNfse>
-          ${envioXml}
-          <username>${
-            this.homologacao === true
-              ? process.env.MUNICIPIO_LOGIN_TEST
-              : process.env.MUNICIPIO_LOGIN
-          }</username>
-          <password>${
-            this.homologacao === true
-              ? process.env.MUNICIPIO_SENHA_TEST
-              : process.env.MUNICIPIO_SENHA
-          }</password>
-        </ws:gerarNfse>
-      </soapenv:Body>
-    </soapenv:Envelope>
-    `.replace(/[\r\n]+/g, "") // Remove quebras de linha
-      .replace(/\s{2,}/g, " ") // Substitui múltiplos espaços por um único
-      .replace(/>\s+</g, "><") // Remove espaços entre tags
-      .replace(/<\s+/g, "<") // Remove espaços após '<'
-      .replace(/\s+>/g, ">") // Remove espaços antes de '>'
-      .trim(); // Remove espaços no início e fim
-
-      if(this.homologacao){
-        aliquota = "2.00";
-      }
-
-    const NsfeRepository = AppDataSource.getRepository(NFSE);
-    const insertDatabase = NsfeRepository.create({
-      login: rpsData?.login || "",
-      numeroRps: nfseNumber || 0,
-      serieRps: nfseResponse[0]?.serieRps || "",
-      tipoRps: nfseResponse[0]?.tipoRps || 0,
-      dataEmissao: rpsData?.processamento
-        ? new Date(rpsData.processamento)
-        : new Date(),
-      competencia: rpsData?.datavenc ? new Date(rpsData.datavenc) : new Date(),
-      valorServico: valorReduzido || 0,
-      aliquota: Number(Number(aliquota).toFixed(4)),
-      issRetido: nfseResponse[0]?.issRetido || 0,
-      responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
-      itemListaServico: nfseResponse[0]?.itemListaServico || "",
-      discriminacao: service,
-      codigoMunicipio: nfseResponse[0]?.codigoMunicipio || 0,
-      exigibilidadeIss: nfseResponse[0]?.exigibilidadeIss || 0,
-      cnpjPrestador: nfseResponse[0]?.cnpjPrestador || "",
-      inscricaoMunicipalPrestador:
-        nfseResponse[0]?.inscricaoMunicipalPrestador || "",
-      cpfTomador: ClientData?.cpf_cnpj.replace(/[^0-9]/g, "") || "",
-      razaoSocialTomador: ClientData?.nome || "",
-      enderecoTomador: ClientData?.endereco || "",
-      numeroEndereco: ClientData?.numero || "",
-      complemento: ClientData?.complemento || undefined,
-      bairro: ClientData?.bairro || "",
-      uf: nfseResponse[0]?.uf || "",
-      cep: ClientData?.cep.replace(/[^0-9]/g, "") || "",
-      telefoneTomador: ClientData?.celular.replace(/[^0-9]/g, "") || undefined,
-      emailTomador: ClientData?.email || undefined,
-      optanteSimplesNacional: 1,
-      incentivoFiscal: 2,
-    });
-
-    if (await this.verificaRps(nfseNumber)) {
-
-      await NsfeData.save(insertDatabase);
-      
-    if(this.homologacao){
-      return soapFinalHomologacao;
-    }
-
-      return soapFinal;
-    } else {
-      return "ERRO NA CONSULTA DE RPS";
-    }
-    } catch (error) {
-      return "Error " + error;
-    }
+    const xml = `
+      <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
+        <InfDeclaracaoPrestacaoServico Id="RPS${String(rpsData?.uuid_lanc)}">
+          <Rps>
+            <IdentificacaoRps>
+              <Numero>${String(nfseNumber)}</Numero>
+              <Serie>${String(nfseBase?.serieRps)}</Serie>
+              <Tipo>${String(nfseBase?.tipoRps)}</Tipo>
+            </IdentificacaoRps>
+            <DataEmissao>${new Date().toISOString().substring(0, 10)}</DataEmissao>
+            <Status>1</Status>
+          </Rps>
+          <Competencia>${new Date().toISOString().substring(0, 10)}</Competencia>
+          <Servico>
+            <Valores>
+              <ValorServicos>${String(valorReduzido)}</ValorServicos>
+              <Aliquota>${this.homologacao ? "2.00" : aliquota || "4.4269"}</Aliquota>
+            </Valores>
+            <IssRetido>${String(nfseBase?.issRetido)}</IssRetido>
+            <ResponsavelRetencao>${String(nfseBase?.responsavelRetencao)}</ResponsavelRetencao>
+            <ItemListaServico>${this.homologacao ? "17.01" : String(nfseBase?.itemListaServico)}</ItemListaServico>
+            <Discriminacao>${service}</Discriminacao>
+            <CodigoMunicipio>3503406</CodigoMunicipio>
+            <ExigibilidadeISS>${String(nfseBase?.exigibilidadeIss)}</ExigibilidadeISS>
+          </Servico>
+          <Prestador>
+            <CpfCnpj><Cnpj>${this.homologacao ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj>
+            <InscricaoMunicipal>${this.homologacao ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal>
+          </Prestador>
+          <Tomador>
+            <IdentificacaoTomador>
+              <CpfCnpj>
+                <${ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj"}>${String(ClientData?.cpf_cnpj.replace(/[^0-9]/g, ""))}</${ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj"}>
+              </CpfCnpj>
+            </IdentificacaoTomador>
+            <RazaoSocial>${String(ClientData?.nome)}</RazaoSocial>
+            <Endereco>
+              <Endereco>${String(ClientData?.endereco)}</Endereco>
+              <Numero>${String(ClientData?.numero)}</Numero>
+              <Complemento>${String(ClientData?.complemento)}</Complemento>
+              <Bairro>${String(ClientData?.bairro)}</Bairro>
+              <CodigoMunicipio>${municipio}</CodigoMunicipio>
+              <Uf>SP</Uf>
+              <Cep>${String(ClientData?.cep.replace(/[^0-9]/g, ""))}</Cep>
+            </Endereco>
+            <Contato>
+              <Telefone>${String(ClientData?.celular.replace(/[^0-9]/g, ""))}</Telefone>
+              <Email>${this.homologacao ? "teste24542frsgwr@gmail.com" : String(ClientData?.email)}</Email>
+            </Contato>
+          </Tomador>
+          ${this.homologacao ? "" : "<RegimeEspecialTributacao>6</RegimeEspecialTributacao>"}
+          <OptanteSimplesNacional>${this.homologacao ? "2" : nfseBase?.optanteSimplesNacional || "1"}</OptanteSimplesNacional>
+          <IncentivoFiscal>${nfseBase?.incentivoFiscal || "2"}</IncentivoFiscal>
+        </InfDeclaracaoPrestacaoServico>
+      </Rps>
+    `.replace(/[\r\n]+/g, "").replace(/\s{2,}/g, " ").replace(/>\s+</g, "><").replace(/<\s+/g, "<").replace(/\s+>/g, ">").trim();
+    return xml;
   }
 
   private extrairChaveECertificado() {
