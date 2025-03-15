@@ -36,11 +36,13 @@ export const Nfe = () => {
     vencimento: string[];
     cli_ativado: string[];
     nova_nfe: string[];
+    servicos: string[];
   }>({
     plano: [],
     vencimento: [],
     cli_ativado: [],
     nova_nfe: [],
+    servicos: [],
   });
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");

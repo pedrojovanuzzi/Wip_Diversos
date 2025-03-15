@@ -1109,13 +1109,15 @@ class NFSEController {
     const { cpf, filters, dateFilter } = req.body;
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const whereConditions: any = {};
+    let servicosFilter: string[] = ["mensalidade"]; // Default
     if (cpf) whereConditions.cpf_cnpj = cpf;
     if (filters) {
-      const { plano, vencimento, cli_ativado, nova_nfe } = filters;
+      let { plano, vencimento, cli_ativado, nova_nfe, servicos } = filters;
       if (plano?.length) whereConditions.plano = In(plano);
       if (vencimento?.length) whereConditions.venc = In(vencimento);
       if (cli_ativado?.length) whereConditions.cli_ativado = In(["s"]);
       if (nova_nfe?.length) whereConditions.tags = In(nova_nfe);
+      if (servicos?.length) servicosFilter = servicos; // Se tiver serviços, usa eles
     }
     try {
       const clientesResponse = await ClientRepository.find({
@@ -1138,6 +1140,7 @@ class NFSEController {
           login: In(clientesResponse.map((cliente) => cliente.login)),
           datavenc: Between(startDate, endDate),
           datadel: IsNull(),
+          tipo: In(servicosFilter), 
         },
         select: {
           id: true,

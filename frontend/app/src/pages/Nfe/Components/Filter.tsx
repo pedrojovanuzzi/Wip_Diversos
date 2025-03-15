@@ -31,6 +31,7 @@ const filters = {
   ],
   cli_ativado: [{ value: "active_client", label: "Cliente Ativo" }],
   nova_nfe: [{ value: "new_nfe", label: "Nova NFE" }],
+  servicos: [{ value: "servicos", label: "Servicos" }],
   vencimento: [
     { value: "05", label: "Dia 5" },
     { value: "10", label: "Dia 10" },
