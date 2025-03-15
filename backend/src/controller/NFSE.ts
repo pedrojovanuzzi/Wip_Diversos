@@ -125,6 +125,8 @@ class NFSEController {
       const nfseResponse = await NsfeData.find({ order: { id: "DESC" }, take: 1 });
       let nfseNumber = nfseResponse && nfseResponse[0]?.numeroRps ? nfseResponse[0].numeroRps + 1 : 1;
       let responses: any[] = [];
+      if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
+      const logPath = "./log/xml_log.txt";
       for (let i = 0; i < ids.length; i += 50) {
         const batch = ids.slice(i, i + 50);
         let rpsXmls = "";
@@ -139,13 +141,11 @@ class NFSEController {
             <CpfCnpj><Cnpj>${this.homologacao ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj>
             <InscricaoMunicipal>${this.homologacao ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal>
             <QuantidadeRps>${batch.length}</QuantidadeRps>
-            <ListaRps>
-              ${rpsXmls}
-            </ListaRps>
+            <ListaRps>${rpsXmls}</ListaRps>
           </LoteRps>
         `;
         loteXmlSemAssinatura = loteXmlSemAssinatura.replace(/[\r\n]+/g, "").replace(/>\s+</g, "><").trim();
-        const signedLote = this.assinarXml(loteXmlSemAssinatura, `InfDeclaracaoPrestacaoServico`);
+        const signedLote = this.assinarXml(loteXmlSemAssinatura, "InfDeclaracaoPrestacaoServico");
         let envioXml = "";
         let soapXml = "";
         if (this.homologacao) {
@@ -156,15 +156,60 @@ class NFSEController {
           soapXml = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:recepcionarLoteRpsSincrono>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:recepcionarLoteRpsSincrono></soapenv:Body></soapenv:Envelope>`;
         }
         soapXml = soapXml.replace(/[\r\n]+/g, "").replace(/>\s+</g, "><").trim();
+        fs.appendFileSync(logPath, soapXml + "\n", "utf8");
         console.log("SOAP XML:", soapXml);
-        const response = await axios.post(this.WSDL_URL, soapXml, {
+        await axios.post(this.WSDL_URL, soapXml, {
           httpsAgent,
-          headers: {
-            "Content-Type": "text/xml; charset=UTF-8",
-            SOAPAction: SOAPAction,
-          },
+          headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction: SOAPAction },
         });
-        responses.push({ status: "200", response: soapXml });
+        const firstId = batch[0];
+        const RPSQuery = MkauthSource.getRepository(Faturas);
+        const rpsData = await RPSQuery.findOne({ where: { id: Number(firstId) } });
+        const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+        const FaturasRepository = MkauthSource.getRepository(Faturas);
+        const FaturasData = await FaturasRepository.findOne({ where: { id: Number(firstId) } });
+        const ClientData = await ClientRepository.findOne({ where: { login: FaturasData?.login } });
+        const resp = await axios.get(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`);
+        const municipio = resp.data.id;
+        let valorMenosDesconto = ClientData?.desconto ? Number(rpsData?.valor) - Number(ClientData?.desconto) : Number(rpsData?.valor);
+        let valorReduzido = Number(valorMenosDesconto) * Number(reducao);
+        valorReduzido = Number(valorReduzido.toFixed(2));
+        const insertDatabase = NsfeData.create({
+          login: rpsData?.login || "",
+          numeroRps: nfseNumber,
+          serieRps: nfseResponse[0]?.serieRps || "",
+          tipoRps: nfseResponse[0]?.tipoRps || 0,
+          dataEmissao: rpsData?.processamento ? new Date(rpsData.processamento) : new Date(),
+          competencia: rpsData?.datavenc ? new Date(rpsData.datavenc) : new Date(),
+          valorServico: valorReduzido || 0,
+          aliquota: Number(Number(aliquota).toFixed(4)),
+          issRetido: nfseResponse[0]?.issRetido || 0,
+          responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
+          itemListaServico: nfseResponse[0]?.itemListaServico || "",
+          discriminacao: service,
+          codigoMunicipio: nfseResponse[0]?.codigoMunicipio || 0,
+          exigibilidadeIss: nfseResponse[0]?.exigibilidadeIss || 0,
+          cnpjPrestador: nfseResponse[0]?.cnpjPrestador || "",
+          inscricaoMunicipalPrestador: nfseResponse[0]?.inscricaoMunicipalPrestador || "",
+          cpfTomador: ClientData?.cpf_cnpj.replace(/[^0-9]/g, "") || "",
+          razaoSocialTomador: ClientData?.nome || "",
+          enderecoTomador: ClientData?.endereco || "",
+          numeroEndereco: ClientData?.numero || "",
+          complemento: ClientData?.complemento || undefined,
+          bairro: ClientData?.bairro || "",
+          uf: nfseResponse[0]?.uf || "",
+          cep: ClientData?.cep.replace(/[^0-9]/g, "") || "",
+          telefoneTomador: ClientData?.celular.replace(/[^0-9]/g, "") || undefined,
+          emailTomador: ClientData?.email || undefined,
+          optanteSimplesNacional: 1,
+          incentivoFiscal: 2,
+        });
+        if (await this.verificaRps(nfseNumber)) {
+          await NsfeData.save(insertDatabase);
+          responses.push({ status: "200", response: soapXml });
+        } else {
+          responses.push({ status: "500", response: "ERRO NA CONSULTA DE RPS" });
+        }
       }
       if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
       if (fs.existsSync(this.DECRYPTED_CERT_PATH)) fs.unlinkSync(this.DECRYPTED_CERT_PATH);
@@ -174,8 +219,14 @@ class NFSEController {
     }
   }
   
-  
-  private async gerarRpsXml(id: string, aliquota: string, service: string, reducao: number | string, nfseNumber: number, nfseBase: any): Promise<string> {
+  private async gerarRpsXml(
+    id: string,
+    aliquota: string,
+    service: string,
+    reducao: number | string,
+    nfseNumber: number,
+    nfseBase: any
+  ): Promise<string> {
     const RPSQuery = MkauthSource.getRepository(Faturas);
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
