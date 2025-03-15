@@ -71,11 +71,13 @@ export default function Filter({
       vencimento: string[];
       cli_ativado: string[];
       nova_nfe: string[];
+      servicos: string[];
     } = {
       plano: [],
       vencimento: [],
       cli_ativado: [],
       nova_nfe: [],
+      servicos: [],
     };
 
     const planos = [
@@ -92,6 +94,8 @@ export default function Filter({
 
     const vencimentos = ["05", "10", "15", "20", "25"];
 
+    const servicos = ["servicos"];
+
     filters.forEach((filter) => {
       if (planos.includes(filter)) {
         categorizedFilters.plano.push(filter);
@@ -101,6 +105,9 @@ export default function Filter({
         categorizedFilters.cli_ativado = [filter]; // Cliente ativo
       } else if (vencimentos.includes(filter)) {
         categorizedFilters.vencimento.push(filter);
+      }
+      else if (servicos.includes(filter)) { 
+        categorizedFilters.servicos = [filter]; // Apenas um serviço ativo
       }
     });
 
