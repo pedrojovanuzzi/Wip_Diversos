@@ -91,7 +91,7 @@ class NFSEController {
     SOAPAction: string,
     aliquota: string,
     service: string = "Servico de Suporte Tecnico",
-    reducao: number | string = 40,
+    reducao: number | string = 40
   ) {
     try {
       if (!fs.existsSync(this.TEMP_DIR))
@@ -143,49 +143,19 @@ class NFSEController {
               ${rpsXmls}
             </ListaRps>
           </LoteRps>
-        `.replace(/[\r\n]+/g, "").replace(/\s{2,}/g, " ").replace(/>\s+</g, "><").replace(/<\s+/g, "<").replace(/\s+>/g, ">").trim();
+        `;
+        loteXmlSemAssinatura = loteXmlSemAssinatura.replace(/[\r\n]+/g, "").replace(/>\s+</g, "><").trim();
         const signedLote = this.assinarXml(loteXmlSemAssinatura, `InfDeclaracaoPrestacaoServico`);
         let envioXml = "";
         let soapXml = "";
         if (this.homologacao) {
-          envioXml = `
-            <GerarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
-              ${signedLote}
-            </GerarNfseEnvio>
-          `.trim();
-          soapXml = `
-            <?xml version="1.0" encoding="UTF-8"?>
-            <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
-              <soapenv:Header/>
-              <soapenv:Body>
-                <ws:gerarNfse>
-                  ${envioXml}
-                  <username>${process.env.MUNICIPIO_LOGIN_TEST}</username>
-                  <password>${process.env.MUNICIPIO_SENHA_TEST}</password>
-                </ws:gerarNfse>
-              </soapenv:Body>
-            </soapenv:Envelope>
-          `.replace(/[\r\n]+/g, "").replace(/\s{2,}/g, " ").replace(/>\s+</g, "><").replace(/<\s+/g, "<").replace(/\s+>/g, ">").trim();
+          envioXml = `<GerarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${signedLote}</GerarNfseEnvio>`;
+          soapXml = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:gerarNfse>${envioXml}<username>${process.env.MUNICIPIO_LOGIN_TEST}</username><password>${process.env.MUNICIPIO_SENHA_TEST}</password></ws:gerarNfse></soapenv:Body></soapenv:Envelope>`;
         } else {
-          envioXml = `
-            <EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">
-              ${signedLote}
-            </EnviarLoteRpsSincronoEnvio>
-          `.trim();
-          soapXml = `
-            <?xml version="1.0" encoding="UTF-8"?>
-            <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
-              <soapenv:Header/>
-              <soapenv:Body>
-                <ws:recepcionarLoteRpsSincrono>
-                  ${envioXml}
-                  <username>${process.env.MUNICIPIO_LOGIN}</username>
-                  <password>${process.env.MUNICIPIO_SENHA}</password>
-                </ws:recepcionarLoteRpsSincrono>
-              </soapenv:Body>
-            </soapenv:Envelope>
-          `.replace(/[\r\n]+/g, "").replace(/\s{2,}/g, " ").replace(/>\s+</g, "><").replace(/<\s+/g, "<").replace(/\s+>/g, ">").trim();
+          envioXml = `<EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${signedLote}</EnviarLoteRpsSincronoEnvio>`;
+          soapXml = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:recepcionarLoteRpsSincrono>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:recepcionarLoteRpsSincrono></soapenv:Body></soapenv:Envelope>`;
         }
+        soapXml = soapXml.replace(/[\r\n]+/g, "").replace(/>\s+</g, "><").trim();
         console.log("SOAP XML:", soapXml);
         const response = await axios.post(this.WSDL_URL, soapXml, {
           httpsAgent,
@@ -194,55 +164,7 @@ class NFSEController {
             SOAPAction: SOAPAction,
           },
         });
-        const firstId = batch[0];
-        const RPSQuery = MkauthSource.getRepository(Faturas);
-        const rpsData = await RPSQuery.findOne({ where: { id: Number(firstId) } });
-        const ClientRepository = MkauthSource.getRepository(ClientesEntities);
-        const FaturasRepository = MkauthSource.getRepository(Faturas);
-        const FaturasData = await FaturasRepository.findOne({ where: { id: Number(firstId) } });
-        const ClientData = await ClientRepository.findOne({ where: { login: FaturasData?.login } });
-        const resp = await axios.get(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`);
-        const municipio = resp.data.id;
-        let valorMenosDesconto = 0;
-        ClientData?.desconto ? valorMenosDesconto = Number(rpsData?.valor) - Number(ClientData?.desconto) : valorMenosDesconto = Number(rpsData?.valor);
-        let valorReduzido = Number(valorMenosDesconto) * Number(reducao);
-        valorReduzido = Number(valorReduzido.toFixed(2));
-        const insertDatabase = NsfeData.create({
-          login: rpsData?.login || "",
-          numeroRps: nfseNumber,
-          serieRps: nfseResponse[0]?.serieRps || "",
-          tipoRps: nfseResponse[0]?.tipoRps || 0,
-          dataEmissao: rpsData?.processamento ? new Date(rpsData.processamento) : new Date(),
-          competencia: rpsData?.datavenc ? new Date(rpsData.datavenc) : new Date(),
-          valorServico: valorReduzido || 0,
-          aliquota: Number(Number(aliquota).toFixed(4)),
-          issRetido: nfseResponse[0]?.issRetido || 0,
-          responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
-          itemListaServico: nfseResponse[0]?.itemListaServico || "",
-          discriminacao: service,
-          codigoMunicipio: nfseResponse[0]?.codigoMunicipio || 0,
-          exigibilidadeIss: nfseResponse[0]?.exigibilidadeIss || 0,
-          cnpjPrestador: nfseResponse[0]?.cnpjPrestador || "",
-          inscricaoMunicipalPrestador: nfseResponse[0]?.inscricaoMunicipalPrestador || "",
-          cpfTomador: ClientData?.cpf_cnpj.replace(/[^0-9]/g, "") || "",
-          razaoSocialTomador: ClientData?.nome || "",
-          enderecoTomador: ClientData?.endereco || "",
-          numeroEndereco: ClientData?.numero || "",
-          complemento: ClientData?.complemento || undefined,
-          bairro: ClientData?.bairro || "",
-          uf: nfseResponse[0]?.uf || "",
-          cep: ClientData?.cep.replace(/[^0-9]/g, "") || "",
-          telefoneTomador: ClientData?.celular.replace(/[^0-9]/g, "") || undefined,
-          emailTomador: ClientData?.email || undefined,
-          optanteSimplesNacional: 1,
-          incentivoFiscal: 2,
-        });
-        if (await this.verificaRps(nfseNumber)) {
-          await NsfeData.save(insertDatabase);
-          responses.push({ status: "200", response: soapXml });
-        } else {
-          responses.push({ status: "500", response: "ERRO NA CONSULTA DE RPS" });
-        }
+        responses.push({ status: "200", response: soapXml });
       }
       if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
       if (fs.existsSync(this.DECRYPTED_CERT_PATH)) fs.unlinkSync(this.DECRYPTED_CERT_PATH);
@@ -262,8 +184,7 @@ class NFSEController {
     const ClientData = await ClientRepository.findOne({ where: { login: FaturasData?.login } });
     const resp = await axios.get(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`);
     const municipio = resp.data.id;
-    let valorMenosDesconto = 0;
-    ClientData?.desconto ? valorMenosDesconto = Number(rpsData?.valor) - Number(ClientData?.desconto) : valorMenosDesconto = Number(rpsData?.valor);
+    let valorMenosDesconto = ClientData?.desconto ? Number(rpsData?.valor) - Number(ClientData?.desconto) : Number(rpsData?.valor);
     let valorReduzido = Number(valorMenosDesconto) * Number(reducao);
     valorReduzido = Number(valorReduzido.toFixed(2));
     const xml = `
@@ -321,8 +242,8 @@ class NFSEController {
           <IncentivoFiscal>${nfseBase?.incentivoFiscal || "2"}</IncentivoFiscal>
         </InfDeclaracaoPrestacaoServico>
       </Rps>
-    `.replace(/[\r\n]+/g, "").replace(/\s{2,}/g, " ").replace(/>\s+</g, "><").replace(/<\s+/g, "<").replace(/\s+>/g, ">").trim();
-    return xml;
+    `;
+    return xml.replace(/[\r\n]+/g, "").replace(/>\s+</g, "><").trim();
   }
 
   private extrairChaveECertificado() {
