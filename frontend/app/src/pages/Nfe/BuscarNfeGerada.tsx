@@ -118,7 +118,7 @@ export const BuscarNfeGerada = () => {
   const setSessionPassword = async () => {
     try {
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/setSessionPassword`,
+        `${process.env.REACT_APP_URL}/Nfe/cancelarNfse`,
         {
           password: password,
         },
@@ -362,6 +362,15 @@ export const BuscarNfeGerada = () => {
                 Arquivo selecionado:{" "}
                 <span className="font-semibold">{arquivo.name}</span>
               </p>
+            )}
+            {showPopUp && (
+              <PopUpCancelNFSE
+                setShowPopUp={setShowPopUp}
+                showPopUp={showPopUp}
+                setPassword={setPassword}
+                password={password}
+                cancelNFSE={cancelNFSE}
+              />
             )}
             {showPopUp && (
               <SetPassword
