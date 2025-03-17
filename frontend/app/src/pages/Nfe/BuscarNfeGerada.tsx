@@ -16,6 +16,7 @@ import PDFNFSE from "./Components/PDFNFSE";
 import { useReactToPrint } from "react-to-print";
 import Success from "./Components/Success";
 import Error from "./Components/Error";
+import SetPassword from "./Components/SetPassword";
 
 export const BuscarNfeGerada = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -113,6 +114,31 @@ export const BuscarNfeGerada = () => {
   const handlePrint = useReactToPrint({
     documentTitle: "NFSE",
   });
+
+  const setSessionPassword = async () => {
+    try {
+      const resposta = await axios.post(
+        `${process.env.REACT_APP_URL}/Nfe/setSessionPassword`,
+        {
+          password: password,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      setSuccess("Senha atualizada");
+      window.location.reload();      
+    } catch (erro) {
+      console.error(erro);
+    }
+    finally {
+      setShowPopUp(false);
+    }
+  }
+
 
   const cancelNFSE = async () => {
     try {
@@ -324,6 +350,12 @@ export const BuscarNfeGerada = () => {
         >
           Cancelar Nota
         </button>
+        <button
+          className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
+          onClick={() => setShowPopUp(true)}
+        >
+          Senha Certificado
+        </button>
       </div>
             {arquivo && (
               <p className="text-sm text-gray-500 m-5">
@@ -332,12 +364,12 @@ export const BuscarNfeGerada = () => {
               </p>
             )}
             {showPopUp && (
-              <PopUpCancelNFSE
+              <SetPassword
                 setShowPopUp={setShowPopUp}
                 showPopUp={showPopUp}
                 setPassword={setPassword}
                 password={password}
-                cancelNFSE={cancelNFSE}
+                setSessionPassword={setSessionPassword}
               />
             )}
             <div>
