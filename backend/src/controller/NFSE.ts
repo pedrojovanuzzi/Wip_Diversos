@@ -47,6 +47,7 @@ class NFSEController {
   constructor() {
     this.setNfseStatus = this.setNfseStatus.bind(this);
     this.setNfseNumber = this.setNfseNumber.bind(this);
+    this.setPassword = this.setPassword.bind(this);
     this.BuscarNSFE = this.BuscarNSFE.bind(this);
   }
 
@@ -502,74 +503,37 @@ class NFSEController {
     }
   }
 
+  public async setPassword(req: Request, res: Response){
+    const {password} = req.body
+    this.PASSWORD = password;
+    res.status(200).json({ error: "Sucesso" });;
+  }
+
+
   private async setNfseNumber(
     rpsNumber: string | number,
     serie: string = "1",
     tipo: string = "1"
   ) {
     try {
-      const dados = `<IdentificacaoRps>
-                    <Numero>${rpsNumber}</Numero>
-                    <Serie>${serie}</Serie>
-                    <Tipo>${tipo}</Tipo>
-                    </IdentificacaoRps>
-                    <Prestador>
-                    <CpfCnpj>
-                        <Cnpj>${
-                          this.homologacao === true
-                            ? process.env.MUNICIPIO_CNPJ_TEST
-                            : process.env.MUNICIPIO_LOGIN
-                        }</Cnpj>
-                    </CpfCnpj>
-                    <InscricaoMunicipal>${
-                      this.homologacao === true
-                        ? process.env.MUNICIPIO_INCRICAO_TEST
-                        : process.env.MUNICIPIO_INCRICAO
-                    }</InscricaoMunicipal>
-                    </Prestador>`.trim();
-
-      const envioXml =
-        `<ConsultarNfseRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseRpsEnvio>`.trim();
-      const soapFinal =
-        `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:consultarNfsePorRps>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:consultarNfsePorRps></soapenv:Body></soapenv:Envelope>`
-          .replace(/[\r\n]+/g, "")
-          .replace(/\s{2,}/g, " ")
-          .replace(/>\s+</g, "><")
-          .replace(/<\s+/g, "<")
-          .replace(/\s+>/g, ">")
-          .trim();
-
-      const certPathToUse = fs.existsSync(this.NEW_CERT_PATH)
-        ? this.NEW_CERT_PATH
-        : this.certPath;
-      const pfxBuffer = fs.readFileSync(certPathToUse);
-
-      const httpsAgent = new https.Agent({
-        pfx: pfxBuffer,
-        passphrase: this.PASSWORD,
-        rejectUnauthorized: false,
-      });
-
-      const response = await axios.post(this.WSDL_URL, soapFinal, {
-        httpsAgent,
-        headers: {
-          "Content-Type": "text/xml; charset=UTF-8",
-          SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
-        },
-      });
-
+      const dados = `<IdentificacaoRps><Numero>${rpsNumber}</Numero><Serie>${serie}</Serie><Tipo>${tipo}</Tipo></IdentificacaoRps><Prestador><CpfCnpj><Cnpj>${this.homologacao ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj><InscricaoMunicipal>${this.homologacao ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal></Prestador>`;
+      const envioXml = `<ConsultarNfseRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseRpsEnvio>`;
+      const soapFinal = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:consultarNfsePorRps>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:consultarNfsePorRps></soapenv:Body></soapenv:Envelope>`;
+      const pfxBuffer = fs.readFileSync(this.certPath);
+      const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: this.PASSWORD, rejectUnauthorized: false });
+      const response = await axios.post(this.WSDL_URL, soapFinal, { httpsAgent, headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction: "ConsultarNfseServicoPrestadoEnvio" } });
       const match = response.data.match(/<ns2:Numero>(\d+)<\/ns2:Numero>/);
-
       if (match && match[1]) {
-        return match[1]; // Retorna o valor do número
+        return match[1];
       } else {
         console.log("Número não encontrado no XML.");
-        return null; // Retorna null caso o número não seja encontrado
+        return null;
       }
     } catch (error) {
       return error;
     }
   }
+  
 
   private assinarXml(xml: string, referenceId: string): string {
     const { privateKeyPem, x509Certificate } = this.extrairChaveECertificado();

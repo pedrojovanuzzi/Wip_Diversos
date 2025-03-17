@@ -39,6 +39,8 @@ router.post("/BuscarNSFE", AuthGuard, NFSE.BuscarNSFE);
 
 router.post("/imprimirNFSE", AuthGuard, NFSE.imprimirNFSE);
 
+router.post("/setSessionPassword", AuthGuard, NFSE.setPassword);
+
 router.post("/upload", upload.any(), AuthGuard, NFSE.uploadCertificado);
 
 export default router;
