@@ -2,13 +2,8 @@ import {
   Disclosure,
   DisclosureButton,
   DisclosurePanel,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuItems,
 } from "@headlessui/react";
-import { ChevronDownIcon, FunnelIcon } from "@heroicons/react/20/solid";
-import { log } from "node:console";
+import { FunnelIcon } from "@heroicons/react/20/solid";
 import { useState } from "react";
 import Calendar from "./Calendar";
 import Line from "./Line";
@@ -16,6 +11,10 @@ import { CiCirclePlus } from "react-icons/ci";
 import { IoArrowUpCircleOutline } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
 import { HiMiniDocumentMagnifyingGlass } from "react-icons/hi2";
+import axios from "axios";
+import { TypedUseSelectorHook, useSelector } from "react-redux";
+import { RootState } from "../../../types";
+import SetPassword from "./SetPassword";
 
 const filters = {
   plano: [
@@ -43,16 +42,10 @@ const filters = {
 
 interface FilterProps {
   setActiveFilters: (filters: any) => void;
-
-  setDate: React.Dispatch<
-    React.SetStateAction<{ start: string; end: string } | null>
-  >;
-
+  setDate: React.Dispatch<React.SetStateAction<{ start: string; end: string } | null>>;
   setArquivo: React.Dispatch<React.SetStateAction<File | null>>;
-
   enviarCertificado: React.Dispatch<React.SetStateAction<File | null>>;
-  
-  BuscarNfe? : boolean;
+  BuscarNfe?: boolean;
 }
 
 export default function Filter({
@@ -64,22 +57,34 @@ export default function Filter({
 }: FilterProps) {
   const [filter, setFilter] = useState<string[]>([]);
   const navigate = useNavigate();
+  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
+  const user = useTypedSelector((state: RootState) => state.auth.user);
+  const token = user.token;
+  const [password, setPassword] = useState<string>("");
+  const [showPopUp, setShowPopUp] = useState(false);
 
-  const categorizeFilters = (filters: string[]) => {
-    const categorizedFilters: {
-      plano: string[];
-      vencimento: string[];
-      cli_ativado: string[];
-      nova_nfe: string[];
-      servicos: string[];
-    } = {
-      plano: [],
-      vencimento: [],
-      cli_ativado: [],
-      nova_nfe: [],
-      servicos: [],
+  const setSessionPassword = async () => {
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_URL}/Nfe/setSessionPassword`,
+        { password: password },
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+      );
+      window.location.reload();
+    } catch {}
+    finally {
+      setShowPopUp(false);
+    }
+  };
+
+  const categorizeFilters = (filtersArray: string[]) => {
+    const categorizedFilters = {
+      plano: [] as string[],
+      vencimento: [] as string[],
+      cli_ativado: [] as string[],
+      nova_nfe: [] as string[],
+      servicos: [] as string[],
     };
-
     const planos = [
       "90_PFJ_Radio5M",
       "91_PFJ_Radio8M",
@@ -91,53 +96,31 @@ export default function Filter({
       "4_PFJ_FIBRA_700M",
       "5_PFJ_FIBRA_800M",
     ];
-
     const vencimentos = ["05", "10", "15", "20", "25"];
-
     const servicos = ["servicos"];
-
-    filters.forEach((filter) => {
-      if (planos.includes(filter)) {
-        categorizedFilters.plano.push(filter);
-      } else if (filter === "new_nfe") {
-        categorizedFilters.nova_nfe = [filter]; // Apenas um "new_nfe" ativo
-      } else if (filter === "active_client") {
-        categorizedFilters.cli_ativado = [filter]; // Cliente ativo
-      } else if (vencimentos.includes(filter)) {
-        categorizedFilters.vencimento.push(filter);
-      }
-      else if (servicos.includes(filter)) { 
-        categorizedFilters.servicos = [filter]; // Apenas um serviço ativo
-      }
+    filtersArray.forEach((f) => {
+      if (planos.includes(f)) categorizedFilters.plano.push(f);
+      else if (f === "new_nfe") categorizedFilters.nova_nfe = [f];
+      else if (f === "active_client") categorizedFilters.cli_ativado = [f];
+      else if (vencimentos.includes(f)) categorizedFilters.vencimento.push(f);
+      else if (servicos.includes(f)) categorizedFilters.servicos = [f];
     });
-
     return categorizedFilters;
   };
 
   const clickedFilter = (selectedFilter: string) => {
     setFilter((prevFilters) => {
       let newFilters;
-
-      // Se for nova_nfe, substitui a seleção anterior
       if (selectedFilter === "new_nfe") {
         newFilters = prevFilters.includes(selectedFilter)
           ? prevFilters.filter((f) => f !== selectedFilter)
-          : prevFilters
-              .filter(
-                (f) => !filters.nova_nfe.map((opt) => opt.value).includes(f)
-              )
-              .concat(selectedFilter);
+          : prevFilters.filter((f) => !f.includes("new_nfe")).concat(selectedFilter);
       } else {
-        // Caso contrário, adiciona ou remove normalmente
         newFilters = prevFilters.includes(selectedFilter)
           ? prevFilters.filter((f) => f !== selectedFilter)
           : [...prevFilters, selectedFilter];
       }
-
-      const organizedFilters = categorizeFilters(newFilters);
-      setActiveFilters(organizedFilters);
-
-      console.log(organizedFilters);
+      setActiveFilters(categorizeFilters(newFilters));
       return newFilters;
     });
   };
@@ -149,33 +132,21 @@ export default function Filter({
 
   return (
     <div className="bg-white">
-      <Disclosure
-        as="section"
-        aria-labelledby="filter-heading"
-        className="grid items-center border-b border-t "
-      >
+      <Disclosure as="section" aria-labelledby="filter-heading" className="grid items-center border-b border-t ">
         <h2 id="filter-heading" className="sr-only">
           Filtros
         </h2>
         <div className="relative col-start-1 row-start-1 py-4">
           <div className="mx-auto flex flex-col sm:flex-row items-center justify-between gap-5 max-w-7xl space-x-6 px-4 text-sm sm:px-6 lg:px-8">
             <div className="flex flex-col sm:flex-row items-center gap-6">
-              <DisclosureButton className="group flex items-center font-medium text-gray-700">
-                <FunnelIcon
-                  aria-hidden="true"
-                  className="mr-2 size-5 flex-none text-gray-400 group-hover:text-gray-500"
-                />
+              <Disclosure.Button className="group flex items-center font-medium text-gray-700">
+                <FunnelIcon aria-hidden="true" className="mr-2 size-5 flex-none text-gray-400 group-hover:text-gray-500" />
                 {`${filter.length} Filtros`}
-              </DisclosureButton>
-              <button
-                onClick={clearFilter}
-                type="button"
-                className="text-gray-500"
-              >
+              </Disclosure.Button>
+              <button onClick={clearFilter} type="button" className="text-gray-500">
                 Limpar Filtro
               </button>
             </div>
-
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-6">
               <label className="relative ring-1 ring-black ring-opacity-5 bg-slate-500 text-gray-200 py-6 px-8 rounded hover:bg-slate-400 transition-all cursor-pointer">
                 <span className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 text-4xl">
@@ -187,7 +158,6 @@ export default function Filter({
                   className="hidden"
                 />
               </label>
-
               <button
                 className="bg-indigo-500 ring-1 ring-black ring-opacity-5 text-white indent-2 py-3 px-8 rounded hover:bg-indigo-400 transition-all flex items-center justify-center"
                 onClick={() => enviarCertificado(null)}
@@ -195,18 +165,35 @@ export default function Filter({
                 <IoArrowUpCircleOutline className="text-2xl" />
                 Enviar
               </button>
-
-              {BuscarNfe && <button
-              className="bg-teal-500 ring-1 ring-black ring-opacity-5 text-white indent-2 py-3 px-2 rounded hover:bg-teal-400 transition-all flex items-center justify-center"
-                onClick={() => navigate("/BuscarNfeGerada")}              >
-                <HiMiniDocumentMagnifyingGlass className="text-2xl" />
-                NFS-e Geradas
-              </button>}
+              {BuscarNfe && (
+                <button
+                  className="bg-teal-500 ring-1 ring-black ring-opacity-5 text-white indent-2 py-3 px-2 rounded hover:bg-teal-400 transition-all flex items-center justify-center"
+                  onClick={() => navigate("/BuscarNfeGerada")}
+                >
+                  <HiMiniDocumentMagnifyingGlass className="text-2xl" />
+                  NFS-e Geradas
+                </button>
+              )}
+              <button
+                className="bg-indigo-500 ring-1 ring-black ring-opacity-5 text-white indent-2 py-3 px-8 rounded hover:bg-indigo-400 transition-all flex items-center justify-center"
+                onClick={setSessionPassword}
+              >
+                <IoArrowUpCircleOutline className="text-2xl" />
+                Senha Certificado
+              </button>
+              {showPopUp && (
+                <SetPassword
+                  setShowPopUp={setShowPopUp}
+                  showPopUp={showPopUp}
+                  setPassword={setPassword}
+                  password={password}
+                  setSessionPassword={setSessionPassword}
+                />
+              )}
             </div>
           </div>
         </div>
-
-        <DisclosurePanel className="border-t border-gray-200">
+        <Disclosure.Panel className="border-t border-gray-200">
           <Calendar setDateFilter={setDate} />
           <Line />
           <div className="mx-auto flex flex-col items-center sm:grid sm:items-baseline sm:place-items-center max-w-7xl my-10 grid-cols-3 sm:gap-4 sm:px-6 text-sm md:gap-x-6 lg:px-8">
@@ -248,10 +235,7 @@ export default function Filter({
                         </svg>
                       </div>
                     </div>
-                    <label
-                      htmlFor={`plano-${optionIdx}`}
-                      className="text-base text-gray-600 sm:text-sm"
-                    >
+                    <label htmlFor={`plano-${optionIdx}`} className="text-base text-gray-600 sm:text-sm">
                       {option.label}
                     </label>
                   </div>
@@ -296,10 +280,7 @@ export default function Filter({
                         </svg>
                       </div>
                     </div>
-                    <label
-                      htmlFor={`plano-${optionIdx}`}
-                      className="text-base text-gray-600 sm:text-sm"
-                    >
+                    <label htmlFor={`outros-${optionIdx}`} className="text-base text-gray-600 sm:text-sm">
                       {option.label}
                     </label>
                   </div>
@@ -339,10 +320,7 @@ export default function Filter({
                         </svg>
                       </div>
                     </div>
-                    <label
-                      htmlFor={`plano-${optionIdx}`}
-                      className="text-base text-gray-600 sm:text-sm"
-                    >
+                    <label htmlFor={`outros-${optionIdx}`} className="text-base text-gray-600 sm:text-sm">
                       {option.label}
                     </label>
                   </div>
@@ -382,10 +360,7 @@ export default function Filter({
                         </svg>
                       </div>
                     </div>
-                    <label
-                      htmlFor={`plano-${optionIdx}`}
-                      className="text-base text-gray-600 sm:text-sm"
-                    >
+                    <label htmlFor={`outros-${optionIdx}`} className="text-base text-gray-600 sm:text-sm">
                       {option.label}
                     </label>
                   </div>
@@ -430,10 +405,7 @@ export default function Filter({
                         </svg>
                       </div>
                     </div>
-                    <label
-                      htmlFor={`vencimento-${optionIdx}`}
-                      className="text-base text-gray-600 sm:text-sm"
-                    >
+                    <label htmlFor={`vencimento-${optionIdx}`} className="text-base text-gray-600 sm:text-sm">
                       {option.label}
                     </label>
                   </div>
@@ -441,7 +413,7 @@ export default function Filter({
               </div>
             </fieldset>
           </div>
-        </DisclosurePanel>
+        </Disclosure.Panel>
       </Disclosure>
     </div>
   );
