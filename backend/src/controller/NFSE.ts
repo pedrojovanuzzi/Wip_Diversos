@@ -114,8 +114,8 @@ class NFSEController {
         const batch = ids.slice(i, i + 50);
         let rpsXmls = "";
         for (const bid of batch) {
-          rpsXmls += await this.gerarRpsXml(bid, Number(aliquota).toFixed(4), service, reducao, nfseNumber, nfseResponse[0]);
           nfseNumber++;
+          rpsXmls += await this.gerarRpsXml(bid, Number(aliquota).toFixed(4), service, reducao, nfseNumber, nfseResponse[0]);
         }
         let lote = `
           <LoteRps versao="2.01" Id="lote${nfseNumber}">
@@ -158,7 +158,7 @@ class NFSEController {
         const resp = await axios.get(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`);
         const municipio = resp.data.id;
         let valorMenosDesconto = ClientData?.desconto ? Number(rpsData?.valor) - Number(ClientData?.desconto) : Number(rpsData?.valor);
-        let valorReduzido = Number(reducao) === 0 ? valorMenosDesconto : Number(valorMenosDesconto) * Number(reducao);
+        let valorReduzido =  Number(reducao) === 0 ? valorMenosDesconto : Number(valorMenosDesconto) * Number(reducao);
         valorReduzido = Number(valorReduzido.toFixed(2));
         const insertDatabase = NsfeData.create({
           login: rpsData?.login || "",
