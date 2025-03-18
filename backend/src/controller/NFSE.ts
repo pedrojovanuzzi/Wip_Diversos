@@ -48,10 +48,10 @@ class NFSEController {
     this.BuscarClientes = this.BuscarClientes.bind(this);
   }
 
-  async uploadCertificado(req: Request, res: Response) {
+  async uploadCertificado(req: Request, res: Response){
     try {
       const { password } = req.body;
-      if (!req.file) return res.status(400).json({ erro: "Nenhum arquivo enviado" });
+      if (!req.file) res.status(400).json({ erro: "Nenhum arquivo enviado" });
   
       this.certPath = path.join(__dirname, "..", "files", "certificado.pfx");
       this.PASSWORD = password;
