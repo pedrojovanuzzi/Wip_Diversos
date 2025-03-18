@@ -105,7 +105,7 @@ class NFSEController {
       const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: password, rejectUnauthorized: false });
       const NsfeData = AppDataSource.getRepository(NFSE);
       const nfseResponse = await NsfeData.find({ order: { id: "DESC" }, take: 1 });
-      let nfseNumber = nfseResponse[0]?.numeroRps ? nfseResponse[0].numeroRps + 1 : 1;
+      let nfseNumber = nfseResponse[0]?.numeroRps ? nfseResponse[0].numeroRps : 1;
       
       const respArr: any[] = [];
       if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
