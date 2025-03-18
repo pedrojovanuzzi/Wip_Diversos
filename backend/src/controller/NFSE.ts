@@ -55,12 +55,12 @@ class NFSEController {
       const isLinux = os.platform() === "linux";
       const isWindows = os.platform() === "win32";
       if (isLinux || isWindows) {
+        // Remove a flag "-legacy" e use ciphers mais modernos no export.
         execFileSync("openssl", [
           "pkcs12",
           "-in",
           this.certPath,
           "-nodes",
-          "-legacy",
           "-out",
           this.DECRYPTED_CERT_PATH,
           "-passin",
@@ -75,12 +75,13 @@ class NFSEController {
           this.NEW_CERT_PATH,
           "-passout",
           `pass:${password}`,
-          "-keypbe",
-          "PBE-SHA1-3DES",
           "-certpbe",
-          "PBE-SHA1-3DES",
+          "AES-256-CBC",
+          "-keypbe",
+          "AES-256-CBC",
         ]);
       }
+      
       this.PASSWORD = password;
       res.status(200).json({ mensagem: "OK" });
     } catch {
