@@ -105,7 +105,7 @@ class NFSEController {
       const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: password, rejectUnauthorized: false });
       const NsfeData = AppDataSource.getRepository(NFSE);
       const nfseResponse = await NsfeData.find({ order: { id: "DESC" }, take: 1 });
-      let nfseNumber = nfseResponse[0]?.numeroRps ? nfseResponse[0].numeroRps : 1;
+      let nfseNumber = nfseResponse[0]?.numeroRps ? nfseResponse[0].numeroRps + 1 : 1;
       
       const respArr: any[] = [];
       if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
@@ -114,9 +114,10 @@ class NFSEController {
         const batch = ids.slice(i, i + 50);
         let rpsXmls = "";
         for (const bid of batch) {
-          nfseNumber++;
           rpsXmls += await this.gerarRpsXml(bid, Number(aliquota).toFixed(4), service, reducao, nfseNumber, nfseResponse[0]);
+          
         }
+        nfseNumber++;
         let lote = `
           <LoteRps versao="2.01" Id="lote${nfseNumber}">
             <NumeroLote>1</NumeroLote>
