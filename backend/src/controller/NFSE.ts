@@ -57,7 +57,7 @@ class NFSEController {
         return;
       }
   
-      this.certPath = path.join(__dirname, "certificados", "certificado.pfx");
+      this.certPath = path.join(__dirname, "..", "files", "certificado.pfx");
       this.PASSWORD = password;
   
       res.status(200).json({ mensagem: "Certificado salvo com sucesso" });
