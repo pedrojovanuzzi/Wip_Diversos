@@ -107,6 +107,9 @@ class NFSEController {
       const nfseResponse = await NsfeData.find({ order: { id: "DESC" }, take: 1 });
       let nfseNumber = nfseResponse[0]?.numeroRps ? nfseResponse[0].numeroRps + 1 : 1;
       
+      console.log(nfseNumber);
+      
+
       const respArr: any[] = [];
       if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
       const logPath = "./log/xml_log.txt";
@@ -203,7 +206,7 @@ class NFSEController {
 
 
         
-        console.log(response);
+        // console.log(response);
         
         respArr.push({ status: "200", response: "ok" });
       }
