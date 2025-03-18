@@ -21,6 +21,8 @@ import SetPassword from "./Components/SetPassword";
 export const BuscarNfeGerada = () => {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
+  const [showCertPasswordPopUp, setShowCertPasswordPopUp] = useState(false);
+  const [certPassword, setCertPassword] = useState<string>("");
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
   const [pdfDados, setPdfDados] = useState<any[]>([]);
@@ -163,29 +165,39 @@ export const BuscarNfeGerada = () => {
     }
   };
 
-  const enviarCertificado = async () => {
+  const handleEnviarCertificado = () => {
     if (!arquivo) {
       alert("Selecione um arquivo para enviar.");
       return;
     }
+    setShowCertPasswordPopUp(true);
+  };
 
-    const formData = new FormData();
-    formData.append("arquivo", arquivo);
-
+  const enviarCertificado = async () => {
+    if (!arquivo || !certPassword) {
+      alert("É necessário arquivo e senha.");
+      return;
+    }
     try {
-      const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/upload`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const formData = new FormData();
+      formData.append("certificado", arquivo);
+      formData.append("password", certPassword);
+
+      const resposta = await axios.post(`${process.env.REACT_APP_URL}/Nfe/upload`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
       console.log("Certificado enviado:", resposta.data);
+      setSuccess("Certificado enviado com sucesso!");
+      setShowCertPasswordPopUp(false);
+      setCertPassword("");
     } catch (erro) {
       console.error("Erro ao enviar o certificado:", erro);
+      setError("Não foi possível enviar o certificado.");
+      setShowCertPasswordPopUp(false);
     }
   };
 
@@ -230,7 +242,7 @@ export const BuscarNfeGerada = () => {
         setActiveFilters={setActiveFilters}
         setDate={setDateFilter}
         setArquivo={setArquivo}
-        enviarCertificado={enviarCertificado}
+        enviarCertificado={handleEnviarCertificado}
         BuscarNfe={false}
       />
       {error && <Error message={error} />}
@@ -393,6 +405,34 @@ export const BuscarNfeGerada = () => {
           password={password}
           setSessionPassword={setSessionPassword}
         />
+      )}
+            {showCertPasswordPopUp && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/30">
+          <div className="bg-white p-6 rounded-md shadow-lg">
+            <h2 className="text-lg font-semibold">Digite a senha do Certificado:</h2>
+            <input
+              type="password"
+              value={certPassword}
+              onChange={(e) => setCertPassword(e.target.value)}
+              className="block w-full border p-2 my-4 rounded"
+              placeholder="Senha do PFX"
+            />
+            <div className="flex justify-end mt-4">
+              <button
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded mr-2"
+                onClick={() => {
+                  setShowCertPasswordPopUp(false);
+                  setCertPassword("");
+                }}
+              >
+                Cancelar
+              </button>
+              <button className="bg-indigo-500 text-white px-4 py-2 rounded" onClick={enviarCertificado}>
+                Enviar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div>
