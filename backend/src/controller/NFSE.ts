@@ -311,7 +311,7 @@ class NFSEController {
         .replace(/\s{2,}/g, " ")
         .replace(/>\s+</g, "><")
         .trim();
-      const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
+      const certPathToUse = processarCertificado(this.certPath, this.PASSWORD, this.TEMP_DIR);
       const pfxBuffer = fs.readFileSync(certPathToUse);
       const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: this.PASSWORD, rejectUnauthorized: false });
       const response = await axios.post(this.WSDL_URL, soapFinal, {
@@ -351,7 +351,7 @@ class NFSEController {
               .replace(/\s{2,}/g, " ")
               .replace(/>\s+</g, "><")
               .trim();
-            const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
+            const certPathToUse = processarCertificado(this.certPath, this.PASSWORD, this.TEMP_DIR);
             const pfxBuffer = fs.readFileSync(certPathToUse);
             const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: this.PASSWORD, rejectUnauthorized: false });
             let response;
@@ -389,7 +389,7 @@ class NFSEController {
       const dados = `<IdentificacaoRps><Numero>${rpsNumber}</Numero><Serie>${serie}</Serie><Tipo>${tipo}</Tipo></IdentificacaoRps><Prestador><CpfCnpj><Cnpj>${this.homologacao ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN}</Cnpj></CpfCnpj><InscricaoMunicipal>${this.homologacao ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO}</InscricaoMunicipal></Prestador>`;
       const envioXml = `<ConsultarNfseRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseRpsEnvio>`;
       const soapFinal = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:consultarNfsePorRps>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:consultarNfsePorRps></soapenv:Body></soapenv:Envelope>`;
-      const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
+      const certPathToUse = processarCertificado(this.certPath, this.PASSWORD, this.TEMP_DIR);
       const pfxBuffer = fs.readFileSync(certPathToUse);
       const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: this.PASSWORD, rejectUnauthorized: false });
       const response = await axios.post(this.WSDL_URL, soapFinal, {
@@ -413,7 +413,7 @@ class NFSEController {
         .replace(/\s{2,}/g, " ")
         .replace(/>\s+</g, "><")
         .trim();
-      const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
+      const certPathToUse = processarCertificado(this.certPath, this.PASSWORD, this.TEMP_DIR);
       const pfxBuffer = fs.readFileSync(certPathToUse);
       const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: this.PASSWORD, rejectUnauthorized: false });
       const response = await axios.post(this.WSDL_URL, soapFinal, {
@@ -522,7 +522,7 @@ const filtered = arr
         .replace(/\s{2,}/g, " ")
         .replace(/>\s+</g, "><")
         .trim();
-      const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
+      const certPathToUse = processarCertificado(this.certPath, this.PASSWORD, this.TEMP_DIR);
       const pfxBuffer = fs.readFileSync(certPathToUse);
       const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: this.PASSWORD, rejectUnauthorized: false });
       const response = await axios.post(this.WSDL_URL, soapFinal, {
