@@ -16,6 +16,8 @@ import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
 import { In, Between, IsNull } from "typeorm";
 import moment from "moment-timezone";
+import { processarCertificado } from "../utils/certUtils";
+
 
 dotenv.config();
 
@@ -98,30 +100,7 @@ class NFSEController {
     reducao: number
   ) {
     try {
-
-      if (!fs.existsSync(this.TEMP_DIR))
-        fs.mkdirSync(this.TEMP_DIR, { recursive: true });
-      const isLinux = os.platform() === "linux";
-      const isWindows = os.platform() === "win32";
-      if (isLinux) {
-        execSync(`openssl pkcs12 -in "${this.certPath}" -nodes -legacy -passin pass:${password} -out "${this.DECRYPTED_CERT_PATH}"`, { stdio: "inherit" });
-        execSync(`openssl pkcs12 -in "${this.DECRYPTED_CERT_PATH}" -export -out "${this.NEW_CERT_PATH}" -passout pass:${password}`, { stdio: "inherit" });
-      } else if (isWindows) {
-        const powershellCommand = `
-            try {
-              $certificado = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('${this.certPath}', '${password}', [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable);
-              $bytes = $certificado.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12, '${password}');
-              [System.IO.File]::WriteAllBytes('${this.NEW_CERT_PATH}', $bytes)
-            } catch {
-              Write-Error $_.Exception.Message
-              exit 1
-            }
-          `;
-          execSync(`powershell -Command "${powershellCommand.replace(/\n/g, " ")}"`, { stdio: ["ignore", "inherit", "pipe"] });
-      }
-    
-
-      const certPathToUse = fs.existsSync(this.NEW_CERT_PATH) ? this.NEW_CERT_PATH : this.certPath;
+      const certPathToUse = processarCertificado(this.certPath, password, this.TEMP_DIR);
       const pfxBuffer = fs.readFileSync(certPathToUse);
       const httpsAgent = new https.Agent({ pfx: pfxBuffer, passphrase: password, rejectUnauthorized: false });
       const NsfeData = AppDataSource.getRepository(NFSE);
