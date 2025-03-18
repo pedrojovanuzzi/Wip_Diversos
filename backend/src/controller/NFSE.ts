@@ -51,41 +51,14 @@ class NFSEController {
   async uploadCertificado(req: Request, res: Response) {
     try {
       const { password } = req.body;
-      if (!fs.existsSync(this.TEMP_DIR)) fs.mkdirSync(this.TEMP_DIR, { recursive: true });
-      const isLinux = os.platform() === "linux";
-      const isWindows = os.platform() === "win32";
-      if (isLinux || isWindows) {
-        // Remove a flag "-legacy" e use ciphers mais modernos no export.
-        execFileSync("openssl", [
-          "pkcs12",
-          "-in",
-          this.certPath,
-          "-nodes",
-          "-out",
-          this.DECRYPTED_CERT_PATH,
-          "-passin",
-          `pass:${password}`,
-        ]);
-        execFileSync("openssl", [
-          "pkcs12",
-          "-in",
-          this.DECRYPTED_CERT_PATH,
-          "-export",
-          "-out",
-          this.NEW_CERT_PATH,
-          "-passout",
-          `pass:${password}`,
-          "-certpbe",
-          "AES-256-CBC",
-          "-keypbe",
-          "AES-256-CBC",
-        ]);
-      }
-      
+      if (!req.file) return res.status(400).json({ erro: "Nenhum arquivo enviado" });
+  
+      this.certPath = path.join(__dirname, "..", "files", "certificado.pfx");
       this.PASSWORD = password;
-      res.status(200).json({ mensagem: "OK" });
-    } catch {
-      res.status(500).json({ erro: "Erro ao gerar novo certificado" });
+  
+      res.status(200).json({ mensagem: "Certificado salvo com sucesso" });
+    } catch (error) {
+      res.status(500).json({ erro: "Erro ao salvar o certificado" });
     }
   }
 
