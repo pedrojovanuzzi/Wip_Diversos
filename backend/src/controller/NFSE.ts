@@ -159,6 +159,7 @@ class NFSEController {
         const municipio = resp.data.id;
         let valorMenosDesconto = ClientData?.desconto ? Number(rpsData?.valor) - Number(ClientData?.desconto) : Number(rpsData?.valor);
         let valorReduzido = reducao === 0 ? valorMenosDesconto : Number(valorMenosDesconto) * Number(reducao);
+        valorReduzido = valorReduzido > 0 ? valorReduzido : 0.01;
         valorReduzido = Number(valorReduzido.toFixed(2));
         const insertDatabase = NsfeData.create({
           login: rpsData?.login || "",
