@@ -42,7 +42,7 @@ export const BuscarNfeGerada = () => {
     plano: string[];
     vencimento: string[];
     cli_ativado: string[];
-    nova_nfe: string[],
+    nova_nfe: string[];
     servicos: string[];
   }>({
     plano: [],
@@ -51,12 +51,12 @@ export const BuscarNfeGerada = () => {
     nova_nfe: [],
     servicos: [],
   });
-  const [showPopUp, setShowPopUp] = useState(false);
+  const [showCancelPopUp, setShowCancelPopUp] = useState(false);
+  const [showPasswordPopUp, setShowPasswordPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
   const user = useTypedSelector((state: RootState) => state.auth.user);
   const token = user.token;
-
 
   const handleCheckboxChange = (clienteId: number) => {
     setClientesSelecionados((prevSelecionados) => {
@@ -75,12 +75,12 @@ export const BuscarNfeGerada = () => {
       const numeroRpsValidos = clientes
         .filter((cliente) => cliente.nfse && cliente.nfse.numero_rps)
         .map((cliente) => cliente.nfse.numero_rps);
-  
+
       setClientesSelecionados(numeroRpsValidos);
     }
   };
 
-  const imprimir = async (reactToPrintContent : any) => {
+  const imprimir = async (reactToPrintContent: any) => {
     try {
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/imprimirNFSE`,
@@ -105,7 +105,6 @@ export const BuscarNfeGerada = () => {
       }, 0);
 
       setClientesSelecionados([]);
-      
     } catch (erro) {
       console.error("Erro ao Buscar Clientes:", erro);
     }
@@ -130,15 +129,13 @@ export const BuscarNfeGerada = () => {
         }
       );
       setSuccess("Senha atualizada");
-      window.location.reload();      
+      window.location.reload();
     } catch (erro) {
       console.error(erro);
+    } finally {
+      setShowCancelPopUp(false);
     }
-    finally {
-      setShowPopUp(false);
-    }
-  }
-
+  };
 
   const cancelNFSE = async () => {
     try {
@@ -158,16 +155,14 @@ export const BuscarNfeGerada = () => {
       setSuccess("Notas Canceladas com Sucesso!");
       window.location.reload();
       console.log("Notas Canceladas:", resposta.data);
-      
     } catch (erro) {
       setError("Erro ao Cancelar Notas!");
       console.error("Erro ao Buscar Clientes:", erro);
-    }
-    finally {
-      setShowPopUp(false);
+    } finally {
+      setShowCancelPopUp(false);
     }
   };
-  
+
   const enviarCertificado = async () => {
     if (!arquivo) {
       alert("Selecione um arquivo para enviar.");
@@ -223,15 +218,21 @@ export const BuscarNfeGerada = () => {
   };
 
   useEffect(() => {
-      handleSearch();
-    }, []);
+    handleSearch();
+  }, []);
 
   return (
     <div>
       <NavBar />
-      
+
       <Stacked2 setSearchCpf={setSearchCpf} onSearch={handleSearch} />
-      <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={enviarCertificado} BuscarNfe={false}/>
+      <Filter
+        setActiveFilters={setActiveFilters}
+        setDate={setDateFilter}
+        setArquivo={setArquivo}
+        enviarCertificado={enviarCertificado}
+        BuscarNfe={false}
+      />
       {error && <Error message={error} />}
       {success && <Success message={success} />}
       {clientes.length > 0 && (
@@ -303,10 +304,14 @@ export const BuscarNfeGerada = () => {
                   <tr key={cliente.id}>
                     <td className="px-4 py-4">
                       <input
-                      className="cursor-pointer"
+                        className="cursor-pointer"
                         type="checkbox"
-                        checked={clientesSelecionados.includes(cliente.nfse.numero_rps)}
-                        onChange={() => handleCheckboxChange(cliente.nfse.numero_rps)}
+                        checked={clientesSelecionados.includes(
+                          cliente.nfse.numero_rps
+                        )}
+                        onChange={() =>
+                          handleCheckboxChange(cliente.nfse.numero_rps)
+                        }
                       />
                     </td>
                     <td className="px-6 py-4">{cliente.nfse.numeroNfse}</td>
@@ -314,9 +319,7 @@ export const BuscarNfeGerada = () => {
                     <td className="px-6 py-4">{cliente.nfse.competencia}</td>
                     <td className="px-6 py-4">{cliente.nfse.aliquota}</td>
                     <td className="px-6 py-4">{cliente.nfse.valor_servico}</td>
-                    <td className="px-6 py-4">
-                      {cliente.nfse.status}
-                    </td>
+                    <td className="px-6 py-4">{cliente.nfse.status}</td>
                   </tr>
                 ))}
               </tbody>
@@ -329,62 +332,72 @@ export const BuscarNfeGerada = () => {
         </p>
       )}
 
-      <main className="flex justify-center mt-20">
-      </main>
+      <main className="flex justify-center mt-20"></main>
       <div className="relative flex flex-col sm:block">
         <span className="absolute translate-x-8 top-1/4 sm:top-1/2 text-gray-200 -translate-y-1/2 text-4xl">
-          <BsFiletypeDoc className="cursor-pointer" onClick={() => {imprimir(reactToPrintContent);}} />
+          <BsFiletypeDoc
+            className="cursor-pointer"
+            onClick={() => {
+              imprimir(reactToPrintContent);
+            }}
+          />
         </span>
         <button
           className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
-          onClick={() => {imprimir(reactToPrintContent);}}
+          onClick={() => {
+            imprimir(reactToPrintContent);
+          }}
         >
           Imprimir Nota
         </button>
         <span className="absolute translate-x-8 bottom-1/4 sm:top-1/2 sm:bottom-0 text-gray-200 translate-y-1/2 sm:-translate-y-1/2 text-4xl">
-        <CiNoWaitingSign className="cursor-pointer" onClick={() => setShowPopUp(true)} />
+          <CiNoWaitingSign
+            className="cursor-pointer"
+            onClick={() => setShowCancelPopUp(true)}
+          />
         </span>
         <button
           className="bg-red-600 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-red-400 transition-all"
-          onClick={() => setShowPopUp(true)}
+          onClick={() => setShowCancelPopUp(true)}
         >
           Cancelar Nota
         </button>
         <button
           className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
-          onClick={() => setShowPopUp(true)}
+          onClick={() => setShowPasswordPopUp(true)}
         >
           Senha Certificado
         </button>
       </div>
-            {arquivo && (
-              <p className="text-sm text-gray-500 m-5">
-                Arquivo selecionado:{" "}
-                <span className="font-semibold">{arquivo.name}</span>
-              </p>
-            )}
-            {showPopUp && (
-              <PopUpCancelNFSE
-                setShowPopUp={setShowPopUp}
-                showPopUp={showPopUp}
-                setPassword={setPassword}
-                password={password}
-                cancelNFSE={cancelNFSE}
-              />
-            )}
-            {showPopUp && (
-              <SetPassword
-                setShowPopUp={setShowPopUp}
-                showPopUp={showPopUp}
-                setPassword={setPassword}
-                password={password}
-                setSessionPassword={setSessionPassword}
-              />
-            )}
-            <div>
-            <PDFNFSE ref={componentRef} dados={pdfDados} />
-            </div>
+      {arquivo && (
+        <p className="text-sm text-gray-500 m-5">
+          Arquivo selecionado:{" "}
+          <span className="font-semibold">{arquivo.name}</span>
+        </p>
+      )}
+      {showCancelPopUp && (
+        <PopUpCancelNFSE
+          setShowPopUp={setShowCancelPopUp}
+          showPopUp={showCancelPopUp}
+          setPassword={setPassword}
+          password={password}
+          cancelNFSE={cancelNFSE}
+        />
+      )}
 
+      {showPasswordPopUp && (
+        <SetPassword
+          setShowPopUp={setShowPasswordPopUp}
+          showPopUp={showPasswordPopUp}
+          setPassword={setPassword}
+          password={password}
+          setSessionPassword={setSessionPassword}
+        />
+      )}
+
+      <div>
+        <PDFNFSE ref={componentRef} dados={pdfDados} />
+      </div>
     </div>
   );
 };
