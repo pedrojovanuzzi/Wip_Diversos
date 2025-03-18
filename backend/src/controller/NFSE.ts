@@ -500,7 +500,9 @@ class NFSEController {
           };
         })
       );
-      const filtered = arr.filter(i => i !== null).sort((a, b) => (b.nfse.id || "").localeCompare(a.nfse.id || ""));
+const filtered = arr
+  .filter((i): i is NonNullable<typeof i> => i !== null) // Remove nulls corretamente
+  .sort((a, b) => ((b?.nfse?.id || "").localeCompare(a?.nfse?.id || "")));
       res.status(200).json(filtered);
     } catch {
       res.status(500).json({ error: "Internal Server Error" });
@@ -618,8 +620,8 @@ class NFSEController {
             },
           };
         })
-        .filter(x => x !== null)
-        .sort((a, b) => (b.fatura.titulo || "").localeCompare(a.fatura.titulo || ""));
+        .filter((i): i is NonNullable<typeof i> => i !== null)
+        .sort((a, b) => ((b?.fatura?.titulo || "").localeCompare(a?.fatura?.titulo || "")));        
       res.status(200).json(arr);
     } catch {
       res.status(500).json({ message: "Erro ao buscar clientes" });
