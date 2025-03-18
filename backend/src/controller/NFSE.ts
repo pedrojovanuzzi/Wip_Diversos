@@ -48,19 +48,31 @@ class NFSEController {
     this.BuscarClientes = this.BuscarClientes.bind(this);
   }
 
-  async uploadCertificado(req: Request, res: Response){
+  async uploadCertificado(req: Request, res: Response): Promise<void> {
     try {
       const { password } = req.body;
-      if (!req.file) res.status(400).json({ erro: "Nenhum arquivo enviado" });
   
-      this.certPath = path.join(__dirname, "..", "files", "certificado.pfx");
+      if (!req.file) {
+        res.status(400).json({ erro: "Nenhum arquivo enviado" });
+        return;
+      }
+  
+      this.certPath = path.join(__dirname, "certificados", "certificado.pfx");
       this.PASSWORD = password;
   
       res.status(200).json({ mensagem: "Certificado salvo com sucesso" });
+      return;
     } catch (error) {
-      res.status(500).json({ erro: "Erro ao salvar o certificado" });
+      console.error("Erro ao salvar o certificado:", error);
+      
+      // Evita múltiplas respostas
+      if (!res.headersSent) {
+        res.status(500).json({ erro: "Erro ao salvar o certificado" });
+        return;
+      }
     }
   }
+  
 
   async iniciar(req: Request, res: Response) {
     try {
