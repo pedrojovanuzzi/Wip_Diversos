@@ -141,17 +141,20 @@ class NFSEController {
         }
         soap = soap.replace(/[\r\n]+/g, "").replace(/>\s+</g, "><").trim();
         fs.appendFileSync(logPath, soap + "\n", "utf8");
-        await axios.post(this.WSDL_URL, soap, {
+        const response = await axios.post(this.WSDL_URL, soap, {
           httpsAgent,
           headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction },
         });
+        console.log(response);
+        
         respArr.push({ status: "200", response: "ok" });
       }
       if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
       if (fs.existsSync(this.DECRYPTED_CERT_PATH)) fs.unlinkSync(this.DECRYPTED_CERT_PATH);
       return respArr;
     } catch (error: any) {
-      return { status: "500", response: error.message || "Erro" };
+      console.log(error);
+      return { status: "500", response: error || "Erro" };
     }
   }
 
