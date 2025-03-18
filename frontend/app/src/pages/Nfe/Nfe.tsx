@@ -13,10 +13,14 @@ import { PiPrinter } from "react-icons/pi";
 import Error from "./Components/Error";
 import Success from "./Components/Success";
 
-
 export const Nfe = () => {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
+
+  // Estados para controlar envio do certificado e senha
+  const [showCertPasswordPopUp, setShowCertPasswordPopUp] = useState(false);
+  const [certPassword, setCertPassword] = useState<string>("");
+
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
   const [aliquota, setAliquota] = useState("");
@@ -24,13 +28,8 @@ export const Nfe = () => {
   const [success, setSuccess] = useState("");
   const [service, setService] = useState("");
   const [reducao, setReducao] = useState("");
-  const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
-    []
-  );
-  const [dateFilter, setDateFilter] = useState<{
-    start: string;
-    end: string;
-  } | null>(null);
+  const [clientesSelecionados, setClientesSelecionados] = useState<number[]>([]);
+  const [dateFilter, setDateFilter] = useState<{ start: string; end: string } | null>(null);
   const [activeFilters, setActiveFilters] = useState<{
     plano: string[];
     vencimento: string[];
@@ -44,8 +43,9 @@ export const Nfe = () => {
     nova_nfe: [],
     servicos: [],
   });
+
   const [showPopUp, setShowPopUp] = useState(false);
-  const [password, setPassword] = useState<string>("");
+  const [password, setPassword] = useState<string>(""); // senha para emitir nf
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
   const user = useTypedSelector((state: RootState) => state.auth.user);
   const token = user.token;
@@ -67,20 +67,18 @@ export const Nfe = () => {
       const titulosValidos = clientes
         .filter((cliente) => cliente.fatura && cliente.fatura.titulo)
         .map((cliente) => cliente.fatura.titulo);
-  
       setClientesSelecionados(titulosValidos);
     }
   };
-  
+
   useEffect(() => {
     handleSearch();
   }, []);
 
   const emitirNFe = async () => {
     try {
-
-      setError(''); // Limpa qualquer mensagem de erro anterior
-      setSuccess('');
+      setError("");
+      setSuccess("");
 
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/`,
@@ -92,36 +90,40 @@ export const Nfe = () => {
           },
         }
       );
-
-
       setDadosNFe(resposta.data);
-      setSuccess("NF-e emitida com sucesso.");     
-      
-
+      setSuccess("NF-e emitida com sucesso.");
     } catch (erro) {
       console.error("Erro ao emitir NF-e:", erro);
-      // Verifica se a resposta do erro está disponível
-    if (axios.isAxiosError(erro) && erro.response && erro.response.data && erro.response.data.erro) {
-      setError(`Erro ao emitir NF-e: ${erro.response.data.erro}`);
-    } else {
-      setError("Erro desconhecido ao emitir NF-e.");
-    }
-    }
-      finally {
-        setShowPopUp(false);
+      if (axios.isAxiosError(erro) && erro.response && erro.response.data && erro.response.data.erro) {
+        setError(`Erro ao emitir NF-e: ${erro.response.data.erro}`);
+      } else {
+        setError("Erro desconhecido ao emitir NF-e.");
       }
+    } finally {
+      setShowPopUp(false);
+    }
   };
 
-  const enviarCertificado = async () => {
+  // Função que abre o popup para senha do certificado
+  const handleEnviarCertificado = () => {
     if (!arquivo) {
       alert("Selecione um arquivo para enviar.");
       return;
     }
+    setShowCertPasswordPopUp(true);
+  };
 
-    const formData = new FormData();
-    formData.append("arquivo", arquivo);
-
+  // Envia o certificado + senha
+  const enviarCertificado = async () => {
+    if (!arquivo || !certPassword) {
+      alert("É necessário arquivo e senha.");
+      return;
+    }
     try {
+      const formData = new FormData();
+      formData.append("arquivo", arquivo);
+      formData.append("password", certPassword);
+
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/upload`,
         formData,
@@ -133,56 +135,55 @@ export const Nfe = () => {
         }
       );
       console.log("Certificado enviado:", resposta.data);
+      setSuccess("Certificado enviado com sucesso!");
+      setShowCertPasswordPopUp(false);
+      setCertPassword("");
     } catch (erro) {
       console.error("Erro ao enviar o certificado:", erro);
+      setError("Não foi possível enviar o certificado.");
+      setShowCertPasswordPopUp(false);
     }
   };
 
   const handleSearch = async () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
-    
-    
-      try {
-        const resposta = await axios.post(
-          `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
-          {
-            cpf: searchCpfRegex,
-            filters: activeFilters,
-            dateFilter: dateFilter,
+    try {
+      const resposta = await axios.post(
+        `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
+        {
+          cpf: searchCpfRegex,
+          filters: activeFilters,
+          dateFilter: dateFilter,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-  
-        setError(''); // Limpa qualquer mensagem de erro anterior
-        console.log("Clientes encontrados:", resposta.data);
-        setClientes(resposta.data); // Armazena os clientes no estado
-      } catch (erro) {
-        console.error("Erro ao Buscar Clientes:", erro);
-        if (axios.isAxiosError(erro) && erro.response && erro.response.status === 500) {
-          setError('Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde.');
-        } else if (axios.isAxiosError(erro) && erro.response) {
-          // Outros erros baseados no status HTTP
-          setError(`Erro: ${erro.response.data.error || 'Algo deu errado.'}`);
-        } else {
-          // Erros de rede ou outros tipos de erros
-          setError('Erro de rede. Verifique sua conexão e tente novamente.');
         }
+      );
+      setError("");
+      console.log("Clientes encontrados:", resposta.data);
+      setClientes(resposta.data);
+    } catch (erro) {
+      console.error("Erro ao Buscar Clientes:", erro);
+      if (axios.isAxiosError(erro) && erro.response && erro.response.status === 500) {
+        setError("Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde.");
+      } else if (axios.isAxiosError(erro) && erro.response) {
+        setError(`Erro: ${erro.response.data.error || "Algo deu errado."}`);
+      } else {
+        setError("Erro de rede. Verifique sua conexão e tente novamente.");
       }
-    }    
-
+    }
+  };
 
   return (
     <div>
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
-      <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={enviarCertificado}/>
-      {error && <Error message={error}/>}
-      {success && <Success message={success}/>}
+      <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={handleEnviarCertificado} />
+      {error && <Error message={error} />}
+      {success && <Success message={success} />}
       {clientes.length > 0 && (
         <h1 className="text-center mt-5 self-center text-2xl font-semibold text-gray-900">
           Total de Resultados: {clientes.length}
@@ -193,58 +194,22 @@ export const Nfe = () => {
           <div className="overflow-auto shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
             <table className="min-w-full divide-y bg-gray-50 divide-gray-300 ">
               <thead className="bg-gray-50 w-full text-center">
-                <th className="px-4 py-4">
-                  <input
-                    className="cursor-pointer"
-                    type="checkbox"
-                    checked={
-                      clientesSelecionados.length > 0 &&
-                      clientesSelecionados.length === clientes.length
-                    }
-                    onChange={handleSelectAll}
-                  />
-                </th>
                 <tr>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-sm font-semibold text-gray-900"
-                  ></th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-sm font-semibold text-gray-900"
-                  >
-                    Titulo
+                  <th className="px-4 py-4">
+                    <input
+                      className="cursor-pointer"
+                      type="checkbox"
+                      checked={clientesSelecionados.length > 0 && clientesSelecionados.length === clientes.length}
+                      onChange={handleSelectAll}
+                    />
                   </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-sm font-semibold text-gray-900"
-                  >
-                    Login
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-sm font-semibold text-gray-900"
-                  >
-                    Vencimento
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-sm font-semibold text-gray-900"
-                  >
-                    Tipo
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-sm font-semibold text-gray-900"
-                  >
-                    Valor
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-sm font-semibold text-gray-900"
-                  >
-                    Status
-                  </th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900" />
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">Titulo</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">Login</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">Vencimento</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">Tipo</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">Valor</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
@@ -252,20 +217,19 @@ export const Nfe = () => {
                   <tr key={cliente.id}>
                     <td className="px-4 py-4">
                       <input
-                      className="cursor-pointer"
+                        className="cursor-pointer"
                         type="checkbox"
                         checked={clientesSelecionados.includes(cliente.fatura.titulo)}
                         onChange={() => handleCheckboxChange(cliente.fatura.titulo)}
                       />
                     </td>
+                    <td className="px-6 py-4" />
                     <td className="px-6 py-4">{cliente.fatura.titulo}</td>
                     <td className="px-6 py-4">{cliente.login}</td>
                     <td className="px-6 py-4">{cliente.fatura.datavenc}</td>
                     <td className="px-6 py-4">{cliente.fatura.tipo}</td>
                     <td className="px-6 py-4">{cliente.fatura.valor}</td>
-                    <td className="px-6 py-4">
-                      {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
-                    </td>
+                    <td className="px-6 py-4">{cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -273,13 +237,11 @@ export const Nfe = () => {
           </div>
         </div>
       ) : (
-        <p className="text-center mt-10 text-gray-500">
-          Nenhum cliente encontrado
-        </p>
+        <p className="text-center mt-10 text-gray-500">Nenhum cliente encontrado</p>
       )}
 
-      <main className="flex justify-center mt-20">
-      </main>
+      <main className="flex justify-center mt-20" />
+
       <div className="relative">
         <span className="absolute translate-x-8 top-11 text-gray-200 -translate-y-1/2 text-4xl">
           <BsFiletypeDoc className="cursor-pointer" onClick={() => setShowPopUp(true)} />
@@ -290,35 +252,51 @@ export const Nfe = () => {
         >
           Emitir NF-e
         </button>
-        <input type="text" onChange={((e) => {
-          setAliquota(e.target.value);
-        })} placeholder="Exemplo 4,4249%" className="ring-2 ring-gray-500 p-2 rounded m-5" />
+        <input
+          type="text"
+          onChange={(e) => {
+            setAliquota(e.target.value);
+          }}
+          placeholder="Exemplo 4,4249%"
+          className="ring-2 ring-gray-500 p-2 rounded m-5"
+        />
       </div>
+
       <div className="relative">
-      <input type="text" onChange={((e) => {
-          setService(
-            e.target.value
-              .normalize("NFD") // Separa caracteres acentuados em base + diacrítico
-              .replace(/[\u0300-\u036f]/g, "") // Remove os diacríticos
-              .replace(/[^a-zA-Z0-9 ]/g, "") // Remove outros caracteres especiais
-          );          
-        })} placeholder="Servico de Manutencao" className="ring-2 ring-gray-500 p-2 rounded m-5" />
-        <input type="text" onChange={((e) => {
-          setReducao(
-            e.target.value
-              .normalize("NFD") // Separa caracteres acentuados em base + diacrítico
-              .replace(/[\u0300-\u036f]/g, "") // Remove os diacríticos
-              .replace(/[^a-zA-Z0-9 ]/g, "") // Remove outros caracteres especiais
-          );          
-        })} placeholder="Redução" className="ring-2 ring-gray-500 p-2 rounded m-5" />
+        <input
+          type="text"
+          onChange={(e) => {
+            setService(
+              e.target.value
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-zA-Z0-9 ]/g, "")
+            );
+          }}
+          placeholder="Servico de Manutencao"
+          className="ring-2 ring-gray-500 p-2 rounded m-5"
+        />
+        <input
+          type="text"
+          onChange={(e) => {
+            setReducao(
+              e.target.value
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-zA-Z0-9 ]/g, "")
+            );
+          }}
+          placeholder="Redução"
+          className="ring-2 ring-gray-500 p-2 rounded m-5"
+        />
       </div>
-      
+
       {arquivo && (
         <p className="text-sm text-gray-500 m-5">
-          Arquivo selecionado:{" "}
-          <span className="font-semibold">{arquivo.name}</span>
+          Arquivo selecionado: <span className="font-semibold">{arquivo.name}</span>
         </p>
       )}
+
       {showPopUp && (
         <PopUpButton
           setShowPopUp={setShowPopUp}
@@ -327,6 +305,39 @@ export const Nfe = () => {
           password={password}
           emitirNFe={emitirNFe}
         />
+      )}
+
+      {/* Popup para senha do certificado */}
+      {showCertPasswordPopUp && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/30">
+          <div className="bg-white p-6 rounded-md shadow-lg">
+            <h2 className="text-lg font-semibold">Digite a senha do Certificado:</h2>
+            <input
+              type="password"
+              value={certPassword}
+              onChange={(e) => setCertPassword(e.target.value)}
+              className="block w-full border p-2 my-4 rounded"
+              placeholder="Senha do PFX"
+            />
+            <div className="flex justify-end mt-4">
+              <button
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded mr-2"
+                onClick={() => {
+                  setShowCertPasswordPopUp(false);
+                  setCertPassword("");
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                className="bg-indigo-500 text-white px-4 py-2 rounded"
+                onClick={enviarCertificado}
+              >
+                Enviar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
