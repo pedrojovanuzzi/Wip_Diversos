@@ -634,17 +634,22 @@ const filtered = arr
     let servicosFilter: string[] = ["mensalidade"];
     if (cpf) w.cpf_cnpj = cpf;
     if (filters) {
-      let { plano, vencimento, cli_ativado, nova_nfe, servicos } = filters;
+      let { plano, vencimento, cli_ativado, SCM, servicos } = filters;
       if (plano?.length) w.plano = In(plano);
       if (vencimento?.length) w.venc = In(vencimento);
       if (cli_ativado?.length) w.cli_ativado = In(["s"]);
-      if (nova_nfe?.length) w.tags = In(nova_nfe);
+      if (SCM?.length){
+        w.vendedor = In(SCM);
+      }
+      else{
+        w.vendedor = In(["SVA"]);
+      }
       if (servicos?.length) servicosFilter = servicos;
     }
     try {
       const clientesResponse = await ClientRepository.find({
         where: w,
-        select: { login: true, cpf_cnpj: true, cli_ativado: true, desconto: true },
+        select: { login: true, cpf_cnpj: true, cli_ativado: true, desconto: true},
         order: { id: "DESC" },
       });
       const faturasData = MkauthSource.getRepository(Faturas);
