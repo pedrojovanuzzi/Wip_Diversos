@@ -29,7 +29,7 @@ const filters = {
     { value: "5_PFJ_FIBRA_800M", label: "800M" },
   ],
   cli_ativado: [{ value: "active_client", label: "Cliente Ativo" }],
-  nova_nfe: [{ value: "new_nfe", label: "Nova NFE" }],
+  nova_nfe: [{ value: "SVA", label: "SVA" }],
   servicos: [{ value: "servicos", label: "Servicos" }],
   vencimento: [
     { value: "05", label: "Dia 5" },
