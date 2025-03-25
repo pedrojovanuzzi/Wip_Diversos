@@ -17,6 +17,7 @@ import { Faturas } from "../entities/Faturas";
 import { In, Between, IsNull } from "typeorm";
 import moment from "moment-timezone";
 import { processarCertificado } from "../utils/certUtils";
+import { parseStringPromise } from "xml2js";
 
 
 dotenv.config();
@@ -194,6 +195,24 @@ class NFSEController {
           optanteSimplesNacional: 1,
           incentivoFiscal: 2,
         });
+
+        const xml = response.data;
+        const parsed = await parseStringPromise(xml, { explicitArray: false });
+
+        console.log(response.data);
+        
+
+        // Caminho até a resposta SOAP
+        const resposta = parsed?.["soap:Envelope"]?.["soap:Body"]?.["ns3:recepcionarLoteRpsSincronoResponse"]?.["ns2:EnviarLoteRpsSincronoResposta"];
+
+        // Verifica se existe mensagem de erro
+        const temErro = resposta?.ListaMensagemRetornoLote?.MensagemRetorno;
+
+        if (temErro) {
+          console.log("Erro detectado na resposta SOAP:", temErro);
+          respArr.push({ status: "500", response: "Erro na geração da NFSe", detalhes: temErro });
+          continue; // pula este lote, não insere no banco
+        }
 
         if(await this.verificaRps(nfseNumber)){
           await NsfeData.save(insertDatabase);
