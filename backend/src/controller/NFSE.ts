@@ -84,8 +84,8 @@ class NFSEController {
         if (ok) res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
         else res.status(500).json({ erro: "Erro ao criar o RPS." });
       } else {
-        if (result?.status === "200") res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
-        else res.status(500).json({ erro: "Erro ao criar o RPS." });
+        // if (result?.status === "200") res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
+        // else res.status(500).json({ erro: "Erro ao criar o RPS." });
       }
     } catch {
       res.status(500).json({ erro: "Erro ao criar o RPS." });
@@ -118,40 +118,79 @@ class NFSEController {
         const batch = ids.slice(i, i + 50);
         let rpsXmls = "";
         for (const bid of batch) {
-          rpsXmls += await this.gerarRpsXml(bid, Number(aliquota).toFixed(4), service, reducao, nfseNumber, nfseResponse[0]);
-          
-        }
-        nfseNumber++;
-        let lote = `
-          <LoteRps versao="2.01" Id="lote${nfseNumber}">
-            <NumeroLote>1</NumeroLote>
-            <CpfCnpj><Cnpj>${
-              this.homologacao ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN
-            }</Cnpj></CpfCnpj>
-            <InscricaoMunicipal>${
-              this.homologacao ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO
-            }</InscricaoMunicipal>
-            <QuantidadeRps>${batch.length}</QuantidadeRps>
-            <ListaRps>${rpsXmls}</ListaRps>
-          </LoteRps>
-        `;
-        lote = lote.replace(/[\r\n]+/g, "").replace(/>\s+</g, "><").trim();
-        const signed = this.assinarXml(lote, "InfDeclaracaoPrestacaoServico");
-        let envio = "";
-        let soap = "";
-        if (this.homologacao) {
-          envio = `<GerarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${signed}</GerarNfseEnvio>`;
-          soap = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:gerarNfse>${envio}<username>${process.env.MUNICIPIO_LOGIN_TEST}</username><password>${process.env.MUNICIPIO_SENHA_TEST}</password></ws:gerarNfse></soapenv:Body></soapenv:Envelope>`;
-        } else {
-          envio = `<EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${signed}</EnviarLoteRpsSincronoEnvio>`;
-          soap = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:recepcionarLoteRpsSincrono>${envio}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:recepcionarLoteRpsSincrono></soapenv:Body></soapenv:Envelope>`;
-        }
+        // Gerar o XML do RPS sem assinatura
+        let rps = await this.gerarRpsXml(bid, Number(aliquota).toFixed(4), service, reducao, nfseNumber, nfseResponse[0]);
+        
+        // Assinar cada RPS individualmente
+        const signedRps = this.assinarXml(rps, "InfDeclaracaoPrestacaoServico");
+        
+        // Adicionar o RPS assinado à lista
+        rpsXmls += signedRps;
+
+        
+        // Criar o LoteRps contendo todos os RPS assinados
+    let lote = `
+    <LoteRps versao="2.01" Id="lote${nfseNumber}">
+      <NumeroLote>1</NumeroLote>
+      <CpfCnpj><Cnpj>${
+        this.homologacao ? process.env.MUNICIPIO_CNPJ_TEST : process.env.MUNICIPIO_LOGIN
+      }</Cnpj></CpfCnpj>
+      <InscricaoMunicipal>${
+        this.homologacao ? process.env.MUNICIPIO_INCRICAO_TEST : process.env.MUNICIPIO_INCRICAO
+      }</InscricaoMunicipal>
+      <QuantidadeRps>${batch.length}</QuantidadeRps>
+      <ListaRps>${rpsXmls}</ListaRps>
+    </LoteRps>
+  `;
+
+  // Limpar espaços em branco e formatar
+  lote = lote.replace(/[\r\n]+/g, "").replace(/>\s+</g, "><").trim();
+  
+  // Assinar o lote inteiro (opcional, se necessário pela API)
+  // const signedLote = this.assinarXml(lote, "LoteRps");
+
+  let envio = "";
+  let soap = "";
+  if (this.homologacao) {
+      envio = `<GerarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${lote}</GerarNfseEnvio>`;
+      soap = `<?xml version="1.0" encoding="UTF-8"?>
+          <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
+              <soapenv:Header/>
+              <soapenv:Body>
+                  <ws:gerarNfse>
+                      ${envio}
+                      <username>${process.env.MUNICIPIO_LOGIN_TEST}</username>
+                      <password>${process.env.MUNICIPIO_SENHA_TEST}</password>
+                  </ws:gerarNfse>
+              </soapenv:Body>
+          </soapenv:Envelope>`;
+  } else {
+      envio = `<EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${lote}</EnviarLoteRpsSincronoEnvio>`;
+      soap = `<?xml version="1.0" encoding="UTF-8"?>
+          <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
+              <soapenv:Header/>
+              <soapenv:Body>
+                  <ws:recepcionarLoteRpsSincrono>
+                      ${envio}
+                      <username>${process.env.MUNICIPIO_LOGIN}</username>
+                      <password>${process.env.MUNICIPIO_SENHA}</password>
+                  </ws:recepcionarLoteRpsSincrono>
+              </soapenv:Body>
+          </soapenv:Envelope>`;
+  }
+
         soap = soap.replace(/[\r\n]+/g, "").replace(/>\s+</g, "><").trim();
         fs.appendFileSync(logPath, soap + "\n", "utf8");
-        const response = await axios.post(this.WSDL_URL, soap, {
-          httpsAgent,
-          headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction },
-        });
+        
+        // Incrementar o número do RPS
+        nfseNumber++;
+        }
+
+
+        // const response = await axios.post(this.WSDL_URL, soap, {
+        //   httpsAgent,
+        //   headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction },
+        // });
 
         const firstId = batch[0];
         const RPSQuery = MkauthSource.getRepository(Faturas);
@@ -196,30 +235,30 @@ class NFSEController {
           incentivoFiscal: 2,
         });
 
-        const xml = response.data;
-        const parsed = await parseStringPromise(xml, { explicitArray: false });
+        // const xml = response.data;
+        // const parsed = await parseStringPromise(xml, { explicitArray: false });
 
-        console.log(response.data);
+        // console.log(response.data);
         
 
         // Caminho até a resposta SOAP
-        const resposta = parsed?.["soap:Envelope"]?.["soap:Body"]?.["ns3:recepcionarLoteRpsSincronoResponse"]?.["ns2:EnviarLoteRpsSincronoResposta"];
+        // const resposta = parsed?.["soap:Envelope"]?.["soap:Body"]?.["ns3:recepcionarLoteRpsSincronoResponse"]?.["ns2:EnviarLoteRpsSincronoResposta"];
 
         // Verifica se existe mensagem de erro
-        const temErro = resposta?.ListaMensagemRetornoLote?.MensagemRetorno;
+        // const temErro = resposta?.ListaMensagemRetornoLote?.MensagemRetorno;
 
-        if (temErro) {
-          console.log("Erro detectado na resposta SOAP:", temErro);
-          respArr.push({ status: "500", response: "Erro na geração da NFSe", detalhes: temErro });
-          continue; // pula este lote, não insere no banco
-        }
+        // if (temErro) {
+        //   console.log("Erro detectado na resposta SOAP:", temErro);
+        //   respArr.push({ status: "500", response: "Erro na geração da NFSe", detalhes: temErro });
+        //   continue; // pula este lote, não insere no banco
+        // }
 
         if(await this.verificaRps(nfseNumber)){
-          await NsfeData.save(insertDatabase);
-          respArr.push({ status: "200", response: soap });
+          // await NsfeData.save(insertDatabase);
+          // respArr.push({ status: "200", response: soap });
         }
         else{
-          respArr.push({ status: "500", response: "ERRO NA CONSULTA DE RPS" });
+          // respArr.push({ status: "500", response: "ERRO NA CONSULTA DE RPS" });
         }
         
 
@@ -227,14 +266,14 @@ class NFSEController {
         
         // console.log(response);
         
-        respArr.push({ status: "200", response: "ok" });
+        // respArr.push({ status: "200", response: "ok" });
       }
-      if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
-      if (fs.existsSync(this.DECRYPTED_CERT_PATH)) fs.unlinkSync(this.DECRYPTED_CERT_PATH);
-      return respArr;
+      // if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
+      // if (fs.existsSync(this.DECRYPTED_CERT_PATH)) fs.unlinkSync(this.DECRYPTED_CERT_PATH);
+      // return respArr;
     } catch (error: any) {
-      console.log(error);
-      return { status: "500", response: error || "Erro" };
+      // console.log(error);
+      // return { status: "500", response: error || "Erro" };
     }
   }
 
