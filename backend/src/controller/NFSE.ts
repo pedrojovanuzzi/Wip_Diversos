@@ -204,10 +204,10 @@ class NFSEController {
         // Salva o lote inteiro como uma linha única no arquivo de log
         fs.appendFileSync(logPath, soap + "\n", "utf8");
 
-        // const response = await axios.post(this.WSDL_URL, soap, {
-        //   httpsAgent,
-        //   headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction },
-        // });
+        const response = await axios.post(this.WSDL_URL, soap, {
+          httpsAgent,
+          headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction },
+        });
 
         const firstId = batch[0];
         const RPSQuery = MkauthSource.getRepository(Faturas);
@@ -271,40 +271,40 @@ class NFSEController {
           incentivoFiscal: 2,
         });
 
-        // const xml = response.data;
-        // const parsed = await parseStringPromise(xml, { explicitArray: false });
+        const xml = response.data;
+        const parsed = await parseStringPromise(xml, { explicitArray: false });
 
-        // console.log(response.data);
+        console.log(response.data);
 
         // Caminho até a resposta SOAP
-        // const resposta = parsed?.["soap:Envelope"]?.["soap:Body"]?.["ns3:recepcionarLoteRpsSincronoResponse"]?.["ns2:EnviarLoteRpsSincronoResposta"];
+        const resposta = parsed?.["soap:Envelope"]?.["soap:Body"]?.["ns3:recepcionarLoteRpsSincronoResponse"]?.["ns2:EnviarLoteRpsSincronoResposta"];
 
         // Verifica se existe mensagem de erro
-        // const temErro = resposta?.ListaMensagemRetornoLote?.MensagemRetorno;
+        const temErro = resposta?.ListaMensagemRetornoLote?.MensagemRetorno;
 
-        // if (temErro) {
-        //   console.log("Erro detectado na resposta SOAP:", temErro);
-        //   respArr.push({ status: "500", response: "Erro na geração da NFSe", detalhes: temErro });
-        //   continue; // pula este lote, não insere no banco
-        // }
-
-        if (await this.verificaRps(nfseNumber)) {
-          // await NsfeData.save(insertDatabase);
-          // respArr.push({ status: "200", response: soap });
-        } else {
-          // respArr.push({ status: "500", response: "ERRO NA CONSULTA DE RPS" });
+        if (temErro) {
+          console.log("Erro detectado na resposta SOAP:", temErro);
+          respArr.push({ status: "500", response: "Erro na geração da NFSe", detalhes: temErro });
+          continue; // pula este lote, não insere no banco
         }
 
-        // console.log(response);
+        if (await this.verificaRps(nfseNumber)) {
+          await NsfeData.save(insertDatabase);
+          respArr.push({ status: "200", response: soap });
+        } else {
+          respArr.push({ status: "500", response: "ERRO NA CONSULTA DE RPS" });
+        }
 
-        // respArr.push({ status: "200", response: "ok" });
+        console.log(response);
+
+        respArr.push({ status: "200", response: "ok" });
       }
-      // if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
-      // if (fs.existsSync(this.DECRYPTED_CERT_PATH)) fs.unlinkSync(this.DECRYPTED_CERT_PATH);
-      // return respArr;
+      if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
+      if (fs.existsSync(this.DECRYPTED_CERT_PATH)) fs.unlinkSync(this.DECRYPTED_CERT_PATH);
+      return respArr;
     } catch (error: any) {
-      // console.log(error);
-      // return { status: "500", response: error || "Erro" };
+      console.log(error);
+      return { status: "500", response: error || "Erro" };
     }
   }
 
