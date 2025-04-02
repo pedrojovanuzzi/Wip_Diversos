@@ -69,7 +69,7 @@ class NFSEController {
       aliquota = aliquota?.trim() ? aliquota : "4.4269";
       aliquota = aliquota.replace(",", ".").replace("%", "");
       if (!service) service = "Servico de Suporte Tecnico";
-      if (!reducao) reducao = 40;
+      if (!reducao) reducao = 60;
       reducao = Number(reducao) / 100;
       const result = await this.gerarNFSE(
         password,
