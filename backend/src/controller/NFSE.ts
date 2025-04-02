@@ -112,23 +112,28 @@ class NFSEController {
       
 
       const respArr: any[] = [];
-      if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
-      const logPath = "./log/xml_log.txt";
-      for (let i = 0; i < ids.length; i += 50) {
-        const batch = ids.slice(i, i + 50);
-        let rpsXmls = "";
-        for (const bid of batch) {
+if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
+const logPath = "./log/xml_log.txt";
+
+for (let i = 0; i < ids.length; i += 50) {
+    const batch = ids.slice(i, i + 50);
+    let rpsXmls = "";
+    
+    for (const bid of batch) {
         // Gerar o XML do RPS sem assinatura
         let rps = await this.gerarRpsXml(bid, Number(aliquota).toFixed(4), service, reducao, nfseNumber, nfseResponse[0]);
         
         // Assinar cada RPS individualmente
         const signedRps = this.assinarXml(rps, "InfDeclaracaoPrestacaoServico");
         
-        // Adicionar o RPS assinado à lista
+        // Adicionar o RPS assinado na lista
         rpsXmls += signedRps;
-
         
-        // Criar o LoteRps contendo todos os RPS assinados
+        // Incrementar o número do RPS
+        nfseNumber++;
+    }
+
+    // Criar o LoteRps contendo todos os RPS assinados
     let lote = `
     <LoteRps versao="2.01" Id="lote${nfseNumber}">
       <NumeroLote>1</NumeroLote>
@@ -143,48 +148,30 @@ class NFSEController {
     </LoteRps>
   `;
 
-  // Limpar espaços em branco e formatar
   lote = lote.replace(/[\r\n]+/g, "").replace(/>\s+</g, "><").trim();
+
+  let envio = `<EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${lote}</EnviarLoteRpsSincronoEnvio>`;
+  let soap = `<?xml version="1.0" encoding="UTF-8"?>
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
+          <soapenv:Header/>
+          <soapenv:Body>
+              <ws:recepcionarLoteRpsSincrono>
+                  ${envio}
+                  <username>${process.env.MUNICIPIO_LOGIN}</username>
+                  <password>${process.env.MUNICIPIO_SENHA}</password>
+              </ws:recepcionarLoteRpsSincrono>
+          </soapenv:Body>
+      </soapenv:Envelope>`;
   
-  // Assinar o lote inteiro (opcional, se necessário pela API)
-  // const signedLote = this.assinarXml(lote, "LoteRps");
+  // Remove todas as quebras de linha e espaços desnecessários
+  soap = soap.replace(/[\r\n]+/g, "").replace(/>\s+</g, "><").trim();
 
-  let envio = "";
-  let soap = "";
-  if (this.homologacao) {
-      envio = `<GerarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${lote}</GerarNfseEnvio>`;
-      soap = `<?xml version="1.0" encoding="UTF-8"?>
-          <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
-              <soapenv:Header/>
-              <soapenv:Body>
-                  <ws:gerarNfse>
-                      ${envio}
-                      <username>${process.env.MUNICIPIO_LOGIN_TEST}</username>
-                      <password>${process.env.MUNICIPIO_SENHA_TEST}</password>
-                  </ws:gerarNfse>
-              </soapenv:Body>
-          </soapenv:Envelope>`;
-  } else {
-      envio = `<EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${lote}</EnviarLoteRpsSincronoEnvio>`;
-      soap = `<?xml version="1.0" encoding="UTF-8"?>
-          <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
-              <soapenv:Header/>
-              <soapenv:Body>
-                  <ws:recepcionarLoteRpsSincrono>
-                      ${envio}
-                      <username>${process.env.MUNICIPIO_LOGIN}</username>
-                      <password>${process.env.MUNICIPIO_SENHA}</password>
-                  </ws:recepcionarLoteRpsSincrono>
-              </soapenv:Body>
-          </soapenv:Envelope>`;
-  }
+  // Salva o lote inteiro como uma linha única no arquivo de log
+  fs.appendFileSync(logPath, soap + "\n", "utf8");
 
-        soap = soap.replace(/[\r\n]+/g, "").replace(/>\s+</g, "><").trim();
-        fs.appendFileSync(logPath, soap + "\n", "utf8");
-        
-        // Incrementar o número do RPS
-        nfseNumber++;
-        }
+
+
+
 
 
         // const response = await axios.post(this.WSDL_URL, soap, {
