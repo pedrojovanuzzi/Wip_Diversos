@@ -68,7 +68,7 @@ class NFSEController {
       let { password, clientesSelecionados, aliquota, service, reducao } =
         req.body;
       this.PASSWORD = password;
-      aliquota = aliquota?.trim() ? aliquota : "4.4269";
+      aliquota = aliquota?.trim() ? aliquota : "5.0000";
       aliquota = aliquota.replace(",", ".").replace("%", "");
       if (!service) service = "Servico de Suporte Tecnico";
       if (!reducao) reducao = 40;
