@@ -51,6 +51,7 @@ class NFSEController {
     this.BuscarNSFE = this.BuscarNSFE.bind(this);
     this.BuscarNSFEDetalhes = this.BuscarNSFEDetalhes.bind(this);
     this.BuscarClientes = this.BuscarClientes.bind(this);
+    this.removerAcentos = this.removerAcentos.bind(this);
   }
 
   public async uploadCertificado(req: Request, res: Response) {
@@ -391,7 +392,7 @@ class NFSEController {
             </IdentificacaoTomador>
             <RazaoSocial>${ClientData?.nome}</RazaoSocial>
             <Endereco>
-              <Endereco>${ClientData?.endereco}</Endereco>
+              <Endereco>${this.removerAcentos(ClientData?.endereco)}</Endereco>
               <Numero>${ClientData?.numero}</Numero>
               <Complemento>${ClientData?.complemento}</Complemento>
               <Bairro>${ClientData?.bairro}</Bairro>
@@ -930,6 +931,10 @@ class NFSEController {
       };
     }
   }
+
+  removerAcentos(texto: any): string {
+    return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
 
   async BuscarClientes(req: Request, res: Response) {
     const { cpf, filters, dateFilter } = req.body;
