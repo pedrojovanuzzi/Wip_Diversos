@@ -147,10 +147,15 @@ class NFSEController {
           );
 
           // Assinar cada RPS individualmente
-          const signedRps = this.assinarXml(
+          let signedRps = this.assinarXml(
             rps,
             "InfDeclaracaoPrestacaoServico"
           );
+
+          // Remove a tag <Signature> se estiver em homologação
+          if (this.homologacao) {
+            signedRps = signedRps.replace(/<Signature[^>]*>[\s\S]*?<\/Signature>/g, "");
+          }
 
           // Adicionar o RPS assinado na lista
           rpsXmls += signedRps;
