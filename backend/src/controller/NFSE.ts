@@ -162,6 +162,77 @@ class NFSEController {
 
           // Incrementar o número do RPS
           nfseNumber++;
+
+         
+          const RPSQuery = MkauthSource.getRepository(Faturas);
+          const rpsData = await RPSQuery.findOne({
+            where: { id: Number(bid) },
+          });
+          const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+          const FaturasRepository = MkauthSource.getRepository(Faturas);
+          const FaturasData = await FaturasRepository.findOne({
+            where: { id: Number(bid) },
+          });
+          const ClientData = await ClientRepository.findOne({
+            where: { login: FaturasData?.login },
+          });
+          const resp = await axios.get(
+            `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
+          );
+          const municipio = resp.data.id;
+          let valorMenosDesconto = ClientData?.desconto
+            ? Number(rpsData?.valor) - Number(ClientData?.desconto)
+            : Number(rpsData?.valor);
+          let valorReduzido =
+            Number(reducao) === 0
+              ? valorMenosDesconto
+              : Number(valorMenosDesconto) * Number(reducao);
+          valorReduzido = Number(valorReduzido.toFixed(2));
+          const novoRegistro  = NsfeData.create({
+            login: rpsData?.login || "",
+            numeroRps: nfseNumber - 1,
+            serieRps: nfseResponse[0]?.serieRps || "",
+            tipoRps: nfseResponse[0]?.tipoRps || 0,
+            dataEmissao: rpsData?.processamento
+              ? new Date(rpsData.processamento)
+              : new Date(),
+            competencia: rpsData?.datavenc
+              ? new Date(rpsData.datavenc)
+              : new Date(),
+            valorServico: valorReduzido || 0,
+            aliquota: Number(Number(aliquota).toFixed(4)),
+            issRetido: nfseResponse[0]?.issRetido || 0,
+            responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
+            itemListaServico: nfseResponse[0]?.itemListaServico || "",
+            discriminacao: service,
+            codigoMunicipio: nfseResponse[0]?.codigoMunicipio || 0,
+            exigibilidadeIss: nfseResponse[0]?.exigibilidadeIss || 0,
+            cnpjPrestador: nfseResponse[0]?.cnpjPrestador || "",
+            inscricaoMunicipalPrestador:
+              nfseResponse[0]?.inscricaoMunicipalPrestador || "",
+            cpfTomador: ClientData?.cpf_cnpj.replace(/[^0-9]/g, "") || "",
+            razaoSocialTomador: ClientData?.nome || "",
+            enderecoTomador: ClientData?.endereco || "",
+            numeroEndereco: ClientData?.numero || "",
+            complemento: ClientData?.complemento || undefined,
+            bairro: ClientData?.bairro || "",
+            uf: nfseResponse[0]?.uf || "",
+            cep: ClientData?.cep.replace(/[^0-9]/g, "") || "",
+            telefoneTomador:
+              ClientData?.celular.replace(/[^0-9]/g, "") || undefined,
+            emailTomador: ClientData?.email || undefined,
+            optanteSimplesNacional: 1,
+            incentivoFiscal: 2,
+          });
+  
+          if (await this.verificaRps(nfseNumber)) {
+            await NsfeData.save(novoRegistro);
+            respArr.push({ status: "200", response: `RPS ${nfseNumber - 1} salvo com sucesso.` });
+        } else {
+            respArr.push({ status: "500", response: `Erro ao salvar RPS ${nfseNumber - 1}` });
+        }
+
+
         }
 
         // Criar o LoteRps contendo todos os RPS assinados
@@ -215,67 +286,6 @@ class NFSEController {
           headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction },
         });
 
-        const firstId = batch[0];
-        const RPSQuery = MkauthSource.getRepository(Faturas);
-        const rpsData = await RPSQuery.findOne({
-          where: { id: Number(firstId) },
-        });
-        const ClientRepository = MkauthSource.getRepository(ClientesEntities);
-        const FaturasRepository = MkauthSource.getRepository(Faturas);
-        const FaturasData = await FaturasRepository.findOne({
-          where: { id: Number(firstId) },
-        });
-        const ClientData = await ClientRepository.findOne({
-          where: { login: FaturasData?.login },
-        });
-        const resp = await axios.get(
-          `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
-        );
-        const municipio = resp.data.id;
-        let valorMenosDesconto = ClientData?.desconto
-          ? Number(rpsData?.valor) - Number(ClientData?.desconto)
-          : Number(rpsData?.valor);
-        let valorReduzido =
-          Number(reducao) === 0
-            ? valorMenosDesconto
-            : Number(valorMenosDesconto) * Number(reducao);
-        valorReduzido = Number(valorReduzido.toFixed(2));
-        const insertDatabase = NsfeData.create({
-          login: rpsData?.login || "",
-          numeroRps: nfseNumber - 1,
-          serieRps: nfseResponse[0]?.serieRps || "",
-          tipoRps: nfseResponse[0]?.tipoRps || 0,
-          dataEmissao: rpsData?.processamento
-            ? new Date(rpsData.processamento)
-            : new Date(),
-          competencia: rpsData?.datavenc
-            ? new Date(rpsData.datavenc)
-            : new Date(),
-          valorServico: valorReduzido || 0,
-          aliquota: Number(Number(aliquota).toFixed(4)),
-          issRetido: nfseResponse[0]?.issRetido || 0,
-          responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
-          itemListaServico: nfseResponse[0]?.itemListaServico || "",
-          discriminacao: service,
-          codigoMunicipio: nfseResponse[0]?.codigoMunicipio || 0,
-          exigibilidadeIss: nfseResponse[0]?.exigibilidadeIss || 0,
-          cnpjPrestador: nfseResponse[0]?.cnpjPrestador || "",
-          inscricaoMunicipalPrestador:
-            nfseResponse[0]?.inscricaoMunicipalPrestador || "",
-          cpfTomador: ClientData?.cpf_cnpj.replace(/[^0-9]/g, "") || "",
-          razaoSocialTomador: ClientData?.nome || "",
-          enderecoTomador: ClientData?.endereco || "",
-          numeroEndereco: ClientData?.numero || "",
-          complemento: ClientData?.complemento || undefined,
-          bairro: ClientData?.bairro || "",
-          uf: nfseResponse[0]?.uf || "",
-          cep: ClientData?.cep.replace(/[^0-9]/g, "") || "",
-          telefoneTomador:
-            ClientData?.celular.replace(/[^0-9]/g, "") || undefined,
-          emailTomador: ClientData?.email || undefined,
-          optanteSimplesNacional: 1,
-          incentivoFiscal: 2,
-        });
 
         const xml = response.data;
         const parsed = await parseStringPromise(xml, { explicitArray: false });
@@ -292,13 +302,6 @@ class NFSEController {
           console.log("Erro detectado na resposta SOAP:", temErro);
           respArr.push({ status: "500", response: "Erro na geração da NFSe", detalhes: temErro });
           continue; // pula este lote, não insere no banco
-        }
-
-        if (await this.verificaRps(nfseNumber)) {
-          await NsfeData.save(insertDatabase);
-          respArr.push({ status: "200", response: soap });
-        } else {
-          respArr.push({ status: "500", response: "ERRO NA CONSULTA DE RPS" });
         }
 
         console.log(response);
