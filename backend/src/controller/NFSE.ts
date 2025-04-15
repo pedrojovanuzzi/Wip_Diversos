@@ -153,9 +153,9 @@ class NFSEController {
           );
 
           // Remove a tag <Signature> se estiver em homologação
-          if (this.homologacao) {
-            signedRps = signedRps.replace(/<Signature[^>]*>[\s\S]*?<\/Signature>/g, "");
-          }
+          // if (this.homologacao) {
+          //   signedRps = signedRps.replace(/<Signature[^>]*>[\s\S]*?<\/Signature>/g, "");
+          // }
 
           // Adicionar o RPS assinado na lista
           rpsXmls += signedRps;
