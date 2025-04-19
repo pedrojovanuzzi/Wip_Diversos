@@ -1,15 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
-import Stacked from "./Components/Stacked";
 import Filter from "./Components/Filter";
-import { CiCirclePlus, CiNoWaitingSign } from "react-icons/ci";
+import { CiNoWaitingSign } from "react-icons/ci";
 import { TypedUseSelectorHook, useSelector } from "react-redux";
 import { RootState } from "../../types";
 import { BsFiletypeDoc } from "react-icons/bs";
-import { IoArrowUpCircleOutline } from "react-icons/io5";
-import PopUpButton from "./Components/PopUpButton";
-import { PiPrinter } from "react-icons/pi";
 import Stacked2 from "./Components/Stacked2";
 import PopUpCancelNFSE from "./Components/PopUpCancelNFSE";
 import PDFNFSE from "./Components/PDFNFSE";
@@ -19,7 +15,6 @@ import Error from "./Components/Error";
 import SetPassword from "./Components/SetPassword";
 
 export const BuscarNfeGerada = () => {
-  const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [showCertPasswordPopUp, setShowCertPasswordPopUp] = useState(false);
   const [certPassword, setCertPassword] = useState<string>("");
