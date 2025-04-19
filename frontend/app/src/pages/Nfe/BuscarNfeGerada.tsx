@@ -1,11 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
+import Stacked from "./Components/Stacked";
 import Filter from "./Components/Filter";
-import { CiNoWaitingSign } from "react-icons/ci";
+import { CiCirclePlus, CiNoWaitingSign } from "react-icons/ci";
 import { TypedUseSelectorHook, useSelector } from "react-redux";
 import { RootState } from "../../types";
 import { BsFiletypeDoc } from "react-icons/bs";
+import { IoArrowUpCircleOutline } from "react-icons/io5";
+import PopUpButton from "./Components/PopUpButton";
+import { PiPrinter } from "react-icons/pi";
 import Stacked2 from "./Components/Stacked2";
 import PopUpCancelNFSE from "./Components/PopUpCancelNFSE";
 import PDFNFSE from "./Components/PDFNFSE";
@@ -15,6 +19,7 @@ import Error from "./Components/Error";
 import SetPassword from "./Components/SetPassword";
 
 export const BuscarNfeGerada = () => {
+  const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [showCertPasswordPopUp, setShowCertPasswordPopUp] = useState(false);
   const [certPassword, setCertPassword] = useState<string>("");
@@ -242,12 +247,12 @@ export const BuscarNfeGerada = () => {
       />
       {error && <Error message={error} />}
       {success && <Success message={success} />}
-      {clientes.filter((c) => c.nfse.status !== "Cancelada").length > 0 && (
+      {clientes.length > 0 && (
         <h1 className="text-center mt-5 self-center text-2xl font-semibold text-gray-900">
           Total de Resultados: {clientes.length}
         </h1>
       )}
-      {clientes.filter((c) => c.nfse.status !== "Cancelada").length > 0 ? (
+      {clientes.length > 0 ? (
         <div className="mt-10 px-4 sm:px-6 lg:px-8">
           <div className="overflow-auto shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
             <table className="min-w-full divide-y bg-gray-50 divide-gray-300 ">
@@ -307,7 +312,7 @@ export const BuscarNfeGerada = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {clientes.filter((cliente) => cliente.nfse.status !== "Cancelada").map((cliente) => (
+                {clientes.map((cliente) => (
                   <tr key={cliente.id}>
                     <td className="px-4 py-4">
                       <input
