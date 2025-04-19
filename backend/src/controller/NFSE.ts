@@ -742,96 +742,66 @@ class NFSEController {
           const nfseDoCliente = nfseResponse.filter(
             (nf) => nf.login === c.login
           );
-          if (!nfseDoCliente.length) return null;
-          const statusArray = await Promise.all(
-            nfseDoCliente.map(async (nf) =>
-              (await this.setNfseStatus(nf.numeroRps)) ? "Cancelada" : "Ativa"
-            )
-          );
-          const nfseNumberArray = await Promise.all(
-            nfseDoCliente.map(async (nf) => this.setNfseNumber(nf.numeroRps))
-          );
+        
+          const nfseValidas: typeof nfseDoCliente = [];
+          const nfseNumberArray: string[] = [];
+        
+          for (const nf of nfseDoCliente) {
+            const isCancelada = await this.setNfseStatus(nf.numeroRps);
+            if (!isCancelada) {
+              nfseValidas.push(nf);
+              const numeroNfse = await this.setNfseNumber(nf.numeroRps);
+              nfseNumberArray.push(numeroNfse);
+            }
+          }
+        
+          if (!nfseValidas.length) return null;
+        
           return {
             ...c,
             nfse: {
-              id: nfseDoCliente.map((nf) => nf.id).join(", ") || null,
-              login: nfseDoCliente.map((nf) => nf.login).join(", ") || null,
-              numero_rps:
-                nfseDoCliente.map((nf) => nf.numeroRps).join(", ") || null,
-              serie_rps:
-                nfseDoCliente.map((nf) => nf.serieRps).join(", ") || null,
-              tipo_rps:
-                nfseDoCliente.map((nf) => nf.tipoRps).join(", ") || null,
-              data_emissao:
-                nfseDoCliente
-                  .map((nf) =>
-                    moment
-                      .tz(nf.dataEmissao, "America/Sao_Paulo")
-                      .format("DD/MM/YYYY")
-                  )
-                  .join(", ") || null,
-              competencia:
-                nfseDoCliente
-                  .map((nf) =>
-                    moment
-                      .tz(nf.competencia, "America/Sao_Paulo")
-                      .format("DD/MM/YYYY")
-                  )
-                  .join(", ") || null,
-              valor_servico:
-                nfseDoCliente.map((nf) => nf.valorServico).join(", ") || null,
-              aliquota:
-                nfseDoCliente.map((nf) => nf.aliquota).join(", ") || null,
-              iss_retido:
-                nfseDoCliente.map((nf) => nf.issRetido).join(", ") || null,
-              responsavel_retecao:
-                nfseDoCliente.map((nf) => nf.responsavelRetencao).join(", ") ||
-                null,
-              item_lista_servico:
-                nfseDoCliente.map((nf) => nf.itemListaServico).join(", ") ||
-                null,
-              discriminacao:
-                nfseDoCliente.map((nf) => nf.discriminacao).join(", ") || null,
-              codigo_municipio:
-                nfseDoCliente.map((nf) => nf.codigoMunicipio).join(", ") ||
-                null,
-              exigibilidade_iss:
-                nfseDoCliente.map((nf) => nf.exigibilidadeIss).join(", ") ||
-                null,
-              cnpj_prestador:
-                nfseDoCliente.map((nf) => nf.cnpjPrestador).join(", ") || null,
-              inscricao_municipal_prestador:
-                nfseDoCliente
-                  .map((nf) => nf.inscricaoMunicipalPrestador)
-                  .join(", ") || null,
-              cpf_tomador:
-                nfseDoCliente.map((nf) => nf.cpfTomador).join(", ") || null,
-              razao_social_tomador:
-                nfseDoCliente.map((nf) => nf.razaoSocialTomador).join(", ") ||
-                null,
-              endereco_tomador:
-                nfseDoCliente.map((nf) => nf.enderecoTomador).join(", ") ||
-                null,
-              numero_endereco:
-                nfseDoCliente.map((nf) => nf.numeroEndereco).join(", ") || null,
-              complemento:
-                nfseDoCliente.map((nf) => nf.complemento).join(", ") || null,
-              bairro: nfseDoCliente.map((nf) => nf.bairro).join(", ") || null,
-              uf: nfseDoCliente.map((nf) => nf.uf).join(", ") || null,
-              cep: nfseDoCliente.map((nf) => nf.cep).join(", ") || null,
-              telefone_tomador:
-                nfseDoCliente.map((nf) => nf.telefoneTomador).join(", ") ||
-                null,
-              email_tomador:
-                nfseDoCliente.map((nf) => nf.emailTomador).join(", ") || null,
-              optante_simples_nacional:
-                nfseDoCliente
-                  .map((nf) => nf.optanteSimplesNacional)
-                  .join(", ") || null,
-              incentivo_fiscal:
-                nfseDoCliente.map((nf) => nf.incentivoFiscal).join(", ") ||
-                null,
-              status: statusArray.join(", ") || null,
+              id: nfseValidas.map((nf) => nf.id).join(", ") || null,
+              login: nfseValidas.map((nf) => nf.login).join(", ") || null,
+              numero_rps: nfseValidas.map((nf) => nf.numeroRps).join(", ") || null,
+              serie_rps: nfseValidas.map((nf) => nf.serieRps).join(", ") || null,
+              tipo_rps: nfseValidas.map((nf) => nf.tipoRps).join(", ") || null,
+              data_emissao: nfseValidas
+                .map((nf) =>
+                  moment
+                    .tz(nf.dataEmissao, "America/Sao_Paulo")
+                    .format("DD/MM/YYYY")
+                )
+                .join(", ") || null,
+              competencia: nfseValidas
+                .map((nf) =>
+                  moment
+                    .tz(nf.competencia, "America/Sao_Paulo")
+                    .format("DD/MM/YYYY")
+                )
+                .join(", ") || null,
+              valor_servico: nfseValidas.map((nf) => nf.valorServico).join(", ") || null,
+              aliquota: nfseValidas.map((nf) => nf.aliquota).join(", ") || null,
+              iss_retido: nfseValidas.map((nf) => nf.issRetido).join(", ") || null,
+              responsavel_retecao: nfseValidas.map((nf) => nf.responsavelRetencao).join(", ") || null,
+              item_lista_servico: nfseValidas.map((nf) => nf.itemListaServico).join(", ") || null,
+              discriminacao: nfseValidas.map((nf) => nf.discriminacao).join(", ") || null,
+              codigo_municipio: nfseValidas.map((nf) => nf.codigoMunicipio).join(", ") || null,
+              exigibilidade_iss: nfseValidas.map((nf) => nf.exigibilidadeIss).join(", ") || null,
+              cnpj_prestador: nfseValidas.map((nf) => nf.cnpjPrestador).join(", ") || null,
+              inscricao_municipal_prestador: nfseValidas.map((nf) => nf.inscricaoMunicipalPrestador).join(", ") || null,
+              cpf_tomador: nfseValidas.map((nf) => nf.cpfTomador).join(", ") || null,
+              razao_social_tomador: nfseValidas.map((nf) => nf.razaoSocialTomador).join(", ") || null,
+              endereco_tomador: nfseValidas.map((nf) => nf.enderecoTomador).join(", ") || null,
+              numero_endereco: nfseValidas.map((nf) => nf.numeroEndereco).join(", ") || null,
+              complemento: nfseValidas.map((nf) => nf.complemento).join(", ") || null,
+              bairro: nfseValidas.map((nf) => nf.bairro).join(", ") || null,
+              uf: nfseValidas.map((nf) => nf.uf).join(", ") || null,
+              cep: nfseValidas.map((nf) => nf.cep).join(", ") || null,
+              telefone_tomador: nfseValidas.map((nf) => nf.telefoneTomador).join(", ") || null,
+              email_tomador: nfseValidas.map((nf) => nf.emailTomador).join(", ") || null,
+              optante_simples_nacional: nfseValidas.map((nf) => nf.optanteSimplesNacional).join(", ") || null,
+              incentivo_fiscal: nfseValidas.map((nf) => nf.incentivoFiscal).join(", ") || null,
+              status: "Ativa",
               numeroNfse: nfseNumberArray.join(", ") || null,
             },
           };
