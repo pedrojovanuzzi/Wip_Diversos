@@ -258,8 +258,9 @@ export const BuscarNfeGerada = () => {
                     type="checkbox"
                     checked={
                       clientesSelecionados.length > 0 &&
-                      clientesSelecionados.length === clientes.length
-                    }
+                      clientesSelecionados.length ===
+                      clientes.filter((c) => c.nfse.status !== "Cancelada").length                   
+                     }
                     onChange={handleSelectAll}
                   />
                 </th>
