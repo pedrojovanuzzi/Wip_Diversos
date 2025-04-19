@@ -312,7 +312,7 @@ export const BuscarNfeGerada = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {clientes.map((cliente) => (
+                {clientes.filter((cliente) => cliente.nfse.status !== "Cancelada").map((cliente) => (
                   <tr key={cliente.id}>
                     <td className="px-4 py-4">
                       <input
