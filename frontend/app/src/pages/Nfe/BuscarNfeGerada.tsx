@@ -242,12 +242,12 @@ export const BuscarNfeGerada = () => {
       />
       {error && <Error message={error} />}
       {success && <Success message={success} />}
-      {clientes.length > 0 && (
+      {clientes.filter((c) => c.nfse.status !== "Cancelada").length > 0 && (
         <h1 className="text-center mt-5 self-center text-2xl font-semibold text-gray-900">
           Total de Resultados: {clientes.length}
         </h1>
       )}
-      {clientes.length > 0 ? (
+      {clientes.filter((c) => c.nfse.status !== "Cancelada").length > 0 ? (
         <div className="mt-10 px-4 sm:px-6 lg:px-8">
           <div className="overflow-auto shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
             <table className="min-w-full divide-y bg-gray-50 divide-gray-300 ">
@@ -258,9 +258,8 @@ export const BuscarNfeGerada = () => {
                     type="checkbox"
                     checked={
                       clientesSelecionados.length > 0 &&
-                      clientesSelecionados.length ===
-                      clientes.filter((c) => c.nfse.status !== "Cancelada").length                   
-                     }
+                      clientesSelecionados.length === clientes.length
+                    }
                     onChange={handleSelectAll}
                   />
                 </th>
