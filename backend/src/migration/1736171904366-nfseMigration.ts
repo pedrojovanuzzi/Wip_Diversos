@@ -19,7 +19,7 @@ export class NfseMigration1736171904366 implements MigrationInterface {
                     {
                         name: 'login',
                         type: 'varchar',
-                        length: '20',
+                        length: '200',
                         isNullable: false,
                     },
                     {
@@ -30,7 +30,7 @@ export class NfseMigration1736171904366 implements MigrationInterface {
                     {
                         name: 'serie_rps',
                         type: 'varchar',
-                        length: '20',
+                        length: '200',
                         isNullable: true,
                     },
                     {
@@ -75,7 +75,7 @@ export class NfseMigration1736171904366 implements MigrationInterface {
                     {
                         name: 'item_lista_servico',
                         type: 'varchar',
-                        length: '10',
+                        length: '100',
                         isNullable: true,
                     },
                     {
@@ -96,7 +96,7 @@ export class NfseMigration1736171904366 implements MigrationInterface {
                     {
                         name: 'cnpj_prestador',
                         type: 'varchar',
-                        length: '14',
+                        length: '140',
                         isNullable: true,
                         default: '0',
                     },
@@ -109,7 +109,7 @@ export class NfseMigration1736171904366 implements MigrationInterface {
                     {
                         name: 'cpf_tomador',
                         type: 'varchar',
-                        length: '14',
+                        length: '140',
                         isNullable: true,
                         default: '0',
                     },
@@ -128,7 +128,7 @@ export class NfseMigration1736171904366 implements MigrationInterface {
                     {
                         name: 'numero_endereco',
                         type: 'varchar',
-                        length: '10',
+                        length: '100',
                         isNullable: true,
                     },
                     {

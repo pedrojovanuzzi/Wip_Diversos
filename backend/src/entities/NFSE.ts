@@ -11,7 +11,7 @@ export class NFSE {
     @Column({ name: 'numero_rps', type: 'int' })
     numeroRps!: number;
 
-    @Column({ name: 'serie_rps', type: 'varchar', length: 20 })
+    @Column({ name: 'serie_rps', type: 'varchar', length: 200 })
     serieRps!: string;
 
     @Column({ name: 'tipo_rps', type: 'int' })
@@ -35,7 +35,7 @@ export class NFSE {
     @Column({ name: 'responsavel_retencao', type: 'int' })
     responsavelRetencao!: number;
 
-    @Column({ name: 'item_lista_servico', type: 'varchar', length: 10 })
+    @Column({ name: 'item_lista_servico', type: 'varchar', length: 100 })
     itemListaServico!: string;
 
     @Column({ name: 'discriminacao', type: 'text' })
@@ -47,10 +47,10 @@ export class NFSE {
     @Column({ name: 'exigibilidade_iss', type: 'int' })
     exigibilidadeIss!: number;
 
-    @Column({ name: 'cnpj_prestador', type: 'varchar', length: 14 })
+    @Column({ name: 'cnpj_prestador', type: 'varchar', length: 140 })
     cnpjPrestador!: string;
 
-    @Column({ name: 'inscricao_municipal_prestador', type: 'varchar', length: 20 })
+    @Column({ name: 'inscricao_municipal_prestador', type: 'varchar', length: 200 })
     inscricaoMunicipalPrestador!: string;
 
     @Column({ name: 'cpf_tomador', type: 'varchar', length: 11 })
@@ -62,7 +62,7 @@ export class NFSE {
     @Column({ name: 'endereco_tomador', type: 'varchar', length: 100 })
     enderecoTomador!: string;
 
-    @Column({ name: 'numero_endereco', type: 'varchar', length: 10 })
+    @Column({ name: 'numero_endereco', type: 'varchar', length: 100 })
     numeroEndereco!: string;
 
     @Column({ name: 'complemento', type: 'varchar', length: 50 })
