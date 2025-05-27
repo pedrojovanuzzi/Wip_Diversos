@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { HiBars3, HiChevronLeft, HiChevronRight, HiDocumentText, HiHome } from "react-icons/hi2";
 import { MdOutlineFeedback } from "react-icons/md";
 import { VscGraph } from "react-icons/vsc";
+import { FaWhatsapp } from "react-icons/fa";
 
 import { Link } from 'react-router-dom';
 
@@ -73,6 +74,11 @@ export const NavBar = () => {
             <li className='p-2 grid place-items-center col-span-2'>
               <Link to='/Nfe'>
                 <HiDocumentText className='text-white size-8 transition-all hover:text-green-400' />
+              </Link>
+            </li>
+            <li className='p-2 grid place-items-center col-span-2'>
+              <Link to='/Whatsapp'>
+                <FaWhatsapp className='text-white size-8 transition-all hover:text-green-400' />
               </Link>
             </li>
           </ul>
