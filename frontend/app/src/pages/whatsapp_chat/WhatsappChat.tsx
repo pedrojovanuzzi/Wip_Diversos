@@ -35,8 +35,8 @@ export default function WhatsappChat() {
 
   return (
     <>
-    <NavBar />
       <div>
+        <NavBar />
         <Dialog open={sidebarOpen} onClose={setSidebarOpen} className="relative z-50 lg:hidden">
           <DialogBackdrop
             transition
