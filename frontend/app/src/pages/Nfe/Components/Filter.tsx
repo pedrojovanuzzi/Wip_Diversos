@@ -185,7 +185,7 @@ export default function Filter({
                 <IoArrowUpCircleOutline className="text-2xl" />
                 Enviar
               </button>
-              {BuscarNfe && (
+              {/* {BuscarNfe && (
                 <button
                   className="bg-teal-500 ring-1 ring-black ring-opacity-5 text-white indent-2 py-3 px-2 rounded hover:bg-teal-400 transition-all flex items-center justify-center"
                   onClick={() => navigate("/BuscarNfeGerada")}
@@ -193,7 +193,7 @@ export default function Filter({
                   <HiMiniDocumentMagnifyingGlass className="text-2xl" />
                   NFS-e Geradas
                 </button>
-              )}
+              )} */}
               <button
                 className="bg-indigo-500 ring-1 ring-black ring-opacity-5 text-white indent-2 py-3 px-8 rounded hover:bg-indigo-400 transition-all flex items-center justify-center"
                 onClick={() => setShowPasswordPopUp(true)}
