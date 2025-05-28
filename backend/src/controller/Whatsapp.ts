@@ -14,7 +14,7 @@ class WhatsappController {
     try {
         const selectConversations = API_MK.getRepository(Conversations);
         const conversations = await selectConversations.find({
-            select: ['nome'],
+            select: ['id','nome'],
             order: { id: 'ASC' },
         });
 
@@ -26,13 +26,13 @@ class WhatsappController {
 
         const selectPeopleConversations = API_MK.getRepository(PeopleConversations);
         const peopleConversations = await selectPeopleConversations.find({
-            select: ['nome', 'telefone'],
+            select: ['id', 'nome', 'telefone'],
             order: { id: 'ASC'},
         });
 
         const selectMensagens = API_MK.getRepository(Mensagens);
         const mensagens = await selectMensagens.find({
-            select: ['conv_id', 'sender_id', 'content'],
+            select: ['id', 'conv_id', 'sender_id', 'content'],
             order: { conv_id: 'ASC', sender_id: 'ASC' },
         });
 
@@ -60,7 +60,6 @@ class WhatsappController {
         user: userByConvId.get(conv.id) || { nome: 'Desconhecido', telefone: '' },
         messages: messagesByConvId.get(conv.id) || []
         }));
-
 
       
       res.status(200).json({ conversations: conversationObjects });

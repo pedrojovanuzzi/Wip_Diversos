@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { NavBar } from '../../components/navbar/NavBar'
 import axios from 'axios'
+import img from '../../assets/icon.png'
 
 interface User {
-  name: string
+  nome: string
   telefone: string
 }
 
@@ -46,12 +47,14 @@ export default function WhatsappChat () {
     <>
       <NavBar/>
       <div className='grid bg-slate-500 min-h-screen max-w-36 overflow-auto'>
-        
           {conversations.length > 0 && (
             <ul>{conversations.map((conv, index) => (
-              <li key={index}>
-                <p>{conv.user.name}</p>
-              </li>
+              <div key={index} className='flex flex-col items-center justify-center'>
+                <img src={img} alt="" />
+                <li className='flex flex-col items-center justify-center text-white p-4 border-b border-gray-300 hover:bg-gray-700 cursor-pointer'>
+                  <p>{conv.user.nome}</p>
+                </li>
+              </div>
             ))}</ul>
           )}
           {conversations.length <= 0 && (
