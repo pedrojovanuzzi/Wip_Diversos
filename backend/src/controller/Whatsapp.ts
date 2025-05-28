@@ -10,7 +10,8 @@ class WhatsappController {
 
   getConversations = async () =>{
     try {
-                const selectConversations = API_MK.getRepository(Conversations);
+
+        const selectConversations = API_MK.getRepository(Conversations);
         const conversations = await selectConversations.find({
             select: ['id','nome'],
             order: { id: 'ASC' },
@@ -38,7 +39,6 @@ class WhatsappController {
         conversationUsers.forEach((user) => {
             const users = peopleConversations.find(people => people.id === user.user_id);
             if (users) userByConvId.set(user.conv_id, { nome: users.nome, telefone: users.telefone });
-            console.log(users);
         })
 
         const messagesByConvId = new Map();
@@ -54,11 +54,14 @@ class WhatsappController {
             })
         })
 
-        const conversationObjects = conversations.map(conv => ({
+        let conversationObjects = conversations.map(conv => ({
         id: conv.id,
         user: userByConvId.get(conv.id) || { nome: 'Desconhecido', telefone: '' },
         messages: messagesByConvId.get(conv.id) || []
         }));
+
+        conversationObjects = conversationObjects.filter(conv => conv.id !== 1);
+
 
         return conversationObjects
     } catch (error) {
