@@ -1,7 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, PrimaryColumn } from 'typeorm';
+import { Entity, PrimaryColumn } from 'typeorm';
 
 @Entity('conversations_users')
-export default class Mensagens {
+export default class ConversationsUsers {
     @PrimaryColumn()
     conv_id!: number;
 

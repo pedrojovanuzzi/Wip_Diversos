@@ -13,4 +13,7 @@ export default class Mensagens {
 
     @Column({type: 'varchar', length: 255, nullable: false})
     content!: string;
+
+    @Column({type: 'timestamp'})
+    timestamp!: Date;
 }
