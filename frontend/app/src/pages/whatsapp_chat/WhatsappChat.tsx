@@ -79,10 +79,7 @@ export default function WhatsappChat() {
       );
       if (response.status === 200) {
         setConversations(response.data.conversation);
-        console.log(
-          "Changed Name:",
-          response.data.conversation
-        );
+        console.log("Changed Name:", response.data.conversation);
       }
     } catch (error) {
       console.log("Error fetching conversations:", error);
@@ -100,17 +97,20 @@ export default function WhatsappChat() {
         {conversations.length > 0 && (
           <ul>
             {conversations.map((conv) => (
-              <div
-                key={conv.id}
-                className="flex flex-col relative items-center justify-center text-white p-4 border-b border-gray-300 hover:bg-gray-600 cursor-pointer"
-              >
-                <img src={img} className="w-20" alt="" />
-                <li>
-                  <p>{conv.user.nome}</p>
-                </li>
+              <div className="relative">
+                <a
+                  href={"/Whatsapp/" + conv.id}
+                  key={conv.id}
+                  className="flex flex-col items-center justify-center text-white p-4 border-b border-gray-300 hover:bg-gray-600 cursor-pointer"
+                >
+                  <img src={img} className="w-20" alt="" />
+                  <li>
+                    <p>{conv.user.nome}</p>
+                  </li>
+                </a>
                 <p
                   onClick={() => openModal(conv.id, conv.user.nome)}
-                  className="p-2 absolute right-0"
+                  className="absolute right-0 top-0"
                 >
                   <TiPencil className="text-white border-gray-300 hover:bg-green-500 cursor-pointer rounded-sm" />
                 </p>

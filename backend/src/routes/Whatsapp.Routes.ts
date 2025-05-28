@@ -9,5 +9,8 @@ const router: Router = Router()
 router.get("/conversations", AuthGuard, Whatsapp.receiveUsers);
 router.post("/conversations", AuthGuard, Whatsapp.changeName);
 
+router.post("/conversation", AuthGuard, Whatsapp.receiveUser);
+router.post("/sendMsg", AuthGuard, Whatsapp.sendMessage);
+
 
 export default router;

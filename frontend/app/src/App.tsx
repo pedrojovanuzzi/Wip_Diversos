@@ -14,6 +14,7 @@ import { BuscarNfeGerada } from './pages/Nfe/BuscarNfeGerada';
 import PrefeituraLogin from './pages/prefeitura_login/PrefeituraLogin';
 import CodeOtp from './pages/prefeitura_login/CodeOtp';
 import WhatsappChat from './pages/whatsapp_chat/WhatsappChat';
+import UserChat from './pages/whatsapp_chat/userChat/userChat';
 
 
 function App() {
@@ -54,6 +55,7 @@ function App() {
           <Route path="/Prefeitura/Login" element={<PrefeituraLogin />} />
           <Route path="/Prefeitura/CodeOtp" element={<CodeOtp />} />
           <Route path="/Whatsapp" element={auth ? <WhatsappChat /> : <Navigate to="/auth/login" />} />
+          <Route path="/Whatsapp/:id" element={auth ? <UserChat /> : <Navigate to="/auth/login" />} />
           <Route path="*" element={auth ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>
