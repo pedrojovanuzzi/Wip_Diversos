@@ -6,13 +6,11 @@ import Conversation_Users from '../entities/APIMK/Conversation_Users';
 import PeopleConversations from '../entities/APIMK/People_Conversations';
 import { time } from 'console';
 class WhatsappController {
-  constructor() {
-    // Initialize any necessary properties or services here
-  }
 
-  async receiveUsers(req: Request , res : Response){
+
+  getConversations = async () =>{
     try {
-        const selectConversations = API_MK.getRepository(Conversations);
+                const selectConversations = API_MK.getRepository(Conversations);
         const conversations = await selectConversations.find({
             select: ['id','nome'],
             order: { id: 'ASC' },
@@ -39,7 +37,8 @@ class WhatsappController {
         const userByConvId = new Map();
         conversationUsers.forEach((user) => {
             const users = peopleConversations.find(people => people.id === user.user_id);
-            if (users) userByConvId.set(user.conv_id, users);
+            if (users) userByConvId.set(user.conv_id, { nome: users.nome, telefone: users.telefone });
+            console.log(users);
         })
 
         const messagesByConvId = new Map();
@@ -61,12 +60,56 @@ class WhatsappController {
         messages: messagesByConvId.get(conv.id) || []
         }));
 
-      
+        return conversationObjects
+    } catch (error) {
+      console.error('Error getting conversations:', error);
+    }
+  }
+
+  receiveUsers = async (req: Request , res : Response) => {
+    try {
+      const conversationObjects = await this.getConversations();
       res.status(200).json({ conversations: conversationObjects });
     } catch (error) {
       console.error('Error receiving users:', error);
       res.status(500).json({ error: 'Failed to receive users' });
     }
+  }
+
+  changeName = async (req: Request, res: Response) => {
+    const { id, nome } = req.body;
+
+    try {
+      const selectConversations = API_MK.getRepository(Conversations);
+      const conversation = await selectConversations.findOneBy({ id });
+
+      const selectPeopleConversations = API_MK.getRepository(PeopleConversations);
+      const peopleConversation = await selectPeopleConversations.findOneBy({ id });
+
+        if (!peopleConversation) {
+            res.status(404).json({ error: 'People conversation not found' });
+            return;
+        }
+
+        if (!conversation) {
+            res.status(404).json({ error: 'Conversation not found' });
+            return;
+        }
+
+      peopleConversation.nome = nome;
+      await selectPeopleConversations.save(peopleConversation);
+
+      conversation.nome = nome;
+      await selectConversations.save(conversation);
+
+      const conversations = await this.getConversations();
+
+      res.status(200).json({ conversation: conversations });
+    } catch (error) {
+      console.error('Error changing conversation name:', error);
+      res.status(500).json({ error: 'Failed to change conversation name' });
+    }
+
   }
 
   // Example method to send a message
