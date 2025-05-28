@@ -28,6 +28,7 @@ export default function UserChat() {
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
   const userToken = useTypedSelector((state: RootState) => state.auth.user);
   const token = userToken.token;
+  const meuId = 1;
 
   const { id } = useParams();
 
@@ -100,12 +101,45 @@ export default function UserChat() {
     }
   }, [id]);
 
-  return (
-    <div>
-      <NavBar />
-      <div>
-        <header>{user?.nome || "Carregando..."}</header>
+return (
+  <div className="flex flex-col min-h-screen bg-gray-100">
+    <NavBar />
+    <div className="flex flex-col flex-1 p-4 space-y-2 overflow-y-auto">
+      <header className="mb-4">
+        <h2 className="text-2xl font-bold">{user?.nome || "Carregando..."}</h2>
+        <p className="text-gray-600">{user?.telefone || "Carregando..."}</p>
+      </header>
+
+      <div className="flex flex-col space-y-2">
+        {conversation?.messages
+          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) // garante ordem por data
+          .map((msg, index) => {
+            const isMe = msg.sender_id === meuId;
+            return (
+              <div
+                key={index}
+                className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[70%] px-4 py-2 rounded-lg shadow ${
+                    isMe
+                      ? "bg-blue-500 text-white rounded-br-none"
+                      : "bg-green-200 text-gray-800 rounded-bl-none"
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  <span className="block text-xs text-right mt-1 opacity-60">
+                    {new Date(msg.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
       </div>
     </div>
-  );
+  </div>
+);
+
+
+
 }
