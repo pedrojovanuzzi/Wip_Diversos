@@ -25,9 +25,15 @@ export default function WhatsappChat () {
 
 
   async function fetchConversations () {
-    const response = await axios.get(process.env.REACT_APP_URL + '/whatsapp/conversations')
+    try {
+      const response = await axios.get(process.env.REACT_APP_URL + '/whatsapp/conversations')
     if (response.status === 200) {
-      setConversations(response.data.name)
+      setConversations(response.data.conversations)
+      console.log('Conversations fetched successfully:', response.data.conversations);
+      
+    }
+    } catch (error) {
+      console.log('Error fetching conversations:', error);
     }
   }
 
@@ -41,15 +47,15 @@ export default function WhatsappChat () {
       <NavBar/>
       <div className='grid bg-slate-500 min-h-screen max-w-36 overflow-auto'>
         
-          {conversations && (
+          {conversations.length > 0 && (
             <ul>{conversations.map((conv, index) => (
               <li key={index}>
                 <p>{conv.user.name}</p>
               </li>
             ))}</ul>
           )}
-          {!conversations && (
-            <p className='text-center self-center justify-center justify-items-center'>Sem Clientes encontrados</p>
+          {conversations.length <= 0 && (
+            <p className='text-center self-center justify-center justify-items-center text-white'>Sem Clientes encontrados</p>
           )}
 
       </div>

@@ -1,6 +1,6 @@
 import { Entity, PrimaryColumn } from 'typeorm';
 
-@Entity('conversations_users')
+@Entity('conversation_users')
 export default class ConversationsUsers {
     @PrimaryColumn()
     conv_id!: number;

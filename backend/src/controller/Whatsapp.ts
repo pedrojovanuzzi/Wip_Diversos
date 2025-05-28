@@ -4,6 +4,7 @@ import Mensagens from '../entities/APIMK/Mensagens';
 import Conversations from '../entities/APIMK/Conversations';
 import Conversation_Users from '../entities/APIMK/Conversation_Users';
 import PeopleConversations from '../entities/APIMK/People_Conversations';
+import { time } from 'console';
 class WhatsappController {
   constructor() {
     // Initialize any necessary properties or services here
@@ -35,12 +36,34 @@ class WhatsappController {
             order: { conv_id: 'ASC', sender_id: 'ASC' },
         });
 
-        const conversationObject = {
-            
-        }
+        const userByConvId = new Map();
+        conversationUsers.forEach((user) => {
+            const users = peopleConversations.find(people => people.id === user.user_id);
+            if (users) userByConvId.set(user.conv_id, users);
+        })
+
+        const messagesByConvId = new Map();
+        mensagens.forEach((message) => {
+            if(!messagesByConvId.has(message.conv_id)){
+                messagesByConvId.set(message.conv_id, [])
+            }
+            messagesByConvId.get(message.conv_id).push({
+                conv_id: message.conv_id,
+                sender_id: message.sender_id,
+                content: message.content,
+                timestamp: message.timestamp
+            })
+        })
+
+        const conversationObjects = conversations.map(conv => ({
+        id: conv.id,
+        user: userByConvId.get(conv.id) || { nome: 'Desconhecido', telefone: '' },
+        messages: messagesByConvId.get(conv.id) || []
+        }));
+
 
       
-      res.status(200).json({ conversations: conversationObject });
+      res.status(200).json({ conversations: conversationObjects });
     } catch (error) {
       console.error('Error receiving users:', error);
       res.status(500).json({ error: 'Failed to receive users' });
@@ -61,3 +84,5 @@ class WhatsappController {
     // Here you would typically listen for incoming messages from an API or webhook
   }
 }
+
+export default new WhatsappController();

@@ -5,6 +5,7 @@ import Auth from "./routes/Auth.Routes";
 import cors from "cors";
 import Feed from "./routes/Feedback.routes";
 import NFSE from "./routes/NFSE.routes";
+import Whatsapp from "./routes/Whatsapp.Routes";
 import Prefeitura from "./routes/PrefeituraUser.routes";
 
 export class App{
@@ -28,6 +29,7 @@ export class App{
     this.server.use("/api/auth", Auth);
     this.server.use("/api/feedback", Feed);
     this.server.use("/api/Nfe", NFSE);
+    this.server.use("/api/whatsapp", Whatsapp);
     this.server.use("/api/Prefeitura", Prefeitura);
   }
 }
