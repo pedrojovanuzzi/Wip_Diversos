@@ -54,7 +54,10 @@ export default function UserChat() {
         setUser(conv.user);
         setIdUser(conv.user.id);
         console.log("Conversation:", conv);
-        
+          conv.messages = conv.messages.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp),
+        }));
 
         console.log(
           "Conversations fetched successfully:",
