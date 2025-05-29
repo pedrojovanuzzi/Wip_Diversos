@@ -165,13 +165,15 @@ return (
     e.preventDefault();
     if (text.trim()) {
       postConversation();
+      setText("");
     }
   }
-}} onChange={((e : React.ChangeEvent<HTMLInputElement>) => setText(e.target.value))} className="p-5 mb-3 pr-12 shadow-lg w-screen max-w-[70%] bg-green-200 rounded-xl placeholder:text-gray-700" placeholder="Digite uma Mensagem" type="text" name="" id="" />
+}} value={text} onChange={((e : React.ChangeEvent<HTMLInputElement>) => setText(e.target.value))} className="p-5 mb-3 pr-12 shadow-lg w-screen max-w-[70%] bg-green-200 rounded-xl placeholder:text-gray-700" placeholder="Digite uma Mensagem" type="text" name="" id="" />
   <IoSendOutline
  onClick={() => {
     if (text.trim()) {
       postConversation();
+      setText("");
     }
   }} className="absolute right-[18%] top-1/2 -translate-y-4 text-xl text-gray-700 cursor-pointer" />
     </div>
