@@ -6,6 +6,13 @@ import Conversation_Users from "../entities/APIMK/Conversation_Users";
 import PeopleConversations from "../entities/APIMK/People_Conversations";
 import { time } from "console";
 import { In } from "typeorm";
+import axios from "axios";
+
+const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
+const urlMedia = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
+const token = process.env.CLOUD_API_ACCESS_TOKEN;
+
+
 class WhatsappController {
   getConversations = async () => {
     try {
@@ -195,11 +202,90 @@ class WhatsappController {
     }
   };
 
-  async sendMessage(res: Response, req: Request) {
-    const { user, message } = req.body;
-    console.log(`Sending message to ${user}: ${message}`);
+sendMessage = async (req: Request, res: Response) => {
+  const { user, message } = req.body;
+
+  if (!user || !message || !message.content) {
+    res.status(400).json({ message: "User and message content are required" });
     return;
   }
+
+  const selectConversations = API_MK.getRepository(Conversations);
+  const conversation = await selectConversations.findOneBy({ id: message.conv_id });
+
+  if (!conversation) {
+    res.status(404).json({ message: "Conversation not found" });
+    return;
+  }
+
+  const selectMensagens = API_MK.getRepository(Mensagens);
+  const newMessage = new Mensagens();
+  newMessage.conv_id = message.conv_id;
+  newMessage.sender_id = message.sender_id;
+  newMessage.content = message.content;
+  newMessage.timestamp = message.timestamp ? new Date(message.timestamp) : new Date();
+
+  await selectMensagens.save(newMessage);
+
+  const selectConversationUsers = API_MK.getRepository(Conversation_Users);
+  const conversationUsers = await selectConversationUsers.find({
+    where: { conv_id: message.conv_id },
+    select: ["user_id"],
+  });
+
+  const userIds = conversationUsers.map((cu) => cu.user_id);
+  const selectPeopleConversations = API_MK.getRepository(PeopleConversations);
+  const peopleConversations = await selectPeopleConversations.find({
+    where: { id: In(userIds) },
+    select: ["id", "nome", "telefone"],
+  });
+
+  const recipient = peopleConversations.find(
+    (pc) => pc.id !== message.sender_id
+  );
+
+  if (!recipient) {
+    res.status(404).json({ message: "Recipient not found" });
+    return;
+  }
+
+const recipient_number = recipient.telefone.replace(/\D/g, ""); // Remove non-numeric characters
+if (!recipient_number) {
+    res.status(400).json({ message: "Invalid recipient phone number" });
+    return;
+  }
+
+  await this.MensagensComuns(recipient_number, message.content);
+
+  res.status(200).json({ message: "Message sent successfully" });
+}
+
+  MensagensComuns = async (recipient_number : string, msg : string) => {
+    try {
+      const response = await axios.post(
+        url,
+        {
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: recipient_number,
+          type: "text",
+          text: {
+            preview_url: false,
+            body: msg,
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
+  }
+
 
   // Example method to receive messages
   async receiveMessage() {

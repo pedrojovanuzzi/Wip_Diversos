@@ -4,6 +4,7 @@ import { TypedUseSelectorHook, useSelector } from "react-redux";
 import { RootState } from "../../../types";
 import { useParams } from "react-router-dom";
 import { NavBar } from "../../../components/navbar/NavBar";
+import { IoSendOutline } from "react-icons/io5";
 
 interface User {
   nome: string;
@@ -24,11 +25,14 @@ interface Conversation {
 export default function UserChat() {
   const [conversation, setConversation] = useState<Conversation>();
   const [user, setUser] = useState<User>();
+  const [idUser, setIdUser] = useState<string | number | null>(null);
+  const [text, setText] = useState<string>("");
 
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
   const userToken = useTypedSelector((state: RootState) => state.auth.user);
   const token = userToken.token;
   const meuId = 1;
+  
 
   const { id } = useParams();
 
@@ -48,6 +52,7 @@ export default function UserChat() {
         const conv = response.data.conversations[0]; // ou buscar por id se preferir
         setConversation(conv);
         setUser(conv.user);
+        setIdUser(conv.user.id);
         console.log("Conversation:", conv);
         
 
@@ -61,39 +66,46 @@ export default function UserChat() {
     }
   }
 
-  async function postConversation() {
-    try {
-      const response = await axios.post(
-        process.env.REACT_APP_URL + "/whatsapp/sendMsg",
-        {
-          user: {
-            nome: "John Doe",
-            telefone: "1234567890",
-          },
-          message: [
-            {
-              conv_id: 1,
-              sender_id: 1,
-              content: "Hello, this is a test message.",
-              timestamp: new Date(),
-            },
-          ],
+async function postConversation() {
+  const messageContent = text.trim();
+
+  if (!messageContent || !conversation) return;
+
+  try {
+    const response = await axios.post(
+      process.env.REACT_APP_URL + "/whatsapp/sendMsg",
+      {
+        user: {
+          id: meuId,
         },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+        message: 
+          {
+            conv_id: conversation.id,
+            sender_id: meuId,
+            content: messageContent,
+            timestamp: new Date(),
           },
-        }
-      );
-      if (response.status === 200) {
-        setConversation(response.data.conversations);
-        console.log("Message sent successfully:", response.data.conversations);
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       }
-    } catch (error) {
-      console.log("Error sending message:", error);
+    );
+
+    if (response.status === 200) {
+      // Atualiza a conversa com a nova resposta
+      const conv = response.data.message;
+      fetchConversation(conversation.id); 
+      setText(""); // limpa o input
+      console.log("Message sent successfully:", conv);
     }
+  } catch (error) {
+    console.log("Error sending message:", error);
   }
+}
+
 
   useEffect(() => {
     if (id) {
@@ -129,13 +141,32 @@ return (
                 >
                   <p className="whitespace-pre-wrap">{msg.content}</p>
                   <span className="block text-xs text-right mt-1 opacity-60">
-                    {new Date(msg.timestamp).toLocaleTimeString()}
+                    {new Date(msg.timestamp).toLocaleTimeString("pt-BR")}
                   </span>
+                  
                 </div>
               </div>
+              
             );
           })}
       </div>
+      
+    </div>
+    <div className="flex relative justify-center items-center">
+      <input onChange={((e : React.ChangeEvent<HTMLInputElement>) => setText(e.target.value))} className="p-5 mb-3 pr-12 shadow-lg w-screen max-w-[70%] bg-green-200 rounded-xl placeholder:text-gray-700" placeholder="Digite uma Mensagem" type="text" name="" id="" />
+  <IoSendOutline onKeyDown={(e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    if (text.trim()) {
+      postConversation();
+    }
+  }
+}}
+ onClick={() => {
+    if (text.trim()) {
+      postConversation();
+    }
+  }} className="absolute right-[18%] top-1/2 -translate-y-4 text-xl text-gray-700 cursor-pointer" />
     </div>
   </div>
 );
