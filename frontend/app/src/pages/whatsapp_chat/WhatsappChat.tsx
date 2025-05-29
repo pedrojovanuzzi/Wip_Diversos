@@ -5,6 +5,7 @@ import img from "../../assets/users.png";
 import { TiPencil } from "react-icons/ti";
 import { TypedUseSelectorHook, useSelector } from "react-redux";
 import { RootState } from "../../types";
+import wallpaper from "../../assets/wallpaper.jpg";
 
 interface User {
   nome: string;
@@ -23,7 +24,6 @@ interface Conversation {
 }
 
 export default function WhatsappChat() {
-  const [user, setUser] = useState<string>("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
   //ChatGpt
@@ -86,14 +86,22 @@ export default function WhatsappChat() {
     }
   }
 
-  useEffect(() => {
+useEffect(() => {
+  fetchConversations();
+
+  const interval = setInterval(() => {
     fetchConversations();
-  }, []);
+  }, 10000); 
+
+  return () => clearInterval(interval);
+}, []);
 
   return (
-    <>
+      <div
+        className="bg-cover bg-center min-h-screen shadow-lg bg-gradient-to-t from-blue-600 to-blue-900"
+      >
       <NavBar />
-      <div className="grid bg-slate-500 min-h-screen max-w-36 overflow-auto">
+      <div className="grid bg-blue-500 shadow-lg min-h-screen sm:w-2/12 overflow-auto">
         {conversations.length > 0 && (
           <ul>
             {conversations.map((conv) => (
@@ -101,7 +109,7 @@ export default function WhatsappChat() {
                 <a
                   href={"/Whatsapp/" + conv.id}
                   key={conv.id}
-                  className="flex flex-col items-center justify-center text-white p-4 border-b border-gray-300 hover:bg-gray-600 cursor-pointer"
+                  className="flex transition-all flex-col items-center justify-center text-white p-4 border-b border-gray-300 hover:bg-gray-500 cursor-pointer"
                 >
                   <img src={img} className="w-20" alt="" />
                   <li>
@@ -112,7 +120,7 @@ export default function WhatsappChat() {
                   onClick={() => openModal(conv.id, conv.user.nome)}
                   className="absolute right-0 top-0"
                 >
-                  <TiPencil className="text-white border-gray-300 hover:bg-green-500 cursor-pointer rounded-sm" />
+                  <TiPencil className="text-white border-gray-300 text-xl hover:bg-green-500 cursor-pointer rounded-sm" />
                 </p>
               </div>
             ))}
@@ -157,6 +165,6 @@ export default function WhatsappChat() {
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }

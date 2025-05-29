@@ -204,6 +204,7 @@ class WhatsappController {
 
 sendMessage = async (req: Request, res: Response) => {
   const { user, message } = req.body;
+  
 
   if (!user || !message || !message.content) {
     res.status(400).json({ message: "User and message content are required" });
@@ -223,7 +224,10 @@ sendMessage = async (req: Request, res: Response) => {
   newMessage.conv_id = message.conv_id;
   newMessage.sender_id = message.sender_id;
   newMessage.content = message.content;
-  newMessage.timestamp = message.timestamp ? new Date(message.timestamp) : new Date();
+  newMessage.timestamp = message.timestamp
+  ? new Date(message.timestamp)
+  : new Date(Date.now() - 3 * 60 * 60 * 1000); 
+
 
   await selectMensagens.save(newMessage);
 

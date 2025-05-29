@@ -1,5 +1,5 @@
 import axios from "axios";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { TypedUseSelectorHook, useSelector } from "react-redux";
 import { RootState } from "../../../types";
 import { useParams } from "react-router-dom";
@@ -83,7 +83,7 @@ async function postConversation() {
             conv_id: conversation.id,
             sender_id: meuId,
             content: messageContent,
-            timestamp: new Date(),
+            timestamp: new Date()
           },
       },
       {
@@ -107,19 +107,26 @@ async function postConversation() {
 }
 
 
-  useEffect(() => {
-    if (id) {
-      fetchConversation(id);
-    }
-  }, [id]);
+useEffect(() => {
+  if (!id) return;
+
+  fetchConversation(id);
+
+  const interval = setInterval(() => {
+    fetchConversation(id);
+  }, 1000); 
+
+  return () => clearInterval(interval);
+}, [id]);
+
 
 return (
-  <div className="flex flex-col min-h-screen bg-gray-100">
+  <div className="flex flex-col min-h-screen bg-gradient-to-t from-blue-600 to-blue-900">
     <NavBar />
     <div className="flex flex-col flex-1 p-4 space-y-2 overflow-y-auto">
       <header className="mb-4">
-        <h2 className="text-2xl font-bold">{user?.nome || "Carregando..."}</h2>
-        <p className="text-gray-600">{user?.telefone || "Carregando..."}</p>
+        <h2 className="text-2xl text-gray-50 font-bold">{user?.nome || "Carregando..."}</h2>
+        <p className="text-gray-200">{user?.telefone || "Carregando..."}</p>
       </header>
 
       <div className="flex flex-col space-y-2">
@@ -153,15 +160,15 @@ return (
       
     </div>
     <div className="flex relative justify-center items-center">
-      <input onChange={((e : React.ChangeEvent<HTMLInputElement>) => setText(e.target.value))} className="p-5 mb-3 pr-12 shadow-lg w-screen max-w-[70%] bg-green-200 rounded-xl placeholder:text-gray-700" placeholder="Digite uma Mensagem" type="text" name="" id="" />
-  <IoSendOutline onKeyDown={(e) => {
+      <input  onKeyDown={(e) => {
   if (e.key === "Enter") {
     e.preventDefault();
     if (text.trim()) {
       postConversation();
     }
   }
-}}
+}} onChange={((e : React.ChangeEvent<HTMLInputElement>) => setText(e.target.value))} className="p-5 mb-3 pr-12 shadow-lg w-screen max-w-[70%] bg-green-200 rounded-xl placeholder:text-gray-700" placeholder="Digite uma Mensagem" type="text" name="" id="" />
+  <IoSendOutline
  onClick={() => {
     if (text.trim()) {
       postConversation();
