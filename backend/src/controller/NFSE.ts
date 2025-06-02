@@ -283,9 +283,9 @@ class NFSEController {
 
         const response = await axios.post(this.WSDL_URL, soap, {
           httpsAgent,
+          timeout: 600000, // 5 minutos
           headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction },
         });
-
 
         const xml = response.data;
         const parsed = await parseStringPromise(xml, { explicitArray: false });
