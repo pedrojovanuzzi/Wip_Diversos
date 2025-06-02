@@ -690,6 +690,7 @@ class NFSEController {
       });
       const response = await axios.post(this.WSDL_URL, soapFinal, {
         httpsAgent,
+        timeout: 600000,
         headers: {
           "Content-Type": "text/xml; charset=UTF-8",
           SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
