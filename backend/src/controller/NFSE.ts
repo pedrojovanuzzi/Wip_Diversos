@@ -651,6 +651,8 @@ class NFSEController {
           SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
         },
       });
+      console.log("Setado Status NFSE: RPS: " + rpsNumber);
+      
       const match = response.data.match(/<ns2:Numero>(\d+)<\/ns2:Numero>/);
       if (match && match[1]) return match[1];
       return null;
