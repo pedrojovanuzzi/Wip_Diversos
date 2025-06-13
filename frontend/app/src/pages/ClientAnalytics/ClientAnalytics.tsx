@@ -45,6 +45,7 @@ export const ClientAnalytics = () => {
   const [conectado, setConectado] = useState(false);
   const [suspenso, setSuspenso] = useState(false);
   const [testes, setTestes] = useState<Testes>();
+  const [sinalOnu, setSinalOnu] = useState<null>(null);
 
   //Redux
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
@@ -74,6 +75,8 @@ export const ClientAnalytics = () => {
         console.log("Client Info:", response.data);
 
         await fetchDesconexoes(pppoe);
+
+        await fetchSinal(pppoe);
       }
     } catch (error) {
       console.log("Error fetching conversations:", error);
@@ -95,6 +98,27 @@ export const ClientAnalytics = () => {
       if (response.status === 200) {
         setDesconexoes(response.data.desconexoes);
         console.log("Client Info:", response.data.desconexoes);
+      }
+    } catch (error) {
+      console.log("Error fetching conversations:", error);
+    }
+  };
+
+  const fetchSinal = async (pppoe: string) => {
+    try {
+      const response = await axios.post(
+        process.env.REACT_APP_URL + "/ClientAnalytics/SinalOnu",
+        { pppoe },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (response.status === 200) {
+        setSinalOnu(response.data.respostaTelnet);
+        console.log("respostaTelnet Info:", response.data.respostaTelnet);
       }
     } catch (error) {
       console.log("Error fetching conversations:", error);
@@ -125,7 +149,7 @@ export const ClientAnalytics = () => {
       </div>
 
       {clientinfo && (
-        <div className="bg-white shadow-md p-4 w-full max-w-2xl">
+        <div className="bg-white shadow-md p-4 w-full text-left max-w-2xl">
           <h2 className="font-semibold mb-2">Analise detalhada:</h2>
           <ul className="space-y-1">
             <li>
@@ -138,9 +162,15 @@ export const ClientAnalytics = () => {
               </span>
             </li>
             <li>
-              2. Sinal ONU:{" "}
-              <span className="text-blue-600">{clientinfo.sinal_onu}</span>
+              2. Dados ONU:{""}
+              <br />
+              {sinalOnu && (
+                <pre className="text-left text-sm font-mono whitespace-pre">
+                  {sinalOnu}
+                </pre>
+              )}
             </li>
+
             <li>
               3. PPPOE?:{" "}
               <span className="text-green-600 font-semibold">

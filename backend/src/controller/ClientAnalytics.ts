@@ -4,6 +4,10 @@ import { Faturas } from "../entities/Faturas";
 import { Request, Response } from "express";
 import { Radacct } from "../entities/Radacct";
 import { Between, LessThanOrEqual } from "typeorm";
+import { Telnet } from "telnet-client";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 class ClientAnalytics {
   info = async (req: Request, res: Response) => {
@@ -33,7 +37,7 @@ class ClientAnalytics {
       });
 
       const suspensao = FaturaDoMes.length > 0;
-      
+
       res.status(200).json({ user: User, suspensao: suspensao });
       return;
     } catch (error) {
@@ -54,6 +58,79 @@ class ClientAnalytics {
       return;
     } catch (error) {
       console.log(error);
+    }
+  };
+
+  onuSinal = async (req: Request, res: Response) => {
+    try {
+      const { pppoe } = req.body;
+
+      const ClientesRepository = MkauthSource.getRepository(ClientesEntities);
+      let User = await ClientesRepository.findOne({
+        where: { login: pppoe, cli_ativado: "s" },
+        order: { id: "ASC" },
+      });
+
+      const ip = String(process.env.OLT_IP);
+      const login = String(process.env.OLT_LOGIN);
+      const password = String(process.env.OLT_PASSWORD);
+
+      const conn = new Telnet();
+
+      // 🟡 Eventos para log no terminal
+      conn.on("data", (data) => {
+        buffer = data.toString();
+        // console.log(buffer);
+      });
+
+      let buffer = "";
+
+      const params = {
+        host: ip,
+        port: 23,
+        timeout: 10000,
+        sendTimeout: 200,
+        debug: true,
+        shellPrompt: /Admin[#>]\s*$/, // Prompt correto após login
+        stripShellPrompt: true,
+        negotiationMandatory: false,
+        disableLogon: true, // impede tentativa automática de login
+      };
+
+      await conn.connect(params);
+
+      await conn.send(login);
+
+      await conn.send(password);
+
+      await conn.send("en");
+      await conn.send(password);
+
+      await conn.send("cd onu");
+
+      await conn.send(
+        `show optic_module slot ${User?.porta_olt?.substring(
+          0,
+          2
+        )} pon ${User?.porta_olt?.substring(2, 4)} onu ${User?.onu_ont}`
+      );
+
+      const output = buffer.split("Admin\\onu#")[0].trim();
+
+      if (/onu#\s*$/i.test(output)) {
+        res.status(200).json({ respostaTelnet: "ONU APAGADA" });
+        return;
+      }
+
+      await conn.end();
+
+      res.status(200).json({ respostaTelnet: output });
+    } catch (error) {
+      console.error("❌ Erro Telnet:", error);
+      res.status(500).json({
+        erro: "Falha ao executar comando Telnet",
+        detalhes: String(error),
+      });
     }
   };
 }
