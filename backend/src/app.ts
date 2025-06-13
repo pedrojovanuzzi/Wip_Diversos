@@ -7,6 +7,7 @@ import Feed from "./routes/Feedback.routes";
 import NFSE from "./routes/NFSE.routes";
 import Whatsapp from "./routes/Whatsapp.Routes";
 import Prefeitura from "./routes/PrefeituraUser.routes";
+import ClientAnalytics from "./routes/ClientAnalytics.routes";
 
 export class App{
   public server: express.Application;
@@ -31,5 +32,6 @@ export class App{
     this.server.use("/api/Nfe", NFSE);
     this.server.use("/api/whatsapp", Whatsapp);
     this.server.use("/api/Prefeitura", Prefeitura);
+    this.server.use("/api/ClientAnalytics", ClientAnalytics);
   }
 }
