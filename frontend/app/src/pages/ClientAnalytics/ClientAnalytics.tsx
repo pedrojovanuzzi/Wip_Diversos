@@ -75,8 +75,12 @@ export const ClientAnalytics = () => {
         console.log("Client Info:", response.data);
 
         await fetchDesconexoes(pppoe);
-
         await fetchSinal(pppoe);
+
+        if(conectado){
+          await fetchMikrotik(pppoe);
+        }
+
       }
     } catch (error) {
       console.log("Error fetching conversations:", error);
@@ -98,6 +102,27 @@ export const ClientAnalytics = () => {
       if (response.status === 200) {
         setDesconexoes(response.data.desconexoes);
         console.log("Client Info:", response.data.desconexoes);
+      }
+    } catch (error) {
+      console.log("Error fetching conversations:", error);
+    }
+  };
+
+  const fetchMikrotik = async (pppoe: string) => {
+    try {
+      const response = await axios.post(
+        process.env.REACT_APP_URL + "/ClientAnalytics/Mikrotik",
+        { pppoe },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (response.status === 200) {
+        setTestes(response.data.tests);
+        console.log("Testes Info:", response.data.tests);
       }
     } catch (error) {
       console.log("Error fetching conversations:", error);
@@ -149,7 +174,7 @@ export const ClientAnalytics = () => {
       </div>
 
       {clientinfo && (
-        <div className="bg-white shadow-md p-4 w-full text-left max-w-2xl">
+        <div className="bg-white shadow-md m-3 p-4 w-full text-left max-w-2xl">
           <h2 className="font-semibold mb-2">Analise detalhada:</h2>
           <ul className="space-y-1">
             <li>
@@ -258,12 +283,12 @@ export const ClientAnalytics = () => {
             </table>
           </div>
 
-          {/* <div className="mt-6 space-y-2">
+          <div className="mt-6 space-y-2">
           <p>Ping: <span className="text-green-600">{testes?.ping}</span></p>
           <p>Consumo em tempo real: <span className="text-green-600">{testes?.ctr}</span></p>
           <p>Fragmentação: <span className="text-green-600">{testes?.fr}</span></p>
           <p>Velocidade: <span className="text-green-600">{testes?.velocidade}</span></p>
-        </div> */}
+        </div>
 
           {/* <div className="mt-6">
           <h4 className="font-semibold mb-2">Gráfico de Consumo:</h4>

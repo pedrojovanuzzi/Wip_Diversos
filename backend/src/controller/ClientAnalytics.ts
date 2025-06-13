@@ -5,6 +5,7 @@ import { Request, Response } from "express";
 import { Radacct } from "../entities/Radacct";
 import { Between, LessThanOrEqual } from "typeorm";
 import { Telnet } from "telnet-client";
+import { Client } from "ssh2";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -131,6 +132,29 @@ class ClientAnalytics {
         erro: "Falha ao executar comando Telnet",
         detalhes: String(error),
       });
+    }
+  };
+
+ mikrotik = async (req: Request, res: Response) => {
+    try {
+      const { pppoe } = req.body;
+
+      const ClientesRepository = MkauthSource.getRepository(ClientesEntities);
+      const User = await ClientesRepository.findOne({
+        where: { login: pppoe, cli_ativado: "s" },
+        order: { id: "ASC" },
+      });
+
+      if (!User || !User.ip) {
+        return res.status(404).json({ erro: "Usuário não encontrado ou sem IP." });
+      }
+
+      
+
+
+    } catch (error) {
+      console.error("Erro ao consultar Mikrotik:", error);
+      res.status(500).json({ erro: "Erro interno ao testar conexão com cliente." });
     }
   };
 }
