@@ -11,6 +11,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 class ClientAnalytics {
+  private clientIp: string | undefined;
+  private serverIp: string | undefined;
+
   info = async (req: Request, res: Response) => {
     try {
       const { pppoe } = req.body;
@@ -189,7 +192,6 @@ class ClientAnalytics {
     try {
       const testes = {
         ping: "",
-        ctr: "",
         fr: "",
         velocidade: "",
       };
@@ -243,7 +245,9 @@ class ClientAnalytics {
       const primeiro = resultados.find((r) => r.encontrado);
 
       if (primeiro && primeiro.host) {
+        this.clientIp = ipCliente;
         const ipDoServidor = primeiro.host;
+        this.serverIp = ipDoServidor;
         const outroComando = `/ping ${ipCliente} count=1`;
         const respostaPing = await this.executarSSH(ipDoServidor, outroComando);
 
@@ -268,8 +272,6 @@ class ClientAnalytics {
           comandoFragment
         );
 
-        
-
         console.log(respostaFragment);
 
         let statusFragment = "";
@@ -293,6 +295,40 @@ class ClientAnalytics {
           testes.fr = statusFragment;
         }
 
+        const comandoBuffer = `/tool ping ${ipCliente} size=65535 interval=0.01 count=2000`;
+
+        const respostaBuffer = await this.executarSSH(
+          ipDoServidor,
+          comandoBuffer
+        );
+
+        console.log("fefefe" + respostaBuffer);
+
+        const comandoVelocidade = `/interface monitor-traffic <pppoe-${pppoe}> duration=5`;
+
+        const respostaVelocidade = await this.executarSSH(
+          ipDoServidor,
+          comandoVelocidade
+        );
+
+        const linhasVelocidade = respostaVelocidade.split("\n");
+
+        let rx = "";
+        let tx = "";
+
+        for (const linha of linhasVelocidade) {
+          const l = linha.trim();
+
+          if (l.startsWith("rx-bits-per-second:")) {
+            rx = l.split(":")[1].trim(); // ex: "49.7kbps"
+          }
+
+          if (l.startsWith("tx-bits-per-second:")) {
+            tx = l.split(":")[1].trim(); // ex: "4.8Mbps"
+          }
+        }
+
+        testes.velocidade = `⬇️ ${rx} / ⬆️ ${tx}`;
 
         res.status(200).json({
           tests: testes,
@@ -307,6 +343,74 @@ class ClientAnalytics {
       res.status(500).json({ erro: "Erro interno." });
     }
   };
+
+  mikrotikTempoReal = async (req: Request, res: Response) => {
+    try {
+      const { pppoe } = req.body;
+      const tempoReal = {
+        tmp: 0,
+      };
+
+      console.log(pppoe);
+
+      const comandoFragment = `/ping address=${this.clientIp} size=1492 do-not-fragment count=1`;
+
+      if (this.serverIp) {
+        const comandoVelocidade = `/interface monitor-traffic <pppoe-${pppoe}> duration=5`;
+
+        const respostaVelocidade = await this.executarSSH(
+          this.serverIp,
+          comandoVelocidade
+        );
+
+        const linhasVelocidade = respostaVelocidade.split("\n");
+
+        let rx = "";
+        let tx = "";
+
+        for (const linha of linhasVelocidade) {
+          const l = linha.trim();
+
+          if (l.startsWith("rx-bits-per-second:")) {
+            rx = l.split(":")[1].trim(); // ex: "49.7kbps"
+          }
+
+          if (l.startsWith("tx-bits-per-second:")) {
+            tx = l.split(":")[1].trim(); // ex: "4.8Mbps"
+          }
+        }
+
+        tempoReal.tmp = this.parseBitsPerSecond(tx);
+
+        console.log(respostaVelocidade);
+        res.status(200).json({ tmp: tempoReal.tmp });
+      }
+    } catch (error) {
+      console.error("Erro geral:", error);
+      res.status(500).json({ erro: "Erro interno." });
+    }
+  };
+
+  parseBitsPerSecond(valor: string): number {
+    if (!valor) return 0;
+
+    const match = valor.toLowerCase().match(/([\d.]+)\s*(kbps|mbps|bps)/);
+    if (!match) return 0;
+
+    const num = parseFloat(match[1]);
+    const unidade = match[2];
+
+    switch (unidade) {
+      case "mbps":
+        return num;
+      case "kbps":
+        return num / 1000;
+      case "bps":
+        return num / 1_000_000;
+      default:
+        return 0;
+    }
+  }
 }
 
 export default new ClientAnalytics();

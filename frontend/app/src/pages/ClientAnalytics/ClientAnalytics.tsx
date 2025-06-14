@@ -34,9 +34,12 @@ export const ClientAnalytics = () => {
 
   type Testes = {
     ping: string;
-    ctr: string;
     fr: string;
     velocidade: string;
+  };
+
+  type TempoReal = {
+    tmp: number;
   };
 
   const [pppoe, setPppoe] = useState("");
@@ -45,6 +48,7 @@ export const ClientAnalytics = () => {
   const [conectado, setConectado] = useState(false);
   const [suspenso, setSuspenso] = useState(false);
   const [testes, setTestes] = useState<Testes>();
+  const [tempoReal, setTempoReal] = useState<TempoReal>();
   const [sinalOnu, setSinalOnu] = useState<null>(null);
 
   //Redux
@@ -106,6 +110,33 @@ export const ClientAnalytics = () => {
       console.log("Error fetching conversations:", error);
     }
   };
+
+  const fetchTempoReal = async (pppoe: string) => {
+    try {
+      const response = await axios.post(
+        process.env.REACT_APP_URL + "/ClientAnalytics/TempoReal",
+        { pppoe },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (response.status === 200) {
+        setTempoReal(response.data.tmp);
+        console.log("TMP Info:", response.data.tmp);
+      }
+    } catch (error) {
+      console.log("Error fetching conversations:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (!conectado) {
+      fetchTempoReal(pppoe);
+    }
+  }, [clientinfo, testes]);
 
   const fetchMikrotik = async (pppoe: string) => {
     try {
@@ -333,8 +364,8 @@ export const ClientAnalytics = () => {
                   </div>
                 ) : (
                   <div className="flex">
-                  <p>Ping:</p>
-                  <span className="text-green-600 ml-3">{testes.ping}</span>
+                    <p>Ping:</p>
+                    <span className="text-green-600 ml-3">{testes.ping}</span>
                   </div>
                 )}
               </p>
@@ -369,20 +400,65 @@ export const ClientAnalytics = () => {
                 )}
               </p>
 
-              <p>
+              <p className="flex">
                 Velocidade:{" "}
-                <span className="text-green-600">{testes?.velocidade}</span>
+                {!testes?.ping ? (
+                  <div className="flex">
+                    <svg
+                      className="animate-spin h-5 w-5 ml-5 text-gray-500"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8z"
+                      />
+                    </svg>
+                  </div>
+                ) : (
+                  <span className="text-green-600 ml-3">
+                    {testes.velocidade}
+                  </span>
+                )}
               </p>
             </div>
 
             <div className="mt-6">
               <h4 className="font-semibold mb-2">Consumo em Tempo Real:</h4>
-              <img
-                src="/trafego-exemplo.png"
-                alt="Grafico de consumo"
-                className="border border-gray-400"
-              />
-              <span>{testes?.ctr}</span>
+              {tempoReal?.tmp == null ? (
+                <div className="flex">
+                  <svg
+                    className="animate-spin h-5 w-5 ml-5 text-gray-500"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8z"
+                    />
+                  </svg>
+                </div>
+              ) : (
+                <span className="text-green-600 ml-3">{tempoReal.tmp}</span>
+              )}
             </div>
 
             <div className="mt-6 flex justify-center">

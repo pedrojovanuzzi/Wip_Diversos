@@ -9,5 +9,6 @@ router.post("/info", AuthGuard, ClientAnalytics.info);
 router.post("/Desconections", AuthGuard, ClientAnalytics.desconections);
 router.post("/SinalOnu", AuthGuard, ClientAnalytics.onuSinal);
 router.post("/Mikrotik", AuthGuard, ClientAnalytics.mikrotik);
+router.post("/TempoReal", AuthGuard, ClientAnalytics.mikrotikTempoReal);
 
 export default router;
