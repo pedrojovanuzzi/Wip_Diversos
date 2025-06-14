@@ -135,10 +135,66 @@ class ClientAnalytics {
     }
   };
 
- mikrotik = async (req: Request, res: Response) => {
-    try {
-      const { pppoe } = req.body;
+  executarSSH = async (host: string, comando: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const conn = new Client();
+      let output = "";
 
+      // console.log(`[DEBUG] Tentando conectar no host: ${host}`);
+
+      conn
+        .on("ready", () => {
+          // console.log(`[DEBUG] Conectado com sucesso no ${host}`);
+          conn.exec(comando, (err, stream) => {
+            if (err) {
+              console.error(`[ERRO] Erro ao executar comando no ${host}:`, err);
+              conn.end();
+              return reject(err);
+            }
+
+            stream
+              .on("close", (code: number, signal: string) => {
+                console
+                  .log
+                  // `[DEBUG] Conexão fechada - Código: ${code}, Sinal: ${signal}`
+                  ();
+                conn.end();
+                resolve(output);
+              })
+              .on("data", (data: Buffer) => {
+                console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
+                output += data.toString();
+              })
+              .stderr.on("data", (data: Buffer) => {
+                console.error(`[DEBUG] STDERR (${host}):\n${data.toString()}`);
+                output += data.toString();
+              });
+          });
+        })
+        .on("error", (err) => {
+          console.error(`[ERRO] Erro de conexão com ${host}:`, err);
+          reject(err);
+        })
+        .connect({
+          host,
+          port: 2004,
+          username: process.env.MIKROTIK_LOGIN!,
+          password: process.env.MIKROTIK_PASSWORD!,
+          readyTimeout: 5000,
+        });
+    });
+  };
+
+  mikrotik = async (req: Request, res: Response) => {
+    try {
+      const testes = {
+        ping: "",
+        ctr: "",
+        fr: "",
+        velocidade: "",
+      };
+
+      const { pppoe } = req.body;
       const ClientesRepository = MkauthSource.getRepository(ClientesEntities);
       const User = await ClientesRepository.findOne({
         where: { login: pppoe, cli_ativado: "s" },
@@ -146,15 +202,85 @@ class ClientAnalytics {
       });
 
       if (!User || !User.ip) {
-        return res.status(404).json({ erro: "Usuário não encontrado ou sem IP." });
+        res.status(404).json({ erro: "Usuário não encontrado ou sem IP." });
+        return;
       }
 
-      
+      const ipCliente = User.ip;
+      const servidores = [
+        { host: process.env.MIKROTIK_PPPOE1, nome: "PPPOE1" },
+        { host: process.env.MIKROTIK_PPPOE2, nome: "PPPOE2" },
+        { host: process.env.MIKROTIK_PPPOE3, nome: "PPPOE3" },
+      ];
+
+      const resultados = [];
+
+      for (const servidor of servidores) {
+        try {
+          const comando = `/ping address=${ipCliente} count=2`;
+          const resposta = await this.executarSSH(servidor.host!, comando);
+
+          const match = resposta.match(/received=(\d+)/);
+          const recebido = match ? parseInt(match[1], 10) : 0;
+          const encontrado = recebido > 0;
+
+          resultados.push({
+            servidor: servidor.nome,
+            encontrado,
+            host: servidor.host,
+            resposta,
+          });
+
+          if (encontrado) break;
+        } catch (err: any) {
+          resultados.push({
+            servidor: servidor.nome,
+            erro: err.message || "Erro desconhecido",
+          });
+        }
+      }
+
+      const primeiro = resultados.find((r) => r.encontrado);
+
+      if (primeiro && primeiro.host) {
+        const ipDoServidor = primeiro.host;
+        const outroComando = `/ping ${ipCliente} count=1`;
+        const respostaDetalhada = await this.executarSSH(
+          ipDoServidor,
+          outroComando
+        );
+
+        console.log(respostaDetalhada);
+
+        const linhaPing = respostaDetalhada
+          .split("\n")
+          .find((linha) => linha.trim().startsWith("0"));
+
+        if (linhaPing) {
+          const partes = linhaPing.trim().split(/\s+/); // separa por espaços múltiplos
+
+          const size = partes[2]; // coluna SIZE
+          const ttl = partes[3]; // coluna TTL
+          const time = partes[4]; // coluna TIME
+
+          testes.ping = `SIZE ${size} / TTL ${ttl} / TIME ${time}`;
+        }
+
+        
 
 
+
+        res.status(200).json({
+          tests: testes,
+        });
+        return;
+      } else {
+        res.json({ tests: testes });
+        return;
+      }
     } catch (error) {
-      console.error("Erro ao consultar Mikrotik:", error);
-      res.status(500).json({ erro: "Erro interno ao testar conexão com cliente." });
+      console.error("Erro geral:", error);
+      res.status(500).json({ erro: "Erro interno." });
     }
   };
 }
