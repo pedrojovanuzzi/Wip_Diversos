@@ -332,13 +332,43 @@ export const ClientAnalytics = () => {
                     </svg>
                   </div>
                 ) : (
-                  <span className="text-green-600">Ping: {testes.ping}</span>
+                  <div className="flex">
+                  <p>Ping:</p>
+                  <span className="text-green-600 ml-3">{testes.ping}</span>
+                  </div>
                 )}
               </p>
-              <p>
+              <p className="flex items-center gap-2">
                 Fragmentação:{" "}
-                <span className="text-green-600">{testes?.fr}</span>
+                {!testes?.fr ? (
+                  <>
+                    <svg
+                      className="animate-spin h-5 w-5 text-gray-500"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8z"
+                      />
+                    </svg>
+                  </>
+                ) : testes.fr !== "Sem Fragmentação" ? (
+                  <span className="text-red-500">{testes.fr}</span>
+                ) : (
+                  <span className="text-green-600">Sem Fragmentação</span>
+                )}
               </p>
+
               <p>
                 Velocidade:{" "}
                 <span className="text-green-600">{testes?.velocidade}</span>

@@ -245,14 +245,9 @@ class ClientAnalytics {
       if (primeiro && primeiro.host) {
         const ipDoServidor = primeiro.host;
         const outroComando = `/ping ${ipCliente} count=1`;
-        const respostaDetalhada = await this.executarSSH(
-          ipDoServidor,
-          outroComando
-        );
+        const respostaPing = await this.executarSSH(ipDoServidor, outroComando);
 
-        console.log(respostaDetalhada);
-
-        const linhaPing = respostaDetalhada
+        const linhaPing = respostaPing
           .split("\n")
           .find((linha) => linha.trim().startsWith("0"));
 
@@ -266,8 +261,37 @@ class ClientAnalytics {
           testes.ping = `SIZE ${size} / TTL ${ttl} / TIME ${time}`;
         }
 
+        const comandoFragment = `/ping address=${ipCliente} size=1492 do-not-fragment count=1`;
+
+        const respostaFragment = await this.executarSSH(
+          ipDoServidor,
+          comandoFragment
+        );
+
         
 
+        console.log(respostaFragment);
+
+        let statusFragment = "";
+        const linhas = respostaFragment.trim().split("\n").reverse();
+
+        for (const linha of linhas) {
+          const partes = linha.trim().split(/\s{2,}|\t+/);
+
+          if (
+            linha.toLowerCase().includes("fragmentation") ||
+            linha.toLowerCase().includes("packet too large")
+          ) {
+            statusFragment = partes.slice(1).join(" ");
+            break;
+          }
+        }
+
+        if (!statusFragment || statusFragment.trim() === "") {
+          testes.fr = "Sem Fragmentação";
+        } else {
+          testes.fr = statusFragment;
+        }
 
 
         res.status(200).json({
