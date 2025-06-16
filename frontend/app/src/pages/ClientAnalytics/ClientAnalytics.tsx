@@ -451,7 +451,9 @@ export const ClientAnalytics = () => {
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={tempoReal}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey={(index) => index} />
+                    <YAxis
+                      domain={[0, (dataMax: number) => Math.max(5, dataMax)]}
+                    />
                     <YAxis domain={["dataMin", "dataMax"]} />
                     <Tooltip />
                     <Line
