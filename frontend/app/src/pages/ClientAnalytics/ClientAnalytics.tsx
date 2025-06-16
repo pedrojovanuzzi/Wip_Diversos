@@ -145,7 +145,7 @@ export const ClientAnalytics = () => {
     if (conectado) {
       const intervalo = setInterval(() => {
         fetchTempoReal(pppoe);
-      }, 2000); // 2 segundos
+      }, 5000);
 
       return () => clearInterval(intervalo); // limpa o intervalo quando desmontar ou mudar dependência
     }

@@ -13,6 +13,7 @@ dotenv.config();
 class ClientAnalytics {
   private clientIp: string | undefined;
   private serverIp: string | undefined;
+  private versao: string | undefined;
 
   info = async (req: Request, res: Response) => {
     try {
@@ -165,11 +166,11 @@ class ClientAnalytics {
                 resolve(output);
               })
               .on("data", (data: Buffer) => {
-                console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
+                // console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
                 output += data.toString();
               })
               .stderr.on("data", (data: Buffer) => {
-                console.error(`[DEBUG] STDERR (${host}):\n${data.toString()}`);
+                // console.error(`[DEBUG] STDERR (${host}):\n${data.toString()}`);
                 output += data.toString();
               });
           });
@@ -219,21 +220,24 @@ class ClientAnalytics {
 
       for (const servidor of servidores) {
         try {
-          const comando = `/ping address=${ipCliente} count=2`;
+          console.log("VERIFICANDO PPPoE ATIVO NO SERVIDOR:", servidor.nome);
+
+          const comando = `/ppp active print where name="${pppoe}"`;
           const resposta = await this.executarSSH(servidor.host!, comando);
 
-          const match = resposta.match(/received=(\d+)/);
-          const recebido = match ? parseInt(match[1], 10) : 0;
-          const encontrado = recebido > 0;
+          // Verifica se há linha com "pppoe" e "address=" (ou IP no formato comum)
+          const ativo = /pppoe\s+\S+\s+([0-9]{1,3}\.){3}[0-9]{1,3}/.test(
+            resposta
+          );
 
           resultados.push({
             servidor: servidor.nome,
-            encontrado,
+            encontrado: ativo,
             host: servidor.host,
             resposta,
           });
 
-          if (encontrado) break;
+          if (ativo) break;
         } catch (err: any) {
           resultados.push({
             servidor: servidor.nome,
@@ -248,6 +252,30 @@ class ClientAnalytics {
         this.clientIp = ipCliente;
         const ipDoServidor = primeiro.host;
         this.serverIp = ipDoServidor;
+
+        console.log("VERSAO");
+        const versaoMikrotik = `/system resource print`;
+
+        const respostaversaoMikrotik = await this.executarSSH(
+          this.serverIp,
+          versaoMikrotik
+        );
+
+        let versao = "";
+        const lines = respostaversaoMikrotik.split("\n");
+
+        for (const linha of lines) {
+          if (linha.toLowerCase().includes("version:")) {
+            versao = linha.split(":")[1].trim();
+            break;
+          }
+        }
+
+        this.versao = versao;
+
+        console.log(versao);
+
+        console.log("PING IP");
         const outroComando = `/ping ${ipCliente} count=1`;
         const respostaPing = await this.executarSSH(ipDoServidor, outroComando);
 
@@ -265,6 +293,7 @@ class ClientAnalytics {
           testes.ping = `SIZE ${size} / TTL ${ttl} / TIME ${time}`;
         }
 
+        console.log("FRAGMENT");
         const comandoFragment = `/ping address=${ipCliente} size=1492 do-not-fragment count=1`;
 
         const respostaFragment = await this.executarSSH(
@@ -295,16 +324,17 @@ class ClientAnalytics {
           testes.fr = statusFragment;
         }
 
-        const comandoBuffer = `/tool ping ${ipCliente} size=65535 interval=0.01 count=2000`;
+        const comandoBuffer = `/tool ping ${ipCliente} size=65535 interval=0.01 count=1000`;
 
+        console.log("BUFFER");
         const respostaBuffer = await this.executarSSH(
           ipDoServidor,
           comandoBuffer
         );
 
-        console.log("fefefe" + respostaBuffer);
+        // console.log(respostaBuffer);
 
-        const comandoVelocidade = `/interface monitor-traffic <pppoe-${pppoe}> duration=5`;
+        const comandoVelocidade = `/interface monitor-traffic <pppoe-${pppoe}> duration=1`;
 
         const respostaVelocidade = await this.executarSSH(
           ipDoServidor,
@@ -351,11 +381,8 @@ class ClientAnalytics {
         tmp: 0,
       };
 
-      console.log(pppoe);
-
-      const comandoFragment = `/ping address=${this.clientIp} size=1492 do-not-fragment count=1`;
-
       if (this.serverIp) {
+        console.log("TEMPO REAL");
         const comandoVelocidade = `/interface monitor-traffic <pppoe-${pppoe}> duration=5`;
 
         const respostaVelocidade = await this.executarSSH(
@@ -382,8 +409,12 @@ class ClientAnalytics {
 
         tempoReal.tmp = this.parseBitsPerSecond(tx);
 
-        console.log(respostaVelocidade);
+        // console.log(respostaVelocidade);
         res.status(200).json({ tmp: tempoReal.tmp });
+      }
+      if (!this.serverIp) {
+        res.status(204);
+        return;
       }
     } catch (error) {
       console.error("Erro geral:", error);
