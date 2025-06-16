@@ -3,6 +3,15 @@ import { NavBar } from "../../components/navbar/NavBar";
 import axios from "axios";
 import { TypedUseSelectorHook, useSelector } from "react-redux";
 import { RootState } from "../../types";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+} from "recharts";
 
 function formatarBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) {
@@ -48,7 +57,7 @@ export const ClientAnalytics = () => {
   const [conectado, setConectado] = useState(false);
   const [suspenso, setSuspenso] = useState(false);
   const [testes, setTestes] = useState<Testes>();
-  const [tempoReal, setTempoReal] = useState<TempoReal>();
+  const [tempoReal, setTempoReal] = useState<TempoReal[]>([]);
   const [sinalOnu, setSinalOnu] = useState<null>(null);
 
   //Redux
@@ -124,8 +133,8 @@ export const ClientAnalytics = () => {
         }
       );
       if (response.status === 200) {
-        setTempoReal(response.data.tmp);
-        console.log("TMP Info:", response.data.tmp);
+        setTempoReal((prev) => [...prev, response.data]);
+        console.log("TMP Info:", response.data);
       }
     } catch (error) {
       console.log("Error fetching conversations:", error);
@@ -133,10 +142,14 @@ export const ClientAnalytics = () => {
   };
 
   useEffect(() => {
-    if (!conectado) {
-      fetchTempoReal(pppoe);
+    if (conectado) {
+      const intervalo = setInterval(() => {
+        fetchTempoReal(pppoe);
+      }, 2000); // 2 segundos
+
+      return () => clearInterval(intervalo); // limpa o intervalo quando desmontar ou mudar dependência
     }
-  }, [clientinfo, testes]);
+  }, [conectado, pppoe]);
 
   const fetchMikrotik = async (pppoe: string) => {
     try {
@@ -432,9 +445,25 @@ export const ClientAnalytics = () => {
               </p>
             </div>
 
-            <div className="mt-6">
+            <div className="mt-6 w-full max-w-xl">
               <h4 className="font-semibold mb-2">Consumo em Tempo Real:</h4>
-              {tempoReal?.tmp == null ? (
+              {tempoReal.length > 0 ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={tempoReal}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey={(index) => index} />
+                    <YAxis domain={["dataMin", "dataMax"]} />
+                    <Tooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="tmp"
+                      stroke="#10B981"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
                 <div className="flex">
                   <svg
                     className="animate-spin h-5 w-5 ml-5 text-gray-500"
@@ -456,8 +485,6 @@ export const ClientAnalytics = () => {
                     />
                   </svg>
                 </div>
-              ) : (
-                <span className="text-green-600 ml-3">{tempoReal.tmp}</span>
               )}
             </div>
 
