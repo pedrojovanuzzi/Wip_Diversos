@@ -85,7 +85,7 @@ class ClientAnalytics {
       // 🟡 Eventos para log no terminal
       conn.on("data", (data) => {
         buffer = data.toString();
-        // console.log(buffer);
+        console.log(buffer);
       });
 
       let buffer = "";
@@ -110,15 +110,35 @@ class ClientAnalytics {
 
       await conn.send("en");
       await conn.send(password);
-
       await conn.send("cd onu");
+
+      const slot = User?.porta_olt?.substring(0, 2);
+      const pon = User?.porta_olt?.substring(2, 4);
+      const snCliente = User?.tags?.toLowerCase()?.trim();
+
+      let onuId = "";
+
+      if(snCliente)
+      {
+        onuId = await this.buscarOnuIdPorMac(conn, `show online slot ${slot} pon ${pon}`, snCliente!);
+      }
+
+      console.log(onuId);
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      if (!onuId) {
+        throw new Error("ONU não encontrada na lista online.");
+      }
 
       await conn.send(
         `show optic_module slot ${User?.porta_olt?.substring(
           0,
           2
-        )} pon ${User?.porta_olt?.substring(2, 4)} onu ${User?.onu_ont}`
+        )} pon ${User?.porta_olt?.substring(2, 4)} onu ${onuId}`
       );
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       const output = buffer.split("Admin\\onu#")[0].trim();
 
@@ -126,6 +146,9 @@ class ClientAnalytics {
         res.status(200).json({ respostaTelnet: "ONU APAGADA" });
         return;
       }
+
+      console.log(output);
+      
 
       await conn.end();
 
@@ -188,6 +211,56 @@ class ClientAnalytics {
         });
     });
   };
+
+async buscarOnuIdPorMac(conn: Telnet, comando: string, snCliente: string): Promise<string> {
+  return new Promise(async (resolve, reject) => {
+    let buffer = "";
+    const processadas = new Set<string>();
+    let encontrou = false;
+
+    const onData = (data: Buffer) => {
+      if (encontrou) return;
+
+      const texto = data.toString();
+      buffer += texto;
+
+      const linhas = texto.split("\n").map(l => l.trim()).filter(Boolean);
+
+      for (const linha of linhas) {
+        if (processadas.has(linha)) continue;
+        processadas.add(linha);
+
+        const partes = linha.split(/\s+/);
+        if (partes.length < 3) continue;
+
+        const id = partes[0];
+        const sn = partes[2]?.toLowerCase();
+
+        if (!/^\d+$/.test(id)) continue; // ignora cabeçalhos ou mensagens de sistema
+
+        if (sn === snCliente.toLowerCase()) {
+          encontrou = true;
+          conn.removeListener("data", onData);
+          return resolve(id);
+        }
+      }
+
+      if (!encontrou && buffer.includes("Press any key")) {
+        buffer = "";
+        conn.send("\n");
+      }
+    };
+
+    try {
+      conn.on("data", onData);
+      await conn.send(comando);
+    } catch (e) {
+      conn.removeListener("data", onData);
+      reject(e);
+    }
+  });
+}
+
 
   mikrotik = async (req: Request, res: Response) => {
     try {
