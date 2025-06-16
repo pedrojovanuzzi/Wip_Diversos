@@ -14,7 +14,7 @@ class ClientAnalytics {
   private clientIp: string | undefined;
   private serverIp: string | undefined;
   private versao: string | undefined;
-  private onuId : string | undefined;
+  private onuId: string | undefined;
 
   info = async (req: Request, res: Response) => {
     try {
@@ -67,6 +67,12 @@ class ClientAnalytics {
     }
   };
 
+  normalizeMac(mac: string): string {
+    return mac
+      .toUpperCase() // maiúsculas
+      .replace(/[^0-9A-F]/g, ""); // remove tudo que não seja HEX
+  }
+
   onuSinal = async (req: Request, res: Response) => {
     try {
       const { pppoe } = req.body;
@@ -115,18 +121,23 @@ class ClientAnalytics {
 
       const slot = User?.porta_olt?.substring(0, 2);
       const pon = User?.porta_olt?.substring(2, 4);
-      const snCliente = User?.tags?.toLowerCase()?.trim();
+      const rawTag = User?.tags ?? "";
+      const snCliente = this.normalizeMac(rawTag.trim());
 
       let onuId = "";
 
-      if(snCliente)
-      {
-        onuId = await this.buscarOnuIdPorMac(conn, `show online slot ${slot} pon ${pon}`, snCliente!);
+      if (snCliente) {
+        console.log("Procurando ONU com MAC normalizado:", snCliente);
+        onuId = await this.buscarOnuIdPorMac(
+          conn,
+          `show online slot ${slot} pon ${pon}`,
+          snCliente
+        );
       }
 
       console.log(this.onuId);
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       await conn.send("\x03");
 
@@ -141,7 +152,7 @@ class ClientAnalytics {
         )} pon ${User?.porta_olt?.substring(2, 4)} onu ${this.onuId}`
       );
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       const output = buffer.split("Admin\\onu#")[0].trim();
 
@@ -151,7 +162,6 @@ class ClientAnalytics {
       }
 
       console.log(output);
-      
 
       await conn.end();
 
@@ -215,56 +225,64 @@ class ClientAnalytics {
     });
   };
 
-async buscarOnuIdPorMac(conn: Telnet, comando: string, snCliente: string): Promise<string> {
-  return new Promise(async (resolve, reject) => {
-    let buffer = "";
-    const processadas = new Set<string>();
-    let encontrou = false;
+  async buscarOnuIdPorMac(
+    conn: Telnet,
+    comando: string,
+    snClienteRaw: string
+  ): Promise<string> {
+    const snCliente = this.normalizeMac(snClienteRaw);
+    return new Promise(async (resolve, reject) => {
+      let buffer = "";
+      const processadas = new Set<string>();
+      let encontrou = false;
 
-    const onData = (data: Buffer) => {
-      if (encontrou) return;
+      const onData = (data: Buffer) => {
+        if (encontrou) return;
 
-      const texto = data.toString();
-      buffer += texto;
+        const texto = data.toString();
+        buffer += texto;
 
-      const linhas = texto.split("\n").map(l => l.trim()).filter(Boolean);
+        const linhas = texto
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean);
 
-      for (const linha of linhas) {
-        if (processadas.has(linha)) continue;
-        processadas.add(linha);
+        for (const linha of linhas) {
+          if (processadas.has(linha)) continue;
+          processadas.add(linha);
 
-        const partes = linha.split(/\s+/);
-        if (partes.length < 3) continue;
+          const partes = linha.split(/\s+/);
+          if (partes.length < 3) continue;
 
-        const id = partes[0];
-        const sn = partes[2]?.toLowerCase();
+          const id = partes[0];
+          let snRaw = partes[2];
+          const sn = this.normalizeMac(snRaw);
 
-        if (!/^\d+$/.test(id)) continue; // ignora cabeçalhos ou mensagens de sistema
+          if (!/^\d+$/.test(id)) continue; // ignora cabeçalhos ou mensagens de sistema
 
-        if (sn === snCliente.toLowerCase()) {
-          encontrou = true;
-          this.onuId = id;
-          conn.removeListener("data", onData);
-          return resolve(id);
+          if (sn === snCliente) {
+            encontrou = true;
+            this.onuId = id;
+            conn.removeListener("data", onData);
+            return resolve(id);
+          }
         }
+
+        if (!encontrou && buffer.includes("Press any key")) {
+          buffer = "";
+          conn.send("\n");
+        }
+      };
+
+      try {
+        conn.on("data", onData);
+        await conn.send(comando);
+      } catch (e) {
+        conn.removeListener("data", onData);
+        reject(e);
       }
-
-      if (!encontrou && buffer.includes("Press any key")) {
-        buffer = "";
-        conn.send("\n");
-      }
-    };
-
-    try {
-      conn.on("data", onData);
-      await conn.send(comando);
-    } catch (e) {
-      conn.removeListener("data", onData);
-      reject(e);
-    }
-  });
-}
-
+    });
+  }
 
   mikrotik = async (req: Request, res: Response) => {
     try {
