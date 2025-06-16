@@ -14,6 +14,7 @@ class ClientAnalytics {
   private clientIp: string | undefined;
   private serverIp: string | undefined;
   private versao: string | undefined;
+  private onuId : string | undefined;
 
   info = async (req: Request, res: Response) => {
     try {
@@ -123,11 +124,13 @@ class ClientAnalytics {
         onuId = await this.buscarOnuIdPorMac(conn, `show online slot ${slot} pon ${pon}`, snCliente!);
       }
 
-      console.log(onuId);
+      console.log(this.onuId);
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      if (!onuId) {
+      await conn.send("\x03");
+
+      if (!this.onuId) {
         throw new Error("ONU não encontrada na lista online.");
       }
 
@@ -135,7 +138,7 @@ class ClientAnalytics {
         `show optic_module slot ${User?.porta_olt?.substring(
           0,
           2
-        )} pon ${User?.porta_olt?.substring(2, 4)} onu ${onuId}`
+        )} pon ${User?.porta_olt?.substring(2, 4)} onu ${this.onuId}`
       );
 
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -240,6 +243,7 @@ async buscarOnuIdPorMac(conn: Telnet, comando: string, snCliente: string): Promi
 
         if (sn === snCliente.toLowerCase()) {
           encontrou = true;
+          this.onuId = id;
           conn.removeListener("data", onData);
           return resolve(id);
         }
