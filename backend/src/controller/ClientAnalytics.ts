@@ -142,6 +142,7 @@ class ClientAnalytics {
       await conn.send("\x03");
 
       if (!this.onuId || !slot || !pon) {
+        await conn.end();
         res.status(200).json({ respostaTelnet: "Sem Onu", color: "red" });
         return;
       }
@@ -158,6 +159,7 @@ class ClientAnalytics {
       const output = buffer.split("Admin\\onu#")[0].trim();
 
       if (/onu#\s*$/i.test(output)) {
+        await conn.end();
         res.status(200).json({ respostaTelnet: "ONU APAGADA", color: "red" });
         return;
       }
@@ -514,6 +516,7 @@ class ClientAnalytics {
         res.status(200).json({ tmp: tempoReal.tmp });
       }
       if (!this.serverIp) {
+        
         res.status(204);
         return;
       }
