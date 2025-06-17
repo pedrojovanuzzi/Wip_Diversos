@@ -184,7 +184,8 @@ class ClientAnalytics {
   };
 
   executarSSH = async (host: string, comando: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
+    try {
+      return new Promise((resolve, reject) => {
       const conn = new Client();
       let output = "";
 
@@ -231,6 +232,10 @@ class ClientAnalytics {
           readyTimeout: 5000,
         });
     });
+    } catch (error) {
+      console.log(error);
+      return "";
+    }
   };
 
   async buscarOnuIdPorMac(
@@ -238,58 +243,63 @@ class ClientAnalytics {
     comando: string,
     snClienteRaw: string
   ): Promise<string> {
-    const snCliente = this.normalizeMac(snClienteRaw);
-    return new Promise(async (resolve, reject) => {
-      let buffer = "";
-      const processadas = new Set<string>();
-      let encontrou = false;
+    try {
+      const snCliente = this.normalizeMac(snClienteRaw);
+      return await new Promise<string>(async (resolve, reject) => {
+        let buffer = "";
+        const processadas = new Set<string>();
+        let encontrou = false;
 
-      const onData = (data: Buffer) => {
-        if (encontrou) return;
+        const onData = (data: Buffer) => {
+          if (encontrou) return;
 
-        const texto = data.toString();
-        buffer += texto;
+          const texto = data.toString();
+          buffer += texto;
 
-        const linhas = texto
-          .split("\n")
-          .map((l) => l.trim())
-          .filter(Boolean);
+          const linhas = texto
+            .split("\n")
+            .map((l) => l.trim())
+            .filter(Boolean);
 
-        for (const linha of linhas) {
-          if (processadas.has(linha)) continue;
-          processadas.add(linha);
+          for (const linha of linhas) {
+            if (processadas.has(linha)) continue;
+            processadas.add(linha);
 
-          const partes = linha.split(/\s+/);
-          if (partes.length < 3) continue;
+            const partes = linha.split(/\s+/);
+            if (partes.length < 3) continue;
 
-          const id = partes[0];
-          let snRaw = partes[2];
-          const sn = this.normalizeMac(snRaw);
+            const id = partes[0];
+            let snRaw = partes[2];
+            const sn = this.normalizeMac(snRaw);
 
-          if (!/^\d+$/.test(id)) continue; // ignora cabeçalhos ou mensagens de sistema
+            if (!/^\d+$/.test(id)) continue; // ignora cabeçalhos ou mensagens de sistema
 
-          if (sn === snCliente) {
-            encontrou = true;
-            this.onuId = id;
-            conn.removeListener("data", onData);
-            return resolve(id);
+            if (sn === snCliente) {
+              encontrou = true;
+              this.onuId = id;
+              conn.removeListener("data", onData);
+              return resolve(id);
+            }
           }
-        }
 
-        if (!encontrou && buffer.includes("Press any key")) {
-          buffer = "";
-          conn.send("\n");
-        }
-      };
+          if (!encontrou && buffer.includes("Press any key")) {
+            buffer = "";
+            conn.send("\n");
+          }
+        };
 
-      try {
-        conn.on("data", onData);
-        await conn.send(comando);
-      } catch (e) {
-        conn.removeListener("data", onData);
-        reject(e);
-      }
-    });
+        try {
+          conn.on("data", onData);
+          await conn.send(comando);
+        } catch (e) {
+          conn.removeListener("data", onData);
+          reject(e);
+        }
+      });
+    } catch (error) {
+      console.log(error);
+      return "";
+    }
   }
 
   mikrotik = async (req: Request, res: Response) => {
