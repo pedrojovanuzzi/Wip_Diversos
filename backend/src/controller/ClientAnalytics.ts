@@ -13,7 +13,7 @@ dotenv.config();
 class ClientAnalytics {
   private clientIp: string | undefined;
   private serverIp: string | undefined;
-  private versao: string | undefined;
+  private versao: string | undefined | number;
   private onuId: string | undefined;
 
   info = async (req: Request, res: Response) => {
@@ -47,7 +47,7 @@ class ClientAnalytics {
       res.status(200).json({ user: User, suspensao: suspensao });
       return;
     } catch (error) {
-      console.log(error);
+      (error);
     }
   };
 
@@ -63,7 +63,7 @@ class ClientAnalytics {
       res.status(200).json({ desconexoes: Desconexoes });
       return;
     } catch (error) {
-      console.log(error);
+      ////console.log(error);
     }
   };
 
@@ -92,7 +92,7 @@ class ClientAnalytics {
       // 🟡 Eventos para log no terminal
       conn.on("data", (data) => {
         buffer = data.toString();
-        console.log(buffer);
+        ////console.log(buffer);
       });
 
       let buffer = "";
@@ -127,7 +127,7 @@ class ClientAnalytics {
       let onuId = "";
 
       if (snCliente) {
-        console.log("Procurando ONU com MAC normalizado:", snCliente);
+        ////console.log("Procurando ONU com MAC normalizado:", snCliente);
         onuId = await this.buscarOnuIdPorMac(
           conn,
           `show online slot ${slot} pon ${pon}`,
@@ -135,7 +135,7 @@ class ClientAnalytics {
         );
       }
 
-      console.log(this.onuId);
+      ////console.log(this.onuId);
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
@@ -160,7 +160,7 @@ class ClientAnalytics {
         return;
       }
 
-      console.log(output);
+      ////console.log(output);
 
       if (!this.onuId || !output) {
         res.status(200).json({ respostaTelnet: "Sem Onu", color: "red" });
@@ -185,11 +185,11 @@ class ClientAnalytics {
         const conn = new Client();
         let output = "";
 
-        // console.log(`[DEBUG] Tentando conectar no host: ${host}`);
+        // ////console.log(`[DEBUG] Tentando conectar no host: ${host}`);
 
         conn
           .on("ready", () => {
-            // console.log(`[DEBUG] Conectado com sucesso no ${host}`);
+            // ////console.log(`[DEBUG] Conectado com sucesso no ${host}`);
             conn.exec(comando, (err, stream) => {
               if (err) {
                 console.error(
@@ -210,7 +210,7 @@ class ClientAnalytics {
                   resolve(output);
                 })
                 .on("data", (data: Buffer) => {
-                  // console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
+                  // //console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
                   output += data.toString();
                 })
                 .stderr.on("data", (data: Buffer) => {
@@ -232,7 +232,7 @@ class ClientAnalytics {
           });
       });
     } catch (error) {
-      console.log(error);
+      //console.log(error);
       return "";
     }
   };
@@ -297,7 +297,7 @@ class ClientAnalytics {
         }
       });
     } catch (error) {
-      console.log(error);
+      //console.log(error);
       return "";
     }
   }
@@ -333,7 +333,7 @@ class ClientAnalytics {
 
       for (const servidor of servidores) {
         try {
-          console.log("VERIFICANDO PPPoE ATIVO NO SERVIDOR:", servidor.nome);
+          //console.log("VERIFICANDO PPPoE ATIVO NO SERVIDOR:", servidor.nome);
 
           const comando = `/ppp active print where name="${pppoe}"`;
           const resposta = await this.executarSSH(servidor.host!, comando);
@@ -366,7 +366,7 @@ class ClientAnalytics {
         const ipDoServidor = primeiro.host;
         this.serverIp = ipDoServidor;
 
-        console.log("VERSAO");
+        //console.log("VERSAO");
         const versaoMikrotik = `/system resource print`;
 
         const respostaversaoMikrotik = await this.executarSSH(
@@ -386,9 +386,9 @@ class ClientAnalytics {
 
         this.versao = versao;
 
-        console.log(versao);
+        //console.log(versao);
 
-        console.log("PING IP");
+        //console.log("PING IP");
         const outroComando = `/ping ${ipCliente} count=1`;
         const respostaPing = await this.executarSSH(ipDoServidor, outroComando);
 
@@ -406,7 +406,7 @@ class ClientAnalytics {
           testes.ping = `SIZE ${size} / TTL ${ttl} / TIME ${time}`;
         }
 
-        console.log("FRAGMENT");
+        //console.log("FRAGMENT");
         const comandoFragment = `/ping address=${ipCliente} size=1492 do-not-fragment count=1`;
 
         const respostaFragment = await this.executarSSH(
@@ -414,7 +414,7 @@ class ClientAnalytics {
           comandoFragment
         );
 
-        console.log(respostaFragment);
+        //console.log(respostaFragment);
 
         let statusFragment = "";
         const linhas = respostaFragment.trim().split("\n").reverse();
@@ -431,21 +431,32 @@ class ClientAnalytics {
           }
         }
 
+        
+
         if (!statusFragment || statusFragment.trim() === "") {
           testes.fr = "Sem Fragmentação";
         } else {
           testes.fr = statusFragment;
         }
 
-        const comandoBuffer = `/tool ping ${ipCliente} size=65535 interval=0.01 count=1000`;
+        this.versao = parseInt(this.versao.split(".")[0]);
 
-        console.log("BUFFER");
+        let comandoBuffer = "";
+
+        if(this.versao <= 6){
+          comandoBuffer = `ping address=${ipCliente} interval=0.01 size=60000 count=500`;
+        }
+        else if(this.versao >= 7){
+          comandoBuffer = `/tool ping ${ipCliente} size=65535 interval=0.01 count=500`;
+        }
+
+        //console.log("BUFFER");
         const respostaBuffer = await this.executarSSH(
           ipDoServidor,
           comandoBuffer
         );
 
-        // console.log(respostaBuffer);
+        // //console.log(respostaBuffer);
 
         const comandoVelocidade = `/interface monitor-traffic <pppoe-${pppoe}> duration=1`;
 
@@ -495,7 +506,7 @@ class ClientAnalytics {
       };
 
       if (this.serverIp) {
-        console.log("TEMPO REAL");
+        ("TEMPO REAL");
         const comandoVelocidade = `/interface monitor-traffic <pppoe-${pppoe}> duration=5`;
 
         const respostaVelocidade = await this.executarSSH(
@@ -522,7 +533,7 @@ class ClientAnalytics {
 
         tempoReal.tmp = this.parseBitsPerSecond(tx);
 
-        // console.log(respostaVelocidade);
+        // (respostaVelocidade);
         res.status(200).json({ tmp: tempoReal.tmp });
       }
       if (!this.serverIp) {
