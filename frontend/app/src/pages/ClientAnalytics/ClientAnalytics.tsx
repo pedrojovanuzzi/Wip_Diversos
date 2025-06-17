@@ -101,6 +101,7 @@ export const ClientAnalytics = () => {
   };
 
   const fetchDesconexoes = async (pppoe: string) => {
+    setDesconexoes([]);
     try {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/Desconections",
@@ -153,6 +154,7 @@ export const ClientAnalytics = () => {
   }, [conectado, pppoe]);
 
   const fetchMikrotik = async (pppoe: string) => {
+    setTestes(undefined);
     try {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/Mikrotik",
@@ -174,6 +176,7 @@ export const ClientAnalytics = () => {
   };
 
   const fetchSinal = async (pppoe: string) => {
+    setSinalOnu(null);
     try {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/SinalOnu",
