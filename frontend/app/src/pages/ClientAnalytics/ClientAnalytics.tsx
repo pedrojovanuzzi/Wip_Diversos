@@ -495,7 +495,11 @@ export const ClientAnalytics = () => {
                 onClick={() => {
                   const ip = desconexoes[0].framedipaddress;
                   const port = process.env.REACT_APP_PORT_ROUTER;
-                  window.location.href = `http://${ip}:${port}`;
+                  window.open(
+                    `http://${ip}:${port}`,
+                    "_blank",
+                    "noopener,noreferrer"
+                  );
                 }}
                 className="bg-red-700 text-white px-6 py-2 rounded"
               >

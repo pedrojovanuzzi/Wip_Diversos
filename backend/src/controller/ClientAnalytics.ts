@@ -142,7 +142,8 @@ class ClientAnalytics {
       await conn.send("\x03");
 
       if (!this.onuId) {
-        throw new Error("ONU não encontrada na lista online.");
+        res.status(200).json({ respostaTelnet: "Sem Onu" });
+        return;
       }
 
       await conn.send(
@@ -164,6 +165,11 @@ class ClientAnalytics {
       console.log(output);
 
       await conn.end();
+
+      if(!this.onuId || !output){
+        res.status(200).json({ respostaTelnet: "Sem Onu" });
+        return;
+      }
 
       res.status(200).json({ respostaTelnet: output });
     } catch (error) {
