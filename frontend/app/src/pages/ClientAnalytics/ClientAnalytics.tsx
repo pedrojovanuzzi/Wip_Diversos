@@ -264,11 +264,11 @@ export const ClientAnalytics = () => {
                   </pre>
                 )}
               </li>
-                {sinalOnu && 
+                
               <button onClick={() => {
                 fetchSinal(pppoe);
               }} className="bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all">Testar Onu Novamente</button>
-              }
+              
               <li>
                 3. PPPOE?:{" "}
                 <span className="text-green-600 font-semibold">

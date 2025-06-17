@@ -103,10 +103,10 @@ class ClientAnalytics {
         timeout: 10000,
         sendTimeout: 200,
         debug: true,
-        shellPrompt: /Admin[#>]\s*$/, // Prompt correto após login
+        shellPrompt: /onu[#>]\s*$/,
         stripShellPrompt: true,
         negotiationMandatory: false,
-        disableLogon: true, // impede tentativa automática de login
+        disableLogon: true,
       };
 
       await conn.connect(params);
