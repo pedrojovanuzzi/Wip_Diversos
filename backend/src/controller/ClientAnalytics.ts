@@ -47,7 +47,7 @@ class ClientAnalytics {
       res.status(200).json({ user: User, suspensao: suspensao });
       return;
     } catch (error) {
-      (error);
+      error;
     }
   };
 
@@ -431,8 +431,6 @@ class ClientAnalytics {
           }
         }
 
-        
-
         if (!statusFragment || statusFragment.trim() === "") {
           testes.fr = "Sem Fragmentação";
         } else {
@@ -443,10 +441,9 @@ class ClientAnalytics {
 
         let comandoBuffer = "";
 
-        if(this.versao <= 6){
+        if (this.versao <= 6) {
           comandoBuffer = `ping address=${ipCliente} interval=0.01 size=60000 count=500`;
-        }
-        else if(this.versao >= 7){
+        } else if (this.versao >= 7) {
           comandoBuffer = `/tool ping ${ipCliente} size=65535 interval=0.01 count=500`;
         }
 
