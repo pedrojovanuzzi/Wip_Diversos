@@ -147,16 +147,15 @@ class ClientAnalytics {
         return;
       }
 
-      await conn.send(
-        `show optic_module slot ${User?.porta_olt?.substring(
-          0,
-          2
-        )} pon ${User?.porta_olt?.substring(2, 4)} onu ${this.onuId}`
-      );
+      const optic = await conn.exec(
+  `show optic_module slot ${slot} pon ${pon} onu ${onuId}`,
+  { timeout: 10000 }
+);
+
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      const output = buffer.split("Admin\\onu#")[0].trim();
+      const output = optic.split("Admin\\onu#")[0].trim();
 
       if (/onu#\s*$/i.test(output)) {
         await conn.end();
