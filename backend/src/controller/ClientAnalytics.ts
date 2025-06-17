@@ -385,6 +385,26 @@ class ClientAnalytics {
         }
 
         this.versao = versao;
+        this.versao = parseInt(this.versao.split(".")[0]);
+
+                let conectado = false;
+
+        const conectadoComand = `/ppp active print where address="${ipCliente}"`;
+
+        const conectadoResposta = await this.executarSSH(
+          ipDoServidor,
+          conectadoComand
+        );
+
+        if (this.versao >= 7) {
+          if (conectadoResposta.includes(ipCliente)) {
+            conectado = true;
+          }
+        } else if (this.versao <= 6) {
+          if (conectadoResposta.includes(ipCliente)) {
+            conectado = true;
+          }
+        }
 
         //console.log(versao);
 
@@ -437,7 +457,7 @@ class ClientAnalytics {
           testes.fr = statusFragment;
         }
 
-        this.versao = parseInt(this.versao.split(".")[0]);
+        
 
         let comandoBuffer = "";
 
@@ -481,12 +501,14 @@ class ClientAnalytics {
 
         testes.velocidade = `⬇️ ${rx} / ⬆️ ${tx}`;
 
+
         res.status(200).json({
           tests: testes,
+          conectado: conectado,
         });
         return;
       } else {
-        res.json({ tests: testes });
+        res.json({ tests: testes, conectado: false });
         return;
       }
     } catch (error) {

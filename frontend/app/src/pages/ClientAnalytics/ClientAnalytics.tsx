@@ -51,7 +51,7 @@ export const ClientAnalytics = () => {
     tmp: number;
   };
 
-  const [pppoe, setPppoe] = useState("");
+  const [pppoe, setPppoe] = useState<string>("");
   const [clientinfo, setClientInfo] = useState<Cliente>();
   const [desconexoes, setDesconexoes] = useState<Desconexoes[]>([]);
   const [conectado, setConectado] = useState(false);
@@ -66,11 +66,6 @@ export const ClientAnalytics = () => {
   const userToken = useTypedSelector((state: RootState) => state.auth.user);
   const token = userToken.token;
 
-  useEffect(() => {
-    const temConexaoAtiva = desconexoes?.some((d) => !d.acctstoptime);
-    setConectado(temConexaoAtiva);
-  }, [desconexoes]);
-
   const fetchClientInfo = async (pppoe: string) => {
     try {
       const response = await axios.post(
@@ -84,6 +79,7 @@ export const ClientAnalytics = () => {
         }
       );
       if (response.status === 200) {
+        setClientInfo(response.data.user);
         setClientInfo(response.data.user);
         setSuspenso(response.data.suspensao);
         console.log("Client Info:", response.data);
@@ -168,6 +164,7 @@ export const ClientAnalytics = () => {
       );
       if (response.status === 200) {
         setTestes(response.data.tests);
+        setConectado(response.data.conectado);
         console.log("Testes Info:", response.data.tests);
       }
     } catch (error) {
@@ -193,7 +190,7 @@ export const ClientAnalytics = () => {
         setColorOnu(response.data.color);
         console.log("respostaTelnet Info:", response.data.respostaTelnet);
       }
-    } catch (error : any) {
+    } catch (error: any) {
       if (error.response) {
         setSinalOnu(
           error.response.data?.respostaTelnet || "Erro ao consultar ONU"
@@ -230,9 +227,10 @@ export const ClientAnalytics = () => {
 
         {clientinfo && (
           <div className="bg-white shadow-md m-3 p-4 w-full text-left max-w-2xl">
-            <h2 className="font-semibold mb-2">Analise detalhada:</h2>
-            <ul className="space-y-1">
-              <li>
+            <div className="mt-5">
+              <h2 className="font-semibold mb-2">Analise detalhada:</h2>
+              <ul className="space-y-1">
+              <li className="mt-5">
                 1. Cliente em Suspensão?:{" "}
                 <span className="text-green-600 font-semibold">
                   {!suspenso && <>NÃO</>}
@@ -241,10 +239,56 @@ export const ClientAnalytics = () => {
                   {suspenso && <>SIM</>}
                 </span>
               </li>
-              <li className="flex">
-                2. Dados ONU:{""}
-                <br />
+              <li className="mt-5">
                 {!sinalOnu ? (
+                  <div className="flex">
+                  2. Dados ONU:{""}
+                    <svg
+                      className="animate-spin h-5 w-5 ml-5 text-gray-500"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8z"
+                      />
+                    </svg>
+                  </div>
+                ) : (
+                  <>
+                  <div>
+                    2. Dados ONU:{""}
+                  </div>
+                  <pre
+                    className={`text-left text-sm ml-3 font-mono whitespace-pre text-${corOnu}-500`}
+                  >
+                    {sinalOnu}
+                  </pre>
+                  </>
+                )}
+              </li>
+
+              <button
+                onClick={() => {
+                  fetchSinal(pppoe);
+                }}
+                className="bg-red-700 text-white mt-5 px-6 py-2 rounded hover:bg-red-400 transition-all"
+              >
+                Testar Onu Novamente
+              </button>
+
+              <li className="flex mt-5">
+                3. Conectado?:{" "}
+                {!conectado ? (
                   <>
                     <svg
                       className="animate-spin h-5 w-5 ml-5 text-gray-500"
@@ -270,30 +314,12 @@ export const ClientAnalytics = () => {
                   <pre
                     className={`text-left text-sm ml-3 font-mono whitespace-pre text-${corOnu}-500`}
                   >
-                    {sinalOnu}
+                    UP
                   </pre>
                 )}
               </li>
-
-              <button
-                onClick={() => {
-                  fetchSinal(pppoe);
-                }}
-                className="bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all"
-              >
-                Testar Onu Novamente
-              </button>
-
-              <li>
-                3. PPPOE?:{" "}
-                <span className="text-green-600 font-semibold">
-                  {conectado && <>UP</>}
-                </span>
-                <span className="text-red-600 font-semibold">
-                  {!conectado && <>DOWN</>}
-                </span>
-              </li>
             </ul>
+            </div>
 
             <h3 className="mt-6 mb-2 font-semibold">Relatorio</h3>
             <div className="overflow-x-auto">
