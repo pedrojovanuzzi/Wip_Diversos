@@ -12,6 +12,7 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
+import { ErrorMessage } from "./components/ErrorMessage";
 
 function formatarBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) {
@@ -59,7 +60,6 @@ export const ClientAnalytics = () => {
   const [testes, setTestes] = useState<Testes>();
   const [tempoReal, setTempoReal] = useState<TempoReal[]>([]);
   const [sinalOnu, setSinalOnu] = useState<null>(null);
-  const [corOnu, setColorOnu] = useState<any>(null);
 
   // Spinner reutilizável
   const Spinner: React.FC<{ text?: string }> = ({ text }) => (
@@ -193,10 +193,8 @@ export const ClientAnalytics = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setSinalOnu(response.data.respostaTelnet);
-      setColorOnu(response.data.color);
     } catch (e: any) {
       setErrorSinal("Erro ao consultar ONU");
-      setColorOnu(e.response?.data.color);
     } finally {
       setLoadingSinal(false);
     }
@@ -241,21 +239,24 @@ export const ClientAnalytics = () => {
                   </span>
                 </li>
                 <li className="mt-5">
-                  {loadingSinal ? (
-                    <>
-                      <div>2. Dados ONU:{""}</div>
-                      <Spinner />
-                    </>
-                  ) : (
-                    <>
-                      <div>2. Dados ONU:{""}</div>
+                  <li className="mt-5">
+                    <div>2. Dados ONU:</div>
+
+                    {loadingSinal ? (
+                      // 1. enquanto carrega
+                      <Spinner text="Carregando ONU..." />
+                    ) : errorSinal ? (
+                      // 2. se houve erro
+                      <ErrorMessage message={errorSinal} />
+                    ) : (
+                      // 3. quando tiver o resultado
                       <pre
-                        className={`text-left text-sm ml-3 font-mono whitespace-pre text-${corOnu}-500`}
+                        className={`text-left text-sm ml-3 font-mono whitespace-pre text-green-500`}
                       >
                         {sinalOnu}
                       </pre>
-                    </>
-                  )}
+                    )}
+                  </li>
                 </li>
 
                 <button
@@ -273,7 +274,7 @@ export const ClientAnalytics = () => {
                     <Spinner />
                   ) : (
                     <pre
-                      className={`text-left text-sm ml-3 font-mono whitespace-pre text-${corOnu}-500`}
+                      className={`text-left text-sm ml-3 font-mono whitespace-pre text-green-500`}
                     >
                       UP
                     </pre>

@@ -141,7 +141,7 @@ class ClientAnalytics {
 
       if (!this.onuId || !slot || !pon) {
         await conn.end();
-        res.status(200).json({ respostaTelnet: "Sem Onu", color: "red" });
+        res.status(200).json({ respostaTelnet: "Sem Onu"});
         return;
       }
 
@@ -156,18 +156,18 @@ class ClientAnalytics {
 
       if (/onu#\s*$/i.test(output)) {
         await conn.end();
-        res.status(200).json({ respostaTelnet: "ONU APAGADA", color: "red" });
+        res.status(500).json({ respostaTelnet: "ONU APAGADA"});
         return;
       }
 
       ////console.log(output);
 
       if (!this.onuId || !output) {
-        res.status(200).json({ respostaTelnet: "Sem Onu", color: "red" });
+        res.status(500).json({ respostaTelnet: "Sem Onu"});
         return;
       }
 
-      res.status(200).json({ respostaTelnet: output, color: "green" });
+      res.status(200).json({ respostaTelnet: output});
       await conn.end();
     } catch (error) {
       console.error("❌ Erro Telnet:", error);
@@ -507,10 +507,7 @@ class ClientAnalytics {
           conectado: conectado,
         });
         return;
-      } else {
-        res.json({ tests: testes, conectado: false });
-        return;
-      }
+        } 
     } catch (error) {
       console.error("Erro geral:", error);
       res.status(500).json({ erro: "Erro interno." });
