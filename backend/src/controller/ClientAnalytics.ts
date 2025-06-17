@@ -103,7 +103,7 @@ class ClientAnalytics {
         timeout: 10000,
         sendTimeout: 200,
         debug: true,
-        shellPrompt: /onu[#>]\s*$/,
+        shellPrompt: /Admin\\onu#\s*$/,
         stripShellPrompt: true,
         negotiationMandatory: false,
         disableLogon: true,
@@ -139,7 +139,7 @@ class ClientAnalytics {
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      await conn.send("\x03");
+      
 
       if (!this.onuId || !slot || !pon) {
         await conn.end();
@@ -166,7 +166,7 @@ class ClientAnalytics {
 
       console.log(output);
 
-      await conn.end();
+      
 
       if(!this.onuId || !output){
         res.status(200).json({ respostaTelnet: "Sem Onu", color: "red" });
@@ -174,10 +174,11 @@ class ClientAnalytics {
       }
 
       res.status(200).json({ respostaTelnet: output, color: "green" });
+      await conn.end();
     } catch (error) {
       console.error("❌ Erro Telnet:", error);
       res.status(500).json({
-        erro: "Falha ao executar comando Telnet",
+        respostaTelnet: "Falha ao executar comando Telnet", color: "red",
         detalhes: String(error),
       });
     }
@@ -278,7 +279,8 @@ class ClientAnalytics {
               encontrou = true;
               this.onuId = id;
               conn.removeListener("data", onData);
-              return resolve(id);
+              conn.send("\x03");
+              return resolve(this.onuId);
             }
           }
 

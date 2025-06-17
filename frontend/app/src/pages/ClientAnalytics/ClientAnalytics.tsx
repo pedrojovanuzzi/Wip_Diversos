@@ -59,7 +59,7 @@ export const ClientAnalytics = () => {
   const [testes, setTestes] = useState<Testes>();
   const [tempoReal, setTempoReal] = useState<TempoReal[]>([]);
   const [sinalOnu, setSinalOnu] = useState<null>(null);
-  const [corOnu, setColorOnu] = useState<null>(null);
+  const [corOnu, setColorOnu] = useState<any>(null);
 
   //Redux
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
@@ -190,8 +190,13 @@ export const ClientAnalytics = () => {
         setColorOnu(response.data.color);
         console.log("respostaTelnet Info:", response.data.respostaTelnet);
       }
-    } catch (error) {
-      console.log("Error fetching conversations:", error);
+    } catch (error : any) {
+      if (error.response) {
+        setSinalOnu(
+          error.response.data?.respostaTelnet || "Erro ao consultar ONU"
+        );
+        setColorOnu(error.response.data.color);
+      }
     }
   };
 
@@ -259,16 +264,23 @@ export const ClientAnalytics = () => {
                     </svg>
                   </>
                 ) : (
-                  <pre className={`text-left text-sm ml-3 font-mono whitespace-pre text-${corOnu}-500`}>
+                  <pre
+                    className={`text-left text-sm ml-3 font-mono whitespace-pre text-${corOnu}-500`}
+                  >
                     {sinalOnu}
                   </pre>
                 )}
               </li>
-                
-              <button onClick={() => {
-                fetchSinal(pppoe);
-              }} className="bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all">Testar Onu Novamente</button>
-              
+
+              <button
+                onClick={() => {
+                  fetchSinal(pppoe);
+                }}
+                className="bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all"
+              >
+                Testar Onu Novamente
+              </button>
+
               <li>
                 3. PPPOE?:{" "}
                 <span className="text-green-600 font-semibold">
@@ -449,11 +461,16 @@ export const ClientAnalytics = () => {
                   </span>
                 )}
               </p>
-              {testes && 
-              <button onClick={() => {
-                fetchMikrotik(pppoe);
-              }} className="bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all">Realizar o Teste Novamente</button>
-              }
+              {testes && (
+                <button
+                  onClick={() => {
+                    fetchMikrotik(pppoe);
+                  }}
+                  className="bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all"
+                >
+                  Realizar o Teste Novamente
+                </button>
+              )}
             </div>
 
             <div className="mt-6 w-full max-w-xl">
