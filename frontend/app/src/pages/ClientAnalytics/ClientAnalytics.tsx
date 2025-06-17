@@ -445,6 +445,11 @@ export const ClientAnalytics = () => {
                   </span>
                 )}
               </p>
+              {testes && 
+              <button onClick={() => {
+                fetchMikrotik(pppoe);
+              }} className="bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all">Realizar o Teste Novamente</button>
+              }
             </div>
 
             <div className="mt-6 w-full max-w-xl">
