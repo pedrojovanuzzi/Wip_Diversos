@@ -101,142 +101,104 @@ export const ClientAnalytics = () => {
   const token = userToken.token;
 
   const fetchClientInfo = async (pppoe: string) => {
+    setErrorInfo(null);
     setLoadingInfo(true);
     try {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/info",
         { pppoe },
         {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
-      if (response.status === 200) {
-        setClientInfo(response.data.user);
-        setClientInfo(response.data.user);
-        setSuspenso(response.data.suspensao);
-        setLoadingInfo(false);
-        console.log("Client Info:", response.data);
-
-        await fetchDesconexoes(pppoe);
-        await fetchSinal(pppoe);
-
-        if (!conectado) {
-          await fetchMikrotik(pppoe);
-        }
-      }
-    } catch (error) {
-      console.log("Error fetching conversations:", error);
+      setClientInfo(response.data.user);
+      setSuspenso(response.data.suspensao);
+      await fetchDesconexoes(pppoe);
+      await fetchSinal(pppoe);
+      if (!conectado) await fetchMikrotik(pppoe);
+    } catch (e: any) {
+      setErrorInfo("Erro ao buscar informações do cliente");
+    } finally {
+      setLoadingInfo(false);
     }
   };
 
   const fetchDesconexoes = async (pppoe: string) => {
+    setErrorDescon(null);
     setLoadingDescon(true);
     setDesconexoes([]);
     try {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/Desconections",
         { pppoe },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (response.status === 200) {
-        setDesconexoes(response.data.desconexoes);
-        console.log("Client Info:", response.data.desconexoes);
-      }
-    } catch (error) {
-      console.log("Error fetching conversations:", error);
+      setDesconexoes(response.data.desconexoes);
+    } catch {
+      setErrorDescon("Erro ao buscar desconexões");
+    } finally {
+      setLoadingDescon(false);
     }
   };
 
   const fetchTempoReal = async (pppoe: string) => {
-    setLoadingTempoReal(true);
+    setErrorTempoReal(null);
     try {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/TempoReal",
         { pppoe },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (response.status === 200) {
-        setTempoReal((prev) => [...prev, response.data]);
-        console.log("TMP Info:", response.data);
-      }
-    } catch (error) {
-      console.log("Error fetching conversations:", error);
+      setTempoReal((prev) => [...prev, response.data]);
+    } catch {
+      setErrorTempoReal("Erro ao buscar consumo em tempo real");
+    } finally {
+      setLoadingTempoReal(false);
     }
   };
 
   useEffect(() => {
     if (conectado) {
-      const intervalo = setInterval(() => {
-        fetchTempoReal(pppoe);
-      }, 5000);
-
-      return () => clearInterval(intervalo); // limpa o intervalo quando desmontar ou mudar dependência
+      const intervalo = setInterval(() => fetchTempoReal(pppoe), 5000);
+      return () => clearInterval(intervalo);
     }
   }, [conectado, pppoe]);
 
   const fetchMikrotik = async (pppoe: string) => {
+    setErrorMikrotik(null);
     setLoadingMikrotik(true);
-    setTestes(undefined);
     try {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/Mikrotik",
         { pppoe },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (response.status === 200) {
-        setTestes(response.data.tests);
-        setConectado(response.data.conectado);
-        console.log("Testes Info:", response.data.tests);
-      }
-    } catch (error) {
-      console.log("Error fetching conversations:", error);
+      setTestes(response.data.tests);
+      setConectado(response.data.conectado);
+    } catch {
+      setErrorMikrotik("Erro ao executar teste Mikrotik");
+    } finally {
+      setLoadingMikrotik(false);
     }
   };
 
   const fetchSinal = async (pppoe: string) => {
+    setErrorSinal(null);
     setLoadingSinal(true);
     setSinalOnu(null);
     try {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/SinalOnu",
         { pppoe },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (response.status === 200) {
-        setSinalOnu(response.data.respostaTelnet);
-        setColorOnu(response.data.color);
-        console.log("respostaTelnet Info:", response.data.respostaTelnet);
-      }
-    } catch (error: any) {
-      if (error.response) {
-        setSinalOnu(
-          error.response.data?.respostaTelnet || "Erro ao consultar ONU"
-        );
-        setColorOnu(error.response.data.color);
-      }
+      setSinalOnu(response.data.respostaTelnet);
+      setColorOnu(response.data.color);
+    } catch (e: any) {
+      setErrorSinal("Erro ao consultar ONU");
+      setColorOnu(e.response?.data.color);
+    } finally {
+      setLoadingSinal(false);
     }
   };
 
@@ -281,8 +243,8 @@ export const ClientAnalytics = () => {
                 <li className="mt-5">
                   {loadingSinal ? (
                     <>
-                    <div>2. Dados ONU:{""}</div>
-                    <Spinner/>
+                      <div>2. Dados ONU:{""}</div>
+                      <Spinner />
                     </>
                   ) : (
                     <>
@@ -308,7 +270,7 @@ export const ClientAnalytics = () => {
                 <li className="flex mt-5">
                   3. Conectado?:{" "}
                   {loadingMikrotik ? (
-                    <Spinner/>
+                    <Spinner />
                   ) : (
                     <pre
                       className={`text-left text-sm ml-3 font-mono whitespace-pre text-${corOnu}-500`}
@@ -401,7 +363,7 @@ export const ClientAnalytics = () => {
                 {!testes?.ping ? (
                   <div className="flex">
                     <span>Ping:</span>
-                    <Spinner/>
+                    <Spinner />
                   </div>
                 ) : (
                   <div className="flex">
@@ -413,7 +375,7 @@ export const ClientAnalytics = () => {
               <p className="flex items-center gap-2">
                 Fragmentação:{" "}
                 {!testes?.fr ? (
-                  <Spinner/>
+                  <Spinner />
                 ) : testes.fr !== "Sem Fragmentação" ? (
                   <span className="text-red-500">{testes.fr}</span>
                 ) : (
@@ -424,13 +386,14 @@ export const ClientAnalytics = () => {
               <p className="flex">
                 Velocidade:{" "}
                 {!testes?.ping ? (
-                  <Spinner/>
+                  <Spinner />
                 ) : (
                   <span className="text-green-600 ml-3">
                     {testes.velocidade}
                   </span>
                 )}
               </p>
+
               {testes && (
                 <button
                   onClick={() => {
@@ -464,7 +427,7 @@ export const ClientAnalytics = () => {
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <Spinner/>
+                <Spinner />
               )}
             </div>
 
