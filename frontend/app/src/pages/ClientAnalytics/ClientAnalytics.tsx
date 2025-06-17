@@ -59,6 +59,7 @@ export const ClientAnalytics = () => {
   const [testes, setTestes] = useState<Testes>();
   const [tempoReal, setTempoReal] = useState<TempoReal[]>([]);
   const [sinalOnu, setSinalOnu] = useState<null>(null);
+  const [corOnu, setColorOnu] = useState<null>(null);
 
   //Redux
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
@@ -186,6 +187,7 @@ export const ClientAnalytics = () => {
       );
       if (response.status === 200) {
         setSinalOnu(response.data.respostaTelnet);
+        setColorOnu(response.data.color);
         console.log("respostaTelnet Info:", response.data.respostaTelnet);
       }
     } catch (error) {
@@ -257,7 +259,7 @@ export const ClientAnalytics = () => {
                     </svg>
                   </>
                 ) : (
-                  <pre className="text-left text-sm ml-3 font-mono whitespace-pre">
+                  <pre className={`text-left text-sm ml-3 font-mono whitespace-pre text-${corOnu}-500`}>
                     {sinalOnu}
                   </pre>
                 )}
