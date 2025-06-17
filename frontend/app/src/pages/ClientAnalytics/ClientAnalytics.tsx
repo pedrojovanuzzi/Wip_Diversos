@@ -61,12 +61,47 @@ export const ClientAnalytics = () => {
   const [sinalOnu, setSinalOnu] = useState<null>(null);
   const [corOnu, setColorOnu] = useState<any>(null);
 
+  // Spinner reutilizável
+  const Spinner: React.FC<{ text?: string }> = ({ text }) => (
+    <span className="flex items-center gap-2 text-gray-500">
+      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+          fill="none"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8v8z"
+        />
+      </svg>
+      {text}
+    </span>
+  );
+
+  const [loadingInfo, setLoadingInfo] = useState(false);
+  const [errorInfo, setErrorInfo] = useState<string | null>(null);
+  const [loadingDescon, setLoadingDescon] = useState(false);
+  const [errorDescon, setErrorDescon] = useState<string | null>(null);
+  const [loadingSinal, setLoadingSinal] = useState(false);
+  const [errorSinal, setErrorSinal] = useState<string | null>(null);
+  const [loadingMikrotik, setLoadingMikrotik] = useState(false);
+  const [errorMikrotik, setErrorMikrotik] = useState<string | null>(null);
+  const [loadingTempoReal, setLoadingTempoReal] = useState(true);
+  const [errorTempoReal, setErrorTempoReal] = useState<string | null>(null);
+
   //Redux
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
   const userToken = useTypedSelector((state: RootState) => state.auth.user);
   const token = userToken.token;
 
   const fetchClientInfo = async (pppoe: string) => {
+    setLoadingInfo(true);
     try {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/info",
@@ -82,6 +117,7 @@ export const ClientAnalytics = () => {
         setClientInfo(response.data.user);
         setClientInfo(response.data.user);
         setSuspenso(response.data.suspensao);
+        setLoadingInfo(false);
         console.log("Client Info:", response.data);
 
         await fetchDesconexoes(pppoe);
@@ -97,6 +133,7 @@ export const ClientAnalytics = () => {
   };
 
   const fetchDesconexoes = async (pppoe: string) => {
+    setLoadingDescon(true);
     setDesconexoes([]);
     try {
       const response = await axios.post(
@@ -119,6 +156,7 @@ export const ClientAnalytics = () => {
   };
 
   const fetchTempoReal = async (pppoe: string) => {
+    setLoadingTempoReal(true);
     try {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/TempoReal",
@@ -150,6 +188,7 @@ export const ClientAnalytics = () => {
   }, [conectado, pppoe]);
 
   const fetchMikrotik = async (pppoe: string) => {
+    setLoadingMikrotik(true);
     setTestes(undefined);
     try {
       const response = await axios.post(
@@ -173,6 +212,7 @@ export const ClientAnalytics = () => {
   };
 
   const fetchSinal = async (pppoe: string) => {
+    setLoadingSinal(true);
     setSinalOnu(null);
     try {
       const response = await axios.post(
@@ -224,101 +264,60 @@ export const ClientAnalytics = () => {
             OK
           </button>
         </div>
-
         {clientinfo && (
           <div className="bg-white shadow-md m-3 p-4 w-full text-left max-w-2xl">
             <div className="mt-5">
               <h2 className="font-semibold mb-2">Analise detalhada:</h2>
               <ul className="space-y-1">
-              <li className="mt-5">
-                1. Cliente em Suspensão?:{" "}
-                <span className="text-green-600 font-semibold">
-                  {!suspenso && <>NÃO</>}
-                </span>
-                <span className="text-red-600 font-semibold">
-                  {suspenso && <>SIM</>}
-                </span>
-              </li>
-              <li className="mt-5">
-                {!sinalOnu ? (
-                  <div className="flex">
-                  2. Dados ONU:{""}
-                    <svg
-                      className="animate-spin h-5 w-5 ml-5 text-gray-500"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8v8z"
-                      />
-                    </svg>
-                  </div>
-                ) : (
-                  <>
-                  <div>
-                    2. Dados ONU:{""}
-                  </div>
-                  <pre
-                    className={`text-left text-sm ml-3 font-mono whitespace-pre text-${corOnu}-500`}
-                  >
-                    {sinalOnu}
-                  </pre>
-                  </>
-                )}
-              </li>
+                <li className="mt-5">
+                  1. Cliente em Suspensão?:{" "}
+                  <span className="text-green-600 font-semibold">
+                    {!suspenso && <>NÃO</>}
+                  </span>
+                  <span className="text-red-600 font-semibold">
+                    {suspenso && <>SIM</>}
+                  </span>
+                </li>
+                <li className="mt-5">
+                  {loadingSinal ? (
+                    <>
+                    <div>2. Dados ONU:{""}</div>
+                    <Spinner/>
+                    </>
+                  ) : (
+                    <>
+                      <div>2. Dados ONU:{""}</div>
+                      <pre
+                        className={`text-left text-sm ml-3 font-mono whitespace-pre text-${corOnu}-500`}
+                      >
+                        {sinalOnu}
+                      </pre>
+                    </>
+                  )}
+                </li>
 
-              <button
-                onClick={() => {
-                  fetchSinal(pppoe);
-                }}
-                className="bg-red-700 text-white mt-5 px-6 py-2 rounded hover:bg-red-400 transition-all"
-              >
-                Testar Onu Novamente
-              </button>
+                <button
+                  onClick={() => {
+                    fetchSinal(pppoe);
+                  }}
+                  className="bg-red-700 text-white mt-5 px-6 py-2 rounded hover:bg-red-400 transition-all"
+                >
+                  Testar Onu Novamente
+                </button>
 
-              <li className="flex mt-5">
-                3. Conectado?:{" "}
-                {!conectado ? (
-                  <>
-                    <svg
-                      className="animate-spin h-5 w-5 ml-5 text-gray-500"
-                      viewBox="0 0 24 24"
+                <li className="flex mt-5">
+                  3. Conectado?:{" "}
+                  {loadingMikrotik ? (
+                    <Spinner/>
+                  ) : (
+                    <pre
+                      className={`text-left text-sm ml-3 font-mono whitespace-pre text-${corOnu}-500`}
                     >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8v8z"
-                      />
-                    </svg>
-                  </>
-                ) : (
-                  <pre
-                    className={`text-left text-sm ml-3 font-mono whitespace-pre text-${corOnu}-500`}
-                  >
-                    UP
-                  </pre>
-                )}
-              </li>
-            </ul>
+                      UP
+                    </pre>
+                  )}
+                </li>
+              </ul>
             </div>
 
             <h3 className="mt-6 mb-2 font-semibold">Relatorio</h3>
@@ -402,25 +401,7 @@ export const ClientAnalytics = () => {
                 {!testes?.ping ? (
                   <div className="flex">
                     <span>Ping:</span>
-                    <svg
-                      className="animate-spin h-5 w-5 ml-5 text-gray-500"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8v8z"
-                      />
-                    </svg>
+                    <Spinner/>
                   </div>
                 ) : (
                   <div className="flex">
@@ -432,27 +413,7 @@ export const ClientAnalytics = () => {
               <p className="flex items-center gap-2">
                 Fragmentação:{" "}
                 {!testes?.fr ? (
-                  <>
-                    <svg
-                      className="animate-spin h-5 w-5 text-gray-500"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8v8z"
-                      />
-                    </svg>
-                  </>
+                  <Spinner/>
                 ) : testes.fr !== "Sem Fragmentação" ? (
                   <span className="text-red-500">{testes.fr}</span>
                 ) : (
@@ -463,27 +424,7 @@ export const ClientAnalytics = () => {
               <p className="flex">
                 Velocidade:{" "}
                 {!testes?.ping ? (
-                  <div className="flex">
-                    <svg
-                      className="animate-spin h-5 w-5 ml-5 text-gray-500"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8v8z"
-                      />
-                    </svg>
-                  </div>
+                  <Spinner/>
                 ) : (
                   <span className="text-green-600 ml-3">
                     {testes.velocidade}
@@ -523,27 +464,7 @@ export const ClientAnalytics = () => {
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex">
-                  <svg
-                    className="animate-spin h-5 w-5 ml-5 text-gray-500"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v8z"
-                    />
-                  </svg>
-                </div>
+                <Spinner/>
               )}
             </div>
 
