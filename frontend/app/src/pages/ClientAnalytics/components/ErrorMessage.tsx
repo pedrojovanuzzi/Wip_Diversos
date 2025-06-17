@@ -3,6 +3,6 @@ import React from 'react'
 export const ErrorMessage = ({ message }: { message: string }) => {
   
   return (
-    <div>{message}</div>
+    <div className='text-red-500'>{message}</div>
   )
 }

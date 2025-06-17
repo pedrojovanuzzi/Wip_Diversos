@@ -141,7 +141,7 @@ class ClientAnalytics {
 
       if (!this.onuId || !slot || !pon) {
         await conn.end();
-        res.status(200).json({ respostaTelnet: "Sem Onu"});
+        res.status(500).json({ respostaTelnet: "Sem Onu"});
         return;
       }
 
