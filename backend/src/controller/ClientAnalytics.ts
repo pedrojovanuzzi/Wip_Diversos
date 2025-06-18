@@ -24,6 +24,11 @@ class ClientAnalytics {
         where: { login: pppoe, cli_ativado: "s" },
       });
 
+
+      if(User.length < 1){
+        res.status(500).json({error: "Cliente não existe, ou está desativado"});
+      }
+
       const FaturasRepository = MkauthSource.getRepository(Faturas);
 
       const hoje = new Date();
