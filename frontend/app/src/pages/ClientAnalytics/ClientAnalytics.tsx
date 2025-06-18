@@ -35,7 +35,7 @@ export const ClientAnalytics = () => {
   };
 
   type Desconexoes = {
-    username: string,
+    username: string;
     acctstarttime: string;
     acctstoptime: string;
     acctinputoctets: number;
@@ -178,7 +178,7 @@ export const ClientAnalytics = () => {
   useEffect(() => {
     setLoadingTempoReal(true);
     if (testes && !errorMikrotik) {
-      const intervalo = setInterval(() => fetchTempoReal(pppoe), 2000);
+      const intervalo = setInterval(() => fetchTempoReal(pppoe), 5000);
       return () => clearInterval(intervalo);
     } else if (errorMikrotik) {
       setErrorTempoReal("Erro ao buscar dados do Mikrotik");
@@ -251,10 +251,10 @@ export const ClientAnalytics = () => {
         </div>
         {clientinfo && (
           <div className="bg-white shadow-md m-3 p-4 w-full text-left max-w-2xl">
-            <div className="mt-5">
+            <div className="my-5">
               <h2 className="font-semibold mb-2">Analise detalhada:</h2>
               <ul className="space-y-1">
-                <li className="mt-5">
+                <li className="my-5">
                   1. Cliente em Suspensão?:{" "}
                   <span className="text-green-600 font-semibold">
                     {!suspenso && <>NÃO</>}
@@ -263,8 +263,8 @@ export const ClientAnalytics = () => {
                     {suspenso && <>SIM</>}
                   </span>
                 </li>
-                <li className="mt-5">
-                  <li className="mt-5">
+                <li className="my-5">
+                  <li className="my-5">
                     <div>2. Dados ONU:</div>
 
                     {loadingSinal ? (
@@ -276,7 +276,7 @@ export const ClientAnalytics = () => {
                     ) : (
                       // 3. quando tiver o resultado
                       <pre
-                        className={`text-left text-sm ml-3 font-mono whitespace-pre text-green-500`}
+                        className={`text-left text-sm my-5 ml-3 font-mono whitespace-pre text-green-500`}
                       >
                         {sinalOnu}
                       </pre>
@@ -284,19 +284,16 @@ export const ClientAnalytics = () => {
                   </li>
                 </li>
 
-                {!loadingSinal ||
-                  (errorSinal && (
-                    <button
-                      onClick={() => {
-                        fetchSinal(pppoe);
-                      }}
-                      className="bg-red-700 text-white mt-5 px-6 py-2 rounded hover:bg-red-400 transition-all"
-                    >
-                      Testar Onu Novamente
-                    </button>
-                  ))}
-
-                <li className="flex mt-5">
+                {!loadingSinal && (
+                  <button
+                    onClick={() => fetchSinal(pppoe)}
+                    className="bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all"
+                  >
+                    Testar Onu Novamente
+                  </button>
+                )}
+                <div className="p-5 mt-5"></div>
+                <li className="flex">
                   3. Conectado?:{" "}
                   {loadingConectado ? (
                     <Spinner />
