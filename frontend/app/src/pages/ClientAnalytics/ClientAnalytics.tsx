@@ -55,7 +55,7 @@ export const ClientAnalytics = () => {
   const [pppoe, setPppoe] = useState<string>("");
   const [clientinfo, setClientInfo] = useState<Cliente>();
   const [desconexoes, setDesconexoes] = useState<Desconexoes[]>([]);
-  const [conectado, setConectado] = useState(false);
+  const [conectado, setConectado] = useState<string | boolean>("Não Conectado");
   const [suspenso, setSuspenso] = useState(false);
   const [testes, setTestes] = useState<Testes>();
   const [tempoReal, setTempoReal] = useState<TempoReal[]>([]);
@@ -63,7 +63,7 @@ export const ClientAnalytics = () => {
 
   // Spinner reutilizável
   const Spinner: React.FC<{ text?: string }> = ({ text }) => (
-    <span className="flex items-center gap-2 text-gray-500">
+    <span className="flex ml-5 items-center gap-2 text-gray-500">
       <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
         <circle
           className="opacity-25"
@@ -115,7 +115,7 @@ export const ClientAnalytics = () => {
       setSuspenso(response.data.suspensao);
       await fetchDesconexoes(pppoe);
       await fetchSinal(pppoe);
-      if (!conectado) await fetchMikrotik(pppoe);
+      await fetchMikrotik(pppoe);
     } catch (e: any) {
       setErrorInfo("Erro ao buscar informações do cliente");
     } finally {
@@ -259,26 +259,37 @@ export const ClientAnalytics = () => {
                   </li>
                 </li>
 
-                <button
-                  onClick={() => {
-                    fetchSinal(pppoe);
-                  }}
-                  className="bg-red-700 text-white mt-5 px-6 py-2 rounded hover:bg-red-400 transition-all"
-                >
-                  Testar Onu Novamente
-                </button>
+                {!loadingSinal ||
+                  (errorSinal && (
+                    <button
+                      onClick={() => {
+                        fetchSinal(pppoe);
+                      }}
+                      className="bg-red-700 text-white mt-5 px-6 py-2 rounded hover:bg-red-400 transition-all"
+                    >
+                      Testar Onu Novamente
+                    </button>
+                  ))}
 
                 <li className="flex mt-5">
                   3. Conectado?:{" "}
                   {loadingMikrotik ? (
                     <Spinner />
-                  ) : (
+                  ) : errorMikrotik ? (
+                    <ErrorMessage message={errorMikrotik} />
+                  ) : conectado === true ? (
                     <pre
                       className={`text-left text-sm ml-3 font-mono whitespace-pre text-green-500`}
                     >
                       UP
                     </pre>
-                  )}
+                  ) : conectado === false ? (
+                    <pre
+                      className={`text-left text-sm ml-3 font-mono whitespace-pre text-red-500`}
+                    >
+                      DOWN
+                    </pre>
+                  ) : null}
                 </li>
               </ul>
             </div>
@@ -360,25 +371,24 @@ export const ClientAnalytics = () => {
             </div>
 
             <div className="mt-6 space-y-2">
-              <p>
-                {!testes?.ping ? (
-                  <div className="flex">
-                    <span>Ping:</span>
-                    <Spinner />
-                  </div>
+              <p className="flex">
+                <span>Ping:</span>
+                {loadingMikrotik ? (
+                  <Spinner />
+                ) : errorMikrotik ? (
+                  <ErrorMessage message={errorMikrotik} />
                 ) : (
-                  <div className="flex">
-                    <p>Ping:</p>
-                    <span className="text-green-600 ml-3">{testes.ping}</span>
-                  </div>
+                  <span className="text-green-600 ml-3">{testes?.ping}</span>
                 )}
               </p>
               <p className="flex items-center gap-2">
                 Fragmentação:{" "}
-                {!testes?.fr ? (
+                {loadingMikrotik ? (
                   <Spinner />
-                ) : testes.fr !== "Sem Fragmentação" ? (
-                  <span className="text-red-500">{testes.fr}</span>
+                ) : errorMikrotik ? (
+                  <ErrorMessage message={errorMikrotik} />
+                ) : testes?.fr !== "Sem Fragmentação" ? (
+                  <span className="text-red-500">{testes?.fr}</span>
                 ) : (
                   <span className="text-green-600">Sem Fragmentação</span>
                 )}
@@ -386,11 +396,13 @@ export const ClientAnalytics = () => {
 
               <p className="flex">
                 Velocidade:{" "}
-                {!testes?.ping ? (
+                {loadingMikrotik ? (
                   <Spinner />
+                ) : errorMikrotik ? (
+                  <ErrorMessage message={errorMikrotik} />
                 ) : (
                   <span className="text-green-600 ml-3">
-                    {testes.velocidade}
+                    {testes?.velocidade}
                   </span>
                 )}
               </p>
@@ -409,7 +421,11 @@ export const ClientAnalytics = () => {
 
             <div className="mt-6 w-full max-w-xl">
               <h4 className="font-semibold mb-2">Consumo em Tempo Real:</h4>
-              {tempoReal.length > 0 ? (
+              {loadingTempoReal ? (
+                <Spinner />
+              ) : errorTempoReal ? (
+                <ErrorMessage message={errorTempoReal} />
+              ) : tempoReal.length > 0 && !errorTempoReal ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={tempoReal}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -427,9 +443,7 @@ export const ClientAnalytics = () => {
                     />
                   </LineChart>
                 </ResponsiveContainer>
-              ) : (
-                <Spinner />
-              )}
+              ) : null}
             </div>
 
             <div className="mt-6 flex justify-center">

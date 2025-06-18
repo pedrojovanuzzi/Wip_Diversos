@@ -141,7 +141,7 @@ class ClientAnalytics {
 
       if (!this.onuId || !slot || !pon) {
         await conn.end();
-        res.status(500).json({ respostaTelnet: "Sem Onu"});
+        res.status(500).json({ respostaTelnet: "Sem Onu" });
         return;
       }
 
@@ -156,24 +156,23 @@ class ClientAnalytics {
 
       if (/onu#\s*$/i.test(output)) {
         await conn.end();
-        res.status(500).json({ respostaTelnet: "ONU APAGADA"});
+        res.status(500).json({ respostaTelnet: "ONU APAGADA" });
         return;
       }
 
       ////console.log(output);
 
       if (!this.onuId || !output) {
-        res.status(500).json({ respostaTelnet: "Sem Onu"});
+        res.status(500).json({ respostaTelnet: "Sem Onu" });
         return;
       }
 
-      res.status(200).json({ respostaTelnet: output});
+      res.status(200).json({ respostaTelnet: output });
       await conn.end();
     } catch (error) {
       console.error("❌ Erro Telnet:", error);
       res.status(500).json({
         respostaTelnet: "Falha ao executar comando Telnet",
-        color: "red",
         detalhes: String(error),
       });
     }
@@ -210,11 +209,11 @@ class ClientAnalytics {
                   resolve(output);
                 })
                 .on("data", (data: Buffer) => {
-                  // //console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
+                  console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
                   output += data.toString();
                 })
                 .stderr.on("data", (data: Buffer) => {
-                  // console.error(`[DEBUG] STDERR (${host}):\n${data.toString()}`);
+                  console.error(`[DEBUG] STDERR (${host}):\n${data.toString()}`);
                   output += data.toString();
                 });
             });
@@ -343,12 +342,14 @@ class ClientAnalytics {
             resposta
           );
 
-          resultados.push({
+          
+            resultados.push({
             servidor: servidor.nome,
             encontrado: ativo,
             host: servidor.host,
             resposta,
           });
+          
 
           if (ativo) break;
         } catch (err: any) {
@@ -359,7 +360,12 @@ class ClientAnalytics {
         }
       }
 
+
       const primeiro = resultados.find((r) => r.encontrado);
+
+      if(!primeiro || !primeiro.host){
+        res.status(500);
+      }
 
       if (primeiro && primeiro.host) {
         this.clientIp = ipCliente;
@@ -387,7 +393,7 @@ class ClientAnalytics {
         this.versao = versao;
         this.versao = parseInt(this.versao.split(".")[0]);
 
-                let conectado = false;
+        let conectado = false;
 
         const conectadoComand = `/ppp active print where address="${ipCliente}"`;
 
@@ -457,8 +463,6 @@ class ClientAnalytics {
           testes.fr = statusFragment;
         }
 
-        
-
         let comandoBuffer = "";
 
         if (this.versao <= 6) {
@@ -501,13 +505,12 @@ class ClientAnalytics {
 
         testes.velocidade = `⬇️ ${rx} / ⬆️ ${tx}`;
 
-
         res.status(200).json({
           tests: testes,
           conectado: conectado,
         });
         return;
-        } 
+      }
     } catch (error) {
       console.error("Erro geral:", error);
       res.status(500).json({ erro: "Erro interno." });
@@ -549,12 +552,18 @@ class ClientAnalytics {
 
         tempoReal.tmp = this.parseBitsPerSecond(tx);
 
+        console.log(tempoReal);
+
+        if (!this.serverIp) {
+          res.status(204);
+          return;
+        } else if (!tempoReal || !tempoReal.tmp) {
+          res.status(500);
+          return;
+        }
+
         // (respostaVelocidade);
         res.status(200).json({ tmp: tempoReal.tmp });
-      }
-      if (!this.serverIp) {
-        res.status(204);
-        return;
       }
     } catch (error) {
       console.error("Erro geral:", error);
