@@ -211,12 +211,12 @@ class ClientAnalytics {
                   resolve(output);
                 })
                 .on("data", (data: Buffer) => {
-                  console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
+                  // console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
                   output += data.toString();
                 })
                 .stderr.on("data", (data: Buffer) => {
                   console.error(
-                    `[DEBUG] STDERR (${host}):\n${data.toString()}`
+                    // `[DEBUG] STDERR (${host}):\n${data.toString()}`
                   );
                   output += data.toString();
                 });
@@ -507,7 +507,7 @@ class ClientAnalytics {
           }
         }
 
-        testes.velocidade = `⬇️ ${rx} / ⬆️ ${tx}`;
+        testes.velocidade = `⬇️ ${tx} / ⬆️ ${rx}`;
 
         res.status(200).json({
           tests: testes,
@@ -525,7 +525,8 @@ class ClientAnalytics {
     try {
       const { pppoe } = req.body;
       const tempoReal = {
-        tmp: 0,
+        tmp_tx: 0,
+        tmp_rx: 0,
       };
 
       if (this.serverIp) {
@@ -554,13 +555,14 @@ class ClientAnalytics {
           }
         }
 
-        tempoReal.tmp = this.parseBitsPerSecond(tx);
+        tempoReal.tmp_tx = this.parseBitsPerSecond(tx);
+        tempoReal.tmp_rx = this.parseBitsPerSecond(rx);
 
-        if (typeof tempoReal.tmp !== "number") {
+        if (typeof tempoReal.tmp_tx !== "number" && typeof tempoReal.tmp_rx !== "number") {
           res.status(500).json();
         }
 
-        res.status(200).json({ tmp: tempoReal.tmp });
+        res.status(200).json({ tmp: tempoReal });
       } else {
         res.status(500).json({ erro: "Erro interno." });
       }

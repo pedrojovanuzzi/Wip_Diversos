@@ -50,7 +50,8 @@ export const ClientAnalytics = () => {
   };
 
   type TempoReal = {
-    tmp: number;
+    tmp_tx: number;
+    tmp_rx: number;
   };
 
   const [pppoe, setPppoe] = useState<string>("");
@@ -167,7 +168,8 @@ export const ClientAnalytics = () => {
         { pppoe },
         { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
       );
-      setTempoReal((prev) => [...prev, response.data]);
+      setTempoReal((prev) => [...prev, response.data.tmp]);
+      console.log(response.data.tmp);
     } catch {
       setErrorTempoReal("Erro ao buscar consumo em tempo real");
     } finally {
@@ -441,21 +443,29 @@ export const ClientAnalytics = () => {
                 <Spinner />
               ) : errorTempoReal ? (
                 <ErrorMessage message={errorTempoReal} />
-              ) : tempoReal.length > 0 && !errorTempoReal ? (
+              ) : tempoReal.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={tempoReal}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <YAxis
                       domain={[0, (dataMax: number) => Math.max(5, dataMax)]}
                     />
-                    <YAxis domain={["dataMin", "dataMax"]} />
                     <Tooltip />
                     <Line
                       type="monotone"
-                      dataKey="tmp"
-                      stroke="#10B981"
+                      dataKey="tmp_tx"
+                      stroke="#10B981" // verde
                       strokeWidth={2}
                       dot={false}
+                      name="TX"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="tmp_rx"
+                      stroke="#3B82F6" // azul
+                      strokeWidth={2}
+                      dot={false}
+                      name="RX"
                     />
                   </LineChart>
                 </ResponsiveContainer>
