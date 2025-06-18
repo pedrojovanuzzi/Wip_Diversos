@@ -178,7 +178,6 @@ export const ClientAnalytics = () => {
   };
 
   useEffect(() => {
-    setLoadingTempoReal(true);
     if (testes && !errorMikrotik) {
       const intervalo = setInterval(() => fetchTempoReal(pppoe), 5000);
       return () => clearInterval(intervalo);
