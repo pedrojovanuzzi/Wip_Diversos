@@ -92,7 +92,7 @@ class ClientAnalytics {
       // 🟡 Eventos para log no terminal
       conn.on("data", (data) => {
         buffer = data.toString();
-        ////console.log(buffer);
+        console.log(buffer);
       });
 
       let buffer = "";
@@ -154,6 +154,8 @@ class ClientAnalytics {
 
       const output = optic.split("Admin\\onu#")[0].trim();
 
+      console.log(output + "outpte");
+
       if (/onu#\s*$/i.test(output)) {
         await conn.end();
         res.status(500).json({ respostaTelnet: "ONU APAGADA" });
@@ -209,11 +211,13 @@ class ClientAnalytics {
                   resolve(output);
                 })
                 .on("data", (data: Buffer) => {
-                  // console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
+                  console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
                   output += data.toString();
                 })
                 .stderr.on("data", (data: Buffer) => {
-                  // console.error(`[DEBUG] STDERR (${host}):\n${data.toString()}`);
+                  console.error(
+                    `[DEBUG] STDERR (${host}):\n${data.toString()}`
+                  );
                   output += data.toString();
                 });
             });
@@ -284,6 +288,9 @@ class ClientAnalytics {
           if (!encontrou && buffer.includes("Press any key")) {
             buffer = "";
             conn.send("\n");
+          } else if (!encontrou && buffer.includes("Admin\\onu#")) {
+            conn.removeListener("data", onData);
+            resolve("");
           }
         };
 
@@ -342,14 +349,12 @@ class ClientAnalytics {
             resposta
           );
 
-          
-            resultados.push({
+          resultados.push({
             servidor: servidor.nome,
             encontrado: ativo,
             host: servidor.host,
             resposta,
           });
-          
 
           if (ativo) break;
         } catch (err: any) {
@@ -360,11 +365,9 @@ class ClientAnalytics {
         }
       }
 
-
       const primeiro = resultados.find((r) => r.encontrado);
-      
 
-      if(!primeiro || !primeiro.host){
+      if (!primeiro || !primeiro.host) {
         res.status(500).json();
       }
 
@@ -525,7 +528,6 @@ class ClientAnalytics {
         tmp: 0,
       };
 
-
       if (this.serverIp) {
         ("TEMPO REAL");
         const comandoVelocidade = `/interface monitor-traffic <pppoe-${pppoe}> duration=5`;
@@ -552,15 +554,14 @@ class ClientAnalytics {
           }
         }
 
-        tempoReal.tmp = this.parseBitsPerSecond(tx);        
+        tempoReal.tmp = this.parseBitsPerSecond(tx);
 
-        if(typeof(tempoReal.tmp) !== "number"){
+        if (typeof tempoReal.tmp !== "number") {
           res.status(500).json();
         }
 
         res.status(200).json({ tmp: tempoReal.tmp });
-      }
-      else{
+      } else {
         res.status(500).json({ erro: "Erro interno." });
       }
     } catch (error) {

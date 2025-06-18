@@ -35,6 +35,7 @@ export const ClientAnalytics = () => {
   };
 
   type Desconexoes = {
+    username: string,
     acctstarttime: string;
     acctstoptime: string;
     acctinputoctets: number;
@@ -328,7 +329,7 @@ export const ClientAnalytics = () => {
                 <tbody className="bg-black text-gray-100 divide-y divide-gray-700">
                   {desconexoes?.map((d, i) => (
                     <tr key={i}>
-                      <td className="p-2">{pppoe}</td>
+                      <td className="p-2">{d.username}</td>
 
                       <td className="p-2">
                         {new Date(d.acctstarttime).toLocaleString("pt-BR", {
