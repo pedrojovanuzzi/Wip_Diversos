@@ -86,6 +86,8 @@ export const ClientAnalytics = () => {
 
   const [loadingInfo, setLoadingInfo] = useState(false);
   const [errorInfo, setErrorInfo] = useState<string | null>(null);
+  const [loadingConectado, setLoadingConectado] = useState(false);
+  const [errorConectado, setErrorConectado] = useState<string | null>(null);
   const [loadingDescon, setLoadingDescon] = useState(false);
   const [errorDescon, setErrorDescon] = useState<string | null>(null);
   const [loadingSinal, setLoadingSinal] = useState(false);
@@ -101,14 +103,29 @@ export const ClientAnalytics = () => {
   const token = userToken.token;
 
   const fetchClientInfo = async (pppoe: string) => {
-    setErrorInfo(null);
     setLoadingInfo(true);
+    setClientInfo(undefined);
+    setSuspenso(false);
+    setDesconexoes([]);
+    setSinalOnu(null);
+    setTempoReal([]);
+    setConectado("Sem Conexao");
+    setTestes(undefined);
+    setLoadingTempoReal(true);
+
+    setErrorConectado(null);
+    setErrorDescon(null);
+    setErrorInfo(null);
+    setErrorMikrotik(null);
+    setErrorSinal(null);
+    setErrorTempoReal(null);
+
     try {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/info",
         { pppoe },
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}`, timeout: 60000 },
         }
       );
       setClientInfo(response.data.user);
@@ -131,7 +148,7 @@ export const ClientAnalytics = () => {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/Desconections",
         { pppoe },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
       );
       setDesconexoes(response.data.desconexoes);
     } catch {
@@ -147,7 +164,7 @@ export const ClientAnalytics = () => {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/TempoReal",
         { pppoe },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
       );
       setTempoReal((prev) => [...prev, response.data]);
     } catch {
@@ -158,27 +175,34 @@ export const ClientAnalytics = () => {
   };
 
   useEffect(() => {
-    if (conectado) {
-      const intervalo = setInterval(() => fetchTempoReal(pppoe), 5000);
+    setLoadingTempoReal(true);
+    if (testes && !errorMikrotik) {
+      const intervalo = setInterval(() => fetchTempoReal(pppoe), 2000);
       return () => clearInterval(intervalo);
+    } else if (errorMikrotik) {
+      setErrorTempoReal("Erro ao buscar dados do Mikrotik");
     }
-  }, [conectado, pppoe]);
+    setLoadingTempoReal(false);
+  }, [testes, errorMikrotik]);
 
   const fetchMikrotik = async (pppoe: string) => {
     setErrorMikrotik(null);
     setLoadingMikrotik(true);
+    setLoadingConectado(true);
     try {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/Mikrotik",
         { pppoe },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
       );
       setTestes(response.data.tests);
       setConectado(response.data.conectado);
     } catch {
       setErrorMikrotik("Erro ao executar teste Mikrotik");
+      setErrorConectado("DOWN");
     } finally {
       setLoadingMikrotik(false);
+      setLoadingConectado(false);
     }
   };
 
@@ -190,7 +214,7 @@ export const ClientAnalytics = () => {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/SinalOnu",
         { pppoe },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}`, timeout: 60000 } }
       );
       setSinalOnu(response.data.respostaTelnet);
     } catch (e: any) {
@@ -273,21 +297,15 @@ export const ClientAnalytics = () => {
 
                 <li className="flex mt-5">
                   3. Conectado?:{" "}
-                  {loadingMikrotik ? (
+                  {loadingConectado ? (
                     <Spinner />
-                  ) : errorMikrotik ? (
-                    <ErrorMessage message={errorMikrotik} />
+                  ) : errorConectado ? (
+                    <ErrorMessage message={errorConectado} />
                   ) : conectado === true ? (
                     <pre
                       className={`text-left text-sm ml-3 font-mono whitespace-pre text-green-500`}
                     >
                       UP
-                    </pre>
-                  ) : conectado === false ? (
-                    <pre
-                      className={`text-left text-sm ml-3 font-mono whitespace-pre text-red-500`}
-                    >
-                      DOWN
                     </pre>
                   ) : null}
                 </li>

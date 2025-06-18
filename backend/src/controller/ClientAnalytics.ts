@@ -209,11 +209,11 @@ class ClientAnalytics {
                   resolve(output);
                 })
                 .on("data", (data: Buffer) => {
-                  console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
+                  // console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
                   output += data.toString();
                 })
                 .stderr.on("data", (data: Buffer) => {
-                  console.error(`[DEBUG] STDERR (${host}):\n${data.toString()}`);
+                  // console.error(`[DEBUG] STDERR (${host}):\n${data.toString()}`);
                   output += data.toString();
                 });
             });
@@ -362,9 +362,10 @@ class ClientAnalytics {
 
 
       const primeiro = resultados.find((r) => r.encontrado);
+      
 
       if(!primeiro || !primeiro.host){
-        res.status(500);
+        res.status(500).json();
       }
 
       if (primeiro && primeiro.host) {
@@ -524,6 +525,7 @@ class ClientAnalytics {
         tmp: 0,
       };
 
+
       if (this.serverIp) {
         ("TEMPO REAL");
         const comandoVelocidade = `/interface monitor-traffic <pppoe-${pppoe}> duration=5`;
@@ -550,20 +552,16 @@ class ClientAnalytics {
           }
         }
 
-        tempoReal.tmp = this.parseBitsPerSecond(tx);
+        tempoReal.tmp = this.parseBitsPerSecond(tx);        
 
-        console.log(tempoReal);
-
-        if (!this.serverIp) {
-          res.status(204);
-          return;
-        } else if (!tempoReal || !tempoReal.tmp) {
-          res.status(500);
-          return;
+        if(typeof(tempoReal.tmp) !== "number"){
+          res.status(500).json();
         }
 
-        // (respostaVelocidade);
         res.status(200).json({ tmp: tempoReal.tmp });
+      }
+      else{
+        res.status(500).json({ erro: "Erro interno." });
       }
     } catch (error) {
       console.error("Erro geral:", error);
