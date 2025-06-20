@@ -4,7 +4,6 @@ import Mensagens from "../entities/APIMK/Mensagens";
 import Conversations from "../entities/APIMK/Conversations";
 import Conversation_Users from "../entities/APIMK/Conversation_Users";
 import PeopleConversations from "../entities/APIMK/People_Conversations";
-import { time } from "console";
 import { In } from "typeorm";
 import axios from "axios";
 
