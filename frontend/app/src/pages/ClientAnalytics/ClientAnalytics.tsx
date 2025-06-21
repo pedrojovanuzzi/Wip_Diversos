@@ -334,7 +334,7 @@ export const ClientAnalytics = () => {
                           <>
                             <button
                               onClick={() => fetchReset(pppoe)}
-                              className="bg-blue-700 text-white px-6 py-2 rounded hover:bg-blue-400 transition-all"
+                              className="bg-blue-700 sm:mx-2 my-2 sm:my-0 text-white px-6 py-2 rounded hover:bg-blue-400 transition-all"
                             >
                               Reiniciar ONU
                             </button>
