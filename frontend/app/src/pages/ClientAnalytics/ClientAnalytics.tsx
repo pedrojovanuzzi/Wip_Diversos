@@ -98,6 +98,8 @@ export const ClientAnalytics = () => {
   const [errorMikrotik, setErrorMikrotik] = useState<string | null>(null);
   const [loadingTempoReal, setLoadingTempoReal] = useState(true);
   const [errorTempoReal, setErrorTempoReal] = useState<string | null>(null);
+  const [loadingReset, setLoadingReset] = useState(false);
+  const [errorLoading, setErrorLoading] = useState<string | null>(null);
 
   //Redux
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
@@ -111,6 +113,7 @@ export const ClientAnalytics = () => {
     setDesconexoes([]);
     setSinalOnu(null);
     setTempoReal([]);
+    setLoadingReset(false);
     setConectado("Sem Conexao");
     setTestes(undefined);
     setLoadingTempoReal(true);
@@ -121,6 +124,7 @@ export const ClientAnalytics = () => {
     setErrorMikrotik(null);
     setErrorSinal(null);
     setErrorTempoReal(null);
+    setErrorLoading(null);
 
     try {
       const response = await axios.post(
@@ -180,6 +184,25 @@ export const ClientAnalytics = () => {
       setLoadingTempoReal(false);
     }
   };
+
+  const fetchReset = async (pppoe: string) => {
+    setErrorLoading(null);
+    setLoadingReset(true);
+    try {
+      const response = await axios.post(
+        process.env.REACT_APP_URL + "/ClientAnalytics/Reset",
+        { pppoe },
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
+      );
+      setErrorLoading(response.data.message);
+    } catch (e: any) {
+      setErrorLoading(
+        e.response?.data?.error || "Erro ao resetar consumo em tempo real"
+      );
+    } finally {
+      setLoadingReset(false);
+    }
+  }
 
   useEffect(() => {
     if (testes && !errorMikrotik) {
@@ -296,12 +319,20 @@ export const ClientAnalytics = () => {
                     </li>
 
                     {!loadingSinal && (
+                      <>
                       <button
                         onClick={() => fetchSinal(pppoe)}
                         className="bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all"
                       >
                         Testar Onu Novamente
                       </button>
+                      <button
+                        onClick={() => fetchReset(pppoe)}
+                        className="bg-blue-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all"
+                      >
+                        Reiniciar Onu
+                      </button>
+                      </>
                     )}
                     <div className="p-5 mt-5"></div>
                     <li className="flex">
