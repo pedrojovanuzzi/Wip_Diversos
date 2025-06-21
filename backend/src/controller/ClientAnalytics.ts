@@ -185,6 +185,92 @@ class ClientAnalytics {
     }
   };
 
+  onuReiniciar = async (req: Request, res: Response) => {
+    try {
+      const { pppoe } = req.body;
+
+      const ClientesRepository = MkauthSource.getRepository(ClientesEntities);
+      let User = await ClientesRepository.findOne({
+        where: { login: pppoe, cli_ativado: "s" },
+        order: { id: "ASC" },
+      });
+
+      const ip = String(process.env.OLT_IP);
+      const login = String(process.env.OLT_LOGIN);
+      const password = String(process.env.OLT_PASSWORD);
+
+      const conn = new Telnet();
+
+      // 🟡 Eventos para log no terminal
+      conn.on("data", (data) => {
+        buffer = data.toString();
+        console.log(buffer);
+      });
+
+      let buffer = "";
+
+      const params = {
+        host: ip,
+        port: 23,
+        timeout: 10000,
+        sendTimeout: 200,
+        debug: true,
+        shellPrompt: /Admin\\onu#\s*$/,
+        stripShellPrompt: true,
+        negotiationMandatory: false,
+        disableLogon: true,
+      };
+
+      await conn.connect(params);
+
+      await conn.send(login);
+
+      await conn.send(password);
+
+      await conn.send("en");
+      await conn.send(password);
+      await conn.send("cd onu");
+
+      
+      const slot = User?.porta_olt?.substring(0, 2);
+      const pon = User?.porta_olt?.substring(2, 4);
+      const rawTag = User?.tags ?? "";
+      const snCliente = this.normalizeMac(rawTag.trim());
+
+      let onuId = "";
+
+      if (snCliente) {
+        ////console.log("Procurando ONU com MAC normalizado:", snCliente);
+        onuId = await this.buscarOnuIdPorMac(
+          conn,
+          `show online slot ${slot} pon ${pon}`,
+          snCliente
+        );
+      }
+
+      ////console.log(this.onuId);
+
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      if (!this.onuId || !slot || !pon) {
+        await conn.end();
+        res.status(500).json({ respostaTelnet: "Sem Onu" });
+        return;
+      }
+
+      const optic = await conn.exec(
+        `show optic_module slot ${slot} pon ${pon} onu ${onuId}`,
+        { timeout: 10000 }
+      );
+      
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Erro ao reiniciar ONU" });
+    }
+  
+  }
+
+
   executarSSH = async (host: string, comando: string): Promise<string> => {
     try {
       return new Promise((resolve, reject) => {
