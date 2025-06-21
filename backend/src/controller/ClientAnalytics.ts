@@ -263,7 +263,7 @@ class ClientAnalytics {
         { timeout: 10000 }
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 10000));
+      await new Promise((resolve) => setTimeout(resolve, 30000));
 
       const turnOn = await conn.exec(
         `set onu_enable_status slot ${slot} pon ${pon} onu ${onuId} status enable`,
