@@ -319,20 +319,20 @@ export const ClientAnalytics = () => {
                     </li>
 
                     {!loadingSinal && (
-                      <>
+                      <div>
                       <button
                         onClick={() => fetchSinal(pppoe)}
-                        className="bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all"
+                        className="sm:mx-2 my-2 sm:my-0 bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all"
                       >
                         Testar Onu Novamente
                       </button>
                       <button
                         onClick={() => fetchReset(pppoe)}
-                        className="bg-blue-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all"
+                        className="sm:mx-2 my-2 sm:my-0 bg-blue-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all"
                       >
                         Reiniciar Onu
                       </button>
-                      </>
+                      </div>
                     )}
                     <div className="p-5 mt-5"></div>
                     <li className="flex">
