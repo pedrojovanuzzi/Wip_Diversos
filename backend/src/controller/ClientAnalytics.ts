@@ -258,10 +258,20 @@ class ClientAnalytics {
         return;
       }
 
-      const optic = await conn.exec(
-        `show optic_module slot ${slot} pon ${pon} onu ${onuId}`,
+      const turnOff = await conn.exec(
+        `set onu_enable_status slot ${slot} pon ${pon} onu ${onuId} status disable`,
         { timeout: 10000 }
       );
+
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+
+      const turnOn = await conn.exec(
+        `set onu_enable_status slot ${slot} pon ${pon} onu ${onuId} status enable`,
+        { timeout: 10000 }
+      );
+
+      res.status(200).json({
+        respostaTelnet: "ONU reiniciada com sucesso",})
       
     } catch (error) {
       console.log(error);
