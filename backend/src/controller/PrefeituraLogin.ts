@@ -129,7 +129,7 @@ class PrefeituraLogin {
     }
   }
 
-  async VerifyOtp(req: Request, res: Response) {
+  async SendOtp(req: Request, res: Response) {
   const { celular, otp } = req.body;
 
   if (!celular || !otp) {
