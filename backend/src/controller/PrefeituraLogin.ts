@@ -129,7 +129,7 @@ class PrefeituraLogin {
     }
   }
 
-  async SendOtp(req: Request, res: Response) {
+async SendOtp(req: Request, res: Response) {
   const { celular, otp } = req.body;
 
   if (!celular || !otp) {
@@ -141,21 +141,24 @@ class PrefeituraLogin {
   try {
     const check = await client.verify.v2.services(String(verifyServiceSid))
       .verificationChecks
-      .create({ to: phone, code: otp });
+      .create({
+        to: phone,
+        code: otp
+      });
 
-      console.log(check);
-      
+    console.log("🔍 Resultado do check:", check);
 
     if (check.status === "approved") {
       res.status(200).json({ sucesso: "Código verificado com sucesso" });
     } else {
-      res.status(401).json({ error: "Código incorreto" });
+      res.status(401).json({ error: "Código incorreto ou expirado" });
     }
   } catch (error: any) {
-    console.error("❌ Erro na verificação:", error.message || error);
+    console.error("❌ Erro na verificação:", error?.message || error);
     res.status(500).json({ error: "Erro ao verificar código" });
   }
 }
+
 
   static validarCPF(cpf: string): boolean {
     cpf = cpf.replace(/\D/g, ""); // Remove caracteres não numéricos
