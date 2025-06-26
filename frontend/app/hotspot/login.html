@@ -1,47 +1,90 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <title>Redirecionando...</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>Redirecionando...</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <script>
-        window.onload = function () {
-            // Criar formulário para enviar os dados via POST
-            var form = document.createElement("form");
-            form.method = "POST";
-            form.action = "https://wipdiversos.wiptelecomunicacoes.com.br/api/Prefeitura/redirect";
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-            // Função para adicionar campos ocultos
-            function addHiddenField(name, value) {
-                var input = document.createElement("input");
-                input.type = "hidden";
-                input.name = name;
-                input.value = value;
-                form.appendChild(input);
-            }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f9fafb;
+      color: #1f2937;
+      text-align: center;
+      padding: 60px 20px;
+    }
 
-            // Adiciona variáveis do Hotspot
-            addHiddenField("mac", "$(mac)");
-            addHiddenField("ip", "$(ip)");
-            addHiddenField("username", "$(username)");
-            addHiddenField("link-login", "$(link-login)");
-            addHiddenField("link-orig", "$(link-orig)");
-            addHiddenField("link-login-only", "$(link-login-only)");
-            addHiddenField("error", "$(error)");
+    h2 {
+      font-size: 26px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
 
-            // Envia o formulário automaticamente após pequeno delay
-            document.body.appendChild(form);
-            setTimeout(() => {
-                form.submit();
-            }, 1000);
-        };
-    </script>
+    p {
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #1d4ed8;
+    }
+  </style>
+
+  <script>
+    window.onload = function () {
+      // Criar formulário para enviar os dados via POST
+      var form = document.createElement("form");
+      form.method = "POST";
+      form.action = "https://wipdiversos.wiptelecomunicacoes.com.br/api/Prefeitura/redirect";
+
+      function addHiddenField(name, value) {
+        var input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+
+      // Adiciona variáveis do Hotspot
+      addHiddenField("mac", "$(mac)");
+      addHiddenField("ip", "$(ip)");
+      addHiddenField("username", "$(username)");
+      addHiddenField("link-login", "$(link-login)");
+      addHiddenField("link-orig", "$(link-orig)");
+      addHiddenField("link-login-only", "$(link-login-only)");
+      addHiddenField("error", "$(error)");
+
+      // Envia o formulário automaticamente após pequeno delay
+      document.body.appendChild(form);
+      setTimeout(() => {
+        form.submit();
+      }, 1000);
+    };
+  </script>
 </head>
+
 <body>
-    <h2>Redirecionando...</h2>
-    <p>Você será redirecionado para a página de autenticação.</p>
-    <p>Se isso não acontecer automaticamente, clique no botão abaixo:</p>
-    <button onclick="document.forms[0].submit();">Redirecionar agora</button>
+  <h2>Redirecionando...</h2>
+  <p>Você será redirecionado para a página de autenticação.</p>
+  <p>Se isso não acontecer automaticamente, clique no botão abaixo:</p>
+  <button onclick="document.forms[0].submit();">Redirecionar agora</button>
 </body>
 </html>
