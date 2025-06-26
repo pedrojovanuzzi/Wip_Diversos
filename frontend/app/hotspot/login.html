@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Redirecionando...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <script>
+        window.onload = function () {
+            // Criar formulário para enviar os dados via POST
+            var form = document.createElement("form");
+            form.method = "POST";
+            form.action = "https://wipdiversos.wiptelecomunicacoes.com.br/api/Prefeitura/redirect";
+
+            // Função para adicionar campos ocultos
+            function addHiddenField(name, value) {
+                var input = document.createElement("input");
+                input.type = "hidden";
+                input.name = name;
+                input.value = value;
+                form.appendChild(input);
+            }
+
+            // Adiciona variáveis do Hotspot
+            addHiddenField("mac", "$(mac)");
+            addHiddenField("ip", "$(ip)");
+            addHiddenField("username", "$(username)");
+            addHiddenField("link-login", "$(link-login)");
+            addHiddenField("link-orig", "$(link-orig)");
+            addHiddenField("link-login-only", "$(link-login-only)");
+            addHiddenField("error", "$(error)");
+
+            // Envia o formulário automaticamente após pequeno delay
+            document.body.appendChild(form);
+            setTimeout(() => {
+                form.submit();
+            }, 1000);
+        };
+    </script>
+</head>
+<body>
+    <h2>Redirecionando...</h2>
+    <p>Você será redirecionado para a página de autenticação.</p>
+    <p>Se isso não acontecer automaticamente, clique no botão abaixo:</p>
+    <button onclick="document.forms[0].submit();">Redirecionar agora</button>
+</body>
+</html>
