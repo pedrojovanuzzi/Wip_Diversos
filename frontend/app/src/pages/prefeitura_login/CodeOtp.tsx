@@ -46,7 +46,7 @@ useEffect(() => {
     console.log("✅ Enviando login automático para o Hotspot...");
     const form = document.createElement("form");
     form.method = "POST";
-    form.action = dadosHotspot.linkLoginOnly;
+    form.action = dadosHotspot.linkOrig;
     form.style.display = "none";
 
     function addHiddenField(name: string, value: string) {
