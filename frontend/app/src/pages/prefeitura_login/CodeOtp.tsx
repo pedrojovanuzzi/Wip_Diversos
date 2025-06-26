@@ -41,34 +41,32 @@ export default function CodeOtp() {
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    if (loginAutorizado && dadosHotspot) {
-      console.log("✅ Enviando login automático para o Hotspot...");
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = dadosHotspot.linkLoginOnly;
-      form.style.display = "none";
+useEffect(() => {
+  if (loginAutorizado && dadosHotspot) {
+    console.log("✅ Enviando login automático para o Hotspot...");
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = dadosHotspot.linkLoginOnly;
+    form.style.display = "none";
 
-      function addHiddenField(name: string, value: string) {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = name;
-        input.value = value;
-        form.appendChild(input);
-      }
-
-      console.log(form);
-      
-
-      addHiddenField("username", dadosHotspot.username);
-      addHiddenField("password", dadosHotspot.password);
-      addHiddenField("dst", dadosHotspot.linkLoginOnly || "http://www.google.com");
-      addHiddenField("popup", "true");
-
-      document.body.appendChild(form);
-      form.submit();
+    function addHiddenField(name: string, value: string) {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
     }
-  }, [loginAutorizado, dadosHotspot]);
+
+    addHiddenField("username", dadosHotspot.username);
+    addHiddenField("password", dadosHotspot.password || "");
+    addHiddenField("dst", dadosHotspot.linkOrig || "http://www.google.com");
+    addHiddenField("popup", "true");
+
+    document.body.appendChild(form);
+    form.submit();
+  }
+}, [loginAutorizado, dadosHotspot]);
+
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
