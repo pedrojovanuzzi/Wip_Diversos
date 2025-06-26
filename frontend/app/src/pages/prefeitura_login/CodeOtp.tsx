@@ -59,7 +59,7 @@ useEffect(() => {
 
     addHiddenField("username", dadosHotspot.username);
     addHiddenField("password", dadosHotspot.password || "");
-    addHiddenField("dst", dadosHotspot.linkOrig || "http://www.google.com"); // redireciona após login
+    addHiddenField("dst", "http://www.google.com"); // redireciona após login
     addHiddenField("popup", "true");
 
     document.body.appendChild(form);
