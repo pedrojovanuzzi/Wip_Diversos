@@ -10,6 +10,8 @@ dotenv.config();
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+const verifyServiceSid  = process.env.TWILIO_SERVICE_SID;
+
 
 const client = twilio(accountSid, authToken);
 
@@ -127,21 +129,30 @@ class PrefeituraLogin {
     }
   }
 
-  async SendOtp(req: Request, res: Response) {
-    let { otp, celular } = req.body;
-    console.log("🔹 Recebido no SendOtp:", { otp, celular });
+  async VerifyOtp(req: Request, res: Response) {
+  const { celular, otp } = req.body;
 
-    if (!otp || !celular) {
-      res.status(400).json({ error: "OTP ou celular ausente" });
-      return;
-    }
-
-    celular = "+55" + celular;
-
-    const msg = `Seu código de verificação:\ntel:${otp}`;
-    await PrefeituraLogin.SMS(celular, msg);
-    res.status(200).json({ sucesso: "Sucesso" });
+  if (!celular || !otp) {
+    return res.status(400).json({ error: "Dados ausentes" });
   }
+
+  const phone = "+55" + celular.replace(/\D/g, "");
+
+  try {
+    const check = await client.verify.v2.services(String(verifyServiceSid))
+      .verificationChecks
+      .create({ to: phone, code: otp });
+
+    if (check.status === "approved") {
+      return res.status(200).json({ sucesso: "Código verificado com sucesso" });
+    } else {
+      return res.status(401).json({ error: "Código incorreto" });
+    }
+  } catch (error: any) {
+    console.error("❌ Erro na verificação:", error.message || error);
+    res.status(500).json({ error: "Erro ao verificar código" });
+  }
+}
 
   static validarCPF(cpf: string): boolean {
     cpf = cpf.replace(/\D/g, ""); // Remove caracteres não numéricos
