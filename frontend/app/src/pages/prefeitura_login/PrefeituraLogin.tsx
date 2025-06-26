@@ -22,10 +22,11 @@ export default function PrefeituraLogin() {
     const username = searchParams.get("username") || "cliente";
     const password = "";
     const linkLogin = searchParams.get("link-login");
+    const linkLoginOnly = searchParams.get("link-login-only");
     const linkOrig = searchParams.get("link-orig");
     const errorMsg = searchParams.get("error");
   
-    const dados = { mac, ip, username, password, linkLogin, linkOrig, error: errorMsg };
+    const dados = { mac, ip, username, password, linkLogin, linkLoginOnly, linkOrig, error: errorMsg };
     setDadosHotspot(dados);
     console.log("🔹 Dados do Hotspot:", dados);
   
@@ -76,6 +77,7 @@ export default function PrefeituraLogin() {
           linkOrig: dadosHotspot.linkOrig,
           error: dadosHotspot.error,
           linkLogin: dadosHotspot.linkLogin,
+          linkLoginOnly: dadosHotspot.linkLoginOnly,
         });
   
         console.log("✅ Resposta da API:", response.data);
