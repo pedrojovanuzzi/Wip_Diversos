@@ -130,34 +130,42 @@ class PrefeituraLogin {
   }
 
 async SendOtp(req: Request, res: Response) {
-  const { celular, otp } = req.body;
+    const { celular, otp } = req.body;
 
-  if (!celular || !otp) {
-    res.status(400).json({ error: "Dados ausentes" });
-  }
-
-  const phone = "+55" + celular.replace(/\D/g, "");
-
-  try {
-    const check = await client.verify.v2.services(String(verifyServiceSid))
-      .verificationChecks
-      .create({
-        to: phone,
-        code: otp
-      });
-
-    console.log("🔍 Resultado do check:", check);
-
-    if (check.status === "approved") {
-      res.status(200).json({ sucesso: "Código verificado com sucesso" });
-    } else {
-      res.status(401).json({ error: "Código incorreto ou expirado" });
+    if (!celular) {
+      return res.status(400).json({ error: "Celular ausente" });
     }
-  } catch (error: any) {
-    console.error("❌ Erro na verificação:", error?.message || error);
-    res.status(500).json({ error: "Erro ao verificar código" });
+
+    const phone = "+55" + celular.replace(/\D/g, "");
+
+    try {
+      if (!otp) {
+        // 🔹 Modo envio
+        const envio = await client.verify.v2.services(String(verifyServiceSid))
+          .verifications
+          .create({ to: phone, channel: "sms" });
+
+        console.log("✅ OTP enviado:", envio.sid);
+        res.status(200).json({ sucesso: "Código enviado com sucesso" });
+      } else {
+        // 🔐 Modo verificação
+        const check = await client.verify.v2.services(String(verifyServiceSid))
+          .verificationChecks
+          .create({ to: phone, code: otp });
+
+        console.log("🔍 Verificação:", check);
+
+        if (check.status === "approved") {
+          res.status(200).json({ sucesso: "Código verificado com sucesso" });
+        } else {
+          res.status(401).json({ error: "Código incorreto ou expirado" });
+        }
+      }
+    } catch (error: any) {
+      console.error("❌ Erro:", error.message || error);
+      return res.status(500).json({ error: "Erro ao processar solicitação" });
+    }
   }
-}
 
 
   static validarCPF(cpf: string): boolean {
