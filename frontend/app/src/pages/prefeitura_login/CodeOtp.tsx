@@ -22,6 +22,7 @@ export default function CodeOtp() {
     const password = ""; // Senha vazia
     const linkLogin = searchParams.get("link-login");
     const linkOrig = searchParams.get("link-orig");
+    const linkLoginOnly = searchParams.get("link-login-only");
     const errorMsg = searchParams.get("error");
 
     if (mac && ip && username && linkLogin) {
@@ -32,6 +33,7 @@ export default function CodeOtp() {
         password,
         linkLogin,
         linkOrig,
+        linkLoginOnly,
         error: errorMsg,
       };
       setDadosHotspot(dados);
@@ -60,7 +62,7 @@ export default function CodeOtp() {
 
       addHiddenField("username", dadosHotspot.username);
       addHiddenField("password", dadosHotspot.password);
-      addHiddenField("dst", dadosHotspot.linkOrig || "http://www.google.com");
+      addHiddenField("dst", dadosHotspot.linkLoginOnly || "http://www.google.com");
       addHiddenField("popup", "true");
 
       document.body.appendChild(form);
