@@ -55,6 +55,9 @@ export default function CodeOtp() {
         form.appendChild(input);
       }
 
+      console.log(form);
+      
+
       addHiddenField("username", dadosHotspot.username);
       addHiddenField("password", dadosHotspot.password);
       addHiddenField("dst", dadosHotspot.linkOrig || "http://www.google.com");
