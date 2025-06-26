@@ -133,7 +133,7 @@ async SendOtp(req: Request, res: Response) {
     const { celular, otp } = req.body;
 
     if (!celular) {
-      return res.status(400).json({ error: "Celular ausente" });
+      res.status(400).json({ error: "Celular ausente" });
     }
 
     const phone = "+55" + celular.replace(/\D/g, "");
@@ -163,7 +163,7 @@ async SendOtp(req: Request, res: Response) {
       }
     } catch (error: any) {
       console.error("❌ Erro:", error.message || error);
-      return res.status(500).json({ error: "Erro ao processar solicitação" });
+      res.status(500).json({ error: "Erro ao processar solicitação" });
     }
   }
 
