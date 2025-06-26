@@ -120,7 +120,8 @@ async redirect(req: Request, res: Response) {
       return;
     }
 
-    celular += "+55";
+    celular = "+55" + celular;
+
   
     const msg = `Seu código de verificação é: ${otp}`;
     await PrefeituraLogin.SMS(celular, msg);
