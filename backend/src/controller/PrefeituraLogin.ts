@@ -112,13 +112,15 @@ async redirect(req: Request, res: Response) {
 
 
   async SendOtp(req: Request, res: Response) {
-    const { otp, celular } = req.body;
+    let { otp, celular } = req.body;
     console.log("🔹 Recebido no SendOtp:", { otp, celular });
   
     if (!otp || !celular) {
       res.status(400).json({ error: "OTP ou celular ausente" });
       return;
     }
+
+    celular += "+55";
   
     const msg = `Seu código de verificação é: ${otp}`;
     await PrefeituraLogin.SMS(celular, msg);
