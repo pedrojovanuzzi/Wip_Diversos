@@ -143,6 +143,9 @@ class PrefeituraLogin {
       .verificationChecks
       .create({ to: phone, code: otp });
 
+      console.log(check);
+      
+
     if (check.status === "approved") {
       res.status(200).json({ sucesso: "Código verificado com sucesso" });
     } else {
