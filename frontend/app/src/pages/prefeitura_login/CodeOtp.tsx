@@ -46,7 +46,7 @@ useEffect(() => {
     console.log("✅ Enviando login automático para o Hotspot...");
     const form = document.createElement("form");
     form.method = "POST";
-    form.action = dadosHotspot.linkOrig;
+    form.action = dadosHotspot.linkLoginOnly; // CORREÇÃO AQUI
     form.style.display = "none";
 
     function addHiddenField(name: string, value: string) {
@@ -59,13 +59,14 @@ useEffect(() => {
 
     addHiddenField("username", dadosHotspot.username);
     addHiddenField("password", dadosHotspot.password || "");
-    addHiddenField("dst", dadosHotspot.linkOrig || "http://www.google.com");
+    addHiddenField("dst", dadosHotspot.linkOrig || "http://www.google.com"); // redireciona após login
     addHiddenField("popup", "true");
 
     document.body.appendChild(form);
     form.submit();
   }
 }, [loginAutorizado, dadosHotspot]);
+
 
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
