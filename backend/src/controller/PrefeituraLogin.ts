@@ -133,7 +133,7 @@ class PrefeituraLogin {
   const { celular, otp } = req.body;
 
   if (!celular || !otp) {
-    return res.status(400).json({ error: "Dados ausentes" });
+    res.status(400).json({ error: "Dados ausentes" });
   }
 
   const phone = "+55" + celular.replace(/\D/g, "");
@@ -144,9 +144,9 @@ class PrefeituraLogin {
       .create({ to: phone, code: otp });
 
     if (check.status === "approved") {
-      return res.status(200).json({ sucesso: "Código verificado com sucesso" });
+      res.status(200).json({ sucesso: "Código verificado com sucesso" });
     } else {
-      return res.status(401).json({ error: "Código incorreto" });
+      res.status(401).json({ error: "Código incorreto" });
     }
   } catch (error: any) {
     console.error("❌ Erro na verificação:", error.message || error);
