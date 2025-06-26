@@ -46,7 +46,7 @@ export default function CodeOtp() {
       console.log("✅ Enviando login automático para o Hotspot...");
       const form = document.createElement("form");
       form.method = "POST";
-      form.action = dadosHotspot.linkLogin;
+      form.action = dadosHotspot.linkLoginOnly;
       form.style.display = "none";
 
       function addHiddenField(name: string, value: string) {
