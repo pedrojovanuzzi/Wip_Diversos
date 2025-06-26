@@ -123,7 +123,7 @@ async redirect(req: Request, res: Response) {
     celular = "+55" + celular;
 
   
-    const msg = `Seu código de verificação é: ${otp}`;
+    const msg = `Seu código de verificação é:\n\n🔐 ${otp}`;
     await PrefeituraLogin.SMS(celular, msg);
     res.status(200).json({ sucesso: "Sucesso" });
   }
