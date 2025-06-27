@@ -128,48 +128,37 @@ class PrefeituraLogin {
     }
   }
 
-  async SendOtp(req: Request, res: Response) {
-    const { celular, otp } = req.body;
+async SendOtp(req: Request, res: Response) {
+  const { celular, otp } = req.body;
 
-    if (!celular) {
-      res.status(400).json({ error: "Celular ausente" });
-      return;
-    }
-
-    const phone = "+55" + celular.replace(/\D/g, "");
-
-    try {
-      if (!otp) {
-        // 🔹 Modo envio
-        const envio = await client.verify.v2.services(String(verifyServiceSid))
-          .verifications
-          .create({ to: phone, channel: "sms" });
-
-        console.log("✅ OTP enviado:", envio.sid);
-        res.status(200).json({ sucesso: "Código enviado com sucesso" });
-        return;
-      } else {
-        // 🔐 Modo verificação
-        const check = await client.verify.v2.services(String(verifyServiceSid))
-          .verificationChecks
-          .create({ to: phone, code: otp });
-
-        console.log("🔍 Verificação:", check);
-
-        if (check.status === "approved") {
-          res.status(200).json({ sucesso: "Código verificado com sucesso" });
-          return;
-        } else {
-          res.status(401).json({ error: "Código incorreto ou expirado" });
-          return;
-        }
-      }
-    } catch (error: any) {
-      console.error("❌ Erro:", error.message || error);
-      res.status(500).json({ error: "Erro ao processar solicitação" });
-      return;
-    }
+  if (!celular || !otp) {
+    res.status(400).json({ error: "Celular ou código ausente" });
+    return;
   }
+
+  const phone = "+55" + celular.replace(/\D/g, "");
+
+  try {
+    const check = await client.verify.v2.services(String(verifyServiceSid))
+      .verificationChecks
+      .create({ to: phone, code: otp });
+
+    console.log("🔍 Verificação:", check.status);
+
+    if (check.status === "approved") {
+      res.status(200).json({ sucesso: "Código verificado com sucesso" });
+      return;
+    } else {
+      res.status(401).json({ error: "Código incorreto ou expirado" });
+      return;
+    }
+  } catch (error: any) {
+    console.error("❌ Erro ao verificar código:", error.message || error);
+    res.status(500).json({ error: "Erro interno ao verificar código" });
+    return;
+  }
+}
+
 
   static validarCPF(cpf: string): boolean {
     cpf = cpf.replace(/\D/g, ""); // Remove caracteres não numéricos
