@@ -123,6 +123,7 @@ export default function PrefeituraLogin() {
       const sendotp = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/SendOtp`, {
         celular: data.get("celular"),
         otp: generatedOtp,
+        mac: dadosHotspot?.mac,
       });
 
       setLoginAutorizado(true); // 🔹 Ativar login no Hotspot após sucesso

@@ -132,6 +132,7 @@ useEffect(() => {
         <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
           <form onSubmit={handleSubmit} method="POST" className="space-y-6">
             <div>
+              <h1>Um código foi enviado por SMS para seu Celular.</h1>
               <label
                 htmlFor="otp"
                 className="block text-sm/6 font-medium text-gray-900"
