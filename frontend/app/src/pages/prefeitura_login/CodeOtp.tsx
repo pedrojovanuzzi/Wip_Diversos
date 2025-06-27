@@ -88,7 +88,7 @@ useEffect(() => {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/Prefeitura/AuthCode`,
         {
-          uuid: authCode,
+          otp: authCode,
         }
       );
 
