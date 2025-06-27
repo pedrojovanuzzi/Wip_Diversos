@@ -162,7 +162,7 @@ async SendOtp(req: Request, res: Response) {
         }
       }
     } catch (error: any) {
-      console.error("❌ Erro:", error.message || error);
+      console.error("❌ Erro:", error);
       res.status(500).json({ error: "Erro ao processar solicitação" });
     }
   }
