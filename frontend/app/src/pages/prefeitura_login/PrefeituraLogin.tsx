@@ -26,7 +26,7 @@ export default function PrefeituraLogin() {
     const linkOrig = searchParams.get("link-orig");
     const errorMsg = searchParams.get("error");
   
-    const dados = { mac, ip, username, password, linkLogin, linkLoginOnly, linkOrig, error: errorMsg };
+    const dados = { mac, ip, username, password, linkLogin, linkLoginOnly, linkOrig, error: errorMsg, celular: celular };
     setDadosHotspot(dados);
     console.log("🔹 Dados do Hotspot:", dados);
   
@@ -72,6 +72,7 @@ export default function PrefeituraLogin() {
         const response = await axios.post(`${process.env.REACT_APP_URL}/Prefeitura/redirect_2`, {
           username: dadosHotspot.username,
           password: dadosHotspot.password,
+          celular: dadosHotspot.celular,
           mac: dadosHotspot.mac,
           ip: dadosHotspot.ip,
           linkOrig: dadosHotspot.linkOrig,
