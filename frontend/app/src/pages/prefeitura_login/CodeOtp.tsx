@@ -17,6 +17,7 @@ export default function CodeOtp() {
 
   useEffect(() => {
     const mac = searchParams.get("mac");
+    const celular = searchParams.get("celular");
     const ip = searchParams.get("ip");
     const username = searchParams.get("username") || "cliente"; // Usuário padrão
     const password = ""; // Senha vazia
@@ -29,6 +30,7 @@ export default function CodeOtp() {
       const dados = {
         mac,
         ip,
+        celular,
         username,
         password,
         linkLogin,
@@ -89,6 +91,7 @@ useEffect(() => {
         `${process.env.REACT_APP_URL}/Prefeitura/AuthCode`,
         {
           otp: authCode,
+          celular: dadosHotspot.celular,
         }
       );
 

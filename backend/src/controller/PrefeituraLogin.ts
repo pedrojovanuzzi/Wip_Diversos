@@ -93,7 +93,7 @@ class PrefeituraLogin {
   }
 
   async redirect_2(req: Request, res: Response) {
-    const { mac, ip, username, linkLogin, linkOrig, linkLoginOnly, error } =
+    const { mac, ip, username, linkLogin, linkOrig, linkLoginOnly, error, celular } =
       req.body;
 
     console.log("Dados recebidos do Hotspot 2:", {
@@ -103,9 +103,10 @@ class PrefeituraLogin {
       linkLogin,
       linkOrig,
       error,
+      celular
     });
 
-    const redirectUrl = `${process.env.URL}/Prefeitura/CodeOtp?mac=${mac}&ip=${ip}&username=${username}&link-login=${linkLogin}&link-login-only=${linkLoginOnly}&link-orig=${linkOrig}&error=${error}`;
+    const redirectUrl = `${process.env.URL}/Prefeitura/CodeOtp?mac=${mac}&ip=${ip}&username=${username}&link-login=${linkLogin}&link-login-only=${linkLoginOnly}&link-orig=${linkOrig}&error=${error}&celular=${celular}`;
 
     res.json({ redirectUrl }); // 🔹 Retorna a URL no JSON
   }
