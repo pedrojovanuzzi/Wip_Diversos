@@ -128,37 +128,19 @@ class PrefeituraLogin {
     }
   }
 
-async SendOtp(req: Request, res: Response) {
-  const { celular, otp } = req.body;
+  async SendOtp(req: Request, res: Response) {
+    let { celular, otp, mac } = req.body;
 
-  if (!celular || !otp) {
-    res.status(400).json({ error: "Celular ou código ausente" });
-    return;
-  }
-
-  const phone = "+55" + celular.replace(/\D/g, "");
-
-  try {
-    const check = await client.verify.v2.services(String(verifyServiceSid))
-      .verificationChecks
-      .create({ to: phone, code: otp });
-
-    console.log("🔍 Verificação:", check.status);
-
-    if (check.status === "approved") {
-      res.status(200).json({ sucesso: "Código verificado com sucesso" });
-      return;
-    } else {
-      res.status(401).json({ error: "Código incorreto ou expirado" });
-      return;
+    if (!celular) {
+      res.status(400).json({ error: "Celular ausente" });
     }
-  } catch (error: any) {
-    console.error("❌ Erro ao verificar código:", error.message || error);
-    res.status(500).json({ error: "Erro interno ao verificar código" });
-    return;
-  }
-}
 
+    celular = "+55" + celular.replace(/\D/g, "");
+
+    const msg = `${otp} é seu código de verificação`;
+    await PrefeituraLogin.SMS(celular, msg);
+    res.status(200).json({ sucesso: "Sucesso" });
+  }
 
   static validarCPF(cpf: string): boolean {
     cpf = cpf.replace(/\D/g, ""); // Remove caracteres não numéricos
