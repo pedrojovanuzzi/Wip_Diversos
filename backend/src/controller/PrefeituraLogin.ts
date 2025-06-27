@@ -129,38 +129,17 @@ class PrefeituraLogin {
   }
 
   async SendOtp(req: Request, res: Response) {
-    const { celular, otp } = req.body;
+    let { celular, otp } = req.body;
 
     if (!celular) {
       res.status(400).json({ error: "Celular ausente" });
     }
 
-    const phone = "+55" + celular.replace(/\D/g, "");
+    celular = "+55" + celular.replace(/\D/g, "");
 
-    try {
-      if (!otp) {
-        const service = await client.verify.v2.services.create({
-          friendlyName: "OtpPrefeitura",
-        });
-
-        console.log(service.sid);
-
-        const sid = String(service.sid);
-        // 🔹 Modo envio
-        const envio = await client.verify.v2
-          .services(sid)
-          .verifications.create({ to: phone, channel: "sms" });
-
-        console.log("✅ OTP enviado:", envio.sid);
-        
-        res.status(200).json({ sucesso: "Código enviado com sucesso" });
-      } else {
-        res.status(400).json({ error: "Código OTP ausente!" });
-      }
-    } catch (error: any) {
-      console.error("❌ Erro:", error);
-      res.status(500).json({ error: "Erro ao processar solicitação" });
-    }
+    const msg = `Seu código de verificação é: ${otp}`;
+    await PrefeituraLogin.SMS(celular, msg);
+    res.status(200).json({ sucesso: "Sucesso" });
   }
 
   static validarCPF(cpf: string): boolean {
