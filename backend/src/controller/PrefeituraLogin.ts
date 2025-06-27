@@ -137,7 +137,7 @@ class PrefeituraLogin {
 
     celular = "+55" + celular.replace(/\D/g, "");
 
-    const msg = `Seu código de verificação é: ${otp}`;
+    const msg = `${otp} é seu código de verificação`;
     await PrefeituraLogin.SMS(celular, msg);
     res.status(200).json({ sucesso: "Sucesso" });
   }
