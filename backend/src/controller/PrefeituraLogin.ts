@@ -115,7 +115,7 @@ class PrefeituraLogin {
     res.json({ success: true });
   }
 
-  async AuthCode(req: Request, res: Response) {
+  async AuthCodeWithoutTwilio(req: Request, res: Response) {
     const { uuid } = req.body;
     const prefUserRepository = DataSource.getRepository(PrefeituraUser);
     const user = await prefUserRepository.findOne({ where: { uuid } });
@@ -128,7 +128,41 @@ class PrefeituraLogin {
     }
   }
 
-  async SendOtp(req: Request, res: Response) {
+  async AuthCode(req: Request, res: Response) {
+  const { otp, celular } = req.body;
+
+  if (!celular || !otp) {
+    res.status(400).json({ error: "Celular ou código ausente" });
+    return;
+  }
+
+  const phone = "+55" + celular.replace(/\D/g, "");
+
+  try {
+    const check = await client.verify.v2.services(String(verifyServiceSid))
+      .verificationChecks
+      .create({
+        to: phone,
+        code: otp,
+      });
+
+    console.log("🔍 Verificação Twilio:", check.status);
+
+    if (check.status === "approved") {
+      res.status(200).json({ sucesso: "Código verificado com sucesso" });
+      return;
+    } else {
+      res.status(401).json({ error: "Código incorreto ou expirado" });
+      return;
+    }
+  } catch (error: any) {
+    console.error("❌ Erro ao verificar código:", error.message || error);
+    res.status(500).json({ error: "Erro interno ao verificar código" });
+    return;
+  }
+}
+
+  async SendOtpWithoutVerify(req: Request, res: Response) {
     let { celular, otp, mac } = req.body;
 
     if (!celular) {
@@ -141,6 +175,35 @@ class PrefeituraLogin {
     await PrefeituraLogin.SMS(celular, msg);
     res.status(200).json({ sucesso: "Sucesso" });
   }
+
+  async SendOtp(req: Request, res: Response) {
+  let { celular, mac } = req.body;
+
+  if (!celular) {
+    res.status(400).json({ error: "Número de celular ausente" });
+    return;
+  }
+
+  const phone = "+55" + celular.replace(/\D/g, "");
+
+  try {
+    const envio = await client.verify.v2.services(String(verifyServiceSid))
+      .verifications
+      .create({
+        to: phone,
+        channel: "sms",
+      });
+
+    console.log(`📲 OTP enviado para ${phone} (MAC: ${mac || "não informado"}) — SID: ${envio.sid}`);
+
+    res.status(200).json({ sucesso: "Código enviado com sucesso" });
+    return;
+  } catch (error: any) {
+    console.error("❌ Erro ao enviar OTP:", error.message || error);
+    res.status(500).json({ error: "Erro ao enviar o código de verificação" });
+    return;
+  }
+}
 
   static validarCPF(cpf: string): boolean {
     cpf = cpf.replace(/\D/g, ""); // Remove caracteres não numéricos
