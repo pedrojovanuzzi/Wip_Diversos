@@ -10,8 +10,7 @@ dotenv.config();
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
-const verifyServiceSid  = process.env.TWILIO_SERVICE_SID;
-
+const verifyServiceSid = process.env.TWILIO_SERVICE_SID;
 
 const client = twilio(accountSid, authToken);
 
@@ -129,7 +128,7 @@ class PrefeituraLogin {
     }
   }
 
-async SendOtp(req: Request, res: Response) {
+  async SendOtp(req: Request, res: Response) {
     const { celular, otp } = req.body;
 
     if (!celular) {
@@ -140,33 +139,29 @@ async SendOtp(req: Request, res: Response) {
 
     try {
       if (!otp) {
+        const service = await client.verify.v2.services.create({
+          friendlyName: "OtpPrefeitura",
+        });
+
+        console.log(service.sid);
+
+        const sid = String(service.sid);
         // 🔹 Modo envio
-        const envio = await client.verify.v2.services(String(verifyServiceSid))
-          .verifications
-          .create({ to: phone, channel: "sms" });
+        const envio = await client.verify.v2
+          .services(sid)
+          .verifications.create({ to: phone, channel: "sms" });
 
         console.log("✅ OTP enviado:", envio.sid);
+        
         res.status(200).json({ sucesso: "Código enviado com sucesso" });
       } else {
-        // 🔐 Modo verificação
-        const check = await client.verify.v2.services(String(verifyServiceSid))
-          .verificationChecks
-          .create({ to: phone, code: otp });
-
-        console.log("🔍 Verificação:", check);
-
-        if (check.status === "approved") {
-          res.status(200).json({ sucesso: "Código verificado com sucesso" });
-        } else {
-          res.status(401).json({ error: "Código incorreto ou expirado" });
-        }
+        res.status(400).json({ error: "Código OTP ausente!" });
       }
     } catch (error: any) {
       console.error("❌ Erro:", error);
       res.status(500).json({ error: "Erro ao processar solicitação" });
     }
   }
-
 
   static validarCPF(cpf: string): boolean {
     cpf = cpf.replace(/\D/g, ""); // Remove caracteres não numéricos
