@@ -139,7 +139,7 @@ export default function PrefeituraLogin() {
       setError(null);
 
       const sendotp = await axios.post(
-        `${process.env.REACT_APP_URL}/Prefeitura/SendOtp`,
+        `${process.env.REACT_APP_URL}/Prefeitura/SendOtpFacilita`,
         {
           celular: data.get("celular"),
           otp: generatedOtp,
