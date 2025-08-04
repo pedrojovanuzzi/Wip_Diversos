@@ -206,6 +206,22 @@ class PrefeituraLogin {
   }
 }
 
+async SendOtpFacilitaMovel(req: Request, res: Response) {
+    let { celular, otp, mac } = req.body;
+
+     if (!celular) {
+      res.status(400).json({ error: "Celular ausente" });
+    }
+
+    const msg = `${otp} é seu código de verificação`;
+    await axios.post("http://api.facilitamovel.com.br/api/simpleSendJson.ft", {
+      phone: celular,
+      message: `Seu Código de Autenticação para a WipTelecom<br>${otp}`
+    })
+    res.status(200).json({ sucesso: "Sucesso" });
+    
+}
+
   static validarCPF(cpf: string): boolean {
     cpf = cpf.replace(/\D/g, ""); // Remove caracteres não numéricos
 
