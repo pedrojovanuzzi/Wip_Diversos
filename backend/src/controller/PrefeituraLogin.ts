@@ -4,6 +4,7 @@ import DataSource from "../database/DataSource";
 import { PrefeituraUser } from "../entities/PrefeituraUser";
 import axios from "axios";
 import twilio from "twilio";
+import AppDataSource from "../database/DataSource";
 
 dotenv.config();
 
@@ -93,8 +94,16 @@ class PrefeituraLogin {
   }
 
   async redirect_2(req: Request, res: Response) {
-    const { mac, ip, username, linkLogin, linkOrig, linkLoginOnly, error, celular } =
-      req.body;
+    const {
+      mac,
+      ip,
+      username,
+      linkLogin,
+      linkOrig,
+      linkLoginOnly,
+      error,
+      celular,
+    } = req.body;
 
     console.log("Dados recebidos do Hotspot 2:", {
       mac,
@@ -103,7 +112,7 @@ class PrefeituraLogin {
       linkLogin,
       linkOrig,
       error,
-      celular
+      celular,
     });
 
     const redirectUrl = `${process.env.URL}/Prefeitura/CodeOtp?mac=${mac}&ip=${ip}&username=${username}&link-login=${linkLogin}&link-login-only=${linkLoginOnly}&link-orig=${linkOrig}&error=${error}&celular=${celular}`;
@@ -130,38 +139,61 @@ class PrefeituraLogin {
   }
 
   async AuthCode(req: Request, res: Response) {
-  const { otp, celular } = req.body;
+    const { otp, celular } = req.body;
 
-  if (!celular || !otp) {
-    res.status(400).json({ error: "Celular ou código ausente" });
-    return;
-  }
-
-  const phone = "+55" + celular.replace(/\D/g, "");
-
-  try {
-    const check = await client.verify.v2.services(String(verifyServiceSid))
-      .verificationChecks
-      .create({
-        to: phone,
-        code: otp,
-      });
-
-    console.log("🔍 Verificação Twilio:", check.status);
-
-    if (check.status === "approved") {
-      res.status(200).json({ sucesso: "Código verificado com sucesso" });
-      return;
-    } else {
-      res.status(401).json({ error: "Código incorreto ou expirado" });
+    if (!celular || !otp) {
+      res.status(400).json({ error: "Celular ou código ausente" });
       return;
     }
-  } catch (error: any) {
-    console.error("❌ Erro ao verificar código:", error.message || error);
-    res.status(500).json({ error: "Erro interno ao verificar código" });
-    return;
+
+    const phone = "+55" + celular.replace(/\D/g, "");
+
+    try {
+      const check = await client.verify.v2
+        .services(String(verifyServiceSid))
+        .verificationChecks.create({
+          to: phone,
+          code: otp,
+        });
+
+      console.log("🔍 Verificação Twilio:", check.status);
+
+      if (check.status === "approved") {
+        res.status(200).json({ sucesso: "Código verificado com sucesso" });
+        return;
+      } else {
+        res.status(401).json({ error: "Código incorreto ou expirado" });
+        return;
+      }
+    } catch (error: any) {
+      console.error("❌ Erro ao verificar código:", error.message || error);
+      res.status(500).json({ error: "Erro interno ao verificar código" });
+      return;
+    }
   }
-}
+
+  async AuthCodeFacilita(req: Request, res: Response) {
+    const { otp, celular } = req.body;
+
+    if (!celular || !otp) {
+      res.status(400).json({ error: "Celular ou código ausente" });
+      return;
+    }
+    try {
+      const prefeituraRepository = AppDataSource.getRepository(PrefeituraUser);
+      const prefeituraUUID = await prefeituraRepository.findBy({ uuid: otp });
+
+      if (!prefeituraUUID || prefeituraUUID.length <= 0) {
+        res.status(500).json({ error: "Código Invalido" });
+      }
+
+      res.status(200).json({ sucesso: "Sucesso" });
+    } catch (error: any) {
+      console.error("❌ Erro ao verificar código:", error.message || error);
+      res.status(500).json({ error: "Erro interno ao verificar código" });
+      return;
+    }
+  }
 
   async SendOtpWithoutVerify(req: Request, res: Response) {
     let { celular, otp, mac } = req.body;
@@ -178,55 +210,64 @@ class PrefeituraLogin {
   }
 
   async SendOtp(req: Request, res: Response) {
-  let { celular, mac } = req.body;
+    let { celular, mac } = req.body;
 
-  if (!celular) {
-    res.status(400).json({ error: "Número de celular ausente" });
-    return;
+    if (!celular) {
+      res.status(400).json({ error: "Número de celular ausente" });
+      return;
+    }
+
+    const phone = "+55" + celular.replace(/\D/g, "");
+
+    try {
+      const envio = await client.verify.v2
+        .services(String(verifyServiceSid))
+        .verifications.create({
+          to: phone,
+          channel: "sms",
+        });
+
+      console.log(
+        `📲 OTP enviado para ${phone} (MAC: ${mac || "não informado"}) — SID: ${
+          envio.sid
+        }`
+      );
+
+      res.status(200).json({ sucesso: "Código enviado com sucesso" });
+      return;
+    } catch (error: any) {
+      console.error("❌ Erro ao enviar OTP:", error.message || error);
+      res.status(500).json({ error: "Erro ao enviar o código de verificação" });
+      return;
+    }
   }
 
-  const phone = "+55" + celular.replace(/\D/g, "");
-
-  try {
-    const envio = await client.verify.v2.services(String(verifyServiceSid))
-      .verifications
-      .create({
-        to: phone,
-        channel: "sms",
-      });
-
-    console.log(`📲 OTP enviado para ${phone} (MAC: ${mac || "não informado"}) — SID: ${envio.sid}`);
-
-    res.status(200).json({ sucesso: "Código enviado com sucesso" });
-    return;
-  } catch (error: any) {
-    console.error("❌ Erro ao enviar OTP:", error.message || error);
-    res.status(500).json({ error: "Erro ao enviar o código de verificação" });
-    return;
-  }
-}
-
-async SendOtpFacilitaMovel(req: Request, res: Response) {
+  async SendOtpFacilitaMovel(req: Request, res: Response) {
     let { celular, otp, mac } = req.body;
 
-     if (!celular) {
+    if (!celular) {
       res.status(400).json({ error: "Celular ausente" });
     }
 
-    const response = await axios.post("http://api.facilitamovel.com.br/api/simpleSendJson.ft", {
-      phone: celular,
-      message: `Seu Código de Autenticação para a WipTelecom<br>${otp}`
-    },{headers: {
-      password:process.env.FACILITA_PASS,
-      user:process.env.FACILITA_USER,
-      hashSeguranca:process.env.FACILITA_HASH,
-    }})
+    const response = await axios.post(
+      "http://api.facilitamovel.com.br/api/simpleSendJson.ft",
+      {
+        phone: celular,
+        message: `Seu Código de Autenticação para a WipTelecom<br>${otp}`,
+      },
+      {
+        headers: {
+          password: process.env.FACILITA_PASS,
+          user: process.env.FACILITA_USER,
+          hashSeguranca: process.env.FACILITA_HASH,
+        },
+      }
+    );
 
     console.log(response);
-    
 
     res.status(200).json({ sucesso: "Sucesso" });
-}
+  }
 
   static validarCPF(cpf: string): boolean {
     cpf = cpf.replace(/\D/g, ""); // Remove caracteres não numéricos
