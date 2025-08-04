@@ -9,6 +9,7 @@ router.get("/redirect", PrefeituraLogin.redirect);
 router.post("/redirect_2", PrefeituraLogin.redirect_2);
 router.get("/redirect_2", PrefeituraLogin.redirect_2);
 router.post("/SendOtp", PrefeituraLogin.SendOtp);
+router.post("/SendOtpFacilita", PrefeituraLogin.SendOtpFacilitaMovel);
 router.post("/AuthCode", PrefeituraLogin.AuthCode);
 router.post("/Debug", PrefeituraLogin.debug);
 
