@@ -88,7 +88,7 @@ useEffect(() => {
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_URL}/Prefeitura/AuthCode`,
+        `${process.env.REACT_APP_URL}/Prefeitura/AuthCodeFacilita`,
         {
           otp: authCode,
           celular: dadosHotspot.celular,
