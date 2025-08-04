@@ -213,13 +213,15 @@ async SendOtpFacilitaMovel(req: Request, res: Response) {
       res.status(400).json({ error: "Celular ausente" });
     }
 
-    const msg = `${otp} é seu código de verificação`;
-    await axios.post("http://api.facilitamovel.com.br/api/simpleSendJson.ft", {
+    const response = await axios.post("http://api.facilitamovel.com.br/api/simpleSendJson.ft", {
       phone: celular,
       message: `Seu Código de Autenticação para a WipTelecom<br>${otp}`
     })
-    res.status(200).json({ sucesso: "Sucesso" });
+
+    console.log(response);
     
+
+    res.status(200).json({ sucesso: "Sucesso" });
 }
 
   static validarCPF(cpf: string): boolean {
