@@ -216,7 +216,11 @@ async SendOtpFacilitaMovel(req: Request, res: Response) {
     const response = await axios.post("http://api.facilitamovel.com.br/api/simpleSendJson.ft", {
       phone: celular,
       message: `Seu Código de Autenticação para a WipTelecom<br>${otp}`
-    })
+    },{headers: {
+      password:process.env.FACILITA_PASS,
+      user:process.env.FACILITA_USER,
+      hashSeguranca:process.env.FACILITA_HASH,
+    }})
 
     console.log(response);
     
