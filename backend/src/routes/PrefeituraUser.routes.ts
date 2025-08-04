@@ -11,6 +11,7 @@ router.get("/redirect_2", PrefeituraLogin.redirect_2);
 router.post("/SendOtp", PrefeituraLogin.SendOtp);
 router.post("/SendOtpFacilita", PrefeituraLogin.SendOtpFacilitaMovel);
 router.post("/AuthCode", PrefeituraLogin.AuthCode);
+router.post("/AuthCodeFacilita", PrefeituraLogin.AuthCodeFacilita);
 router.post("/Debug", PrefeituraLogin.debug);
 
 
