@@ -44,7 +44,7 @@ class Backup {
     const date = new Date().toISOString().slice(0, 10); // yyyy-mm-dd
 
     for (const db of this.databases) {
-      const backupDir = path.join("..", "backups", db.name, date);
+      const backupDir = path.resolve(__dirname, "..", "backups", db.name, date);
       fs.mkdirSync(backupDir, { recursive: true });
 
       const filePath = path.join(backupDir, `${db.name}.sql`);
@@ -56,7 +56,10 @@ class Backup {
       await new Promise<void>((resolve, reject) => {
         exec(dumpCommand, (error, stdout, stderr) => {
           if (error) {
-            console.error(`❌ Erro no backup do banco ${db.name}:`, error.message);
+            console.error(
+              `❌ Erro no backup do banco ${db.name}:`,
+              error.message
+            );
             return reject(error);
           }
           console.log(`✅ Backup de "${db.name}" salvo em ${filePath}`);
