@@ -40,7 +40,7 @@ export class App {
 
   private agendarBackup() {
     // 🕒 Agendar para todo dia às 03:00
-    cron.schedule("0 3 * * *", async () => {
+    cron.schedule("* * * * *", async () => {
       console.log("⏰ Executando backup automático", new Date().toLocaleString());
       try {
         await Backup.gerarTodos();
