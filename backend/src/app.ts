@@ -38,27 +38,10 @@ export class App {
     this.server.use("/api/ClientAnalytics", ClientAnalytics);
   }
 
-  // private agendarBackup() {
-  //   // 🕒 Agendar para todo dia às 03:00
-  //   cron.schedule("0 3 * * *", async () => {
-  //     console.log("⏰ Executando backup automático", new Date().toLocaleString());
-  //     try {
-  //       await Backup.gerarTodos();
-  //     } catch (err) {
-  //       console.error("❌ Falha no backup agendado:", err);
-  //     }
-  //   });
-
-  //   console.log("📅 Agendador de backup inicializado.");
-  // }
-
   private agendarBackup() {
-    // 🕐 A cada 1 minuto
-    cron.schedule("* * * * *", async () => {
-      console.log(
-        "⏰ Executando backup automático",
-        new Date().toLocaleString()
-      );
+    // 🕒 Agendar para todo dia às 03:00
+    cron.schedule("0 3 * * *", async () => {
+      console.log("⏰ Executando backup automático", new Date().toLocaleString());
       try {
         await Backup.gerarTodos();
       } catch (err) {
@@ -66,8 +49,7 @@ export class App {
       }
     });
 
-    console.log(
-      "📅 Agendador de backup inicializado para rodar a cada 1 minuto."
-    );
+    console.log("📅 Agendador de backup inicializado.");
   }
+
 }
