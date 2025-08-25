@@ -7,9 +7,7 @@ import { TlsOptions } from "tls";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
-
 type RosRow = Record<string, unknown>;
-
 
 export default class DosProtect {
   private isDos = false;
@@ -26,40 +24,48 @@ export default class DosProtect {
   }
 
   private asNumber(val: unknown): number {
-  // Se já for número, retorna direto
-  if (typeof val === "number") return val;
-  // Se for string, tenta converter; números grandes vêm em string
-  if (typeof val === "string") return Number(val.trim().replace(/\s+/g, ""));
-  // Qualquer outro tipo vira 0
-  return 0;
-}
+    // Se já for número, retorna direto
+    if (typeof val === "number") return val;
+    // Se for string, tenta converter; números grandes vêm em string
+    if (typeof val === "string") return Number(val.trim().replace(/\s+/g, ""));
+    // Qualquer outro tipo vira 0
+    return 0;
+  }
 
   private async getMonitorTrafficOnce(targetIface: string) {
     const ros = this.createRosClient();
     await ros.connect();
 
     try {
+      // ros.write(path, args) envia um comando RouterOS pela API.
 
-      const result = await ros.write(
-        "/interface/monitor-traffic",
-        [
-          `=interface=${targetIface}`, // define a interface desejada (ex.: sfp-sfpplus1)
-          "=once=", // flag 'once' (presença da chave liga o comportamento "uma amostra")
-        ]
-      ) as RosRow[];
+      // O path é "/interface/monitor-traffic" → o mesmo comando da CLI do MikroTik.
+
+      // O segundo parâmetro é um array de strings no formato =chave=valor (padrão da API RouterOS).
+
+      // `=interface=${targetIface}` define qual interface monitorar (ex.: sfp-sfpplus1).
+
+      // "=once=" é um flag booleano por presença (não tem valor), dizendo: “me dê uma amostra e finalize” (em vez de stream contínuo).
+
+      // O await espera a resposta da API e o as RosRow[] faz um cast para “array de objetos genéricos (campo:string→valor:unknown)”.
+
+      const result = (await ros.write("/interface/monitor-traffic", [
+        `=interface=${targetIface}`, // define a interface desejada (ex.: sfp-sfpplus1)
+        "=once=", // flag 'once' (presença da chave liga o comportamento "uma amostra")
+      ])) as RosRow[];
 
       await ros.close();
 
-      if (!result || result.length === 0) return { ok: false, reason: "sem_resultado" };
+      if (!result || result.length === 0)
+        return { ok: false, reason: "sem_resultado" };
 
       const row = result[0];
 
-      const rxBps = this.asNumber(row['rx-bits-per-second']);
-      const txBps = this.asNumber(row['tx-bits-per-second']);
-      const name = String(row['name'] ?? targetIface);
+      const rxBps = this.asNumber(row["rx-bits-per-second"]);
+      const txBps = this.asNumber(row["tx-bits-per-second"]);
+      const name = String(row["name"] ?? targetIface);
 
-      return {ok: true, targetIface: name, rxBps, txBps};
-      
+      return { ok: true, targetIface: name, rxBps, txBps };
     } catch (error) {
       console.log(error);
       return;
@@ -79,13 +85,12 @@ export default class DosProtect {
 
   private async queryGBPS() {
     // Verifica se uma interface tem mais de 10GBPS para ativar a proxima função
-    const responseRxBytes = await this.getMonitorTrafficOnce('sfp-sfpplus1');
+    const responseRxBytes = await this.getMonitorTrafficOnce("sfp-sfpplus1");
 
     if (!responseRxBytes?.txBps) return;
     const Gbps = responseRxBytes?.txBps / 1000000000;
-    
+
     console.log(Gbps.toFixed(2));
-    
 
     // se sim vai para a proxima etapa
     if (responseRxBytes.txBps >= 8) {
