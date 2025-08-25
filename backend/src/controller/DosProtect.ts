@@ -16,6 +16,8 @@ export default class DosProtect {
   public async startFunctions() {
     // Inicia as funções utilizando cronjob a cada 1 minuto
     await this.queryGBPS();
+    
+    
     return;
   }
 
@@ -114,13 +116,11 @@ export default class DosProtect {
           "=name=top5_pppoe_rx_tx_pps", // executa o script pelo NOME (exatamente como cadastrado no RouterOS)
           "=.tag=runTop5", // (opcional) tag para correlacionar esta chamada nas respostas
         ]
-      )) as RosRow[]; 
+      )) as RosRow[];
 
       await ros.close();
 
       console.log(result);
-      
-
     } catch (error) {
       console.log(error);
       return;
