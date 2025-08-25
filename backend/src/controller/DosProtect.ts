@@ -10,7 +10,6 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 type RosRow = Record<string, unknown>;
 
 export default class DosProtect {
-  private isDos = false;
   private isDDos = false;
   private host = process.env.BGP_IP as string;
   private login = process.env.MIKROTIK_LOGIN as string;
@@ -78,7 +77,6 @@ export default class DosProtect {
       user: this.login,
       password: this.password,
       port: this.port,
-      tls: "TLSv1.3" as TlsOptions,
       timeout: 8000,
     });
   }
@@ -92,27 +90,51 @@ export default class DosProtect {
 
     console.log(Gbps.toFixed(2));
 
+    const packetCount = await this.checkPacketCount();
+
+    if (!packetCount) return;
     // se sim vai para a proxima etapa
-    if (responseRxBytes.txBps >= 8) {
-      this.checkConnectionsCount();
-    }
-
-    return;
-  }
-
-  private checkPPPoeServers() {
-    this.checkConnectionsCount();
-  }
-
-  private checkConnectionsCount() {
-    // Verifica a quantidade de conexões existentes utilizando o mesmo DST address
-    // SRC > 200 && SRC = SRC && DST = DST Considere DOS
-    // SRC > 200 && SRC != SRC && DST = DST Considere DDOS
-    if (this.isDDos || this.isDos) {
+    if (responseRxBytes.txBps >= 8 || packetCount > 20000) {
       this.blockIp();
     }
 
     return;
+  }
+
+  /*
+  /system script run top5_pppoe_rx_tx_pps
+
+  /system script add name=top5_pppoe_rx_tx_pps source={ :local TOP 5; :local ids [/interface find where type="pppoe-in"]; :local N [:len $ids]; :if ($N=0) do={ :put "Sem pppoe-in"; return; }; :if ($TOP>$N) do={ :set TOP $N }; :local pairs []; :foreach i in=$ids do={ /interface monitor-traffic $i once do={ :local nm [/interface get $i name]; :local rx $"rx-packets-per-second"; :local tx $"tx-packets-per-second"; :if ([:typeof $rx]="nothing") do={ :set rx 0 }; :if ([:typeof $tx]="nothing") do={ :set tx 0 }; :set pairs ($pairs, ($nm."|".$rx."|".$tx)) } }; :local pairsRx $pairs; :local pairsTx $pairs; :put ("=== TOP ".$TOP." PPPoE-in por RxPPS ==="); :for t from=1 to=$TOP do={ :local bestIndex -1; :local bestPps -1; :local idx 0; :foreach e in=$pairsRx do={ :local sep1 [:find $e "|"]; :local sep2 [:find $e "|" ($sep1+1)]; :local rxv [:tonum [:pick $e ($sep1+1) $sep2]]; :if ($rxv>$bestPps) do={ :set bestPps $rxv; :set bestIndex $idx }; :set idx ($idx+1) }; :if ($bestIndex!=-1) do={ :local e [:pick $pairsRx $bestIndex]; :local sep1 [:find $e "|"]; :local sep2 [:find $e "|" ($sep1+1)]; :local nm [:pick $e 0 $sep1]; :local rxv [:pick $e ($sep1+1) $sep2]; :local txv [:pick $e ($sep2+1) [:len $e]]; :put ($t.". ". $nm ." - RxPPS: ". $rxv ."  TxPPS: ". $txv); :local newPairs []; :local idx2 0; :foreach x in=$pairsRx do={ :if ($idx2!=$bestIndex) do={ :set newPairs ($newPairs,$x) }; :set idx2 ($idx2+1) }; :set pairsRx $newPairs } }; :put ("=== TOP ".$TOP." PPPoE-in por TxPPS ==="); :for t from=1 to=$TOP do={ :local bestIndex -1; :local bestPps -1; :local idx 0; :foreach e in=$pairsTx do={ :local sep1 [:find $e "|"]; :local sep2 [:find $e "|" ($sep1+1)]; :local txv [:tonum [:pick $e ($sep2+1) [:len $e]]]; :if ($txv>$bestPps) do={ :set bestPps $txv; :set bestIndex $idx }; :set idx ($idx+1) }; :if ($bestIndex!=-1) do={ :local e [:pick $pairsTx $bestIndex]; :local sep1 [:find $e "|"]; :local sep2 [:find $e "|" ($sep1+1)]; :local nm [:pick $e 0 $sep1]; :local rxv [:pick $e ($sep1+1) $sep2]; :local txv [:pick $e ($sep2+1) [:len $e]]; :put ($t.". ". $nm ." - TxPPS: ". $txv ."  RxPPS: ". $rxv); :local newPairs []; :local idx2 0; :foreach x in=$pairsTx do={ :if ($idx2!=$bestIndex) do={ :set newPairs ($newPairs,$x) }; :set idx2 ($idx2+1) }; :set pairsTx $newPairs } } }
+  */
+
+  private async pppoeClientGrantestPacket(targetIface: string) {
+    const ros = this.createRosClient();
+    await ros.connect();
+    try {
+      const result = (await ros.write(
+        "/system/script/run", // caminho API que executa um script
+        [
+          "=name=top5_pppoe_rx_tx_pps", // executa o script pelo NOME (exatamente como cadastrado no RouterOS)
+          "=.tag=runTop5", // (opcional) tag para correlacionar esta chamada nas respostas
+        ]
+      )) as RosRow[]; 
+
+      await ros.close();
+
+      console.log(result);
+      
+
+    } catch (error) {
+      console.log(error);
+      return;
+    }
+  }
+
+  private async checkPacketCount(): Promise<number> {
+    if (this.isDDos) {
+    }
+
+    return 0;
   }
 
   private blockIp() {}
