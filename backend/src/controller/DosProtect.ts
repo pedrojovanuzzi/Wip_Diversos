@@ -2,9 +2,6 @@ import dotenv from "dotenv";
 import path from "path";
 import { RouterOSAPI } from "node-routeros";
 
-import { Client } from "ssh2";
-import { TlsOptions } from "tls";
-
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 type RosRow = Record<string, unknown>;
