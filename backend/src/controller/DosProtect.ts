@@ -197,20 +197,6 @@ private async pppoeClientGreatestPacket(
   const ros = this.createRosClient(host, user, password, port);
   await ros.connect();
   try {
-    // pega todos os scripts e filtra pelo nome
-    const scripts = (await ros.write("/system/script/print")) as RosRow[];
-    const script = scripts.find((s) => s.name === "top5_pppoe_rx_tx_pps");
-    
-    if (!script) {
-      console.error("Script top5_pppoe_rx_tx_pps não encontrado");
-      return null;
-    }
-
-    const id = String(script[".id"]);
-    
-    
-
-    // executa o script (ignora retorno !empty)
     try {
       // Não funciona via API
       await this.executarSSH(host, "/system script run top5_pppoe_rx_tx_pps")
