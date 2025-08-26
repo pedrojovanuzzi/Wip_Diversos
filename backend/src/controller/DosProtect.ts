@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import path from "path";
 import { RouterOSAPI } from "node-routeros";
+import { Client } from "ssh2";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -100,6 +101,66 @@ export default class DosProtect {
     });
   }
 
+    private async executarSSH (host: string, comando: string): Promise<string> {
+      try {
+        return new Promise((resolve, reject) => {
+          const conn = new Client();
+          let output = "";
+  
+          // ////console.log(`[DEBUG] Tentando conectar no host: ${host}`);
+  
+          conn
+            .on("ready", () => {
+              // ////console.log(`[DEBUG] Conectado com sucesso no ${host}`);
+              conn.exec(comando, (err, stream) => {
+                if (err) {
+                  console.error(
+                    `[ERRO] Erro ao executar comando no ${host}:`,
+                    err
+                  );
+                  conn.end();
+                  return reject(err);
+                }
+  
+                stream
+                  .on("close", (code: number, signal: string) => {
+                    console
+                      .log
+                      // `[DEBUG] Conexão fechada - Código: ${code}, Sinal: ${signal}`
+                      ();
+                    conn.end();
+                    resolve(output);
+                  })
+                  .on("data", (data: Buffer) => {
+                    // console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
+                    output += data.toString();
+                  })
+                  .stderr.on("data", (data: Buffer) => {
+                    console.error(
+                      // `[DEBUG] STDERR (${host}):\n${data.toString()}`
+                    );
+                    output += data.toString();
+                  });
+              });
+            })
+            .on("error", (err) => {
+              console.error(`[ERRO] Erro de conexão com ${host}:`, err);
+              reject(err);
+            })
+            .connect({
+              host,
+              port: 2004,
+              username: process.env.MIKROTIK_LOGIN!,
+              password: process.env.MIKROTIK_PASSWORD!,
+              readyTimeout: 5000,
+            });
+        });
+      } catch (error) {
+        //console.log(error);
+        return "";
+      }
+    };
+
   private async queryGBPS() {
     // Verifica se uma interface tem mais de 10GBPS para ativar a proxima função
     const responseRxBytes = await this.getMonitorTrafficOnce("sfp-sfpplus1");
@@ -139,7 +200,7 @@ private async pppoeClientGreatestPacket(
     // pega todos os scripts e filtra pelo nome
     const scripts = (await ros.write("/system/script/print")) as RosRow[];
     const script = scripts.find((s) => s.name === "top5_pppoe_rx_tx_pps");
-
+    
     if (!script) {
       console.error("Script top5_pppoe_rx_tx_pps não encontrado");
       return null;
@@ -151,7 +212,8 @@ private async pppoeClientGreatestPacket(
 
     // executa o script (ignora retorno !empty)
     try {
-      await ros.write("/system/script/run", [`=.id=${id}`]);
+      // Não funciona via API
+      await this.executarSSH(host, "/system script run top5_pppoe_rx_tx_pps")
 
     } catch (e: any) {
       if (e?.errno === "UNKNOWNREPLY") {
@@ -160,9 +222,6 @@ private async pppoeClientGreatestPacket(
         throw e;
       }
     }
-
-    // espera um pouco para dar tempo do script atualizar a global
-    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     // agora lê a variável global
     const envs = (await ros.write("/system/script/environment/print", [
