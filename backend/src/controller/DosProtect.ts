@@ -127,49 +127,63 @@ export default class DosProtect {
 
   */
 
-  private async pppoeClientGreatestPacket(
-    host: string,
-    user: string,
-    password: string,
-    port: number
-  ) {
-    const ros = this.createRosClient(host, user, password, port);
-    await ros.connect();
-    try {
-      const id = String(0);
+private async pppoeClientGreatestPacket(
+  host: string,
+  user: string,
+  password: string,
+  port: number
+) {
+  const ros = this.createRosClient(host, user, password, port);
+  await ros.connect();
+  try {
+    // pega todos os scripts e filtra pelo nome
+    const scripts = (await ros.write("/system/script/print")) as RosRow[];
+    const script = scripts.find((s) => s.name === "top5_pppoe_rx_tx_pps");
 
-      // executa o script e ignora o erro de !empty
-      try {
-        await ros.write("/system/script/run", [`=.id=${id}`]);
-      } catch (e: any) {
-        if (e?.errno === "UNKNOWNREPLY") {
-          console.log("Script executado (retorno vazio !empty)");
-        } else {
-          throw e;
-        }
-      }
-
-      // agora lê a variável global com o resultado
-      const envs = (await ros.write("/system/script/environment/print", [
-        "?name=top5Result",
-      ])) as RosRow[];
-
-      if (envs.length > 0) {
-        const env = envs[0];
-        const result = (env.value ?? env.val ?? "").toString();
-        console.log("Resultado top5:", result);
-        return result;
-      } else {
-        console.log("Nenhum resultado encontrado em top5Result");
-        return null;
-      }
-    } catch (error) {
-      console.error("Erro:", error);
+    if (!script) {
+      console.error("Script top5_pppoe_rx_tx_pps não encontrado");
       return null;
-    } finally {
-      await ros.close().catch(() => {});
     }
+
+    const id = String(script[".id"]);
+
+    // executa o script (ignora retorno !empty)
+    try {
+      await ros.write("/system/script/run", [`=.id=${id}`]);
+    } catch (e: any) {
+      if (e?.errno === "UNKNOWNREPLY") {
+        console.log("Script executado (retorno vazio !empty)");
+      } else {
+        throw e;
+      }
+    }
+
+    // espera um pouco para dar tempo do script atualizar a global
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // agora lê a variável global
+    const envs = (await ros.write("/system/script/environment/print", [
+      "?name=top5Result",
+    ])) as RosRow[];
+
+    if (envs.length > 0) {
+      const env = envs[0];
+      const result = (env.value ?? env.val ?? "").toString();
+      console.log("Resultado top5:", result);
+      return result;
+    } else {
+      console.log("Nenhum resultado encontrado em top5Result");
+      return null;
+    }
+  } catch (error) {
+    console.error("Erro:", error);
+    return null;
+  } finally {
+    await ros.close().catch(() => {});
   }
+}
+
+
 
   private async checkPacketCount(): Promise<number> {
     await this.pppoeClientGreatestPacket(this.pppoe1hostBgp, this.pppoe1loginBgp, this.pppoe1passwordBgp, this.pppoe1portBgp);
