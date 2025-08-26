@@ -101,65 +101,66 @@ export default class DosProtect {
     });
   }
 
-    private async executarSSH (host: string, comando: string): Promise<string> {
-      try {
-        return new Promise((resolve, reject) => {
-          const conn = new Client();
-          let output = "";
-  
-          // ////console.log(`[DEBUG] Tentando conectar no host: ${host}`);
-  
-          conn
-            .on("ready", () => {
-              // ////console.log(`[DEBUG] Conectado com sucesso no ${host}`);
-              conn.exec(comando, (err, stream) => {
-                if (err) {
-                  console.error(
-                    `[ERRO] Erro ao executar comando no ${host}:`,
-                    err
-                  );
+  private async executarSSH(host: string, comando: string): Promise<string> {
+    try {
+      return new Promise((resolve, reject) => {
+        const conn = new Client();
+        let output = "";
+
+        // ////console.log(`[DEBUG] Tentando conectar no host: ${host}`);
+
+        conn
+          .on("ready", () => {
+            // ////console.log(`[DEBUG] Conectado com sucesso no ${host}`);
+            conn.exec(comando, (err, stream) => {
+              if (err) {
+                console.error(
+                  `[ERRO] Erro ao executar comando no ${host}:`,
+                  err
+                );
+                conn.end();
+                return reject(err);
+              }
+
+              stream
+                .on("close", (code: number, signal: string) => {
+                  console
+                    .log
+                    // `[DEBUG] Conexão fechada - Código: ${code}, Sinal: ${signal}`
+                    ();
                   conn.end();
-                  return reject(err);
-                }
-  
-                stream
-                  .on("close", (code: number, signal: string) => {
-                    console
-                      .log
-                      // `[DEBUG] Conexão fechada - Código: ${code}, Sinal: ${signal}`
-                      ();
-                    conn.end();
-                    resolve(output);
-                  })
-                  .on("data", (data: Buffer) => {
-                    // console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
-                    output += data.toString();
-                  })
-                  .stderr.on("data", (data: Buffer) => {
-                    console.error(
-                      // `[DEBUG] STDERR (${host}):\n${data.toString()}`
-                    );
-                    output += data.toString();
-                  });
-              });
-            })
-            .on("error", (err) => {
-              console.error(`[ERRO] Erro de conexão com ${host}:`, err);
-              reject(err);
-            })
-            .connect({
-              host,
-              port: 2004,
-              username: process.env.MIKROTIK_LOGIN!,
-              password: process.env.MIKROTIK_PASSWORD!,
-              readyTimeout: 5000,
+                  resolve(output);
+                })
+                .on("data", (data: Buffer) => {
+                  // console.log(`[DEBUG] STDOUT (${host}):\n${data.toString()}`);
+                  output += data.toString();
+                })
+                .stderr.on("data", (data: Buffer) => {
+                  console
+                    .error
+                    // `[DEBUG] STDERR (${host}):\n${data.toString()}`
+                    ();
+                  output += data.toString();
+                });
             });
-        });
-      } catch (error) {
-        //console.log(error);
-        return "";
-      }
-    };
+          })
+          .on("error", (err) => {
+            console.error(`[ERRO] Erro de conexão com ${host}:`, err);
+            reject(err);
+          })
+          .connect({
+            host,
+            port: 2004,
+            username: process.env.MIKROTIK_LOGIN!,
+            password: process.env.MIKROTIK_PASSWORD!,
+            readyTimeout: 5000,
+          });
+      });
+    } catch (error) {
+      //console.log(error);
+      return "";
+    }
+  }
 
   private async queryGBPS() {
     // Verifica se uma interface tem mais de 10GBPS para ativar a proxima função
@@ -188,54 +189,73 @@ export default class DosProtect {
 
   */
 
-private async pppoeClientGreatestPacket(
-  host: string,
-  user: string,
-  password: string,
-  port: number
-) {
-  const ros = this.createRosClient(host, user, password, port);
-  await ros.connect();
-  try {
+  private async pppoeClientGreatestPacket(
+    host: string,
+    user: string,
+    password: string,
+    port: number
+  ) {
+    const ros = this.createRosClient(host, user, password, port);
+    await ros.connect();
     try {
-      // Não funciona via API
-      await this.executarSSH(host, "/system script run top5_pppoe_rx_tx_pps")
-
-    } catch (e: any) {
-      if (e?.errno === "UNKNOWNREPLY") {
-        console.log("Script executado (retorno vazio !empty)");
-      } else {
-        throw e;
+      try {
+        // Não funciona via API
+        await this.executarSSH(host, "/system script run top5_pppoe_rx_tx_pps");
+      } catch (e: any) {
+        if (e?.errno === "UNKNOWNREPLY") {
+          console.log("Script executado (retorno vazio !empty)");
+        } else {
+          throw e;
+        }
       }
-    }
 
-    // agora lê a variável global
-    const envs = (await ros.write("/system/script/environment/print", [
-      "?name=top5Result",
-    ])) as RosRow[];
+      // agora lê a variável global
+      const envs = (await ros.write("/system/script/environment/print", [
+        "?name=top5Result",
+      ])) as RosRow[];
 
-    if (envs.length > 0) {
-      const env = envs[0];
-      const result = (env.value ?? env.val ?? "").toString();
-      console.log(result);
-      return result;
-    } else {
-      console.log("Nenhum resultado encontrado em top5Result");
+      if (envs.length > 0) {
+        const env = envs[0];
+        const result = (env.value ?? env.val ?? "").toString();
+        let arrayResult = result
+          .split(/[-\n]/)
+          .filter((f) => f.trim().startsWith("Tx") || f.trim().startsWith("Rx"))
+          .map((line) => {
+            const match = line.match(/RxPPS:\s*(\d+)\s*TxPPS:\s*(\d+)/);
+            if (!match) return { rx: 0, tx: 0 }; // ou lançar erro se quiser
+            const [, rx, tx] = match;
+            let x = 1;
+            console.log(x++);
+            
+            return { rx: Number(rx), tx: Number(tx) };
+          });
+        console.log(arrayResult);
+        return arrayResult;
+      } else {
+        console.log("Nenhum resultado encontrado em top5Result");
+        return null;
+      }
+    } catch (error) {
+      console.error("Erro:", error);
       return null;
+    } finally {
+      await ros.close().catch(() => {});
     }
-  } catch (error) {
-    console.error("Erro:", error);
-    return null;
-  } finally {
-    await ros.close().catch(() => {});
   }
-}
-
-
 
   private async checkPacketCount(): Promise<number> {
-    await this.pppoeClientGreatestPacket(this.pppoe1hostBgp, this.pppoe1loginBgp, this.pppoe1passwordBgp, this.pppoe1portBgp);
-    await this.pppoeClientGreatestPacket(this.pppoe2hostBgp, this.pppoe2loginBgp, this.pppoe2passwordBgp, this.pppoe2portBgp);
+    await this.pppoeClientGreatestPacket(
+      this.pppoe1hostBgp,
+      this.pppoe1loginBgp,
+      this.pppoe1passwordBgp,
+      this.pppoe1portBgp
+    );
+    await this.pppoeClientGreatestPacket(
+      this.pppoe2hostBgp,
+      this.pppoe2loginBgp,
+      this.pppoe2passwordBgp,
+      this.pppoe2portBgp
+    );
     return 0;
   }
 
