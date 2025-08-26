@@ -8,16 +8,26 @@ type RosRow = Record<string, unknown>;
 
 export default class DosProtect {
   private isDDos = false;
-  private host = process.env.BGP_IP as string;
-  private login = process.env.MIKROTIK_LOGIN as string;
-  private password = process.env.MIKROTIK_PASSWORD as string;
-  private port = Number(process.env.PORT_MIKROTIK_API);
+
+  private hostBgp = process.env.BGP_IP as string;
+  private loginBgp = process.env.MIKROTIK_LOGIN as string;
+  private passwordBgp = process.env.MIKROTIK_PASSWORD as string;
+  private portBgp = Number(process.env.PORT_MIKROTIK_API);
+
+  private pppoe1hostBgp = process.env.MIKROTIK_PPPOE1 as string;
+  private pppoe1loginBgp = process.env.MIKROTIK_LOGIN as string;
+  private pppoe1passwordBgp = process.env.MIKROTIK_PASSWORD as string;
+  private pppoe1portBgp = Number(process.env.PORT_MIKROTIK_API);
+
+  private pppoe2hostBgp = process.env.MIKROTIK_PPPOE2 as string;
+  private pppoe2loginBgp = process.env.MIKROTIK_LOGIN as string;
+  private pppoe2passwordBgp = process.env.MIKROTIK_PASSWORD as string;
+  private pppoe2portBgp = Number(process.env.PORT_MIKROTIK_API);
 
   public async startFunctions() {
     // Inicia as funções utilizando cronjob a cada 1 minuto
     await this.queryGBPS();
-    
-    
+
     return;
   }
 
@@ -31,7 +41,12 @@ export default class DosProtect {
   }
 
   private async getMonitorTrafficOnce(targetIface: string) {
-    const ros = this.createRosClient();
+    const ros = this.createRosClient(
+      this.hostBgp,
+      this.loginBgp,
+      this.passwordBgp,
+      this.portBgp
+    );
     await ros.connect();
 
     try {
@@ -70,12 +85,17 @@ export default class DosProtect {
     }
   }
 
-  private createRosClient() {
+  private createRosClient(
+    host: string,
+    user: string,
+    password: string,
+    port: number
+  ) {
     return new RouterOSAPI({
-      host: this.host,
-      user: this.login,
-      password: this.password,
-      port: this.port,
+      host,
+      user,
+      password,
+      port,
       timeout: 8000,
     });
   }
@@ -103,34 +123,57 @@ export default class DosProtect {
   /*
   /system script run top5_pppoe_rx_tx_pps
 
-  /system script add name=top5_pppoe_rx_tx_pps source={ :local TOP 5; :local ids [/interface find where type="pppoe-in"]; :local N [:len $ids]; :if ($N=0) do={ :put "Sem pppoe-in"; return; }; :if ($TOP>$N) do={ :set TOP $N }; :local pairs []; :foreach i in=$ids do={ /interface monitor-traffic $i once do={ :local nm [/interface get $i name]; :local rx $"rx-packets-per-second"; :local tx $"tx-packets-per-second"; :if ([:typeof $rx]="nothing") do={ :set rx 0 }; :if ([:typeof $tx]="nothing") do={ :set tx 0 }; :set pairs ($pairs, ($nm."|".$rx."|".$tx)) } }; :local pairsRx $pairs; :local pairsTx $pairs; :put ("=== TOP ".$TOP." PPPoE-in por RxPPS ==="); :for t from=1 to=$TOP do={ :local bestIndex -1; :local bestPps -1; :local idx 0; :foreach e in=$pairsRx do={ :local sep1 [:find $e "|"]; :local sep2 [:find $e "|" ($sep1+1)]; :local rxv [:tonum [:pick $e ($sep1+1) $sep2]]; :if ($rxv>$bestPps) do={ :set bestPps $rxv; :set bestIndex $idx }; :set idx ($idx+1) }; :if ($bestIndex!=-1) do={ :local e [:pick $pairsRx $bestIndex]; :local sep1 [:find $e "|"]; :local sep2 [:find $e "|" ($sep1+1)]; :local nm [:pick $e 0 $sep1]; :local rxv [:pick $e ($sep1+1) $sep2]; :local txv [:pick $e ($sep2+1) [:len $e]]; :put ($t.". ". $nm ." - RxPPS: ". $rxv ."  TxPPS: ". $txv); :local newPairs []; :local idx2 0; :foreach x in=$pairsRx do={ :if ($idx2!=$bestIndex) do={ :set newPairs ($newPairs,$x) }; :set idx2 ($idx2+1) }; :set pairsRx $newPairs } }; :put ("=== TOP ".$TOP." PPPoE-in por TxPPS ==="); :for t from=1 to=$TOP do={ :local bestIndex -1; :local bestPps -1; :local idx 0; :foreach e in=$pairsTx do={ :local sep1 [:find $e "|"]; :local sep2 [:find $e "|" ($sep1+1)]; :local txv [:tonum [:pick $e ($sep2+1) [:len $e]]]; :if ($txv>$bestPps) do={ :set bestPps $txv; :set bestIndex $idx }; :set idx ($idx+1) }; :if ($bestIndex!=-1) do={ :local e [:pick $pairsTx $bestIndex]; :local sep1 [:find $e "|"]; :local sep2 [:find $e "|" ($sep1+1)]; :local nm [:pick $e 0 $sep1]; :local rxv [:pick $e ($sep1+1) $sep2]; :local txv [:pick $e ($sep2+1) [:len $e]]; :put ($t.". ". $nm ." - TxPPS: ". $txv ."  RxPPS: ". $rxv); :local newPairs []; :local idx2 0; :foreach x in=$pairsTx do={ :if ($idx2!=$bestIndex) do={ :set newPairs ($newPairs,$x) }; :set idx2 ($idx2+1) }; :set pairsTx $newPairs } } }
+  :local TOP 5;:local ids [/interface find where type="pppoe-in"];:local N [:len $ids];:if ($N=0) do={:put "Sem pppoe-in";:global top5Result "Sem pppoe-in";return};:if ($TOP>$N) do={:set TOP $N};:local pairs [];:foreach i in=$ids do={/interface monitor-traffic $i once do={:local nm [/interface get $i name];:local rx $"rx-packets-per-second";:local tx $"tx-packets-per-second";:if ([:typeof $rx]="nothing") do={:set rx 0};:if ([:typeof $tx]="nothing") do={:set tx 0};:set pairs ($pairs, ($nm."|".$rx."|".$tx))}};:local pairsRx $pairs;:local pairsTx $pairs;:local output "";:for t from=1 to=$TOP do={:local bestIndex -1;:local bestPps -1;:local idx 0;:foreach e in=$pairsRx do={:local sep1 [:find $e "|"];:local sep2 [:find $e "|" ($sep1+1)];:local rxv [:tonum [:pick $e ($sep1+1) $sep2]];:if ($rxv>$bestPps) do={:set bestPps $rxv;:set bestIndex $idx};:set idx ($idx+1)};:if ($bestIndex!=-1) do={:local e [:pick $pairsRx $bestIndex];:local sep1 [:find $e "|"];:local sep2 [:find $e "|" ($sep1+1)];:local nm [:pick $e 0 $sep1];:local rxv [:pick $e ($sep1+1) $sep2];:local txv [:pick $e ($sep2+1) [:len $e]];:set output ($output.$t.". ".$nm." - RxPPS: ".$rxv." TxPPS: ".$txv."\n");:local newPairs [];:local idx2 0;:foreach x in=$pairsRx do={:if ($idx2!=$bestIndex) do={:set newPairs ($newPairs,$x)};:set idx2 ($idx2+1)};:set pairsRx $newPairs}};:for t from=1 to=$TOP do={:local bestIndex -1;:local bestPps -1;:local idx 0;:foreach e in=$pairsTx do={:local sep1 [:find $e "|"];:local sep2 [:find $e "|" ($sep1+1)];:local txv [:tonum [:pick $e ($sep2+1) [:len $e]]];:if ($txv>$bestPps) do={:set bestPps $txv;:set bestIndex $idx};:set idx ($idx+1)};:if ($bestIndex!=-1) do={:local e [:pick $pairsTx $bestIndex];:local sep1 [:find $e "|"];:local sep2 [:find $e "|" ($sep1+1)];:local nm [:pick $e 0 $sep1];:local rxv [:pick $e ($sep1+1) $sep2];:local txv [:pick $e ($sep2+1) [:len $e]];:set output ($output.$t.". ".$nm." - TxPPS: ".$txv." RxPPS: ".$rxv."\n");:local newPairs [];:local idx2 0;:foreach x in=$pairsTx do={:if ($idx2!=$bestIndex) do={:set newPairs ($newPairs,$x)};:set idx2 ($idx2+1)};:set pairsTx $newPairs}};:global top5Result $output
+
   */
 
-  private async pppoeClientGrantestPacket(targetIface: string) {
-    const ros = this.createRosClient();
+  private async pppoeClientGreatestPacket(
+    host: string,
+    user: string,
+    password: string,
+    port: number
+  ) {
+    const ros = this.createRosClient(host, user, password, port);
     await ros.connect();
     try {
-      const result = (await ros.write(
-        "/system/script/run", // caminho API que executa um script
-        [
-          "=name=top5_pppoe_rx_tx_pps", // executa o script pelo NOME (exatamente como cadastrado no RouterOS)
-          "=.tag=runTop5", // (opcional) tag para correlacionar esta chamada nas respostas
-        ]
-      )) as RosRow[];
+      const id = String(0);
 
-      await ros.close();
+      // executa o script e ignora o erro de !empty
+      try {
+        await ros.write("/system/script/run", [`=.id=${id}`]);
+      } catch (e: any) {
+        if (e?.errno === "UNKNOWNREPLY") {
+          console.log("Script executado (retorno vazio !empty)");
+        } else {
+          throw e;
+        }
+      }
 
-      console.log(result);
+      // agora lê a variável global com o resultado
+      const envs = (await ros.write("/system/script/environment/print", [
+        "?name=top5Result",
+      ])) as RosRow[];
+
+      if (envs.length > 0) {
+        const env = envs[0];
+        const result = (env.value ?? env.val ?? "").toString();
+        console.log("Resultado top5:", result);
+        return result;
+      } else {
+        console.log("Nenhum resultado encontrado em top5Result");
+        return null;
+      }
     } catch (error) {
-      console.log(error);
-      return;
+      console.error("Erro:", error);
+      return null;
+    } finally {
+      await ros.close().catch(() => {});
     }
   }
 
   private async checkPacketCount(): Promise<number> {
-    if (this.isDDos) {
-    }
-
+    await this.pppoeClientGreatestPacket(this.pppoe1hostBgp, this.pppoe1loginBgp, this.pppoe1passwordBgp, this.pppoe1portBgp);
+    await this.pppoeClientGreatestPacket(this.pppoe2hostBgp, this.pppoe2loginBgp, this.pppoe2passwordBgp, this.pppoe2portBgp);
     return 0;
   }
 
