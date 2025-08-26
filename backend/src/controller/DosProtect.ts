@@ -146,10 +146,13 @@ private async pppoeClientGreatestPacket(
     }
 
     const id = String(script[".id"]);
+    
+    
 
     // executa o script (ignora retorno !empty)
     try {
       await ros.write("/system/script/run", [`=.id=${id}`]);
+
     } catch (e: any) {
       if (e?.errno === "UNKNOWNREPLY") {
         console.log("Script executado (retorno vazio !empty)");
@@ -159,7 +162,7 @@ private async pppoeClientGreatestPacket(
     }
 
     // espera um pouco para dar tempo do script atualizar a global
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     // agora lê a variável global
     const envs = (await ros.write("/system/script/environment/print", [
@@ -169,7 +172,7 @@ private async pppoeClientGreatestPacket(
     if (envs.length > 0) {
       const env = envs[0];
       const result = (env.value ?? env.val ?? "").toString();
-      console.log("Resultado top5:", result);
+      console.log(result);
       return result;
     } else {
       console.log("Nenhum resultado encontrado em top5Result");
