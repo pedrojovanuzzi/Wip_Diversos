@@ -171,11 +171,11 @@ export default class DosProtect {
 
     console.log(Gbps.toFixed(2));
 
-    const packetCount = await this.checkPacketCount();
+    const packetCountOver20000 = await this.checkPacketCount();
 
-    if (!packetCount) return;
+    if (!packetCountOver20000) return;
     // se sim vai para a proxima etapa
-    if (responseRxBytes.txBps >= 8 || packetCount > 20000) {
+    if (responseRxBytes.txBps >= 8 || packetCountOver20000) {
       this.blockIp();
     }
 
@@ -224,13 +224,14 @@ export default class DosProtect {
             const match = line.match(/RxPPS:\s*(\d+)\s*TxPPS:\s*(\d+)/);
             if (!match) return { rx: 0, tx: 0 }; // ou lançar erro se quiser
             const [, rx, tx] = match;
-            let x = 1;
-            console.log(x++);
-            
             return { rx: Number(rx), tx: Number(tx) };
           });
-        console.log(arrayResult);
-        return arrayResult;
+
+        const maiorRx = Math.max(...arrayResult.map((f) => f.rx));
+        const maiorTx = Math.max(...arrayResult.map((f) => f.tx));
+        const maiorRxeTx = { rx: maiorRx, tx: maiorTx };
+        // console.log(maiorRxeTx);
+        return maiorRxeTx;
       } else {
         console.log("Nenhum resultado encontrado em top5Result");
         return null;
@@ -243,20 +244,29 @@ export default class DosProtect {
     }
   }
 
-  private async checkPacketCount(): Promise<number> {
-    await this.pppoeClientGreatestPacket(
+  private async checkPacketCount(): Promise<boolean> {
+    const pppoe1 = await this.pppoeClientGreatestPacket(
       this.pppoe1hostBgp,
       this.pppoe1loginBgp,
       this.pppoe1passwordBgp,
       this.pppoe1portBgp
     );
-    await this.pppoeClientGreatestPacket(
+    const pppoe2 = await this.pppoeClientGreatestPacket(
       this.pppoe2hostBgp,
       this.pppoe2loginBgp,
       this.pppoe2passwordBgp,
       this.pppoe2portBgp
     );
-    return 0;
+
+    if(!pppoe1?.rx || !pppoe1?.tx) return false;
+    if(!pppoe2?.rx || !pppoe2?.tx) return false;
+
+    if (pppoe1?.rx >= 20000 || pppoe1?.tx >= 20000 || pppoe2?.rx >= 20000 || pppoe2?.tx >= 20000) {
+      console.warn('DDOS DETECTADO');
+      return true;
+    }
+
+    return false;
   }
 
   private blockIp() {}
