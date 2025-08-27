@@ -3,6 +3,10 @@ import path from "path";
 import { RouterOSAPI } from "node-routeros";
 import { Client } from "ssh2";
 
+const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
+const urlMedia = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
+const token = process.env.CLOUD_API_ACCESS_TOKEN;
+
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 type RosRow = Record<string, unknown>;
@@ -275,7 +279,7 @@ export default class DosProtect {
       this.pppoe2portBgp
     );
 
-    const LIMITPACKETS = 2000;
+    const LIMITPACKETS = 2000000;
 
     if (!pppoe1 || !pppoe2) return { dddosActive: false };
 
@@ -304,7 +308,7 @@ export default class DosProtect {
 
   private async blockIp(offenders: PacketResponse) {
     try {
-      this.notify(offenders);
+      await this.notify(offenders);
       offenders.offenders?.map(async (f) => {
         const ros = this.createRosClient(
           f.server,
@@ -319,8 +323,6 @@ export default class DosProtect {
           `?name=${f.pppoe}`, // filtro por nome exato (sem aspas)
           "=.proplist=name,address,service,caller-id", // quais campos queremos (opcional)
         ])) as RosRow[]; // tipagem do retorno (array de linhas)
-
-        console.log(resultIpClient[0].address);
 
         //         const addRes = await ros.write([
         //   '/ip/firewall/address-list/add', // comando correto para adicionar uma entrada
@@ -341,7 +343,7 @@ export default class DosProtect {
     }
   }
 
-  private notify(offenders: PacketResponse) {
+  private async notify(offenders: PacketResponse) {
     const list = offenders.offenders ?? [];
 
     if (list.length === 0) {
@@ -355,13 +357,31 @@ export default class DosProtect {
       })
       .join(" ; ");
 
+    const msg = `Cliente Adicionado a Black Hole, possível ataque DDoS detectado! ${detalhes}`;
+
     console.warn(
       // usa warn para destacar
-      `Cliente Adicionado a Black Hole, possível ataque DDoS detectado! ${detalhes}` // mensagem completa
+      msg // mensagem completa
     ); // fim do log
+
+    const celulares = ["+5514981727282", ""]
+
+    await this.templateMessage(celulares, msg);
 
     return;
   }
+
+  templateMessage = async (
+    recipient_number: string | string[],
+    msg: string
+  ) => {
+    try {
+      
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
+  };
+
 }
 
 //Teste das Funções
