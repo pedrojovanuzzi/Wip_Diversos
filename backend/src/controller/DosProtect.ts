@@ -7,6 +7,11 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 type RosRow = Record<string, unknown>;
 
+interface PacketResponse {
+  dddosActive: boolean;
+  offenders?: Array<{ pppoe: string; rx: number; tx: number; server: string }>;
+}
+
 export default class DosProtect {
   private isDDos = false;
 
@@ -175,8 +180,8 @@ export default class DosProtect {
 
     if (!packetCountOver) return;
     // se sim vai para a proxima etapa
-    if (responseRxBytes.txBps >= 8 || packetCountOver) {
-      this.blockIp();
+    if (responseRxBytes.txBps >= 8 || packetCountOver.dddosActive) {
+      await this.blockIp(packetCountOver);
     }
 
     return;
@@ -214,27 +219,39 @@ export default class DosProtect {
         "?name=top5Result",
       ])) as RosRow[];
 
+      // Verifica se há itens em 'envs'
       if (envs.length > 0) {
-        const env = envs[0];
-        const result = (env.value ?? env.val ?? "").toString();
-        let arrayResult = result
-          .split(/[-\n]/)
-          .filter((f) => f.trim().startsWith("Tx") || f.trim().startsWith("Rx"))
-          .map((line) => {
-            const match = line.match(/RxPPS:\s*(\d+)\s*TxPPS:\s*(\d+)/);
-            if (!match) return { rx: 0, tx: 0 }; // ou lançar erro se quiser
-            const [, rx, tx] = match;
-            return { rx: Number(rx), tx: Number(tx) };
-          });
+        // Pega o primeiro item
+        const env = envs[0]; // item de onde vem a string
+        // Garante string (usa value, ou val, ou vazio) e converte
+        const result = (env.value ?? env.val ?? "").toString(); // texto completo com várias linhas
 
-        const maiorRx = Math.max(...arrayResult.map((f) => f.rx));
-        const maiorTx = Math.max(...arrayResult.map((f) => f.tx));
-        const maiorRxeTx = { rx: maiorRx, tx: maiorTx };
-        // console.log(maiorRxeTx);
-        return maiorRxeTx;
+        // Regex global para capturar PPPoE (grupo 1) e Rx/Tx em qualquer ordem:
+        //  - Se vier "Rx ... Tx": grupos (2=rx, 3=tx)
+        //  - Se vier "Tx ... Rx": grupos (4=tx, 5=rx)
+        const re =
+          /<pppoe-([^>]+)>.*?(?:RxPPS:\s*(\d+).*?TxPPS:\s*(\d+)|TxPPS:\s*(\d+).*?RxPPS:\s*(\d+))/g; // 'g' para todas ocorrências
+
+        // Converte todos os matches em objetos { pppoe, rx, tx }
+        const arrayResult = Array.from(result.matchAll(re)) // itera todas as correspondências
+          .map((m) => ({
+            // m é um RegExpMatchArray
+            host: host,
+            pppoe: m[1], // grupo 1: nome PPPoE
+            rx: Number(m[2] ?? m[5] ?? 0), // se Rx veio antes usa m[2]; se depois usa m[5]
+            tx: Number(m[3] ?? m[4] ?? 0), // se Tx veio depois usa m[3]; se antes usa m[4]
+          })); // retorna o objeto já tipado
+
+        // Opcional: inspeciona o array calculado
+        // console.log(arrayResult); // conferência do parsing
+
+        // Retorna o resultado
+        return arrayResult; // { rx: <maiorRx>, tx: <maiorTx> }
       } else {
-        console.log("Nenhum resultado encontrado em top5Result");
-        return null;
+        // Caso não haja dados em 'envs'
+        console.log("Nenhum resultado encontrado em top5Result"); // log de aviso
+        // Retorna nulo
+        return null; // sem dados para processar
       }
     } catch (error) {
       console.error("Erro:", error);
@@ -244,7 +261,7 @@ export default class DosProtect {
     }
   }
 
-  private async checkPacketCount(): Promise<boolean> {
+  private async checkPacketCount(): Promise<PacketResponse> {
     const pppoe1 = await this.pppoeClientGreatestPacket(
       this.pppoe1hostBgp,
       this.pppoe1loginBgp,
@@ -258,20 +275,93 @@ export default class DosProtect {
       this.pppoe2portBgp
     );
 
-    const LIMITPACKETS = 150000
+    const LIMITPACKETS = 2000;
 
-    if(!pppoe1?.rx || !pppoe1?.tx) return false;
-    if(!pppoe2?.rx || !pppoe2?.tx) return false;
+    if (!pppoe1 || !pppoe2) return { dddosActive: false };
 
-    if (pppoe1?.rx >= LIMITPACKETS || pppoe1?.tx >= LIMITPACKETS || pppoe2?.rx >= LIMITPACKETS || pppoe2?.tx >= LIMITPACKETS) {
-      console.warn('DDOS DETECTADO');
-      return true;
+    // Função utilitária para testar se um item estoura o limite (rx OU tx)
+    const isOver = (f: { rx: number; tx: number }) =>
+      f.rx >= LIMITPACKETS || f.tx >= LIMITPACKETS;
+
+    const offenders1 = pppoe1
+      .filter(isOver)
+      .map((f) => ({ pppoe: f.pppoe, rx: f.rx, tx: f.tx, server: f.host }));
+    const offenders2 = pppoe2
+      .filter(isOver)
+      .map((f) => ({ pppoe: f.pppoe, rx: f.rx, tx: f.tx, server: f.host }));
+
+    const allOffenders = [...offenders1, ...offenders2];
+
+    if (allOffenders.length === 0) return { dddosActive: false };
+
+    if (allOffenders) {
+      console.log(allOffenders);
+      return { offenders: allOffenders, dddosActive: true };
     }
 
-    return false;
+    return { dddosActive: false };
   }
 
-  private blockIp() {}
+  private async blockIp(offenders: PacketResponse) {
+    try {
+      this.notify(offenders);
+      offenders.offenders?.map(async (f) => {
+        const ros = this.createRosClient(
+          f.server,
+          this.loginBgp,
+          this.passwordBgp,
+          this.portBgp
+        );
+        await ros.connect();
+
+        const resultIpClient = (await ros.write([
+          "/ppp/active/print", // comando correto (não use '=print=')
+          `?name=${f.pppoe}`, // filtro por nome exato (sem aspas)
+          "=.proplist=name,address,service,caller-id", // quais campos queremos (opcional)
+        ])) as RosRow[]; // tipagem do retorno (array de linhas)
+
+        console.log(resultIpClient[0].address);
+
+        //         const addRes = await ros.write([
+        //   '/ip/firewall/address-list/add', // comando correto para adicionar uma entrada
+        //   `=address=${resultIpClient[0].address}`,           // IP a ser adicionado (NÃO use aspas)
+        //   '=list=block-ddos',               // nome da lista (ajuste se quiser)
+        //   '=comment=auto-ddos',             // (opcional) comentário para auditoria
+        //   // '=timeout=10m',                // (opcional) tempo de expiração (ex.: 10 minutos)
+        // ]);                                  // o retorno é um array de linhas do RouterOS
+
+        await ros.close();
+      });
+    } catch (e: any) {
+      if (e?.errno === "UNKNOWNREPLY") {
+        console.log("Script executado (retorno vazio !empty)");
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  private notify(offenders: PacketResponse) {
+    const list = offenders.offenders ?? [];
+
+    if (list.length === 0) {
+      console.warn("Nenhum cliente adicionado a Black Hole");
+      return;
+    }
+
+    const detalhes = list
+      .map((f) => {
+        return `PPPOE: ${f.pppoe} | SERVERS: ${f.server} | RX: ${f.rx} | TX: ${f.tx}`;
+      })
+      .join(" ; ");
+
+    console.warn(
+      // usa warn para destacar
+      `Cliente Adicionado a Black Hole, possível ataque DDoS detectado! ${detalhes}` // mensagem completa
+    ); // fim do log
+
+    return;
+  }
 }
 
 //Teste das Funções
