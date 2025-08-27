@@ -11,7 +11,6 @@ const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/
 const urlMedia = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
 const token = process.env.CLOUD_API_ACCESS_TOKEN;
 
-
 class WhatsappController {
   getConversations = async () => {
     try {
@@ -201,69 +200,71 @@ class WhatsappController {
     }
   };
 
-sendMessage = async (req: Request, res: Response) => {
-  const { user, message } = req.body;
-  
+  sendMessage = async (req: Request, res: Response) => {
+    const { user, message } = req.body;
 
-  if (!user || !message || !message.content) {
-    res.status(400).json({ message: "User and message content are required" });
-    return;
-  }
+    if (!user || !message || !message.content) {
+      res
+        .status(400)
+        .json({ message: "User and message content are required" });
+      return;
+    }
 
-  const selectConversations = API_MK.getRepository(Conversations);
-  const conversation = await selectConversations.findOneBy({ id: message.conv_id });
+    const selectConversations = API_MK.getRepository(Conversations);
+    const conversation = await selectConversations.findOneBy({
+      id: message.conv_id,
+    });
 
-  if (!conversation) {
-    res.status(404).json({ message: "Conversation not found" });
-    return;
-  }
+    if (!conversation) {
+      res.status(404).json({ message: "Conversation not found" });
+      return;
+    }
 
-  const selectMensagens = API_MK.getRepository(Mensagens);
-  const newMessage = new Mensagens();
-  newMessage.conv_id = message.conv_id;
-  newMessage.sender_id = message.sender_id;
-  newMessage.content = message.content;
-  newMessage.timestamp = message.timestamp
-  ? new Date(message.timestamp)
-  : new Date(Date.now() - 3 * 60 * 60 * 1000); 
+    const selectMensagens = API_MK.getRepository(Mensagens);
+    const newMessage = new Mensagens();
+    newMessage.conv_id = message.conv_id;
+    newMessage.sender_id = message.sender_id;
+    newMessage.content = message.content;
+    newMessage.timestamp = message.timestamp
+      ? new Date(message.timestamp)
+      : new Date(Date.now() - 3 * 60 * 60 * 1000);
 
+    await selectMensagens.save(newMessage);
 
-  await selectMensagens.save(newMessage);
+    const selectConversationUsers = API_MK.getRepository(Conversation_Users);
+    const conversationUsers = await selectConversationUsers.find({
+      where: { conv_id: message.conv_id },
+      select: ["user_id"],
+    });
 
-  const selectConversationUsers = API_MK.getRepository(Conversation_Users);
-  const conversationUsers = await selectConversationUsers.find({
-    where: { conv_id: message.conv_id },
-    select: ["user_id"],
-  });
+    const userIds = conversationUsers.map((cu) => cu.user_id);
+    const selectPeopleConversations = API_MK.getRepository(PeopleConversations);
+    const peopleConversations = await selectPeopleConversations.find({
+      where: { id: In(userIds) },
+      select: ["id", "nome", "telefone"],
+    });
 
-  const userIds = conversationUsers.map((cu) => cu.user_id);
-  const selectPeopleConversations = API_MK.getRepository(PeopleConversations);
-  const peopleConversations = await selectPeopleConversations.find({
-    where: { id: In(userIds) },
-    select: ["id", "nome", "telefone"],
-  });
+    const recipient = peopleConversations.find(
+      (pc) => pc.id !== message.sender_id
+    );
 
-  const recipient = peopleConversations.find(
-    (pc) => pc.id !== message.sender_id
-  );
+    if (!recipient) {
+      res.status(404).json({ message: "Recipient not found" });
+      return;
+    }
 
-  if (!recipient) {
-    res.status(404).json({ message: "Recipient not found" });
-    return;
-  }
+    const recipient_number = recipient.telefone.replace(/\D/g, ""); // Remove non-numeric characters
+    if (!recipient_number) {
+      res.status(400).json({ message: "Invalid recipient phone number" });
+      return;
+    }
 
-const recipient_number = recipient.telefone.replace(/\D/g, ""); // Remove non-numeric characters
-if (!recipient_number) {
-    res.status(400).json({ message: "Invalid recipient phone number" });
-    return;
-  }
+    await this.MensagensComuns(recipient_number, message.content);
 
-  await this.MensagensComuns(recipient_number, message.content);
+    res.status(200).json({ message: "Message sent successfully" });
+  };
 
-  res.status(200).json({ message: "Message sent successfully" });
-}
-
-  MensagensComuns = async (recipient_number : string, msg : string) => {
+  MensagensComuns = async (recipient_number: string, msg: string) => {
     try {
       const response = await axios.post(
         url,
@@ -287,8 +288,7 @@ if (!recipient_number) {
     } catch (error) {
       console.error("Error sending message:", error);
     }
-  }
-
+  };
 
   // Example method to receive messages
   async receiveMessage() {
