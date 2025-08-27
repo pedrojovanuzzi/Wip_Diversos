@@ -2,6 +2,8 @@ import dotenv from "dotenv";
 import path from "path";
 import { RouterOSAPI } from "node-routeros";
 import { Client } from "ssh2";
+import axios from "axios";
+
 
 const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
 const urlMedia = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
@@ -376,7 +378,14 @@ export default class DosProtect {
     msg: string
   ) => {
     try {
-      
+      if(typeof recipient_number != 'string'){
+        recipient_number.map(r => {
+
+        })
+      }
+      else{
+
+      }
     } catch (error) {
       console.error("Error sending message:", error);
     }
