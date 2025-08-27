@@ -171,11 +171,11 @@ export default class DosProtect {
 
     console.log(Gbps.toFixed(2));
 
-    const packetCountOver20000 = await this.checkPacketCount();
+    const packetCountOver = await this.checkPacketCount();
 
-    if (!packetCountOver20000) return;
+    if (!packetCountOver) return;
     // se sim vai para a proxima etapa
-    if (responseRxBytes.txBps >= 8 || packetCountOver20000) {
+    if (responseRxBytes.txBps >= 8 || packetCountOver) {
       this.blockIp();
     }
 
@@ -258,10 +258,12 @@ export default class DosProtect {
       this.pppoe2portBgp
     );
 
+    const LIMITPACKETS = 150000
+
     if(!pppoe1?.rx || !pppoe1?.tx) return false;
     if(!pppoe2?.rx || !pppoe2?.tx) return false;
 
-    if (pppoe1?.rx >= 20000 || pppoe1?.tx >= 20000 || pppoe2?.rx >= 20000 || pppoe2?.tx >= 20000) {
+    if (pppoe1?.rx >= LIMITPACKETS || pppoe1?.tx >= LIMITPACKETS || pppoe2?.rx >= LIMITPACKETS || pppoe2?.tx >= LIMITPACKETS) {
       console.warn('DDOS DETECTADO');
       return true;
     }
