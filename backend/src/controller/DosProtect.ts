@@ -329,19 +329,19 @@ export default class DosProtect {
           "=.proplist=name,address,service,caller-id", // quais campos queremos (opcional)
         ])) as RosRow[]; // tipagem do retorno (array de linhas)
 
-        if (!Array.isArray(resultIpClient) || resultIpClient.length === 0) return;
+        if (!Array.isArray(resultIpClient) || resultIpClient.length === 0)
+          return;
         console.log(resultIpClient[0].address);
 
-      const dosResponse = dosRepository.create({
-        pppoe: f.pppoe,
-        host: f.server,
-        ip: resultIpClient[0].address as string,
-      })
+        const dosResponse = dosRepository.create({
+          pppoe: f.pppoe,
+          host: f.server,
+          ip: resultIpClient[0].address as string,
+        });
 
-      const save = await dosRepository.save(dosResponse);
+        const save = await dosRepository.save(dosResponse);
 
-      console.log(save);
-        
+        console.log(save);
 
         // const addRes = await ros.write([
         //   '/ip/firewall/address-list/add', // comando correto para adicionar uma entrada
@@ -383,8 +383,11 @@ export default class DosProtect {
       msg // mensagem completa
     ); // fim do log
 
-
-    const celulares = [process.env.TEST_PHONE as string, process.env.TEST_PHONE2 as string, process.env.TEST_PHONE3 as string];
+    const celulares = [
+      process.env.TEST_PHONE as string,
+      process.env.TEST_PHONE2 as string,
+      process.env.TEST_PHONE3 as string,
+    ];
 
     await this.templateMessage(celulares, msg);
 
@@ -400,37 +403,37 @@ export default class DosProtect {
         typeof recipient_number !== "string" &&
         Array.isArray(recipient_number)
       ) {
-          await Promise.all(
-            recipient_number.map(async f => {
+        await Promise.all(
+          recipient_number.map(async (f) => {
             const text = await axios.post(
-          url,
-          {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: f,
-            type: "template",
-            template: {
-              name: "aviso_d",
-              language: {
-                code: "pt_BR",
-              },
-              components: [
-                {
-                  type: "body",
+              url,
+              {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: f,
+                type: "template",
+                template: {
+                  name: "aviso_d",
+                  language: {
+                    code: "pt_BR",
+                  },
+                  components: [
+                    {
+                      type: "body",
+                    },
+                  ],
                 },
-              ],
-            },
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+            // console.log(text);
+          })
         );
-        // console.log(text);
-          })     
-          )   
       } else {
         const text = await axios.post(
           url,
@@ -464,10 +467,52 @@ export default class DosProtect {
       console.error("Error sending message:", error);
     }
   };
+
+  public async last10Pppoe() {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+    const dosresponse = await dosRepository
+      .createQueryBuilder("m") // define alias 'm' para a tabela
+      .select("m.pppoe", "pppoe") // seleciona a coluna pppoe (alias 'pppoe' no resultado)
+      .addSelect("COUNT(*)", "total") // adiciona a contagem como 'total'
+      .where("m.timestamp >= :from", { from: oneHourAgo }) // filtro por janela temporal (parametrizado)
+      .groupBy("m.pppoe") // agrupa por pppoe
+      .orderBy("total", "DESC") // ordena do maior para o menor
+      .limit(10) // limita ao top 10
+      .getRawMany(); // executa e retorna linhas simples { pppoe, total }
+
+    return dosresponse;
+  }
+
+  public async eventsPerMinute() {
+    const dosresponse = await dosRepository
+      .createQueryBuilder("m")
+      .select("DATE_FORMAT(m.timestamp, '%Y-%m-%d %H:%i') AS minuto")
+      .addSelect("COUNT(*)", "total")
+      .where("m.timestamp >= NOW - INTERVAL 30 MINUTE")
+      .groupBy("minuto")
+      .orderBy("minuto")
+      .getRawMany();
+
+    return dosresponse;
+  }
+
+  public async eventsPerHost(){
+        const dosresponse = await dosRepository
+      .createQueryBuilder("m")
+      .select("m.host")
+      .addSelect("COUNT(*)", "total")
+      .where('m.timestamp >= NOW() - INTERVAL 1 HOUR')
+      .groupBy("m.host")
+      .orderBy('total', 'DESC')
+      .getRawMany();
+
+    return dosresponse;
+  }
+
 }
 
 //Teste das Funções
 
-const test = new DosProtect();
-console.log(test.startFunctions());
-
+// const test = new DosProtect();
+// console.log(test.startFunctions());

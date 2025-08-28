@@ -13,6 +13,7 @@ export class PrefeituraUser {
     
     @Column({type: 'varchar'})
     cpf?: string
+    
 
     @Column({type: 'varchar'})
     ip?: string

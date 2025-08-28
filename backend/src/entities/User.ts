@@ -9,5 +9,6 @@ export class User {
     login?: string
 
     @Column({type: 'varchar'})
+    
     password?: string
 }
