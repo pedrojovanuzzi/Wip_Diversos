@@ -9,6 +9,6 @@ const router: Router = Router();
 
 router.get("/last10Pppoe", AuthGuard, DosProtect.last10Pppoe);
 router.get("/eventsPerHost", AuthGuard, DosProtect.eventsPerHost);
-router.get("/eventsPerHost", AuthGuard, DosProtect.eventsPerHost);
+router.get("/eventsPerMinute", AuthGuard, DosProtect.eventsPerMinute);
 
 export default router;
