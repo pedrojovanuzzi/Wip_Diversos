@@ -1,5 +1,7 @@
 import { MigrationInterface, QueryRunner, Table } from "typeorm";
 
+
+
 export class PrefeituraUserMigration1740149821773 implements MigrationInterface {
     name = 'PrefeituraUserMigration1740149821773'
 

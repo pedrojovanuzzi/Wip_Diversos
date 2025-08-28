@@ -5,22 +5,23 @@ export class PrefeituraUser {
     @PrimaryGeneratedColumn()
     id?: number
 
-    @Column()
+    @Column({type: 'varchar'})
     name?: string
 
-    @Column({nullable: true})
+    @Column({type: 'varchar', nullable: true})
     celular?: string
     
-    @Column()
+    @Column({type: 'varchar'})
     cpf?: string
+    
 
-    @Column()
+    @Column({type: 'varchar'})
     ip?: string
 
-    @Column()
+    @Column({type: 'varchar'})
     mac?: string
 
-    @Column()
+    @Column({type: 'varchar'})
     uuid?: string
 
 }
