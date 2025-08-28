@@ -4,12 +4,11 @@ import { RouterOSAPI } from "node-routeros";
 import { Client } from "ssh2";
 import axios from "axios";
 
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
 const urlMedia = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
 const token = process.env.CLOUD_API_ACCESS_TOKEN;
-
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 type RosRow = Record<string, unknown>;
 
@@ -326,13 +325,17 @@ export default class DosProtect {
           "=.proplist=name,address,service,caller-id", // quais campos queremos (opcional)
         ])) as RosRow[]; // tipagem do retorno (array de linhas)
 
-        //         const addRes = await ros.write([
-        //   '/ip/firewall/address-list/add', // comando correto para adicionar uma entrada
-        //   `=address=${resultIpClient[0].address}`,           // IP a ser adicionado (NÃO use aspas)
-        //   '=list=block-ddos',               // nome da lista (ajuste se quiser)
-        //   '=comment=auto-ddos',             // (opcional) comentário para auditoria
-        //   // '=timeout=10m',                // (opcional) tempo de expiração (ex.: 10 minutos)
-        // ]);                                  // o retorno é um array de linhas do RouterOS
+        if (!Array.isArray(resultIpClient) || resultIpClient.length === 0) return;
+        console.log(resultIpClient[0].address);
+        
+
+        const addRes = await ros.write([
+          '/ip/firewall/address-list/add', // comando correto para adicionar uma entrada
+          `=address=${resultIpClient[0].address}`,// IP a ser adicionado (NÃO use aspas)
+          '=list=block-ddos',               // nome da lista (ajuste se quiser)
+          '=comment=auto-ddos',             // (opcional) comentário para auditoria
+          '=timeout=10m',                // (opcional) tempo de expiração (ex.: 10 minutos)
+        ]);                                  // o retorno é um array de linhas do RouterOS
 
         await ros.close();
       });
@@ -366,34 +369,90 @@ export default class DosProtect {
       msg // mensagem completa
     ); // fim do log
 
-    const celulares = ["+5514981727282", ""]
+    const celulares = [process.env.TEST_PHONE as string, process.env.TEST_PHONE2 as string, process.env.TEST_PHONE3 as string];
 
     await this.templateMessage(celulares, msg);
 
     return;
   }
 
-  templateMessage = async (
+  private templateMessage = async (
     recipient_number: string | string[],
     msg: string
   ) => {
     try {
-      if(typeof recipient_number != 'string'){
-        recipient_number.map(r => {
-
-        })
-      }
-      else{
-
+      if (
+        typeof recipient_number !== "string" &&
+        Array.isArray(recipient_number)
+      ) {
+          await Promise.all(
+            recipient_number.map(async f => {
+            const text = await axios.post(
+          url,
+          {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: f,
+            type: "template",
+            template: {
+              name: "aviso_d",
+              language: {
+                code: "pt_BR",
+              },
+              components: [
+                {
+                  type: "body",
+                },
+              ],
+            },
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        // console.log(text);
+          })     
+          )   
+      } else {
+        const text = await axios.post(
+          url,
+          {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: recipient_number,
+            type: "template",
+            template: {
+              name: "aviso_d",
+              language: {
+                code: "pt_BR",
+              },
+              components: [
+                {
+                  type: "body",
+                },
+              ],
+            },
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        // console.log(text);
       }
     } catch (error) {
       console.error("Error sending message:", error);
     }
   };
-
 }
 
 //Teste das Funções
 
-const test = new DosProtect();
-console.log(test.startFunctions());
+// const test = new DosProtect();
+// console.log(test.startFunctions());
+
