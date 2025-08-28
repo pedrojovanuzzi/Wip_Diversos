@@ -11,6 +11,9 @@ export class DDDOS_MonitoringEntities{
     @Column({type: 'varchar'})
     ip?: string;
 
+    @Column({type: 'varchar'})
+    host?: string;
+
     @CreateDateColumn({type: 'datetime', name: 'timestamp', default: () => 'CURRENT_TIMESTAMP'})
     timestamp?: Date;
 
