@@ -567,5 +567,5 @@ export default DosProtect;
 
 //Teste das Funções
 
-const test = new DosProtect();
-console.log(test.startFunctions());
+// const test = new DosProtect();
+// console.log(test.startFunctions());
