@@ -5,6 +5,8 @@ import { Client } from "ssh2";
 import axios from "axios";
 import AppDataSource from "../database/DataSource";
 import { DDDOS_MonitoringEntities } from "../entities/DDDOS_Monitoring";
+import { RequestHandler } from "express";
+
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -20,7 +22,7 @@ interface PacketResponse {
   offenders?: Array<{ pppoe: string; rx: number; tx: number; server: string }>;
 }
 
-export default class DosProtect {
+class DosProtect {
   private isDDos = false;
 
   private hostBgp = process.env.BGP_IP as string;
@@ -468,49 +470,72 @@ export default class DosProtect {
     }
   };
 
-  public async last10Pppoe() {
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  public static last10Pppoe: RequestHandler = async (req, res, next) => {
+    // Usa try/catch para capturar e repassar erros ao middleware de erro
+    try {
+      // Calcula o horário de 1 hora atrás a partir de agora
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      // Monta a query de top 10 PPPoE pela contagem na última hora
+      const rows = await dosRepository
+        .createQueryBuilder("m")                // Define alias 'm' para a tabela
+        .select("m.pppoe", "pppoe")            // Seleciona a coluna pppoe com alias 'pppoe'
+        .addSelect("COUNT(*)", "total")        // Adiciona a contagem como 'total'
+        .where("m.timestamp >= :from", { from: oneHourAgo }) // Filtra por janela temporal
+        .groupBy("m.pppoe")                    // Agrupa por pppoe
+        .orderBy("total", "DESC")              // Ordena do maior para o menor
+        .limit(10)                             // Limita em 10 resultados
+        .getRawMany();                         // Retorna objetos simples { pppoe, total }
+      // Responde ao cliente com o JSON da query
+      res.json(rows);
+    } catch (err) {
+      // Encaminha o erro para o middleware global
+      next(err);
+    }
+  };
 
-    const dosresponse = await dosRepository
-      .createQueryBuilder("m") // define alias 'm' para a tabela
-      .select("m.pppoe", "pppoe") // seleciona a coluna pppoe (alias 'pppoe' no resultado)
-      .addSelect("COUNT(*)", "total") // adiciona a contagem como 'total'
-      .where("m.timestamp >= :from", { from: oneHourAgo }) // filtro por janela temporal (parametrizado)
-      .groupBy("m.pppoe") // agrupa por pppoe
-      .orderBy("total", "DESC") // ordena do maior para o menor
-      .limit(10) // limita ao top 10
-      .getRawMany(); // executa e retorna linhas simples { pppoe, total }
+  public static eventsPerMinute: RequestHandler = async (req, res, next) => {
+    // Protege com try/catch para tratar erros
+    try {
+      // Executa query agregando por minuto nos últimos 30 minutos
+      const rows = await dosRepository
+        .createQueryBuilder("m")                                         // Alias 'm'
+        .select("DATE_FORMAT(m.timestamp, '%Y-%m-%d %H:%i')", "minuto")  // Formata timestamp por minuto
+        .addSelect("COUNT(*)", "total")                                  // Conta eventos por minuto
+        .where("m.timestamp >= NOW() - INTERVAL 30 MINUTE")              // Janela de 30 minutos
+        .groupBy("minuto")                                               // Agrupa por minuto
+        .orderBy("minuto")                                               // Ordena crescente por minuto
+        .getRawMany();                                                   // Retorna objetos simples
+      // Envia o resultado como JSON
+      res.json(rows);
+    } catch (err) {
+      // Repassa erro ao middleware global
+      next(err);
+    }
+  };
 
-    return dosresponse;
-  }
-
-  public async eventsPerMinute() {
-    const dosresponse = await dosRepository
-      .createQueryBuilder("m")
-      .select("DATE_FORMAT(m.timestamp, '%Y-%m-%d %H:%i') AS minuto")
-      .addSelect("COUNT(*)", "total")
-      .where("m.timestamp >= NOW - INTERVAL 30 MINUTE")
-      .groupBy("minuto")
-      .orderBy("minuto")
-      .getRawMany();
-
-    return dosresponse;
-  }
-
-  public async eventsPerHost(){
-        const dosresponse = await dosRepository
-      .createQueryBuilder("m")
-      .select("m.host")
-      .addSelect("COUNT(*)", "total")
-      .where('m.timestamp >= NOW() - INTERVAL 1 HOUR')
-      .groupBy("m.host")
-      .orderBy('total', 'DESC')
-      .getRawMany();
-
-    return dosresponse;
-  }
-
+  public static eventsPerHost: RequestHandler = async (req, res, next) => {
+    // Envolve em try/catch para robustez
+    try {
+      // Executa query agregando por host na última hora
+      const rows = await dosRepository
+        .createQueryBuilder("m")                           // Alias 'm'
+        .select("m.host", "host")                          // Seleciona host com alias 'host'
+        .addSelect("COUNT(*)", "total")                    // Conta eventos por host
+        .where("m.timestamp >= NOW() - INTERVAL 1 HOUR")   // Janela de 1 hora
+        .groupBy("m.host")                                 // Agrupa por host
+        .orderBy("total", "DESC")                          // Ordena dos maiores para os menores
+        .getRawMany();                                     // Retorna objetos simples
+      // Retorna o JSON com os hosts e totais
+      res.json(rows);
+    } catch (err) {
+      // Encaminha erro para tratamento centralizado
+      next(err);
+    }
+  };
 }
+
+
+export default DosProtect;
 
 //Teste das Funções
 
