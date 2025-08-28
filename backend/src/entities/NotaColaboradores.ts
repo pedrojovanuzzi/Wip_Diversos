@@ -32,7 +32,9 @@ export class Feedback {
     you_recomend?: string
 
     @Column({type: 'boolean', default: false })
-    used?: boolean;
+
+    used
+    ?: boolean;
 
     @Column({type: 'datetime'})
     time?: Date

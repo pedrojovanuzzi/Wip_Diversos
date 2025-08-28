@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import express from "express";
+
 import ChamadosRouter from "./routes/Chamados.Routes"; // Caminho correto para o arquivo de rotas
 import Home from "./routes/Home.Routes";
 import Auth from "./routes/Auth.Routes";
