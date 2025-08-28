@@ -60,12 +60,13 @@ export const DDDOS_Home = () => {
       );
 
       console.log(response);
-      return Array.isArray(response)
-    ? response.map(d => ({
-        pppoe: String(d.pppoe),
-        total: Number(d.total), // <- número!
-      }))
-    : [];
+      const responseData = response.data;
+      return Array.isArray(responseData)
+        ? responseData.map((d) => ({
+            pppoe: String(d.pppoe),
+            total: Number(d.total), // <- número!
+          }))
+        : [];
     } catch (error) {
       console.log(error);
       return [];
@@ -83,12 +84,13 @@ export const DDDOS_Home = () => {
       );
 
       console.log(response);
-      return Array.isArray(response)
-    ? response.map(d => ({
-        minuto: String(d.minuto),
-        total: Number(d.total),
-      }))
-    : [];
+      const responseData = response.data;
+      return Array.isArray(responseData)
+        ? responseData.map((d) => ({
+            minuto: String(d.minuto),
+            total: Number(d.total),
+          }))
+        : [];
     } catch (error) {
       console.log(error);
       return [];
@@ -106,12 +108,14 @@ export const DDDOS_Home = () => {
       );
 
       console.log(response);
-      return Array.isArray(response)
-    ? response.map(d => ({
-        host: String(d.host),
-        total: Number(d.total),
-      }))
-    : [];
+      const responseData = response.data;
+      
+      return Array.isArray(responseData)
+        ? responseData.map((d) => ({
+            host: String(d.host),
+            total: Number(d.total),
+          }))
+        : [];
     } catch (error) {
       console.log(error);
       return [];
@@ -121,13 +125,14 @@ export const DDDOS_Home = () => {
   if (loading) return <div className="p-4">Carregando…</div>;
   if (errorMsg) return <div className="p-4 text-red-500">{errorMsg}</div>;
 
+
   return (
     <>
-      <div>
+      <div className="mt-5 mr-5">
         <h3 className="font-semibold mb-2">Eventos por PPPOE</h3>
         <div className="w-full h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={eventsPerMinute}>
+            <LineChart data={last10pppoe}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="pppoe" />
               <YAxis />
@@ -161,25 +166,25 @@ export const DDDOS_Home = () => {
           </ResponsiveContainer>
         </div>
         <div>
-        <h3 className="font-semibold mb-2">Eventos por Host</h3>
-        <div className="w-full h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={eventsPerHost}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="host" />
-              <YAxis />
-              <Tooltip />
-              <Line
-                type="monotone"
-                dataKey="total"
-                stroke="#3B82F6"
-                strokeWidth={2}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <h3 className="font-semibold mb-2">Eventos por Host</h3>
+          <div className="w-full h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={eventsPerHost}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="host" />
+                <YAxis />
+                <Tooltip />
+                <Line
+                  type="monotone"
+                  dataKey="total"
+                  stroke="#3B82F6"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </div>
       </div>
     </>
   );
