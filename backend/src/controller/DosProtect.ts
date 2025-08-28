@@ -310,9 +310,10 @@ export default class DosProtect {
     return { dddosActive: false };
   }
 
+  //Ativar novamente funções após terminar monitoramento
   private async blockIp(offenders: PacketResponse) {
     try {
-      await this.notify(offenders);
+      // await this.notify(offenders);
       offenders.offenders?.map(async (f) => {
         const ros = this.createRosClient(
           f.server,
@@ -330,6 +331,16 @@ export default class DosProtect {
 
         if (!Array.isArray(resultIpClient) || resultIpClient.length === 0) return;
         console.log(resultIpClient[0].address);
+
+      const dosResponse = dosRepository.create({
+        pppoe: f.pppoe,
+        host: f.server,
+        ip: resultIpClient[0].address as string,
+      })
+
+      const save = await dosRepository.save(dosResponse);
+
+      console.log(save);
         
 
         // const addRes = await ros.write([
@@ -372,18 +383,6 @@ export default class DosProtect {
       msg // mensagem completa
     ); // fim do log
 
-    
-    offenders.offenders?.map(async f => {
-      const dosResponse = dosRepository.create({
-        pppoe: f.pppoe,
-        ip: f.server,
-      })
-
-      const save = await dosRepository.save(dosResponse);
-
-      console.log(save);
-      
-    })
 
     const celulares = [process.env.TEST_PHONE as string, process.env.TEST_PHONE2 as string, process.env.TEST_PHONE3 as string];
 

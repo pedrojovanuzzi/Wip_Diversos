@@ -22,6 +22,10 @@ export class DDDOSMigration1756385697569 implements MigrationInterface {
                     type: 'varchar'
                 },
                 {
+                    name: 'host',
+                    type: 'varchar'
+                },
+                {
                     name: 'timestamp',
                     type: 'datetime',
                     default: 'CURRENT_TIMESTAMP',
