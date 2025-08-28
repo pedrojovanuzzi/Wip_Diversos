@@ -3,12 +3,15 @@ import path from "path";
 import { RouterOSAPI } from "node-routeros";
 import { Client } from "ssh2";
 import axios from "axios";
+import AppDataSource from "../database/DataSource";
+import { DDDOS_MonitoringEntities } from "../entities/DDDOS_Monitoring";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
 const urlMedia = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
 const token = process.env.CLOUD_API_ACCESS_TOKEN;
+const dosRepository = AppDataSource.getRepository(DDDOS_MonitoringEntities);
 
 type RosRow = Record<string, unknown>;
 
@@ -280,7 +283,7 @@ export default class DosProtect {
       this.pppoe2portBgp
     );
 
-    const LIMITPACKETS = 2000000;
+    const LIMITPACKETS = 1000;
 
     if (!pppoe1 || !pppoe2) return { dddosActive: false };
 
@@ -329,13 +332,13 @@ export default class DosProtect {
         console.log(resultIpClient[0].address);
         
 
-        const addRes = await ros.write([
-          '/ip/firewall/address-list/add', // comando correto para adicionar uma entrada
-          `=address=${resultIpClient[0].address}`,// IP a ser adicionado (NÃO use aspas)
-          '=list=block-ddos',               // nome da lista (ajuste se quiser)
-          '=comment=auto-ddos',             // (opcional) comentário para auditoria
-          '=timeout=10m',                // (opcional) tempo de expiração (ex.: 10 minutos)
-        ]);                                  // o retorno é um array de linhas do RouterOS
+        // const addRes = await ros.write([
+        //   '/ip/firewall/address-list/add', // comando correto para adicionar uma entrada
+        //   `=address=${resultIpClient[0].address}`,// IP a ser adicionado (NÃO use aspas)
+        //   '=list=block-ddos',               // nome da lista (ajuste se quiser)
+        //   '=comment=auto-ddos',             // (opcional) comentário para auditoria
+        //   '=timeout=10m',                // (opcional) tempo de expiração (ex.: 10 minutos)
+        // ]);                                  // o retorno é um array de linhas do RouterOS
 
         await ros.close();
       });
@@ -368,6 +371,19 @@ export default class DosProtect {
       // usa warn para destacar
       msg // mensagem completa
     ); // fim do log
+
+    
+    offenders.offenders?.map(async f => {
+      const dosResponse = dosRepository.create({
+        pppoe: f.pppoe,
+        ip: f.server,
+      })
+
+      const save = await dosRepository.save(dosResponse);
+
+      console.log(save);
+      
+    })
 
     const celulares = [process.env.TEST_PHONE as string, process.env.TEST_PHONE2 as string, process.env.TEST_PHONE3 as string];
 
@@ -453,6 +469,6 @@ export default class DosProtect {
 
 //Teste das Funções
 
-// const test = new DosProtect();
-// console.log(test.startFunctions());
+const test = new DosProtect();
+console.log(test.startFunctions());
 
