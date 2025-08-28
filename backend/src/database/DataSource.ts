@@ -1,3 +1,4 @@
+
 import { DataSource } from "typeorm";
 import dotenv from "dotenv";
 import path from "path";
@@ -5,8 +6,10 @@ import { User } from "../entities/User";
 import { Feedback } from "../entities/NotaColaboradores";
 import { NFSE } from "../entities/NFSE";
 import { PrefeituraUser } from "../entities/PrefeituraUser";
+import { DDDOS_MonitoringEntities } from "../entities/DDDOS_Monitoring";
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+
 
 const AppDataSource = new DataSource({
     type: "mysql",
@@ -15,7 +18,7 @@ const AppDataSource = new DataSource({
     username: process.env.DATABASE_USERNAME,
     password: process.env.DATABASE_PASSWORD,
     database: process.env.DATABASE,
-    entities: [User, Feedback, NFSE, PrefeituraUser],
+    entities: [User, Feedback, NFSE, PrefeituraUser, DDDOS_MonitoringEntities],
     migrations: [path.join(__dirname, "../migration/*.ts")], 
 })
 
