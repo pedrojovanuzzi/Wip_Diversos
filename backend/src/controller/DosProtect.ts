@@ -331,6 +331,13 @@ class DosProtect {
           "=.proplist=name,address,service,caller-id", // quais campos queremos (opcional)
         ])) as RosRow[]; // tipagem do retorno (array de linhas)
 
+        
+        // const resultIpClient = (await ros.write([
+        //   "/ppp/active/print", // comando correto (não use '=print=')
+        //   `?name=GRAZIELIPRADOCASA`, // filtro por nome exato (sem aspas)
+        //   "=.proplist=name,address,service,caller-id", // quais campos queremos (opcional)
+        // ])) as RosRow[]; // tipagem do retorno (array de linhas)
+
         if (!Array.isArray(resultIpClient) || resultIpClient.length === 0)
           return;
         console.log(resultIpClient[0].address);
@@ -351,7 +358,7 @@ class DosProtect {
         //   '=list=block-ddos',               // nome da lista (ajuste se quiser)
         //   '=comment=auto-ddos',             // (opcional) comentário para auditoria
         //   '=timeout=10m',                // (opcional) tempo de expiração (ex.: 10 minutos)
-        // ]);                                  // o retorno é um array de linhas do RouterOS
+        // ]);  // o retorno é um array de linhas do RouterOS
 
         await ros.close();
       });
@@ -539,5 +546,5 @@ export default DosProtect;
 
 //Teste das Funções
 
-// const test = new DosProtect();
-// console.log(test.startFunctions());
+const test = new DosProtect();
+console.log(test.startFunctions());
