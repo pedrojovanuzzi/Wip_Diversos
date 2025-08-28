@@ -7,7 +7,6 @@ import AppDataSource from "../database/DataSource";
 import { DDDOS_MonitoringEntities } from "../entities/DDDOS_Monitoring";
 import { RequestHandler } from "express";
 
-
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
@@ -41,10 +40,15 @@ class DosProtect {
   private pppoe2portBgp = Number(process.env.PORT_MIKROTIK_API);
 
   public async startFunctions() {
-    // Inicia as funções utilizando cronjob a cada 1 minuto
-    await this.queryGBPS();
+    try {
+      // Inicia as funções utilizando cronjob a cada 1 minuto
+      await this.queryGBPS();
 
-    return;
+      return;
+    } catch (error) {
+      console.log(error);
+      return;
+    }
   }
 
   private asNumber(val: unknown): number {
@@ -63,10 +67,10 @@ class DosProtect {
       this.passwordBgp,
       this.portBgp
     );
-    await ros.connect();
+    await ros!.connect();
 
     try {
-      // ros.write(path, args) envia um comando RouterOS pela API.
+      // ros!.write(path, args) envia um comando RouterOS pela API.
 
       // O path é "/interface/monitor-traffic" → o mesmo comando da CLI do MikroTik.
 
@@ -78,12 +82,12 @@ class DosProtect {
 
       // O await espera a resposta da API e o as RosRow[] faz um cast para “array de objetos genéricos (campo:string→valor:unknown)”.
 
-      const result = (await ros.write("/interface/monitor-traffic", [
+      const result = (await ros!.write("/interface/monitor-traffic", [
         `=interface=${targetIface}`, // define a interface desejada (ex.: sfp-sfpplus1)
         "=once=", // flag 'once' (presença da chave liga o comportamento "uma amostra")
       ])) as RosRow[];
 
-      await ros.close();
+      await ros!.close();
 
       if (!result || result.length === 0)
         return { ok: false, reason: "sem_resultado" };
@@ -107,13 +111,18 @@ class DosProtect {
     password: string,
     port: number
   ) {
-    return new RouterOSAPI({
-      host,
-      user,
-      password,
-      port,
-      timeout: 8000,
-    });
+    try {
+      return new RouterOSAPI({
+        host,
+        user,
+        password,
+        port,
+        timeout: 8000,
+      });
+    } catch (error) {
+      console.log(error);
+      return;
+    }
   }
 
   private async executarSSH(host: string, comando: string): Promise<string> {
@@ -178,23 +187,27 @@ class DosProtect {
   }
 
   private async queryGBPS() {
-    // Verifica se uma interface tem mais de 10GBPS para ativar a proxima função
-    const responseRxBytes = await this.getMonitorTrafficOnce("sfp-sfpplus1");
+    try {
+      // Verifica se uma interface tem mais de 10GBPS para ativar a proxima função
+      const responseRxBytes = await this.getMonitorTrafficOnce("sfp-sfpplus1");
 
-    if (!responseRxBytes?.txBps) return;
-    const Gbps = responseRxBytes?.txBps / 1000000000;
+      if (!responseRxBytes?.txBps) return;
+      const Gbps = responseRxBytes?.txBps / 1000000000;
 
-    console.log(Gbps.toFixed(2));
+      console.log(Gbps.toFixed(2));
 
-    const packetCountOver = await this.checkPacketCount();
+      const packetCountOver = await this.checkPacketCount();
 
-    if (!packetCountOver) return;
-    // se sim vai para a proxima etapa
-    if (responseRxBytes.txBps >= 8 || packetCountOver.dddosActive) {
-      await this.blockIp(packetCountOver);
+      if (!packetCountOver) return;
+      // se sim vai para a proxima etapa
+      if (responseRxBytes.txBps >= 8 || packetCountOver.dddosActive) {
+        await this.blockIp(packetCountOver);
+      }
+
+      return;
+    } catch (error) {
+      console.log(error);
     }
-
-    return;
   }
 
   /*
@@ -211,7 +224,7 @@ class DosProtect {
     port: number
   ) {
     const ros = this.createRosClient(host, user, password, port);
-    await ros.connect();
+    await ros!.connect();
     try {
       try {
         // Não funciona via API
@@ -225,7 +238,7 @@ class DosProtect {
       }
 
       // agora lê a variável global
-      const envs = (await ros.write("/system/script/environment/print", [
+      const envs = (await ros!.write("/system/script/environment/print", [
         "?name=top5Result",
       ])) as RosRow[];
 
@@ -267,49 +280,54 @@ class DosProtect {
       console.error("Erro:", error);
       return null;
     } finally {
-      await ros.close().catch(() => {});
+      await ros!.close().catch(() => {});
     }
   }
 
   private async checkPacketCount(): Promise<PacketResponse> {
-    const pppoe1 = await this.pppoeClientGreatestPacket(
-      this.pppoe1hostBgp,
-      this.pppoe1loginBgp,
-      this.pppoe1passwordBgp,
-      this.pppoe1portBgp
-    );
-    const pppoe2 = await this.pppoeClientGreatestPacket(
-      this.pppoe2hostBgp,
-      this.pppoe2loginBgp,
-      this.pppoe2passwordBgp,
-      this.pppoe2portBgp
-    );
+    try {
+      const pppoe1 = await this.pppoeClientGreatestPacket(
+        this.pppoe1hostBgp,
+        this.pppoe1loginBgp,
+        this.pppoe1passwordBgp,
+        this.pppoe1portBgp
+      );
+      const pppoe2 = await this.pppoeClientGreatestPacket(
+        this.pppoe2hostBgp,
+        this.pppoe2loginBgp,
+        this.pppoe2passwordBgp,
+        this.pppoe2portBgp
+      );
 
-    const LIMITPACKETS = 1000;
+      const LIMITPACKETS = 1000;
 
-    if (!pppoe1 || !pppoe2) return { dddosActive: false };
+      if (!pppoe1 || !pppoe2) return { dddosActive: false };
 
-    // Função utilitária para testar se um item estoura o limite (rx OU tx)
-    const isOver = (f: { rx: number; tx: number }) =>
-      f.rx >= LIMITPACKETS || f.tx >= LIMITPACKETS;
+      // Função utilitária para testar se um item estoura o limite (rx OU tx)
+      const isOver = (f: { rx: number; tx: number }) =>
+        f.rx >= LIMITPACKETS || f.tx >= LIMITPACKETS;
 
-    const offenders1 = pppoe1
-      .filter(isOver)
-      .map((f) => ({ pppoe: f.pppoe, rx: f.rx, tx: f.tx, server: f.host }));
-    const offenders2 = pppoe2
-      .filter(isOver)
-      .map((f) => ({ pppoe: f.pppoe, rx: f.rx, tx: f.tx, server: f.host }));
+      const offenders1 = pppoe1
+        .filter(isOver)
+        .map((f) => ({ pppoe: f.pppoe, rx: f.rx, tx: f.tx, server: f.host }));
+      const offenders2 = pppoe2
+        .filter(isOver)
+        .map((f) => ({ pppoe: f.pppoe, rx: f.rx, tx: f.tx, server: f.host }));
 
-    const allOffenders = [...offenders1, ...offenders2];
+      const allOffenders = [...offenders1, ...offenders2];
 
-    if (allOffenders.length === 0) return { dddosActive: false };
+      if (allOffenders.length === 0) return { dddosActive: false };
 
-    if (allOffenders) {
-      console.log(allOffenders);
-      return { offenders: allOffenders, dddosActive: true };
+      if (allOffenders) {
+        console.log(allOffenders);
+        return { offenders: allOffenders, dddosActive: true };
+      }
+
+      return { dddosActive: false };
+    } catch (error) {
+      console.log(error);
+      return { dddosActive: false };
     }
-
-    return { dddosActive: false };
   }
 
   //Ativar novamente funções após terminar monitoramento
@@ -323,16 +341,15 @@ class DosProtect {
           this.passwordBgp,
           this.portBgp
         );
-        await ros.connect();
+        await ros!.connect();
 
-        const resultIpClient = (await ros.write([
+        const resultIpClient = (await ros!.write([
           "/ppp/active/print", // comando correto (não use '=print=')
           `?name=${f.pppoe}`, // filtro por nome exato (sem aspas)
           "=.proplist=name,address,service,caller-id", // quais campos queremos (opcional)
         ])) as RosRow[]; // tipagem do retorno (array de linhas)
 
-        
-        // const resultIpClient = (await ros.write([
+        // const resultIpClient = (await ros!.write([
         //   "/ppp/active/print", // comando correto (não use '=print=')
         //   `?name=GRAZIELIPRADOCASA`, // filtro por nome exato (sem aspas)
         //   "=.proplist=name,address,service,caller-id", // quais campos queremos (opcional)
@@ -352,7 +369,7 @@ class DosProtect {
 
         console.log(save);
 
-        // const addRes = await ros.write([
+        // const addRes = await ros!.write([
         //   '/ip/firewall/address-list/add', // comando correto para adicionar uma entrada
         //   `=address=${resultIpClient[0].address}`,// IP a ser adicionado (NÃO use aspas)
         //   '=list=block-ddos',               // nome da lista (ajuste se quiser)
@@ -360,7 +377,7 @@ class DosProtect {
         //   '=timeout=10m',                // (opcional) tempo de expiração (ex.: 10 minutos)
         // ]);  // o retorno é um array de linhas do RouterOS
 
-        await ros.close();
+        await ros!.close();
       });
     } catch (e: any) {
       if (e?.errno === "UNKNOWNREPLY") {
@@ -372,35 +389,40 @@ class DosProtect {
   }
 
   private async notify(offenders: PacketResponse) {
-    const list = offenders.offenders ?? [];
+    try {
+      const list = offenders.offenders ?? [];
 
-    if (list.length === 0) {
-      console.warn("Nenhum cliente adicionado a Black Hole");
+      if (list.length === 0) {
+        console.warn("Nenhum cliente adicionado a Black Hole");
+        return;
+      }
+
+      const detalhes = list
+        .map((f) => {
+          return `PPPOE: ${f.pppoe} | SERVERS: ${f.server} | RX: ${f.rx} | TX: ${f.tx}`;
+        })
+        .join(" ; ");
+
+      const msg = `Cliente Adicionado a Black Hole, possível ataque DDoS detectado! ${detalhes}`;
+
+      console.warn(
+        // usa warn para destacar
+        msg // mensagem completa
+      ); // fim do log
+
+      const celulares = [
+        process.env.TEST_PHONE as string,
+        process.env.TEST_PHONE2 as string,
+        process.env.TEST_PHONE3 as string,
+      ];
+
+      await this.templateMessage(celulares, msg);
+
+      return;
+    } catch (error) {
+      console.log(error);
       return;
     }
-
-    const detalhes = list
-      .map((f) => {
-        return `PPPOE: ${f.pppoe} | SERVERS: ${f.server} | RX: ${f.rx} | TX: ${f.tx}`;
-      })
-      .join(" ; ");
-
-    const msg = `Cliente Adicionado a Black Hole, possível ataque DDoS detectado! ${detalhes}`;
-
-    console.warn(
-      // usa warn para destacar
-      msg // mensagem completa
-    ); // fim do log
-
-    const celulares = [
-      process.env.TEST_PHONE as string,
-      process.env.TEST_PHONE2 as string,
-      process.env.TEST_PHONE3 as string,
-    ];
-
-    await this.templateMessage(celulares, msg);
-
-    return;
   }
 
   private templateMessage = async (
@@ -484,14 +506,14 @@ class DosProtect {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
       // Monta a query de top 10 PPPoE pela contagem na última hora
       const rows = await dosRepository
-        .createQueryBuilder("m")                // Define alias 'm' para a tabela
-        .select("m.pppoe", "pppoe")            // Seleciona a coluna pppoe com alias 'pppoe'
-        .addSelect("COUNT(*)", "total")        // Adiciona a contagem como 'total'
+        .createQueryBuilder("m") // Define alias 'm' para a tabela
+        .select("m.pppoe", "pppoe") // Seleciona a coluna pppoe com alias 'pppoe'
+        .addSelect("COUNT(*)", "total") // Adiciona a contagem como 'total'
         .where("m.timestamp >= :from", { from: oneHourAgo }) // Filtra por janela temporal
-        .groupBy("m.pppoe")                    // Agrupa por pppoe
-        .orderBy("total", "DESC")              // Ordena do maior para o menor
-        .limit(10)                             // Limita em 10 resultados
-        .getRawMany();                         // Retorna objetos simples { pppoe, total }
+        .groupBy("m.pppoe") // Agrupa por pppoe
+        .orderBy("total", "DESC") // Ordena do maior para o menor
+        .limit(10) // Limita em 10 resultados
+        .getRawMany(); // Retorna objetos simples { pppoe, total }
       // Responde ao cliente com o JSON da query
       res.json(rows);
     } catch (err) {
@@ -505,13 +527,13 @@ class DosProtect {
     try {
       // Executa query agregando por minuto nos últimos 30 minutos
       const rows = await dosRepository
-        .createQueryBuilder("m")                                         // Alias 'm'
-        .select("DATE_FORMAT(m.timestamp, '%Y-%m-%d %H:%i')", "minuto")  // Formata timestamp por minuto
-        .addSelect("COUNT(*)", "total")                                  // Conta eventos por minuto
-        .where("m.timestamp >= NOW() - INTERVAL 30 MINUTE")              // Janela de 30 minutos
-        .groupBy("minuto")                                               // Agrupa por minuto
-        .orderBy("minuto")                                               // Ordena crescente por minuto
-        .getRawMany();                                                   // Retorna objetos simples
+        .createQueryBuilder("m") // Alias 'm'
+        .select("DATE_FORMAT(m.timestamp, '%Y-%m-%d %H:%i')", "minuto") // Formata timestamp por minuto
+        .addSelect("COUNT(*)", "total") // Conta eventos por minuto
+        .where("m.timestamp >= NOW() - INTERVAL 30 MINUTE") // Janela de 30 minutos
+        .groupBy("minuto") // Agrupa por minuto
+        .orderBy("minuto") // Ordena crescente por minuto
+        .getRawMany(); // Retorna objetos simples
       // Envia o resultado como JSON
       res.json(rows);
     } catch (err) {
@@ -525,13 +547,13 @@ class DosProtect {
     try {
       // Executa query agregando por host na última hora
       const rows = await dosRepository
-        .createQueryBuilder("m")                           // Alias 'm'
-        .select("m.host", "host")                          // Seleciona host com alias 'host'
-        .addSelect("COUNT(*)", "total")                    // Conta eventos por host
-        .where("m.timestamp >= NOW() - INTERVAL 1 HOUR")   // Janela de 1 hora
-        .groupBy("m.host")                                 // Agrupa por host
-        .orderBy("total", "DESC")                          // Ordena dos maiores para os menores
-        .getRawMany();                                     // Retorna objetos simples
+        .createQueryBuilder("m") // Alias 'm'
+        .select("m.host", "host") // Seleciona host com alias 'host'
+        .addSelect("COUNT(*)", "total") // Conta eventos por host
+        .where("m.timestamp >= NOW() - INTERVAL 1 HOUR") // Janela de 1 hora
+        .groupBy("m.host") // Agrupa por host
+        .orderBy("total", "DESC") // Ordena dos maiores para os menores
+        .getRawMany(); // Retorna objetos simples
       // Retorna o JSON com os hosts e totais
       res.json(rows);
     } catch (err) {
@@ -540,7 +562,6 @@ class DosProtect {
     }
   };
 }
-
 
 export default DosProtect;
 
