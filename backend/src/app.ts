@@ -12,7 +12,7 @@ import Prefeitura from "./routes/PrefeituraUser.routes";
 import ClientAnalytics from "./routes/ClientAnalytics.routes";
 import cron from "node-cron";
 import Backup from "./controller/Backup"; // Caminho para sua classe de backup
-import DosProtect from './controller/DosProtect';
+import DosProtect from './routes/DosProtect.Routes';
 
 export class App {
   public server: express.Application;
