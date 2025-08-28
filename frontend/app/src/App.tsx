@@ -16,6 +16,7 @@ import CodeOtp from './pages/prefeitura_login/CodeOtp';
 import WhatsappChat from './pages/whatsapp_chat/WhatsappChat';
 import UserChat from './pages/whatsapp_chat/userChat/userChat';
 import { ClientAnalytics } from './pages/ClientAnalytics/ClientAnalytics';
+import { DDDOS_Home } from './pages/DDDOS_Monitoring/DDDOS_Home';
 
 
 function App() {
@@ -58,6 +59,7 @@ function App() {
           <Route path="/Whatsapp" element={auth ? <WhatsappChat /> : <Navigate to="/auth/login" />} />
           <Route path="/Whatsapp/:id" element={auth ? <UserChat /> : <Navigate to="/auth/login" />} />
           <Route path="/ClientAnalytics" element={auth ? <ClientAnalytics /> : <Navigate to="/auth/login" />} />
+          <Route path="/DDDOS" element={auth ? <DDDOS_Home /> : <Navigate to="/auth/login" />} />
           <Route path="*" element={auth ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>
