@@ -4,36 +4,38 @@ export class Feedback {
     @PrimaryGeneratedColumn()
     id?: number
 
-    @Column({ unique: true })
+    @Column({ type: 'varchar', unique: true })
     unique_identifier?: string;
 
-    @Column()
+    @Column({type: 'varchar'})
     login?: string
 
-    @Column()
+    @Column({type: 'varchar'})
     opnion?: string
 
-    @Column()
+    @Column({type: 'varchar'})
     note_internet?: string
 
-    @Column()
+    @Column({type: 'varchar'})
     note_service?: string
 
-    @Column()
+    @Column({type: 'varchar'})
     note_response_time?: string
 
-    @Column()
+    @Column({type: 'varchar'})
     note_technician_service?: string
 
-    @Column()
+    @Column({type: 'varchar'})
     you_problem_as_solved?: string
 
-    @Column()
+    @Column({type: 'varchar'})
     you_recomend?: string
 
-    @Column({ default: false })
-    used?: boolean;
+    @Column({type: 'boolean', default: false })
 
-    @Column()
+    used
+    ?: boolean;
+
+    @Column({type: 'datetime'})
     time?: Date
 }

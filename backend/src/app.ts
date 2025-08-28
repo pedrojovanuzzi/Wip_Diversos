@@ -1,4 +1,6 @@
+import 'reflect-metadata';
 import express from "express";
+
 import ChamadosRouter from "./routes/Chamados.Routes"; // Caminho correto para o arquivo de rotas
 import Home from "./routes/Home.Routes";
 import Auth from "./routes/Auth.Routes";
@@ -10,6 +12,7 @@ import Prefeitura from "./routes/PrefeituraUser.routes";
 import ClientAnalytics from "./routes/ClientAnalytics.routes";
 import cron from "node-cron";
 import Backup from "./controller/Backup"; // Caminho para sua classe de backup
+import DosProtect from './routes/DosProtect.Routes';
 
 export class App {
   public server: express.Application;
@@ -36,6 +39,7 @@ export class App {
     this.server.use("/api/whatsapp", Whatsapp);
     this.server.use("/api/Prefeitura", Prefeitura);
     this.server.use("/api/ClientAnalytics", ClientAnalytics);
+    this.server.use("/api/DosProtect", DosProtect);
   }
 
   private agendarBackup() {
