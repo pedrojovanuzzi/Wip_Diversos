@@ -13,6 +13,7 @@ import ClientAnalytics from "./routes/ClientAnalytics.routes";
 import cron from "node-cron";
 import Backup from "./controller/Backup"; // Caminho para sua classe de backup
 import DosProtect from './routes/DosProtect.Routes';
+import DosProtectController from './controller/DosProtect';
 
 export class App {
   public server: express.Application;
@@ -22,6 +23,7 @@ export class App {
     this.middleware();
     this.router();
     this.agendarBackup();
+    this.verificaDDOS();
   }
 
   private middleware() {
@@ -48,6 +50,20 @@ export class App {
       console.log("⏰ Executando backup automático", new Date().toLocaleString());
       try {
         await Backup.gerarTodos();
+      } catch (err) {
+        console.error("❌ Falha no backup agendado:", err);
+      }
+    });
+
+    console.log("📅 Agendador de backup inicializado.");
+  }
+
+  private verificaDDOS(){
+    console.log('Verificando DDDOS');
+    
+    cron.schedule("* * * * *", async () => {
+      try {
+        await new DosProtectController().startFunctions();
       } catch (err) {
         console.error("❌ Falha no backup agendado:", err);
       }

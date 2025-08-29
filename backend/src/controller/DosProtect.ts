@@ -299,7 +299,7 @@ class DosProtect {
         this.pppoe2portBgp
       );
 
-      const LIMITPACKETS = 1000;
+      const LIMITPACKETS = 300000;
 
       if (!pppoe1 || !pppoe2) return { dddosActive: false };
 
@@ -333,7 +333,7 @@ class DosProtect {
   //Ativar novamente funções após terminar monitoramento
   private async blockIp(offenders: PacketResponse) {
     try {
-      // await this.notify(offenders);
+      await this.notify(offenders);
       offenders.offenders?.map(async (f) => {
         const ros = this.createRosClient(
           f.server,
@@ -393,7 +393,7 @@ class DosProtect {
       const list = offenders.offenders ?? [];
 
       if (list.length === 0) {
-        console.warn("Nenhum cliente adicionado a Black Hole");
+        // console.warn("Nenhum cliente adicionado a Black Hole");
         return;
       }
 
