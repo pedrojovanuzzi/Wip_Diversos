@@ -201,7 +201,7 @@ class DosProtect {
 
       if (!packetCountOver) return;
       // se sim vai para a proxima etapa
-      if (responseRxBytes.txBps >= 8 || packetCountOver.dddosActive) {
+      if (responseRxBytes.txBps >= 10 || packetCountOver.dddosActive) {
         await this.blockIp(packetCountOver);
       }
 
