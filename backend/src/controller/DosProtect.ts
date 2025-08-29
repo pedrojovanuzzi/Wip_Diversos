@@ -43,7 +43,8 @@ class DosProtect {
     try {
       // Inicia as funções utilizando cronjob a cada 1 minuto
       await this.queryGBPS();
-
+      console.log('Dddos Concluido');
+      
       return;
     } catch (error) {
       console.log(error);
@@ -369,13 +370,13 @@ class DosProtect {
 
         console.log(save);
 
-        // const addRes = await ros!.write([
-        //   '/ip/firewall/address-list/add', // comando correto para adicionar uma entrada
-        //   `=address=${resultIpClient[0].address}`,// IP a ser adicionado (NÃO use aspas)
-        //   '=list=block-ddos',               // nome da lista (ajuste se quiser)
-        //   '=comment=auto-ddos',             // (opcional) comentário para auditoria
-        //   '=timeout=10m',                // (opcional) tempo de expiração (ex.: 10 minutos)
-        // ]);  // o retorno é um array de linhas do RouterOS
+        const addRes = await ros!.write([
+          '/ip/firewall/address-list/add', // comando correto para adicionar uma entrada
+          `=address=${resultIpClient[0].address}`,// IP a ser adicionado (NÃO use aspas)
+          '=list=block-ddos',               // nome da lista (ajuste se quiser)
+          '=comment=auto-ddos',             // (opcional) comentário para auditoria
+          '=timeout=10m',                // (opcional) tempo de expiração (ex.: 10 minutos)
+        ]);  // o retorno é um array de linhas do RouterOS
 
         await ros!.close();
       });
