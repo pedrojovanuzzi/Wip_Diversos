@@ -47,7 +47,7 @@ class DosProtect {
       
       return;
     } catch (error) {
-      console.log(error);
+      console.log('1: ' + error);
       return;
     }
   }
@@ -101,7 +101,7 @@ class DosProtect {
 
       return { ok: true, targetIface: name, rxBps, txBps };
     } catch (error) {
-      console.log(error);
+      console.log('2: ' + error);
       return;
     }
   }
@@ -121,7 +121,7 @@ class DosProtect {
         timeout: 8000,
       });
     } catch (error) {
-      console.log(error);
+      console.log('3: ' + error);
       return;
     }
   }
@@ -182,7 +182,7 @@ class DosProtect {
           });
       });
     } catch (error) {
-      //console.log(error);
+      console.log('4: ' + error);
       return "";
     }
   }
@@ -207,7 +207,7 @@ class DosProtect {
 
       return;
     } catch (error) {
-      console.log(error);
+      console.log('5: ' + error);
     }
   }
 
@@ -326,7 +326,7 @@ class DosProtect {
 
       return { dddosActive: false };
     } catch (error) {
-      console.log(error);
+      console.log('6: ' + error);
       return { dddosActive: false };
     }
   }
@@ -421,7 +421,7 @@ class DosProtect {
 
       return;
     } catch (error) {
-      console.log(error);
+      console.log('7: ' + error);
       return;
     }
   }
