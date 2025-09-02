@@ -2,11 +2,15 @@ import { readFileSync, writeFileSync } from "fs";
 import forge from "node-forge";
 import { create } from "xmlbuilder2";
 import { SignedXml } from "xml-crypto";
+import path from "path";
 
-const CERT_PATH = "certificado.pfx";
-const CERT_PWD = "senha_do_certificado";
+const CERT_PATH = path.join(__dirname, '/files', 'certificado.pfx');
+const CERT_PWD = process.env.CANCELAR_NFSE_SENHA;
 const NFSE_NUMERO = "1146";
 const ID_CANCEL = "CANCEL179";
+
+console.log(CERT_PATH);
+
 
 let pfx: forge.pkcs12.Pkcs12Pfx;
 try {
