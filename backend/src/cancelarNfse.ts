@@ -1,8 +1,12 @@
+import dotenv from "dotenv";
 import { readFileSync, writeFileSync } from "fs";
 import forge from "node-forge";
 import { create } from "xmlbuilder2";
 import { SignedXml } from "xml-crypto";
 import path from "path";
+
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
+
 
 const CERT_PATH = path.join(__dirname, '/files', 'certificado.pfx');
 const CERT_PWD = process.env.CANCELAR_NFSE_SENHA;
@@ -21,9 +25,9 @@ try {
   );
   const pfxAsn1 = forge.asn1.fromDer(pfxDer);
   pfx = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, CERT_PWD);
-} catch {
+} catch (error){
   throw new Error(
-    "Não foi possível carregar o certificado PFX. Verifique se o arquivo existe e se a senha está correta."
+    error as string
   );
 }
 
