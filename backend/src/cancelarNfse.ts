@@ -8,9 +8,20 @@ const CERT_PWD = "senha_do_certificado";
 const NFSE_NUMERO = "1146";
 const ID_CANCEL = "CANCEL179";
 
-const pfxBuffer = readFileSync(CERT_PATH);
-const pfxAsn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"), false);
-const pfx = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, CERT_PWD);
+let pfx: forge.pkcs12.Pkcs12Pfx;
+try {
+  const pfxBuffer = readFileSync(CERT_PATH);
+  const pfxDer = forge.util.createBuffer(
+    pfxBuffer.toString("binary"),
+    "binary" as any
+  );
+  const pfxAsn1 = forge.asn1.fromDer(pfxDer);
+  pfx = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, CERT_PWD);
+} catch {
+  throw new Error(
+    "Não foi possível carregar o certificado PFX. Verifique se o arquivo existe e se a senha está correta."
+  );
+}
 
 const certBags = pfx.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag]!;
 const keyBags = pfx.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag]!;
