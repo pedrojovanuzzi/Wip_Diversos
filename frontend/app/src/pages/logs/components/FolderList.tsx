@@ -19,7 +19,7 @@ export default function Folders({ folders }: FoldersProps) {
 
   useEffect(() => {
     setProjects(folders);
-  }, []);
+  });
 
   function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(" ");
@@ -31,15 +31,15 @@ export default function Folders({ folders }: FoldersProps) {
       let folder: Folder = { name: folderName };
 
       const response = await axios.post(
-        `${process.env.REACT_APP_URL}/FoldersRecursion`,
-        {
-          body: folder,
+        `${process.env.REACT_APP_URL}/ServerLogs/FoldersRecursion`,
+        { folder: folder },
+        {          
           headers: { Authorization: `Bearer ${token}` },
           timeout: 60000,
         }
       );
       console.log(response);
-      setProjects(response.data);
+      setProjects(response.data[0]);
     } catch (error) {
       console.error(error);
     }
@@ -54,7 +54,7 @@ export default function Folders({ folders }: FoldersProps) {
         className="m-10 sm:grid flex flex-col justify-center items-center gap-4 lg:grid-cols-9 lg:gap-4  "
       >
         {projects.map((project) => (
-          <button
+          <button  key={String(project)}
             onClick={() => {
               accessFolder(String(project));
             }}

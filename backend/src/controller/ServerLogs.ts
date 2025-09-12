@@ -11,37 +11,48 @@ const config = {
   host: process.env.SERVER_LOGS,
   port: 22,
   username: process.env.SERVER_LOGS_LOGIN,
-  password: process.env.SERVER_LOGS_PASSWORD
-}
+  password: process.env.SERVER_LOGS_PASSWORD,
+};
 
-
-class ServerLogs{
-    public async getFolders(req: Request, res: Response){
-        try {
-            await sftp.connect(config);
-            const lista = await sftp.list('/var/log/cgnat/syslog');
-            await sftp.end();
-            res.status(200).send(lista.map(f => f.name));
-        } catch (error) {
-            console.error(error);
-            res.status(500).json(error)
-            await sftp.end();
-        }
+class ServerLogs {
+  public async getFolders(req: Request, res: Response) {
+    try {
+      await sftp.connect(config);
+      const lista = await sftp.list("/var/log/cgnat/syslog");
+      await sftp.end();
+      res.status(200).send(lista.map((f) => f.name));
+    } catch (error) {
+      console.error(error);
+      res.status(500).json(error);
+      await sftp.end();
+    } finally {
+      try {
+        await sftp.end();
+      } catch (_) {
+        await sftp.end();
+      }
     }
+  }
 
-    public async FoldersRecursion(req: Request, res: Response){
-        try {
-            const {folderName} = req.body;
-            await sftp.connect(config);
-            const lista = await sftp.list(`/var/log/cgnat/syslog/${folderName.name}`);
-            await sftp.end();
-            res.status(200).send(lista.map(f => f.name));
-        } catch (error) {
-            console.error(error);
-            res.status(500).json(error)
-            await sftp.end();
-        }
+  public async FoldersRecursion(req: Request, res: Response) {
+    try {
+      const { folder } = req.body;
+      await sftp.connect(config);
+      const lista = await sftp.list(`/var/log/cgnat/syslog/${folder.name}`);
+      await sftp.end();
+      res.status(200).send(lista.map((f) => f.name));
+    } catch (error) {
+      console.error(error);
+      res.status(500).json(error);
+      await sftp.end();
+    } finally {
+      try {
+        await sftp.end();
+      } catch (_) {
+        await sftp.end();
+      }
     }
+  }
 }
 
 export default ServerLogs;
