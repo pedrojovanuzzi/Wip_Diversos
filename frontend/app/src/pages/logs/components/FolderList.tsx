@@ -16,10 +16,11 @@ export default function Folders({ folders }: FoldersProps) {
   const token = userToken.token;
 
   const [projects, setProjects] = useState<Folder[]>([]);
+  const [path, setPath] = useState('');
 
-  useEffect(() => {
-    setProjects(folders);
-  });
+ useEffect(() => {
+  setProjects(folders);
+}, [folders]);
 
   function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(" ");
@@ -39,7 +40,7 @@ export default function Folders({ folders }: FoldersProps) {
         }
       );
       console.log(response);
-      setProjects(response.data[0]);
+      setProjects(response.data);
     } catch (error) {
       console.error(error);
     }
