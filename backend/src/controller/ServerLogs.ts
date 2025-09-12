@@ -33,7 +33,7 @@ class ServerLogs{
         try {
             const {folderName} = req.body;
             await sftp.connect(config);
-            const lista = await sftp.list(`/var/log/cgnat/syslog/${folderName}`);
+            const lista = await sftp.list(`/var/log/cgnat/syslog/${folderName.name}`);
             await sftp.end();
             res.status(200).send(lista.map(f => f.name));
         } catch (error) {
