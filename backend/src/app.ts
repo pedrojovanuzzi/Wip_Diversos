@@ -23,7 +23,7 @@ export class App {
     this.middleware();
     this.router();
     this.agendarBackup();
-    this.verificaDDOS();
+    // this.verificaDDOS();
   }
 
   private middleware() {
@@ -58,18 +58,18 @@ export class App {
     console.log("📅 Agendador de backup inicializado.");
   }
 
-  private verificaDDOS(){
-    console.log('Verificando DDDOS');
+  // private verificaDDOS(){
+  //   console.log('Verificando DDDOS');
     
-    cron.schedule("* * * * *", async () => {
-      try {
-        await new DosProtectController().startFunctions();
-      } catch (err) {
-        console.error("❌ Falha no backup agendado:", err);
-      }
-    });
+  //   cron.schedule("* * * * *", async () => {
+  //     try {
+  //       await new DosProtectController().startFunctions();
+  //     } catch (err) {
+  //       console.error("❌ Falha no backup agendado:", err);
+  //     }
+  //   });
 
-    console.log("📅 Agendador de backup inicializado.");
-  }
+  //   console.log("📅 Agendador de backup inicializado.");
+  // }
 
 }
