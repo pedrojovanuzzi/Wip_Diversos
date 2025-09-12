@@ -8,5 +8,6 @@ const serverLogs = new ServerLogs();
 const router: Router = Router();
 
 router.get("/", AuthGuard, serverLogs.getFolders);
+router.get("/FoldersRecursion/:name", AuthGuard, serverLogs.FoldersRecursion);
 
 export default router;

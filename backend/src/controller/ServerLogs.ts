@@ -28,6 +28,20 @@ class ServerLogs{
             await sftp.end();
         }
     }
+
+    public async FoldersRecursion(req: Request, res: Response){
+        try {
+            const {folderName} = req.body;
+            await sftp.connect(config);
+            const lista = await sftp.list(`/var/log/cgnat/syslog/${folderName}`);
+            await sftp.end();
+            res.status(200).send(lista.map(f => f.name));
+        } catch (error) {
+            console.error(error);
+            res.status(500).json(error)
+            await sftp.end();
+        }
+    }
 }
 
 export default ServerLogs;
