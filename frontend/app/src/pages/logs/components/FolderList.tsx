@@ -2,6 +2,7 @@ import { EllipsisVerticalIcon } from "@heroicons/react/20/solid";
 import { Folder } from "../../../types";
 import { NavBar } from "../../../components/navbar/NavBar";
 import { FaRegFolder } from "react-icons/fa";
+import FolderList from "../components/FolderList";
 
 interface FoldersProps {
   folders: Folder[];
@@ -11,11 +12,14 @@ function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
 }
 
-function accessFolder(){
+function accessFolder(folderName : string){
     try {
+        console.log(folderName);
         
+        let folder : Folder = {name: folderName};
+        <FolderList folders={[folder]}></FolderList>
     } catch (error) {
-        
+        console.error(error);
     }
 }
 
@@ -31,10 +35,12 @@ export default function Folders({ folders }: FoldersProps) {
       </h2>
       <ul
         role="list"
-        className="m-10 sm:grid flex flex-col justify-center items-center gap-4 sm:grid-cols-9 sm:gap-4"
+        className="m-10 sm:grid flex flex-col justify-center items-center gap-4 lg:grid-cols-9 lg:gap-4  "
       >
         {projects.map((project) => (
-          <button onClick={accessFolder}>
+          <button onClick={() => {
+            accessFolder(String(project))
+          }}>
             <li className="flex rounded-md shadow-sm dark:shadow-none">
               <div
                 className={classNames(
