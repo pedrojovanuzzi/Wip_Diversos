@@ -1,12 +1,15 @@
 import axios from "axios";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { RootState } from "../../types";
+import { Folder, RootState } from "../../types";
+import FolderList from "./components/FolderList";
 
 export const ServerLogs = () => {
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
   const userToken = useTypedSelector((state: RootState) => state.auth.user);
   const token = userToken.token;
+
+  const [folders, setFolders] = useState<Folder[]>([]);
 
   async function queryFolders() {
     try {
@@ -18,6 +21,7 @@ export const ServerLogs = () => {
         }
       );
       console.log(response);
+      setFolders(response.data);
     } catch (error) {
       console.error(error);
     }
@@ -29,7 +33,7 @@ export const ServerLogs = () => {
     })();
   }, []);
 
-  return <div>
-     
-  </div>;
+  return <div className="bg-slate-200 h-screen overflow-auto">
+        <FolderList folders={folders}></FolderList> 
+    </div>;
 };
