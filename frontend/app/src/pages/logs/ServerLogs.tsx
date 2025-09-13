@@ -3,11 +3,13 @@ import React, { useEffect, useState } from "react";
 import { TypedUseSelectorHook, useSelector } from "react-redux";
 import { Folder, RootState } from "../../types";
 import FolderList from "./components/FolderList";
+import { useLocation } from "react-router-dom";
 
 export const ServerLogs = () => {
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
   const userToken = useTypedSelector((state: RootState) => state.auth.user);
   const token = userToken.token;
+
 
   const [folders, setFolders] = useState<Folder[]>([]);
 
