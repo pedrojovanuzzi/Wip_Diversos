@@ -33,7 +33,8 @@ export default function Folders({ folders }: FoldersProps) {
   }, []);
 
   useEffect(() => {
-    async function fetchFolders() {
+    try {
+      async function fetchFolders() {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/ServerLogs/FoldersRecursion`,
         { path: path },
@@ -42,6 +43,9 @@ export default function Folders({ folders }: FoldersProps) {
       setProjects(response.data);
     }
     fetchFolders();
+    } catch (error) {
+      console.error(error);
+    }
   }, [path]);
 
 
@@ -91,6 +95,7 @@ export default function Folders({ folders }: FoldersProps) {
         setProjects(response.data);
       }
     } catch (error) {
+      setPath(initialPath)
       console.error(error);
     }
   }
