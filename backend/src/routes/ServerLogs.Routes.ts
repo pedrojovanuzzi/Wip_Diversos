@@ -9,5 +9,6 @@ const router: Router = Router();
 
 router.get("/", AuthGuard, serverLogs.getFolders);
 router.post("/FoldersRecursion", AuthGuard, serverLogs.FoldersRecursion);
+router.post("/AccessFile", AuthGuard, serverLogs.AccessFile);
 
 export default router;
