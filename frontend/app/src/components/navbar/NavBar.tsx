@@ -6,7 +6,7 @@ import {
   HiDocumentText,
   HiHome,
 } from "react-icons/hi2";
-import { MdOutlineFeedback } from "react-icons/md";
+import { MdDns, MdOutlineFeedback } from "react-icons/md";
 import { FaWhatsapp } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 import { PiComputerTowerBold } from "react-icons/pi";
@@ -106,6 +106,11 @@ export const NavBar = () => {
             <li className="p-2 grid place-items-center col-span-2">
               <Link to="/ServerLogs">
                 <FaRegFolder className="text-white size-8 transition-all hover:text-green-400" />
+              </Link>
+            </li>
+            <li className="p-2 grid place-items-center col-span-2">
+              <Link to="/PowerDns">
+                <MdDns  className="text-white size-8 transition-all hover:text-green-400" />
               </Link>
             </li>
           </ul>
