@@ -186,6 +186,8 @@ class ClientAnalytics {
   };
 
   onuReiniciar = async (req: Request, res: Response) => {
+    let turnOff = "";
+
     try {
       const { pppoe } = req.body;
 
@@ -266,18 +268,24 @@ class ClientAnalytics {
         `cd maintenance`,
       );
 
-      const turnOff = await conn.exec(
+      turnOff = await conn.exec(
         `reboot slot ${slot} pon ${pon} onulist ${onuId}`,
         { timeout: 10000 }
       );
 
 
       res.status(200).json({
-        respostaTelnet: "ONU reiniciada com sucesso",})
+        respostaTelnet: "ONU reiniciada com sucesso: " + turnOff,})
       
-    } catch (error) {
-      console.log(error);
-      res.status(500).json({ error: "Erro ao reiniciar ONU" });
+    } catch (error : any) {
+       if (error.message?.includes("response not received") && turnOff?.includes("reset onu ok!")) {
+    res.status(200).json({
+      respostaTelnet: "ONU reiniciada com sucesso",
+    });
+  } else {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao reiniciar ONU" });
+  }
     }
   
   }
