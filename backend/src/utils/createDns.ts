@@ -59,7 +59,7 @@ const PADRAO_DOMINIO = /\b(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b/g;
 // =========================================
 // Função que extrai domínios de arquivos
 // =========================================
-async function extrairDominios(caminhoArquivo: string): Promise<string[]> {
+export async function extrairDominios(caminhoArquivo: string): Promise<string[]> {
   // pega a extensão do arquivo
   const extensao = path.extname(caminhoArquivo).toLowerCase();
 
@@ -103,7 +103,7 @@ async function extrairDominios(caminhoArquivo: string): Promise<string[]> {
 // ======================================
 // Inserção em lote no PostgreSQL
 // ======================================
-async function inserirDominios(dominios: string[]) {
+export async function inserirDominios(dominios: string[]) {
   if (dominios.length === 0) {
     console.log("⚠️ Nenhum domínio para inserir.");
     return;
@@ -143,14 +143,3 @@ async function inserirDominios(dominios: string[]) {
   }
 }
 
-// ===========================
-// Exemplo de uso direto (CLI)
-// ===========================
-(async () => {
-  const caminhoArquivo = "2.pdf"; // mude aqui o arquivo a processar
-
-  const dominiosExtraidos = await extrairDominios(caminhoArquivo);
-  console.log(`🔎 Encontrados ${dominiosExtraidos.length} domínios únicos.`);
-
-  await inserirDominios(dominiosExtraidos);
-})();
