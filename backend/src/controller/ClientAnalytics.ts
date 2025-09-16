@@ -218,7 +218,7 @@ class ClientAnalytics {
         timeout: 10000,
         sendTimeout: 200,
         debug: true,
-        shellPrompt: /Admin\\onu#\s*$/,
+        shellPrompt: /[#>]\s*$/,
         stripShellPrompt: true,
         negotiationMandatory: false,
         disableLogon: true,
