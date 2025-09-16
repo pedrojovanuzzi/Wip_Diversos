@@ -270,19 +270,17 @@ class ClientAnalytics {
       );
 
       console.log("Turn off " + turnOff);
-      
 
       if (turnOff.includes("reset onu ok!")) {
-    return res.status(200).json({
-      respostaTelnet: "ONU reiniciada com sucesso: " + turnOff,
-      });
-    }
-
+        res.status(200).json({
+          respostaTelnet: "ONU reiniciada com sucesso: " + turnOff,
+        });
+        return;
+      }
 
       res.status(200).json({
         respostaTelnet: "ONU reiniciada com sucesso: " + turnOff,
       });
-
     } catch (error: any) {
       res.status(500).json({ error: "Erro ao reiniciar ONU" });
     }
