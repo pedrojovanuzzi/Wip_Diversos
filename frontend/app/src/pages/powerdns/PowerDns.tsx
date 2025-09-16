@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { NavBar } from "../../components/navbar/NavBar";
 import SendPdf from "./components/SendPdf";
 import axios from "axios";
@@ -9,7 +9,7 @@ export const PowerDns = () => {
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
   const userToken = useTypedSelector((state: RootState) => state.auth.user);
   const token = userToken.token;
-
+const [message, setMessage] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   async function handleFile(file: File) {
@@ -29,6 +29,7 @@ export const PowerDns = () => {
         }
       );
       console.log("✅ Enviado:", response.data);
+      setMessage(response.data.message);
     } catch (error) {
       console.error("❌ Erro:", error);
     }
@@ -37,7 +38,7 @@ export const PowerDns = () => {
   return (
     <>
       <NavBar />
-      <div className="bg-gray-200 min-h-screen flex justify-center items-center">
+      <div className="bg-gray-200 min-h-screen flex flex-col justify-center items-center">
         {/* Input escondido */}
         <input
           type="file"
@@ -50,10 +51,12 @@ export const PowerDns = () => {
             }
           }}
         />
-
+        
         {/* Botão que abre o seletor */}
         <SendPdf onClick={() => inputRef.current?.click()} />
+          {message && <p className="mt-5">{message}</p>}
       </div>
+      
     </>
   );
 };
