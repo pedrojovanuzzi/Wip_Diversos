@@ -271,7 +271,7 @@ class ClientAnalytics {
 
       console.log("Turn off " + turnOff);
 
-      if (turnOff.includes("reset onu ok!")) {
+      if (turnOff === 'reset onu ok!') {
         res.status(200).json({
           respostaTelnet: "ONU reiniciada com sucesso: " + turnOff,
         });
