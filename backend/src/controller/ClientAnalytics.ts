@@ -266,23 +266,25 @@ class ClientAnalytics {
 
       turnOff = await conn.exec(
         `reboot slot ${slot} pon ${pon} onulist ${onuId}`,
-        { timeout: 10000 }
+        { timeout: 1000 }
       );
+
+      console.log("Turn off " + turnOff);
+      
+
+      if (turnOff.includes("reset onu ok!")) {
+    return res.status(200).json({
+      respostaTelnet: "ONU reiniciada com sucesso: " + turnOff,
+      });
+    }
+
 
       res.status(200).json({
         respostaTelnet: "ONU reiniciada com sucesso: " + turnOff,
       });
-    } catch (error: any) {
-      if (turnOff?.includes("reset onu ok!")) {
-        console.log(turnOff);
 
-        res.status(200).json({
-          respostaTelnet: "ONU reiniciada com sucesso",
-        });
-      } else {
-        console.error(error);
-        res.status(500).json({ error: "Erro ao reiniciar ONU" });
-      }
+    } catch (error: any) {
+      res.status(500).json({ error: "Erro ao reiniciar ONU" });
     }
   };
 
