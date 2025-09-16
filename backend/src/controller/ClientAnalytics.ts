@@ -252,23 +252,21 @@ class ClientAnalytics {
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      if (!this.onuId || !slot || !pon) {
+      if (!onuId || !slot || !pon) {
         await conn.end();
         res.status(500).json({ respostaTelnet: "Sem Onu" });
         return;
       }
 
+      await conn.exec(
+        `cd maintenance`,
+      );
+
       const turnOff = await conn.exec(
-        `set onu_enable_status slot ${slot} pon ${pon} onu ${onuId} status disable`,
+        `reboot slot ${slot} pon ${pon} onulist ${onuId}`,
         { timeout: 10000 }
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 30000));
-
-      const turnOn = await conn.exec(
-        `set onu_enable_status slot ${slot} pon ${pon} onu ${onuId} status enable`,
-        { timeout: 10000 }
-      );
 
       res.status(200).json({
         respostaTelnet: "ONU reiniciada com sucesso",})
