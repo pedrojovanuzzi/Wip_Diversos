@@ -1,14 +1,12 @@
-// import {Router} from "express"
-// import AuthGuard from "../middleware/AuthGuard";
-// import ServerLogs from "../controller/ServerLogs";
+import {Router} from "express"
+import AuthGuard from "../middleware/AuthGuard";
+import PowerDNS from "../controller/PowerDns";
+const powerdns = new PowerDNS();
 
-// const serverLogs = new ServerLogs();
+// import 
+const router: Router = Router();
 
-// // import 
-// const router: Router = Router();
+router.get("/inserirPdf", AuthGuard, powerdns.inserirPdf);
 
-// router.get("/", AuthGuard, serverLogs.getFolders);
-// router.post("/FoldersRecursion", AuthGuard, serverLogs.FoldersRecursion);
-// router.post("/AccessFile", AuthGuard, serverLogs.AccessFile);
 
-// export default router;
+export default router;
