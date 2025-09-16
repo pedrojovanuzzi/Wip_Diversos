@@ -7,11 +7,11 @@ import multer from "multer";
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, path.join(__dirname, "..", "uploads"));
+        cb(null, path.join(__dirname, "..", '..', "uploads"));
     },
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname);
-        const nomeFinal = 'DnsPdf';
+        const nomeFinal = 'DnsPdf.pdf';
         cb(null, nomeFinal);
     }
 })
