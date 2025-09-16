@@ -259,6 +259,10 @@ class ClientAnalytics {
       }
 
       await conn.exec(
+        `cd ..`,
+      );
+
+      await conn.exec(
         `cd maintenance`,
       );
 
