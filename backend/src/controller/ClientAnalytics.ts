@@ -258,11 +258,11 @@ class ClientAnalytics {
         return;
       }
 
-      await conn.exec(
+      await conn.send(
         `cd ..`,
       );
 
-      await conn.exec(
+      await conn.send(
         `cd maintenance`,
       );
 
