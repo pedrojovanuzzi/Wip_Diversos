@@ -15,6 +15,7 @@ import Backup from "./controller/Backup"; // Caminho para sua classe de backup
 import DosProtect from './routes/DosProtect.Routes';
 import DosProtectController from './controller/DosProtect';
 import ServerLogs from "./routes/ServerLogs.Routes";
+import PowerDNS from './routes/PowerDns.routes';
 
 export class App {
   public server: express.Application;
@@ -44,6 +45,7 @@ export class App {
     this.server.use("/api/ClientAnalytics", ClientAnalytics);
     this.server.use("/api/DosProtect", DosProtect);
     this.server.use("/api/ServerLogs", ServerLogs);
+    this.server.use("/api/PowerDns", PowerDNS);
   }
 
   private agendarBackup() {
