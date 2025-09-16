@@ -19,6 +19,7 @@ import { ClientAnalytics } from './pages/ClientAnalytics/ClientAnalytics';
 import { DDDOS_Home } from './pages/DDDOS_Monitoring/DDDOS_Home';
 import { ServerLogs } from './pages/logs/ServerLogs';
 import { LogViewer } from './pages/logs/LogViewer';
+import { PowerDns } from './pages/powerdns/PowerDns';
 
 
 function App() {
@@ -64,6 +65,7 @@ function App() {
           <Route path="/DDDOS" element={auth ? <DDDOS_Home /> : <Navigate to="/auth/login" />} />
           <Route path="/ServerLogs" element={auth ? <ServerLogs /> : <Navigate to="/auth/login" />} />
           <Route path="/LogViewer" element={auth ? <LogViewer /> : <Navigate to="/auth/login" />} />
+          <Route path="/PowerDns" element={auth ? <PowerDns /> : <Navigate to="/auth/login" />} />
           <Route path="*" element={auth ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>

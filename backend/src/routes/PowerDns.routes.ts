@@ -1,14 +1,30 @@
-// import {Router} from "express"
-// import AuthGuard from "../middleware/AuthGuard";
-// import ServerLogs from "../controller/ServerLogs";
+import {Router} from "express"
+import AuthGuard from "../middleware/AuthGuard";
+import PowerDNS from "../controller/PowerDns";
 
-// const serverLogs = new ServerLogs();
+import path from "path";
+import multer from "multer";
 
-// // import 
-// const router: Router = Router();
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, path.join(__dirname, "..", '..', "uploads"));
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        const nomeFinal = 'DnsPdf.pdf';
+        cb(null, nomeFinal);
+    }
+})
 
-// router.get("/", AuthGuard, serverLogs.getFolders);
-// router.post("/FoldersRecursion", AuthGuard, serverLogs.FoldersRecursion);
-// router.post("/AccessFile", AuthGuard, serverLogs.AccessFile);
+const upload = multer({storage});
 
-// export default router;
+
+const powerdns = new PowerDNS();
+
+// import 
+const router: Router = Router();
+
+router.post("/inserirPdf", AuthGuard, upload.single("file"), powerdns.inserirPdf.bind(powerdns));
+
+
+export default router;

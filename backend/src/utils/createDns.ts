@@ -15,11 +15,11 @@ dotenv.config();
 // Config do banco PowerDNS
 // ========================
 const DB_CONFIG = {
-  host:process.env.POWERDNS_IP,
-  port:Number(process.env.POWERDNS_PORT),
-  database:process.env.POWERDNS_DATABASE, // ajuste se seu banco tiver outro nome
-  user:process.env.POWERDNS_USER,
-  password:process.env.POWERDNS_PASS,
+  host: process.env.POWERDNS_IP,
+  port: Number(process.env.POWERDNS_PORT),
+  database: process.env.POWERDNS_DATABASE, // ajuste se seu banco tiver outro nome
+  user: process.env.POWERDNS_USER,
+  password: process.env.POWERDNS_PASS,
 };
 
 // Nome da tabela de bloqueio
@@ -59,7 +59,9 @@ const PADRAO_DOMINIO = /\b(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b/g;
 // =========================================
 // Função que extrai domínios de arquivos
 // =========================================
-async function extrairDominios(caminhoArquivo: string): Promise<string[]> {
+export async function extrairDominios(
+  caminhoArquivo: string
+): Promise<string[]> {
   // pega a extensão do arquivo
   const extensao = path.extname(caminhoArquivo).toLowerCase();
 
@@ -103,7 +105,7 @@ async function extrairDominios(caminhoArquivo: string): Promise<string[]> {
 // ======================================
 // Inserção em lote no PostgreSQL
 // ======================================
-async function inserirDominios(dominios: string[]) {
+export async function inserirDominios(dominios: string[]) {
   if (dominios.length === 0) {
     console.log("⚠️ Nenhum domínio para inserir.");
     return;
@@ -124,33 +126,25 @@ async function inserirDominios(dominios: string[]) {
     let inseridos = 0;
     for (const d of dominios) {
       const res = await client.query(sql, [d]);
-      if(res.rowCount){
+      if (res.rowCount) {
         if (res.rowCount > 0) inseridos++;
       }
-      
-      
     }
 
     const repetidos = dominios.length - inseridos;
 
-    console.log("\n📋 Resumo da operação:");
-    console.log(`✅ ${inseridos} domínios novos inseridos.`);
-    console.log(`⏭️ ${repetidos} domínios já existiam (ou foram ignorados).`);
+    const resumo = `
+📋 Resumo da operação:
+✅ ${inseridos} domínios novos inseridos.
+⏭️ ${repetidos} domínios já existiam (ou foram ignorados).
+  `;
+
+    console.log(resumo);
+    return resumo; // aqui sim retorna string
   } catch (e) {
     console.error("❌ Falha ao inserir domínios:", e);
+    throw e;
   } finally {
     await client.end();
   }
 }
-
-// ===========================
-// Exemplo de uso direto (CLI)
-// ===========================
-(async () => {
-  const caminhoArquivo = "2.pdf"; // mude aqui o arquivo a processar
-
-  const dominiosExtraidos = await extrairDominios(caminhoArquivo);
-  console.log(`🔎 Encontrados ${dominiosExtraidos.length} domínios únicos.`);
-
-  await inserirDominios(dominiosExtraidos);
-})();
