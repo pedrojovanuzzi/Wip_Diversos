@@ -24,9 +24,10 @@ class ClientAnalytics {
         where: { login: pppoe, cli_ativado: "s" },
       });
 
-
-      if(User.length < 1){
-        res.status(500).json({error: "Cliente não existe, ou está desativado"});
+      if (User.length < 1) {
+        res
+          .status(500)
+          .json({ error: "Cliente não existe, ou está desativado" });
       }
 
       const FaturasRepository = MkauthSource.getRepository(Faturas);
@@ -233,7 +234,6 @@ class ClientAnalytics {
       await conn.send(password);
       await conn.send("cd onu");
 
-      
       const slot = User?.porta_olt?.substring(0, 2);
       const pon = User?.porta_olt?.substring(2, 4);
       const rawTag = User?.tags ?? "";
@@ -260,36 +260,31 @@ class ClientAnalytics {
         return;
       }
 
-      await conn.send(
-        `cd ..`,
-      );
+      await conn.send(`cd ..`);
 
-      await conn.send(
-        `cd maintenance`,
-      );
+      await conn.send(`cd maintenance`);
 
       turnOff = await conn.exec(
         `reboot slot ${slot} pon ${pon} onulist ${onuId}`,
         { timeout: 10000 }
       );
 
-
       res.status(200).json({
-        respostaTelnet: "ONU reiniciada com sucesso: " + turnOff,})
-      
-    } catch (error : any) {
-       if (error.message?.includes("response not received") && turnOff?.includes("reset onu ok!")) {
-    res.status(200).json({
-      respostaTelnet: "ONU reiniciada com sucesso",
-    });
-  } else {
-    console.error(error);
-    res.status(500).json({ error: "Erro ao reiniciar ONU" });
-  }
-    }
-  
-  }
+        respostaTelnet: "ONU reiniciada com sucesso: " + turnOff,
+      });
+    } catch (error: any) {
+      if (turnOff?.includes("reset onu ok!")) {
+        console.log(turnOff);
 
+        res.status(200).json({
+          respostaTelnet: "ONU reiniciada com sucesso",
+        });
+      } else {
+        console.error(error);
+        res.status(500).json({ error: "Erro ao reiniciar ONU" });
+      }
+    }
+  };
 
   executarSSH = async (host: string, comando: string): Promise<string> => {
     try {
@@ -326,9 +321,10 @@ class ClientAnalytics {
                   output += data.toString();
                 })
                 .stderr.on("data", (data: Buffer) => {
-                  console.error(
+                  console
+                    .error
                     // `[DEBUG] STDERR (${host}):\n${data.toString()}`
-                  );
+                    ();
                   output += data.toString();
                 });
             });
@@ -669,7 +665,10 @@ class ClientAnalytics {
         tempoReal.tmp_tx = this.parseBitsPerSecond(tx);
         tempoReal.tmp_rx = this.parseBitsPerSecond(rx);
 
-        if (typeof tempoReal.tmp_tx !== "number" && typeof tempoReal.tmp_rx !== "number") {
+        if (
+          typeof tempoReal.tmp_tx !== "number" &&
+          typeof tempoReal.tmp_rx !== "number"
+        ) {
           res.status(500).json();
         }
 
