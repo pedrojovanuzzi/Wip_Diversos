@@ -197,7 +197,7 @@ export const ClientAnalytics = () => {
       setErrorLoading(response.data.message);
     } catch (e: any) {
       setErrorLoading(
-        e.response?.data?.error || "Erro ao resetar consumo em tempo real"
+        e.response?.data?.error || "Erro ao resetar onu"
       );
     } finally {
       setLoadingReset(false);
