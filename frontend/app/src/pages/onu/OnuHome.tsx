@@ -12,16 +12,32 @@ export const OnuHome = () => {
   const navigate = useNavigate();
 
   const [onuOn, setOnuOn] = useState<OnuData[] | []>([]);
-  const [slot, setSlot] = useState('');
-  const [pon, setPon] = useState('');
+  const [localizarMac, setLocalizarMac] = useState(false);
+  const [slot, setSlot] = useState("");
+  const [pon, setPon] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<any>("");
 
-  async function createOnu() {
+  async function createOnuRedirect() {
     try {
-        navigate('/Onu/AutorizarOnu');
+      navigate("/Onu/AutorizarOnu");
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  function resetState() {
+    setOnuOn([]);
+    setLoading(true);
+    setError("");
+  }
+
+  async function verifyOnlineOnu(slot: string, pon: string) {
+    try {
+      resetState();
       const response = await axios.post(
-        `${process.env.REACT_APP_URL}/Onu/OnuAuthentication`,
-        {},
+        `${process.env.REACT_APP_URL}/Onu/OnuShowOnline`,
+        { slot, pon },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -32,18 +48,21 @@ export const OnuHome = () => {
       );
 
       console.log(response.data);
-    } catch (error) {
+      setLoading(false);
+      setOnuOn(response.data);
+    } catch (error: any) {
+      setError(String(error?.response?.data));
+      setLoading(false);
       console.error(error);
     }
   }
 
-  async function verifyOnlineOnu(slot: string, pon: string) {
+  async function verifyWhitListOnu() {
     try {
-        setOnuOn([]);
-        setLoading(true);
+      resetState();
       const response = await axios.post(
-        `${process.env.REACT_APP_URL}/Onu/OnuShowOnline`,
-        { slot, pon },
+        `${process.env.REACT_APP_URL}/Onu/OnuShowAuth`,
+        {},
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -64,56 +83,112 @@ export const OnuHome = () => {
   return (
     <div>
       <NavBar />
-      {onuOn && (
-        <div  className="flex justify-center flex-col">
-          <div className="w-1/4 my-5 self-center">
-            <label
-              
-              className="block text-sm/6 font-medium text-gray-900"
-            >
-              Slot
-            </label>
-            <div className="mt-2">
-              <input
-                onChange={(e) => (
-                    setSlot(e.target.value)
-                )}
-                placeholder="11"
-                className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
-              />
-            </div>
-            <label
-              
-              className="block text-sm/6 font-medium text-gray-900"
-            >
-              Pon
-            </label>
-            <div className="mt-2">
-              <input
-              onChange={(e) => (
-                    setPon(e.target.value)
-                )}
-                placeholder="04"
-                className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
-              />
-            </div>
-          </div>
-          <pre>
-            <OnuList list={onuOn}></OnuList>
-          </pre>
-          {loading && <p>Carregando...</p>}
-        </div>
-      )}
-      <div className="flex sm:flex gap-2 sm:justify-evenly flex-col-reverse sm:flex-row-reverse my-5 pt-10">
-        <button className="p-3 bg-blue-600 text-gray-200 w-40 text-sm self-center" onClick={createOnu}>Autorizar Onu</button>
-        <button className="p-3 bg-slate-600 text-gray-200 w-40 text-sm self-center"
+      <div className="flex justify-around">
+        <button
           onClick={() => {
-            verifyOnlineOnu(slot, pon);
+            setLocalizarMac(true);
           }}
+          className="p-3 bg-slate-800 hover:bg-slate-700 transition-all text-gray-200 text-nowrap w-full max-h-20  text-sm self-center"
         >
-          Verificar Onu's Online
+          Localizar Informações pelo SN
+        </button>
+        <button
+          onClick={() => {
+            setLocalizarMac(false);
+          }}
+          className="p-3 bg-slate-800 hover:bg-slate-700 transition-all text-gray-200 text-nowrap w-full max-h-20  text-sm self-center"
+        >
+          Verificar Onu's / Autorizar
         </button>
       </div>
+      {!localizarMac && (
+        <>
+          {onuOn && (
+            <div className="flex justify-center flex-col">
+              <div className="w-1/4 my-5 self-center">
+                <label className="block text-sm/6 font-medium text-gray-900">
+                  Slot
+                </label>
+                <div className="mt-2">
+                  <input
+                    onChange={(e) => setSlot(e.target.value)}
+                    placeholder="11"
+                    className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                  />
+                </div>
+                <label className="block text-sm/6 font-medium text-gray-900">
+                  Pon
+                </label>
+                <div className="mt-2">
+                  <input
+                    onChange={(e) => setPon(e.target.value)}
+                    placeholder="04"
+                    className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                  />
+                </div>
+              </div>
+              <pre>
+                <OnuList list={onuOn}></OnuList>
+              </pre>
+              {loading && <p>Carregando...</p>}
+              {error && (
+                <h3 className="text-red-500 text-2xl">Erro: {error}</h3>
+              )}
+            </div>
+          )}
+          <div className="flex flex-col sm:flex sm:flex-row gap-2 sm:justify-evenly my-5 pt-10">
+            <button
+              className="p-3 bg-violet-600 text-gray-200 w-full max-w-72 sm:w-52 text-sm self-center"
+              onClick={() => {
+                verifyWhitListOnu();
+              }}
+            >
+              Verificar Onu's para Autorizar
+            </button>
+            <button
+              className="p-3 bg-slate-600 text-gray-200 w-full max-w-72 sm:w-52 text-sm self-center"
+              onClick={() => {
+                verifyOnlineOnu(slot, pon);
+              }}
+            >
+              Verificar Onu's Online
+            </button>
+            <button
+              className="p-3 bg-blue-600 text-gray-200 w-full max-w-72 sm:w-52 text-sm self-center"
+              onClick={createOnuRedirect}
+            >
+              Autorizar Onu
+            </button>
+          </div>
+        </>
+      )}
+      {localizarMac && (
+        <>
+          {onuOn && (
+            <div className="flex justify-center flex-col">
+              <div className="w-1/4 my-5 self-center">
+                <label className="block text-sm/6 font-medium text-gray-900">
+                  SN
+                </label>
+                <div className="mt-2">
+                  <input
+                    onChange={(e) => setSlot(e.target.value)}
+                    placeholder="11"
+                    className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                  />
+                </div>
+              </div>
+              <pre>
+                <OnuList title="Informações da Onu" list={onuOn}></OnuList>
+              </pre>
+              {loading && <p>Carregando...</p>}
+              {error && (
+                <h3 className="text-red-500 text-2xl">Erro: {error}</h3>
+              )}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

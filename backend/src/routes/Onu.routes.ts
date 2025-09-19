@@ -9,6 +9,7 @@ const router: Router = Router();
 
 router.post("/OnuAuthentication", AuthGuard, onu.onuAuthentication);
 router.post("/OnuShowOnline", AuthGuard, onu.onuShowOnline);
+router.post("/OnuShowAuth", AuthGuard, onu.onuShowAuth);
 
 
 export default router;
