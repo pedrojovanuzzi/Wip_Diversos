@@ -20,6 +20,7 @@ import { DDDOS_Home } from './pages/DDDOS_Monitoring/DDDOS_Home';
 import { ServerLogs } from './pages/logs/ServerLogs';
 import { LogViewer } from './pages/logs/LogViewer';
 import { PowerDns } from './pages/powerdns/PowerDns';
+import { OnuHome } from './pages/onu/OnuHome';
 
 
 function App() {
@@ -66,6 +67,7 @@ function App() {
           <Route path="/ServerLogs" element={auth ? <ServerLogs /> : <Navigate to="/auth/login" />} />
           <Route path="/LogViewer" element={auth ? <LogViewer /> : <Navigate to="/auth/login" />} />
           <Route path="/PowerDns" element={auth ? <PowerDns /> : <Navigate to="/auth/login" />} />
+          <Route path="/Onu" element={auth ? <OnuHome /> : <Navigate to="/auth/login" />} />
           <Route path="*" element={auth ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>
