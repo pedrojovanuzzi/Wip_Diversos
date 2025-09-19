@@ -1,14 +1,14 @@
 import { OnuData } from "../../../types";
 
 
-export default function OnuList({ list }: { list: OnuData[] }) {
+export default function OnuList({ list, title }: { list: OnuData[], title? : string  }) {
   return (
     <div className="">
       <div className="">
         <div className="sm:flex-auto">
           <h1 className="text-base font-semibold text-gray-900">Lista de Onu's</h1>
           <p className="mt-2 text-sm text-gray-700">
-            Uma lista de Todas as Onu Online<br></br> na Pon digitada
+            {title ?? <>Uma lista de Todas as Onu Online<br></br> na Pon digitada</>}
           </p>
         </div>
       </div>

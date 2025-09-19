@@ -13,7 +13,7 @@ class Onu {
       return;
     }
     try {
-      conn.send("cd onu");
+      await conn.send("cd onu");
       const query = await conn.exec("show unauth");
       res.status(200).json(query);
     } catch (error) {
@@ -32,10 +32,64 @@ class Onu {
     }
     try {
       const { slot, pon } = req.body;
+      if(!slot || !pon){
+        res.status(500).json('Slot ou Pon Vazios');
+        return;
+      }
 
       await conn.send("cd onu");
 
       const query = await conn.exec(`show online slot ${slot} pon ${pon}`, {
+        execTimeout: 30000,
+        stripControls: true, // remove caracteres de controle
+        maxBufferLength: 10 * 1024, // aumenta limite do buffer (10KB ou mais)
+      });
+
+      // divide a saída em linhas
+      const lines = query.split("\n");
+
+      // limpa as mensagens "Press any key..." e espaços extras
+      const cleaned = lines
+        .map(
+          (l) => l.replace(/--Press any key.*?stop--/g, "").trim() // remove a mensagem
+        )
+        .filter((l) => /^\d+/.test(l)); // mantém só linhas que começam com número (as ONUs)
+
+      // console.log("DEBUG linhas limpas:", cleaned);
+
+      // agora converte em objetos
+      const onus = cleaned.map((line) => {
+        const parts = line.trim().split(/\s+/);
+        return {
+          onuid: parts[0],
+          model: parts[1],
+          sn: parts[2],
+          slotPon: parts[parts.length - 1],
+        };
+      });
+
+      // console.log("Resultado final:", onus);
+
+      res.status(200).json(onus);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json(error);
+    } finally {
+      conn.end();
+    }
+  };
+
+  public onuShowAuth = async (req: Request, res: Response) => {
+    const conn = await this.telnetStart(this.ip, this.login, this.password);
+    if (!conn) {
+      res.status(500).json("Erro No Telnet");
+      return;
+    }
+    try {
+
+      await conn.send("cd onu");
+
+      const query = await conn.exec(`show unauth`, {
         execTimeout: 30000,
         stripControls: true, // remove caracteres de controle
         maxBufferLength: 10 * 1024, // aumenta limite do buffer (10KB ou mais)
