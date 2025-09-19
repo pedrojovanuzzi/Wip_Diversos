@@ -9,8 +9,8 @@ import {
 import { MdDns, MdOutlineFeedback } from "react-icons/md";
 import { FaWhatsapp } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
-import { PiComputerTowerBold } from "react-icons/pi";
 import { FaRegFolder } from "react-icons/fa";
+import { FaPlugCirclePlus } from "react-icons/fa6";
 
 import { Link } from "react-router-dom";
 
@@ -111,6 +111,11 @@ export const NavBar = () => {
             <li className="p-2 grid place-items-center col-span-2">
               <Link to="/PowerDns">
                 <MdDns  className="text-white size-8 transition-all hover:text-green-400" />
+              </Link>
+            </li>
+            <li className="p-2 grid place-items-center col-span-2">
+              <Link to="/Onu">
+                <FaPlugCirclePlus className="text-white size-8 transition-all hover:text-green-400" />
               </Link>
             </li>
           </ul>
