@@ -7,6 +7,7 @@ class Onu {
   private password = String(process.env.OLT_PASSWORD);
 
   public onuAuthentication = async (req: Request, res: Response) => {
+    const {sn, vlan} = req.body;
     const conn = await this.telnetStart(this.ip, this.login, this.password);
     if (!conn) {
       res.status(500).json("Erro No Telnet");
@@ -14,8 +15,12 @@ class Onu {
     }
     try {
       await conn.send("cd onu");
-      const query = await conn.exec("show unauth");
-      res.status(200).json(query);
+      const onuInfo = await this.querySnHelper(sn);
+
+      console.log(onuInfo, vlan);
+      
+
+      res.status(200).json(onuInfo);
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
@@ -180,6 +185,59 @@ class Onu {
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
+    } finally {
+      conn.end();
+    }
+  };
+
+  public querySnHelper = async (sn : string) => {
+    const conn = await this.telnetStart(this.ip, this.login, this.password);
+    if (!conn) {
+      return;
+    }
+    try {
+      await conn.send("cd onu");
+
+      const query = await conn.exec(`show onu-info by ${sn}`, {
+        execTimeout: 30000,
+        stripControls: true, // remove caracteres de controle
+        maxBufferLength: 10 * 1024, // aumenta limite do buffer (10KB ou mais)
+      });
+
+      // divide a saída em linhas
+      const lines = query;
+
+      const match = lines.match(/-----\s+(\d+)\s+(\d+)\s+(\d+)/);
+
+      let slot,
+        pon,
+        onuNumber = "";
+
+      if (match) {
+        slot = match[1]; // "11"
+        pon = match[2]; // "5"
+        onuNumber = match[3];
+      }
+
+      // console.log("Resultado final:", onus);
+      const slotPon = `${slot}0${pon}`;
+
+      if (!slot || !pon || !conn || !sn) {
+        console.error("Campos ausentes");
+        return;
+      }
+
+      const model = await this.filterByMacOnu(
+        conn,
+        sn,
+        slot as string,
+        pon as string
+      );
+
+      return model;
+
+    } catch (error) {
+      console.error(error);
     } finally {
       conn.end();
     }

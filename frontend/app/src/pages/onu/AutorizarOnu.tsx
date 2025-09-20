@@ -9,12 +9,34 @@ export const AutorizarOnu = () => {
   const userToken = useTypedSelector((state: RootState) => state.auth.user);
   const token = userToken.token;
   const [bridge, setBridge] = useState(true);
+  const [sn, setSn] = useState("");
+  const [vlan, setVlan] = useState("");
 
-  async function createOnu() {
+  async function createOnuWifi() {
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/Onu/OnuAuthentication`,
         {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 60000,
+        }
+      );
+
+      console.log(response.data);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function createOnuBridge(sn: string, vlan: string) {
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Onu/OnuAuthentication`,
+        { sn: sn, vlan: vlan },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -71,17 +93,42 @@ export const AutorizarOnu = () => {
             </label>
             <input
               placeholder="FHTT0726a260"
+              onChange={(e) => setSn(e.target.value)}
               className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
             />
-            <label className="block text-sm/6 font-medium text-gray-900">
-              Type
-            </label>
-            <input
-              placeholder="5506-01-A1"
-              className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
-            />
-            {bridge && <></>}
-            {!bridge && <></>}
+
+            {bridge && (
+              <>
+                <label className="block text-sm/6 font-medium text-gray-900">
+                  Vlan
+                </label>
+                <input
+                  onChange={(e) => setVlan(e.target.value)}
+                  placeholder="IP fixo use VLAN 1008/1009 ou padrão"
+                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                />
+                <button
+                  onClick={() => {
+                    createOnuBridge(sn, vlan);
+                  }}
+                  className="bg-zinc-600 text-gray-200 p-3 my-2"
+                >
+                  Criar
+                </button>
+              </>
+            )}
+            {!bridge && (
+              <>
+                <button
+                  onClick={() => {
+                    createOnuWifi();
+                  }}
+                  className="bg-teal-600 text-gray-200 p-3 my-2"
+                >
+                  Criar
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
