@@ -153,7 +153,7 @@ class ClientAnalytics {
 
       const optic = await conn.exec(
         `show optic_module slot ${slot} pon ${pon} onu ${onuId}`,
-        { timeout: 10000 }
+        { timeout: 10000, execTimeout: 30000 }
       );
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
