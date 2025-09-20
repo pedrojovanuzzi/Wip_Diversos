@@ -21,6 +21,7 @@ import { ServerLogs } from './pages/logs/ServerLogs';
 import { LogViewer } from './pages/logs/LogViewer';
 import { PowerDns } from './pages/powerdns/PowerDns';
 import { OnuHome } from './pages/onu/OnuHome';
+import { AutorizarOnu } from './pages/onu/AutorizarOnu';
 
 
 function App() {
@@ -68,6 +69,7 @@ function App() {
           <Route path="/LogViewer" element={auth ? <LogViewer /> : <Navigate to="/auth/login" />} />
           <Route path="/PowerDns" element={auth ? <PowerDns /> : <Navigate to="/auth/login" />} />
           <Route path="/Onu" element={auth ? <OnuHome /> : <Navigate to="/auth/login" />} />
+          <Route path="/Onu/AutorizarOnu" element={auth ? <AutorizarOnu /> : <Navigate to="/auth/login" />} />
           <Route path="*" element={auth ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>

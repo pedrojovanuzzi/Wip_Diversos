@@ -440,6 +440,8 @@ class ClientAnalytics {
         { host: process.env.MIKROTIK_PPPOE1, nome: "PPPOE1" },
         { host: process.env.MIKROTIK_PPPOE2, nome: "PPPOE2" },
         { host: process.env.MIKROTIK_PPPOE3, nome: "PPPOE3" },
+        { host: process.env.MIKROTIK_PPPOE4, nome: "PPPOE4" },
+        { host: process.env.MIKROTIK_PPPOE5, nome: "PPPOE5" },
       ];
 
       const resultados = [];
