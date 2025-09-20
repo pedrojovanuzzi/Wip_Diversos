@@ -32,8 +32,8 @@ class Onu {
     }
     try {
       const { slot, pon } = req.body;
-      if(!slot || !pon){
-        res.status(500).json('Slot ou Pon Vazios');
+      if (!slot || !pon) {
+        res.status(500).json("Slot ou Pon Vazios");
         return;
       }
 
@@ -86,7 +86,6 @@ class Onu {
       return;
     }
     try {
-
       await conn.send("cd onu");
 
       const query = await conn.exec(`show unauth`, {
@@ -128,6 +127,116 @@ class Onu {
       conn.end();
     }
   };
+
+  public querySn = async (req: Request, res: Response) => {
+    const { sn } = req.body;
+    const conn = await this.telnetStart(this.ip, this.login, this.password);
+    if (!conn) {
+      res.status(500).json("Erro No Telnet");
+      return;
+    }
+    try {
+      await conn.send("cd onu");
+
+      const query = await conn.exec(`show onu-info by ${sn}`, {
+        execTimeout: 30000,
+        stripControls: true, // remove caracteres de controle
+        maxBufferLength: 10 * 1024, // aumenta limite do buffer (10KB ou mais)
+      });
+
+      // divide a saída em linhas
+      const lines = query;
+
+      const match = lines.match(/-----\s+(\d+)\s+(\d+)\s+(\d+)/);
+
+      let slot,
+        pon,
+        onuNumber = "";
+
+      if (match) {
+        slot = match[1]; // "11"
+        pon = match[2]; // "5"
+        onuNumber = match[3];
+      }
+
+      // console.log("Resultado final:", onus);
+      const slotPon = `${slot}0${pon}`;
+
+      if (!slot || !pon || !conn || !sn) {
+        console.error("Campos ausentes");
+        res.status(500).json("Campos ausentes");
+        return;
+      }
+
+      const model = await this.filterByMacOnu(
+        conn,
+        sn,
+        slot as string,
+        pon as string
+      );
+
+
+      res.status(200).json({ slotPon: slotPon, onuid: onuNumber, sn: sn, model: model?.model });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json(error);
+    } finally {
+      conn.end();
+    }
+  };
+
+  private async filterByMacOnu(
+    conn: Telnet,
+    sn: string,
+    slot: string,
+    pon: string
+  ) {
+    try {
+      const query = await conn.exec(`show online slot ${slot} pon ${pon}`, {
+        execTimeout: 30000,
+        stripControls: true,
+        maxBufferLength: 10 * 1024,
+      });
+
+      // divide a saída em linhas
+      const lines = query.split("\n");
+
+      // limpa as mensagens "Press any key..." e espaços extras
+      const cleaned = lines
+        .map(
+          (l) => l.replace(/--Press any key.*?stop--/g, "").trim() // remove a mensagem
+        )
+        .filter((l) => /^\d+/.test(l)); // mantém só linhas que começam com número (as ONUs)
+
+      // console.log("DEBUG linhas limpas:", cleaned);
+
+      // agora converte em objetos
+      const onus = cleaned.map((line) => {
+        const parts = line.trim().split(/\s+/);
+        return {
+          onuid: parts[0],
+          model: parts[1],
+          sn: parts[2],
+          slotPon: parts[parts.length - 1],
+        };
+      });
+
+      const found = onus.find(
+        (onu) => onu.sn.toUpperCase() === sn.toUpperCase()
+      );
+
+      if (found) {
+        console.log("✅ ONU encontrada:", found);
+        return found;
+      } else {
+        console.warn("⚠️ SN não encontrado:", sn);
+        return null;
+      }
+    } catch (error) {
+      console.error("❌ Erro no filterByMacOnu:", error);
+      return null;
+    }
+  }
 
   private async telnetStart(ip: string, login: string, password: string) {
     try {
