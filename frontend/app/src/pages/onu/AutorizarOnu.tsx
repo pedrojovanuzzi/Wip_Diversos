@@ -15,7 +15,7 @@ export const AutorizarOnu = () => {
   async function createOnuWifi() {
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_URL}/Onu/OnuAuthentication`,
+        `${process.env.REACT_APP_URL}/Onu/OnuAuthenticationWifi`,
         {},
         {
           headers: {
@@ -35,7 +35,7 @@ export const AutorizarOnu = () => {
   async function createOnuBridge(sn: string, vlan: string) {
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_URL}/Onu/OnuAuthentication`,
+        `${process.env.REACT_APP_URL}/Onu/OnuAuthenticationBridge`,
         { sn: sn, vlan: vlan },
         {
           headers: {
