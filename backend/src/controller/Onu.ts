@@ -17,6 +17,8 @@ class Onu {
       await conn.send("cd onu");
       const onuInfo = await this.querySnHelper(sn);
 
+      const lastOnuNumber = await conn.exec(`show onu slot 11 pon 04 onulist all`, {execTimeout: 30000});
+
       await conn.send("cd lan");
 
       await conn.exec(
@@ -35,7 +37,9 @@ class Onu {
         `set epon slot ${onuInfo?.slotPon.slice(
           0,
           2
-        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${onuInfo?.onuid} port 1 service number 1`,
+        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${
+          onuInfo?.onuid
+        } port 1 service number 1`,
         { execTimeout: 30000 }
       );
 
@@ -43,11 +47,18 @@ class Onu {
         `set epon slot ${onuInfo?.slotPon.slice(
           0,
           2
-        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${onuInfo?.onuid} port 1 service 1 vlan_mode tag 0 33024 ${vlan}`,
+        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${
+          onuInfo?.onuid
+        } port 1 service 1 vlan_mode tag 0 33024 ${vlan}`,
         { execTimeout: 30000 }
       );
 
-      await conn.exec(`apply onu ${onuInfo?.slotPon.slice(0,2)} ${onuInfo?.slotPon.slice(2,4)} ${onuInfo?.onuid} vlan`);
+      await conn.exec(
+        `apply onu ${onuInfo?.slotPon.slice(0, 2)} ${onuInfo?.slotPon.slice(
+          2,
+          4
+        )} ${onuInfo?.onuid} vlan`
+      );
 
       res.status(200).json(onuInfo);
     } catch (error) {
@@ -87,7 +98,9 @@ class Onu {
         `set epon slot ${onuInfo?.slotPon.slice(
           0,
           2
-        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${onuInfo?.onuid} port 1 service number 1`,
+        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${
+          onuInfo?.onuid
+        } port 1 service number 1`,
         { execTimeout: 30000 }
       );
 
@@ -95,11 +108,18 @@ class Onu {
         `set epon slot ${onuInfo?.slotPon.slice(
           0,
           2
-        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${onuInfo?.onuid} port 1 service 1 vlan_mode tag 0 33024 ${vlan}`,
+        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${
+          onuInfo?.onuid
+        } port 1 service 1 vlan_mode tag 0 33024 ${vlan}`,
         { execTimeout: 30000 }
       );
 
-      await conn.exec(`apply onu ${onuInfo?.slotPon.slice(0,2)} ${onuInfo?.slotPon.slice(2,4)} ${onuInfo?.onuid} vlan`);
+      await conn.exec(
+        `apply onu ${onuInfo?.slotPon.slice(0, 2)} ${onuInfo?.slotPon.slice(
+          2,
+          4
+        )} ${onuInfo?.onuid} vlan`
+      );
 
       res.status(200).json(onuInfo);
     } catch (error) {
@@ -233,22 +253,30 @@ class Onu {
       // divide a saída em linhas
       const lines = query;
 
-      const match = lines.match(/-----\s+(\d+)\s+(\d+)\s+(\d+)/);
+      const match = lines.match(
+        /-----\s+(\d+)\s+(\d+)(?:\s+(\d+))?\s+(Auth|UnAuth)\s*-+/i
+      );
 
       let slot,
         pon,
-        onuNumber = "";
+        onuNumber,
+        state = "";
 
       if (match) {
-        slot = match[1]; // "11"
-        pon = match[2]; // "5"
-        onuNumber = match[3];
+        slot = match[1]; // exemplo: "11"
+        pon = match[2]; // exemplo: "1"
+        onuNumber = match[3] || "Desconhecido"; // pode estar vazio
+        state = match[4]; // "Auth" ou "UnAuth"
+      } else {
+        console.error("❌ Não consegui casar a linha com regex");
+        res.status(500).json("Erro no parse do show onu-info");
+        return;
       }
 
       // console.log("Resultado final:", onus);
-      const slotPon = `${slot}0${pon}`;
+      const slotPon = `${slot}${pon}`;
 
-      if (!slot || !pon || !conn || !sn) {
+      if (!slot || !pon || !conn || !sn || !state) {
         console.error("Campos ausentes");
         res.status(500).json("Campos ausentes");
         return;
@@ -261,14 +289,13 @@ class Onu {
         pon as string
       );
 
-      res
-        .status(200)
-        .json({
-          slotPon: slotPon,
-          onuid: onuNumber,
-          sn: sn,
-          model: model?.model,
-        });
+      res.status(200).json({
+        slotPon: slotPon,
+        onuid: onuNumber,
+        sn: sn,
+        model: model?.model,
+        state: state,
+      });
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
@@ -291,23 +318,29 @@ class Onu {
         maxBufferLength: 10 * 1024, // aumenta limite do buffer (10KB ou mais)
       });
 
-      // divide a saída em linhas
-      const lines = query;
+      console.log('query ' + query);
+      
 
-      const match = lines.match(/-----\s+(\d+)\s+(\d+)\s+(\d+)/);
+      // divide a saída em linhas
+      const match = query.match(
+        /-----\s+(\d+)\s+(\d+)(?:\s+(\d+))?\s+(Auth|UnAuth)\s*-+/i
+      );
 
       let slot,
         pon,
-        onuNumber = "";
+        onuNumber,
+        state = "";
 
       if (match) {
-        slot = match[1]; // "11"
-        pon = match[2]; // "5"
-        onuNumber = match[3];
+        slot = match[1]; // exemplo: "11"
+        pon = match[2]; // exemplo: "1"
+        onuNumber = match[3] || "Desconhecido"; // pode estar vazio
+        state = match[4]; // "Auth" ou "UnAuth"
+      } else {
+        console.error("❌ Não consegui casar a linha com regex");
+        return;
       }
 
-      // console.log("Resultado final:", onus);
-      const slotPon = `${slot}0${pon}`;
 
       if (!slot || !pon || !conn || !sn) {
         console.error("Campos ausentes");
