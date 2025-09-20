@@ -9,6 +9,7 @@ export type OnuData = {
   onuid: string;
   slotPon: string;
   sn: string;
+  state?: string;
 };
 
 
