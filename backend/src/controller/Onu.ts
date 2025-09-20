@@ -6,8 +6,8 @@ class Onu {
   private login = String(process.env.OLT_LOGIN);
   private password = String(process.env.OLT_PASSWORD);
 
-  public onuAuthentication = async (req: Request, res: Response) => {
-    const {sn, vlan} = req.body;
+  public onuAuthenticationBridge = async (req: Request, res: Response) => {
+    const { sn, vlan } = req.body;
     const conn = await this.telnetStart(this.ip, this.login, this.password);
     if (!conn) {
       res.status(500).json("Erro No Telnet");
@@ -17,8 +17,89 @@ class Onu {
       await conn.send("cd onu");
       const onuInfo = await this.querySnHelper(sn);
 
-      console.log(onuInfo, vlan);
-      
+      await conn.send("cd lan");
+
+      await conn.exec(
+        `set whitelist phy_addr address ${
+          onuInfo?.sn
+        } password null action add slot ${onuInfo?.slotPon.slice(
+          0,
+          2
+        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${onuInfo?.onuid} type ${
+          onuInfo?.model
+        }`,
+        { execTimeout: 30000 }
+      );
+
+      await conn.exec(
+        `set epon slot ${onuInfo?.slotPon.slice(
+          0,
+          2
+        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${onuInfo?.onuid} port 1 service number 1`,
+        { execTimeout: 30000 }
+      );
+
+      await conn.exec(
+        `set epon slot ${onuInfo?.slotPon.slice(
+          0,
+          2
+        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${onuInfo?.onuid} port 1 service 1 vlan_mode tag 0 33024 ${vlan}`,
+        { execTimeout: 30000 }
+      );
+
+      await conn.exec(`apply onu ${onuInfo?.slotPon.slice(0,2)} ${onuInfo?.slotPon.slice(2,4)} ${onuInfo?.onuid} vlan`);
+
+      res.status(200).json(onuInfo);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json(error);
+    } finally {
+      conn.end();
+    }
+  };
+
+  public onuAuthenticationWifi = async (req: Request, res: Response) => {
+    const { sn, vlan } = req.body;
+    const conn = await this.telnetStart(this.ip, this.login, this.password);
+    if (!conn) {
+      res.status(500).json("Erro No Telnet");
+      return;
+    }
+    try {
+      await conn.send("cd onu");
+      const onuInfo = await this.querySnHelper(sn);
+
+      await conn.send("cd lan");
+
+      await conn.exec(
+        `set whitelist phy_addr address ${
+          onuInfo?.sn
+        } password null action add slot ${onuInfo?.slotPon.slice(
+          0,
+          2
+        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${onuInfo?.onuid} type ${
+          onuInfo?.model
+        }`,
+        { execTimeout: 30000 }
+      );
+
+      await conn.exec(
+        `set epon slot ${onuInfo?.slotPon.slice(
+          0,
+          2
+        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${onuInfo?.onuid} port 1 service number 1`,
+        { execTimeout: 30000 }
+      );
+
+      await conn.exec(
+        `set epon slot ${onuInfo?.slotPon.slice(
+          0,
+          2
+        )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${onuInfo?.onuid} port 1 service 1 vlan_mode tag 0 33024 ${vlan}`,
+        { execTimeout: 30000 }
+      );
+
+      await conn.exec(`apply onu ${onuInfo?.slotPon.slice(0,2)} ${onuInfo?.slotPon.slice(2,4)} ${onuInfo?.onuid} vlan`);
 
       res.status(200).json(onuInfo);
     } catch (error) {
@@ -180,8 +261,14 @@ class Onu {
         pon as string
       );
 
-
-      res.status(200).json({ slotPon: slotPon, onuid: onuNumber, sn: sn, model: model?.model });
+      res
+        .status(200)
+        .json({
+          slotPon: slotPon,
+          onuid: onuNumber,
+          sn: sn,
+          model: model?.model,
+        });
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
@@ -190,7 +277,7 @@ class Onu {
     }
   };
 
-  public querySnHelper = async (sn : string) => {
+  public querySnHelper = async (sn: string) => {
     const conn = await this.telnetStart(this.ip, this.login, this.password);
     if (!conn) {
       return;
@@ -235,7 +322,6 @@ class Onu {
       );
 
       return model;
-
     } catch (error) {
       console.error(error);
     } finally {
