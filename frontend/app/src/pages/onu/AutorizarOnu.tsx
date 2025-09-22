@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { NavBar } from "../../components/navbar/NavBar";
 import axios from "axios";
 import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { RootState } from "../../types";
+import { RootState, WifiData } from "../../types";
 
 export const AutorizarOnu = () => {
   const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
@@ -12,12 +12,19 @@ export const AutorizarOnu = () => {
   const [sn, setSn] = useState("");
   const [vlan, setVlan] = useState("");
   const [cos, setCos] = useState("");
+  const [wifiData, setWifiData] = useState<WifiData>({
+    pppoe: "",
+    senha_pppoe: "",
+    wifi_2ghz: "",
+    wifi_5ghz: "",
+    senha_wifi: "",
+  });
 
   async function createOnuWifi() {
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/Onu/OnuAuthenticationWifi`,
-        {},
+        { sn, vlan, cos, wifiData },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -97,25 +104,25 @@ export const AutorizarOnu = () => {
               onChange={(e) => setSn(e.target.value)}
               className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
             />
+            <label className="block text-sm/6 font-medium text-gray-900">
+              Vlan
+            </label>
+            <input
+              onChange={(e) => setVlan(e.target.value)}
+              placeholder="IP fixo use VLAN 1008/1009 ou padrão"
+              className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+            />
+            <label className="block text-sm/6 font-medium text-gray-900">
+              Cos
+            </label>
+            <input
+              onChange={(e) => setCos(e.target.value)}
+              placeholder="Cos"
+              className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+            />
 
             {bridge && (
               <>
-                <label className="block text-sm/6 font-medium text-gray-900">
-                  Vlan
-                </label>
-                <input
-                  onChange={(e) => setVlan(e.target.value)}
-                  placeholder="IP fixo use VLAN 1008/1009 ou padrão"
-                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
-                />
-                <label className="block text-sm/6 font-medium text-gray-900">
-                  Cos
-                </label>
-                <input
-                  onChange={(e) => setCos(e.target.value)}
-                  placeholder="Cos"
-                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
-                />
                 <button
                   onClick={() => {
                     createOnuBridge(sn, vlan);
@@ -128,6 +135,56 @@ export const AutorizarOnu = () => {
             )}
             {!bridge && (
               <>
+                <label className="block text-sm/6 font-medium text-gray-900">
+                  PPPOE
+                </label>
+                <input
+                  onChange={(e) =>
+                    setWifiData({ ...wifiData, pppoe: e.target.value })
+                  }
+                  placeholder="PEDROJOVANUZZI"
+                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                />
+                <label className="block text-sm/6 font-medium text-gray-900">
+                  Senha PPPOE
+                </label>
+                <input
+                  onChange={(e) =>
+                    setWifiData({ ...wifiData, senha_pppoe: e.target.value })
+                  }
+                  placeholder="27062004"
+                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                />
+                <label className="block text-sm/6 font-medium text-gray-900">
+                  Nome da Rede Wifi 2.4
+                </label>
+                <input
+                  onChange={(e) =>
+                    setWifiData({ ...wifiData, wifi_2ghz: e.target.value })
+                  }
+                  placeholder="Wip_Test"
+                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                />
+                <label className="block text-sm/6 font-medium text-gray-900">
+                  Nome da Rede Wifi 5.0
+                </label>
+                <input
+                  onChange={(e) =>
+                    setWifiData({ ...wifiData, wifi_5ghz: e.target.value })
+                  }
+                  placeholder="Wip_Test_5G"
+                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                />
+                <label className="block text-sm/6 font-medium text-gray-900">
+                  Senha Wifi
+                </label>
+                <input
+                  onChange={(e) =>
+                    setWifiData({ ...wifiData, senha_wifi: e.target.value })
+                  }
+                  placeholder="23r524fwer#"
+                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                />
                 <button
                   onClick={() => {
                     createOnuWifi();
