@@ -124,7 +124,8 @@ class Onu {
 
       await conn.send("cd lan");
 
-      await conn.exec(`set wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu} index 1 mode internet type route ${vlan} ${cos} nat enable qos disable dsp pppoe proxy disable ${wifiDataTyped.pppoe} ${wifiDataTyped.senha_pppoe} null auto entries 6 fe1 fe2 fe3 fe4 ssid1 ssid5`,
+
+      await conn.exec(`set wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu} index 1 mode internet type route ${vlan} ${cos} nat enable qos disable vlanmode tag tvlan disable 0xffff 0xffff qinq disable 0 0xffff 0xffff dsp pppoe proxy disable ${wifiDataTyped.pppoe} ${wifiDataTyped.senha_pppoe} null auto entries 6 fe1 fe2 fe3 fe4 ssid1 ssid5`,
       {execTimeout: 30000});
 
       await conn.exec(`apply wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu}`,
@@ -151,8 +152,8 @@ class Onu {
       await conn.send("cd ..");
 
      await conn.exec(`set onu_local_manage_config slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} config_enable_switch enable console_switch enable telnet_switch disable web_switch enable web_port 29189 web_ani_switch enable tel_ani_switch disable web_admin_switch enable`,
-  { execTimeout: 30000 }
-);
+      { execTimeout: 30000 }
+      );
 
 
       res.status(200).json(onuInfo);

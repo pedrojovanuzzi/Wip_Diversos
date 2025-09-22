@@ -41,12 +41,6 @@ export const AutorizarOnu = () => {
         );
         console.log(response.data);
       } else {
-        // modo Wifi
-        if (wifiData.senha_wifi.length < 7) {
-          alert("A senha do Wi-Fi deve ter no mínimo 7 caracteres.");
-          return;
-        }
-
         const response = await axios.post(
           `${process.env.REACT_APP_URL}/Onu/OnuAuthenticationWifi`,
           { sn, vlan, cos, wifiData },
