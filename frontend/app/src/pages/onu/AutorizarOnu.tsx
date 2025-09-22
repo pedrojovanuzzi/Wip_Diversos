@@ -15,6 +15,7 @@ export const AutorizarOnu = () => {
   const [wifiData, setWifiData] = useState<WifiData>({
     pppoe: "",
     senha_pppoe: "",
+    canal: "",
     wifi_2ghz: "",
     wifi_5ghz: "",
     senha_wifi: "",
@@ -145,6 +146,7 @@ export const AutorizarOnu = () => {
                   placeholder="PEDROJOVANUZZI"
                   className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
                 />
+                
                 <label className="block text-sm/6 font-medium text-gray-900">
                   Senha PPPOE
                 </label>
@@ -153,6 +155,16 @@ export const AutorizarOnu = () => {
                     setWifiData({ ...wifiData, senha_pppoe: e.target.value })
                   }
                   placeholder="27062004"
+                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                />
+                <label className="block text-sm/6 font-medium text-gray-900">
+                  Canal
+                </label>
+                <input
+                  onChange={(e) =>
+                    setWifiData({ ...wifiData, canal: e.target.value })
+                  }
+                  placeholder="PEDROJOVANUZZI"
                   className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
                 />
                 <label className="block text-sm/6 font-medium text-gray-900">
