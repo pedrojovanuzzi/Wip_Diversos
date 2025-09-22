@@ -146,7 +146,10 @@ class Onu {
       {execTimeout: 30000});
 
       await conn.exec(`set wifi_serv_wlan slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 2 index 1 ssid enable wifi5 hide disable authmode wpa2psk/wpa2psk
-        encrypt_type tkipaes wkakey pass5g interval 0 wapi_serv_addr 0.0.0.0 wifi connect_num 32`,
+        encrypt_type tkipaes wpakey pass5g interval 0 wapi_serv_addr 0.0.0.0 wifi_connect_num 32`,
+      {execTimeout: 30000});
+
+      await conn.exec(`set wifi_serv_cfg slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 2 wifi enable district etsi channel ${wifiDataTyped.canal} standard 802.11ac txpower 20 frequency 5.8ghz freq_bandwidth 80mhz`,
       {execTimeout: 30000});
 
       res.status(200).json(onuInfo);
