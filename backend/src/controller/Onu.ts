@@ -124,8 +124,7 @@ class Onu {
 
       await conn.send("cd lan");
 
-      await conn.exec(`set wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu} index 1 mode internet type route ${vlan} ${cos} nat enable
-      qos disable dsp pppoe proxy disable ${wifiDataTyped.pppoe} ${wifiDataTyped.senha_pppoe} null auto entries 6 fe1 fe2 fe3 fe4 ssid1 ssid5`,
+      await conn.exec(`set wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu} index 1 mode internet type route ${vlan} ${cos} nat enable qos disable dsp pppoe proxy disable ${wifiDataTyped.pppoe} ${wifiDataTyped.senha_pppoe} null auto entries 6 fe1 fe2 fe3 fe4 ssid1 ssid5`,
       {execTimeout: 30000});
 
       await conn.exec(`apply wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu}`,
@@ -137,20 +136,24 @@ class Onu {
       await conn.exec(`apply wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu}`,
       {execTimeout: 30000});
 
-      await conn.exec(`set wifi_serv_wlan slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 1 index 1 ssid enable wifi2.4 hide disable authmode wpa2psk encrypt_type aes wkakey ${wifiDataTyped.senha_wifi} interval 0 
-        radius_serv_ipv4 0.0.0.0 port 65535 pswd null wapi_serv_addr 0.0.0.0 wifi`,
+      await conn.exec(`set wifi_serv_wlan slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 1 index 1 ssid enable ${wifiDataTyped.wifi_2ghz} hide disable authmode wpa2psk encrypt_type tkipaes wpakey ${wifiDataTyped.senha_wifi} interval 0 radius_serv ipv4 0.0.0.0 port 65535 pswd null wapi_serv_addr 0.0.0.0 0 wifi_connect_num 32`,
       {execTimeout: 30000});
 
-      await conn.exec(`set wifi_serv_cfg slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 1 wifi enable district etsi channel ${wifiDataTyped.canal} 
-        standard 802.11bgn txpower 20 frequency 2.4ghz freq_bandwidth 20mhz/40mhz`,
+      await conn.exec(`set wifi_serv_cfg slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 1 wifi enable district brazil channel ${wifiDataTyped.canal} standard 802.11bgn txpower 20 frequency 2.4ghz freq_bandwidth 20mhz/40mhz`,
       {execTimeout: 30000});
 
-      await conn.exec(`set wifi_serv_wlan slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 2 index 1 ssid enable wifi5 hide disable authmode wpa2psk/wpa2psk
-        encrypt_type tkipaes wpakey pass5g interval 0 wapi_serv_addr 0.0.0.0 wifi_connect_num 32`,
+      await conn.exec(`set wifi_serv_wlan slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 2 index 1 ssid enable ${wifiDataTyped.wifi_5ghz} hide disable authmode wpa2psk encrypt_type tkipaes wpakey ${wifiDataTyped.senha_wifi} interval 0 wapi_serv_addr 0.0.0.0 0 wifi_connect_num 32`,
       {execTimeout: 30000});
 
-      await conn.exec(`set wifi_serv_cfg slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 2 wifi enable district etsi channel ${wifiDataTyped.canal} standard 802.11ac txpower 20 frequency 5.8ghz freq_bandwidth 80mhz`,
+      await conn.exec(`set wifi_serv_cfg slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 2 wifi enable district brazil channel 36 standard 802.11ac txpower 20 frequency 5.8ghz freq_bandwidth 80mhz`,
       {execTimeout: 30000});
+
+      await conn.send("cd ..");
+
+     await conn.exec(`set onu_local_manage_config slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} config_enable_switch enable console_switch enable telnet_switch disable web_switch enable web_port 29189 web_ani_switch enable tel_ani_switch disable web_admin_switch enable`,
+  { execTimeout: 30000 }
+);
+
 
       res.status(200).json(onuInfo);
     } catch (error) {
