@@ -119,14 +119,22 @@ class Onu {
 
       const wifiDataTyped = wifiData as WifiData;
 
-      console.log(wifiDataTyped);
-      
       
 
       await conn.send("cd lan");
 
-      await conn.exec(`set wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid} index 1 mode internet type route ${vlan} ${cos} nat enable
-        qos disable dsp pppoe proxy disable ${wifiDataTyped.pppoe}`, {execTimeout: 30000});
+      await conn.exec(`set wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu} index 1 mode internet type route ${vlan} ${cos} nat enable
+      qos disable dsp pppoe proxy disable ${wifiDataTyped.pppoe} ${wifiDataTyped.senha_pppoe} null auto entries 6 fe1 fe2 fe3 fe4 ssid1 ssid5`,
+      {execTimeout: 30000});
+
+      await conn.exec(`apply wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu}`,
+      {execTimeout: 30000});
+
+      await conn.exec(`set wancfg sl ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu} ind 1 ip-stack-mode both ipv6-src-type slaac prefix-src-type delegate`,
+      {execTimeout: 30000});
+
+      await conn.exec(`apply wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu}`,
+      {execTimeout: 30000});
 
       res.status(200).json(onuInfo);
     } catch (error) {
