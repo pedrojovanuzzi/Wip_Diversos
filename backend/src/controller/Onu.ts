@@ -7,7 +7,7 @@ class Onu {
   private password = String(process.env.OLT_PASSWORD);
 
   public onuAuthenticationBridge = async (req: Request, res: Response) => {
-    const { sn, vlan } = req.body;
+    const { sn, vlan, cos } = req.body;
     const conn = await this.telnetStart(this.ip, this.login, this.password);
     if (!conn) {
       res.status(500).json("Erro No Telnet");
@@ -15,6 +15,7 @@ class Onu {
     }
     try {
       await conn.send("cd onu");
+
       const onuInfo = await this.querySnHelper(sn);
 
       // executa o comando na OLT e captura a saída completa
@@ -25,50 +26,44 @@ class Onu {
 
       const response = this.nextOnu(output);
 
-      const onuModel = await this.getOnuFromUnauth(conn, sn);
       
-      console.log(onuModel);
       
 
+      await conn.exec(
+        `set whitelist phy_addr address ${
+          onuInfo?.sn
+        } password null action add slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${response?.nextOnu} type ${
+          onuInfo?.model}`,
+        { execTimeout: 30000 }
+      );
+
+      if(!onuInfo?.slot || !onuInfo?.pon){
+        return;
+      }
+
+      const onuAuth = await this.filterByMacOnu(conn, sn, onuInfo?.slot, onuInfo?.pon);
 
       await conn.send("cd lan");
 
       await conn.exec(
-        `set whitelist phy_addr address ${
-          onuModel?.sn
-        } password null action add slot ${onuModel?.slot} pon ${onuModel?.pon} onu ${response?.nextOnu} type ${
-          onuModel?.model}`,
+        `set epon slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${
+          onuAuth?.onuid ?? response?.nextOnu
+        } port 1 service number 1`,
         { execTimeout: 30000 }
       );
 
-      // await conn.exec(
-      //   `set epon slot ${onuModel?.slotPon.slice(
-      //     0,
-      //     2
-      //   )} pon ${onuModel?.slotPon.slice(2, 4)} onu ${
-      //     onuModel?.onuid
-      //   } port 1 service number 1`,
-      //   { execTimeout: 30000 }
-      // );
+      await conn.exec(
+        `set epon slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${
+          onuAuth?.onuid ?? response?.nextOnu
+        } port 1 service 1 vlan_mode tag ${cos} 33024 ${vlan}`,
+        { execTimeout: 30000 }
+      );
 
-      // await conn.exec(
-      //   `set epon slot ${onuModel?.slotPon.slice(
-      //     0,
-      //     2
-      //   )} pon ${onuModel?.slotPon.slice(2, 4)} onu ${
-      //     onuModel?.onuid
-      //   } port 1 service 1 vlan_mode tag 0 33024 ${vlan}`,
-      //   { execTimeout: 30000 }
-      // );
+      await conn.exec(
+        `apply onu ${onuInfo?.slot} ${onuInfo?.pon} ${onuAuth?.onuid ?? response?.nextOnu} vlan`
+      );
 
-      // await conn.exec(
-      //   `apply onu ${onuModel?.slotPon.slice(0, 2)} ${onuModel?.slotPon.slice(
-      //     2,
-      //     4
-      //   )} ${onuModel?.onuid} vlan`
-      // );
-
-      res.status(200).json(onuModel);
+      res.status(200).json(onuInfo);
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
@@ -221,49 +216,6 @@ class Onu {
       conn.end();
     }
   };
-
-// função para procurar uma ONU no "show unauth" pelo SN
-private async getOnuFromUnauth(conn: any, sn: string) {
-  // executa o comando e pega a saída
-  const output = await conn.exec("show unauth", { execTimeout: 30000 });
-
-  // remove textos de paginação e quebra em linhas
-  const cleaned = output
-    .replace(/--Press any key to continue Ctrl\+c to stop--/g, "")
-    .trim();
-  const lines = cleaned.split("\n");
-
-  // percorre cada linha em busca do SN
-  for (const line of lines) {
-    if (line.includes(sn)) {
-      // quebra a linha em colunas
-      const parts = line.trim().split(/\s+/);
-
-      // segunda coluna é o modelo (OnuType)
-      const model = parts[1] || "Desconhecido";
-
-      // tenta extrair SLOT, PON e ONU (se houver no formato da linha)
-      const match = line.match(/SLOT\s+(\d+)\s+PON\s+(\d+)\s+ONU\s+(\d+)?/i);
-
-      const slot = match ? match[1] : undefined;
-      const pon = match ? match[2] : undefined;
-      const onuNumber = match ? match[3] || "Desconhecido" : undefined;
-
-      return {
-        slot,
-        pon,
-        onuNumber,
-        sn,
-        model, // <-- novo campo
-      };
-    }
-  }
-
-  // se não encontrar nada, retorna null
-  return null;
-}
-
-
 
 
 
@@ -487,6 +439,10 @@ public querySnHelper = async (sn: string) => {
         maxBufferLength: 10 * 1024,
       });
 
+
+      console.log('Query: ' + query);
+      
+
       // divide a saída em linhas
       const lines = query.split("\n");
 
@@ -509,6 +465,7 @@ public querySnHelper = async (sn: string) => {
           slotPon: parts[parts.length - 1],
         };
       });
+      
 
       const found = onus.find(
         (onu) => onu.sn.toUpperCase() === sn.toUpperCase()

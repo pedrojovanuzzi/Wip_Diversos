@@ -11,6 +11,7 @@ export const AutorizarOnu = () => {
   const [bridge, setBridge] = useState(true);
   const [sn, setSn] = useState("");
   const [vlan, setVlan] = useState("");
+  const [cos, setCos] = useState("");
 
   async function createOnuWifi() {
     try {
@@ -36,7 +37,7 @@ export const AutorizarOnu = () => {
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/Onu/OnuAuthenticationBridge`,
-        { sn: sn, vlan: vlan },
+        { sn: sn, vlan: vlan, cos: cos },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -105,6 +106,14 @@ export const AutorizarOnu = () => {
                 <input
                   onChange={(e) => setVlan(e.target.value)}
                   placeholder="IP fixo use VLAN 1008/1009 ou padrão"
+                  className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                />
+                <label className="block text-sm/6 font-medium text-gray-900">
+                  Cos
+                </label>
+                <input
+                  onChange={(e) => setCos(e.target.value)}
+                  placeholder="Cos"
                   className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
                 />
                 <button
