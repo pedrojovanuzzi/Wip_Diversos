@@ -26,22 +26,21 @@ class Onu {
 
       const response = this.nextOnu(output);
 
-      
-      
-
       await conn.exec(
-        `set whitelist phy_addr address ${
-          onuInfo?.sn
-        } password null action add slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${response?.nextOnu} type ${
-          onuInfo?.model}`,
+        `set whitelist phy_addr address ${onuInfo?.sn} password null action add slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${response?.nextOnu} type ${onuInfo?.model}`,
         { execTimeout: 30000 }
       );
 
-      if(!onuInfo?.slot || !onuInfo?.pon){
+      if (!onuInfo?.slot || !onuInfo?.pon) {
         return;
       }
 
-      const onuAuth = await this.filterByMacOnu(conn, sn, onuInfo?.slot, onuInfo?.pon);
+      const onuAuth = await this.filterByMacOnu(
+        conn,
+        sn,
+        onuInfo?.slot,
+        onuInfo?.pon
+      );
 
       await conn.send("cd lan");
 
@@ -60,7 +59,9 @@ class Onu {
       );
 
       await conn.exec(
-        `apply onu ${onuInfo?.slot} ${onuInfo?.pon} ${onuAuth?.onuid ?? response?.nextOnu} vlan`
+        `apply onu ${onuInfo?.slot} ${onuInfo?.pon} ${
+          onuAuth?.onuid ?? response?.nextOnu
+        } vlan`
       );
 
       res.status(200).json(onuInfo);
@@ -73,7 +74,7 @@ class Onu {
   };
 
   public onuAuthenticationWifi = async (req: Request, res: Response) => {
-    const { sn, vlan } = req.body;
+    const { sn, vlan, cos } = req.body;
     const conn = await this.telnetStart(this.ip, this.login, this.password);
     if (!conn) {
       res.status(500).json("Erro No Telnet");
@@ -81,48 +82,41 @@ class Onu {
     }
     try {
       await conn.send("cd onu");
+
       const onuInfo = await this.querySnHelper(sn);
+
+      // executa o comando na OLT e captura a saída completa
+      const output = await conn.exec(
+        `show onu slot ${onuInfo?.slot} pon ${onuInfo?.pon} onulist all`,
+        { execTimeout: 30000 }
+      );
+
+      const response = this.nextOnu(output);
+
+      await conn.exec(
+        `set whitelist phy_addr address ${onuInfo?.sn} password null action add slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${response?.nextOnu} type ${onuInfo?.model}`,
+        { execTimeout: 30000 }
+      );
+
+      if (!onuInfo?.slot || !onuInfo?.pon) {
+        return;
+      }
+
+      const onuAuth = await this.filterByMacOnu(
+        conn,
+        sn,
+        onuInfo?.slot,
+        onuInfo?.pon
+      );
 
       await conn.send("cd lan");
 
-      // await conn.exec(
-      //   `set whitelist phy_addr address ${
-      //     onuInfo?.sn
-      //   } password null action add slot ${onuInfo?.slotPon.slice(
-      //     0,
-      //     2
-      //   )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${onuInfo?.onuid} type ${
-      //     onuInfo?.model
-      //   }`,
-      //   { execTimeout: 30000 }
-      // );
-
-      // await conn.exec(
-      //   `set epon slot ${onuInfo?.slotPon.slice(
-      //     0,
-      //     2
-      //   )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${
-      //     onuInfo?.onuid
-      //   } port 1 service number 1`,
-      //   { execTimeout: 30000 }
-      // );
-
-      // await conn.exec(
-      //   `set epon slot ${onuInfo?.slotPon.slice(
-      //     0,
-      //     2
-      //   )} pon ${onuInfo?.slotPon.slice(2, 4)} onu ${
-      //     onuInfo?.onuid
-      //   } port 1 service 1 vlan_mode tag 0 33024 ${vlan}`,
-      //   { execTimeout: 30000 }
-      // );
-
-      // await conn.exec(
-      //   `apply onu ${onuInfo?.slotPon.slice(0, 2)} ${onuInfo?.slotPon.slice(
-      //     2,
-      //     4
-      //   )} ${onuInfo?.onuid} vlan`
-      // );
+      await conn.exec(
+        `set epon slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${
+          onuAuth?.onuid ?? response?.nextOnu
+        } port 1 service number 1`,
+        { execTimeout: 30000 }
+      );
 
       res.status(200).json(onuInfo);
     } catch (error) {
@@ -180,7 +174,6 @@ class Onu {
       const query = await conn.exec(`show online slot ${slot} pon ${pon}`, {
         execTimeout: 30000,
         stripControls: true, // remove caracteres de controle
-        maxBufferLength: 10 * 1024, // aumenta limite do buffer (10KB ou mais)
       });
 
       // divide a saída em linhas
@@ -202,11 +195,11 @@ class Onu {
           onuid: parts[0],
           model: parts[1],
           sn: parts[2],
-          slotPon: parts[parts.length - 1],
+          slotPon: parts[parts.length - 1].replace('/', ''),
         };
       });
 
-      // console.log("Resultado final:", onus);
+      console.log("Resultado final:", onus);
 
       res.status(200).json(onus);
     } catch (error) {
@@ -217,7 +210,44 @@ class Onu {
     }
   };
 
+  // função para procurar uma ONU no "show unauth" pelo SN
+  private async getOnuFromUnauth(conn: any, sn: string) {
+    // executa o comando e pega a saída
+    const output = await conn.exec("show unauth", { execTimeout: 30000 });
 
+    // remove textos de paginação e quebra em linhas
+    const cleaned = output
+      .replace(/--Press any key to continue Ctrl\+c to stop--/g, "")
+      .trim();
+    const lines = cleaned.split("\n");
+
+    // percorre cada linha em busca do SN
+    for (const line of lines) {
+      if (line.includes(sn)) {
+        // quebra a linha em colunas
+        const parts = line.trim().split(/\s+/);
+
+        // segunda coluna é o modelo (OnuType)
+        const model = parts[1] || "Desconhecido";
+
+        // tenta extrair SLOT, PON e ONU (se houver no formato da linha)
+        const match = line.match(/SLOT\s+(\d+)\s+PON\s+(\d+)\s+ONU\s+(\d+)?/i);
+
+        const slot = match ? match[1] : undefined;
+        const pon = match ? match[2] : undefined;
+        const onuNumber = match ? match[3] || "Desconhecido" : undefined;
+
+        return {
+          slot,
+          pon,
+          model,
+        };
+      }
+    }
+
+    // se não encontrar nada, retorna null
+    return null;
+  }
 
   public onuShowAuth = async (req: Request, res: Response) => {
     const conn = await this.telnetStart(this.ip, this.login, this.password);
@@ -247,15 +277,40 @@ class Onu {
       // console.log("DEBUG linhas limpas:", cleaned);
 
       // agora converte em objetos
-      const onus = cleaned.map((line) => {
-        const parts = line.trim().split(/\s+/);
-        return {
-          onuid: parts[0],
-          model: parts[1],
-          sn: parts[2],
-          slotPon: parts[parts.length - 1],
-        };
-      });
+      const onus = await Promise.all(
+        cleaned.map(async (line) => {
+          const parts = line.trim().split(/\s+/);
+
+          const onuid = parts[0];
+          const model = parts[1];
+          const sn = parts[2];
+
+          // busca slot/pon no show onu-info
+          const onuInfo = await this.querySnHelper(sn); // sua função que extrai slot/pon/onuNumber/state
+
+          let slotPon = undefined;
+          let finalModel = model;
+
+          if (onuInfo?.slot && onuInfo?.pon) {
+            slotPon = `${onuInfo.slot}${onuInfo.pon}`;
+          }
+
+          // se for UnAuth, pega o modelo certo do show unauth
+          if (onuInfo?.state === "UnAuth") {
+            const extraInfo = await this.getOnuFromUnauth(conn, sn);
+            if (extraInfo?.model) {
+              finalModel = extraInfo.model;
+            }
+          }
+
+          return {
+            onuid,
+            sn,
+            model: finalModel,
+            slotPon,
+          };
+        })
+      );
 
       // console.log("Resultado final:", onus);
 
@@ -338,93 +393,87 @@ class Onu {
     }
   };
 
-public querySnHelper = async (sn: string) => {
-  const conn = await this.telnetStart(this.ip, this.login, this.password);
-  if (!conn) return;
+  public querySnHelper = async (sn: string) => {
+    const conn = await this.telnetStart(this.ip, this.login, this.password);
+    if (!conn) return;
 
-  try {
-    await conn.send("cd onu");
+    try {
+      await conn.send("cd onu");
 
-    // 1. consulta no onu-info
-    const query = await conn.exec(`show onu-info by ${sn}`, {
-      execTimeout: 30000,
-      stripControls: true,
-      maxBufferLength: 10 * 1024,
-    });
+      // 1. consulta no onu-info
+      const query = await conn.exec(`show onu-info by ${sn}`, {
+        execTimeout: 30000,
+        stripControls: true,
+        maxBufferLength: 10 * 1024,
+      });
 
-    console.log("query", query);
+      console.log("query", query);
 
-    let slot: string | undefined;
-    let pon: string | undefined;
-    let onuNumber: string | undefined;
-    let state = "";
+      let slot: string | undefined;
+      let pon: string | undefined;
+      let onuNumber: string | undefined;
+      let state = "";
 
-    // tenta AUTH
-    let match = query.match(/-----\s+(\d+)\s+(\d+)\s+(\d+)\s+(Auth|UnAuth)\s*-+/i);
-    if (match) {
-      slot = match[1];
-      pon = match[2];
-      onuNumber = match[3];
-      state = match[4];
-    } else {
-      // tenta UNAUTH (sem ONU number)
-      match = query.match(/-----\s+(\d+)\s+(\d+)\s+(Auth|UnAuth)\s*-+/i);
+      // tenta AUTH
+      let match = query.match(
+        /-----\s+(\d+)\s+(\d+)\s+(\d+)\s+(Auth|UnAuth)\s*-+/i
+      );
       if (match) {
         slot = match[1];
         pon = match[2];
-        onuNumber = "Desconhecido";
-        state = match[3];
-      }
-    }
-
-    if (!slot || !pon) {
-      console.error("❌ Não consegui extrair slot/pon");
-      return;
-    }
-
-    let model: string | undefined = undefined;
-
-    // 2. se for UnAuth, buscar modelo no "show unauth"
-    if (state === "UnAuth") {
-      const unauthOutput = await conn.exec("show unauth", {
-        execTimeout: 30000,
-      });
-
-      const lines = unauthOutput.split("\n");
-      for (const line of lines) {
-        if (line.includes(sn)) {
-          const parts = line.trim().split(/\s+/);
-          model = parts[1] || "Desconhecido"; // segunda coluna = OnuType
-          break;
+        onuNumber = match[3];
+        state = match[4];
+      } else {
+        // tenta UNAUTH (sem ONU number)
+        match = query.match(/-----\s+(\d+)\s+(\d+)\s+(Auth|UnAuth)\s*-+/i);
+        if (match) {
+          slot = match[1];
+          pon = match[2];
+          onuNumber = "Desconhecido";
+          state = match[3];
         }
       }
+
+      if (!slot || !pon) {
+        console.error("❌ Não consegui extrair slot/pon");
+        return;
+      }
+
+      let model: string | undefined = undefined;
+
+      // 2. se for UnAuth, buscar modelo no "show unauth"
+      if (state === "UnAuth") {
+        const unauthOutput = await conn.exec("show unauth", {
+          execTimeout: 30000,
+        });
+
+        const lines = unauthOutput.split("\n");
+        for (const line of lines) {
+          if (line.includes(sn)) {
+            const parts = line.trim().split(/\s+/);
+            model = parts[1] || "Desconhecido"; // segunda coluna = OnuType
+            break;
+          }
+        }
+      }
+
+      console.log(slot, pon, onuNumber, sn, state, model);
+
+      // objeto final
+      return {
+        slot,
+        pon,
+        onuNumber,
+        sn,
+        state,
+        model,
+      };
+    } catch (error) {
+      console.error(error);
+    } finally {
+      conn.end();
     }
-
-    console.log(slot,
-      pon,
-      onuNumber,
-      sn,
-      state,
-      model,);
-    
-
-    // objeto final
-    return {
-      slot,
-      pon,
-      onuNumber,
-      sn,
-      state,
-      model,
-    };
-  } catch (error) {
-    console.error(error);
-  } finally {
-    conn.end();
-  }
-};
-
-
+  };
 
   private async filterByMacOnu(
     conn: Telnet,
@@ -439,9 +488,7 @@ public querySnHelper = async (sn: string) => {
         maxBufferLength: 10 * 1024,
       });
 
-
-      console.log('Query: ' + query);
-      
+      console.log("Query: " + query);
 
       // divide a saída em linhas
       const lines = query.split("\n");
@@ -465,7 +512,6 @@ public querySnHelper = async (sn: string) => {
           slotPon: parts[parts.length - 1],
         };
       });
-      
 
       const found = onus.find(
         (onu) => onu.sn.toUpperCase() === sn.toUpperCase()

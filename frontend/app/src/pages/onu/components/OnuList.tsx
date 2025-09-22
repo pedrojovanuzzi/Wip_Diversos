@@ -50,7 +50,7 @@ export default function OnuList({ list, title }: { list: OnuData[], title? : str
                     <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-0">
                       {list.onuid}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{list.slotPon}</td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{list.slotPon.slice(0,2)}/{list.slotPon.slice(2,3)}</td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{list.model}</td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{list.sn}</td>
                   </tr>
