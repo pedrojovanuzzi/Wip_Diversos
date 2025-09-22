@@ -1,6 +1,14 @@
 import { Request, Response } from "express";
 import { Telnet } from "telnet-client";
 
+type WifiData = {
+  pppoe: string;
+  senha_pppoe: string;
+  wifi_2ghz: string;
+  wifi_5ghz: string;
+  senha_wifi: string;
+};
+
 class Onu {
   private ip = String(process.env.OLT_IP);
   private login = String(process.env.OLT_LOGIN);
@@ -74,7 +82,7 @@ class Onu {
   };
 
   public onuAuthenticationWifi = async (req: Request, res: Response) => {
-    const { sn, vlan, cos } = req.body;
+    const { sn, vlan, cos, wifiData} = req.body;
     const conn = await this.telnetStart(this.ip, this.login, this.password);
     if (!conn) {
       res.status(500).json("Erro No Telnet");
@@ -109,14 +117,16 @@ class Onu {
         onuInfo?.pon
       );
 
+      const wifiDataTyped = wifiData as WifiData;
+
+      console.log(wifiDataTyped);
+      
+      
+
       await conn.send("cd lan");
 
-      await conn.exec(
-        `set epon slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${
-          onuAuth?.onuid ?? response?.nextOnu
-        } port 1 service number 1`,
-        { execTimeout: 30000 }
-      );
+      await conn.exec(`set wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid} index 1 mode internet type route ${vlan} ${cos} nat enable
+        qos disable dsp pppoe proxy disable ${wifiDataTyped.pppoe}`, {execTimeout: 30000});
 
       res.status(200).json(onuInfo);
     } catch (error) {

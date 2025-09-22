@@ -12,6 +12,14 @@ export type OnuData = {
   state?: string;
 };
 
+export type WifiData = {
+  pppoe: string;
+  senha_pppoe: string;
+  wifi_2ghz: string;
+  wifi_5ghz: string;
+  senha_wifi: string;
+};
+
 
 export type AppDispatch = typeof store.dispatch;
 export type RootState = ReturnType<typeof store.getState>;
