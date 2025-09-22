@@ -14,6 +14,7 @@ export type OnuData = {
 
 export type WifiData = {
   pppoe: string;
+  canal: string;
   senha_pppoe: string;
   wifi_2ghz: string;
   wifi_5ghz: string;
