@@ -26,34 +26,53 @@ function formatarBytes(bytes: number): string {
   }
 }
 
+function parseUptime(uptime: string): number {
+  const match = uptime.match(/(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/);
+
+  if (!match) return 0;
+
+  const [, h, m, s] = match.map((x) => parseInt(x || "0", 10));
+
+  return (h || 0) * 3600 + (m || 0) * 60 + (s || 0);
+}
+
+
+type Cliente = {
+  suspensao: boolean;
+  sinal_onu: string;
+  pppoe_up: boolean;
+  ip_duplicado: boolean;
+};
+
+type Desconexoes = {
+  username: string;
+  acctstarttime: string;
+  acctstoptime: string;
+  acctinputoctets: number;
+  acctoutputoctets: number;
+  framedipaddress: string;
+};
+
+type Testes = {
+  ping: string;
+  fr: string;
+  velocidade: string;
+};
+
+type TempoReal = {
+  tmp_tx: number;
+  tmp_rx: number;
+};
+
+type ClientList = {
+  servidor: string;
+  pppoe: string;
+  ip: string;
+  upTime: string;
+  callerId: string;
+};
+
 export const ClientAnalytics = () => {
-  type Cliente = {
-    suspensao: boolean;
-    sinal_onu: string;
-    pppoe_up: boolean;
-    ip_duplicado: boolean;
-  };
-
-  type Desconexoes = {
-    username: string;
-    acctstarttime: string;
-    acctstoptime: string;
-    acctinputoctets: number;
-    acctoutputoctets: number;
-    framedipaddress: string;
-  };
-
-  type Testes = {
-    ping: string;
-    fr: string;
-    velocidade: string;
-  };
-
-  type TempoReal = {
-    tmp_tx: number;
-    tmp_rx: number;
-  };
-
   const [pppoe, setPppoe] = useState<string>("");
   const [clientinfo, setClientInfo] = useState<Cliente>();
   const [desconexoes, setDesconexoes] = useState<Desconexoes[]>([]);
@@ -62,6 +81,30 @@ export const ClientAnalytics = () => {
   const [testes, setTestes] = useState<Testes>();
   const [tempoReal, setTempoReal] = useState<TempoReal[]>([]);
   const [sinalOnu, setSinalOnu] = useState<null>(null);
+
+  const [loadingInfo, setLoadingInfo] = useState(false);
+  const [errorInfo, setErrorInfo] = useState<string | null>(null);
+  const [loadingConectado, setLoadingConectado] = useState(false);
+  const [errorConectado, setErrorConectado] = useState<string | null>(null);
+  const [loadingDescon, setLoadingDescon] = useState(false);
+  const [errorDescon, setErrorDescon] = useState<string | null>(null);
+  const [loadingSinal, setLoadingSinal] = useState(false);
+  const [errorSinal, setErrorSinal] = useState<string | null>(null);
+  const [loadingMikrotik, setLoadingMikrotik] = useState(false);
+  const [errorMikrotik, setErrorMikrotik] = useState<string | null>(null);
+  const [loadingTempoReal, setLoadingTempoReal] = useState(true);
+  const [errorTempoReal, setErrorTempoReal] = useState<string | null>(null);
+  const [loadingReset, setLoadingReset] = useState(false);
+  const [errorLoading, setErrorLoading] = useState<string | null>(null);
+
+  const [loadingClientList, setLoadingClientList] = useState(false);
+  const [errorClientList, setErrorClientList] = useState<string | null>(null);
+  const [clientlist, setClientList] = useState<ClientList[]>([]);
+
+  //Redux
+  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
+  const userToken = useTypedSelector((state: RootState) => state.auth.user);
+  const token = userToken.token;
 
   // Spinner reutilizável
   const Spinner: React.FC<{ text?: string }> = ({ text }) => (
@@ -85,26 +128,6 @@ export const ClientAnalytics = () => {
       {text}
     </span>
   );
-
-  const [loadingInfo, setLoadingInfo] = useState(false);
-  const [errorInfo, setErrorInfo] = useState<string | null>(null);
-  const [loadingConectado, setLoadingConectado] = useState(false);
-  const [errorConectado, setErrorConectado] = useState<string | null>(null);
-  const [loadingDescon, setLoadingDescon] = useState(false);
-  const [errorDescon, setErrorDescon] = useState<string | null>(null);
-  const [loadingSinal, setLoadingSinal] = useState(false);
-  const [errorSinal, setErrorSinal] = useState<string | null>(null);
-  const [loadingMikrotik, setLoadingMikrotik] = useState(false);
-  const [errorMikrotik, setErrorMikrotik] = useState<string | null>(null);
-  const [loadingTempoReal, setLoadingTempoReal] = useState(true);
-  const [errorTempoReal, setErrorTempoReal] = useState<string | null>(null);
-  const [loadingReset, setLoadingReset] = useState(false);
-  const [errorLoading, setErrorLoading] = useState<string | null>(null);
-
-  //Redux
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const userToken = useTypedSelector((state: RootState) => state.auth.user);
-  const token = userToken.token;
 
   const fetchClientInfo = async (pppoe: string) => {
     setLoadingInfo(true);
@@ -196,9 +219,7 @@ export const ClientAnalytics = () => {
       );
       setErrorLoading(response.data.message);
     } catch (e: any) {
-      setErrorLoading(
-        e.response?.data?.error || "Erro ao resetar onu"
-      );
+      setErrorLoading(e.response?.data?.error || "Erro ao resetar onu");
     } finally {
       setLoadingReset(false);
     }
@@ -252,6 +273,32 @@ export const ClientAnalytics = () => {
       setLoadingSinal(false);
     }
   };
+
+  const fetchClientsList = async () => {
+    try {
+      setLoadingClientList(true);
+      setErrorClientList("");
+      setClientList([]);
+
+      const response = await axios.get(
+        process.env.REACT_APP_URL + "/ClientAnalytics/ClientList",
+        { headers: { Authorization: `Bearer ${token}`, timeout: 60000 } }
+      );
+      setClientList(response.data);
+      console.log(response.data);
+    } catch (error) {
+      setErrorClientList("Falha ao consultar tabelas: " + error);
+    } finally {
+      setLoadingClientList(false);
+    }
+  };
+
+  useEffect(() => {
+    const exec = async () => {
+      await fetchClientsList();
+    };
+    exec();
+  }, [token]);
 
   return (
     <>
@@ -557,6 +604,45 @@ export const ClientAnalytics = () => {
 
           return null;
         })()}
+
+        {clientlist && (
+          <><h1 className="text-3xl mb-5">Total Clientes: {clientlist.length}</h1><div className="w-72 sm:w-1/2 self-center overflow-auto">
+            <div className="inline-block h-96 py-2 align-middle sm:px-6 lg:px-8">
+              <table className="relative divide-y divide-gray-300">
+                <thead>
+                  <tr>
+                    <th>Servidor</th>
+                    <th>PPPOE</th>
+                    <th>callerId</th>
+                    <th>IP</th>
+                    <th>Uptime</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientlist.slice().sort((a, b) => parseUptime(a.upTime) - parseUptime(b.upTime)).map((f) => (
+                    <tr key={f.ip}>
+                      <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
+                        {f.servidor}
+                      </td>
+                      <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
+                        {f.pppoe}
+                      </td>
+                      <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
+                        {f.callerId}
+                      </td>
+                      <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
+                        {f.ip}
+                      </td>
+                      <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
+                        {f.upTime}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div></>
+        )}
       </div>
     </>
   );
