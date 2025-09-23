@@ -9,6 +9,16 @@ export type OnuData = {
   onuid: string;
   slotPon: string;
   sn: string;
+  state?: string;
+};
+
+export type WifiData = {
+  pppoe: string;
+  canal: string;
+  senha_pppoe: string;
+  wifi_2ghz: string;
+  wifi_5ghz: string;
+  senha_wifi: string;
 };
 
 

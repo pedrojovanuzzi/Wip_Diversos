@@ -216,14 +216,22 @@ export const OnuHome = () => {
               {error && (
                 <h3 className="text-red-500 my-5 text-2xl">Erro: {error}</h3>
               )}
-              <button
-              className="p-3 py-5 bg-blue-600 text-gray-200 w-full max-w-72 sm:w-40 text-sm self-center"
+              <div className="flex flex-col justify-evenly gap-5 my-5 sm:flex-row">
+                <button
+              className="p-3 bg-stone-800  text-gray-200 w-full max-w-72 sm:w-40 text-sm self-center"
               onClick={() => {
                 querySn(sn);
               }}
             >
               Buscar
             </button>
+            <button
+              className="p-3 bg-blue-600 text-gray-200 w-full max-w-72 sm:w-52 text-sm self-center"
+              onClick={createOnuRedirect}
+            >
+              Autorizar Onu
+            </button>
+              </div>
             </div>
           )}
         </>

@@ -7,7 +7,8 @@ const onu = new Onu();
 // import 
 const router: Router = Router();
 
-router.post("/OnuAuthentication", AuthGuard, onu.onuAuthentication);
+router.post("/OnuAuthenticationBridge", AuthGuard, onu.onuAuthenticationBridge);
+router.post("/OnuAuthenticationWifi", AuthGuard, onu.onuAuthenticationWifi);
 router.post("/OnuShowOnline", AuthGuard, onu.onuShowOnline);
 router.post("/OnuShowAuth", AuthGuard, onu.onuShowAuth);
 router.post("/querySn", AuthGuard, onu.querySn);
