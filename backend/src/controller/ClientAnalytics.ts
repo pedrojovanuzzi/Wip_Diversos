@@ -153,7 +153,7 @@ class ClientAnalytics {
 
       const optic = await conn.exec(
         `show optic_module slot ${slot} pon ${pon} onu ${onuId}`,
-        { timeout: 10000 }
+        { timeout: 10000, execTimeout: 30000 }
       );
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -579,9 +579,9 @@ class ClientAnalytics {
         let comandoBuffer = "";
 
         if (this.versao <= 6) {
-          comandoBuffer = `ping address=${ipCliente} interval=0.01 size=60000 count=500`;
+          comandoBuffer = `ping address=${ipCliente} interval=0.01 size=30000 count=500`;
         } else if (this.versao >= 7) {
-          comandoBuffer = `/tool ping ${ipCliente} size=65535 interval=0.01 count=500`;
+          comandoBuffer = `/tool ping ${ipCliente} size=30000 interval=0.01 count=500`;
         }
 
         //console.log("BUFFER");
