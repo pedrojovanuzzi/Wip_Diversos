@@ -10,6 +10,14 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const servidores = [
+  { host: process.env.MIKROTIK_PPPOE1, nome: "PPPOE1" },
+  { host: process.env.MIKROTIK_PPPOE2, nome: "PPPOE2" },
+  { host: process.env.MIKROTIK_PPPOE3, nome: "PPPOE3" },
+  { host: process.env.MIKROTIK_PPPOE4, nome: "PPPOE4" },
+  { host: process.env.MIKROTIK_PPPOE5, nome: "PPPOE5" },
+];
+
 class ClientAnalytics {
   private clientIp: string | undefined;
   private serverIp: string | undefined;
@@ -54,6 +62,48 @@ class ClientAnalytics {
       return;
     } catch (error) {
       error;
+    }
+  };
+
+  clientList = async (req: Request, res: Response) => {
+    try {
+      const resultados = [];
+
+      for (const servidor of servidores) {
+        try {
+          const comando = `/ppp active print without-paging detail`;
+          const resposta = await this.executarSSH(servidor.host!, comando);
+
+          const regex =
+            /name="([^"]+)"\s+service=pppoe\s+caller-id="([0-9A-F:]+)"\s+address=(\d+\.\d+\.\d+\.\d+)\s+uptime=([\dhms]+)/gim;
+
+          const matches = [...resposta.matchAll(regex)];
+
+          for (const match of matches) {
+            const [, pppoe, callerId, ip, upTime] = match;
+
+            resultados.push({
+              servidor: servidor.nome,
+              pppoe,
+              callerId,
+              ip,
+              upTime: upTime.replace("...", ""),
+              
+            });
+          }
+        } catch (err: any) {
+          resultados.push({
+            servidor: servidor.nome,
+            erro: err.message || "Erro desconhecido",
+          });
+        }
+      }
+
+      console.log(resultados);
+
+      res.status(200).json(resultados);
+    } catch (error) {
+      res.status(500).json(error);
     }
   };
 
@@ -271,7 +321,7 @@ class ClientAnalytics {
 
       console.log("Turn off " + turnOff);
 
-      if (turnOff === 'reset onu ok!') {
+      if (turnOff === "reset onu ok!") {
         res.status(200).json({
           respostaTelnet: "ONU reiniciada com sucesso: " + turnOff,
         });
@@ -436,13 +486,6 @@ class ClientAnalytics {
       }
 
       const ipCliente = User.ip;
-      const servidores = [
-        { host: process.env.MIKROTIK_PPPOE1, nome: "PPPOE1" },
-        { host: process.env.MIKROTIK_PPPOE2, nome: "PPPOE2" },
-        { host: process.env.MIKROTIK_PPPOE3, nome: "PPPOE3" },
-        { host: process.env.MIKROTIK_PPPOE4, nome: "PPPOE4" },
-        { host: process.env.MIKROTIK_PPPOE5, nome: "PPPOE5" },
-      ];
 
       const resultados = [];
 
