@@ -11,5 +11,6 @@ router.post("/SinalOnu", AuthGuard, ClientAnalytics.onuSinal);
 router.post("/Mikrotik", AuthGuard, ClientAnalytics.mikrotik);
 router.post("/TempoReal", AuthGuard, ClientAnalytics.mikrotikTempoReal);
 router.post("/Reset", AuthGuard, ClientAnalytics.onuReiniciar);
+router.get("/ClientList", AuthGuard, ClientAnalytics.clientList);
 
 export default router;
