@@ -12,6 +12,7 @@ export type OnuData = {
   state?: string;
 };
 
+
 export type WifiData = {
   pppoe: string;
   canal: string;
