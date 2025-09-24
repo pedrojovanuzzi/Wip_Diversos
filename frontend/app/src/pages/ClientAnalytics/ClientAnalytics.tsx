@@ -246,9 +246,7 @@ export const ClientAnalytics = () => {
       );
       setTestes(response.data.tests);
       setConectado(response.data.conectado);
-      console.log(testes);
-      console.log(conectado);
-      console.log();
+
       
     } catch {
       setErrorMikrotik("Erro ao executar teste Mikrotik");
