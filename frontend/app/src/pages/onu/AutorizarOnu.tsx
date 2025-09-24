@@ -73,38 +73,50 @@ export const AutorizarOnu = () => {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {/* Switch Bridge/Wifi */}
             <div className="flex items-center justify-between gap-3">
-              <div className="group relative inline-flex w-11 shrink-0 rounded-full bg-gray-200 p-0.5 ring-1 ring-gray-900/5">
-                <label className="group flex items-center gap-2">
-                  <span className={`size-5 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform ${!variasOnus ? 'group-has-[:checked]:translate-x-5' : ''}`} />
-                <input
-                  onClick={() => setBridge((prev) => !variasOnus ? !prev : prev)}
+              <div className="relative inline-flex w-11 shrink-0 rounded-full  bg-gray-200 p-0.5 ring-1 ring-gray-900/5">
+                <label className="relative inline-flex w-11 shrink-0 rounded-full bg-gray-200 p-0.5 ring-1 ring-gray-900/5 cursor-pointer has-[:checked]:bg-blue-300">
+                  <input
                   type="checkbox"
-                  className="absolute inset-0 appearance-none cursor-pointer"
+                  checked={bridge}
+                  onClick={() => {
+                    setBridge((prev) => !prev);
+                    // se trocar para Wifi, força Uma ONU
+                    if (bridge) setvariasOnus(false);
+                  }}
+                  className="peer absolute inset-0 appearance-none cursor-pointer"
+                />
+                <span
+                  className={`size-5 rounded-full bg-white peer shadow-sm ring-1 ring-gray-900/5 transition-transform ${
+                    bridge ? "translate-x-5" : ""
+                  }`}
                 />
                 </label>
               </div>
               <span className="font-medium text-gray-900">
                 {bridge ? "Bridge" : "Wifi"}
               </span>
-              
             </div>
+
             <div className="flex items-center justify-between gap-3">
-              <div className="group relative inline-flex w-11 shrink-0 rounded-full bg-gray-200 p-0.5 ring-1 ring-gray-900/5">
-                <label className="group flex items-center gap-2">
-                  <span className="size-5 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform group-has-[:checked]:translate-x-5" />
-                <input
-                  onClick={() => (
-                    setvariasOnus((prev) => !prev)
-                  )}
+              <div className="relative inline-flex w-11 shrink-0 rounded-full bg-gray-200 p-0.5 ring-1 ring-gray-900/5">
+                <label className="relative inline-flex w-11 shrink-0 rounded-full has-[:checked]:bg-blue-700 bg-gray-200 p-0.5 ring-1 ring-gray-900/5 cursor-pointer">
+                  <input
                   type="checkbox"
-                  className="absolute inset-0 appearance-none cursor-pointer"
+                  checked={variasOnus}
+                  disabled={!bridge} // se estiver em Wifi, trava
+                  onClick={() => setvariasOnus((prev) => !prev)}
+                  className="peer absolute inset-0 appearance-none cursor-pointer disabled:cursor-not-allowed"
+                />
+                <span
+                  className={`size-5 rounded-full bg-white peer shadow-sm ring-1 ring-gray-900/5 transition-transform ${
+                    variasOnus ? "translate-x-5" : ""
+                  }`}
                 />
                 </label>
               </div>
               <span className="font-medium text-gray-900">
-                {variasOnus ?  "Varias" : "Uma Onu"}
+                {variasOnus ? "Várias Onu's" : "Uma Onu"}
               </span>
-              
             </div>
 
             {/* Campos comuns */}
@@ -112,7 +124,7 @@ export const AutorizarOnu = () => {
             <input
               value={sn}
               onChange={(e) => setSn(e.target.value)}
-              placeholder="FHTT0726a260"
+              placeholder={`${!variasOnus ? 'FHTT0726a260' : 'FHTT0726a260, FHTTfe1aca8b'}`}
               required
               className="block w-full rounded-md border px-3 py-1.5"
             />
