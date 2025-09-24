@@ -248,6 +248,7 @@ export const ClientAnalytics = () => {
       setConectado(response.data.conectado);
       console.log(testes);
       console.log(conectado);
+      console.log();
       
     } catch {
       setErrorMikrotik("Erro ao executar teste Mikrotik");
@@ -257,6 +258,7 @@ export const ClientAnalytics = () => {
       setLoadingConectado(false);
     }
   };
+
 
   const fetchSinal = async (pppoe: string) => {
     setErrorSinal(null);
