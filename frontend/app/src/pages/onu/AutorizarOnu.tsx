@@ -10,6 +10,7 @@ export const AutorizarOnu = () => {
   const token = userToken.token;
 
   const [bridge, setBridge] = useState(true);
+  const [variasOnus, setvariasOnus] = useState(true);
   const [sn, setSn] = useState("");
   const [vlan, setVlan] = useState("");
   const [cos, setCos] = useState("");
@@ -73,16 +74,37 @@ export const AutorizarOnu = () => {
             {/* Switch Bridge/Wifi */}
             <div className="flex items-center justify-between gap-3">
               <div className="group relative inline-flex w-11 shrink-0 rounded-full bg-gray-200 p-0.5 ring-1 ring-gray-900/5">
-                <span className="size-5 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform group-has-[:checked]:translate-x-5" />
+                <label className="group flex items-center gap-2">
+                  <span className={`size-5 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform ${!variasOnus ? 'group-has-[:checked]:translate-x-5' : ''}`} />
                 <input
-                  onClick={() => setBridge((prev) => !prev)}
+                  onClick={() => setBridge((prev) => !variasOnus ? !prev : prev)}
                   type="checkbox"
                   className="absolute inset-0 appearance-none cursor-pointer"
                 />
+                </label>
               </div>
               <span className="font-medium text-gray-900">
                 {bridge ? "Bridge" : "Wifi"}
               </span>
+              
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="group relative inline-flex w-11 shrink-0 rounded-full bg-gray-200 p-0.5 ring-1 ring-gray-900/5">
+                <label className="group flex items-center gap-2">
+                  <span className="size-5 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform group-has-[:checked]:translate-x-5" />
+                <input
+                  onClick={() => (
+                    setvariasOnus((prev) => !prev)
+                  )}
+                  type="checkbox"
+                  className="absolute inset-0 appearance-none cursor-pointer"
+                />
+                </label>
+              </div>
+              <span className="font-medium text-gray-900">
+                {variasOnus ?  "Varias" : "Uma Onu"}
+              </span>
+              
             </div>
 
             {/* Campos comuns */}
