@@ -36,7 +36,6 @@ function parseUptime(uptime: string): number {
   return (h || 0) * 3600 + (m || 0) * 60 + (s || 0);
 }
 
-
 type Cliente = {
   suspensao: boolean;
   sinal_onu: string;
@@ -606,42 +605,64 @@ export const ClientAnalytics = () => {
         })()}
 
         {clientlist && (
-          <><h1 className="text-3xl mb-5">Total Clientes: {clientlist.length}</h1><div className="w-72 sm:w-1/2 self-center overflow-auto">
-            <div className="inline-block h-96 py-2 align-middle sm:px-6 lg:px-8">
-              <table className="relative divide-y divide-gray-300">
-                <thead>
-                  <tr>
-                    <th>Servidor</th>
-                    <th>PPPOE</th>
-                    <th>callerId</th>
-                    <th>IP</th>
-                    <th>Uptime</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {clientlist.slice().sort((a, b) => parseUptime(a.upTime) - parseUptime(b.upTime)).map((f) => (
-                    <tr key={f.ip}>
-                      <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
-                        {f.servidor}
-                      </td>
-                      <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
-                        {f.pppoe}
-                      </td>
-                      <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
-                        {f.callerId}
-                      </td>
-                      <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
-                        {f.ip}
-                      </td>
-                      <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
-                        {f.upTime}
-                      </td>
+          <>
+            <h1 className="text-3xl mb-5">
+              Total Clientes: {clientlist.length}
+            </h1>
+            <div className="w-72 sm:w-1/2 self-center overflow-auto">
+              <div className="inline-block h-96 py-2 align-middle sm:px-6 lg:px-8">
+                <table className="relative divide-y divide-gray-300">
+                  <thead>
+                    <tr>
+                      <th>Servidor</th>
+                      <th>PPPOE</th>
+                      <th>callerId</th>
+                      <th>IP</th>
+                      <th>Uptime</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+
+                  <tbody>
+                    {clientlist
+                      .slice()
+                      .sort(
+                        (a, b) =>
+                          parseUptime(a.upTime ?? "") -
+                          parseUptime(b.upTime ?? "")
+                      )
+                      .map((f) => (
+                        <tr key={f.ip}>
+                          <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
+                            {f.servidor}
+                          </td>
+                          <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
+                            {f.pppoe}
+                          </td>
+                          <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
+                            {f.callerId}
+                          </td>
+                          <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
+                            {f.ip}
+                          </td>
+                          <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
+                            {f.upTime}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+                {loadingClientList ? (
+                  // 1. enquanto carrega
+                  <Spinner text="Carregando ONU..." />
+                ) : errorClientList ? (
+                  // 2. se houve erro
+                  <ErrorMessage message={errorClientList} />
+                ) : (
+                  <></>
+                )}
+              </div>
             </div>
-          </div></>
+          </>
         )}
       </div>
     </>
