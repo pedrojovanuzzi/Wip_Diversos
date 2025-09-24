@@ -16,64 +16,73 @@ class Onu {
   private password = String(process.env.OLT_PASSWORD);
 
   public onuAuthenticationBridge = async (req: Request, res: Response) => {
-    const { sn, vlan, cos } = req.body;
+    let { sn, vlan, cos } = req.body;
     const conn = await this.telnetStart(this.ip, this.login, this.password);
     if (!conn) {
       res.status(500).json("Erro No Telnet");
       return;
     }
     try {
+
+
+      sn = sn.split(',').map((sn : string) => ({sn: sn.trim()}));
+      
+      const snList = sn.map((item: { sn: string }) => ({
+        sn: item.sn.trim(),
+      }));
+
       await conn.send("cd onu");
+      
+        for (const item of snList) {
+      // consulta informações para cada SN
+      const onuInfo = await this.querySnHelper(item.sn);
 
-      const onuInfo = await this.querySnHelper(sn);
+      if (!onuInfo?.slot || !onuInfo?.pon) {
+        console.warn("SN inválido ou não encontrado:", item.sn);
+        continue;
+      }
 
-      // executa o comando na OLT e captura a saída completa
       const output = await conn.exec(
-        `show onu slot ${onuInfo?.slot} pon ${onuInfo?.pon} onulist all`,
+        `show onu slot ${onuInfo.slot} pon ${onuInfo.pon} onulist all`,
         { execTimeout: 30000 }
       );
 
       const response = this.nextOnu(output);
 
       await conn.exec(
-        `set whitelist phy_addr address ${onuInfo?.sn} password null action add slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${response?.nextOnu} type ${onuInfo?.model}`,
+        `set whitelist phy_addr address ${onuInfo.sn} password null action add slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${response?.nextOnu} type ${onuInfo.model}`,
         { execTimeout: 30000 }
       );
 
-      if (!onuInfo?.slot || !onuInfo?.pon) {
-        return;
-      }
-
       const onuAuth = await this.filterByMacOnu(
         conn,
-        sn,
-        onuInfo?.slot,
-        onuInfo?.pon
+        item.sn, // passa só o SN individual
+        onuInfo.slot,
+        onuInfo.pon
       );
 
       await conn.send("cd lan");
 
       await conn.exec(
-        `set epon slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${
+        `set epon slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${
           onuAuth?.onuid ?? response?.nextOnu
         } port 1 service number 1`,
         { execTimeout: 30000 }
       );
 
       await conn.exec(
-        `set epon slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${
+        `set epon slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${
           onuAuth?.onuid ?? response?.nextOnu
         } port 1 service 1 vlan_mode tag ${cos} 33024 ${vlan}`,
         { execTimeout: 30000 }
       );
 
       await conn.exec(
-        `apply onu ${onuInfo?.slot} ${onuInfo?.pon} ${
-          onuAuth?.onuid ?? response?.nextOnu
-        } vlan`
+        `apply onu ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu} vlan`
       );
-
-      res.status(200).json(onuInfo);
+    }
+      
+      res.status(200).json(snList);
     } catch (error) {
       console.error(error);
       res.status(500).json(error);

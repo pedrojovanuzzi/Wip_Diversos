@@ -88,7 +88,6 @@ class ClientAnalytics {
               callerId,
               ip,
               upTime: upTime.replace("...", ""),
-              
             });
           }
         } catch (err: any) {
@@ -480,13 +479,12 @@ class ClientAnalytics {
         order: { id: "ASC" },
       });
 
-      if (!User || !User.ip) {
+      if (!User) {
         res.status(404).json({ erro: "Usuário não encontrado ou sem IP." });
         return;
       }
 
-      const ipCliente = User.ip;
-
+      let ipCliente = "";
       const resultados = [];
 
       for (const servidor of servidores) {
@@ -508,7 +506,25 @@ class ClientAnalytics {
             resposta,
           });
 
-          if (ativo) break;
+          if (ativo) {
+            const comando = `/ppp active print without-paging detail where name=${pppoe}`;
+            const resposta = await this.executarSSH(servidor.host!, comando);
+
+            const regex =
+              /name="([^"]+)"\s+service=pppoe\s+caller-id="([0-9A-F:]+)"\s+address=([\d.]+)\s+uptime=([\dhms]+)/i;
+
+            const match = regex.exec(resposta);
+
+            if (match) {
+              const nome = match[1];
+              const callerId = match[2];
+              const ipCliente = match[3]; // 🎯 aqui está o IP do cliente
+              const uptime = match[4];
+
+              console.log({ nome, callerId, ipCliente, uptime });
+            }
+            break;
+          }
         } catch (err: any) {
           resultados.push({
             servidor: servidor.nome,
