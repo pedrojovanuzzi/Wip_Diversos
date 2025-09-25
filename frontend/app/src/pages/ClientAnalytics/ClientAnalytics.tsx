@@ -26,15 +26,48 @@ function formatarBytes(bytes: number): string {
   }
 }
 
-function parseUptime(uptime: string): number {
-  const match = uptime.match(/(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/);
+// converte uptime do Mikrotik para segundos (suporta w, d, h, m, s)
+export function parseUptime(raw: string): number {
+  // garante que temos uma string, remove espaços e normaliza para minúsculas
+  const s = String(raw ?? "").trim().toLowerCase();
+  // se vier vazio/indefinido, retornamos 0 para não quebrar o sort
+  if (!s) return 0;
 
-  if (!match) return 0;
+  // tabela de multiplicadores por unidade (w=semana, d=dia, h=hora, m=minuto, s=segundo)
+  const unitToSec: Record<string, number> = {
+    w: 7 * 24 * 60 * 60, // segundos em 1 semana
+    d: 24 * 60 * 60,     // segundos em 1 dia
+    h: 60 * 60,          // segundos em 1 hora
+    m: 60,               // segundos em 1 minuto
+    s: 1,                // segundos em 1 segundo
+  };
 
-  const [, h, m, s] = match.map((x) => parseInt(x || "0", 10));
+  // regex que captura blocos "<numero><unidade>" como 2d, 21h, 56m, 10s, 1w etc.
+  const re = /(\d+)\s*([wdhms])/g;
 
-  return (h || 0) * 3600 + (m || 0) * 60 + (s || 0);
+  // acumulador de segundos totais
+  let total = 0;
+
+  // variável para iterar sobre todos os matches do regex
+  let match: RegExpExecArray | null;
+
+  // percorre cada combinação <valor><unidade> encontrada na string
+  while ((match = re.exec(s)) !== null) {
+    // converte o primeiro grupo (número) para Number
+    const value = Number(match[1]);
+    // pega a unidade (w/d/h/m/s)
+    const unit = match[2];
+    // soma ao total: valor * multiplicador da unidade (desconhecido vira 0)
+    total += value * (unitToSec[unit] ?? 0);
+  }
+
+  // se não encontramos nada válido, retornamos 0 (evita NaN)
+  if (!Number.isFinite(total)) return 0;
+
+  // devolve o total de segundos para uso no sort
+  return total;
 }
+
 
 type Cliente = {
   suspensao: boolean;
