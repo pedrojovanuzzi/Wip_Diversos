@@ -12,6 +12,9 @@ export const AutorizarOnu = () => {
   const [bridge, setBridge] = useState(true);
   const [variasOnus, setvariasOnus] = useState(true);
   const [sn, setSn] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sucesso, setSucesso] = useState(false);
+  const [error, setError] = useState("");
   const [vlan, setVlan] = useState("");
   const [cos, setCos] = useState("");
   const [wifiData, setWifiData] = useState<WifiData>({
@@ -27,6 +30,7 @@ export const AutorizarOnu = () => {
     e.preventDefault(); // evita reload da página
 
     try {
+      setLoading(true);
       if (bridge) {
         // modo Bridge
         const response = await axios.post(
@@ -41,6 +45,7 @@ export const AutorizarOnu = () => {
           }
         );
         console.log(response.data);
+        setSucesso(response.data)
       } else {
         const response = await axios.post(
           `${process.env.REACT_APP_URL}/Onu/OnuAuthenticationWifi`,
@@ -55,8 +60,12 @@ export const AutorizarOnu = () => {
         );
         console.log(response.data);
       }
-    } catch (error) {
+    } catch (error : any) {
       console.error(error);
+      setError(error);
+    }
+    finally{
+      setLoading(false);
     }
   }
 
@@ -235,7 +244,11 @@ export const AutorizarOnu = () => {
             >
               Criar
             </button>
+            
           </form>
+          {loading && <p className="mt-2">Carregando....</p>}
+              {error && <p className="text-red-500 mt-2">Error: {error}</p>}
+              {sucesso && <p className="text-green-500 mt-2">{sucesso}</p>}
         </div>
       </div>
     </div>
