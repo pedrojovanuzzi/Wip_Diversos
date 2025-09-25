@@ -82,7 +82,8 @@ class Onu {
       );
     }
       
-      res.status(200).json(snList);
+    res.status(200).json('Onu Autorizada!');
+
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
@@ -164,8 +165,17 @@ class Onu {
       { execTimeout: 30000 }
       );
 
+      await conn.send(`cd ..`);
 
-      res.status(200).json(onuInfo);
+      await conn.send(`cd maintenance`);
+
+      await conn.exec(
+        `reboot slot ${onuInfo.slot} pon ${onuInfo.pon} onulist ${onuAuth?.onuid ?? response?.nextOnu}`,
+        { execTimeout: 30000 }
+      );
+
+
+      res.status(200).json('Onu Autorizada!');
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
