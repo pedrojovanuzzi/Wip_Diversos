@@ -75,7 +75,8 @@ class ClientAnalytics {
           const resposta = await this.executarSSH(servidor.host!, comando);
 
           const regex =
-            /name="([^"]+)"\s+service=pppoe\s+caller-id="([0-9A-F:]+)"\s+address=(\d+\.\d+\.\d+\.\d+)\s+uptime=([\dhms]+)/gim;
+          /name="([^"]+)"\s+service=pppoe\s+caller-id="([0-9A-F:]+)"\s+address=(\d+\.\d+\.\d+\.\d+)\s+uptime=([\ddhms]+)/gim;
+
 
           const matches = [...resposta.matchAll(regex)];
 
