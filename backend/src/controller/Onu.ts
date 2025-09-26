@@ -588,51 +588,62 @@ class Onu {
   }
 
   private async telnetStart(ip: string, login: string, password: string) {
-    try {
-      const conn = new Telnet();
+  let conn: Telnet | null = null;
 
-      // 🟡 Eventos para log no terminal
-      conn.on("data", (data) => {
+  try {
+    conn = new Telnet();
+    let buffer = "";
+
+    // 🟡 Eventos para log no terminal
+    conn.on("data", (data) => {
       const chunk = data.toString();
       buffer += chunk;
       console.log(chunk);
 
       // se a OLT pedir "Press any key", manda Enter
       if (chunk.includes("Press any key")) {
-        conn.send("\n").catch(console.error);
+        conn?.send("\n").catch(console.error);
       }
     });
 
-    
-      let buffer = "";
+    const params = {
+      host: ip,
+      port: 23,
+      timeout: 30000,
+      sendTimeout: 200,
+      debug: true,
+      shellPrompt: /[#>]\s*$/,
+      stripShellPrompt: true,
+      negotiationMandatory: false,
+      disableLogon: true,
+    };
 
-      const params = {
-        host: ip,
-        port: 23,
-        timeout: 30000,
-        sendTimeout: 200,
-        debug: true,
-        shellPrompt: /[#>]\s*$/,
-        stripShellPrompt: true,
-        negotiationMandatory: false,
-        disableLogon: true,
-      };
+    await conn.connect(params);
 
-      await conn.connect(params);
+    await conn.send(login);
+    await conn.send(password);
 
-      await conn.send(login);
+    await conn.send("en");
+    await conn.send(password);
 
-      await conn.send(password);
+    return conn;
+  } catch (error: any) {
+    console.error("Erro no Telnet:", error.message || error);
 
-      await conn.send("en");
-      await conn.send(password);
-
-      return conn;
-    } catch (error) {
-      console.log(error);
-      return;
+    // 🛑 Se der "response not received", fecha a conexão
+    if (conn) {
+      try {
+        conn.end();
+        console.log("Conexão Telnet encerrada por timeout/erro");
+      } catch (e) {
+        console.error("Erro ao encerrar conexão Telnet:", e);
+      }
     }
+
+    return null;
   }
+}
+
 }
 
 export default Onu;
