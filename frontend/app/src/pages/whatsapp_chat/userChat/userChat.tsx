@@ -1,11 +1,10 @@
 import axios from "axios";
 import React, { useEffect, useRef, useState } from "react";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { RootState } from "../../../types";
 import { useParams } from "react-router-dom";
 import { NavBar } from "../../../components/navbar/NavBar";
 import { IoSendOutline } from "react-icons/io5";
 import { subHours } from "date-fns";
+import { useAuth } from "../../../context/AuthContext";
 
 interface User {
   nome: string;
@@ -29,9 +28,9 @@ export default function UserChat() {
   const [idUser, setIdUser] = useState<string | number | null>(null);
   const [text, setText] = useState<string>("");
 
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const userToken = useTypedSelector((state: RootState) => state.auth.user);
-  const token = userToken.token;
+
+  const { user: authUser } = useAuth();
+  const token = authUser?.token;
   const meuId = 1;
 
   const { id } = useParams();

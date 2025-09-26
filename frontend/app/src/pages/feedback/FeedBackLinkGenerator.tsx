@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { NavBar } from "../../components/navbar/NavBar";
 import Select from "./components/Select";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { RootState } from "../../types";
 import { BarChart } from "@mui/x-charts/BarChart";
 import Toggle from "./components/Toggle";
+import { useAuth } from "../../context/AuthContext";
 
 interface Tech {
   id: number;
@@ -154,8 +153,8 @@ const TechBarChart = ({
 const FeedbackLinkGenerator = () => {
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const { user } = useTypedSelector((state) => state.auth);
+  const { user } = useAuth();
+  const token = user?.token;
   const [noteData, setNoteData] = useState<{ [key: string]: Note[] }>({
     internet: [],
     service: [],
@@ -176,7 +175,7 @@ const FeedbackLinkGenerator = () => {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${user.token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
     return response.json();
@@ -191,7 +190,7 @@ const FeedbackLinkGenerator = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ technician: selectedTechnician }),
       });
@@ -234,7 +233,7 @@ const FeedbackLinkGenerator = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${user.token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ technician: selectedTechnician }),
         }

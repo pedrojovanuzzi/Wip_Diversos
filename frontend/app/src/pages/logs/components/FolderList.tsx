@@ -1,21 +1,19 @@
-import { EllipsisVerticalIcon } from "@heroicons/react/20/solid";
-import { Folder, RootState } from "../../../types";
+import { Folder} from "../../../types";
 import { NavBar } from "../../../components/navbar/NavBar";
 import { FaRegFolder } from "react-icons/fa";
-import FolderList from "../components/FolderList";
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../../context/AuthContext";
 
 interface FoldersProps {
   folders: Folder[];
 }
 
 export default function Folders({ folders }: FoldersProps) {
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const userToken = useTypedSelector((state: RootState) => state.auth.user);
-  const token = userToken.token;
+  
+  const { user } = useAuth();
+  const token = user?.token;
   const location = useLocation();
   const initialPath =
     (location.state?.path as string) || "/var/log/cgnat/syslog";

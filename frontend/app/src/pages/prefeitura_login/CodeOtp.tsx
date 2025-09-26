@@ -4,7 +4,6 @@ import { MdOutlineSignalWifi4BarLock } from "react-icons/md";
 import axios from "axios";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { v4 as uuidv4 } from "uuid";
 
 export default function CodeOtp() {
   const [error, setError] = useState<string | null>(null);

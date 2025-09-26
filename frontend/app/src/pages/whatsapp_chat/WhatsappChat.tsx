@@ -3,9 +3,7 @@ import { NavBar } from "../../components/navbar/NavBar";
 import axios from "axios";
 import img from "../../assets/users.png";
 import { TiPencil } from "react-icons/ti";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { RootState } from "../../types";
-import wallpaper from "../../assets/wallpaper.jpg";
+import { useAuth } from "../../context/AuthContext";
 
 interface User {
   nome: string;
@@ -31,10 +29,9 @@ export default function WhatsappChat() {
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
   const [newName, setNewName] = useState("");
 
-  //Redux
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const userToken = useTypedSelector((state: RootState) => state.auth.user);
-  const token = userToken.token;
+  
+  const { user } = useAuth();
+  const token = user?.token;
 
   function openModal(id: string, currentName: string) {
     setSelectedId(id);

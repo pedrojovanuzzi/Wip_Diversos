@@ -1,15 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
-import Stacked from "./Components/Stacked";
 import Filter from "./Components/Filter";
-import { CiCirclePlus, CiNoWaitingSign } from "react-icons/ci";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { RootState } from "../../types";
+import { CiNoWaitingSign } from "react-icons/ci";
 import { BsFiletypeDoc } from "react-icons/bs";
-import { IoArrowUpCircleOutline } from "react-icons/io5";
-import PopUpButton from "./Components/PopUpButton";
-import { PiPrinter } from "react-icons/pi";
+
 import Stacked2 from "./Components/Stacked2";
 import PopUpCancelNFSE from "./Components/PopUpCancelNFSE";
 import PDFNFSE from "./Components/PDFNFSE";
@@ -17,6 +12,7 @@ import { useReactToPrint } from "react-to-print";
 import Success from "./Components/Success";
 import Error from "./Components/Error";
 import SetPassword from "./Components/SetPassword";
+import { useAuth } from "../../context/AuthContext";
 
 export const BuscarNfeGerada = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -56,9 +52,9 @@ export const BuscarNfeGerada = () => {
   const [showCancelPopUp, setShowCancelPopUp] = useState(false);
   const [showPasswordPopUp, setShowPasswordPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const user = useTypedSelector((state: RootState) => state.auth.user);
-  const token = user.token;
+
+  const { user } = useAuth();
+  const token = user?.token;
 
   const handleCheckboxChange = (clienteId: number) => {
     setClientesSelecionados((prevSelecionados) => {

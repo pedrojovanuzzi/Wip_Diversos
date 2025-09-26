@@ -1,4 +1,3 @@
-import { PlusIcon } from '@heroicons/react/20/solid'
 
 export default function Line() {
   return (
