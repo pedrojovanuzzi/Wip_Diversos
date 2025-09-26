@@ -1,4 +1,3 @@
-import { store } from "./store";
 
 export interface Folder{
     name: string
@@ -22,6 +21,3 @@ export type WifiData = {
   senha_wifi: string;
 };
 
-
-export type AppDispatch = typeof store.dispatch;
-export type RootState = ReturnType<typeof store.getState>;

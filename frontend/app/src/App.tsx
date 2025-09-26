@@ -1,9 +1,7 @@
 import './App.css';
 import { HomePage } from './pages/home/HomePage';
-import { ChamadosPage } from './pages/chamados/ChamadosPage';
 import { AuthPage } from './pages/auth/AuthPage';
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from './hooks/useAuth';
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { GoAlert } from "react-icons/go";
 import FeedbackLinkGenerator from './pages/feedback/FeedBackLinkGenerator';
@@ -22,10 +20,11 @@ import { LogViewer } from './pages/logs/LogViewer';
 import { PowerDns } from './pages/powerdns/PowerDns';
 import { OnuHome } from './pages/onu/OnuHome';
 import { AutorizarOnu } from './pages/onu/AutorizarOnu';
+import { useAuth } from './context/AuthContext';
 
 
 function App() {
-  const { auth, loading } = useAuth();
+  const { user, loading } = useAuth();
 
   const manutencao = false;
 
@@ -50,27 +49,26 @@ function App() {
     <BrowserRouter>
       <div className='App'>
         <Routes>
-          <Route path="/" element={auth ? <HomePage /> : <Navigate to="/auth/login" />} />
-          <Route path="/auth/login" element={!auth ? <AuthPage /> : <Navigate to="/" />} />
-          <Route path="/chamados/" element={auth ? <ChamadosPage /> : <Navigate to="/auth/login" />} />
-          <Route path="/feedbackCreate" element={auth ? <FeedbackLinkGenerator /> : <Navigate to="/auth/login" />} />
+          <Route path="/" element={user?.token ? <HomePage /> : <Navigate to="/auth/login" />} />
+          <Route path="/auth/login" element={!user?.token ? <AuthPage /> : <Navigate to="/" />} />
+          <Route path="/feedbackCreate" element={user?.token ? <FeedbackLinkGenerator /> : <Navigate to="/auth/login" />} />
           <Route path="/feedback/Opnion" element={<Opnion />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
-          <Route path="/Nfe" element={auth ? <Nfe /> : <Navigate to="/auth/login" />} />
-          <Route path="/BuscarNfeGerada" element={auth ? <BuscarNfeGerada /> : <Navigate to="/auth/login" />} />
+          <Route path="/Nfe" element={user?.token ? <Nfe /> : <Navigate to="/auth/login" />} />
+          <Route path="/BuscarNfeGerada" element={user?.token ? <BuscarNfeGerada /> : <Navigate to="/auth/login" />} />
           <Route path="/Prefeitura/Login" element={<PrefeituraLogin />} />
           <Route path="/Prefeitura/CodeOtp" element={<CodeOtp />} />
-          <Route path="/Whatsapp" element={auth ? <WhatsappChat /> : <Navigate to="/auth/login" />} />
-          <Route path="/Whatsapp/:id" element={auth ? <UserChat /> : <Navigate to="/auth/login" />} />
-          <Route path="/ClientAnalytics" element={auth ? <ClientAnalytics /> : <Navigate to="/auth/login" />} />
-          <Route path="/DDDOS" element={auth ? <DDDOS_Home /> : <Navigate to="/auth/login" />} />
-          <Route path="/ServerLogs" element={auth ? <ServerLogs /> : <Navigate to="/auth/login" />} />
-          <Route path="/LogViewer" element={auth ? <LogViewer /> : <Navigate to="/auth/login" />} />
-          <Route path="/PowerDns" element={auth ? <PowerDns /> : <Navigate to="/auth/login" />} />
-          <Route path="/Onu" element={auth ? <OnuHome /> : <Navigate to="/auth/login" />} />
-          <Route path="/Onu/AutorizarOnu" element={auth ? <AutorizarOnu /> : <Navigate to="/auth/login" />} />
-          <Route path="*" element={auth ? <HomePage /> : <Navigate to="/auth/login" />} />
+          <Route path="/Whatsapp" element={user?.token ? <WhatsappChat /> : <Navigate to="/auth/login" />} />
+          <Route path="/Whatsapp/:id" element={user?.token ? <UserChat /> : <Navigate to="/auth/login" />} />
+          <Route path="/ClientAnalytics" element={user?.token ? <ClientAnalytics /> : <Navigate to="/auth/login" />} />
+          <Route path="/DDDOS" element={user?.token ? <DDDOS_Home /> : <Navigate to="/auth/login" />} />
+          <Route path="/ServerLogs" element={user?.token ? <ServerLogs /> : <Navigate to="/auth/login" />} />
+          <Route path="/LogViewer" element={user?.token ? <LogViewer /> : <Navigate to="/auth/login" />} />
+          <Route path="/PowerDns" element={user?.token ? <PowerDns /> : <Navigate to="/auth/login" />} />
+          <Route path="/Onu" element={user?.token ? <OnuHome /> : <Navigate to="/auth/login" />} />
+          <Route path="/Onu/AutorizarOnu" element={user?.token ? <AutorizarOnu /> : <Navigate to="/auth/login" />} />
+          <Route path="*" element={user?.token ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>
     </BrowserRouter>

@@ -1,14 +1,13 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { Folder, RootState } from "../../types";
+import { Folder} from "../../types";
 import FolderList from "./components/FolderList";
-import { useLocation } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 export const ServerLogs = () => {
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const userToken = useTypedSelector((state: RootState) => state.auth.user);
-  const token = userToken.token;
+  
+  const { user } = useAuth();
+  const token = user?.token;
 
 
   const [folders, setFolders] = useState<Folder[]>([]);
