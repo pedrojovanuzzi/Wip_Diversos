@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { NavBar } from "../../components/navbar/NavBar";
 import axios from "axios";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { RootState, WifiData } from "../../types";
+import { WifiData } from "../../types";
+import { useAuth } from "../../context/AuthContext";
 
 export const AutorizarOnu = () => {
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const userToken = useTypedSelector((state: RootState) => state.auth.user);
-  const token = userToken.token;
+
+  const { user } = useAuth();
+  const token = user?.token;
 
   const [bridge, setBridge] = useState(true);
   const [variasOnus, setvariasOnus] = useState(true);

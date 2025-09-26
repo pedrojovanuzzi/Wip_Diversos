@@ -1,7 +1,6 @@
 import {
   Disclosure,
-  DisclosureButton,
-  DisclosurePanel,
+
 } from "@headlessui/react";
 import { FunnelIcon } from "@heroicons/react/20/solid";
 import { useState } from "react";
@@ -10,11 +9,9 @@ import Line from "./Line";
 import { CiCirclePlus } from "react-icons/ci";
 import { IoArrowUpCircleOutline } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
-import { HiMiniDocumentMagnifyingGlass } from "react-icons/hi2";
 import axios from "axios";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { RootState } from "../../../types";
 import SetPassword from "./SetPassword";
+import { useAuth } from "../../../context/AuthContext";
 
 const filters = {
   plano: [
@@ -59,9 +56,9 @@ export default function Filter({
 }: FilterProps) {
   const [filter, setFilter] = useState<string[]>([]);
   const navigate = useNavigate();
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const user = useTypedSelector((state: RootState) => state.auth.user);
-  const token = user.token;
+
+  const { user } = useAuth();
+  const token = user?.token;
   const [password, setPassword] = useState<string>("");
   const [showPasswordPopUp, setShowPasswordPopUp] = useState(false);
 

@@ -3,15 +3,12 @@ import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import Stacked from "./Components/Stacked";
 import Filter from "./Components/Filter";
-import { CiCirclePlus } from "react-icons/ci";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { RootState } from "../../types";
+
 import { BsFiletypeDoc } from "react-icons/bs";
-import { IoArrowUpCircleOutline } from "react-icons/io5";
 import PopUpButton from "./Components/PopUpButton";
-import { PiPrinter } from "react-icons/pi";
 import Error from "./Components/Error";
 import Success from "./Components/Success";
+import { useAuth } from "../../context/AuthContext";
 
 export const Nfe = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -46,9 +43,9 @@ export const Nfe = () => {
 
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>(""); // senha para emitir nf
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const user = useTypedSelector((state: RootState) => state.auth.user);
-  const token = user.token;
+
+  const { user } = useAuth();
+  const token = user?.token;
 
   const handleCheckboxChange = (clienteId: number) => {
     setClientesSelecionados((prevSelecionados) => {

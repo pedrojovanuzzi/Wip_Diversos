@@ -1,46 +1,40 @@
 import React, { useEffect, useState } from 'react'
-
-import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
-import { loginThunk, reset } from '../../slices/authSlice';
-import { RootState, AppDispatch } from '../../types';
-
 import Message from '../../components/Message';
+import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
 
 export const AuthPage = () => {
 
     const [login, setLogin] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
     const [password, setPassword] = useState("");
-
-    const dispatch = useDispatch<AppDispatch>();
-
-    const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
+    const {loginIn} = useAuth();
 
 
-    const { loading, error } = useTypedSelector((state) => state.auth);
 
-    function handleSubmit(e : React.FormEvent<HTMLFormElement>){
+
+
+    async function handleSubmit(e : React.FormEvent<HTMLFormElement>){
         e.preventDefault();
-
-        const user = {
-            login,
-            password
+        setLoading(true);
+        try {
+          const res = await axios.post(`${process.env.REACT_APP_URL}/auth/login`, {login, password})
+          const token = res.data;
+          loginIn(token);
+        } catch (error : any) {
+          setError(error);
         }
-
-
-        console.log(user);
-        
-        dispatch(loginThunk(user));
-
-        
+        finally{
+          setLoading(false);
+        }
     }
 
     useEffect(() => {
       document.title = 'Login';
     }, []);
 
-    useEffect(() => {
-      dispatch(reset());
-    }, [dispatch])
+
 
 
   return (
