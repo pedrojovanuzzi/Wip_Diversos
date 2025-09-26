@@ -1,14 +1,13 @@
 import { NavBar } from "../../components/navbar/NavBar";
+import { useAuth } from "../../context/AuthContext";
 import List from "./components/List";
 import { useEffect, useState } from "react";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { RootState } from "../../types";
 
 export const Opnion = () => {
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const { user } = useTypedSelector((state) => state.auth);
+  
   const [feedback, setFeedback] = useState<Opnion[]>([]);
-
+  const { user } = useAuth();
+  const token = user?.token;
   interface Opnion {
     login: string;
     opnion: string;
@@ -29,7 +28,7 @@ export const Opnion = () => {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${user.token}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );

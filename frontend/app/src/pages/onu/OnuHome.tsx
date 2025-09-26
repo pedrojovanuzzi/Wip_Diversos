@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { NavBar } from "../../components/navbar/NavBar";
 import axios from "axios";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { OnuData, RootState } from "../../types";
+import { OnuData } from "../../types";
 import OnuList from "./components/OnuList";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 export const OnuHome = () => {
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const userToken = useTypedSelector((state: RootState) => state.auth.user);
-  const token = userToken.token;
+  
+  const { user } = useAuth();
+  const token = user?.token;
   const navigate = useNavigate();
 
   const [onuOn, setOnuOn] = useState<OnuData[] | []>([]);

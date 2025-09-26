@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { NavBar } from "../../components/navbar/NavBar";
 import axios from "axios";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { RootState } from "../../types";
 import {
   LineChart,
   Line,
@@ -13,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { ErrorMessage } from "./components/ErrorMessage";
+import { AuthContext, useAuth } from "../../context/AuthContext";
 
 function formatarBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) {
@@ -133,10 +132,8 @@ export const ClientAnalytics = () => {
   const [errorClientList, setErrorClientList] = useState<string | null>(null);
   const [clientlist, setClientList] = useState<ClientList[]>([]);
 
-  //Redux
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const userToken = useTypedSelector((state: RootState) => state.auth.user);
-  const token = userToken.token;
+const { user } = useAuth();
+const token = user?.token;
 
   // Spinner reutilizável
   const Spinner: React.FC<{ text?: string }> = ({ text }) => (

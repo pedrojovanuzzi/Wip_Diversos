@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 import PopUp from "./components/PopUp";
 import PopUpError from "./components/PopUpError";
 import { Helmet } from "react-helmet-async";
-import icon from "./imgs/icon.png";
 
 const FeedbackPage = () => {
   const { technician, id } = useParams<{ technician: string; id: string }>();

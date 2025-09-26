@@ -1,7 +1,6 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
-import { RootState } from "../../types";
+
 import {
   ResponsiveContainer,
   LineChart,
@@ -11,16 +10,15 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
+import { useAuth } from "../../context/AuthContext";
 
 type Last10 = { pppoe: string; total: number };
 type EventsPerMinute = { minuto: string; total: number };
 type EventsPerHost = { host: string; total: number };
 
 export const DDDOS_Home = () => {
-  //Redux
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const userToken = useTypedSelector((state: RootState) => state.auth.user);
-  const token = userToken.token;
+  const { user } = useAuth();
+  const token = user?.token;
 
   const [last10pppoe, setLast10Ppoe] = useState<Last10[]>([]);
   const [eventsPerMinute, setEventsPerMinute] = useState<EventsPerMinute[]>([]);

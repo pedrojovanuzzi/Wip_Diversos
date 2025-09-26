@@ -2,13 +2,12 @@ import React, { useRef, useState } from "react";
 import { NavBar } from "../../components/navbar/NavBar";
 import SendPdf from "./components/SendPdf";
 import axios from "axios";
-import { RootState } from "../../types";
-import { TypedUseSelectorHook, useSelector } from "react-redux";
+import { useAuth } from "../../context/AuthContext";
 
 export const PowerDns = () => {
-  const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
-  const userToken = useTypedSelector((state: RootState) => state.auth.user);
-  const token = userToken.token;
+
+  const { user } = useAuth();
+  const token = user?.token;
 const [message, setMessage] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
