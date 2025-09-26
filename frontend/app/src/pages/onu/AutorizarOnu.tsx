@@ -26,6 +26,15 @@ export const AutorizarOnu = () => {
     senha_wifi: "",
   });
 
+  const saved = localStorage.getItem('sn');
+
+  useState(() => {
+    if(saved){
+    const array = JSON.parse(saved) as string[];
+    setSn(array.join(", "));
+  }
+  })
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); // evita reload da página
 
