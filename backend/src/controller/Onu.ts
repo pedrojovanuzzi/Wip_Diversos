@@ -592,15 +592,18 @@ class Onu {
       const conn = new Telnet();
 
       // 🟡 Eventos para log no terminal
-      conn.on("data", async (data) => {
-        buffer = data.toString();
-        console.log(buffer);
+      conn.on("data", (data) => {
+      const chunk = data.toString();
+      buffer += chunk;
+      console.log(chunk);
 
-        if (buffer.includes("Press any key")) {
-          await conn.send("\n"); // envia Enter
-        }
-      });
+      // se a OLT pedir "Press any key", manda Enter
+      if (chunk.includes("Press any key")) {
+        conn.send("\n").catch(console.error);
+      }
+    });
 
+    
       let buffer = "";
 
       const params = {
