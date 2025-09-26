@@ -37,8 +37,8 @@ export default function OnuList({ list, title }: { list: OnuData[], title? : str
           </p>
         </div>
       </div>
-      <div className="mt-8 flow-root">
-        <div className="overflow-x-auto ">
+      <div className="mt-8 flex justify-center">
+        <div className="overflow-x-auto w-1/2">
           <div className="inline-block min-w-full max-h-72 py-2 align-middle sm:px-6 lg:px-8">
             <table className="relative min-w-full divide-y divide-gray-300">
               <thead>
