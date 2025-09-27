@@ -650,6 +650,7 @@ class Onu {
       let buffer = "";
 
       // 🟡 Eventos para log no terminal
+      conn.removeAllListeners("data");
       conn.on("data", (data) => {
         const chunk = data.toString();
         buffer += chunk;
