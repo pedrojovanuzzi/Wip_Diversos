@@ -3,6 +3,7 @@ import { NavBar } from "../../components/navbar/NavBar";
 import axios from "axios";
 import { WifiData } from "../../types";
 import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 export const AutorizarOnu = () => {
 
@@ -25,6 +26,7 @@ export const AutorizarOnu = () => {
     wifi_5ghz: "",
     senha_wifi: "",
   });
+  const navigate = useNavigate();
 
   const saved = localStorage.getItem('sn');
 
@@ -40,6 +42,8 @@ export const AutorizarOnu = () => {
 
     try {
       setLoading(true);
+      setSucesso('');
+      setError('');
       if (bridge) {
         // modo Bridge
         const response = await axios.post(
@@ -77,6 +81,10 @@ export const AutorizarOnu = () => {
     finally{
       setLoading(false);
     }
+  }
+
+  function redirect(){
+    navigate('/Onu/DesautorizarOnu');
   }
 
   return (
@@ -253,6 +261,13 @@ export const AutorizarOnu = () => {
               className="bg-indigo-600 text-white p-3 rounded-md"
             >
               Criar
+            </button>
+
+            <button
+              onClick={redirect}
+              className="bg-red-600 text-white p-3 rounded-md"
+            >
+              Desautorizar
             </button>
             
           </form>
