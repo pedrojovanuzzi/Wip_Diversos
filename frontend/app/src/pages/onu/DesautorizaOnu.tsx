@@ -4,7 +4,7 @@ import axios from "axios";
 import { WifiData } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 
-export const AutorizarOnu = () => {
+export const DesautorizaOnu = () => {
 
   const { user } = useAuth();
   const token = user?.token;
@@ -85,58 +85,14 @@ export const AutorizarOnu = () => {
       <div className="flex justify-center">
         <div className="lg:w-1/4 my-5">
           <h2 className="text-2xl/7 my-5 font-bold text-gray-900 sm:text-3xl">
-            Autorizar Onu
+            Desautorizar Onu
           </h2>
 
           {/* Formulário */}
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {/* Switch Bridge/Wifi */}
-            <div className="flex items-center justify-between gap-3">
-              <div className="relative inline-flex w-11 shrink-0 rounded-full  bg-gray-200 p-0.5 ring-1 ring-gray-900/5">
-                <label className="relative inline-flex w-11 shrink-0 rounded-full bg-gray-200 p-0.5 ring-1 ring-gray-900/5 cursor-pointer has-[:checked]:bg-blue-300">
-                  <input
-                  type="checkbox"
-                  checked={bridge}
-                  onClick={() => {
-                    setBridge((prev) => !prev);
-                    // se trocar para Wifi, força Uma ONU
-                    if (bridge) setvariasOnus(false);
-                  }}
-                  className="peer absolute inset-0 appearance-none cursor-pointer"
-                />
-                <span
-                  className={`size-5 rounded-full bg-white peer shadow-sm ring-1 ring-gray-900/5 transition-transform ${
-                    bridge ? "translate-x-5" : ""
-                  }`}
-                />
-                </label>
-              </div>
-              <span className="font-medium text-gray-900">
-                {bridge ? "Bridge" : "Wifi"}
-              </span>
-            </div>
+            
 
-            <div className="flex items-center justify-between gap-3">
-              <div className="relative inline-flex w-11 shrink-0 rounded-full bg-gray-200 p-0.5 ring-1 ring-gray-900/5">
-                <label className="relative inline-flex w-11 shrink-0 rounded-full has-[:checked]:bg-blue-700 bg-gray-200 p-0.5 ring-1 ring-gray-900/5 cursor-pointer">
-                  <input
-                  type="checkbox"
-                  checked={variasOnus}
-                  disabled={!bridge} // se estiver em Wifi, trava
-                  onClick={() => setvariasOnus((prev) => !prev)}
-                  className="peer absolute inset-0 appearance-none cursor-pointer disabled:cursor-not-allowed"
-                />
-                <span
-                  className={`size-5 rounded-full bg-white peer shadow-sm ring-1 ring-gray-900/5 transition-transform ${
-                    variasOnus ? "translate-x-5" : ""
-                  }`}
-                />
-                </label>
-              </div>
-              <span className="font-medium text-gray-900">
-                {variasOnus ? "Várias Onu's" : "Uma Onu"}
-              </span>
-            </div>
 
             {/* Campos comuns */}
             <label className="block text-sm font-medium text-gray-900">SN</label>
