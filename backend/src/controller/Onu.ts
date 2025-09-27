@@ -91,6 +91,50 @@ class Onu {
     }
   };
 
+  public Desautorize = async (req: Request, res: Response) => {
+    let { sn } = req.body;
+    const conn = await this.telnetStart(this.ip, this.login, this.password);
+    if (!conn) {
+      res.status(500).json("Erro No Telnet");
+      return;
+    }
+    try {
+      
+
+      
+      await conn.send("cd onu");
+
+      
+        // consulta informações para cada SN
+        const onuInfo = await this.querySnHelper(sn);
+
+        if (!onuInfo?.slot || !onuInfo?.pon) {
+          console.warn("SN inválido ou não encontrado:", sn);
+          return;
+        }
+
+        const onuAuth = await this.filterByMacOnu(
+          conn,
+          sn, // passa só o SN individual
+          onuInfo.slot,
+          onuInfo.pon
+        );
+
+         await conn.exec(
+        `set whitelist phy_addr address ${onuInfo?.sn} password null action delete slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${onuAuth?.onuid} type ${onuInfo?.model}`,
+        { execTimeout: 30000 }
+      );
+      
+
+      res.status(200).json("Onu Desautorizada!");
+    } catch (error) {
+      console.error(error);
+      res.status(500).json(error);
+    } finally {
+      conn.end();
+    }
+  };
+
   public onuAuthenticationWifi = async (req: Request, res: Response) => {
     const { sn, vlan, cos, wifiData } = req.body;
     const conn = await this.telnetStart(this.ip, this.login, this.password);
