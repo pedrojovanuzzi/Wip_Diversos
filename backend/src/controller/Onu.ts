@@ -651,14 +651,14 @@ class Onu {
 
       // 🟡 Eventos para log no terminal
       conn.removeAllListeners("data");
-      conn.on("data", (data) => {
+      conn.on("data", async (data) => {
         const chunk = data.toString();
         buffer += chunk;
         console.log(chunk);
 
         // se a OLT pedir "Press any key", manda Enter
         if (chunk.includes("Press any key")) {
-          conn?.exec("\n", {execTimeout: 30000}).catch(console.error);
+          await conn?.send("\n").catch(console.error);
         }
       });
 
@@ -666,7 +666,7 @@ class Onu {
         host: ip,
         port: 23,
         timeout: 30000,
-        sendTimeout: 200,
+        sendTimeout: 500,
         debug: true,
         shellPrompt: regex ?? /[#>]\s*$/,
         stripShellPrompt: true,
