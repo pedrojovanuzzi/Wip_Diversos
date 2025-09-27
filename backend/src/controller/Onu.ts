@@ -657,7 +657,7 @@ class Onu {
 
         // se a OLT pedir "Press any key", manda Enter
         if (chunk.includes("Press any key")) {
-          conn?.send("\n").catch(console.error);
+          conn?.exec("\n", {execTimeout: 30000}).catch(console.error);
         }
       });
 
