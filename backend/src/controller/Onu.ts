@@ -23,67 +23,66 @@ class Onu {
       return;
     }
     try {
+      sn = sn.split(",").map((sn: string) => ({ sn: sn.trim() }));
 
-
-      sn = sn.split(',').map((sn : string) => ({sn: sn.trim()}));
-      
       const snList = sn.map((item: { sn: string }) => ({
         sn: item.sn.trim(),
       }));
 
       await conn.send("cd onu");
-      
-        for (const item of snList) {
-      // consulta informações para cada SN
-      const onuInfo = await this.querySnHelper(item.sn);
 
-      if (!onuInfo?.slot || !onuInfo?.pon) {
-        console.warn("SN inválido ou não encontrado:", item.sn);
-        continue;
+      for (const item of snList) {
+        // consulta informações para cada SN
+        const onuInfo = await this.querySnHelper(item.sn);
+
+        if (!onuInfo?.slot || !onuInfo?.pon) {
+          console.warn("SN inválido ou não encontrado:", item.sn);
+          continue;
+        }
+
+        const output = await conn.exec(
+          `show onu slot ${onuInfo.slot} pon ${onuInfo.pon} onulist all`,
+          { execTimeout: 30000 }
+        );
+
+        const response = this.nextOnu(output);
+
+        await conn.exec(
+          `set whitelist phy_addr address ${onuInfo.sn} password null action add slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${response?.nextOnu} type ${onuInfo.model}`,
+          { execTimeout: 30000 }
+        );
+
+        const onuAuth = await this.filterByMacOnu(
+          conn,
+          item.sn, // passa só o SN individual
+          onuInfo.slot,
+          onuInfo.pon
+        );
+
+        await conn.send("cd lan");
+
+        await conn.exec(
+          `set epon slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${
+            onuAuth?.onuid ?? response?.nextOnu
+          } port 1 service number 1`,
+          { execTimeout: 30000 }
+        );
+
+        await conn.exec(
+          `set epon slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${
+            onuAuth?.onuid ?? response?.nextOnu
+          } port 1 service 1 vlan_mode tag ${cos} 33024 ${vlan}`,
+          { execTimeout: 30000 }
+        );
+
+        await conn.exec(
+          `apply onu ${onuInfo.slot} ${onuInfo.pon} ${
+            onuAuth?.onuid ?? response?.nextOnu
+          } vlan`
+        );
       }
 
-      const output = await conn.exec(
-        `show onu slot ${onuInfo.slot} pon ${onuInfo.pon} onulist all`,
-        { execTimeout: 30000 }
-      );
-
-      const response = this.nextOnu(output);
-
-      await conn.exec(
-        `set whitelist phy_addr address ${onuInfo.sn} password null action add slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${response?.nextOnu} type ${onuInfo.model}`,
-        { execTimeout: 30000 }
-      );
-
-      const onuAuth = await this.filterByMacOnu(
-        conn,
-        item.sn, // passa só o SN individual
-        onuInfo.slot,
-        onuInfo.pon
-      );
-
-      await conn.send("cd lan");
-
-      await conn.exec(
-        `set epon slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${
-          onuAuth?.onuid ?? response?.nextOnu
-        } port 1 service number 1`,
-        { execTimeout: 30000 }
-      );
-
-      await conn.exec(
-        `set epon slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${
-          onuAuth?.onuid ?? response?.nextOnu
-        } port 1 service 1 vlan_mode tag ${cos} 33024 ${vlan}`,
-        { execTimeout: 30000 }
-      );
-
-      await conn.exec(
-        `apply onu ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu} vlan`
-      );
-    }
-      
-    res.status(200).json('Onu Autorizada!');
-
+      res.status(200).json("Onu Autorizada!");
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
@@ -93,7 +92,7 @@ class Onu {
   };
 
   public onuAuthenticationWifi = async (req: Request, res: Response) => {
-    const { sn, vlan, cos, wifiData} = req.body;
+    const { sn, vlan, cos, wifiData } = req.body;
     const conn = await this.telnetStart(this.ip, this.login, this.password);
     if (!conn) {
       res.status(500).json("Erro No Telnet");
@@ -130,39 +129,87 @@ class Onu {
 
       const wifiDataTyped = wifiData as WifiData;
 
-      
-
       await conn.send("cd lan");
 
+      await conn.exec(
+        `set wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${
+          onuAuth?.onuid ?? response?.nextOnu
+        } index 1 mode internet type route ${vlan} ${cos} nat enable qos disable vlanmode tag tvlan disable 0xffff 0xffff qinq disable 0 0xffff 0xffff dsp pppoe proxy disable ${
+          wifiDataTyped.pppoe
+        } ${
+          wifiDataTyped.senha_pppoe
+        } null auto entries 6 fe1 fe2 fe3 fe4 ssid1 ssid5`,
+        { execTimeout: 30000 }
+      );
 
-      await conn.exec(`set wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu} index 1 mode internet type route ${vlan} ${cos} nat enable qos disable vlanmode tag tvlan disable 0xffff 0xffff qinq disable 0 0xffff 0xffff dsp pppoe proxy disable ${wifiDataTyped.pppoe} ${wifiDataTyped.senha_pppoe} null auto entries 6 fe1 fe2 fe3 fe4 ssid1 ssid5`,
-      {execTimeout: 30000});
+      await conn.exec(
+        `apply wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${
+          onuAuth?.onuid ?? response?.nextOnu
+        }`,
+        { execTimeout: 30000 }
+      );
 
-      await conn.exec(`apply wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu}`,
-      {execTimeout: 30000});
+      await conn.exec(
+        `set wancfg sl ${onuInfo.slot} ${onuInfo.pon} ${
+          onuAuth?.onuid ?? response?.nextOnu
+        } ind 1 ip-stack-mode both ipv6-src-type slaac prefix-src-type delegate`,
+        { execTimeout: 30000 }
+      );
 
-      await conn.exec(`set wancfg sl ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu} ind 1 ip-stack-mode both ipv6-src-type slaac prefix-src-type delegate`,
-      {execTimeout: 30000});
+      await conn.exec(
+        `apply wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${
+          onuAuth?.onuid ?? response?.nextOnu
+        }`,
+        { execTimeout: 30000 }
+      );
 
-      await conn.exec(`apply wancfg slot ${onuInfo.slot} ${onuInfo.pon} ${onuAuth?.onuid ?? response?.nextOnu}`,
-      {execTimeout: 30000});
+      await conn.exec(
+        `set wifi_serv_wlan slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${
+          onuAuth?.onuid ?? response?.nextOnu
+        } serv_no 1 index 1 ssid enable ${
+          wifiDataTyped.wifi_2ghz
+        } hide disable authmode wpa2psk encrypt_type tkipaes wpakey ${
+          wifiDataTyped.senha_wifi
+        } interval 0 radius_serv ipv4 0.0.0.0 port 65535 pswd null wapi_serv_addr 0.0.0.0 0 wifi_connect_num 32`,
+        { execTimeout: 30000 }
+      );
 
-      await conn.exec(`set wifi_serv_wlan slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 1 index 1 ssid enable ${wifiDataTyped.wifi_2ghz} hide disable authmode wpa2psk encrypt_type tkipaes wpakey ${wifiDataTyped.senha_wifi} interval 0 radius_serv ipv4 0.0.0.0 port 65535 pswd null wapi_serv_addr 0.0.0.0 0 wifi_connect_num 32`,
-      {execTimeout: 30000});
+      await conn.exec(
+        `set wifi_serv_cfg slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${
+          onuAuth?.onuid ?? response?.nextOnu
+        } serv_no 1 wifi enable district brazil channel ${
+          wifiDataTyped.canal
+        } standard 802.11bgn txpower 20 frequency 2.4ghz freq_bandwidth 20mhz/40mhz`,
+        { execTimeout: 30000 }
+      );
 
-      await conn.exec(`set wifi_serv_cfg slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 1 wifi enable district brazil channel ${wifiDataTyped.canal} standard 802.11bgn txpower 20 frequency 2.4ghz freq_bandwidth 20mhz/40mhz`,
-      {execTimeout: 30000});
+      await conn.exec(
+        `set wifi_serv_wlan slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${
+          onuAuth?.onuid ?? response?.nextOnu
+        } serv_no 2 index 1 ssid enable ${
+          wifiDataTyped.wifi_5ghz
+        } hide disable authmode wpa2psk encrypt_type tkipaes wpakey ${
+          wifiDataTyped.senha_wifi
+        } interval 0 wapi_serv_addr 0.0.0.0 0 wifi_connect_num 32`,
+        { execTimeout: 30000 }
+      );
 
-      await conn.exec(`set wifi_serv_wlan slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 2 index 1 ssid enable ${wifiDataTyped.wifi_5ghz} hide disable authmode wpa2psk encrypt_type tkipaes wpakey ${wifiDataTyped.senha_wifi} interval 0 wapi_serv_addr 0.0.0.0 0 wifi_connect_num 32`,
-      {execTimeout: 30000});
-
-      await conn.exec(`set wifi_serv_cfg slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} serv_no 2 wifi enable district brazil channel 36 standard 802.11ac txpower 20 frequency 5.8ghz freq_bandwidth 80mhz`,
-      {execTimeout: 30000});
+      await conn.exec(
+        `set wifi_serv_cfg slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${
+          onuAuth?.onuid ?? response?.nextOnu
+        } serv_no 2 wifi enable district brazil channel 36 standard 802.11ac txpower 20 frequency 5.8ghz freq_bandwidth 80mhz`,
+        { execTimeout: 30000 }
+      );
 
       await conn.send("cd ..");
 
-     await conn.exec(`set onu_local_manage_config slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid ?? response?.nextOnu} config_enable_switch enable console_switch enable telnet_switch disable web_switch enable web_port 29189 web_ani_switch enable tel_ani_switch disable web_admin_switch enable`,
-      { execTimeout: 30000 }
+      await conn.exec(
+        `set onu_local_manage_config slot ${onuInfo.slot} pon ${
+          onuInfo.pon
+        } onu ${
+          onuAuth?.onuid ?? response?.nextOnu
+        } config_enable_switch enable console_switch enable telnet_switch disable web_switch enable web_port 29189 web_ani_switch enable tel_ani_switch disable web_admin_switch enable`,
+        { execTimeout: 30000 }
       );
 
       await conn.send(`cd ..`);
@@ -170,12 +217,13 @@ class Onu {
       await conn.send(`cd maintenance`);
 
       await conn.exec(
-        `reboot slot ${onuInfo.slot} pon ${onuInfo.pon} onulist ${onuAuth?.onuid ?? response?.nextOnu}`,
+        `reboot slot ${onuInfo.slot} pon ${onuInfo.pon} onulist ${
+          onuAuth?.onuid ?? response?.nextOnu
+        }`,
         { execTimeout: 30000 }
       );
 
-
-      res.status(200).json('Onu Autorizada!');
+      res.status(200).json("Onu Autorizada!");
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
@@ -252,7 +300,7 @@ class Onu {
           onuid: parts[0],
           model: parts[1],
           sn: parts[2],
-          slotPon: parts[parts.length - 1].replace('/', ''),
+          slotPon: parts[parts.length - 1].replace("/", ""),
         };
       });
 
@@ -587,63 +635,76 @@ class Onu {
     }
   }
 
-  private async telnetStart(ip: string, login: string, password: string) {
-  let conn: Telnet | null = null;
+  private async telnetStart(
+    ip: string,
+    login: string,
+    password: string,
+    regex?: string,
+    attempt: number = 1,
+    maxAttempts: number = 3
+  ): Promise<Telnet | null> {
+    let conn: Telnet | null = null;
 
-  try {
-    conn = new Telnet();
-    let buffer = "";
+    try {
+      conn = new Telnet();
+      let buffer = "";
 
-    // 🟡 Eventos para log no terminal
-    conn.on("data", (data) => {
-      const chunk = data.toString();
-      buffer += chunk;
-      console.log(chunk);
+      // 🟡 Eventos para log no terminal
+      conn.on("data", (data) => {
+        const chunk = data.toString();
+        buffer += chunk;
+        console.log(chunk);
 
-      // se a OLT pedir "Press any key", manda Enter
-      if (chunk.includes("Press any key")) {
-        conn?.send("\n").catch(console.error);
+        // se a OLT pedir "Press any key", manda Enter
+        if (chunk.includes("Press any key")) {
+          conn?.send("\n").catch(console.error);
+        }
+      });
+
+      const params = {
+        host: ip,
+        port: 23,
+        timeout: 30000,
+        sendTimeout: 200,
+        debug: true,
+        shellPrompt: regex ?? /[#>]\s*$/,
+        stripShellPrompt: true,
+        negotiationMandatory: false,
+        disableLogon: true,
+      };
+
+      await conn.connect(params);
+
+      await conn.send(login);
+      await conn.send(password);
+
+      await conn.send("en");
+      await conn.send(password);
+
+      return conn;
+    } catch (error: any) {
+      console.error("Erro no Telnet:", error.message || error);
+
+      if (
+        error.message?.includes("response not received") &&
+        attempt < maxAttempts
+      ) {
+        console.warn(
+          `⚠️ Tentando novamente... (${attempt + 1}/${maxAttempts})`
+        );
+        return this.telnetStart(
+          ip,
+          login,
+          password,
+          regex,
+          attempt + 1,
+          maxAttempts
+        );
       }
-    });
 
-    const params = {
-      host: ip,
-      port: 23,
-      timeout: 30000,
-      sendTimeout: 200,
-      debug: true,
-      shellPrompt: /[#>]\s*$/,
-      stripShellPrompt: true,
-      negotiationMandatory: false,
-      disableLogon: true,
-    };
-
-    await conn.connect(params);
-
-    await conn.send(login);
-    await conn.send(password);
-
-    await conn.send("en");
-    await conn.send(password);
-
-    return conn;
-  } catch (error: any) {
-    console.error("Erro no Telnet:", error.message || error);
-
-    // 🛑 Se der "response not received", fecha a conexão
-    if (conn) {
-      try {
-        conn.end();
-        console.log("Conexão Telnet encerrada por timeout/erro");
-      } catch (e) {
-        console.error("Erro ao encerrar conexão Telnet:", e);
-      }
+      return null; // falhou mesmo após tentativas
     }
-
-    return null;
   }
-}
-
 }
 
 export default Onu;
