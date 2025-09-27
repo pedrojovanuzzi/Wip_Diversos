@@ -217,7 +217,7 @@ class Onu {
       await conn.send(`cd maintenance`);
 
       await conn.exec(
-        `reboot slot ${onuInfo.slot} pon ${onuInfo.pon} onulist ${
+        `reboot slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${
           onuAuth?.onuid ?? response?.nextOnu
         }`,
         { execTimeout: 30000 }
