@@ -191,4 +191,4 @@ private async enviarEmailBackup(
 
 }
 
-export default new Backup();
+export default Backup;

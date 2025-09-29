@@ -18,6 +18,7 @@ import ServerLogs from "./routes/ServerLogs.Routes";
 import PowerDNS from './routes/PowerDns.routes';
 import Onu from './routes/Onu.routes';
 import BackupRoutes from './routes/Backup.routes';
+const backup = new Backup();
 
 export class App {
   public server: express.Application;
@@ -57,7 +58,7 @@ export class App {
     cron.schedule("0 3 * * *", async () => {
       console.log("⏰ Executando backup automático", new Date().toLocaleString());
       try {
-        await Backup.gerarTodos();
+        await backup.gerarTodos();
       } catch (err) {
         console.error("❌ Falha no backup agendado:", err);
       }
