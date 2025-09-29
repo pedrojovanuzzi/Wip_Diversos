@@ -121,14 +121,15 @@ public async gerarTodosButton(req: Request, res: Response) {
     //Como nas existe await exec precisamos criar uma promisse e aplicar o await nela
     await new Promise<void>((resolve, reject) => {
       exec(dumpCommand, (error, stdout, stderr) => {
+          console.log(stdout);
+          console.log(stderr);
         if (error) {
           // se der erro, mostrar no console e rejeitar a promessa
           if(error){
             console.error(error.message);
             return reject(error);
           }
-          //Retorna o throw error para o usuario
-          console.log(stdout);
+          
           
           return reject(error);
         }
