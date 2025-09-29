@@ -45,7 +45,7 @@ class Backup {
   
 
 public async gerarTodos() {
- try {
+ try {    
     // obter a data atual no formato YYYY-MM-DD
   const date = new Date().toISOString().slice(0,10);
 
@@ -61,8 +61,9 @@ public async gerarTodos() {
     // definir o caminho final do arquivo SQL
     const filePath = path.join(backupDir, `${db.name}.sql`);
     // montar o comando mysqldump para gerar o backup
-    const dumpCommand = `mysqldump -h ${db.host} -u ${db.user} -p '${db.pass}' ${db.name} > "${filePath}"`;
-
+    const dumpCommand = `mysqldump -h ${db.host} -u ${db.user} -p'${db.pass}' ${db.name} > "${filePath}"`;
+    console.log(dumpCommand);
+    
     // mostrar no console que o backup está começando
    console.log(`Iniciando Backup do Banco ${db.name}`);
   
@@ -70,13 +71,17 @@ public async gerarTodos() {
     //Como nas existe await exec precisamos criar uma promisse e aplicar o await nela
     await new Promise<void>((resolve, reject) => {
       exec(dumpCommand, (error, stdout, stderr) => {
+        //Retorna o throw error para o usuario
+          console.log(stdout);
+          console.log(stderr);
         if (error) {
           // se der erro, mostrar no console e rejeitar a promessa
           if(error){
             console.error(error.message);
             return reject(error);
           }
-          //Retorna o throw error para o usuario
+          
+          
           return reject(error);
         }
         // se der certo, mostrar no console e adicionar o anexo ao array
@@ -88,10 +93,11 @@ public async gerarTodos() {
   }
 
   // (depois você pode usar o array `attachments` para enviar os backups por e-mail)
-  await this.enviarEmailBackup(attachments, date);
+  const send = await this.enviarEmailBackup(attachments, date);
+  console.log(send);
+  
   } catch (error) {
-    console.error();
-    
+    console.error(error);
   }
 }
 
@@ -160,7 +166,7 @@ private async enviarEmailBackup(
 ) {
   // Criar o transporter com os dados do servidor SMTP
   const transporter = nodemailer.createTransport({
-    host: "smpt.mailgun.org",
+    host: "smtp.mailgun.org",
     port: 587,
     secure: false,
     auth:{
