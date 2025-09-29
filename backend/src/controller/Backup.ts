@@ -180,6 +180,7 @@ private async enviarEmailBackup(
   } catch (err) {
     // Se der erro, mostrar no console
     console.error("❌ Erro ao enviar email de backup:", err);
+    return err;
   }
 }
 
