@@ -95,7 +95,7 @@ public async gerarTodos() {
   }
 }
 
-public async gerarTodosButton(req: Request, res: Response) {
+public gerarTodosButton = async (req: Request, res: Response) => {
   try {    
     // obter a data atual no formato YYYY-MM-DD
   const date = new Date().toISOString().slice(0,10);
