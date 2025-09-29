@@ -151,9 +151,9 @@ public gerarTodosButton = async (req: Request, res: Response) => {
 
   // (depois você pode usar o array `attachments` para enviar os backups por e-mail)
   const send = await this.enviarEmailBackup(attachments, date);
-  console.log('passei');
   
-  res.status(200).json(send);
+  
+  res.status(200).json('Backup Realizado! ' + send);
   } catch (error) {
     console.error(error);
     res.status(500).json('Erro ' + error);
