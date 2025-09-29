@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as dotenv from "dotenv";
 import nodemailer from 'nodemailer';
+import { Request, Response } from "express";
 
 dotenv.config();
 
@@ -13,8 +14,7 @@ interface DatabaseConfig {
   pass: string;
 }
 
-class Backup {
-  private databases: DatabaseConfig[] = [
+const databases: DatabaseConfig[] = [
     {
       name: process.env.DATABASE!,
       host: process.env.DATABASE_HOST!,
@@ -41,15 +41,19 @@ class Backup {
     },
   ];
 
+class Backup {
+  
+
 public async gerarTodos() {
-  // obter a data atual no formato YYYY-MM-DD
+ try {
+    // obter a data atual no formato YYYY-MM-DD
   const date = new Date().toISOString().slice(0,10);
 
   // array para armazenar os arquivos gerados (para enviar depois por e-mail)
   const attachments: { filename: string; path: string }[] = [];
 
   // para cada banco de dados listado
-  for (const db of this.databases) {
+  for (const db of databases) {
     // definir o caminho onde o backup será salvo: ./backups/<nome do banco>/<data>
     const backupDir = path.resolve(__dirname, "..", "backups", db.name, date);
     // criar a pasta caso não exista
@@ -85,6 +89,64 @@ public async gerarTodos() {
 
   // (depois você pode usar o array `attachments` para enviar os backups por e-mail)
   await this.enviarEmailBackup(attachments, date);
+  } catch (error) {
+    console.error();
+    
+  }
+}
+
+public async gerarTodosButton(req: Request, res: Response) {
+  try {    
+    // obter a data atual no formato YYYY-MM-DD
+  const date = new Date().toISOString().slice(0,10);
+
+  // array para armazenar os arquivos gerados (para enviar depois por e-mail)
+  const attachments: { filename: string; path: string }[] = [];
+
+  // para cada banco de dados listado
+  for (const db of databases) {
+    // definir o caminho onde o backup será salvo: ./backups/<nome do banco>/<data>
+    const backupDir = path.resolve(__dirname, "..", "backups", db.name, date);
+    // criar a pasta caso não exista
+    fs.mkdirSync(backupDir, {recursive: true});
+    // definir o caminho final do arquivo SQL
+    const filePath = path.join(backupDir, `${db.name}.sql`);
+    // montar o comando mysqldump para gerar o backup
+    const dumpCommand = `mysqldump -h ${db.host} -u ${db.user} -p '${db.pass}' ${db.name} > "${filePath}"`;
+
+    // mostrar no console que o backup está começando
+   console.log(`Iniciando Backup do Banco ${db.name}`);
+  
+    // executar o comando e aguardar ele finalizar
+    //Como nas existe await exec precisamos criar uma promisse e aplicar o await nela
+    await new Promise<void>((resolve, reject) => {
+      exec(dumpCommand, (error, stdout, stderr) => {
+        if (error) {
+          // se der erro, mostrar no console e rejeitar a promessa
+          if(error){
+            console.error(error.message);
+            return reject(error);
+          }
+          //Retorna o throw error para o usuario
+          return reject(error);
+        }
+        // se der certo, mostrar no console e adicionar o anexo ao array
+        console.log(`Backup de ${db.name} salvo em ${filePath}`);
+        attachments.push({filename: `${db.name}.sql`, path: filePath});
+        resolve();
+      });
+    });
+  }
+
+  // (depois você pode usar o array `attachments` para enviar os backups por e-mail)
+  const send = await this.enviarEmailBackup(attachments, date);
+  console.log('passei');
+  
+  res.status(200).json(send);
+  } catch (error) {
+    console.error();
+    res.status(500).json('Erro ' + error);
+  }
 }
 
 private async enviarEmailBackup(
