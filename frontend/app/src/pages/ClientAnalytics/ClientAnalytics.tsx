@@ -28,17 +28,19 @@ function formatarBytes(bytes: number): string {
 // converte uptime do Mikrotik para segundos (suporta w, d, h, m, s)
 export function parseUptime(raw: string): number {
   // garante que temos uma string, remove espaços e normaliza para minúsculas
-  const s = String(raw ?? "").trim().toLowerCase();
+  const s = String(raw ?? "")
+    .trim()
+    .toLowerCase();
   // se vier vazio/indefinido, retornamos 0 para não quebrar o sort
   if (!s) return 0;
 
   // tabela de multiplicadores por unidade (w=semana, d=dia, h=hora, m=minuto, s=segundo)
   const unitToSec: Record<string, number> = {
     w: 7 * 24 * 60 * 60, // segundos em 1 semana
-    d: 24 * 60 * 60,     // segundos em 1 dia
-    h: 60 * 60,          // segundos em 1 hora
-    m: 60,               // segundos em 1 minuto
-    s: 1,                // segundos em 1 segundo
+    d: 24 * 60 * 60, // segundos em 1 dia
+    h: 60 * 60, // segundos em 1 hora
+    m: 60, // segundos em 1 minuto
+    s: 1, // segundos em 1 segundo
   };
 
   // regex que captura blocos "<numero><unidade>" como 2d, 21h, 56m, 10s, 1w etc.
@@ -66,7 +68,6 @@ export function parseUptime(raw: string): number {
   // devolve o total de segundos para uso no sort
   return total;
 }
-
 
 type Cliente = {
   suspensao: boolean;
@@ -132,8 +133,8 @@ export const ClientAnalytics = () => {
   const [errorClientList, setErrorClientList] = useState<string | null>(null);
   const [clientlist, setClientList] = useState<ClientList[]>([]);
 
-const { user } = useAuth();
-const token = user?.token;
+  const { user } = useAuth();
+  const token = user?.token;
 
   // Spinner reutilizável
   const Spinner: React.FC<{ text?: string }> = ({ text }) => (
@@ -276,8 +277,6 @@ const token = user?.token;
       );
       setTestes(response.data.tests);
       setConectado(response.data.conectado);
-
-      
     } catch {
       setErrorMikrotik("Erro ao executar teste Mikrotik");
       setErrorConectado("DOWN");
@@ -286,7 +285,6 @@ const token = user?.token;
       setLoadingConectado(false);
     }
   };
-
 
   const fetchSinal = async (pppoe: string) => {
     setErrorSinal(null);
@@ -337,6 +335,7 @@ const token = user?.token;
       <NavBar />
       <div className="bg-gray-100 min-h-screen flex flex-col items-center py-6 px-4 text-sm">
         <h1 className="text-2xl">ClientAnalytics</h1>
+
         <div className="flex items-center mb-6 w-full max-w-md">
           <input
             type="text"
@@ -365,6 +364,11 @@ const token = user?.token;
             return (
               <div className="bg-white shadow-md m-3 p-4 w-full text-left max-w-2xl">
                 <div className="my-5">
+                  {clientlist.some((c) => c.pppoe === pppoe) && (
+                    <h1>
+                      {clientlist.find((c) => c.pppoe === pppoe)?.servidor}
+                    </h1>
+                  )}
                   <h2 className="font-semibold mb-2">Analise detalhada:</h2>
                   <ul className="space-y-1">
                     <li className="my-5">
@@ -449,6 +453,7 @@ const token = user?.token;
                 </div>
 
                 <h3 className="mt-6 mb-2 font-semibold">Relatorio</h3>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left border border-gray-300">
                     <thead className="bg-gray-800 text-white">
