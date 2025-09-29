@@ -61,9 +61,7 @@ public async gerarTodos() {
     // definir o caminho final do arquivo SQL
     const filePath = path.join(backupDir, `${db.name}.sql`);
     // montar o comando mysqldump para gerar o backup
-    const dumpCommand = `mysqldump -h ${db.host} -u ${db.user} -p'${db.pass}' ${db.name} > "${filePath}"`;
-    console.log(dumpCommand);
-    
+    const dumpCommand = `mysqldump -h ${db.host} -u ${db.user} -p '${db.pass}' ${db.name} > "${filePath}"`;
 
     // mostrar no console que o backup está começando
    console.log(`Iniciando Backup do Banco ${db.name}`);
@@ -115,7 +113,8 @@ public async gerarTodosButton(req: Request, res: Response) {
     const filePath = path.join(backupDir, `${db.name}.sql`);
     // montar o comando mysqldump para gerar o backup
     const dumpCommand = `mysqldump -h ${db.host} -u ${db.user} -p '${db.pass}' ${db.name} > "${filePath}"`;
-
+    console.log(dumpCommand);
+    
     // mostrar no console que o backup está começando
    console.log(`Iniciando Backup do Banco ${db.name}`);
   
@@ -123,6 +122,7 @@ public async gerarTodosButton(req: Request, res: Response) {
     //Como nas existe await exec precisamos criar uma promisse e aplicar o await nela
     await new Promise<void>((resolve, reject) => {
       exec(dumpCommand, (error, stdout, stderr) => {
+        //Retorna o throw error para o usuario
           console.log(stdout);
           console.log(stderr);
         if (error) {
