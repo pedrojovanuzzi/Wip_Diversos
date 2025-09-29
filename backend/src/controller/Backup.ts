@@ -128,6 +128,8 @@ public async gerarTodosButton(req: Request, res: Response) {
             return reject(error);
           }
           //Retorna o throw error para o usuario
+          console.log(stdout);
+          
           return reject(error);
         }
         // se der certo, mostrar no console e adicionar o anexo ao array
@@ -144,7 +146,7 @@ public async gerarTodosButton(req: Request, res: Response) {
   
   res.status(200).json(send);
   } catch (error) {
-    console.error();
+    console.error(error);
     res.status(500).json('Erro ' + error);
   }
 }
