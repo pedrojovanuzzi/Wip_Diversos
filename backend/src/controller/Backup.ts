@@ -62,6 +62,8 @@ public async gerarTodos() {
     const filePath = path.join(backupDir, `${db.name}.sql`);
     // montar o comando mysqldump para gerar o backup
     const dumpCommand = `mysqldump -h ${db.host} -u ${db.user} -p'${db.pass}' ${db.name} > "${filePath}"`;
+    console.log(dumpCommand);
+    
 
     // mostrar no console que o backup está começando
    console.log(`Iniciando Backup do Banco ${db.name}`);
