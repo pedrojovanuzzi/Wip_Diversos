@@ -157,7 +157,7 @@ class ClientAnalytics {
         host: ip,
         port: 23,
         timeout: 10000,
-        sendTimeout: 200,
+        sendTimeout: 2000,
         debug: true,
         shellPrompt: /Admin\\onu#\s*$/,
         stripShellPrompt: true,
@@ -203,7 +203,7 @@ class ClientAnalytics {
 
       const optic = await conn.exec(
         `show optic_module slot ${slot} pon ${pon} onu ${onuId}`,
-        { timeout: 10000, execTimeout: 30000 }
+        { execTimeout: 30000 }
       );
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
