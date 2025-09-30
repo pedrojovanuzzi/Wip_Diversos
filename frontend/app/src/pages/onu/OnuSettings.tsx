@@ -10,13 +10,14 @@ export const OnuSettings = () => {
   const { user } = useAuth();
   const token = user?.token;
   const [loading, setLoading] = useState(false);
+  const [loadingHigh, setLoadingHigh] = useState(false);
   const [onu, setOnu] = useState<OnuData[] | []>([]);
   const [timeLeft, setTimeLeft] = useState(90);
-  const [time, setTime] = useState(new Date());
 
   const destravarOnu = async () => {
     try {
-      setLoading(true);
+      setLoadingHigh(true);
+      setTimeLeft(90);
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/Onu/Destravar`,
         {},
@@ -28,7 +29,7 @@ export const OnuSettings = () => {
     } catch (error) {
       console.error(error);
     } finally {
-      setLoading(false);
+      setLoadingHigh(false);
     }
   };
 
@@ -49,7 +50,7 @@ export const OnuSettings = () => {
       <NavBar></NavBar>
       <h1 className="text-2xl mt-5">Configurações Avançadas</h1>
       <div className="flex justify-center m-5 flex-col">
-        {loading && (
+        {loadingHigh && (
           <>
             <h1>
               Carregando, Tempo Estimado: {minutes}:
