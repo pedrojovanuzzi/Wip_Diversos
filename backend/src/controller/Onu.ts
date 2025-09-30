@@ -99,32 +99,27 @@ class Onu {
       return;
     }
     try {
-      
-
-      
       await conn.send("cd onu");
 
-      
-        // consulta informações para cada SN
-        const onuInfo = await this.querySnHelper(sn);
+      // consulta informações para cada SN
+      const onuInfo = await this.querySnHelper(sn);
 
-        if (!onuInfo?.slot || !onuInfo?.pon) {
-          console.warn("SN inválido ou não encontrado:", sn);
-          return;
-        }
+      if (!onuInfo?.slot || !onuInfo?.pon) {
+        console.warn("SN inválido ou não encontrado:", sn);
+        return;
+      }
 
-        const onuAuth = await this.filterByMacOnu(
-          conn,
-          sn, // passa só o SN individual
-          onuInfo.slot,
-          onuInfo.pon
-        );
+      const onuAuth = await this.filterByMacOnu(
+        conn,
+        sn, // passa só o SN individual
+        onuInfo.slot,
+        onuInfo.pon
+      );
 
-         await conn.exec(
+      await conn.exec(
         `set whitelist phy_addr address ${onuInfo?.sn} password null action delete slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${onuAuth?.onuid} type ${onuInfo?.model}`,
         { execTimeout: 30000 }
       );
-      
 
       res.status(200).json("Onu Desautorizada!");
     } catch (error) {
@@ -268,6 +263,73 @@ class Onu {
       );
 
       res.status(200).json("Onu Autorizada!");
+    } catch (error) {
+      console.error(error);
+      res.status(500).json(error);
+    } finally {
+      conn.end();
+    }
+  };
+
+  public Destravar = async (req: Request, res: Response) => {
+    const conn = await this.telnetStart(this.ip, this.login, this.password);
+    if (!conn) {
+      res.status(500).json("Erro No Telnet");
+      return;
+    }
+    try {
+      await conn.send("cd onu");
+
+      const slot = [11, 12, 13, 14, 15];
+      const pon = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+      let allOnus: any[] = [];
+
+      for (const slots of slot) {
+        // percorre cada slot
+        for (const pons of pon) {
+          // percorre cada pon
+          try {
+            // executa o comando para o slot/pon atual
+            const query = await conn.exec(
+              `show online slot ${slots} pon ${pons}`,
+              {
+                execTimeout: 30000,
+                stripControls: true,
+              }
+            );
+
+            // divide a saída em linhas
+            const lines = query.split("\n");
+
+            // limpa a saída removendo mensagens inúteis e pegando só linhas de ONU
+            const cleaned = lines
+              .map((l) => l.replace(/--Press any key.*?stop--/g, "").trim())
+              .filter((l) => /^\d+/.test(l));
+
+            // converte cada linha em objeto
+            const onus = cleaned.map((line) => {
+              const parts = line.trim().split(/\s+/);
+              return {
+                onuid: parts[0], // ID da ONU
+                model: parts[1], // modelo
+                sn: parts[2], // número de série
+                slotPon: `${slots}${pons}`, // slot e pon atuais
+              };
+            });
+
+            // adiciona os ONUs encontrados ao array final
+            allOnus = allOnus.concat(onus);
+          } catch (err) {
+            console.error(`Erro no slot ${slot} pon ${pon}:`, err);
+          }
+        }
+      }
+
+
+      console.log(allOnus);
+      
+
+      res.status(200).json(allOnus);
     } catch (error) {
       console.error(error);
       res.status(500).json(error);

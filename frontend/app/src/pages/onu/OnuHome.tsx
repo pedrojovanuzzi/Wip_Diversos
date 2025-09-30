@@ -5,6 +5,7 @@ import { OnuData } from "../../types";
 import OnuList from "./components/OnuList";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { HiCog6Tooth } from "react-icons/hi2";
 export const OnuHome = () => {
   
   const { user } = useAuth();
@@ -26,6 +27,15 @@ export const OnuHome = () => {
       console.error(error);
     }
   }
+
+  async function settingsOnuRedirect() {
+    try {
+      navigate("/Onu/Settings");
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
 
   function resetState() {
     setOnuOn([]);
@@ -113,6 +123,7 @@ export const OnuHome = () => {
     <div>
       <NavBar />
       <div className="flex  flex-col sm:justify-around sm:flex-row">
+        
         <button
           onClick={() => {
             setLocalizarMac(true);
@@ -132,6 +143,7 @@ export const OnuHome = () => {
           Verificar Onu's / Autorizar
         </button>
       </div>
+      <HiCog6Tooth onClick={settingsOnuRedirect} className="text-5xl absolute right-10 cursor-pointer"/>
       {!localizarMac && (
         <>
           {onuOn && (
