@@ -129,6 +129,86 @@ class ClientAnalytics {
       .replace(/[^0-9A-F]/g, ""); // remove tudo que não seja HEX
   }
 
+  public querySnHelper = async (conn: Telnet, sn: string) => {
+    if (!conn) return;
+
+    try {
+      await conn.send("cd onu");
+
+      // 1. consulta no onu-info
+      const query = await conn.exec(`show onu-info by ${sn}`, {
+        execTimeout: 30000,
+        stripControls: true,
+        maxBufferLength: 10 * 1024,
+      });
+
+      console.log("query", query);
+
+      let slot: string | undefined;
+      let pon: string | undefined;
+      let onuNumber: string | undefined;
+      let state = "";
+
+      // tenta AUTH
+      let match = query.match(
+        /-----\s+(\d+)\s+(\d+)\s+(\d+)\s+(Auth|UnAuth)\s*-+/i
+      );
+      if (match) {
+        slot = match[1];
+        pon = match[2];
+        onuNumber = match[3];
+        state = match[4];
+      } else {
+        // tenta UNAUTH (sem ONU number)
+        match = query.match(/-----\s+(\d+)\s+(\d+)\s+(Auth|UnAuth)\s*-+/i);
+        if (match) {
+          slot = match[1];
+          pon = match[2];
+          onuNumber = "Desconhecido";
+          state = match[3];
+        }
+      }
+
+      if (!slot || !pon) {
+        console.error("❌ Não consegui extrair slot/pon");
+        return;
+      }
+
+      let model: string | undefined = undefined;
+
+      // 2. se for UnAuth, buscar modelo no "show unauth"
+      if (state === "UnAuth") {
+        const unauthOutput = await conn.exec("show unauth", {
+          execTimeout: 30000,
+        });
+
+        const lines = unauthOutput.split("\n");
+        for (const line of lines) {
+          if (line.includes(sn)) {
+            const parts = line.trim().split(/\s+/);
+            model = parts[1] || "Desconhecido"; // segunda coluna = OnuType
+            break;
+          }
+        }
+      }
+
+      console.log(slot, pon, onuNumber, sn, state, model);
+
+      // objeto final
+      return {
+        slot,
+        pon,
+        onuNumber,
+        sn,
+        state,
+        model,
+      };
+    } catch (error) {
+      console.error(error);
+    } 
+  };
+
+
   onuSinal = async (req: Request, res: Response) => {
     try {
       const { pppoe } = req.body;
@@ -173,36 +253,35 @@ class ClientAnalytics {
 
       await conn.send("en");
       await conn.send(password);
-      await conn.send("cd onu");
 
       const slot = User?.porta_olt?.substring(0, 2);
       const pon = User?.porta_olt?.substring(2, 4);
       const rawTag = User?.tags ?? "";
       const snCliente = this.normalizeMac(rawTag.trim());
 
-      let onuId = "";
+      let onuId : any;
 
       if (snCliente) {
         ////console.log("Procurando ONU com MAC normalizado:", snCliente);
-        onuId = await this.buscarOnuIdPorMac(
+        onuId = await this.querySnHelper(
           conn,
-          `show online slot ${slot} pon ${pon}`,
           snCliente
         );
       }
 
       ////console.log(this.onuId);
 
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      if (!this.onuId || !slot || !pon) {
+      if (!onuId || !slot || !pon) {
         await conn.end();
         res.status(500).json({ respostaTelnet: "Sem Onu" });
         return;
       }
 
+      console.log('Numero onu ' + onuId.onuNumber);
+      
+
       const optic = await conn.exec(
-        `show optic_module slot ${slot} pon ${pon} onu ${onuId}`,
+        `show optic_module slot ${slot} pon ${pon} onu ${onuId.onuNumber}`,
         { execTimeout: 30000 }
       );
 
@@ -218,9 +297,11 @@ class ClientAnalytics {
         return;
       }
 
+      this.onuId = onuId.onuNumber;
+
       ////console.log(output);
 
-      if (!this.onuId || !output) {
+      if (!onuId || !output) {
         res.status(500).json({ respostaTelnet: "Sem Onu" });
         return;
       }
@@ -740,7 +821,7 @@ class ClientAnalytics {
       }
     } catch (error) {
       console.error("Erro geral:", error);
-      res.status(500).json({ erro: "Erro interno." });
+      res.status(500).json({ erro: "Erro interno. " + error });
     }
   };
 
