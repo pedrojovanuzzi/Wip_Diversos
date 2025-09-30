@@ -275,6 +275,7 @@ class Onu {
 
   public Destravar = async (req: Request, res: Response) => {
     const conn = await this.telnetStart(this.ip, this.login, this.password);
+    let {slot, pon} = req.body;
     if (!conn) {
       res.status(500).json("Erro No Telnet");
       return;
@@ -282,8 +283,18 @@ class Onu {
     try {
       await conn.send("cd onu");
 
-      const slot = [11, 12, 13, 14, 15];
-      const pon = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+      
+      slot = (slot !== undefined && slot !== null && slot !== "")
+        ? [Number(slot)]
+        : [11, 12, 13, 14, 15];
+
+      pon = (pon !== undefined && pon !== null && pon !== "")
+        ? [Number(pon)]
+        : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+
+      console.log(slot, pon);
+      
+
       let allOnus: any[] = [];
 
       for (const slots of slot) {

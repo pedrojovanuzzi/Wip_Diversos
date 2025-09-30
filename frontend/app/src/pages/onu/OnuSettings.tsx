@@ -1,5 +1,5 @@
 import axios from "axios";
-import React, { useEffect, useState } from "react";
+import React, { ReactElement, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { NavBar } from "../../components/navbar/NavBar";
 
@@ -13,14 +13,17 @@ export const OnuSettings = () => {
   const [loadingHigh, setLoadingHigh] = useState(false);
   const [onu, setOnu] = useState<OnuData[] | []>([]);
   const [timeLeft, setTimeLeft] = useState(90);
+  const [slot, setSlot] = useState<string | undefined>();
+  const [pon, setPon] = useState<string | undefined>();
 
-  const destravarOnu = async () => {
+  const destravarOnu = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
       setLoadingHigh(true);
       setTimeLeft(90);
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/Onu/Destravar`,
-        {},
+        {slot, pon},
         { headers: { Authorization: `Bearer ${token}` } }
       );
       console.log(response.data);
@@ -49,8 +52,10 @@ export const OnuSettings = () => {
     <div>
       <NavBar></NavBar>
       <h1 className="text-2xl mt-5">Configurações Avançadas</h1>
-      <div className="flex justify-center m-5 flex-col">
-        {loadingHigh && (
+      <div className="flex justify-center m-5 ">
+        
+        <form className="flex flex-col gap-2">
+          {loadingHigh && (
           <>
             <h1>
               Carregando, Tempo Estimado: {minutes}:
@@ -58,13 +63,29 @@ export const OnuSettings = () => {
             </h1>
           </>
         )}
-
-        <button
-          onClick={destravarOnu}
-          className="p-3 bg-violet-600 text-gray-200 w-full max-w-72 sm:w-52 text-sm self-center"
-        >
-          Destravar Todas as Onu's
-        </button>
+          Slot
+          <label>
+            <input className="border p-2 rounded-sm border-black"
+              onChange={(e) => setSlot(e.target.value)}
+              placeholder="11"
+              type="number"
+            />
+          </label>
+          Pon
+          <label>
+            <input className="border p-2 rounded-sm border-black"
+              onChange={(e) => setPon(e.target.value)}
+              placeholder="04"
+              type="number"
+            />
+          </label>
+          <button
+            onClick={destravarOnu}
+            className="p-3 bg-violet-600 text-gray-200 w-full max-w-72 sm:w-52 text-sm self-center"
+          >
+            Destravar Todas as Onu's
+          </button>
+        </form>
       </div>
       {onu && (
         <>

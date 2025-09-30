@@ -70,6 +70,7 @@ class ClientAnalytics {
       const resultados = [];
 
       for (const servidor of servidores) {
+        
         try {
           const comando = `/ppp active print without-paging detail`;
           const resposta = await this.executarSSH(servidor.host!, comando);
@@ -79,8 +80,12 @@ class ClientAnalytics {
 
           const matches = [...resposta.matchAll(regex)];
 
+          
+          
+
           for (const match of matches) {
             const [, pppoe, callerId, ip, upTime] = match;
+            
 
             resultados.push({
               servidor: servidor.nome,
@@ -98,7 +103,7 @@ class ClientAnalytics {
         }
       }
 
-      console.log(resultados);
+      
 
       res.status(200).json(resultados);
     } catch (error) {
