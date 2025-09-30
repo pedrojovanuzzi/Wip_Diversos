@@ -22,6 +22,7 @@ import { OnuHome } from './pages/onu/OnuHome';
 import { AutorizarOnu } from './pages/onu/AutorizarOnu';
 import { DesautorizaOnu } from './pages/onu/DesautorizaOnu';
 import { useAuth } from './context/AuthContext';
+import { OnuSettings } from './pages/onu/OnuSettings';
 
 
 function App() {
@@ -70,6 +71,7 @@ function App() {
           <Route path="/Onu" element={user?.token ? <OnuHome /> : <Navigate to="/auth/login" />} />
           <Route path="/Onu/AutorizarOnu" element={user?.token ? <AutorizarOnu /> : <Navigate to="/auth/login" />} />
           <Route path="/Onu/DesautorizarOnu" element={user?.token ? <DesautorizaOnu /> : <Navigate to="/auth/login" />} />
+          <Route path="/Onu/Settings" element={user?.token ? <OnuSettings /> : <Navigate to="/auth/login" />} />
           <Route path="*" element={user?.token ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>
