@@ -325,6 +325,21 @@ class Onu {
         }
       }
 
+      await conn.send("cd lan");
+
+      for(const onus of allOnus){
+        try {
+          await conn.exec(
+          `apply wancfg slot ${onus.slotPon.slice(0,2)} ${onus.slotPon.slice(2)} ${
+            onus.onuid
+          }`,
+          { execTimeout: 30000 }
+        );
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
 
       console.log(allOnus);
       
