@@ -3,6 +3,7 @@ import { NavBar } from "../../components/navbar/NavBar";
 import Select from "./components/Select";
 import { BarChart } from "@mui/x-charts/BarChart";
 import Toggle from "./components/Toggle";
+ import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 
 interface Tech {
@@ -153,6 +154,7 @@ const TechBarChart = ({
 const FeedbackLinkGenerator = () => {
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
+  const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const token = user?.token;
   const [noteData, setNoteData] = useState<{ [key: string]: Note[] }>({
@@ -168,85 +170,96 @@ const FeedbackLinkGenerator = () => {
   const [isMonthly, setMonthly] = useState(true);
   const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768);
 
-  const fetchNotes = async (type: string) => {
-    const period = isMonthly ? "month" : "year";
-    const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
-    const response = await fetch(endpoint, {
-      method: "GET",
+
+// Função para buscar notas gerais
+const fetchNotes = async (type: string) => {
+  // Define se o período é "month" ou "year"
+  const period = isMonthly ? "month" : "year";
+
+  // Monta o endpoint
+  const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
+
+  try {
+    // Faz a requisição GET usando axios
+    const response = await axios.get(endpoint, {
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${token}`, // passa o token no header
       },
     });
-    return response.json();
-  };
 
-  const fetchNotesTech = async (type: string): Promise<NoteTech[]> => {
-    const period = isMonthly ? "month" : "year";
-    const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
+    // O axios já converte automaticamente para JSON em response.data
+    console.log(response.data);
 
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao buscar notas:", error);
+    return []; // Retorna array vazio em caso de erro
+  }
+};
+
+// Função para buscar notas de um técnico específico
+const fetchNotesTech = async (type: string): Promise<NoteTech[]> => {
+  const period = isMonthly ? "month" : "year";
+  const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
+
+  try {
+    // Faz a requisição POST usando axios
+    const response = await axios.post(
+      endpoint,
+      { technician: selectedTechnician }, // corpo da requisição
+      {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ technician: selectedTechnician }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-
-        // Converte o dado recebido no formato correto
-        const parsedData = data.map((item: any) => ({
-          note: item.note,
-          count: Number(item.count), // Converte count para número
-          name: item.login || "", // Usa o campo login como 'name'
-        }));
-
-        return parsedData;
-      } else {
-        console.error(
-          "Erro na requisição:",
-          response.status,
-          await response.text()
-        );
-        return []; // Retorna um array vazio no caso de erro
       }
-    } catch (error) {
-      console.error("Erro ao buscar dados do técnico:", error);
-      return []; // Retorna um array vazio em caso de exceção
-    }
-  };
+    );
 
-  const createLink = async () => {
-    if (!selectedTechnician) {
-      alert("Selecione um técnico antes de gerar o link.");
-      return;
-    }
+    console.log(response.data);
 
-    try {
-      const response = await fetch(
-        `${process.env.REACT_APP_URL}/feedback/create`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ technician: selectedTechnician }),
-        }
-      );
+    // Converte o dado recebido para o formato correto
+    const parsedData: NoteTech[] = response.data.map((item: any) => ({
+      note: item.note,
+      count: Number(item.count), // Converte count para número
+      name: item.login || "",    // Usa o campo login como 'name'
+    }));
 
-      if (response.ok) {
-        const data = await response.json();
-        setGeneratedLink(data.link);
+    return parsedData;
+  } catch (error: any) {
+    console.error("Erro ao buscar dados do técnico:", error);
+    return [];
+  }
+};
+
+// Função para gerar link de feedback
+const createLink = async () => {
+  if (!selectedTechnician) {
+    alert("Selecione um técnico antes de gerar o link.");
+    return;
+  }
+
+  try {
+    // Faz a requisição POST usando axios
+    const response = await axios.post(
+      `${process.env.REACT_APP_URL}/feedback/create`,
+      { technician: selectedTechnician }, // corpo
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       }
-    } catch (error) {
-      console.error("Erro ao gerar o link:", error);
+    );
+
+    if (response.data?.link) {
+      setGeneratedLink(response.data.link); // pega o link do backend
     }
-  };
+  } catch (error) {
+    console.error("Erro ao gerar o link:", error);
+  }
+};
+
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -264,6 +277,7 @@ const FeedbackLinkGenerator = () => {
   
     const fetchAllNotes = async () => {
       try {
+        setLoading(true);
         const [internet, service, responseTime, recommend, solved] =
           await Promise.all([
             fetchNotes("Internet"),
@@ -286,6 +300,7 @@ const FeedbackLinkGenerator = () => {
   
         const tech = await fetchNotesTech("Technician");
         settechNoteData({ technician: tech });
+        setLoading(false);
       } catch (error) {
         console.error("Erro ao buscar os dados:", error);
       }
@@ -341,43 +356,46 @@ const FeedbackLinkGenerator = () => {
             checked={!isMonthly}
             onChange={() => setMonthly((prev) => !prev)}
           />
-          <div className="flex flex-col sm:flex-row flex-wrap gap-5 justify-center">
-            <div className="flex sm:max-w-[30%]">
+          {loading &&
+          <><h1>Carregando ...</h1></>
+          }
+          <div className="flex flex-col sm:flex-row flex-wrap gap-20 justify-center">
+            <div className="flex sm:max-w-[30%] bg-gray-200">
               <FeedbackBarChart
                 data={noteData.internet}
                 label="Notas sobre a Internet"
                 isMobile={isMobile}
               />
             </div>
-            <div className="flex sm:max-w-[30%]">
+            <div className="flex sm:max-w-[30%] bg-gray-200">
               <FeedbackBarChart
                 data={noteData.service}
                 label="Notas sobre o Atendimento"
                 isMobile={isMobile}
               />
             </div>
-            <div className="flex sm:max-w-[30%]">
+            <div className="flex sm:max-w-[30%] bg-gray-200">
               <FeedbackBarChart
                 data={noteData.responseTime}
                 label="Notas sobre o Tempo de Resposta"
                 isMobile={isMobile}
               />
             </div>
-            <div className="flex sm:max-w-[30%]">
+            <div className="flex sm:max-w-[30%] bg-gray-200">
               <YesOrNoChart
                 data={noteData.recommend}
                 label="Clientes que nós Recomendam"
                 isMobile={isMobile}
               />
             </div>
-            <div className="flex sm:max-w-[30%]">
+            <div className="flex sm:max-w-[30%] bg-gray-200">
               <YesOrNoChart
                 data={noteData.solved}
                 label="Clientes que solucionamos os problemas"
                 isMobile={isMobile}
               />
             </div>
-            <div className="flex sm:max-w-[30%]">
+            <div className="flex sm:max-w-[30%] bg-gray-200">
               {technoteData.technician.length > 0 && (
                 <TechBarChart
                   data={technoteData.technician}
