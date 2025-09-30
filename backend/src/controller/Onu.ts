@@ -255,7 +255,7 @@ class Onu {
 
       await conn.send(`cd maintenance`);
 
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await new Promise((resolve) => setTimeout(resolve, 10000));
 
       await conn.exec(
         `reboot slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${
