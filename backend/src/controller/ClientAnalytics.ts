@@ -75,8 +75,7 @@ class ClientAnalytics {
           const resposta = await this.executarSSH(servidor.host!, comando);
 
           const regex =
-          /name="([^"]+)"\s+service=pppoe\s+caller-id="([0-9A-F:]+)"\s+address=(\d+\.\d+\.\d+\.\d+)\s+uptime=([\ddhms]+)/gim;
-
+            /name="([^"]+)"\s+service=pppoe\s+caller-id="([0-9A-F:]+)"\s+address=(\d+\.\d+\.\d+\.\d+)\s+uptime=([\ddhms]+)/gim;
 
           const matches = [...resposta.matchAll(regex)];
 
@@ -129,86 +128,6 @@ class ClientAnalytics {
       .replace(/[^0-9A-F]/g, ""); // remove tudo que não seja HEX
   }
 
-  public querySnHelper = async (conn: Telnet, sn: string) => {
-    if (!conn) return;
-
-    try {
-      await conn.send("cd onu");
-
-      // 1. consulta no onu-info
-      const query = await conn.exec(`show onu-info by ${sn}`, {
-        execTimeout: 30000,
-        stripControls: true,
-        maxBufferLength: 10 * 1024,
-      });
-
-      console.log("query", query);
-
-      let slot: string | undefined;
-      let pon: string | undefined;
-      let onuNumber: string | undefined;
-      let state = "";
-
-      // tenta AUTH
-      let match = query.match(
-        /-----\s+(\d+)\s+(\d+)\s+(\d+)\s+(Auth|UnAuth)\s*-+/i
-      );
-      if (match) {
-        slot = match[1];
-        pon = match[2];
-        onuNumber = match[3];
-        state = match[4];
-      } else {
-        // tenta UNAUTH (sem ONU number)
-        match = query.match(/-----\s+(\d+)\s+(\d+)\s+(Auth|UnAuth)\s*-+/i);
-        if (match) {
-          slot = match[1];
-          pon = match[2];
-          onuNumber = "Desconhecido";
-          state = match[3];
-        }
-      }
-
-      if (!slot || !pon) {
-        console.error("❌ Não consegui extrair slot/pon");
-        return;
-      }
-
-      let model: string | undefined = undefined;
-
-      // 2. se for UnAuth, buscar modelo no "show unauth"
-      if (state === "UnAuth") {
-        const unauthOutput = await conn.exec("show unauth", {
-          execTimeout: 30000,
-        });
-
-        const lines = unauthOutput.split("\n");
-        for (const line of lines) {
-          if (line.includes(sn)) {
-            const parts = line.trim().split(/\s+/);
-            model = parts[1] || "Desconhecido"; // segunda coluna = OnuType
-            break;
-          }
-        }
-      }
-
-      console.log(slot, pon, onuNumber, sn, state, model);
-
-      // objeto final
-      return {
-        slot,
-        pon,
-        onuNumber,
-        sn,
-        state,
-        model,
-      };
-    } catch (error) {
-      console.error(error);
-    } 
-  };
-
-
   onuSinal = async (req: Request, res: Response) => {
     try {
       const { pppoe } = req.body;
@@ -223,15 +142,22 @@ class ClientAnalytics {
       const login = String(process.env.OLT_LOGIN);
       const password = String(process.env.OLT_PASSWORD);
 
+      let buffer = "";
+
       const conn = new Telnet();
 
       // 🟡 Eventos para log no terminal
-      conn.on("data", (data) => {
-        buffer = data.toString();
-        console.log(buffer);
-      });
+      conn.removeAllListeners("data");
+      conn.on("data", async (data) => {
+        const chunk = data.toString();
+        buffer += chunk;
+        console.log(chunk);
 
-      let buffer = "";
+        // se a OLT pedir "Press any key", manda Enter
+        if (chunk.includes("Press any key")) {
+          await conn?.send("\n").catch(console.error);
+        }
+      });
 
       const params = {
         host: ip,
@@ -259,17 +185,49 @@ class ClientAnalytics {
       const rawTag = User?.tags ?? "";
       const snCliente = this.normalizeMac(rawTag.trim());
 
-      let onuId : any;
+      let onuId: any;
 
-      if (snCliente) {
+      if (!snCliente) {
         ////console.log("Procurando ONU com MAC normalizado:", snCliente);
-        onuId = await this.querySnHelper(
-          conn,
-          snCliente
-        );
+        res.status(500).json({ respostaTelnet: "Sem Onu" });
+        return;
       }
 
-      ////console.log(this.onuId);
+      await conn.exec("cd onu", { execTimeout: 30000 });
+
+      const query = await conn.exec(`show online slot ${slot} pon ${pon}`, {
+        execTimeout: 30000,
+        stripControls: true, // remove caracteres de controle
+      });
+
+      // divide a saída em linhas
+      const lines = query.split("\n");
+
+      // limpa as mensagens "Press any key..." e espaços extras
+      const cleaned = lines
+        .map(
+          (l) => l.replace(/--Press any key.*?stop--/g, "").trim() // remove a mensagem
+        )
+        .filter((l) => /^\d+/.test(l)); // mantém só linhas que começam com número (as ONUs)
+
+      
+
+      // agora converte em objetos
+      const onus = cleaned.map((line) => {
+        const parts = line.trim().split(/\s+/);
+
+        return {
+          onuid: parts[0] ?? "", // ID da ONU
+          model: parts[1] ?? "", // Modelo (pode vir vazio)
+          sn: parts[2] ?? "", // Número de série ou MAC
+          extra: parts[3] ?? "", // Às vezes vem "epon,123456"
+          slotPon: parts[parts.length - 1], // sempre no final
+        };
+      });
+
+      // console.log("DEBUG linhas limpas:", onus);
+
+      onuId = onus.find((f) => this.normalizeMac(f.sn) === snCliente)?.onuid;
 
       if (!onuId || !slot || !pon) {
         await conn.end();
@@ -277,11 +235,10 @@ class ClientAnalytics {
         return;
       }
 
-      console.log('Numero onu ' + onuId.onuNumber);
-      
+      console.log("Numero onu " + onuId);
 
       const optic = await conn.exec(
-        `show optic_module slot ${slot} pon ${pon} onu ${onuId.onuNumber}`,
+        `show optic_module slot ${slot} pon ${pon} onu ${onuId}`,
         { execTimeout: 30000 }
       );
 
@@ -297,7 +254,7 @@ class ClientAnalytics {
         return;
       }
 
-      this.onuId = onuId.onuNumber;
+      this.onuId = onuId;
 
       ////console.log(output);
 
