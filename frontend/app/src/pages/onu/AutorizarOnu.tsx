@@ -95,6 +95,7 @@ export const AutorizarOnu = () => {
           <h2 className="text-2xl/7 my-5 font-bold text-gray-900 sm:text-3xl">
             Autorizar Onu
           </h2>
+          
 
           {/* Formulário */}
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
