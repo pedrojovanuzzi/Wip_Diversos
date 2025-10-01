@@ -218,7 +218,7 @@ class Onu {
           onuAuth?.onuid ?? response?.nextOnu
         } serv_no 1 wifi enable district brazil channel ${
           wifiDataTyped.canal
-        } standard 802.11bgn txpower 20 frequency 2.4ghz freq_bandwidth 20mhz/40mhz`,
+        } standard 802.11bgn txpower 20 frequency 2.4ghz freq_bandwidth 20mhz`,
         { execTimeout: 30000 }
       );
 
@@ -247,7 +247,7 @@ class Onu {
           onuInfo.pon
         } onu ${
           onuAuth?.onuid ?? response?.nextOnu
-        } config_enable_switch enable console_switch enable telnet_switch disable web_switch enable web_port 29189 web_ani_switch enable tel_ani_switch disable web_admin_switch enable`,
+        } config_enable_switch enable console_switch enable telnet_switch disable web_switch enable web_port 29189 web_ani_switch enable tel_ani_switch disable web_admin_switch enable icmp_ani enable icmp_uni enable`,
         { execTimeout: 30000 }
       );
 
