@@ -25,49 +25,43 @@ function formatarBytes(bytes: number): string {
   }
 }
 
-// converte uptime do Mikrotik para segundos (suporta w, d, h, m, s)
+// converte uptime do Mikrotik para segundos (suporta y, mo, w, d, h, m, s)
 export function parseUptime(raw: string): number {
   // garante que temos uma string, remove espaços e normaliza para minúsculas
   const s = String(raw ?? "")
     .trim()
     .toLowerCase();
-  // se vier vazio/indefinido, retornamos 0 para não quebrar o sort
   if (!s) return 0;
 
-  // tabela de multiplicadores por unidade (w=semana, d=dia, h=hora, m=minuto, s=segundo)
+  // tabela de multiplicadores por unidade
+  // OBS: mês (mo) = 30 dias, ano (y) = 365 dias (aproximação)
   const unitToSec: Record<string, number> = {
-    w: 7 * 24 * 60 * 60, // segundos em 1 semana
-    d: 24 * 60 * 60, // segundos em 1 dia
-    h: 60 * 60, // segundos em 1 hora
-    m: 60, // segundos em 1 minuto
-    s: 1, // segundos em 1 segundo
+    y: 365 * 24 * 60 * 60,  // 1 ano em segundos
+    mo: 30 * 24 * 60 * 60,  // 1 mês em segundos (aproximado)
+    w: 7 * 24 * 60 * 60,    // 1 semana
+    d: 24 * 60 * 60,        // 1 dia
+    h: 60 * 60,             // 1 hora
+    m: 60,                  // 1 minuto
+    s: 1,                   // 1 segundo
   };
 
-  // regex que captura blocos "<numero><unidade>" como 2d, 21h, 56m, 10s, 1w etc.
-  const re = /(\d+)\s*([wdhms])/g;
+  // regex que captura "<numero><unidade>", incluindo "mo" e "y"
+  const re = /(\d+)\s*(y|mo|w|d|h|m|s)/g;
 
-  // acumulador de segundos totais
   let total = 0;
-
-  // variável para iterar sobre todos os matches do regex
   let match: RegExpExecArray | null;
 
   // percorre cada combinação <valor><unidade> encontrada na string
   while ((match = re.exec(s)) !== null) {
-    // converte o primeiro grupo (número) para Number
     const value = Number(match[1]);
-    // pega a unidade (w/d/h/m/s)
     const unit = match[2];
-    // soma ao total: valor * multiplicador da unidade (desconhecido vira 0)
     total += value * (unitToSec[unit] ?? 0);
   }
 
-  // se não encontramos nada válido, retornamos 0 (evita NaN)
   if (!Number.isFinite(total)) return 0;
-
-  // devolve o total de segundos para uso no sort
   return total;
 }
+
 
 type Cliente = {
   suspensao: boolean;
@@ -669,7 +663,7 @@ export const ClientAnalytics = () => {
                           parseUptime(b.upTime ?? "")
                       )
                       .map((f) => (
-                        <tr key={f.ip}>
+                        <tr>
                           <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
                             {f.servidor}
                           </td>

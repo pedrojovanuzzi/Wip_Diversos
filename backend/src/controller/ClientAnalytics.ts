@@ -70,29 +70,28 @@ class ClientAnalytics {
       const resultados = [];
 
       for (const servidor of servidores) {
-        
         try {
           const comando = `/ppp active print without-paging detail`;
           const resposta = await this.executarSSH(servidor.host!, comando);
 
           const regex =
-            /name="([^"]+)"\s+service=pppoe\s+caller-id="([0-9A-F:]+)"\s+address=(\d+\.\d+\.\d+\.\d+)\s+uptime=([\ddhms]+)/gim;
+            /name="([^"]+)"\s+service=pppoe\s+caller-id="([0-9A-F:]+)"\s+address=(\d+\.\d+\.\d+\.\d+)\s+uptime=((?:\d+y)?(?:\d+mo)?(?:\d+w)?(?:\d+d)?(?:\d+h)?(?:\d+m)?(?:\d+s)?|\d+)/gim;
 
           const matches = [...resposta.matchAll(regex)];
 
-          
-          
-
           for (const match of matches) {
-            const [, pppoe, callerId, ip, upTime] = match;
-            
+            let [, pppoe, callerId, ip, upTime] = match;
+
+            if (/^\d+$/.test(upTime)) {
+              upTime = `${upTime}d`;
+            }
 
             resultados.push({
               servidor: servidor.nome,
               pppoe,
               callerId,
               ip,
-              upTime: upTime.replace("...", ""),
+              upTime: upTime,
             });
           }
         } catch (err: any) {
@@ -102,8 +101,6 @@ class ClientAnalytics {
           });
         }
       }
-
-      
 
       res.status(200).json(resultados);
     } catch (error) {
@@ -214,8 +211,6 @@ class ClientAnalytics {
           (l) => l.replace(/--Press any key.*?stop--/g, "").trim() // remove a mensagem
         )
         .filter((l) => /^\d+/.test(l)); // mantém só linhas que começam com número (as ONUs)
-
-      
 
       // agora converte em objetos
       const onus = cleaned.map((line) => {
