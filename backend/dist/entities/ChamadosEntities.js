@@ -13,7 +13,6 @@ exports.ChamadosEntities = void 0;
 const typeorm_1 = require("typeorm");
 let ChamadosEntities = class ChamadosEntities {
 };
-exports.ChamadosEntities = ChamadosEntities;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
@@ -90,6 +89,7 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'longtext', nullable: true }),
     __metadata("design:type", String)
 ], ChamadosEntities.prototype, "motivo_fechar", void 0);
-exports.ChamadosEntities = ChamadosEntities = __decorate([
+ChamadosEntities = __decorate([
     (0, typeorm_1.Entity)('sis_suporte')
 ], ChamadosEntities);
+exports.ChamadosEntities = ChamadosEntities;

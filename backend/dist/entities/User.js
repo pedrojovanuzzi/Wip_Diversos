@@ -13,19 +13,23 @@ exports.User = void 0;
 const typeorm_1 = require("typeorm");
 let User = class User {
 };
-exports.User = User;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
 ], User.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)({ type: 'varchar' }),
     __metadata("design:type", String)
 ], User.prototype, "login", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)({ type: 'varchar' }),
     __metadata("design:type", String)
 ], User.prototype, "password", void 0);
-exports.User = User = __decorate([
+__decorate([
+    (0, typeorm_1.Column)({ type: 'int', default: 1 }),
+    __metadata("design:type", Number)
+], User.prototype, "permission", void 0);
+User = __decorate([
     (0, typeorm_1.Entity)('users')
 ], User);
+exports.User = User;
