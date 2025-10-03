@@ -30,7 +30,7 @@ class NfseMigration1736171904366 {
                     {
                         name: 'login',
                         type: 'varchar',
-                        length: '20',
+                        length: '200',
                         isNullable: false,
                     },
                     {
@@ -41,7 +41,7 @@ class NfseMigration1736171904366 {
                     {
                         name: 'serie_rps',
                         type: 'varchar',
-                        length: '20',
+                        length: '200',
                         isNullable: true,
                     },
                     {
@@ -86,7 +86,7 @@ class NfseMigration1736171904366 {
                     {
                         name: 'item_lista_servico',
                         type: 'varchar',
-                        length: '10',
+                        length: '100',
                         isNullable: true,
                     },
                     {
@@ -107,7 +107,7 @@ class NfseMigration1736171904366 {
                     {
                         name: 'cnpj_prestador',
                         type: 'varchar',
-                        length: '14',
+                        length: '140',
                         isNullable: true,
                         default: '0',
                     },
@@ -120,7 +120,7 @@ class NfseMigration1736171904366 {
                     {
                         name: 'cpf_tomador',
                         type: 'varchar',
-                        length: '14',
+                        length: '140',
                         isNullable: true,
                         default: '0',
                     },
@@ -139,7 +139,7 @@ class NfseMigration1736171904366 {
                     {
                         name: 'numero_endereco',
                         type: 'varchar',
-                        length: '10',
+                        length: '100',
                         isNullable: true,
                     },
                     {

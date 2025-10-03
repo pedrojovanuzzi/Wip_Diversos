@@ -13,35 +13,35 @@ exports.PrefeituraUser = void 0;
 const typeorm_1 = require("typeorm");
 let PrefeituraUser = class PrefeituraUser {
 };
-exports.PrefeituraUser = PrefeituraUser;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
 ], PrefeituraUser.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)({ type: 'varchar' }),
     __metadata("design:type", String)
 ], PrefeituraUser.prototype, "name", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ nullable: true }),
+    (0, typeorm_1.Column)({ type: 'varchar', nullable: true }),
     __metadata("design:type", String)
 ], PrefeituraUser.prototype, "celular", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)({ type: 'varchar' }),
     __metadata("design:type", String)
 ], PrefeituraUser.prototype, "cpf", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)({ type: 'varchar' }),
     __metadata("design:type", String)
 ], PrefeituraUser.prototype, "ip", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)({ type: 'varchar' }),
     __metadata("design:type", String)
 ], PrefeituraUser.prototype, "mac", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)({ type: 'varchar' }),
     __metadata("design:type", String)
 ], PrefeituraUser.prototype, "uuid", void 0);
-exports.PrefeituraUser = PrefeituraUser = __decorate([
+PrefeituraUser = __decorate([
     (0, typeorm_1.Entity)('pref_user')
 ], PrefeituraUser);
+exports.PrefeituraUser = PrefeituraUser;
