@@ -11,6 +11,8 @@ export const LogsClient = () => {
   const token = user?.token;
 
   const [content, setContent] = useState<LogsPPPoes[] | undefined>();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     logList();
@@ -18,13 +20,18 @@ export const LogsClient = () => {
 
   async function logList() {
     try {
+      setLoading(true);
       const response = await axios.get(
         `${process.env.REACT_APP_URL}/ClientAnalytics/Logs`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setContent(response.data);
-    } catch (error) {
+    } catch (error: any) {
       console.log(error);
+      setError(error);
+    }
+    finally{
+      setLoading(false);
     }
   }
 
@@ -55,11 +62,8 @@ const parseDate = (s: string) => {
               ))}
             </>
           )}
-          {!content && (
-            <>
-              <h1>Sem conteúdo</h1>
-            </>
-          )}
+          {loading && <><h1>Carregando ....</h1></>}
+          {error && <><h1 className="text-red-500">Erro {error}</h1></>}
         </div>
       </div>
     </>
