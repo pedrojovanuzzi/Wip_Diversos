@@ -13,7 +13,6 @@ exports.FuncionariosEntities = void 0;
 const typeorm_1 = require("typeorm");
 let FuncionariosEntities = class FuncionariosEntities {
 };
-exports.FuncionariosEntities = FuncionariosEntities;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
@@ -114,6 +113,7 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'varchar', length: 16, nullable: true }),
     __metadata("design:type", String)
 ], FuncionariosEntities.prototype, "cidade_ibge", void 0);
-exports.FuncionariosEntities = FuncionariosEntities = __decorate([
+FuncionariosEntities = __decorate([
     (0, typeorm_1.Entity)('sis_func')
 ], FuncionariosEntities);
+exports.FuncionariosEntities = FuncionariosEntities;

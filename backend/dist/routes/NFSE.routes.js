@@ -34,5 +34,6 @@ router.post("/BuscarClientes", AuthGuard_1.default, NFSE_1.default.BuscarCliente
 router.post("/cancelarNfse", AuthGuard_1.default, NFSE_1.default.cancelarNfse.bind(NFSE_1.default));
 router.post("/BuscarNSFE", AuthGuard_1.default, NFSE_1.default.BuscarNSFE);
 router.post("/imprimirNFSE", AuthGuard_1.default, NFSE_1.default.imprimirNFSE);
+router.post("/setSessionPassword", AuthGuard_1.default, NFSE_1.default.setPassword);
 router.post("/upload", upload.any(), AuthGuard_1.default, NFSE_1.default.uploadCertificado);
 exports.default = router;

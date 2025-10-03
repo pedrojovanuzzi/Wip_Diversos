@@ -7,6 +7,7 @@ interface UserData {
   id: number;
   login: string;
   token: string;
+  permission: number;
 }
 
 // Define o formato dos dados do contexto (o que será compartilhado entre os componentes)

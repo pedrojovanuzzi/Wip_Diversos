@@ -11,4 +11,7 @@ export class User {
     @Column({type: 'varchar'})
     
     password?: string
+
+    @Column({type: 'int', default: 1})
+    permission?: number
 }

@@ -10,6 +10,14 @@ export type OnuData = {
   state?: string;
 };
 
+export type ErrorArray = {
+  type: string;
+  value: string;
+  path: string;
+  msg: string;
+  location: string;
+}
+
 export type LogsPPPoes = {
   servidor: string;
   time: string;

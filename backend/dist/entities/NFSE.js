@@ -13,7 +13,6 @@ exports.NFSE = void 0;
 const typeorm_1 = require("typeorm");
 let NFSE = class NFSE {
 };
-exports.NFSE = NFSE;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
@@ -27,7 +26,7 @@ __decorate([
     __metadata("design:type", Number)
 ], NFSE.prototype, "numeroRps", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'serie_rps', type: 'varchar', length: 20 }),
+    (0, typeorm_1.Column)({ name: 'serie_rps', type: 'varchar', length: 200 }),
     __metadata("design:type", String)
 ], NFSE.prototype, "serieRps", void 0);
 __decorate([
@@ -59,7 +58,7 @@ __decorate([
     __metadata("design:type", Number)
 ], NFSE.prototype, "responsavelRetencao", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'item_lista_servico', type: 'varchar', length: 10 }),
+    (0, typeorm_1.Column)({ name: 'item_lista_servico', type: 'varchar', length: 100 }),
     __metadata("design:type", String)
 ], NFSE.prototype, "itemListaServico", void 0);
 __decorate([
@@ -75,11 +74,11 @@ __decorate([
     __metadata("design:type", Number)
 ], NFSE.prototype, "exigibilidadeIss", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'cnpj_prestador', type: 'varchar', length: 14 }),
+    (0, typeorm_1.Column)({ name: 'cnpj_prestador', type: 'varchar', length: 140 }),
     __metadata("design:type", String)
 ], NFSE.prototype, "cnpjPrestador", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'inscricao_municipal_prestador', type: 'varchar', length: 20 }),
+    (0, typeorm_1.Column)({ name: 'inscricao_municipal_prestador', type: 'varchar', length: 200 }),
     __metadata("design:type", String)
 ], NFSE.prototype, "inscricaoMunicipalPrestador", void 0);
 __decorate([
@@ -95,7 +94,7 @@ __decorate([
     __metadata("design:type", String)
 ], NFSE.prototype, "enderecoTomador", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'numero_endereco', type: 'varchar', length: 10 }),
+    (0, typeorm_1.Column)({ name: 'numero_endereco', type: 'varchar', length: 100 }),
     __metadata("design:type", String)
 ], NFSE.prototype, "numeroEndereco", void 0);
 __decorate([
@@ -130,6 +129,7 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'incentivo_fiscal', type: 'int' }),
     __metadata("design:type", Number)
 ], NFSE.prototype, "incentivoFiscal", void 0);
-exports.NFSE = NFSE = __decorate([
+NFSE = __decorate([
     (0, typeorm_1.Entity)('nfse')
 ], NFSE);
+exports.NFSE = NFSE;

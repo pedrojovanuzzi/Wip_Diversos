@@ -13,7 +13,6 @@ exports.ClientesEntities = void 0;
 const typeorm_1 = require("typeorm");
 let ClientesEntities = class ClientesEntities {
 };
-exports.ClientesEntities = ClientesEntities;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
@@ -546,6 +545,7 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'enum', enum: ['u', 'r'], nullable: true }),
     __metadata("design:type", String)
 ], ClientesEntities.prototype, "local_dici", void 0);
-exports.ClientesEntities = ClientesEntities = __decorate([
+ClientesEntities = __decorate([
     (0, typeorm_1.Entity)('sis_cliente')
 ], ClientesEntities);
+exports.ClientesEntities = ClientesEntities;
