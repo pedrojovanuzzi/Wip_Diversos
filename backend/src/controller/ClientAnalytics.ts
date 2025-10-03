@@ -108,6 +108,45 @@ class ClientAnalytics {
     }
   };
 
+  pppoesLogs = async (req: Request, res: Response) => {
+    try {
+      const resultados = [];
+
+      for (const servidor of servidores) {
+        try {
+          const comando = `log/print without-paging detail`;
+          const resposta = await this.executarSSH(servidor.host!, comando);
+
+          const regex =
+  /time=(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+topics=([^ ]+)\s+message="([^"]+)"\s+extra-info="([^"]*)"/g;
+
+          const matches = [...resposta.matchAll(regex)];
+
+          for (const match of matches) {
+            const [, time, topics, message, extra] = match;
+
+            resultados.push({
+              servidor: servidor.nome,
+              time,
+              topics,
+              message,
+              extra,
+            });
+          }
+        } catch (err: any) {
+          resultados.push({
+            servidor: servidor.nome,
+            erro: err.message || "Erro desconhecido",
+          });
+        }
+      }
+
+      res.status(200).json(resultados);
+    } catch (error) {
+      res.status(500).json(error);
+    }
+  };
+
   desconections = async (req: Request, res: Response) => {
     try {
       const { pppoe } = req.body;
