@@ -23,6 +23,7 @@ import { AutorizarOnu } from './pages/onu/AutorizarOnu';
 import { DesautorizaOnu } from './pages/onu/DesautorizaOnu';
 import { useAuth } from './context/AuthContext';
 import { OnuSettings } from './pages/onu/OnuSettings';
+import { LogsClient } from './pages/ClientAnalytics/LogsClient';
 
 
 function App() {
@@ -64,6 +65,7 @@ function App() {
           <Route path="/Whatsapp" element={user?.token ? <WhatsappChat /> : <Navigate to="/auth/login" />} />
           <Route path="/Whatsapp/:id" element={user?.token ? <UserChat /> : <Navigate to="/auth/login" />} />
           <Route path="/ClientAnalytics" element={user?.token ? <ClientAnalytics /> : <Navigate to="/auth/login" />} />
+          <Route path="/ClientAnalytics/Logs" element={user?.token ? <LogsClient /> : <Navigate to="/auth/login" />} />
           <Route path="/DDDOS" element={user?.token ? <DDDOS_Home /> : <Navigate to="/auth/login" />} />
           <Route path="/ServerLogs" element={user?.token ? <ServerLogs /> : <Navigate to="/auth/login" />} />
           <Route path="/LogViewer" element={user?.token ? <LogViewer /> : <Navigate to="/auth/login" />} />
