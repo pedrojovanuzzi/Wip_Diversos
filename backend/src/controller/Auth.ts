@@ -38,7 +38,7 @@ class Auth{
 
       let errorsArray = validationResult(req).array();
 
-      const { login, password } = req.body;
+      const { login, password, permission } = req.body;
 
       const userRepository = DataSource.getRepository(User);
       const user = await userRepository.findOne({where: {login : login}})

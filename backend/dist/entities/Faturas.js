@@ -13,7 +13,6 @@ exports.Faturas = void 0;
 const typeorm_1 = require("typeorm");
 let Faturas = class Faturas {
 };
-exports.Faturas = Faturas;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
@@ -250,6 +249,7 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'varchar', length: 64, nullable: true }),
     __metadata("design:type", String)
 ], Faturas.prototype, "codigo_barras", void 0);
-exports.Faturas = Faturas = __decorate([
+Faturas = __decorate([
     (0, typeorm_1.Entity)('sis_lanc')
 ], Faturas);
+exports.Faturas = Faturas;
