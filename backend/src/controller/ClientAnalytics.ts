@@ -108,23 +108,49 @@ class ClientAnalytics {
     }
   };
 
-  pppoesLogs = async (req: Request, res: Response) => {
-    try {
-      const resultados = [];
+pppoesLogs = async (req: Request, res: Response) => {
+  try {
+    const resultados: any[] = [];
 
-      for (const servidor of servidores) {
-        try {
-          const comando = `log/print without-paging detail`;
-          const resposta = await this.executarSSH(servidor.host!, comando);
+    for (const servidor of servidores) {
+      try {
+        const comando = `log print without-paging detail`;
+        const resposta = await this.executarSSH(servidor.host!, comando);
 
-          const regex =
-  /time=(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+topics=([^ ]+)\s+message="([^"]+)"\s+extra-info="([^"]*)"/g;
+        // Regex para os servidores "normais" (data + extra-info)
+        const regexNormal =
+          /time=(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+topics=([^ ]+)\s+message="([^"]+)"\s+extra-info="([^"]*)"/g;
 
-          const matches = [...resposta.matchAll(regex)];
+        // Regex específico para o PPPOE1 (só hora, sem extra-info)
+        const regexPPPOE1 =
+          /time=(\d{2}:\d{2}:\d{2})\s+topics=([^ ]+)\s+message="([^"]+)"/g;
 
-          
-          for (const match of matches) {
+        // Escolhe qual regex usar
+        const regex = servidor.nome === "PPPOE1" ? regexPPPOE1 : regexNormal;
+
+        const matches = [...resposta.matchAll(regex)];
+
+        for (const match of matches) {
+          // Se for PPPOE1, não existe "extra"
+          if (servidor.nome === "PPPOE1") {
+            const [, time, topics, message] = match;
+
+            if (message.startsWith("user api_diversos logged")) continue;
+
+            const hoje = new Date().toISOString().split("T")[0]; // ex: "2025-10-03"
+            const dataCompleta = `${hoje} ${time}`;
+
+            resultados.push({
+              servidor: servidor.nome,
+              time: dataCompleta,
+              topics,
+              message,
+              extra: null, // mantém consistência no JSON
+            });
+          } else {
             const [, time, topics, message, extra] = match;
+
+            if (message.startsWith("user api_diversos logged")) continue;
 
             resultados.push({
               servidor: servidor.nome,
@@ -134,19 +160,22 @@ class ClientAnalytics {
               extra,
             });
           }
-        } catch (err: any) {
-          resultados.push({
-            servidor: servidor.nome,
-            erro: err.message || "Erro desconhecido",
-          });
         }
+      } catch (err: any) {
+        resultados.push({
+          servidor: servidor.nome,
+          erro: err.message || "Erro desconhecido",
+        });
       }
-
-      res.status(200).json(resultados);
-    } catch (error) {
-      res.status(500).json(error);
     }
-  };
+
+    res.status(200).json(resultados);
+  } catch (error) {
+    res.status(500).json(error);
+  }
+};
+
+
 
   desconections = async (req: Request, res: Response) => {
     try {
