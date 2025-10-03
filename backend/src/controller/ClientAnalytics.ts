@@ -122,6 +122,7 @@ class ClientAnalytics {
 
           const matches = [...resposta.matchAll(regex)];
 
+          
           for (const match of matches) {
             const [, time, topics, message, extra] = match;
 
