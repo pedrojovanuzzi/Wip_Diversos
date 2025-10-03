@@ -703,7 +703,7 @@ export const ClientAnalytics = () => {
               </div>
               
             </div>
-            <button onClick={redirectLogs} className="p-2 bg-slate-600 text-gray-200 w-20 mt-2">Logs</button>
+            <button onClick={redirectLogs} className="p-2 bg-slate-600 text-gray-200 w-full sm:w-1/4 mt-2">Logs</button>
           </>
         )}
       </div>
