@@ -7,12 +7,15 @@ import {
   HiHome,
 } from "react-icons/hi2";
 import { MdDns, MdOutlineFeedback } from "react-icons/md";
-import { FaWhatsapp } from "react-icons/fa";
+import { FaUserPlus, FaWhatsapp } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 import { FaRegFolder } from "react-icons/fa";
 import { FaPlugCirclePlus } from "react-icons/fa6";
+import { ImExit } from "react-icons/im";
 
 import { Link } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import Cookies from "js-cookie";
 
 type Color = {
   color?: string;
@@ -20,6 +23,10 @@ type Color = {
 
 export const NavBar = ({color = 'black'}: Color) => {
   const [isOpen, setIsOpen] = useState(false);
+
+  const {user} = useAuth();
+  const token = user?.token;
+  const permission = user?.permission;
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -33,6 +40,11 @@ export const NavBar = ({color = 'black'}: Color) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
   
+
+  function clearCookies(){
+    Cookies.remove('user');
+    window.location.reload();
+  }
 
   return (
     <div
@@ -71,7 +83,7 @@ export const NavBar = ({color = 'black'}: Color) => {
       </nav>
 
       {isOpen && (
-        <div className=" w-full text-white rounded-md">
+        <div className=" w-full text-white rounded-md overflow-y-auto scrollbar-thin scrollbar-thumb-green-600 scrollbar-track-gray-900">
           <ul className="grid grid-cols-2 gap-5 p-4">
             <li className="p-2 grid place-items-center col-span-2">
               <Link to="/">
@@ -83,6 +95,13 @@ export const NavBar = ({color = 'black'}: Color) => {
                 <VscGraph className='text-white size-8 transition-all hover:text-green-400' />
               </Link>
             </li> */}
+            {permission! >= 5 && 
+            <li className="p-2 grid place-items-center col-span-2">
+              <Link to="/Create">
+                <FaUserPlus className="text-white size-8 transition-all hover:text-green-400" />
+              </Link>
+            </li>
+            }
             <li className="p-2 grid place-items-center col-span-2">
               <Link to="/feedbackCreate">
                 <MdOutlineFeedback className="text-white size-8 transition-all hover:text-green-400" />
@@ -122,6 +141,11 @@ export const NavBar = ({color = 'black'}: Color) => {
               <Link to="/Onu">
                 <FaPlugCirclePlus className="text-white size-8 transition-all hover:text-green-400" />
               </Link>
+            </li>
+            <li className="p-2 grid place-items-center col-span-2">
+              <button onClick={clearCookies}>
+                <ImExit className="text-white size-8 transition-all hover:text-green-400" />
+              </button>
             </li>
           </ul>
         </div>

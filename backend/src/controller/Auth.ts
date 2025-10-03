@@ -34,6 +34,7 @@ class Auth{
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
+        return;
       }
 
       let errorsArray = validationResult(req).array();
@@ -42,6 +43,8 @@ class Auth{
 
       const userRepository = DataSource.getRepository(User);
       const user = await userRepository.findOne({where: {login : login}})
+
+      
 
       if(user){
 
@@ -57,12 +60,27 @@ class Auth{
         return
       }
 
+      if(permission > 5 || permission < 1 || !permission){
+
+        errorsArray.push({
+          type: "field",
+          value: "",
+          path: "user",
+          msg: "Nivel de Permissão entre 1 e 5",
+          location: "body" // Onde o erro ocorreu (corpo da requisição)
+        });
+
+        res.status(422).json({errors: errorsArray});
+        return
+      }
+
       const salt = await bcrypt.genSalt();
       const passwordHash = await bcrypt.hash(password, salt);
 
       const newUser = userRepository.create({
         login,
-        password: passwordHash
+        password: passwordHash,
+        permission: permission
       });
 
       const savedUser = await userRepository.save(newUser);
@@ -164,7 +182,8 @@ class Auth{
       res.status(201).json({
         id: user.id,
         login: user.login,
-        token: generateToken(String(user.id))
+        token: generateToken(String(user.id)),
+        permission: user.permission,
       });
 
       } catch (error) {

@@ -24,6 +24,7 @@ import { DesautorizaOnu } from './pages/onu/DesautorizaOnu';
 import { useAuth } from './context/AuthContext';
 import { OnuSettings } from './pages/onu/OnuSettings';
 import { LogsClient } from './pages/ClientAnalytics/LogsClient';
+import { Create } from './pages/create_users/Create';
 
 
 function App() {
@@ -54,6 +55,7 @@ function App() {
         <Routes>
           <Route path="/" element={user?.token ? <HomePage /> : <Navigate to="/auth/login" />} />
           <Route path="/auth/login" element={!user?.token ? <AuthPage /> : <Navigate to="/" />} />
+         <Route path="/Create" element={user?.token && user.permission >= 5 ? <Create /> : <Navigate to="/auth/login" />} />
           <Route path="/feedbackCreate" element={user?.token ? <FeedbackLinkGenerator /> : <Navigate to="/auth/login" />} />
           <Route path="/feedback/Opnion" element={<Opnion />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
@@ -73,7 +75,7 @@ function App() {
           <Route path="/Onu" element={user?.token ? <OnuHome /> : <Navigate to="/auth/login" />} />
           <Route path="/Onu/AutorizarOnu" element={user?.token ? <AutorizarOnu /> : <Navigate to="/auth/login" />} />
           <Route path="/Onu/DesautorizarOnu" element={user?.token ? <DesautorizaOnu /> : <Navigate to="/auth/login" />} />
-          <Route path="/Onu/Settings" element={user?.token ? <OnuSettings /> : <Navigate to="/auth/login" />} />
+          <Route path="/Onu/Settings" element={user?.token && user.permission >= 5 ? <OnuSettings /> : <Navigate to="/auth/login" />} />
           <Route path="*" element={user?.token ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>

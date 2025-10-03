@@ -10,6 +10,7 @@ export const OnuHome = () => {
   
   const { user } = useAuth();
   const token = user?.token;
+  const permission = user?.permission;
   const navigate = useNavigate();
 
   const [onuOn, setOnuOn] = useState<OnuData[] | []>([]);
@@ -143,7 +144,7 @@ export const OnuHome = () => {
           Verificar Onu's / Autorizar
         </button>
       </div>
-      <HiCog6Tooth onClick={settingsOnuRedirect} className="text-5xl absolute right-10 cursor-pointer"/>
+      {permission! >= 5 && <HiCog6Tooth onClick={settingsOnuRedirect} className="text-5xl absolute right-10 cursor-pointer"/>}
       {!localizarMac && (
         <>
           {onuOn && (
