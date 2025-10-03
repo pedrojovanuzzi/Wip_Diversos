@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { ErrorMessage } from "./components/ErrorMessage";
 import { AuthContext, useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 function formatarBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) {
@@ -126,6 +127,7 @@ export const ClientAnalytics = () => {
   const [loadingClientList, setLoadingClientList] = useState(false);
   const [errorClientList, setErrorClientList] = useState<string | null>(null);
   const [clientlist, setClientList] = useState<ClientList[]>([]);
+  const navigate = useNavigate();
 
   const { user } = useAuth();
   const token = user?.token;
@@ -152,6 +154,10 @@ export const ClientAnalytics = () => {
       {text}
     </span>
   );
+
+  function redirectLogs(){
+    navigate('/ClientAnalytics/Logs');
+  }
 
   const fetchClientInfo = async (pppoe: string) => {
     setLoadingInfo(true);
@@ -682,7 +688,9 @@ export const ClientAnalytics = () => {
                         </tr>
                       ))}
                   </tbody>
+                  
                 </table>
+                
                 {loadingClientList ? (
                   // 1. enquanto carrega
                   <Spinner text="Carregando ONU..." />
@@ -693,7 +701,9 @@ export const ClientAnalytics = () => {
                   <></>
                 )}
               </div>
+              
             </div>
+            <button onClick={redirectLogs} className="p-2 bg-slate-600 text-gray-200 w-20 mt-2">Logs</button>
           </>
         )}
       </div>

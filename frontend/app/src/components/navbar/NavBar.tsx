@@ -14,7 +14,11 @@ import { FaPlugCirclePlus } from "react-icons/fa6";
 
 import { Link } from "react-router-dom";
 
-export const NavBar = () => {
+type Color = {
+  color?: string;
+}
+
+export const NavBar = ({color = 'black'}: Color) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const toggleMenu = () => {
@@ -28,6 +32,7 @@ export const NavBar = () => {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+  
 
   return (
     <div
@@ -52,12 +57,12 @@ export const NavBar = () => {
           >
             {isOpen ? (
               <HiChevronLeft
-                className="text-white cursor-pointer size-10 transition-all hover:text-green-400"
+                className={`text-white cursor-pointer size-10 transition-all hover:text-green-400`}
                 onClick={toggleMenu}
               />
             ) : (
               <HiChevronRight
-                className="text-black cursor-pointer size-10 transition-all hover:text-green-400"
+                className={`text-${color} cursor-pointer size-10 transition-all hover:text-green-400`}
                 onClick={toggleMenu}
               />
             )}
