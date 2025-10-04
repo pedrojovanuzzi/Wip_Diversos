@@ -81,6 +81,29 @@ class WhatsappController {
     }
   };
 
+  getLastMessages = async (req: Request, res: Response) => {
+    try {
+       const lastMessagesSelect = API_MK.getRepository(Mensagens);
+       const lastMessages = await lastMessagesSelect.find({order: {id: 'DESC'}, take: 30});
+
+       console.log(lastMessages);
+
+       const conversationsSelect = API_MK.getRepository(Conversations);
+       const conversations = await Promise.all(lastMessages.filter((msg) => msg.sender_id !== 1).map((msg) => (conversationsSelect.findOne({where: {id: msg.sender_id}}))));
+
+       console.log(conversations);
+       
+       
+
+      
+
+       res.status(200).json()
+
+    } catch (error) {
+      res.status(500).json(error);
+    }
+  }
+
   getConversation = async (userId: number) => {
     try {
       const selectConversations = API_MK.getRepository(Conversations);
