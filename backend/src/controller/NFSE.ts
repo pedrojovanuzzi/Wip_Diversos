@@ -71,6 +71,8 @@ class NFSEController {
       let { password, clientesSelecionados, aliquota, service, reducao } =
         req.body;
       this.PASSWORD = password;
+      console.log(aliquota);
+      
       aliquota = aliquota?.trim() ? aliquota : "5.0000";
       aliquota = aliquota.replace(",", ".").replace("%", "");
       if (!service) service = "Servico de Suporte Tecnico";
@@ -86,6 +88,10 @@ class NFSEController {
       );
       if (Array.isArray(result)) {
         const ok = result.every((r) => r.status === "200");
+        console.log('Result: ' + JSON.stringify(result));
+        
+        console.log('okTest: ' + result.every((r) => r.status === "200"));
+        
         if (ok)
           res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
         else res.status(500).json({ erro: "Erro ao criar o RPS." });
@@ -227,12 +233,7 @@ class NFSEController {
             incentivoFiscal: 2,
           });
   
-          if (await this.verificaRps(nfseNumber)) {
             await NsfeData.save(novoRegistro);
-            respArr.push({ status: "200", response: `RPS ${nfseNumber - 1} salvo com sucesso.` });
-        } else {
-            respArr.push({ status: "500", response: `Erro ao salvar RPS ${nfseNumber - 1}` });
-        }
 
 
         }
@@ -292,13 +293,17 @@ class NFSEController {
         const xml = response.data;
         const parsed = await parseStringPromise(xml, { explicitArray: false });
 
-        console.log(response.data);
+        
 
         // Caminho até a resposta SOAP
         const resposta = parsed?.["soap:Envelope"]?.["soap:Body"]?.["ns3:recepcionarLoteRpsSincronoResponse"]?.["ns2:EnviarLoteRpsSincronoResposta"];
 
+
         // Verifica se existe mensagem de erro
-        const temErro = resposta?.ListaMensagemRetornoLote?.MensagemRetorno;
+        const temErro = resposta?.["ns2:ListaMensagemRetorno"]?.["ns2:MensagemRetorno"];
+
+        console.log('Tem erro: ' + temErro);
+        
 
         if (temErro) {
           console.log("Erro detectado na resposta SOAP:", temErro);
@@ -365,7 +370,7 @@ class NFSEController {
           <Servico>
             <Valores>
               <ValorServicos>${val}</ValorServicos>
-              <Aliquota>${this.homologacao ? "2.00" : aliquota}</Aliquota>
+              <Aliquota>${aliquota}</Aliquota>
             </Valores>
             <IssRetido>${nfseBase?.issRetido}</IssRetido>
             <ResponsavelRetencao>${
@@ -413,7 +418,7 @@ class NFSEController {
             <Contato>
               <Telefone>${ClientData?.celular.replace(/[^0-9]/g, "")}</Telefone>
               <Email>${
-                this.homologacao ? "teste@gmail.com" : ClientData?.email
+                this.homologacao ? "suporte_wiptelecom@outlook.com" : ClientData?.email
               }</Email>
             </Contato>
           </Tomador>
