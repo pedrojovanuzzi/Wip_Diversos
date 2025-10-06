@@ -52,6 +52,8 @@ class NFSEController {
     this.BuscarNSFEDetalhes = this.BuscarNSFEDetalhes.bind(this);
     this.BuscarClientes = this.BuscarClientes.bind(this);
     this.removerAcentos = this.removerAcentos.bind(this);
+    console.log('Servidor Localhost?: ' + this.homologacao);
+    console.log(this.WSDL_URL);
   }
 
   public async uploadCertificado(req: Request, res: Response) {
