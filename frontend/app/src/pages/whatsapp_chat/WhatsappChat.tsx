@@ -22,7 +22,7 @@ export default function WhatsappChat() {
   const [showModal, setShowModal] = useState(false);
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
   const [newName, setNewName] = useState("");
-  const [recentConvBool, setRecentConvBool] = useState(false);
+  const [recentConvBool, setRecentConvBool] = useState(true);
 
   const { user } = useAuth();
   const token = user?.token;
@@ -68,8 +68,8 @@ export default function WhatsappChat() {
         }
       );
       if (response.status === 200) {
-        setConversations(response.data.conversations);
-        console.log("Last Conversations:", response.data.conversations);
+        setConversations(response.data);
+        console.log("Last Conversations:", response.data);
       }
     } catch (error) {
       console.log("Error fetching conversations:", error);
@@ -126,7 +126,8 @@ export default function WhatsappChat() {
                 }}
                 className="p-4 bg-purple-900 w-full shadow-sm text-gray-200"
               >
-                Historico de Conversas
+                
+                Conversas Recentes
               </button>
             )}
             {!recentConvBool && (
@@ -134,9 +135,9 @@ export default function WhatsappChat() {
                 onClick={() => {
                   setRecentConvBool((prev) => !prev);
                 }}
-                className="p-4 bg-cyan-500 w-full shadow-sm text-gray-200"
+                className="p-4 bg-emerald-500 w-full shadow-sm text-gray-200"
               >
-                Conversas Recentes
+                Todas as Conversas
               </button>
             )}
             {conversations.map((conv) => (
