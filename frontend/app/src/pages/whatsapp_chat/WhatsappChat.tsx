@@ -13,12 +13,6 @@ interface User {
 interface Conversation {
   id: string;
   user: User;
-  messages: Array<{
-    conv_id: number;
-    sender_id: number;
-    content: string;
-    timestamp: Date;
-  }>;
 }
 
 export default function WhatsappChat() {
@@ -28,8 +22,8 @@ export default function WhatsappChat() {
   const [showModal, setShowModal] = useState(false);
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
   const [newName, setNewName] = useState("");
+  const [recentConvBool, setRecentConvBool] = useState(true);
 
-  
   const { user } = useAuth();
   const token = user?.token;
 
@@ -62,6 +56,26 @@ export default function WhatsappChat() {
     }
   }
 
+  async function fetchLastConversations() {
+    try {
+      const response = await axios.get(
+        process.env.REACT_APP_URL + "/whatsapp/Lastconversation",
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (response.status === 200) {
+        setConversations(response.data);
+        console.log("Last Conversations:", response.data);
+      }
+    } catch (error) {
+      console.log("Error fetching conversations:", error);
+    }
+  }
+
   async function changeName(id: number | string, nome: string) {
     try {
       const response = await axios.post(
@@ -83,24 +97,49 @@ export default function WhatsappChat() {
     }
   }
 
-useEffect(() => {
-  fetchConversations();
-
-  const interval = setInterval(() => {
-    fetchConversations();
-  }, 10000); 
-
-  return () => clearInterval(interval);
-}, []);
+  useEffect(() => {
+    let interval: any;
+    if (recentConvBool) {
+      fetchLastConversations();
+      interval = setInterval(() => {
+        fetchLastConversations();
+      }, 10000);
+    } else if (!recentConvBool) {
+      fetchConversations();
+      interval = setInterval(() => {
+        fetchConversations();
+      }, 10000);
+    }
+    return () => clearInterval(interval);
+  }, [recentConvBool]);
 
   return (
-      <div
-        className="bg-cover bg-center min-h-screen shadow-lg bg-gradient-to-t from-blue-600 to-blue-900"
-      >
+    <div className="bg-cover bg-center h-screen shadow-lg bg-gradient-to-t from-blue-600 to-blue-900">
       <NavBar />
-      <div className="grid bg-blue-500 shadow-lg min-h-screen sm:w-2/12 overflow-auto">
+      <div className="grid bg-blue-500 shadow-lg  sm:w-2/12">
         {conversations.length > 0 && (
-          <ul>
+          <ul className="overflow-y-auto overflow-x-hidden scrollbar-none sm:scrollbar scrollbar-thumb-green-400 scrollbar-track-blue-900 flex flex-col max-h-[100vh]">
+            {recentConvBool && (
+              <button
+                onClick={() => {
+                  setRecentConvBool((prev) => !prev);
+                }}
+                className="p-4 bg-purple-900 w-full shadow-sm text-gray-200"
+              >
+                
+                Conversas Recentes
+              </button>
+            )}
+            {!recentConvBool && (
+              <button
+                onClick={() => {
+                  setRecentConvBool((prev) => !prev);
+                }}
+                className="p-4 bg-emerald-500 w-full shadow-sm text-gray-200"
+              >
+                Todas as Conversas
+              </button>
+            )}
             {conversations.map((conv) => (
               <div className="relative">
                 <a
