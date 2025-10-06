@@ -24,6 +24,7 @@ export const Nfe = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [service, setService] = useState("");
+  const [loading, setLoading] = useState(false);
   const [reducao, setReducao] = useState("");
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>([]);
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string } | null>(null);
@@ -74,6 +75,7 @@ export const Nfe = () => {
 
   const emitirNFe = async () => {
     try {
+      setLoading(true);
       setError("");
       setSuccess("");
 
@@ -84,7 +86,8 @@ export const Nfe = () => {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
-          },
+            
+          }, timeout: 480000,
         }
       );
       setDadosNFe(resposta.data);
@@ -98,6 +101,7 @@ export const Nfe = () => {
       }
     } finally {
       setShowPopUp(false);
+      setLoading(false);
     }
   };
 
@@ -182,17 +186,20 @@ export const Nfe = () => {
       {error && <Error message={error} />}
       {success && <Success message={success} />}
       {clientes.length > 0 && (
-        <h1 className="text-center mt-5 self-center text-2xl font-semibold text-gray-900">
+        <>
+        <h1 className="text-center mt-2 self-center text-2xl font-semibold text-gray-900">
           Total de Resultados: {clientes.length}
         </h1>
+        {loading && <><h1 className="text-center mt-2 self-center text-2xl text-gray-500">Carregando ...</h1></>}
+        </>
       )}
       {clientes.length > 0 ? (
-        <div className="mt-10 px-4 sm:px-6 lg:px-8">
-          <div className="overflow-auto shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-            <table className="min-w-full divide-y bg-gray-50 divide-gray-300 ">
+        <div className="mt-5 sm:mt-2">
+          <div className="flex justify-center">
+            <table className="block  overflow-auto sm:rounded-md ring-1 ring-black ring-opacity-30 h-[40vh] divide-y bg-gray-50 ">
               <thead className="bg-gray-50 w-full text-center">
                 <tr>
-                  <th className="px-4 py-4">
+                  <th className="">
                     <input
                       className="cursor-pointer"
                       type="checkbox"
@@ -237,7 +244,7 @@ export const Nfe = () => {
         <p className="text-center mt-10 text-gray-500">Nenhum cliente encontrado</p>
       )}
 
-      <main className="flex justify-center mt-20" />
+      <main className="flex justify-center mt-2" />
 
       <div className="relative">
         <span className="absolute translate-x-8 top-11 text-gray-200 -translate-y-1/2 text-4xl">
