@@ -26,7 +26,9 @@ const options = {
   client_secret: isSandbox
     ? process.env.CLIENT_SECRET_HOMOLOGACAO!
     : process.env.CLIENT_SECRET!,
-  certificate: "../files/gerencianet.pfx",
+    certificate: isSandbox
+    ? path.resolve(process.env.CERTIFICATE_SANDBOX!)
+    : path.resolve(process.env.CERTIFICATE_PROD!),
   validateMtls: false,
 };
 
