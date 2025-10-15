@@ -12,6 +12,7 @@ import { IoMdAnalytics } from "react-icons/io";
 import { FaRegFolder } from "react-icons/fa";
 import { FaPlugCirclePlus } from "react-icons/fa6";
 import { ImExit } from "react-icons/im";
+import { FaPix } from "react-icons/fa6";
 
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -88,6 +89,11 @@ export const NavBar = ({color = 'black'}: Color) => {
             <li className="p-2 grid place-items-center col-span-2">
               <Link to="/">
                 <HiHome className="text-white size-8 transition-all hover:text-green-400" />
+              </Link>
+            </li>
+            <li className="p-2 grid place-items-center col-span-2">
+              <Link to="/Pix">
+                <FaPix className="text-white size-8 transition-all hover:text-green-400" />
               </Link>
             </li>
             {/* <li className='p-2 grid place-items-center col-span-2'>

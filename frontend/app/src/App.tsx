@@ -25,6 +25,7 @@ import { useAuth } from './context/AuthContext';
 import { OnuSettings } from './pages/onu/OnuSettings';
 import { LogsClient } from './pages/ClientAnalytics/LogsClient';
 import { Create } from './pages/create_users/Create';
+import { Pix } from './pages/Pix/Pix';
 
 
 function App() {
@@ -76,6 +77,7 @@ function App() {
           <Route path="/Onu/AutorizarOnu" element={user?.token ? <AutorizarOnu /> : <Navigate to="/auth/login" />} />
           <Route path="/Onu/DesautorizarOnu" element={user?.token ? <DesautorizaOnu /> : <Navigate to="/auth/login" />} />
           <Route path="/Onu/Settings" element={user?.token && user.permission >= 5 ? <OnuSettings /> : <Navigate to="/auth/login" />} />
+          <Route path="/Pix" element={user?.token ? <Pix /> : <Navigate to="/auth/login" />} />
           <Route path="*" element={user?.token ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>
