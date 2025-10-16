@@ -31,10 +31,12 @@ const options = {
 };
 
 const chave_pix = process.env.CHAVE_PIX as string;
+const urlPix = isSandbox ? 'https://pix-h.api.efipay.com.br' : 'https://pix.api.efipay.com.br';
 
 class Pix {
   private recordRepo = AppDataSource.getRepository(Faturas);
   private clienteRepo = AppDataSource.getRepository(ClientesEntities);
+  
 
   constructor() {
     this.AlterarWebhook = this.AlterarWebhook.bind(this);
@@ -565,8 +567,12 @@ class Pix {
     }
   }
 
-  async PixAutomaticoCriar(){
-    
+  async PixAutomaticoCriar(req: Request, res: Response) : Promise<void>{
+    try {
+      const response = await axios.post();
+    } catch (error) {
+      res.status(500).json(error);
+    }
   }
 
 
