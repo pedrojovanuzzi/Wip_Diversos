@@ -79,8 +79,7 @@ function App() {
           <Route path="/Onu/DesautorizarOnu" element={user?.token ? <DesautorizaOnu /> : <Navigate to="/auth/login" />} />
           <Route path="/Onu/Settings" element={user?.token && user.permission >= 5 ? <OnuSettings /> : <Navigate to="/auth/login" />} />
           <Route path="/Pix" element={user?.token ? <Pix /> : <Navigate to="/auth/login" />} />
-          <Route path="/pix" element={<Pix />} />
-          <Route path="/pix/:tipo" element={<PixDetalhe />} /> {/* ← rota dinâmica */}
+          <Route path="/Pix/:tipo" element={<PixDetalhe />} /> {/* ← rota dinâmica */}
           <Route path="*" element={user?.token ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>

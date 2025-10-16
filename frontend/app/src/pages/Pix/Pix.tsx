@@ -24,7 +24,7 @@ export const Pix = () => {
       <div className="divide-y divide-gray-200 overflow-hidden rounded-b-lg shadow sm:grid sm:grid-cols-2 sm:divide-y-0">
         {/* --- Pix Último --- */}
         <PixCard
-          link="/pix/ultimo"
+          link="/Pix/ultimo"
           icon={<ClockIcon className="size-6" />}
           cor="bg-teal-100 text-teal-700"
           titulo="Pix do Último Vencimento"
@@ -33,7 +33,7 @@ export const Pix = () => {
 
         {/* --- Pix Todos --- */}
         <PixCard
-          link="/pix/todos"
+          link="/Pix/todos"
           icon={<IoDocuments className="size-6" />}
           cor="bg-purple-100 text-purple-700"
           titulo="Pix de Todos os Vencimentos"
@@ -42,7 +42,7 @@ export const Pix = () => {
 
         {/* --- Pix Aberto --- */}
         <PixCard
-          link="/pix/aberto"
+          link="/Pix/aberto"
           icon={<FaBoxOpen className="size-6" />}
           cor="bg-sky-100 text-sky-700"
           titulo="Pix Mensalidade em Aberto"
@@ -51,7 +51,7 @@ export const Pix = () => {
 
         {/* --- Pix Varias --- */}
         <PixCard
-          link="/pix/varias"
+          link="/Pix/varias"
           icon={<FaUsers className="size-6" />}
           cor="bg-yellow-100 text-yellow-700"
           titulo="Pix de Várias Contas"
@@ -60,7 +60,7 @@ export const Pix = () => {
 
         {/* --- Pix Automático --- */}
         <PixCard
-          link="/pix/automatico"
+          link="/Pix/automatico"
           icon={<MdOutlineAutoMode className="size-6" />}
           cor="bg-yellow-100 text-yellow-700"
           titulo="Pix Automático"
