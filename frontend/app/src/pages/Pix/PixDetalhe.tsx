@@ -42,12 +42,7 @@ export const PixDetalhe = () => {
         <h1 className="text-2xl font-bold">{modo.titulo}</h1>
         <p className="mt-2">{modo.descricao}</p>
 
-        {/* botão voltar */}
-        <Link to="/pix">
-          <button className="mt-6 px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-600">
-            ← Voltar
-          </button>
-        </Link>
+        
       </div>
     </div>
   );
