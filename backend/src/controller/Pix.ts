@@ -1,7 +1,6 @@
-import AppDataSource from "../database/API_MK";
+import AppDataSource from "../database/MkauthSource";
 import { Faturas } from "../entities/Faturas";
 import { ClientesEntities } from "../entities/ClientesEntities";
-
 import EfiPay from "sdk-node-apis-efi";
 import dotenv from "dotenv";
 import crypto from "crypto";
@@ -11,14 +10,11 @@ import axios from "axios";
 import { Request, Response } from "express";
 import { IsNull, Not } from "typeorm";
 
-
 dotenv.config();
 
 const __dirname = path.resolve();
-const logFilePath = path.join(__dirname, '..', "..", "/log", "logPix.json");
-
+const logFilePath = path.join(__dirname, "..", "..", "/log", "logPix.json");
 const isSandbox = process.env.SERVIDOR_HOMOLOGACAO === "true";
-
 
 const options = {
   sandbox: isSandbox,
@@ -28,13 +24,11 @@ const options = {
   client_secret: isSandbox
     ? process.env.CLIENT_SECRET_HOMOLOGACAO!
     : process.env.CLIENT_SECRET!,
-    certificate: isSandbox
-    ? path.resolve(process.env.CERTIFICATE_SANDBOX!)
-    : path.resolve(process.env.CERTIFICATE_PROD!),
+  certificate: isSandbox
+    ? path.resolve("src", "files", process.env.CERTIFICATE_SANDBOX!)
+    : path.resolve("src", "files", process.env.CERTIFICATE_PROD!),
   validateMtls: false,
 };
-
-
 
 const chave_pix = process.env.CHAVE_PIX as string;
 
@@ -46,10 +40,10 @@ class Pix {
     this.AlterarWebhook = this.AlterarWebhook.bind(this);
     this.gerarPix = this.gerarPix.bind(this);
     this.gerarPixAll = this.gerarPixAll.bind(this);
-    this.StatusUpdatePixTodosVencidos =
-      this.StatusUpdatePixTodosVencidos.bind(this);
     this.gerarPixAberto = this.gerarPixAberto.bind(this);
     this.gerarPixVariasContas = this.gerarPixVariasContas.bind(this);
+    this.StatusUpdatePixTodosVencidos =
+      this.StatusUpdatePixTodosVencidos.bind(this);
     this.validarCPF = this.validarCPF.bind(this);
     this.getAccessToken = this.getAccessToken.bind(this);
     this.setPaid = this.setPaid.bind(this);
@@ -69,7 +63,6 @@ class Pix {
     const clientId = process.env.CLIENT_ID_SEM_SDK!;
     const clientSecret = process.env.CLIENT_SECRET_SEM_SDK!;
     const data = { grant_type: "client_credentials" };
-
     try {
       const response = await axios.post(url, data, {
         headers: {
@@ -81,10 +74,7 @@ class Pix {
       });
       return response.data.access_token;
     } catch (error: any) {
-      console.error(
-        "Erro ao obter token:",
-        error.response ? error.response.data : error.message
-      );
+      console.error("Erro ao obter token:", error.response?.data || error.message);
       return null;
     }
   }
@@ -107,53 +97,59 @@ class Pix {
     }
   }
 
-  async StatusUpdatePixTodosVencidos(
-    req: Request,
-    res: Response
-  ): Promise<void> {
-    res.status(200).end();
-    const pixData = req.body.pix;
-    if (!pixData || pixData.length === 0) return;
-
-    const { txid } = pixData[0];
-    const efipay = new EfiPay(options);
-    let pix: any;
-
+  async StatusUpdatePixTodosVencidos(req: Request, res: Response): Promise<void> {
     try {
-      pix = await efipay.pixDetailCharge({ txid });
-    } catch {
-      try {
-        pix = await efipay.pixDetailDueCharge({ txid });
-      } catch {
+      const pixData = req.body.pix;
+      if (!pixData || pixData.length === 0) {
+        res.status(400).json("Nenhum dado de PIX recebido");
         return;
       }
-    }
 
-    if (!pix) return;
+      const { txid } = pixData[0];
+      const efipay = new EfiPay(options);
+      let pix: any;
 
-    const status = pix.status;
-    const data = new Date();
-    const statusMK = "pago";
-    const updates: { idValor: string; valor: string }[] = [];
-    let qrCodeLink = "";
+      try {
+        pix = await efipay.pixDetailCharge({ txid });
+      } catch {
+        try {
+          pix = await efipay.pixDetailDueCharge({ txid });
+        } catch {
+          res.status(404).json("Cobrança PIX não encontrada");
+          return;
+        }
+      }
 
-    pix.infoAdicionais.forEach((info: any, index: number) => {
-      if (info.nome === "QR" && info.valor) qrCodeLink = info.valor;
-      if (
-        info.nome === "ID" &&
-        pix.infoAdicionais[index + 1]?.nome === "VALOR"
-      ) {
-        updates.push({
-          idValor: info.valor,
-          valor: pix.infoAdicionais[index + 1].valor,
+      if (!pix) {
+        res.status(404).json("Detalhes do PIX não encontrados");
+        return;
+      }
+
+      const status = pix.status;
+      if (status !== "CONCLUIDA") {
+        res.status(200).json({ message: "PIX ainda não concluído", status });
+        return;
+      }
+
+      const data = new Date();
+      const updates: { idValor: string; valor: string }[] = [];
+      let qrCodeLink = "";
+
+      if (Array.isArray(pix.infoAdicionais)) {
+        pix.infoAdicionais.forEach((info: any, index: number) => {
+          if (info.nome === "QR" && info.valor) qrCodeLink = info.valor;
+          if (info.nome === "ID" && pix.infoAdicionais[index + 1]?.nome === "VALOR") {
+            updates.push({
+              idValor: info.valor,
+              valor: pix.infoAdicionais[index + 1].valor,
+            });
+          }
         });
       }
-    });
 
-    if (status === "CONCLUIDA") {
       for (const update of updates) {
         await this.recordRepo.update(update.idValor, {
-          status: statusMK,
+          status: "pago",
           valorpag: update.valor,
           datapag: data,
           coletor: "api_mk_pedro",
@@ -163,60 +159,59 @@ class Pix {
         const record_pppoe = await this.recordRepo.findOne({
           where: { id: Number(update.idValor) },
         });
-
         if (!record_pppoe) continue;
 
         const sis_cliente = await this.clienteRepo.findOne({
           where: { login: record_pppoe.login },
         });
 
-        const moment = require("moment");
-        const dataAtual = moment()
-          .add(1, "days")
-          .format("YYYY-MM-DD HH:mm:ss.SSS");
-
-        if (sis_cliente)
+        if (sis_cliente) {
+          const remObsDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
+            .toISOString()
+            .replace("T", " ")
+            .replace("Z", "");
           await this.clienteRepo.update(
             { login: sis_cliente.login },
-            { observacao: "sim", rem_obs: dataAtual }
+            { observacao: "sim", rem_obs: remObsDate }
           );
+        }
 
-        fs.readFile(logFilePath, "utf8", (err, data) => {
-          let logs: any[] = [];
-          if (!err) {
-            try {
-              logs = JSON.parse(data);
-              if (!Array.isArray(logs)) logs = [];
-            } catch {
-              logs = [];
-            }
-          }
-          const log = {
+        try {
+          const dataLog = fs.existsSync(logFilePath)
+            ? fs.readFileSync(logFilePath, "utf8")
+            : "[]";
+          const logs = Array.isArray(JSON.parse(dataLog))
+            ? JSON.parse(dataLog)
+            : [];
+          logs.push({
             tipo: "PAGAMENTO CONCLUIDO",
-            pppoe: record_pppoe.login,
+            pppoe: record_pppoe?.login,
             status_do_pagamento: status,
             id: update.idValor,
             valor: update.valor,
+            qr: qrCodeLink,
             timestamp: new Date().toISOString(),
-          };
-          logs.push(log);
-          fs.writeFile(
-            logFilePath,
-            JSON.stringify(logs, null, 2),
-            "utf8",
-            () => {}
-          );
-        });
+          });
+          fs.writeFileSync(logFilePath, JSON.stringify(logs, null, 2), "utf8");
+        } catch {}
 
         const cliente = await this.recordRepo.findOne({
           where: { id: Number(update.idValor), chave_gnet2: Not(IsNull()) },
         });
-
         if (cliente) {
           const token = await this.getAccessToken();
-          if (token) await this.setPaid(token, cliente.chave_gnet2!);
+          if (token) {
+            await this.setPaid(token, cliente.chave_gnet2!);
+          }
         }
       }
+
+      res.status(200).json({ message: "Status atualizado com sucesso" });
+      return;
+    } catch (error: any) {
+      console.error("Erro em StatusUpdatePixTodosVencidos:", error);
+      res.status(500).json(error);
+      return;
     }
   }
 
@@ -224,16 +219,13 @@ class Pix {
     cpfCnpj = cpfCnpj.replace(/[^\d]+/g, "");
     if (cpfCnpj.length === 11) {
       if (/^(\d)\1+$/.test(cpfCnpj)) return false;
-      let soma = 0,
-        resto;
-      for (let i = 1; i <= 9; i++)
-        soma += parseInt(cpfCnpj.substring(i - 1, i)) * (11 - i);
+      let soma = 0, resto;
+      for (let i = 1; i <= 9; i++) soma += parseInt(cpfCnpj.substring(i - 1, i)) * (11 - i);
       resto = (soma * 10) % 11;
       if (resto === 10 || resto === 11) resto = 0;
       if (resto !== parseInt(cpfCnpj.substring(9, 10))) return false;
       soma = 0;
-      for (let i = 1; i <= 10; i++)
-        soma += parseInt(cpfCnpj.substring(i - 1, i)) * (12 - i);
+      for (let i = 1; i <= 10; i++) soma += parseInt(cpfCnpj.substring(i - 1, i)) * (12 - i);
       resto = (soma * 10) % 11;
       if (resto === 10 || resto === 11) resto = 0;
       return resto === parseInt(cpfCnpj.substring(10, 11));
@@ -242,8 +234,7 @@ class Pix {
       let tamanho = cpfCnpj.length - 2;
       let numeros = cpfCnpj.substring(0, tamanho);
       let digitos = cpfCnpj.substring(tamanho);
-      let soma = 0,
-        pos = tamanho - 7;
+      let soma = 0, pos = tamanho - 7;
       for (let i = tamanho; i >= 1; i--) {
         soma += parseInt(numeros.charAt(tamanho - i)) * pos--;
         if (pos < 2) pos = 9;
@@ -264,610 +255,315 @@ class Pix {
     return false;
   }
 
-  async gerarPixVariasContas(req: Request, res: Response): Promise<void> {
-    let { nome_completo, cpf } = req.body as {
-      nome_completo: string;
-      cpf: string;
-      titulos: string;
-    };
-    const titulos: string[] = String(req.body.titulos || "")
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-
-    nome_completo = nome_completo.toUpperCase();
-    cpf = cpf.replace(/[^\d]+/g, "");
-
-    const structuredDataRaw = await Promise.all(
-      titulos.map(async (idStr) => {
-        const id = Number(idStr);
-        if (Number.isNaN(id)) return null;
-
-        const fatura = await this.recordRepo.findOne({ where: { id } });
-        if (!fatura) return null;
-
-        const login = fatura.login || "";
-        const sis = await this.clienteRepo.findOne({ where: { login } });
-        const desconto = sis?.desconto ? Number(sis.desconto) : 0;
-
-        return {
-          valor: Number(fatura.valor) - desconto,
-          dataVenc: fatura.datavenc as Date,
-          id: fatura.id,
-        };
-      })
-    );
-
-    const invalidTitulos = structuredDataRaw.some((c) => c === null);
-    if (invalidTitulos) {
-      (req as any).flash(
-        "errors",
-        "Um ou mais títulos estão inválidos ou digitados incorretamente"
-      );
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
-
-    let structuredData = structuredDataRaw as {
-      valor: number;
-      dataVenc: Date;
-      id: number;
-    }[];
-
-    const efipayLoc = new EfiPay(options);
-    let loc: any;
+  async gerarPix(req: Request, res: Response): Promise<void> {
     try {
-      loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
-    } catch (e) {
-      (req as any).flash(
-        "errors",
-        "Falha ao criar localização de cobrança (LOC)"
-      );
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
+      let { pppoe, cpf } = req.body as { pppoe: string; cpf: string };
+      cpf = cpf.replace(/\D/g, "");
 
-    const locID = loc.id;
-    const efipayLocLink = new EfiPay(options);
-    let qrlink: any;
-    try {
-      qrlink = await efipayLocLink.pixGenerateQRCode({ id: locID });
-    } catch (e) {
-      (req as any).flash("errors", "Falha ao gerar QR Code");
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
-    const link: string = qrlink.linkVisualizacao;
+      const cliente = await this.recordRepo.findOne({
+        where: { login: pppoe, status: "vencido", datadel: IsNull() },
+        order: { datavenc: "ASC" as const },
+      });
 
-    const resetTime = (d: Date) => {
-      const x = new Date(d);
-      x.setHours(0, 0, 0, 0);
-      return x;
-    };
-    const differenceInDays = (d1: Date, d2: Date) => {
-      const oneDay = 24 * 60 * 60 * 1000;
-      return Math.floor(Math.abs((d1.getTime() - d2.getTime()) / oneDay));
-    };
-
-    const hoje = new Date();
-
-    structuredData = structuredData.map((c) => {
-      const dataV = new Date(c.dataVenc);
-      const venc = resetTime(dataV);
-      const h = resetTime(hoje);
-
-      if (venc < h) {
-        c.valor = Number(c.valor.toFixed(2));
-        const diffInDays = differenceInDays(hoje, c.dataVenc);
-        const monthlyFine = 0.02;
-        const dailyFine = 0.00033;
-        const multaMensal = c.valor * monthlyFine;
-        const multaDiaria = c.valor * Math.max(0, diffInDays - 4) * dailyFine;
-        const valorFinal = c.valor + multaMensal + multaDiaria;
-        const arredondado = Math.floor(valorFinal * 100) / 100;
-        c.valor = Number(arredondado.toFixed(2));
+      if (!cliente) {
+        res.status(500).json("Usuário não encontrado ou sem mensalidades vencidas");
+        return;
       }
-      return c;
-    });
 
-    let valorSomadoNum = 0;
-    structuredData.forEach((c) => (valorSomadoNum += Number(c.valor)));
-    const valorSomado = Number(valorSomadoNum).toFixed(2);
+      const efipay = new EfiPay(options);
+      const loc = await efipay.pixCreateLocation([], { tipoCob: "cob" });
+      const qrlink = await efipay.pixGenerateQRCode({ id: loc.id });
 
-    const logs = this.lerLogs();
-    logs.push({
-      tipo: "SOMA DAS MENSALIDADES VARIOS TITULOS",
-      cpf,
-      nome_completo,
-      structuredData,
-      timestamp: new Date().toISOString(),
-    });
-    this.salvarLogs(logs);
+      const valor = Number(cliente.valor).toFixed(2);
+      const params = { txid: crypto.randomBytes(16).toString("hex") };
+      const body =
+        cpf.length === 11
+          ? {
+              calendario: { expiracao: 43200 },
+              devedor: { cpf, nome: pppoe },
+              valor: { original: valor },
+              chave: chave_pix,
+              solicitacaoPagador: "Mensalidade",
+              infoAdicionais: [
+                { nome: "ID", valor: String(cliente.id) },
+                { nome: "VALOR", valor: String(valor) },
+                { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+              ],
+              loc: { id: loc.id },
+            }
+          : {
+              calendario: { expiracao: 43200 },
+              devedor: { cnpj: cpf, nome: pppoe },
+              valor: { original: valor },
+              chave: chave_pix,
+              solicitacaoPagador: "Mensalidade",
+              infoAdicionais: [
+                { nome: "ID", valor: String(cliente.id) },
+                { nome: "VALOR", valor: String(valor) },
+                { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+              ],
+              loc: { id: loc.id },
+            };
 
-    const efipay = new EfiPay(options);
+      await efipay.pixCreateCharge(params, body);
 
-    const body: any =
-      cpf.length === 11
-        ? {
-            calendario: { expiracao: 43200 },
-            devedor: { cpf, nome: nome_completo },
-            valor: { original: valorSomado },
-            chave: chave_pix,
-            solicitacaoPagador: "Mensalidade",
-            infoAdicionais: [{ nome: "QR", valor: link }],
-            loc: { id: locID },
-          }
-        : {
-            calendario: { expiracao: 43200 },
-            devedor: { cnpj: cpf, nome: nome_completo },
-            valor: { original: valorSomado },
-            chave: chave_pix,
-            solicitacaoPagador: "Mensalidade",
-            infoAdicionais: [{ nome: "QR", valor: link }],
-            loc: { id: locID },
-          };
+      const options2 = { month: "2-digit", day: "2-digit" } as Intl.DateTimeFormatOptions;
+      const formattedDate = new Intl.DateTimeFormat("pt-BR", options2).format(
+        cliente.datavenc as Date
+      );
 
-    structuredData.forEach((c) => {
-      body.infoAdicionais.push({ nome: "ID", valor: String(c.id) });
-      body.infoAdicionais.push({ nome: "VALOR", valor: String(c.valor) });
-    });
-
-    const params = { txid: crypto.randomBytes(16).toString("hex") };
-
-    try {
-      const pix = await efipay.pixCreateCharge(params, body);
-      const pppoe = nome_completo;
-      res.render("pix", { valor: valorSomado, pppoe, link, structuredData });
-    } catch (error) {
-      (req as any).flash("errors", "Falha ao criar cobrança PIX");
-      (req as any).session.save(() => res.redirect("back"));
+      res.status(200).json({ valor, pppoe, link: qrlink.linkVisualizacao, formattedDate });
+      return;
+    } catch (error: any) {
+      console.error("Erro em gerarPix:", error);
+      res.status(500).json(error);
+      return;
     }
   }
 
   async gerarPixAberto(req: Request, res: Response): Promise<void> {
-    let { pppoe, cpf } = req.body as { pppoe: string; cpf: string };
-    cpf = cpf.replace(/\D/g, "");
-
-    const cliente = await this.recordRepo.findOne({
-      where: { login: pppoe, status: "aberto", datadel: IsNull() },
-      order: { datavenc: "ASC" as const },
-    });
-
-    if (!cliente) {
-      (req as any).flash(
-        "errors",
-        "Usuario não encontrado, ou DESATIVADO ou Não tem Mensalidades Vencidas"
-      );
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
-
-    const sis_cliente = await this.clienteRepo.findOne({
-      where: { login: pppoe, cpf_cnpj: cpf, cli_ativado: "s" },
-    });
-
-    if (!sis_cliente) {
-      (req as any).flash(
-        "errors",
-        "Usuario não encontrado, ou DESATIVADO, verifique se digitou corretamente o PPPOE e cpf"
-      );
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
-
-    const efipayLoc = new EfiPay(options);
-    let loc: any;
     try {
-      loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
-    } catch {
-      (req as any).flash(
-        "errors",
-        "Falha ao criar localização de cobrança (LOC)"
-      );
-      (req as any).session.save(() => res.redirect("back"));
+      let { pppoe, cpf } = req.body as { pppoe: string; cpf: string };
+      cpf = cpf.replace(/\D/g, "");
+
+      const cliente = await this.recordRepo.findOne({
+        where: { login: pppoe, status: "aberto", datadel: IsNull() },
+        order: { datavenc: "ASC" as const },
+      });
+
+      if (!cliente) {
+        res.status(500).json("Usuário não encontrado, desativado ou sem mensalidades abertas");
+        return;
+      }
+
+      const efipay = new EfiPay(options);
+      const loc = await efipay.pixCreateLocation([], { tipoCob: "cob" });
+      const qrlink = await efipay.pixGenerateQRCode({ id: loc.id });
+
+      const valor = Number(cliente.valor).toFixed(2);
+      const params = { txid: crypto.randomBytes(16).toString("hex") };
+      const body =
+        cpf.length === 11
+          ? {
+              calendario: { expiracao: 43200 },
+              devedor: { cpf, nome: pppoe },
+              valor: { original: valor },
+              chave: chave_pix,
+              solicitacaoPagador: "Mensalidade",
+              infoAdicionais: [
+                { nome: "ID", valor: String(cliente.id) },
+                { nome: "VALOR", valor: String(valor) },
+                { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+              ],
+              loc: { id: loc.id },
+            }
+          : {
+              calendario: { expiracao: 43200 },
+              devedor: { cnpj: cpf, nome: pppoe },
+              valor: { original: valor },
+              chave: chave_pix,
+              solicitacaoPagador: "Mensalidade",
+              infoAdicionais: [
+                { nome: "ID", valor: String(cliente.id) },
+                { nome: "VALOR", valor: String(valor) },
+                { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+              ],
+              loc: { id: loc.id },
+            };
+
+      await efipay.pixCreateCharge(params, body);
+
+      res.status(200).json({ valor, pppoe, link: qrlink.linkVisualizacao, dataVenc: cliente.datavenc });
       return;
-    }
-    const locID = loc.id;
-
-    const efipayLocLink = new EfiPay(options);
-    let qrlink: any;
-    try {
-      qrlink = await efipayLocLink.pixGenerateQRCode({ id: locID });
-    } catch {
-      (req as any).flash("errors", "Falha ao gerar QR Code");
-      (req as any).session.save(() => res.redirect("back"));
+    } catch (error: any) {
+      console.error("Erro em gerarPixAberto:", error);
+      res.status(500).json(error);
       return;
-    }
-    const link: string = qrlink.linkVisualizacao;
-
-    const desconto = Number(sis_cliente.desconto || 0);
-    let valorNum = Number(cliente.valor) - desconto;
-    const dataVenc = cliente.datavenc as Date;
-    const id = cliente.id;
-
-    valorNum = Number(valorNum.toFixed(2));
-    let valor = valorNum.toFixed(2);
-
-    const logs = this.lerLogs();
-    logs.push({
-      tipo: "ULTIMO PIX EM ABERTO",
-      cpf,
-      pppoe,
-      id,
-      valor,
-      dataVenc,
-      timestamp: new Date().toISOString(),
-    });
-    this.salvarLogs(logs);
-
-    const efipay = new EfiPay(options);
-
-    const body =
-      cpf.length === 11
-        ? {
-            calendario: { expiracao: 43200 },
-            devedor: { cpf, nome: pppoe },
-            valor: { original: valor },
-            chave: chave_pix,
-            solicitacaoPagador: "Mensalidade",
-            infoAdicionais: [
-              { nome: "ID", valor: String(id) },
-              { nome: "VALOR", valor: String(valor) },
-              { nome: "QR", valor: String(link) },
-            ],
-            loc: { id: locID },
-          }
-        : {
-            calendario: { expiracao: 43200 },
-            devedor: { cnpj: cpf, nome: pppoe },
-            valor: { original: valor },
-            chave: chave_pix,
-            solicitacaoPagador: "Mensalidade",
-            infoAdicionais: [
-              { nome: "ID", valor: String(id) },
-              { nome: "VALOR", valor: String(valor) },
-              { nome: "QR", valor: String(link) },
-            ],
-            loc: { id: locID },
-          };
-
-    const params = { txid: crypto.randomBytes(16).toString("hex") };
-
-    try {
-      const pix = await efipay.pixCreateCharge(params, body);
-      res.render("pix", { valor, pppoe, link, dataVenc });
-    } catch {
-      (req as any).flash("errors", "Falha ao criar cobrança PIX");
-      (req as any).session.save(() => res.redirect("back"));
-    }
-  }
-
-  async gerarPix(req: Request, res: Response): Promise<void> {
-    let { pppoe, cpf } = req.body as { pppoe: string; cpf: string };
-    cpf = cpf.replace(/\D/g, "");
-
-    const cliente = await this.recordRepo.findOne({
-      where: { login: pppoe, status: "vencido", datadel: IsNull() },
-      order: { datavenc: "ASC" as const },
-    });
-
-    if (!cliente) {
-      (req as any).flash(
-        "errors",
-        "Usuario não encontrado ou Não tem Mensalidades Vencidas"
-      );
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
-
-    const sis_cliente = await this.clienteRepo.findOne({
-      where: { login: pppoe, cpf_cnpj: cpf, cli_ativado: "s" },
-    });
-
-    if (!sis_cliente) {
-      (req as any).flash(
-        "errors",
-        "Usuario não encontrado, ou DESATIVADO verifique se digitou corretamente o PPPOE e cpf"
-      );
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
-
-    const efipayLoc = new EfiPay(options);
-    let loc: any;
-    try {
-      loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
-    } catch {
-      (req as any).flash(
-        "errors",
-        "Falha ao criar localização de cobrança (LOC)"
-      );
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
-    const locID = loc.id;
-
-    const efipayLocLink = new EfiPay(options);
-    let qrlink: any;
-    try {
-      qrlink = await efipayLocLink.pixGenerateQRCode({ id: locID});
-    } catch {
-      (req as any).flash("errors", "Falha ao gerar QR Code");
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
-    const link: string = qrlink.linkVisualizacao;
-
-    const desconto = Number(sis_cliente.desconto || 0);
-    let valorNum = Number(cliente.valor) - desconto;
-    const dataVenc = cliente.datavenc as Date;
-    const id = cliente.id;
-
-    const hoje = new Date();
-    const resetTime = (d: Date) => {
-      const x = new Date(d);
-      x.setHours(0, 0, 0, 0);
-      return x;
-    };
-    const differenceInDays = (d1: Date, d2: Date) => {
-      const oneDay = 24 * 60 * 60 * 1000;
-      return Math.floor(Math.abs((d1.getTime() - d2.getTime()) / oneDay));
-    };
-
-    const v = resetTime(new Date(dataVenc));
-    const h = resetTime(new Date(hoje));
-
-    if (v < h) {
-      valorNum = Number(valorNum.toFixed(2));
-      const diffInDays = differenceInDays(dataVenc, hoje);
-      const monthlyFine = 0.02;
-      const dailyFine = 0.00033;
-      const multaMensal = valorNum * monthlyFine;
-      const multaDiaria = valorNum * Math.max(0, diffInDays - 4) * dailyFine;
-      const valorFinal = valorNum + multaMensal + multaDiaria;
-      const arred = Math.floor(valorFinal * 100) / 100;
-      valorNum = Number(arred.toFixed(2));
-    }
-
-    let valor =
-      typeof valorNum === "string"
-        ? Number(valorNum).toFixed(2)
-        : valorNum.toFixed(2);
-
-    const logs = this.lerLogs();
-    logs.push({
-      tipo: "ULTIMO PIX VENCIDO",
-      cpf,
-      pppoe,
-      id,
-      valor,
-      dataVenc,
-      timestamp: new Date().toISOString(),
-    });
-    this.salvarLogs(logs);
-
-    const efipay = new EfiPay(options);
-
-    const body =
-      cpf.length === 11
-        ? {
-            calendario: { expiracao: 43200 },
-            devedor: { cpf, nome: pppoe },
-            valor: { original: valor },
-            chave: chave_pix,
-            solicitacaoPagador: "Mensalidade",
-            infoAdicionais: [
-              { nome: "ID", valor: String(id) },
-              { nome: "VALOR", valor: String(valor) },
-              { nome: "QR", valor: String(link) },
-            ],
-            loc: { id: locID },
-          }
-        : {
-            calendario: { expiracao: 43200 },
-            devedor: { cnpj: cpf, nome: pppoe },
-            valor: { original: valor },
-            chave: chave_pix,
-            solicitacaoPagador: "Mensalidade",
-            infoAdicionais: [
-              { nome: "ID", valor: String(id) },
-              { nome: "VALOR", valor: String(valor) },
-              { nome: "QR", valor: String(link) },
-            ],
-            loc: { id: locID },
-          };
-
-    const params = { txid: crypto.randomBytes(16).toString("hex") };
-
-    try {
-      const pix = await efipay.pixCreateCharge(params, body);
-      const options2 = {
-        month: "2-digit",
-        day: "2-digit",
-      } as Intl.DateTimeFormatOptions;
-      const formattedDate = new Intl.DateTimeFormat("pt-BR", options2).format(
-        dataVenc
-      );
-      res.render("pix", { valor, pppoe, link, formattedDate });
-    } catch {
-      (req as any).flash("errors", "Falha ao criar cobrança PIX");
-      (req as any).session.save(() => res.redirect("back"));
     }
   }
 
   async gerarPixAll(req: Request, res: Response): Promise<void> {
-    let { pppoe, cpf } = req.body as { pppoe: string; cpf: string };
-    cpf = cpf.replace(/\D/g, "");
-
-    const cliente = await this.recordRepo.find({
-      where: { login: pppoe, status: "vencido", datadel: IsNull() },
-      order: { datavenc: "ASC" as const },
-      take: 3,
-    });
-
-    if (!cliente || cliente.length === 0) {
-      (req as any).flash(
-        "errors",
-        "Usuario não encontrado ou Não tem Mensalidades Vencidas"
-      );
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
-
-    const sis_cliente = await this.clienteRepo.findOne({
-      where: { login: pppoe, cpf_cnpj: cpf, cli_ativado: "s" },
-    });
-
-    if (!sis_cliente) {
-      (req as any).flash(
-        "errors",
-        "Usuario não encontrado, ou está Desativado, verifique se digitou corretamente o PPPOE e cpf"
-      );
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
-
-    const efipayLoc = new EfiPay(options);
-    let loc: any;
     try {
-      loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
-    } catch {
-      (req as any).flash(
-        "errors",
-        "Falha ao criar localização de cobrança (LOC)"
-      );
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
-    const locID = loc.id;
+      let { pppoe, cpf } = req.body as { pppoe: string; cpf: string };
+      cpf = cpf.replace(/\D/g, "");
 
-    const efipayLocLink = new EfiPay(options);
-    let qrlink: any;
-    try {
-      qrlink = await efipayLocLink.pixGenerateQRCode({ id: locID });
-    } catch {
-      (req as any).flash("errors", "Falha ao gerar QR Code");
-      (req as any).session.save(() => res.redirect("back"));
-      return;
-    }
-    const link: string = qrlink.linkVisualizacao;
+      const clientes = await this.recordRepo.find({
+        where: { login: pppoe, status: "vencido", datadel: IsNull() },
+        order: { datavenc: "ASC" as const },
+        take: 3,
+      });
 
-    const desconto = Number(sis_cliente.desconto || 0);
-
-    const resetTime = (d: Date) => {
-      const x = new Date(d);
-      x.setHours(0, 0, 0, 0);
-      return x;
-    };
-    const differenceInDays = (d1: Date, d2: Date) => {
-      const oneDay = 24 * 60 * 60 * 1000;
-      return Math.floor(Math.abs((d1.getTime() - d2.getTime()) / oneDay));
-    };
-
-    let structuredData = cliente.map((c) => ({
-      valor: Number(c.valor),
-      dataVenc: c.datavenc as Date,
-      id: c.id,
-    }));
-
-    const hoje = new Date();
-
-    structuredData = structuredData.map((c, index) => {
-      const dataV = new Date(c.dataVenc);
-
-      if (index === 2) {
-        c.valor = Math.floor(c.valor * 0.5);
+      if (!clientes || clientes.length === 0) {
+        res.status(500).json("Usuário não encontrado ou sem mensalidades vencidas");
+        return;
       }
 
-      const venc = resetTime(new Date(dataV));
-      const h = resetTime(new Date(hoje));
+      const efipay = new EfiPay(options);
+      const loc = await efipay.pixCreateLocation([], { tipoCob: "cob" });
+      const qrlink = await efipay.pixGenerateQRCode({ id: loc.id });
 
-      if (venc < h) {
-        c.valor -= desconto;
-        c.valor = Number(c.valor.toFixed(2));
+      const structuredData = clientes.map((c) => ({
+        valor: Number(c.valor),
+        dataVenc: c.datavenc as Date,
+        id: c.id,
+      }));
 
-        const diffInDays = differenceInDays(hoje, c.dataVenc);
-        const monthlyFine = 0.02;
-        const dailyFine = 0.00033;
+      const total = structuredData.reduce((s, c) => s + Number(c.valor), 0).toFixed(2);
 
-        const multaMensal = c.valor * monthlyFine;
-        const multaDiaria = c.valor * Math.max(0, diffInDays - 4) * dailyFine;
-        const valorFinal = c.valor + multaMensal + multaDiaria;
-        const arred = Math.floor(valorFinal * 100) / 100;
-        c.valor = Number(arred.toFixed(2));
-      }
+      const params = { txid: crypto.randomBytes(16).toString("hex") };
+      const body: any =
+        cpf.length === 11
+          ? {
+              calendario: { expiracao: 43200 },
+              devedor: { cpf, nome: pppoe },
+              valor: { original: total },
+              chave: chave_pix,
+              solicitacaoPagador: "Mensalidade",
+              infoAdicionais: [{ nome: "QR", valor: qrlink.linkVisualizacao }],
+              loc: { id: loc.id },
+            }
+          : {
+              calendario: { expiracao: 43200 },
+              devedor: { cnpj: cpf, nome: pppoe },
+              valor: { original: total },
+              chave: chave_pix,
+              solicitacaoPagador: "Mensalidade",
+              infoAdicionais: [{ nome: "QR", valor: qrlink.linkVisualizacao }],
+              loc: { id: loc.id },
+            };
 
-      return c;
-    });
+      structuredData.forEach((c) => {
+        body.infoAdicionais.push({ nome: "ID", valor: String(c.id) });
+        body.infoAdicionais.push({ nome: "VALOR", valor: String(c.valor) });
+      });
 
-    let valorSomadoNum = 0;
-    structuredData.forEach((c) => (valorSomadoNum += Number(c.valor)));
-    const valorSomado = Number(valorSomadoNum).toFixed(2);
+      await efipay.pixCreateCharge(params, body);
 
-    const logs = this.lerLogs();
-    logs.push({
-      tipo: "SOMA DAS MENSALIDADES VENCIDAS!",
-      cpf,
-      pppoe,
-      structuredData,
-      timestamp: new Date().toISOString(),
-    });
-    this.salvarLogs(logs);
+      res.status(200).json({ valor: total, pppoe, link: qrlink.linkVisualizacao, structuredData });
+      return;
+    } catch (error: any) {
+      console.error("Erro em gerarPixAll:", error);
+      res.status(500).json(error);
+      return;
+    }
+  }
 
-    const efipay = new EfiPay(options);
+  async gerarPixVariasContas(req: Request, res: Response): Promise<void> {
+    try {
+      let { nome_completo, cpf } = req.body as { nome_completo: string; cpf: string };
+      const titulos: string[] = String(req.body.titulos || "")
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
 
-    const body: any =
-      cpf.length === 11
-        ? {
-            calendario: { expiracao: 43200 },
-            devedor: { cpf, nome: pppoe },
-            valor: { original: valorSomado },
-            chave: chave_pix,
-            solicitacaoPagador: "Mensalidade",
-            infoAdicionais: [{ nome: "QR", valor: link }],
-            loc: { id: locID },
-          }
-        : {
-            calendario: { expiracao: 43200 },
-            devedor: { cnpj: cpf, nome: pppoe },
-            valor: { original: valorSomado },
-            chave: chave_pix,
-            solicitacaoPagador: "Mensalidade",
-            infoAdicionais: [{ nome: "QR", valor: link }],
-            loc: { id: locID },
+      nome_completo = String(nome_completo || "").toUpperCase();
+      cpf = String(cpf || "").replace(/[^\d]+/g, "");
+
+      const structuredDataRaw = await Promise.all(
+        titulos.map(async (idStr) => {
+          const id = Number(idStr);
+          if (Number.isNaN(id)) return null;
+          const fatura = await this.recordRepo.findOne({ where: { id } });
+          if (!fatura) return null;
+          const login = fatura.login || "";
+          const sis = await this.clienteRepo.findOne({ where: { login } });
+          const desconto = sis?.desconto ? Number(sis.desconto) : 0;
+          return {
+            valor: Number(fatura.valor) - desconto,
+            dataVenc: fatura.datavenc as Date,
+            id: fatura.id,
           };
+        })
+      );
 
-    structuredData.forEach((c) => {
-      body.infoAdicionais.push({ nome: "ID", valor: String(c.id) });
-      body.infoAdicionais.push({ nome: "VALOR", valor: String(c.valor) });
-    });
+      const invalidTitulos = structuredDataRaw.some((c) => c === null);
+      if (invalidTitulos) {
+        res.status(500).json("Um ou mais títulos estão inválidos");
+        return;
+      }
 
-    const params = { txid: crypto.randomBytes(16).toString("hex") };
+      let structuredData = structuredDataRaw as { valor: number; dataVenc: Date; id: number }[];
 
-    try {
-      const pix = await efipay.pixCreateCharge(params, body);
-      const valor = valorSomado;
-      res.render("pix", { valor, pppoe, link, structuredData });
-    } catch {
-      (req as any).flash("errors", "Falha ao criar cobrança PIX");
-      (req as any).session.save(() => res.redirect("back"));
+      const efipayLoc = new EfiPay(options);
+      const loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
+
+      const efipayLocLink = new EfiPay(options);
+      const qrlink = await efipayLocLink.pixGenerateQRCode({ id: loc.id });
+      const link: string = qrlink.linkVisualizacao;
+
+      const resetTime = (d: Date) => {
+        const x = new Date(d);
+        x.setHours(0, 0, 0, 0);
+        return x;
+      };
+      const differenceInDays = (d1: Date, d2: Date) => {
+        const oneDay = 24 * 60 * 60 * 1000;
+        return Math.floor(Math.abs((d1.getTime() - d2.getTime()) / oneDay));
+      };
+
+      const hoje = new Date();
+      structuredData = structuredData.map((c) => {
+        const venc = resetTime(new Date(c.dataVenc));
+        const h = resetTime(new Date(hoje));
+        if (venc < h) {
+          c.valor = Number(c.valor.toFixed(2));
+          const diffInDays = differenceInDays(hoje, c.dataVenc);
+          const monthlyFine = 0.02;
+          const dailyFine = 0.00033;
+          const multaMensal = c.valor * monthlyFine;
+          const multaDiaria = c.valor * Math.max(0, diffInDays - 4) * dailyFine;
+          const valorFinal = c.valor + multaMensal + multaDiaria;
+          const arredondado = Math.floor(valorFinal * 100) / 100;
+          c.valor = Number(arredondado.toFixed(2));
+        }
+        return c;
+      });
+
+      let valorSomadoNum = 0;
+      structuredData.forEach((c) => (valorSomadoNum += Number(c.valor)));
+      const valorSomado = Number(valorSomadoNum).toFixed(2);
+
+     
+
+      const efipay = new EfiPay(options);
+
+      const body: any =
+        cpf.length === 11
+          ? {
+              calendario: { expiracao: 43200 },
+              devedor: { cpf, nome: nome_completo },
+              valor: { original: valorSomado },
+              chave: chave_pix,
+              solicitacaoPagador: "Mensalidade",
+              infoAdicionais: [{ nome: "QR", valor: link }],
+              loc: { id: loc.id },
+            }
+          : {
+              calendario: { expiracao: 43200 },
+              devedor: { cnpj: cpf, nome: nome_completo },
+              valor: { original: valorSomado },
+              chave: chave_pix,
+              solicitacaoPagador: "Mensalidade",
+              infoAdicionais: [{ nome: "QR", valor: link }],
+              loc: { id: loc.id },
+            };
+
+      structuredData.forEach((c) => {
+        body.infoAdicionais.push({ nome: "ID", valor: String(c.id) });
+        body.infoAdicionais.push({ nome: "VALOR", valor: String(c.valor) });
+      });
+
+      const params = { txid: crypto.randomBytes(16).toString("hex") };
+      await efipay.pixCreateCharge(params, body);
+
+      res.status(200).json({ valor: valorSomado, nome_completo, link, structuredData });
+      return;
+    } catch (error: any) {
+      console.error("Erro em gerarPixVariasContas:", error);
+      res.status(500).json(error);
+      return;
     }
   }
-
-  // ----------------------- Funções Auxiliares -----------------------
-private lerLogs(): any[] {
-  try {
-    const data = fs.readFileSync(logFilePath, 'utf8'); // Lê o arquivo log.json
-    const logs = JSON.parse(data); // Converte para array
-    return Array.isArray(logs) ? logs : []; // Garante que é um array
-  } catch {
-    return []; // Caso o arquivo não exista ou esteja vazio
-  }
-}
-
-private salvarLogs(logs: any[]): void {
-  fs.writeFileSync(logFilePath, JSON.stringify(logs, null, 2), 'utf8'); // Salva o conteúdo formatado
-}
 
 
 }
