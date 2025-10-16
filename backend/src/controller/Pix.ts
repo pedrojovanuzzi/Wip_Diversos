@@ -57,7 +57,7 @@ class Pix {
 
   AlterarWebhook(url: string, chave: string): void {
     options.validateMtls = false;
-    const efipay = new (EfiPay as any)(options);
+    const efipay = new EfiPay(options);
     efipay
       .pixConfigWebhook({ chave: String(chave) }, { webhookUrl: String(url) })
       .then(console.log)
@@ -116,7 +116,7 @@ class Pix {
     if (!pixData || pixData.length === 0) return;
 
     const { txid } = pixData[0];
-    const efipay = new (EfiPay as any)(options);
+    const efipay = new EfiPay(options);
     let pix: any;
 
     try {
@@ -314,7 +314,7 @@ class Pix {
       id: number;
     }[];
 
-    const efipayLoc = new (EfiPay as any)(options);
+    const efipayLoc = new EfiPay(options);
     let loc: any;
     try {
       loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
@@ -328,7 +328,7 @@ class Pix {
     }
 
     const locID = loc.id;
-    const efipayLocLink = new (EfiPay as any)(options);
+    const efipayLocLink = new EfiPay(options);
     let qrlink: any;
     try {
       qrlink = await efipayLocLink.pixGenerateQRCode({ id: locID });
@@ -384,7 +384,7 @@ class Pix {
     });
     this.salvarLogs(logs);
 
-    const efipay = new (EfiPay as any)(options);
+    const efipay = new EfiPay(options);
 
     const body: any =
       cpf.length === 11
@@ -455,7 +455,7 @@ class Pix {
       return;
     }
 
-    const efipayLoc = new (EfiPay as any)(options);
+    const efipayLoc = new EfiPay(options);
     let loc: any;
     try {
       loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
@@ -469,7 +469,7 @@ class Pix {
     }
     const locID = loc.id;
 
-    const efipayLocLink = new (EfiPay as any)(options);
+    const efipayLocLink = new EfiPay(options);
     let qrlink: any;
     try {
       qrlink = await efipayLocLink.pixGenerateQRCode({ id: locID });
@@ -500,7 +500,7 @@ class Pix {
     });
     this.salvarLogs(logs);
 
-    const efipay = new (EfiPay as any)(options);
+    const efipay = new EfiPay(options);
 
     const body =
       cpf.length === 11
@@ -573,7 +573,7 @@ class Pix {
       return;
     }
 
-    const efipayLoc = new (EfiPay as any)(options);
+    const efipayLoc = new EfiPay(options);
     let loc: any;
     try {
       loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
@@ -587,7 +587,7 @@ class Pix {
     }
     const locID = loc.id;
 
-    const efipayLocLink = new (EfiPay as any)(options);
+    const efipayLocLink = new EfiPay(options);
     let qrlink: any;
     try {
       qrlink = await efipayLocLink.pixGenerateQRCode({ id: locID});
@@ -646,7 +646,7 @@ class Pix {
     });
     this.salvarLogs(logs);
 
-    const efipay = new (EfiPay as any)(options);
+    const efipay = new EfiPay(options);
 
     const body =
       cpf.length === 11
@@ -727,7 +727,7 @@ class Pix {
       return;
     }
 
-    const efipayLoc = new (EfiPay as any)(options);
+    const efipayLoc = new EfiPay(options);
     let loc: any;
     try {
       loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
@@ -741,7 +741,7 @@ class Pix {
     }
     const locID = loc.id;
 
-    const efipayLocLink = new (EfiPay as any)(options);
+    const efipayLocLink = new EfiPay(options);
     let qrlink: any;
     try {
       qrlink = await efipayLocLink.pixGenerateQRCode({ id: locID });
@@ -814,7 +814,7 @@ class Pix {
     });
     this.salvarLogs(logs);
 
-    const efipay = new (EfiPay as any)(options);
+    const efipay = new EfiPay(options);
 
     const body: any =
       cpf.length === 11
