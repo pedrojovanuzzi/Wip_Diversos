@@ -49,9 +49,9 @@ export const NavBar = ({color = 'black'}: Color) => {
 
   return (
     <div
-      className={`z-10 sm:h-screen ${
+      className={`z-10 sm:h-screen  ${
         isOpen ? "sm:w-32" : "sm:w-0"
-      } bg-black sm:fixed sm:top-0 sm:left-0 grid sm:grid-rows-[auto,1fr] p-4 sm:p-0 sm:pt-10 transition-all duration-300`}
+      } bg-slate-600 sm:fixed sm:top-0 sm:left-0 grid sm:grid-rows-[auto,1fr] p-4 sm:p-0 sm:pt-10 transition-all duration-300`}
     >
       <nav className="sm:w-full sm:p-4 grid place-items-center relative">
         {/* Ícone de menu "HiBars3" para dispositivos móveis */}

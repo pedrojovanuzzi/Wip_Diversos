@@ -8,6 +8,7 @@ interface PixCardProps {
   titulo: string;
   descricao: string;
   spanFull?: boolean;
+  bg: string;
 }
 
 const PixCard: React.FC<PixCardProps> = ({
@@ -17,9 +18,10 @@ const PixCard: React.FC<PixCardProps> = ({
   titulo,
   descricao,
   spanFull,
+  bg,
 }) => (
   <div
-    className={`group relative ring-1 ring-gray-400 hover:bg-green-300 transition-all bg-gray-100 p-6 ${
+    className={`group relative ring-1 ring-gray-400 hover:bg-green-300 transition-all ${bg} p-6 ${
       spanFull ? "col-span-2" : ""
     }`}
   >
