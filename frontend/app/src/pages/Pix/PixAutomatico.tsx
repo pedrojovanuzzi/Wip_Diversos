@@ -7,7 +7,7 @@ async function removerPixAutomatico() {}
 
 export const PixAutomatico = () => {
   const [remover, setRemover] = useState(false);
-  const [date, setDate] = useState(new Date().toLocaleString())
+  const [date, setDate] = useState(new Date().toLocaleDateString("pt-BR"))
 
   return (
     <div className="p-5 bg-slate-800 min-h-screen text-gray-200">
