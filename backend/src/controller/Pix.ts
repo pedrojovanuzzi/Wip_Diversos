@@ -565,6 +565,10 @@ class Pix {
     }
   }
 
+  async PixAutomaticoCriar(){
+    
+  }
+
 
 }
 
