@@ -1,6 +1,7 @@
 import AppDataSource from "../database/API_MK";
 import { Faturas } from "../entities/Faturas";
 import { ClientesEntities } from "../entities/ClientesEntities";
+
 import EfiPay from "sdk-node-apis-efi";
 import dotenv from "dotenv";
 import crypto from "crypto";
@@ -9,6 +10,7 @@ import fs from "fs";
 import axios from "axios";
 import { Request, Response } from "express";
 import { IsNull, Not } from "typeorm";
+
 
 dotenv.config();
 
@@ -32,6 +34,8 @@ const options = {
   validateMtls: false,
 };
 
+
+
 const chave_pix = process.env.CHAVE_PIX as string;
 
 class Pix {
@@ -53,7 +57,7 @@ class Pix {
 
   AlterarWebhook(url: string, chave: string): void {
     options.validateMtls = false;
-    const efipay = new EfiPay(options);
+    const efipay = new (EfiPay as any)(options);
     efipay
       .pixConfigWebhook({ chave: String(chave) }, { webhookUrl: String(url) })
       .then(console.log)
@@ -112,7 +116,7 @@ class Pix {
     if (!pixData || pixData.length === 0) return;
 
     const { txid } = pixData[0];
-    const efipay = new EfiPay(options);
+    const efipay = new (EfiPay as any)(options);
     let pix: any;
 
     try {
@@ -310,7 +314,7 @@ class Pix {
       id: number;
     }[];
 
-    const efipayLoc = new EfiPay(options);
+    const efipayLoc = new (EfiPay as any)(options);
     let loc: any;
     try {
       loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
@@ -324,7 +328,7 @@ class Pix {
     }
 
     const locID = loc.id;
-    const efipayLocLink = new EfiPay(options);
+    const efipayLocLink = new (EfiPay as any)(options);
     let qrlink: any;
     try {
       qrlink = await efipayLocLink.pixGenerateQRCode({ id: locID });
@@ -380,7 +384,7 @@ class Pix {
     });
     this.salvarLogs(logs);
 
-    const efipay = new EfiPay(options);
+    const efipay = new (EfiPay as any)(options);
 
     const body: any =
       cpf.length === 11
@@ -451,7 +455,7 @@ class Pix {
       return;
     }
 
-    const efipayLoc = new EfiPay(options);
+    const efipayLoc = new (EfiPay as any)(options);
     let loc: any;
     try {
       loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
@@ -465,7 +469,7 @@ class Pix {
     }
     const locID = loc.id;
 
-    const efipayLocLink = new EfiPay(options);
+    const efipayLocLink = new (EfiPay as any)(options);
     let qrlink: any;
     try {
       qrlink = await efipayLocLink.pixGenerateQRCode({ id: locID });
@@ -496,7 +500,7 @@ class Pix {
     });
     this.salvarLogs(logs);
 
-    const efipay = new EfiPay(options);
+    const efipay = new (EfiPay as any)(options);
 
     const body =
       cpf.length === 11
@@ -569,7 +573,7 @@ class Pix {
       return;
     }
 
-    const efipayLoc = new EfiPay(options);
+    const efipayLoc = new (EfiPay as any)(options);
     let loc: any;
     try {
       loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
@@ -583,7 +587,7 @@ class Pix {
     }
     const locID = loc.id;
 
-    const efipayLocLink = new EfiPay(options);
+    const efipayLocLink = new (EfiPay as any)(options);
     let qrlink: any;
     try {
       qrlink = await efipayLocLink.pixGenerateQRCode({ id: locID});
@@ -642,7 +646,7 @@ class Pix {
     });
     this.salvarLogs(logs);
 
-    const efipay = new EfiPay(options);
+    const efipay = new (EfiPay as any)(options);
 
     const body =
       cpf.length === 11
@@ -723,7 +727,7 @@ class Pix {
       return;
     }
 
-    const efipayLoc = new EfiPay(options);
+    const efipayLoc = new (EfiPay as any)(options);
     let loc: any;
     try {
       loc = await efipayLoc.pixCreateLocation([], { tipoCob: "cob" });
@@ -737,7 +741,7 @@ class Pix {
     }
     const locID = loc.id;
 
-    const efipayLocLink = new EfiPay(options);
+    const efipayLocLink = new (EfiPay as any)(options);
     let qrlink: any;
     try {
       qrlink = await efipayLocLink.pixGenerateQRCode({ id: locID });
@@ -810,7 +814,7 @@ class Pix {
     });
     this.salvarLogs(logs);
 
-    const efipay = new EfiPay(options);
+    const efipay = new (EfiPay as any)(options);
 
     const body: any =
       cpf.length === 11

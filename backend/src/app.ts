@@ -18,6 +18,7 @@ import ServerLogs from "./routes/ServerLogs.Routes";
 import PowerDNS from './routes/PowerDns.routes';
 import Onu from './routes/Onu.routes';
 import BackupRoutes from './routes/Backup.routes';
+import PixRoutes from './routes/Pix.routes';
 const backup = new Backup();
 
 export class App {
@@ -51,6 +52,7 @@ export class App {
     this.server.use("/api/PowerDns", PowerDNS);
     this.server.use("/api/Onu", Onu);
     this.server.use("/api/Backup", BackupRoutes);
+    this.server.use("/api/Pix", PixRoutes);
   }
 
   private agendarBackup() {
