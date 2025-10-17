@@ -4,21 +4,21 @@ import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { CiSettings } from "react-icons/ci";
 import { useNavigate } from "react-router-dom";
+import {
+  ParametrosPixAutomaticoList,
+  PixAuto,
+  PixAutomaticoListPeople,
+} from "../../types";
 
 export const PixAutomatico = () => {
-  interface PixAuto {
-    contrato: string;
-    cpf: string;
-    nome: string;
-    servico: string;
-    data_inicial: string;
-    periodicidade: string;
-    valor: string;
-    politica: string;
-  }
-
   const [remover, setRemover] = useState(false);
-  const [date, setDate] = useState(new Date().toLocaleDateString("pt-BR"));
+  const [parametros, setParametros] = useState<ParametrosPixAutomaticoList>();
+  const [people, setPeople] = useState<PixAutomaticoListPeople>();
+  const [date, setDate] = useState(() => {
+    const hoje = new Date(); // pega a data atual
+    hoje.setMonth(hoje.getMonth() + 1); // adiciona +1 mês
+    return hoje.toLocaleDateString("pt-BR"); // formata como "DD/MM/AAAA"
+  });
   const [pixAutoData, setPixAutoData] = useState<PixAuto>({
     contrato: "",
     cpf: "",
@@ -56,7 +56,25 @@ export const PixAutomatico = () => {
       setLoading(false);
     }
   }
-  async function getClientesPixAutomatico() {}
+  async function getClientesPixAutomatico() {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoClients`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log(response.data);
+      setPeople(response.data.cobsr);
+      setParametros(response.data.parametros);
+    } catch (error: any) {
+      setError(error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function removerPixAutomatico() {}
 
   // 🔧 Função que converte qualquer tipo de erro em string segura
@@ -89,7 +107,14 @@ export const PixAutomatico = () => {
       <NavBar />
 
       <div className="bg-gray-100 text-gray-900 relative p-10 rounded-md flex flex-col gap-4 items-center">
-        {permission! >= 5 && <CiSettings onClick={() => {navigate('/Pix/automaticoAdmin')}} className="text-6xl sm:text-4xl sm:absolute sm:right-10 cursor-pointer"/>}
+        {permission! >= 5 && (
+          <CiSettings
+            onClick={() => {
+              navigate("/Pix/automaticoAdmin");
+            }}
+            className="text-6xl sm:text-4xl sm:absolute sm:right-10 cursor-pointer"
+          />
+        )}
 
         <h1 className="text-2xl font-bold">Pix Automático</h1>
         <p className="text-gray-700">
@@ -165,7 +190,7 @@ export const PixAutomatico = () => {
                     onChange={(e) =>
                       setPixAutoData((prev) => ({
                         ...prev,
-                        politica: e.target.value,
+                        contrato: e.target.value,
                       }))
                     }
                   />
@@ -206,18 +231,14 @@ export const PixAutomatico = () => {
                     className="ring-1 rounded-sm p-2"
                     type="text"
                     placeholder="Data Inicial"
-                    onChange={(e) =>
-                      setPixAutoData((prev) => ({
-                        ...prev,
-                        data_inicial: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setDate(e.target.value)}
                     value={date}
                   />
                   <input
                     className="ring-1 rounded-sm p-2"
                     type="text"
                     placeholder="Periodicidade"
+                    value={"MENSAL"}
                     onChange={(e) =>
                       setPixAutoData((prev) => ({
                         ...prev,
@@ -246,6 +267,7 @@ export const PixAutomatico = () => {
                         politica: e.target.value,
                       }))
                     }
+                    value={"NAO_PERMITE"}
                   />
                 </div>
 
@@ -259,6 +281,122 @@ export const PixAutomatico = () => {
         {remover && <></>}
         {loading && <p>Carregando ....</p>}
         {error && <p>{error}</p>}
+        <div>
+          <h1 className="text-xl my-2">Buscar Clientes Já Cadastrados</h1>
+          <button
+            className="rounded-md ring-1 p-2 bg-cyan-800 text-white w-full sm:w-60"
+            onClick={getClientesPixAutomatico}
+          >
+            Buscar
+          </button>
+          {people && (
+            <div>
+              <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div className="sm:flex sm:items-center">
+                  <div className="sm:flex-auto">
+                    <h1 className="text-base font-semibold text-gray-900">
+                      Users
+                    </h1>
+                    <p className="mt-2 text-sm text-gray-700">
+                      A list of all the users in your account including their
+                      name, title, email and role.
+                    </p>
+                  </div>
+                  <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none"></div>
+                </div>
+              </div>
+              <div className="mt-8 flow-root overflow-hidden">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                  <table className="w-full text-left">
+                    <thead className="bg-white">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="relative isolate py-3.5 pr-3 text-left text-sm font-semibold text-gray-900"
+                        >
+                          Name
+                          <div className="absolute inset-y-0 right-full -z-10 w-screen border-b border-b-gray-200" />
+                          <div className="absolute inset-y-0 left-0 -z-10 w-screen border-b border-b-gray-200" />
+                        </th>
+                        <th
+                          scope="col"
+                          className="hidden px-3 py-3.5 text-left text-sm font-semibold text-gray-900 sm:table-cell"
+                        >
+                          Title
+                        </th>
+                        <th
+                          scope="col"
+                          className="hidden px-3 py-3.5 text-left text-sm font-semibold text-gray-900 md:table-cell"
+                        >
+                          Email
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                        >
+                          Role
+                        </th>
+                        <th scope="col" className="py-3.5 pl-3">
+                          <span className="sr-only">Edit</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {people?.recs?.length ? (
+                        people.recs.map((person) => (
+                          <tr key={person.idRec}>
+                            <td className="relative py-4 pr-3 text-sm font-medium text-gray-900">
+                              {person.vinculo.contrato}
+                              <div className="absolute bottom-0 right-full h-px w-screen bg-gray-100" />
+                              <div className="absolute bottom-0 left-0 h-px w-screen bg-gray-100" />
+                            </td>
+
+                            <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell">
+                              {person.vinculo.devedor.nome}
+                            </td>
+
+                            <td className="px-3 py-4 text-sm text-gray-500">
+                              R$ {parseFloat(person.valor.valorRec).toFixed(2)}
+                            </td>
+
+                            <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell">
+                              {person.calendario.periodicidade}
+                            </td>
+
+                            <td className="px-3 py-4 text-sm text-gray-500">
+                              {person.status}
+                            </td>
+
+                            <td className="py-4 pl-3 text-right text-sm font-medium">
+                              <a
+                                href="#"
+                                className="text-indigo-600 hover:text-indigo-900"
+                              >
+                                Editar
+                                <span className="sr-only">
+                                  , {person.vinculo.devedor.nome}
+                                </span>
+                              </a>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="text-center py-4 text-gray-500"
+                          >
+                            Nenhum registro encontrado
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
