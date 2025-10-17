@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { NavBar } from "../../components/navbar/NavBar";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
-import { CiSettings } from "react-icons/ci";
+import { CiFilter, CiSettings } from "react-icons/ci";
 import { useNavigate } from "react-router-dom";
 import {
+  FiltrosPix,
   ParametrosPixAutomaticoList,
   PixAuto,
   PixAutomaticoListPeople,
@@ -14,6 +15,7 @@ export const PixAutomatico = () => {
   const [remover, setRemover] = useState(false);
   const [parametros, setParametros] = useState<ParametrosPixAutomaticoList>();
   const [people, setPeople] = useState<PixAutomaticoListPeople>();
+  const [status, setStatus] = useState<"CANCELADA">("CANCELADA");
   const [date, setDate] = useState(() => {
     const hoje = new Date(); // pega a data atual
     hoje.setMonth(hoje.getMonth() + 1); // adiciona +1 mês
@@ -25,16 +27,18 @@ export const PixAutomatico = () => {
     nome: "",
     servico: "",
     data_inicial: date,
-    periodicidade: "",
+    periodicidade: "MENSAL",
     valor: "",
-    politica: "",
+    politica: "NAO_PERMITE",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [idRec, setIdRec] = useState("");
   const token = user?.token;
   const permission = user?.permission;
+  const [filtros, setFiltros] = useState<FiltrosPix>({});
 
   async function criarPixAutomatico(e: React.FormEvent) {
     try {
@@ -66,7 +70,7 @@ export const PixAutomatico = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       console.log(response.data);
-      setPeople(response.data.cobsr);
+      setPeople(response.data);
       setParametros(response.data.parametros);
     } catch (error: any) {
       setError(error);
@@ -75,7 +79,24 @@ export const PixAutomatico = () => {
     }
   }
 
-  async function removerPixAutomatico() {}
+  async function atualizarPixAutomatico(e: React.FormEvent) {
+    try {
+      e.preventDefault();
+      setError("");
+      setLoading(true);
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Pix/atualizarPixAutomaticoClients`,
+        { idRec, status },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log(response.data);
+    } catch (error: any) {
+      const msg = extractErrorMessage(error.response.data);
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   // 🔧 Função que converte qualquer tipo de erro em string segura
   function stringifySafe(x: any): string {
@@ -103,7 +124,7 @@ export const PixAutomatico = () => {
   }
 
   return (
-    <div className="p-5 bg-slate-800 min-h-screen text-gray-200">
+    <div className="sm:p-5 bg-slate-800 min-h-screen text-gray-200">
       <NavBar />
 
       <div className="bg-gray-100 text-gray-900 relative p-10 rounded-md flex flex-col gap-4 items-center">
@@ -170,7 +191,28 @@ export const PixAutomatico = () => {
         {/* Texto dinâmico */}
         <div className="mt-3 text-lg font-semibold">
           {remover ? (
-            <span className="text-red-600">Remover cliente</span>
+            <>
+              <span className="text-red-600">Desativar Cliente</span>
+              <form className="flex flex-col" onSubmit={atualizarPixAutomatico}>
+                <input
+                  className="my-2 ring-1 rounded-sm p-2"
+                  type="text"
+                  placeholder="IdRec"
+                  onChange={(e) => setIdRec(e.target.value)}
+                />
+                <select
+                  className="my-2 ring-1 rounded-sm p-2"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as "CANCELADA")}
+                >
+                  <option value="CANCELADA">CANCELADA</option>
+                </select>
+
+                <button className="rounded-md ring-1 p-2 bg-slate-800 text-white w-full sm:w-60">
+                  Enviar
+                </button>
+              </form>
+            </>
           ) : (
             <span className="text-green-600">Adicionar cliente</span>
           )}
@@ -187,6 +229,7 @@ export const PixAutomatico = () => {
                     className="ring-1 rounded-sm p-2"
                     type="text"
                     placeholder="Contrato"
+                    value={pixAutoData.contrato}
                     onChange={(e) =>
                       setPixAutoData((prev) => ({
                         ...prev,
@@ -198,6 +241,7 @@ export const PixAutomatico = () => {
                     className="ring-1 rounded-sm p-2"
                     type="text"
                     placeholder="CPF"
+                    value={pixAutoData.cpf}
                     onChange={(e) =>
                       setPixAutoData((prev) => ({
                         ...prev,
@@ -209,6 +253,7 @@ export const PixAutomatico = () => {
                     className="ring-1 rounded-sm p-2"
                     type="text"
                     placeholder="Nome Completo"
+                    value={pixAutoData.nome}
                     onChange={(e) =>
                       setPixAutoData((prev) => ({
                         ...prev,
@@ -220,6 +265,7 @@ export const PixAutomatico = () => {
                     className="ring-1 rounded-sm p-2"
                     type="text"
                     placeholder="Serviço"
+                    value={pixAutoData.servico}
                     onChange={(e) =>
                       setPixAutoData((prev) => ({
                         ...prev,
@@ -238,7 +284,7 @@ export const PixAutomatico = () => {
                     className="ring-1 rounded-sm p-2"
                     type="text"
                     placeholder="Periodicidade"
-                    value={"MENSAL"}
+                    value={pixAutoData.periodicidade}
                     onChange={(e) =>
                       setPixAutoData((prev) => ({
                         ...prev,
@@ -250,6 +296,7 @@ export const PixAutomatico = () => {
                     className="ring-1 rounded-sm p-2"
                     type="text"
                     placeholder="Valor"
+                    value={pixAutoData.valor}
                     onChange={(e) =>
                       setPixAutoData((prev) => ({
                         ...prev,
@@ -261,13 +308,13 @@ export const PixAutomatico = () => {
                     className="ring-1 rounded-sm p-2"
                     type="text"
                     placeholder="PoliticaRetentativa"
+                    value={pixAutoData.politica}
                     onChange={(e) =>
                       setPixAutoData((prev) => ({
                         ...prev,
                         politica: e.target.value,
                       }))
                     }
-                    value={"NAO_PERMITE"}
                   />
                 </div>
 
@@ -280,120 +327,123 @@ export const PixAutomatico = () => {
         )}
         {remover && <></>}
         {loading && <p>Carregando ....</p>}
-        {error && <p>{error}</p>}
+        {error && <p className="text-red-500">{error}</p>}
         <div>
           <h1 className="text-xl my-2">Buscar Clientes Já Cadastrados</h1>
-          <button
-            className="rounded-md ring-1 p-2 bg-cyan-800 text-white w-full sm:w-60"
-            onClick={getClientesPixAutomatico}
-          >
-            Buscar
-          </button>
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex items-center">
+              <p>Filtros</p>
+              <CiFilter />
+            </div>
+            <label htmlFor="Status">Status</label>
+            <select className="ring-1 rounded-sm p-2" name="" id="">
+              <option value="">ATIVO</option>
+              <option value="">CANCELADO</option>
+            </select>
+            
+            <button
+              className="rounded-md ring-1 p-2 bg-cyan-800 text-white w-full sm:w-60"
+              onClick={getClientesPixAutomatico}
+            >
+              Buscar
+            </button>
+          </div>
           {people && (
-            <div>
-              <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                <div className="sm:flex sm:items-center">
-                  <div className="sm:flex-auto">
-                    <h1 className="text-base font-semibold text-gray-900">
-                      Users
-                    </h1>
-                    <p className="mt-2 text-sm text-gray-700">
-                      A list of all the users in your account including their
-                      name, title, email and role.
-                    </p>
-                  </div>
-                  <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none"></div>
-                </div>
-              </div>
-              <div className="mt-8 flow-root overflow-hidden">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                  <table className="w-full text-left">
-                    <thead className="bg-white">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="relative isolate py-3.5 pr-3 text-left text-sm font-semibold text-gray-900"
+            <div className="flex flex-col justify-center">
+              <div className="self-center w-1/2 sm:w-full">
+              <div className="w-full overflow-x-auto">
+                <table className="min-w-full border-separate border-spacing-0 text-left my-4">
+                  <thead className="bg-white">
+                    <tr>
+                      <th className="py-3.5 pl-4 pr-3 text-sm font-semibold text-gray-900 sm:pl-6 whitespace-nowrap">
+                        IdRec
+                      </th>
+                      <th className="py-3.5 px-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
+                        Contrato
+                      </th>
+                      <th className="hidden sm:table-cell py-3.5 px-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
+                        Devedor
+                      </th>
+                      <th className="py-3.5 px-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
+                        Valor
+                      </th>
+                      <th className="hidden md:table-cell py-3.5 px-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
+                        Periodicidade
+                      </th>
+                      <th className="py-3.5 px-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
+                        Status
+                      </th>
+                      <th className="py-3.5 pl-3 pr-4 sm:pr-6 text-right">
+                        <span className="sr-only">Editar</span>
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {people?.recs && people.recs.length > 0 ? (
+                      people.recs.map((person) => (
+                        <tr
+                          key={person.idRec}
+                          className="hover:bg-gray-50 transition duration-150 ease-in-out"
                         >
-                          Name
-                          <div className="absolute inset-y-0 right-full -z-10 w-screen border-b border-b-gray-200" />
-                          <div className="absolute inset-y-0 left-0 -z-10 w-screen border-b border-b-gray-200" />
-                        </th>
-                        <th
-                          scope="col"
-                          className="hidden px-3 py-3.5 text-left text-sm font-semibold text-gray-900 sm:table-cell"
-                        >
-                          Title
-                        </th>
-                        <th
-                          scope="col"
-                          className="hidden px-3 py-3.5 text-left text-sm font-semibold text-gray-900 md:table-cell"
-                        >
-                          Email
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
-                        >
-                          Role
-                        </th>
-                        <th scope="col" className="py-3.5 pl-3">
-                          <span className="sr-only">Edit</span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {people?.recs?.length ? (
-                        people.recs.map((person) => (
-                          <tr key={person.idRec}>
-                            <td className="relative py-4 pr-3 text-sm font-medium text-gray-900">
-                              {person.vinculo.contrato}
-                              <div className="absolute bottom-0 right-full h-px w-screen bg-gray-100" />
-                              <div className="absolute bottom-0 left-0 h-px w-screen bg-gray-100" />
-                            </td>
-
-                            <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell">
-                              {person.vinculo.devedor.nome}
-                            </td>
-
-                            <td className="px-3 py-4 text-sm text-gray-500">
-                              R$ {parseFloat(person.valor.valorRec).toFixed(2)}
-                            </td>
-
-                            <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell">
-                              {person.calendario.periodicidade}
-                            </td>
-
-                            <td className="px-3 py-4 text-sm text-gray-500">
-                              {person.status}
-                            </td>
-
-                            <td className="py-4 pl-3 text-right text-sm font-medium">
-                              <a
-                                href="#"
-                                className="text-indigo-600 hover:text-indigo-900"
-                              >
-                                Editar
-                                <span className="sr-only">
-                                  , {person.vinculo.devedor.nome}
-                                </span>
-                              </a>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td
-                            colSpan={5}
-                            className="text-center py-4 text-gray-500"
-                          >
-                            Nenhum registro encontrado
+                          <td className="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 whitespace-nowrap">
+                            {person.idRec || "-"}
+                          </td>
+                          <td className="px-3 py-4 text-sm text-gray-900 whitespace-nowrap">
+                            {person.vinculo.contrato || "-"}
+                          </td>
+                          <td className="hidden sm:table-cell px-3 py-4 text-sm text-gray-600 whitespace-nowrap">
+                            {person.vinculo.devedor?.nome || "Sem nome"}
+                          </td>
+                          <td className="px-3 py-4 text-sm text-gray-600 whitespace-nowrap">
+                            {person.valor?.valorRec
+                              ? `R$ ${parseFloat(person.valor.valorRec).toFixed(
+                                  2
+                                )}`
+                              : "R$ 0,00"}
+                          </td>
+                          <td className="hidden md:table-cell px-3 py-4 text-sm text-gray-600 whitespace-nowrap">
+                            {person.calendario?.periodicidade || "-"}
+                          </td>
+                          <td className="px-3 py-4 text-sm whitespace-nowrap">
+                            <span
+                              className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
+                                person.status === "APROVADA"
+                                  ? "bg-green-100 text-green-800"
+                                  : person.status === "CRIADA"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {person.status || "-"}
+                            </span>
+                          </td>
+                          <td className="py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 whitespace-nowrap">
+                            <button
+                              onClick={() =>
+                                console.log("Editar:", person.idRec)
+                              }
+                              className="text-indigo-600 hover:text-indigo-900 transition-colors"
+                            >
+                              Editar
+                            </button>
                           </td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={7}
+                          className="text-center py-6 text-sm text-gray-500 italic"
+                        >
+                          Nenhum registro encontrado
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
+            </div>
             </div>
           )}
         </div>

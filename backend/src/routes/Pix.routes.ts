@@ -24,6 +24,7 @@ router.post('/criarPixAutomatico', AuthGuard, pixController.PixAutomaticoCriar);
 
 router.post('/criarWebhookPixAutomatico', AuthGuard, pixController.AlterarWebhookPixAutomatico);
 router.post('/getPixAutomaticoClients', AuthGuard, pixController.listaPixAutomatico);
+router.post('/atualizarPixAutomaticoClients', AuthGuard, pixController.atualizarPixAutomatico);
 
 
 // router.post('/PixUnicoVencido/webhook', pixController.StatusUpdatePixUnicoVencido);
