@@ -48,16 +48,20 @@ class Pix {
       .catch(console.log);
   }
 
-  async AlterarWebhookPixAutomatico(req: Request, res: Response): Promise<void> {
+  async AlterarWebhookPixAutomatico(
+    req: Request,
+    res: Response
+  ): Promise<void> {
     try {
-      const {urlWebhook} = req.body;
+      const { urlWebhook } = req.body;
       console.log(urlWebhook);
-      
-    options.validateMtls = false;
-    const efipay = new EfiPay(options);
-    const response = await efipay
-      .pixConfigWebhookRecurrenceAutomatic({}, {webhookUrl: String(urlWebhook) }
-      )
+
+      options.validateMtls = false;
+      const efipay = new EfiPay(options);
+      const response = await efipay.pixConfigWebhookRecurrenceAutomatic(
+        {},
+        { webhookUrl: String(urlWebhook) }
+      );
       res.status(200).json(response);
     } catch (error) {
       res.status(500).json(error);
@@ -229,9 +233,9 @@ class Pix {
     }
   }
 
-  async testwebhook(req: Request, res: Response){
-    console.log('wfwe');
-    
+  async testwebhook(req: Request, res: Response) {
+    console.log("wfwe");
+
     res.status(200).json();
   }
 
@@ -408,14 +412,12 @@ class Pix {
 
       await efipay.pixCreateCharge(params, body);
 
-      res
-        .status(200)
-        .json({
-          valor,
-          pppoe,
-          link: qrlink.linkVisualizacao,
-          dataVenc: cliente.datavenc,
-        });
+      res.status(200).json({
+        valor,
+        pppoe,
+        link: qrlink.linkVisualizacao,
+        dataVenc: cliente.datavenc,
+      });
       return;
     } catch (error: any) {
       console.error("Erro em gerarPixAberto:", error);
@@ -485,14 +487,12 @@ class Pix {
 
       await efipay.pixCreateCharge(params, body);
 
-      res
-        .status(200)
-        .json({
-          valor: total,
-          pppoe,
-          link: qrlink.linkVisualizacao,
-          structuredData,
-        });
+      res.status(200).json({
+        valor: total,
+        pppoe,
+        link: qrlink.linkVisualizacao,
+        structuredData,
+      });
       return;
     } catch (error: any) {
       console.error("Erro em gerarPixAll:", error);
@@ -625,89 +625,125 @@ class Pix {
     }
   }
 
-async PixAutomaticoCriar(req: Request, res: Response): Promise<void> {
-  try {
-    const { pixAutoData } = req.body;
-    let {
-      contrato,
-      cpf,
-      nome,
-      servico,
-      data_inicial,
-      periodicidade,
-      valor,
-      politica,
-    } = pixAutoData;
-
-    const documento = cpf.replace(/\D/g, "");
-
-    const validarCPF = (cpf: string): boolean => {
-      if (!cpf || cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
-      let soma = 0;
-      for (let i = 0; i < 9; i++) soma += parseInt(cpf[i]) * (10 - i);
-      let resto = (soma * 10) % 11;
-      if (resto === 10 || resto === 11) resto = 0;
-      if (resto !== parseInt(cpf[9])) return false;
-      soma = 0;
-      for (let i = 0; i < 10; i++) soma += parseInt(cpf[i]) * (11 - i);
-      resto = (soma * 10) % 11;
-      if (resto === 10 || resto === 11) resto = 0;
-      return resto === parseInt(cpf[10]);
-    };
-
-    const validarCNPJ = (cnpj: string): boolean => {
-      if (!cnpj || cnpj.length !== 14 || /^(\d)\1+$/.test(cnpj)) return false;
-      let tamanho = cnpj.length - 2;
-      let numeros = cnpj.substring(0, tamanho);
-      const digitos = cnpj.substring(tamanho);
-      let soma = 0;
-      let pos = tamanho - 7;
-      for (let i = tamanho; i >= 1; i--) {
-        soma += parseInt(numeros[tamanho - i]) * pos--;
-        if (pos < 2) pos = 9;
-      }
-      let resto = soma % 11 < 2 ? 0 : 11 - (soma % 11);
-      if (resto !== parseInt(digitos[0])) return false;
-      tamanho = tamanho + 1;
-      numeros = cnpj.substring(0, tamanho);
-      soma = 0;
-      pos = tamanho - 7;
-      for (let i = tamanho; i >= 1; i--) {
-        soma += parseInt(numeros[tamanho - i]) * pos--;
-        if (pos < 2) pos = 9;
-      }
-      resto = soma % 11 < 2 ? 0 : 11 - (soma % 11);
-      return resto === parseInt(digitos[1]);
-    };
-
-    const efipay = new EfiPay(options);
-    const isCPF = validarCPF(documento);
-    const isCNPJ = validarCNPJ(documento);
-
-    if (!isCPF && !isCNPJ) {
-      res.status(400).json({ error: "CPF/CNPJ inválido" });
-      return;
-    }
-
-    const payload = {
-      calendario: { dataInicial: data_inicial, periodicidade },
-      politicaRetentativa: politica,
-      valor,
-      vinculo: {
+  async PixAutomaticoCriar(req: Request, res: Response): Promise<void> {
+    try {
+      const { pixAutoData } = req.body;
+      let {
         contrato,
-        devedor: isCPF
-          ? { nome, cpf: documento }
-          : { nome, cnpj: documento },
-      },
-    };
+        cpf,
+        nome,
+        servico,
+        data_inicial,
+        periodicidade,
+        valor,
+        politica,
+      } = pixAutoData;
 
-    const response = await efipay.pixCreateRecurrenceAutomatic("", payload);
-    res.status(200).json(response);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json(error);
+      const documento = cpf.replace(/\D/g, "");
+
+      if (data_inicial.includes("/")) {
+        const [dia, mes, ano] = data_inicial.split("/");
+        data_inicial = `${ano}-${mes}-${dia}`;
+      }
+
+      valor = parseFloat(valor);
+
+      if (isNaN(valor)) {
+        res.status(400).json({
+          error: "O campo 'valor' deve ser um número válido.",
+        });
+        return;
+      }
+
+      valor = valor.toFixed(2);
+
+      console.log(
+        contrato,
+        cpf,
+        nome,
+        servico,
+        data_inicial,
+        periodicidade,
+        valor,
+        politica
+      );
+
+      const validarCPF = (cpf: string): boolean => {
+        if (!cpf || cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+        let soma = 0;
+        for (let i = 0; i < 9; i++) soma += parseInt(cpf[i]) * (10 - i);
+        let resto = (soma * 10) % 11;
+        if (resto === 10 || resto === 11) resto = 0;
+        if (resto !== parseInt(cpf[9])) return false;
+        soma = 0;
+        for (let i = 0; i < 10; i++) soma += parseInt(cpf[i]) * (11 - i);
+        resto = (soma * 10) % 11;
+        if (resto === 10 || resto === 11) resto = 0;
+        return resto === parseInt(cpf[10]);
+      };
+
+      const validarCNPJ = (cnpj: string): boolean => {
+        if (!cnpj || cnpj.length !== 14 || /^(\d)\1+$/.test(cnpj)) return false;
+        let tamanho = cnpj.length - 2;
+        let numeros = cnpj.substring(0, tamanho);
+        const digitos = cnpj.substring(tamanho);
+        let soma = 0;
+        let pos = tamanho - 7;
+        for (let i = tamanho; i >= 1; i--) {
+          soma += parseInt(numeros[tamanho - i]) * pos--;
+          if (pos < 2) pos = 9;
+        }
+        let resto = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+        if (resto !== parseInt(digitos[0])) return false;
+        tamanho = tamanho + 1;
+        numeros = cnpj.substring(0, tamanho);
+        soma = 0;
+        pos = tamanho - 7;
+        for (let i = tamanho; i >= 1; i--) {
+          soma += parseInt(numeros[tamanho - i]) * pos--;
+          if (pos < 2) pos = 9;
+        }
+        resto = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+        return resto === parseInt(digitos[1]);
+      };
+
+      const efipay = new EfiPay(options);
+      const isCPF = validarCPF(documento);
+      const isCNPJ = validarCNPJ(documento);
+
+      if (!isCPF && !isCNPJ) {
+        res.status(400).json({ error: "CPF/CNPJ inválido" });
+        return;
+      }
+
+      const payload = {
+        calendario: { dataInicial: data_inicial, periodicidade },
+        politicaRetentativa: politica,
+        valor: {valorRec: valor},
+        vinculo: {
+          contrato,
+          devedor: isCPF ? { nome, cpf: documento } : { nome, cnpj: documento },
+        },
+      };
+
+      const response = await efipay.pixCreateRecurrenceAutomatic("", payload);
+      res.status(200).json(response);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json(error);
+    }
   }
-}
+
+  async listaPixAutomatico(req: Request, res: Response) : Promise<void> {
+    try {
+      const efi = new EfiPay(options);
+      const hoje = new Date().toISOString().split(".")[0] + "Z";
+      const response = await efi.pixListAutomaticCharge({inicio: '2025-10-17T00:00:00Z', fim: hoje});
+      res.status(200).json(response);
+    } catch (error) {
+      res.status(500).json(error);
+    }
+  }
 
 }
 
