@@ -1,18 +1,96 @@
 import React, { useState } from "react";
 import { NavBar } from "../../components/navbar/NavBar";
-
-async function criarPixAutomatico() {}
-async function getClientesPixAutomatico() {}
-async function removerPixAutomatico() {}
+import axios from "axios";
+import { useAuth } from "../../context/AuthContext";
+import { CiSettings } from "react-icons/ci";
+import { useNavigate } from "react-router-dom";
 
 export const PixAutomatico = () => {
+  interface PixAuto {
+    contrato: string;
+    cpf: string;
+    nome: string;
+    servico: string;
+    data_inicial: string;
+    periodicidade: string;
+    valor: string;
+    politica: string;
+  }
+
   const [remover, setRemover] = useState(false);
-  const [date, setDate] = useState(new Date().toLocaleDateString("pt-BR"))
+  const [date, setDate] = useState(new Date().toLocaleDateString("pt-BR"));
+  const [pixAutoData, setPixAutoData] = useState<PixAuto>({
+    contrato: "",
+    cpf: "",
+    nome: "",
+    servico: "",
+    data_inicial: date,
+    periodicidade: "",
+    valor: "",
+    politica: "",
+  });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const token = user?.token;
+  const permission = user?.permission;
+
+  async function criarPixAutomatico(e: React.FormEvent) {
+    try {
+      console.log(pixAutoData);
+
+      e.preventDefault();
+      setError("");
+      setLoading(true);
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Pix/criarPixAutomatico`,
+        { pixAutoData },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log(response.data);
+    } catch (error: any) {
+      const msg = extractErrorMessage(error.response.data);
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+  async function getClientesPixAutomatico() {}
+  async function removerPixAutomatico() {}
+
+  // 🔧 Função que converte qualquer tipo de erro em string segura
+  function stringifySafe(x: any): string {
+    if (typeof x === "string") return x;
+    try {
+      return JSON.stringify(x);
+    } catch {
+      return String(x);
+    }
+  }
+
+  // 🔧 Função que captura qualquer tipo de erro (string, objeto, AxiosError, etc.)
+  function extractErrorMessage(err: any): string {
+    if (err && err.response) {
+      const d = err.response.data;
+      if (typeof d === "string") return d;
+      if (d == null) return `HTTP ${err.response.status || ""}`;
+      return stringifySafe(d);
+    }
+    if (err && err.request) {
+      return "Falha de rede ou servidor indisponível.";
+    }
+    if (err instanceof Error && err.message) return err.message;
+    return stringifySafe(err);
+  }
 
   return (
     <div className="p-5 bg-slate-800 min-h-screen text-gray-200">
       <NavBar />
-      <div className="bg-gray-100 text-gray-900 p-10 rounded-md flex flex-col gap-4 items-center">
+
+      <div className="bg-gray-100 text-gray-900 relative p-10 rounded-md flex flex-col gap-4 items-center">
+        {permission! >= 5 && <CiSettings onClick={() => {navigate('/Pix/automaticoAdmin')}} className="text-6xl sm:text-4xl sm:absolute sm:right-10 cursor-pointer"/>}
+
         <h1 className="text-2xl font-bold">Pix Automático</h1>
         <p className="text-gray-700">
           Gerencie e adicione clientes ao Pix Automático
@@ -72,18 +150,115 @@ export const PixAutomatico = () => {
             <span className="text-green-600">Adicionar cliente</span>
           )}
         </div>
-        <div>
-          <form className="flex flex-col [&>*:nth-child(odd)]:bg-gray-100 gap-3">
-          <input className="ring-1 rounded-sm p-2" type="text" placeholder="Contrato" />
-          <input className="ring-1 rounded-sm p-2" type="text" placeholder="CPF" />
-          <input className="ring-1 rounded-sm p-2" type="text" placeholder="Nome Completo" />
-          <input className="ring-1 rounded-sm p-2" type="text" placeholder="Serviço" />
-          <input className="ring-1 rounded-sm p-2" type="text" placeholder="Data Inicial" value={date}/>
-          <input className="ring-1 rounded-sm p-2" type="text" placeholder="Periodicidade" />
-          <input className="ring-1 rounded-sm p-2" type="text" placeholder="Valor" />
-          <input className="ring-1 rounded-sm p-2" type="text" placeholder="PoliticaRetentativa" />
-        </form>
-        </div>
+        {!remover && (
+          <>
+            <div>
+              <form
+                onSubmit={criarPixAutomatico}
+                className="flex flex-col gap-3"
+              >
+                <div className="[&>*:nth-child(odd)]:bg-gray-100 flex flex-col gap-3">
+                  <input
+                    className="ring-1 rounded-sm p-2"
+                    type="text"
+                    placeholder="Contrato"
+                    onChange={(e) =>
+                      setPixAutoData((prev) => ({
+                        ...prev,
+                        politica: e.target.value,
+                      }))
+                    }
+                  />
+                  <input
+                    className="ring-1 rounded-sm p-2"
+                    type="text"
+                    placeholder="CPF"
+                    onChange={(e) =>
+                      setPixAutoData((prev) => ({
+                        ...prev,
+                        cpf: e.target.value,
+                      }))
+                    }
+                  />
+                  <input
+                    className="ring-1 rounded-sm p-2"
+                    type="text"
+                    placeholder="Nome Completo"
+                    onChange={(e) =>
+                      setPixAutoData((prev) => ({
+                        ...prev,
+                        nome: e.target.value,
+                      }))
+                    }
+                  />
+                  <input
+                    className="ring-1 rounded-sm p-2"
+                    type="text"
+                    placeholder="Serviço"
+                    onChange={(e) =>
+                      setPixAutoData((prev) => ({
+                        ...prev,
+                        servico: e.target.value,
+                      }))
+                    }
+                  />
+                  <input
+                    className="ring-1 rounded-sm p-2"
+                    type="text"
+                    placeholder="Data Inicial"
+                    onChange={(e) =>
+                      setPixAutoData((prev) => ({
+                        ...prev,
+                        data_inicial: e.target.value,
+                      }))
+                    }
+                    value={date}
+                  />
+                  <input
+                    className="ring-1 rounded-sm p-2"
+                    type="text"
+                    placeholder="Periodicidade"
+                    onChange={(e) =>
+                      setPixAutoData((prev) => ({
+                        ...prev,
+                        periodicidade: e.target.value,
+                      }))
+                    }
+                  />
+                  <input
+                    className="ring-1 rounded-sm p-2"
+                    type="text"
+                    placeholder="Valor"
+                    onChange={(e) =>
+                      setPixAutoData((prev) => ({
+                        ...prev,
+                        valor: e.target.value,
+                      }))
+                    }
+                  />
+                  <input
+                    className="ring-1 rounded-sm p-2"
+                    type="text"
+                    placeholder="PoliticaRetentativa"
+                    onChange={(e) =>
+                      setPixAutoData((prev) => ({
+                        ...prev,
+                        politica: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <button className="rounded-md ring-1 p-2 bg-slate-800 text-white w-full sm:w-60">
+                  Enviar
+                </button>
+              </form>
+            </div>
+          </>
+        )}
+        {remover && <></>}
+        {loading && <p>Carregando ....</p>}
+        {error && <p>{error}</p>}
       </div>
     </div>
   );

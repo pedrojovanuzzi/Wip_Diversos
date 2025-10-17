@@ -21,9 +21,13 @@ router.get('/geradorTitulos', AuthGuard, pixController.gerarPixVariasContas);
 
 router.post('/criarPixAutomatico', AuthGuard, pixController.PixAutomaticoCriar);
 
+router.post('/criarWebhookPixAutomatico', AuthGuard, pixController.AlterarWebhookPixAutomatico);
+
 
 // router.post('/PixUnicoVencido/webhook', pixController.StatusUpdatePixUnicoVencido);
 router.post('/PixTodosVencidos/webhook', pixController.StatusUpdatePixTodosVencidos);
+router.post('/PixAutomatico/webhook', pixController.testwebhook);
+router.get('/PixAutomatico/webhook', pixController.testwebhook);
 
 
 export default router;
