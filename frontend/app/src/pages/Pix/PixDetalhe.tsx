@@ -126,7 +126,7 @@ export const PixDetalhe = () => {
   }
 
   return (
-    <div className="p-5 bg-slate-800 min-h-screen text-gray-200">
+    <div className="sm:p-5 bg-slate-800 min-h-screen text-gray-200">
       <NavBar />
       <form>
         <div className="bg-gray-100 text-gray-900 p-10 rounded-md">

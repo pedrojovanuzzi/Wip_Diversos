@@ -738,7 +738,20 @@ class Pix {
     try {
       const efi = new EfiPay(options);
       const hoje = new Date().toISOString().split(".")[0] + "Z";
-      const response = await efi.pixListAutomaticCharge({inicio: '2025-10-17T00:00:00Z', fim: hoje});
+      const response = await efi.pixListRecurrenceAutomatic({inicio: '2025-10-17T00:00:00Z', fim: hoje});
+      res.status(200).json(response);
+    } catch (error) {
+      res.status(500).json(error);
+    }
+  }
+
+  async atualizarPixAutomatico(req: Request, res: Response) : Promise<void> {
+    try {
+      const {idRec, status} = req.body;
+      console.log(idRec, status);
+      
+      const efipay = new EfiPay(options);
+      const response = await efipay.pixUpdateRecurrenceAutomatic({idRec: idRec}, {status: status});
       res.status(200).json(response);
     } catch (error) {
       res.status(500).json(error);
