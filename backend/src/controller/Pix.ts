@@ -719,7 +719,7 @@ class Pix {
       const payload = {
         calendario: { dataInicial: data_inicial, periodicidade },
         politicaRetentativa: politica,
-        valor: {valorRec: valor},
+        valor: { valorRec: valor },
         vinculo: {
           contrato,
           devedor: isCPF ? { nome, cpf: documento } : { nome, cnpj: documento },
@@ -734,30 +734,72 @@ class Pix {
     }
   }
 
-  async listaPixAutomatico(req: Request, res: Response) : Promise<void> {
+  async listaPixAutomatico(req: Request, res: Response): Promise<void> {
     try {
+      const { filtros } = req.body;
+      
       const efi = new EfiPay(options);
       const hoje = new Date().toISOString().split(".")[0] + "Z";
-      const response = await efi.pixListRecurrenceAutomatic({inicio: '2025-10-17T00:00:00Z', fim: hoje});
+
+      if (filtros && filtros.status && filtros.status != 'TODOS') {
+        const response = await efi.pixListRecurrenceAutomatic({
+          inicio: "2025-10-17T00:00:00Z",
+          status: filtros.status,
+          fim: hoje,
+          "paginacao.itensPorPagina": 100,
+        });
+        res.status(200).json(response);
+        return;
+      }
+
+      const response = await efi.pixListRecurrenceAutomatic({
+        inicio: "2025-10-17T00:00:00Z",
+        fim: hoje,
+        "paginacao.itensPorPagina": 100,
+      });
       res.status(200).json(response);
     } catch (error) {
+      console.log(error);
+
       res.status(500).json(error);
     }
   }
 
-  async atualizarPixAutomatico(req: Request, res: Response) : Promise<void> {
+  async listarPixAutomaticoUmCliente(
+    req: Request,
+    res: Response
+  ): Promise<void> {
     try {
-      const {idRec, status} = req.body;
-      console.log(idRec, status);
+      const { filtros } = req.body;
+      console.log(filtros.idRec);
       
-      const efipay = new EfiPay(options);
-      const response = await efipay.pixUpdateRecurrenceAutomatic({idRec: idRec}, {status: status});
+      const efi = new EfiPay(options);
+      const response = await efi.pixDetailRecurrenceAutomatic({
+        idRec: filtros.idRec,
+      });
+      console.log(response);
+      
       res.status(200).json(response);
     } catch (error) {
       res.status(500).json(error);
     }
   }
 
+  async atualizarPixAutomatico(req: Request, res: Response): Promise<void> {
+    try {
+      const { idRec, status } = req.body;
+      console.log(idRec, status);
+
+      const efipay = new EfiPay(options);
+      const response = await efipay.pixUpdateRecurrenceAutomatic(
+        { idRec: idRec },
+        { status: status }
+      );
+      res.status(200).json(response);
+    } catch (error) {
+      res.status(500).json(error);
+    }
+  }
 }
 
 export default Pix;

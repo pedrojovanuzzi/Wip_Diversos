@@ -50,10 +50,42 @@ export interface PixAutomaticoListPeople {
   recs: PixRecurrence[];
 }
 
+export interface PixAutomaticoListOnePeople {
+  idRec: string;
+  ativacao: {
+    tipoJornada: string;
+  };
+  atualizacao: Array<{
+    status: string;
+    data: string;
+  }>;
+  calendario: {
+    dataInicial: string;
+    periodicidade: string;
+  };
+  politicaRetentativa: string;
+  recebedor: {
+    nome: string;
+    cnpj: string;
+  };
+  status: string;
+  valor: {
+    valorRec: string;
+  };
+  vinculo: {
+    contrato: string;
+    devedor: {
+      cpf: string;
+      nome: string;
+    };
+  };
+}
+
+
 export interface FiltrosPix {
-  status?: 'CRIADA' | 'CANCELADA';
-  periodicidade?: 'SEMANAL' | 'MENSAL' | 'ANUAL';
-  valor? : number,
+  status?: 'CRIADA' | 'CANCELADA' | 'TODOS';
+  periodicidade?: 'SEMANAL' | 'MENSAL' | 'ANUAL' | 'TODOS';
+  idRec? : string,
 }
 
 export interface PixRecurrence {

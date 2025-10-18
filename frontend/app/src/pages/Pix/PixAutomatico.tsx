@@ -8,14 +8,18 @@ import {
   FiltrosPix,
   ParametrosPixAutomaticoList,
   PixAuto,
+  PixAutomaticoListOnePeople,
   PixAutomaticoListPeople,
 } from "../../types";
 
 export const PixAutomatico = () => {
   const [remover, setRemover] = useState(false);
   const [parametros, setParametros] = useState<ParametrosPixAutomaticoList>();
-  const [people, setPeople] = useState<PixAutomaticoListPeople>();
+  const [people, setPeople] = useState<
+    PixAutomaticoListPeople | PixAutomaticoListOnePeople
+  >();
   const [status, setStatus] = useState<"CANCELADA">("CANCELADA");
+  const [filtrosActive, setFiltrosActive] = useState(false);
   const [date, setDate] = useState(() => {
     const hoje = new Date(); // pega a data atual
     hoje.setMonth(hoje.getMonth() + 1); // adiciona +1 mês
@@ -64,16 +68,37 @@ export const PixAutomatico = () => {
     try {
       setLoading(true);
       setError("");
-      const response = await axios.post(
-        `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoClients`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      console.log(response.data);
-      setPeople(response.data);
-      setParametros(response.data.parametros);
+      if (!filtrosActive) {
+        const response = await axios.post(
+          `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoClients`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        console.log(response.data);
+        setPeople(response.data);
+        setParametros(response.data.parametros);
+      } else if (filtrosActive && filtros.idRec) {
+        const response = await axios.post(
+          `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoOneClient`,
+          { filtros },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        console.log(response.data);
+        setPeople(response.data);
+        setParametros(response.data.parametros);
+      } else if (filtrosActive && !filtros.idRec) {
+        const response = await axios.post(
+          `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoClients`,
+          { filtros },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        console.log(response.data);
+        setPeople(response.data);
+        setParametros(response.data.parametros);
+      }
     } catch (error: any) {
-      setError(error);
+      const msg = extractErrorMessage(error.response.data);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -331,16 +356,73 @@ export const PixAutomatico = () => {
         <div>
           <h1 className="text-xl my-2">Buscar Clientes Já Cadastrados</h1>
           <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center">
-              <p>Filtros</p>
-              <CiFilter />
+            <div className="flex gap-2 items-center">
+              <div className="group relative inline-flex w-11 shrink-0 rounded-full bg-gray-200 p-0.5 outline-offset-2 outline-indigo-600 ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-indigo-600 has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
+                <span className="size-5 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-5" />
+                <input
+                  name="setting"
+                  type="checkbox"
+                  onChange={() => setFiltrosActive((prev) => !prev)}
+                  aria-label="Use setting"
+                  className="absolute inset-0 appearance-none focus:outline-none"
+                />
+              </div>
+              <h1>Filtros</h1> <CiFilter />
             </div>
-            <label htmlFor="Status">Status</label>
-            <select className="ring-1 rounded-sm p-2" name="" id="">
-              <option value="">ATIVO</option>
-              <option value="">CANCELADO</option>
-            </select>
-            
+            {filtrosActive && (
+              <>
+                <div className="flex items-center">
+                  <p>Filtros</p>
+                </div>
+                <label htmlFor="Status">Status</label>
+                <select
+                  className="ring-1 rounded-sm p-2 w-32"
+                  value={filtros.status}
+                  onChange={(e) =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      status: e.target.value as
+                        | "CRIADA"
+                        | "CANCELADA"
+                        | "TODOS",
+                    }))
+                  }
+                >
+                  <option value="CRIADA">ATIVO</option>
+                  <option value="CANCELADA">CANCELADO</option>
+                  <option value="TODOS">TODOS</option>
+                </select>
+                {/* <label htmlFor="Status">Periodicidade</label>
+                <select
+                  className="ring-1 rounded-sm p-2 w-32"
+                  value={filtros.periodicidade}
+                  onChange={(e) =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      periodicidade: e.target.value as
+                        | "SEMANAL"
+                        | "MENSAL"
+                        | "ANUAL"
+                        | "TODOS",
+                    }))
+                  }
+                >
+                  <option value="SEMANAL">Semanal</option>
+                  <option value="MENSAL">Mensal</option>
+                  <option value="ANUAL">Anual</option>
+                  <option value="ANUAL">Todos</option>
+                </select> */}
+                <h1>IdRec</h1>
+                <input
+                  onChange={(e) => {
+                    setFiltros((prev) => ({ ...prev, idRec: e.target.value }));
+                  }}
+                  className="ring-1 rounded-sm p-2 w-32"
+                  placeholder="RN09089356202510176a86b02579f"
+                  type="text"
+                />
+              </>
+            )}
             <button
               className="rounded-md ring-1 p-2 bg-cyan-800 text-white w-full sm:w-60"
               onClick={getClientesPixAutomatico}
@@ -349,101 +431,208 @@ export const PixAutomatico = () => {
             </button>
           </div>
           {people && (
-            <div className="flex flex-col justify-center">
-              <div className="self-center w-1/2 sm:w-full">
-              <div className="w-full overflow-x-auto">
-                <table className="min-w-full border-separate border-spacing-0 text-left my-4">
-                  <thead className="bg-white">
-                    <tr>
-                      <th className="py-3.5 pl-4 pr-3 text-sm font-semibold text-gray-900 sm:pl-6 whitespace-nowrap">
-                        IdRec
-                      </th>
-                      <th className="py-3.5 px-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
-                        Contrato
-                      </th>
-                      <th className="hidden sm:table-cell py-3.5 px-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
-                        Devedor
-                      </th>
-                      <th className="py-3.5 px-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
-                        Valor
-                      </th>
-                      <th className="hidden md:table-cell py-3.5 px-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
-                        Periodicidade
-                      </th>
-                      <th className="py-3.5 px-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
-                        Status
-                      </th>
-                      <th className="py-3.5 pl-3 pr-4 sm:pr-6 text-right">
-                        <span className="sr-only">Editar</span>
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-gray-200 bg-white">
-                    {people?.recs && people.recs.length > 0 ? (
-                      people.recs.map((person) => (
-                        <tr
-                          key={person.idRec}
-                          className="hover:bg-gray-50 transition duration-150 ease-in-out"
-                        >
-                          <td className="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 whitespace-nowrap">
-                            {person.idRec || "-"}
-                          </td>
-                          <td className="px-3 py-4 text-sm text-gray-900 whitespace-nowrap">
-                            {person.vinculo.contrato || "-"}
-                          </td>
-                          <td className="hidden sm:table-cell px-3 py-4 text-sm text-gray-600 whitespace-nowrap">
-                            {person.vinculo.devedor?.nome || "Sem nome"}
-                          </td>
-                          <td className="px-3 py-4 text-sm text-gray-600 whitespace-nowrap">
-                            {person.valor?.valorRec
-                              ? `R$ ${parseFloat(person.valor.valorRec).toFixed(
-                                  2
-                                )}`
-                              : "R$ 0,00"}
-                          </td>
-                          <td className="hidden md:table-cell px-3 py-4 text-sm text-gray-600 whitespace-nowrap">
-                            {person.calendario?.periodicidade || "-"}
-                          </td>
-                          <td className="px-3 py-4 text-sm whitespace-nowrap">
-                            <span
-                              className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
-                                person.status === "APROVADA"
-                                  ? "bg-green-100 text-green-800"
-                                  : person.status === "CRIADA"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-gray-100 text-gray-800"
-                              }`}
-                            >
-                              {person.status || "-"}
-                            </span>
-                          </td>
-                          <td className="py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 whitespace-nowrap">
-                            <button
-                              onClick={() =>
-                                console.log("Editar:", person.idRec)
-                              }
-                              className="text-indigo-600 hover:text-indigo-900 transition-colors"
-                            >
-                              Editar
-                            </button>
-                          </td>
+            <div className="flex flex-col justify-center mt-6">
+              <div className="self-center w-full sm:w-11/12 md:w-3/4 lg:w-2/3">
+                <div className="w-full overflow-x-auto">
+                  {/* CASO SEJA UMA LISTA */}
+                  {Array.isArray((people as PixAutomaticoListPeople)?.recs) &&
+                  (people as PixAutomaticoListPeople).recs.length > 0 ? (
+                    <div className="p-2 flex flex-col justify-center w-[70vw] sm:w-full sm:p-0 overflow-auto">
+                      <table className="min-w-full border-separate border-spacing-0 text-left my-4 bg-white rounded-md shadow-sm">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                            IdRec
+                          </th>
+                          <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                            Contrato
+                          </th>
+                          <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                            Devedor
+                          </th>
+                          <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                            Valor
+                          </th>
+                          <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                            Periodicidade
+                          </th>
+                          <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                            Status
+                          </th>
+                          <th className="py-3 px-4"></th>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan={7}
-                          className="text-center py-6 text-sm text-gray-500 italic"
-                        >
-                          Nenhum registro encontrado
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {(people as PixAutomaticoListPeople).recs.map(
+                          (person) => (
+                            <tr key={person.idRec} className="hover:bg-gray-50">
+                              <td className="py-3 px-4 text-sm text-gray-900">
+                                {person.idRec}
+                              </td>
+                              <td className="py-3 px-4 text-sm text-gray-900">
+                                {person.vinculo.contrato}
+                              </td>
+                              <td className="py-3 px-4 text-sm text-gray-700">
+                                {person.vinculo.devedor?.nome}
+                              </td>
+                              <td className="py-3 px-4 text-sm text-gray-700">
+                                R${" "}
+                                {parseFloat(person.valor.valorRec).toFixed(2)}
+                              </td>
+                              <td className="py-3 px-4 text-sm text-gray-700">
+                                {person.calendario.periodicidade}
+                              </td>
+                              <td className="py-3 px-4 text-sm">
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                    person.status === "CRIADA"
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : "bg-gray-100 text-gray-700"
+                                  }`}
+                                >
+                                  {person.status}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right text-sm">
+                                <button className="text-indigo-600 hover:text-indigo-900">
+                                  Editar
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        )}
+                      </tbody>
+                    </table>
+                    </div>
+                  ) : (
+                    // CASO SEJA UM ÚNICO REGISTRO
+                    (people as PixAutomaticoListOnePeople)?.idRec && (
+                      <div className="p-2 flex flex-col justify-center w-[70vw] sm:min-w-full sm:p-0 overflow-auto">
+                        <table className="text-left bg-white rounded-md shadow-sm border">
+                        <tbody>
+                          <tr className="border-b">
+                            <th className="py-2 px-4 text-gray-700">
+                              ID Recorrência
+                            </th>
+                            <td className="py-2 px-4">
+                              {(people as PixAutomaticoListOnePeople).idRec}
+                            </td>
+                          </tr>
+                          <tr className="border-b">
+                            <th className="py-2 px-4 text-gray-700">
+                              Contrato
+                            </th>
+                            <td className="py-2 px-4">
+                              {
+                                (people as PixAutomaticoListOnePeople).vinculo
+                                  .contrato
+                              }
+                            </td>
+                          </tr>
+                          <tr className="border-b">
+                            <th className="py-2 px-4 text-gray-700">
+                              Nome do Devedor
+                            </th>
+                            <td className="py-2 px-4">
+                              {
+                                (people as PixAutomaticoListOnePeople).vinculo
+                                  .devedor.nome
+                              }
+                            </td>
+                          </tr>
+                          <tr className="border-b">
+                            <th className="py-2 px-4 text-gray-700">CPF</th>
+                            <td className="py-2 px-4">
+                              {
+                                (people as PixAutomaticoListOnePeople).vinculo
+                                  .devedor.cpf
+                              }
+                            </td>
+                          </tr>
+                          <tr className="border-b">
+                            <th className="py-2 px-4 text-gray-700">
+                              Valor Recorrente
+                            </th>
+                            <td className="py-2 px-4">
+                              R${" "}
+                              {parseFloat(
+                                (people as PixAutomaticoListOnePeople).valor
+                                  .valorRec
+                              ).toFixed(2)}
+                            </td>
+                          </tr>
+                          <tr className="border-b">
+                            <th className="py-2 px-4 text-gray-700">
+                              Periodicidade
+                            </th>
+                            <td className="py-2 px-4">
+                              {
+                                (people as PixAutomaticoListOnePeople)
+                                  .calendario.periodicidade
+                              }
+                            </td>
+                          </tr>
+                          <tr className="border-b">
+                            <th className="py-2 px-4 text-gray-700">
+                              Data Inicial
+                            </th>
+                            <td className="py-2 px-4">
+                              {
+                                (people as PixAutomaticoListOnePeople)
+                                  .calendario.dataInicial
+                              }
+                            </td>
+                          </tr>
+                          <tr className="border-b">
+                            <th className="py-2 px-4 text-gray-700">
+                              Política de Retentativa
+                            </th>
+                            <td className="py-2 px-4">
+                              {
+                                (people as PixAutomaticoListOnePeople)
+                                  .politicaRetentativa
+                              }
+                            </td>
+                          </tr>
+                          <tr className="border-b">
+                            <th className="py-2 px-4 text-gray-700">Status</th>
+                            <td className="py-2 px-4">
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  (people as PixAutomaticoListOnePeople)
+                                    .status === "CRIADA"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-gray-100 text-gray-700"
+                                }`}
+                              >
+                                {(people as PixAutomaticoListOnePeople).status}
+                              </span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <th className="py-2 px-4 text-gray-700">
+                              Recebedor
+                            </th>
+                            <td className="py-2 px-4">
+                              {
+                                (people as PixAutomaticoListOnePeople).recebedor
+                                  .nome
+                              }{" "}
+                              (
+                              {
+                                (people as PixAutomaticoListOnePeople).recebedor
+                                  .cnpj
+                              }
+                              )
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      </div>
+                    )
+                  )}
+                </div>
               </div>
-            </div>
             </div>
           )}
         </div>
