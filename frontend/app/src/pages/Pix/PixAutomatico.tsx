@@ -439,195 +439,218 @@ export const PixAutomatico = () => {
                   (people as PixAutomaticoListPeople).recs.length > 0 ? (
                     <div className="p-2 flex flex-col justify-center w-[70vw] sm:w-full sm:p-0 overflow-auto">
                       <table className="min-w-full border-separate border-spacing-0 text-left my-4 bg-white rounded-md shadow-sm">
-                      <thead className="bg-gray-50 border-b">
-                        <tr>
-                          <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
-                            IdRec
-                          </th>
-                          <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
-                            Contrato
-                          </th>
-                          <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
-                            Devedor
-                          </th>
-                          <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
-                            Valor
-                          </th>
-                          <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
-                            Periodicidade
-                          </th>
-                          <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
-                            Status
-                          </th>
-                          <th className="py-3 px-4"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {(people as PixAutomaticoListPeople).recs.map(
-                          (person) => (
-                            <tr key={person.idRec} className="hover:bg-gray-50">
-                              <td className="py-3 px-4 text-sm text-gray-900">
-                                {person.idRec}
-                              </td>
-                              <td className="py-3 px-4 text-sm text-gray-900">
-                                {person.vinculo.contrato}
-                              </td>
-                              <td className="py-3 px-4 text-sm text-gray-700">
-                                {person.vinculo.devedor?.nome}
-                              </td>
-                              <td className="py-3 px-4 text-sm text-gray-700">
-                                R${" "}
-                                {parseFloat(person.valor.valorRec).toFixed(2)}
-                              </td>
-                              <td className="py-3 px-4 text-sm text-gray-700">
-                                {person.calendario.periodicidade}
-                              </td>
-                              <td className="py-3 px-4 text-sm">
-                                <span
-                                  className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                    person.status === "CRIADA"
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : "bg-gray-100 text-gray-700"
-                                  }`}
-                                >
-                                  {person.status}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-right text-sm">
-                                <button className="text-indigo-600 hover:text-indigo-900">
-                                  Editar
-                                </button>
-                              </td>
-                            </tr>
-                          )
-                        )}
-                      </tbody>
-                    </table>
+                        <thead className="bg-gray-50 border-b">
+                          <tr>
+                            <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                              IdRec
+                            </th>
+                            <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                              Contrato
+                            </th>
+                            <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                              Devedor
+                            </th>
+                            <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                              Valor
+                            </th>
+                            <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                              Periodicidade
+                            </th>
+                            <th className="py-3 px-4 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                              Status
+                            </th>
+                            <th className="py-3 px-4"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {(people as PixAutomaticoListPeople).recs.map(
+                            (person) => (
+                              <tr
+                                key={person.idRec}
+                                className="hover:bg-gray-50"
+                              >
+                                <td className="py-3 px-4 text-sm text-gray-900">
+                                  {person.idRec}
+                                </td>
+                                <td className="py-3 px-4 text-sm text-gray-900">
+                                  {person.vinculo.contrato}
+                                </td>
+                                <td className="py-3 px-4 text-sm text-gray-700">
+                                  {person.vinculo.devedor?.nome}
+                                </td>
+                                <td className="py-3 px-4 text-sm text-gray-700">
+                                  R${" "}
+                                  {parseFloat(person.valor.valorRec).toFixed(2)}
+                                </td>
+                                <td className="py-3 px-4 text-sm text-gray-700">
+                                  {person.calendario.periodicidade}
+                                </td>
+                                <td className="py-3 px-4 text-sm">
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                      person.status === "CRIADA"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : "bg-gray-100 text-gray-700"
+                                    }`}
+                                  >
+                                    {person.status}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right text-sm">
+                                  <button className="text-indigo-600 hover:text-indigo-900">
+                                    Editar
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   ) : (
                     // CASO SEJA UM ÚNICO REGISTRO
                     (people as PixAutomaticoListOnePeople)?.idRec && (
                       <div className="p-2 flex flex-col justify-center w-[70vw] sm:min-w-full sm:p-0 overflow-auto">
                         <table className="text-left bg-white rounded-md shadow-sm border">
-                        <tbody>
-                          <tr className="border-b">
-                            <th className="py-2 px-4 text-gray-700">
-                              ID Recorrência
-                            </th>
-                            <td className="py-2 px-4">
-                              {(people as PixAutomaticoListOnePeople).idRec}
-                            </td>
-                          </tr>
-                          <tr className="border-b">
-                            <th className="py-2 px-4 text-gray-700">
-                              Contrato
-                            </th>
-                            <td className="py-2 px-4">
-                              {
-                                (people as PixAutomaticoListOnePeople).vinculo
-                                  .contrato
-                              }
-                            </td>
-                          </tr>
-                          <tr className="border-b">
-                            <th className="py-2 px-4 text-gray-700">
-                              Nome do Devedor
-                            </th>
-                            <td className="py-2 px-4">
-                              {
-                                (people as PixAutomaticoListOnePeople).vinculo
-                                  .devedor.nome
-                              }
-                            </td>
-                          </tr>
-                          <tr className="border-b">
-                            <th className="py-2 px-4 text-gray-700">CPF</th>
-                            <td className="py-2 px-4">
-                              {
-                                (people as PixAutomaticoListOnePeople).vinculo
-                                  .devedor.cpf
-                              }
-                            </td>
-                          </tr>
-                          <tr className="border-b">
-                            <th className="py-2 px-4 text-gray-700">
-                              Valor Recorrente
-                            </th>
-                            <td className="py-2 px-4">
-                              R${" "}
-                              {parseFloat(
-                                (people as PixAutomaticoListOnePeople).valor
-                                  .valorRec
-                              ).toFixed(2)}
-                            </td>
-                          </tr>
-                          <tr className="border-b">
-                            <th className="py-2 px-4 text-gray-700">
-                              Periodicidade
-                            </th>
-                            <td className="py-2 px-4">
-                              {
-                                (people as PixAutomaticoListOnePeople)
-                                  .calendario.periodicidade
-                              }
-                            </td>
-                          </tr>
-                          <tr className="border-b">
-                            <th className="py-2 px-4 text-gray-700">
-                              Data Inicial
-                            </th>
-                            <td className="py-2 px-4">
-                              {
-                                (people as PixAutomaticoListOnePeople)
-                                  .calendario.dataInicial
-                              }
-                            </td>
-                          </tr>
-                          <tr className="border-b">
-                            <th className="py-2 px-4 text-gray-700">
-                              Política de Retentativa
-                            </th>
-                            <td className="py-2 px-4">
-                              {
-                                (people as PixAutomaticoListOnePeople)
-                                  .politicaRetentativa
-                              }
-                            </td>
-                          </tr>
-                          <tr className="border-b">
-                            <th className="py-2 px-4 text-gray-700">Status</th>
-                            <td className="py-2 px-4">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          <tbody>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                ID Recorrência
+                              </th>
+                              <td className="py-2 px-4">
+                                {(people as PixAutomaticoListOnePeople).idRec}
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                Contrato
+                              </th>
+                              <td className="py-2 px-4">
+                                {
+                                  (people as PixAutomaticoListOnePeople).vinculo
+                                    .contrato
+                                }
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                Nome do Devedor
+                              </th>
+                              <td className="py-2 px-4">
+                                {
+                                  (people as PixAutomaticoListOnePeople).vinculo
+                                    .devedor.nome
+                                }
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">CPF</th>
+                              <td className="py-2 px-4">
+                                {
+                                  (people as PixAutomaticoListOnePeople).vinculo
+                                    .devedor.cpf
+                                }
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                Valor Recorrente
+                              </th>
+                              <td className="py-2 px-4">
+                                R${" "}
+                                {parseFloat(
+                                  (people as PixAutomaticoListOnePeople).valor
+                                    .valorRec
+                                ).toFixed(2)}
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                Periodicidade
+                              </th>
+                              <td className="py-2 px-4">
+                                {
                                   (people as PixAutomaticoListOnePeople)
-                                    .status === "CRIADA"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-gray-100 text-gray-700"
-                                }`}
-                              >
-                                {(people as PixAutomaticoListOnePeople).status}
-                              </span>
-                            </td>
-                          </tr>
-                          <tr>
-                            <th className="py-2 px-4 text-gray-700">
-                              Recebedor
-                            </th>
-                            <td className="py-2 px-4">
-                              {
-                                (people as PixAutomaticoListOnePeople).recebedor
-                                  .nome
-                              }{" "}
-                              (
-                              {
-                                (people as PixAutomaticoListOnePeople).recebedor
-                                  .cnpj
-                              }
-                              )
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                                    .calendario.periodicidade
+                                }
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                Data Inicial
+                              </th>
+                              <td className="py-2 px-4">
+                                {
+                                  (people as PixAutomaticoListOnePeople)
+                                    .calendario.dataInicial
+                                }
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                Política de Retentativa
+                              </th>
+                              <td className="py-2 px-4">
+                                {
+                                  (people as PixAutomaticoListOnePeople)
+                                    .politicaRetentativa
+                                }
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                Status
+                              </th>
+                              <td className="py-2 px-4">
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                    (people as PixAutomaticoListOnePeople)
+                                      .status === "CRIADA"
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : "bg-gray-100 text-gray-700"
+                                  }`}
+                                >
+                                  {
+                                    (people as PixAutomaticoListOnePeople)
+                                      .status
+                                  }
+                                </span>
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                Recebedor
+                              </th>
+                              <td className="py-2 px-4">
+                                {
+                                  (people as PixAutomaticoListOnePeople)
+                                    .recebedor.nome
+                                }{" "}
+                                (
+                                {
+                                  (people as PixAutomaticoListOnePeople)
+                                    .recebedor.cnpj
+                                }
+                                )
+                              </td>
+                            </tr>
+                            <tr>
+                              <th className="py-2 px-4 text-gray-700">
+                                Atualização
+                              </th>
+                              <td className="py-2 px-4">
+                                {(
+                                  people as PixAutomaticoListOnePeople
+                                ).atualizacao.map((f) => (
+                                  <div className="flex gap-2">
+                                    <p className="text-blue-500">{f.data}</p>
+                                    <p className="text-green-600">{f.status}</p>
+                                  </div>
+                                ))}{" "}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
                     )
                   )}
