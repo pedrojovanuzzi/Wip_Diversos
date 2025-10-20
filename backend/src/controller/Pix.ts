@@ -639,6 +639,37 @@ class Pix {
         politica,
       } = pixAutoData;
 
+      if(!cpf){
+          res.status(500).json('Sem CPF');
+          return;
+        }
+
+        const cpfLimpo = cpf.replace(/\D/g, "");
+
+        const cliente = await this.recordRepo.findOne({
+          where: { login: nome, status: "vencido", datadel: IsNull() },
+          order: { datavenc: "ASC" as const },
+        });
+
+        if (!cliente) {
+          throw new Error(`Usuário ${nome} não encontrado ou sem mensalidades vencidas`);
+        }
+
+
+      const efipay = new EfiPay(options);
+
+      const locResponse = await efipay.pixCreateLocationRecurrenceAutomatic()
+
+      const params = { txid: crypto.randomBytes(16).toString("hex") };
+      const cobv = await efipay.pixCreateCharge(params, {calendario: {expiracao: Number(cliente.datavenc)}, chave: String(process.env.CHAVE_PIX), valor, devedor: {
+        nome,
+        cnpj: cpf,
+        cpf: cpf
+      }, infoAdicionais: {nome: 'TITULO', valor: cliente.id}})
+
+
+        
+
       const documento = cpf.replace(/\D/g, "");
 
       if (data_inicial.includes("/")) {
@@ -707,7 +738,7 @@ class Pix {
         return resto === parseInt(digitos[1]);
       };
 
-      const efipay = new EfiPay(options);
+      
       const isCPF = validarCPF(documento);
       const isCNPJ = validarCNPJ(documento);
 
@@ -719,6 +750,8 @@ class Pix {
       const payload = {
         calendario: { dataInicial: data_inicial, periodicidade },
         politicaRetentativa: politica,
+        // ativacao: {dadosJornada: {txid: }},
+        loc: 1,
         valor: { valorRec: valor },
         vinculo: {
           contrato,
@@ -727,6 +760,9 @@ class Pix {
       };
 
       const response = await efipay.pixCreateRecurrenceAutomatic("", payload);
+      console.log(response);
+      
+
       res.status(200).json(response);
     } catch (error) {
       console.error(error);
@@ -734,14 +770,73 @@ class Pix {
     }
   }
 
+  pegarUltimoBoletoGerarPixAutomatico = async (
+    req: Request,
+    res: Response
+  ) => {
+    try {
+
+      const efi = new EfiPay(options);
+      const hoje = new Date().toISOString().split(".")[0] + "Z";
+      const response = await efi.pixListRecurrenceAutomatic({
+        inicio: "2025-10-17T00:00:00Z",
+        fim: hoje,
+        status: 'CRIADA'
+      });
+
+      console.log(response);
+
+      
+
+      await Promise.all(
+      response.recs.map(async (f) => {
+
+        const cpf = f.vinculo.devedor.cpf ?? f.vinculo.devedor.cnpj;
+        const pppoe = f.vinculo.devedor.nome;
+
+        if(!cpf){
+          res.status(500).json('Sem CPF');
+          return;
+        }
+
+        const cpfLimpo = cpf.replace(/\D/g, "");
+
+        const cliente = await this.recordRepo.findOne({
+          where: { login: pppoe, status: "vencido", datadel: IsNull() },
+          order: { datavenc: "ASC" as const },
+        });
+
+        if (!cliente) {
+          throw new Error(`Usuário ${pppoe} não encontrado ou sem mensalidades vencidas`);
+        }
+
+        console.log(f.calendario.dataInicial);
+        console.log(process.env.CONTA);
+        
+        await efi.pixCreateAutomaticCharge('', {idRec: f.idRec, ajusteDiaUtil: true, calendario: {dataDeVencimento: f.calendario.dataInicial}, recebedor: {agencia:'0001',conta:'600911', tipoConta: 'PAGAMENTO'},
+        valor: {original: String(f.valor.valorRec)}, infoAdicional: String(cliente.id)})
+
+
+
+      })
+    );
+
+      
+
+    } catch (error) {
+      console.log(error);
+      res.status(500).json(error);
+    }
+  }
+
   async listaPixAutomatico(req: Request, res: Response): Promise<void> {
     try {
       const { filtros } = req.body;
-      
+
       const efi = new EfiPay(options);
       const hoje = new Date().toISOString().split(".")[0] + "Z";
 
-      if (filtros && filtros.status && filtros.status != 'TODOS') {
+      if (filtros && filtros.status && filtros.status != "TODOS") {
         const response = await efi.pixListRecurrenceAutomatic({
           inicio: "2025-10-17T00:00:00Z",
           status: filtros.status,
@@ -772,13 +867,13 @@ class Pix {
     try {
       const { filtros } = req.body;
       console.log(filtros.idRec);
-      
+
       const efi = new EfiPay(options);
       const response = await efi.pixDetailRecurrenceAutomatic({
         idRec: filtros.idRec,
       });
       console.log(response);
-      
+
       res.status(200).json(response);
     } catch (error) {
       res.status(500).json(error);
