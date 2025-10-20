@@ -15,6 +15,7 @@ import {
 export const PixAutomatico = () => {
   const [remover, setRemover] = useState(false);
   const [parametros, setParametros] = useState<ParametrosPixAutomaticoList>();
+  const [qr, setQrCode] = useState('');
   const [people, setPeople] = useState<
     PixAutomaticoListPeople | PixAutomaticoListOnePeople
   >();
@@ -57,6 +58,7 @@ export const PixAutomatico = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       console.log(response.data);
+      setQrCode(response.data.dadosQR.pixCopiaECola);
     } catch (error: any) {
       const msg = extractErrorMessage(error.response.data);
       setError(msg);
@@ -234,6 +236,12 @@ export const PixAutomatico = () => {
             className="absolute inset-0 appearance-none focus:outline-none"
           />
         </label>
+{qr && (
+  <img
+    src={`https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(qr)}`}
+    alt="QR Code Pix Automático"
+  />
+)}
 
         {/* Texto dinâmico */}
         <div className="mt-3 text-lg font-semibold">

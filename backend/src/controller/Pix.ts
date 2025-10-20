@@ -9,6 +9,7 @@ import fs from "fs";
 import axios from "axios";
 import { Request, Response } from "express";
 import { IsNull, Not } from "typeorm";
+import { isNotIn } from "class-validator";
 
 dotenv.config();
 
@@ -625,7 +626,7 @@ class Pix {
     }
   }
 
-  async PixAutomaticoCriar(req: Request, res: Response): Promise<void> {
+  PixAutomaticoCriar = async (req: Request, res: Response): Promise<void> => {
     try {
       const { pixAutoData } = req.body;
       let {
@@ -639,67 +640,14 @@ class Pix {
         politica,
       } = pixAutoData;
 
-      if(!cpf){
-          res.status(500).json('Sem CPF');
-          return;
-        }
-
-        const cpfLimpo = cpf.replace(/\D/g, "");
-
-        const cliente = await this.recordRepo.findOne({
-          where: { login: nome, status: "vencido", datadel: IsNull() },
-          order: { datavenc: "ASC" as const },
-        });
-
-        if (!cliente) {
-          throw new Error(`Usuário ${nome} não encontrado ou sem mensalidades vencidas`);
-        }
-
-
-      const efipay = new EfiPay(options);
-
-      const locResponse = await efipay.pixCreateLocationRecurrenceAutomatic()
-
-      const params = { txid: crypto.randomBytes(16).toString("hex") };
-      const cobv = await efipay.pixCreateCharge(params, {calendario: {expiracao: Number(cliente.datavenc)}, chave: String(process.env.CHAVE_PIX), valor, devedor: {
-        nome,
-        cnpj: cpf,
-        cpf: cpf
-      }, infoAdicionais: {nome: 'TITULO', valor: cliente.id}})
-
-
-        
-
-      const documento = cpf.replace(/\D/g, "");
-
-      if (data_inicial.includes("/")) {
-        const [dia, mes, ano] = data_inicial.split("/");
-        data_inicial = `${ano}-${mes}-${dia}`;
-      }
-
-      valor = parseFloat(valor);
-
-      if (isNaN(valor)) {
-        res.status(400).json({
-          error: "O campo 'valor' deve ser um número válido.",
-        });
+      if (!cpf) {
+        res.status(500).json("Sem CPF");
         return;
       }
 
-      valor = valor.toFixed(2);
+      const documento = cpf.replace(/\D/g, "");
 
-      console.log(
-        contrato,
-        cpf,
-        nome,
-        servico,
-        data_inicial,
-        periodicidade,
-        valor,
-        politica
-      );
-
-      const validarCPF = (cpf: string): boolean => {
+            const validarCPF = (cpf: string): boolean => {
         if (!cpf || cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
         let soma = 0;
         for (let i = 0; i < 9; i++) soma += parseInt(cpf[i]) * (10 - i);
@@ -738,20 +686,89 @@ class Pix {
         return resto === parseInt(digitos[1]);
       };
 
-      
       const isCPF = validarCPF(documento);
       const isCNPJ = validarCNPJ(documento);
+
+      const cliente = await this.recordRepo.findOne({
+      where: { login: nome, status: Not('pago'), datadel: IsNull() },
+        order: { datavenc: "ASC" as const },
+      });
+
+      if (!cliente) {
+        throw new Error(
+          `Usuário ${nome} não encontrado ou sem mensalidades vencidas`
+        );
+      }
+
+      const efipay = new EfiPay(options);
+
+      const locResponse = await efipay.pixCreateLocationRecurrenceAutomatic();
+
+      console.log(locResponse);
+      
+      
+
+      const params = { txid: crypto.randomBytes(16).toString("hex") };
+
+      const payload1 = {
+      calendario: { expiracao: 3600 },
+      chave: String(process.env.CHAVE_PIX),
+      valor: { original: Number(valor).toFixed(2) },
+      // loc: {id: locResponse.id},
+      devedor: isCPF
+        ? { nome, cpf: documento }
+        : { nome, cnpj: documento },
+      infoAdicionais: [{ nome: "TITULO", valor: String(cliente.id) }],
+      solicitacaoPagador: "Mensalidade",
+    };
+
+    console.log(params.txid);
+    console.log(options.sandbox);
+    
+    
+      
+      const cobv = await efipay.pixCreateCharge(params, payload1);
+
+      console.log(cobv);
+      
+
+      if (data_inicial.includes("/")) {
+        const [dia, mes, ano] = data_inicial.split("/");
+        data_inicial = `${ano}-${mes}-${dia}`;
+      }
+
+      valor = parseFloat(valor);
+
+      if (isNaN(valor)) {
+        res.status(400).json({
+          error: "O campo 'valor' deve ser um número válido.",
+        });
+        return;
+      }
+
+      valor = valor.toFixed(2);
+
+      console.log(
+        contrato,
+        cpf,
+        nome,
+        servico,
+        data_inicial,
+        periodicidade,
+        valor,
+        politica
+      );
 
       if (!isCPF && !isCNPJ) {
         res.status(400).json({ error: "CPF/CNPJ inválido" });
         return;
       }
 
-      const payload = {
+      const payload2 = {
         calendario: { dataInicial: data_inicial, periodicidade },
         politicaRetentativa: politica,
         // ativacao: {dadosJornada: {txid: }},
-        loc: 1,
+        loc: locResponse.id,
         valor: { valorRec: valor },
         vinculo: {
           contrato,
@@ -759,7 +776,10 @@ class Pix {
         },
       };
 
-      const response = await efipay.pixCreateRecurrenceAutomatic("", payload);
+      const responseRecurrence = await efipay.pixCreateRecurrenceAutomatic("", payload2);
+        
+      const response = await efipay.pixDetailRecurrenceAutomatic({idRec: responseRecurrence.idRec})
+
       console.log(response);
       
 
@@ -770,64 +790,63 @@ class Pix {
     }
   }
 
-  pegarUltimoBoletoGerarPixAutomatico = async (
-    req: Request,
-    res: Response
-  ) => {
+  pegarUltimoBoletoGerarPixAutomatico = async (req: Request, res: Response) => {
     try {
-
       const efi = new EfiPay(options);
       const hoje = new Date().toISOString().split(".")[0] + "Z";
       const response = await efi.pixListRecurrenceAutomatic({
         inicio: "2025-10-17T00:00:00Z",
         fim: hoje,
-        status: 'CRIADA'
+        status: "CRIADA",
       });
 
       console.log(response);
 
-      
-
       await Promise.all(
-      response.recs.map(async (f) => {
+        response.recs.map(async (f) => {
+          const cpf = f.vinculo.devedor.cpf ?? f.vinculo.devedor.cnpj;
+          const pppoe = f.vinculo.devedor.nome;
 
-        const cpf = f.vinculo.devedor.cpf ?? f.vinculo.devedor.cnpj;
-        const pppoe = f.vinculo.devedor.nome;
+          if (!cpf) {
+            res.status(500).json("Sem CPF");
+            return;
+          }
 
-        if(!cpf){
-          res.status(500).json('Sem CPF');
-          return;
-        }
+          const cpfLimpo = cpf.replace(/\D/g, "");
 
-        const cpfLimpo = cpf.replace(/\D/g, "");
+          const cliente = await this.recordRepo.findOne({
+            where: { login: pppoe, status: "vencido", datadel: IsNull() },
+            order: { datavenc: "ASC" as const },
+          });
 
-        const cliente = await this.recordRepo.findOne({
-          where: { login: pppoe, status: "vencido", datadel: IsNull() },
-          order: { datavenc: "ASC" as const },
-        });
+          if (!cliente) {
+            throw new Error(
+              `Usuário ${pppoe} não encontrado ou sem mensalidades vencidas`
+            );
+          }
 
-        if (!cliente) {
-          throw new Error(`Usuário ${pppoe} não encontrado ou sem mensalidades vencidas`);
-        }
+          console.log(f.calendario.dataInicial);
+          console.log(process.env.CONTA);
 
-        console.log(f.calendario.dataInicial);
-        console.log(process.env.CONTA);
-        
-        await efi.pixCreateAutomaticCharge('', {idRec: f.idRec, ajusteDiaUtil: true, calendario: {dataDeVencimento: f.calendario.dataInicial}, recebedor: {agencia:'0001',conta:'600911', tipoConta: 'PAGAMENTO'},
-        valor: {original: String(f.valor.valorRec)}, infoAdicional: String(cliente.id)})
-
-
-
-      })
-    );
-
-      
-
+          await efi.pixCreateAutomaticCharge("", {
+            idRec: f.idRec,
+            ajusteDiaUtil: true,
+            calendario: { dataDeVencimento: f.calendario.dataInicial },
+            recebedor: {
+              agencia: "0001",
+              conta: "600911",
+              tipoConta: "PAGAMENTO",
+            },
+            valor: { original: String(f.valor.valorRec) },
+            infoAdicional: String(cliente.id),
+          });
+        })
+      );
     } catch (error) {
       console.log(error);
       res.status(500).json(error);
     }
-  }
+  };
 
   async listaPixAutomatico(req: Request, res: Response): Promise<void> {
     try {
