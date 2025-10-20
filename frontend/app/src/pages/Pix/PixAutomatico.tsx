@@ -64,6 +64,28 @@ export const PixAutomatico = () => {
       setLoading(false);
     }
   }
+
+  async function gerarCobranca(e: React.FormEvent) {
+    try {
+      console.log(pixAutoData);
+
+      e.preventDefault();
+      setError("");
+      setLoading(true);
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Pix/criarCobrancaPixAutomatico`,
+        { pixAutoData },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log(response.data);
+    } catch (error: any) {
+      const msg = extractErrorMessage(error.response.data);
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function getClientesPixAutomatico() {
     try {
       setLoading(true);
@@ -277,7 +299,7 @@ export const PixAutomatico = () => {
                   <input
                     className="ring-1 rounded-sm p-2"
                     type="text"
-                    placeholder="Nome Completo"
+                    placeholder="PPPOE"
                     value={pixAutoData.nome}
                     onChange={(e) =>
                       setPixAutoData((prev) => ({
@@ -428,6 +450,12 @@ export const PixAutomatico = () => {
               onClick={getClientesPixAutomatico}
             >
               Buscar
+            </button>
+            <button
+              className="rounded-md ring-1 p-2 bg-cyan-600 text-white w-full sm:w-60"
+              onClick={gerarCobranca}
+            >
+              Gerar Cobrança (Teste)
             </button>
           </div>
           {people && (
