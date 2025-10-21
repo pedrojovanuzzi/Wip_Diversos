@@ -59,7 +59,7 @@ class Pix {
 
       options.validateMtls = false;
       const efipay = new EfiPay(options);
-      const response = await efipay.pixConfigWebhookRecurrenceAutomatic(
+      const response = await efipay.pixConfigWebhookAutomaticCharge(
         {},
         { webhookUrl: String(urlWebhook) }
       );
@@ -234,7 +234,7 @@ class Pix {
     }
   }
 
-  async testwebhook(req: Request, res: Response) {
+  async PixAutomaticWebhookCobr(req: Request, res: Response) {
     console.log("wfwe");
 
     res.status(200).json();
@@ -800,6 +800,7 @@ class Pix {
         const response = await efipay.pixListRecurrenceAutomatic({
           inicio: "2025-10-17T00:00:00Z",
           fim: hoje,
+          status: "APROVADA",
           "paginacao.itensPorPagina": 100,
           "paginacao.paginaAtual": paginaAtual,
         });
@@ -810,13 +811,53 @@ class Pix {
       }
 
       console.log(todasAsCobsr);
-      
 
-      res.status(200).json({
-        total: todasAsCobsr.length,
-        cobrancas: todasAsCobsr,
-      });
+      const response = await Promise.all(
+        todasAsCobsr.map(async (f) => {
+          // 🔹 Busca o cliente no banco de dados
+          const cliente = await this.recordRepo.findOne({
+            where: { login: f.pppoe, status: Not("pago"), datadel: IsNull() },
+            order: { datavenc: "ASC" as const },
+          });
 
+          // 🔸 Se não encontrar, apenas loga (não pode usar res.status dentro do loop)
+          if (!cliente) {
+            console.warn(
+              `Usuário ${f.pppoe} não encontrado ou sem mensalidades vencidas`
+            );
+            return null; // sai desta iteração
+          }
+
+          // 🔹 Gera um txid único (requerido pela Efí)
+
+          // 🔹 Cria cobrança automática vinculada a uma recorrência
+          const result = await efipay.pixCreateAutomaticCharge("", {
+            idRec: f.idRec, // ID da recorrência já existente
+            ajusteDiaUtil: true, // Ajusta vencimento se cair em fim de semana
+            calendario: {
+              // dataDeVencimento: cliente.datavenc.toISOString().split("T")[0], // Data da cobrança
+              dataDeVencimento: '2025-10-24', // Data da cobrança
+            },
+            recebedor: {
+              agencia: process.env.AGENCIA!,
+              conta: process.env.CONTA!,
+              tipoConta: "PAGAMENTO", // Tipo da conta bancária
+            },
+            valor: {
+              // original: cliente.valor, // Valor da cobrança
+              original: '1.00'
+            },
+            infoAdicional: "Mensalidade gerada automaticamente",
+          });
+
+          console.log(`Cobrança criada para ${cliente.login}:`, result);
+          return result;
+        })
+      );
+
+      console.log(response);
+
+      res.status(200).json(response);
     } catch (error) {
       console.log(error);
       res.status(500).json(error);

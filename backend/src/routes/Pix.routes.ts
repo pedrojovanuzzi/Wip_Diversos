@@ -30,8 +30,7 @@ router.post('/atualizarPixAutomaticoClients', AuthGuard, pixController.atualizar
 
 // router.post('/PixUnicoVencido/webhook', pixController.StatusUpdatePixUnicoVencido);
 router.post('/PixTodosVencidos/webhook', pixController.StatusUpdatePixTodosVencidos);
-router.post('/PixAutomatico/webhook', pixController.testwebhook);
-router.get('/PixAutomatico/webhook', pixController.testwebhook);
+router.post('/PixAutomatico/webhookCobr', pixController.PixAutomaticWebhookCobr);
 
 
 export default router;

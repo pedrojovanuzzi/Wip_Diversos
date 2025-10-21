@@ -25,7 +25,7 @@ export const PixAutomatico = () => {
   const [filtrosActive, setFiltrosActive] = useState(false);
   const [date, setDate] = useState(() => {
     const hoje = new Date(); // pega a data atual
-    hoje.setMonth(hoje.getMonth() + 1); // adiciona +1 mês
+    hoje.setDate(hoje.getDate() + 1); // adiciona +1 mês
     return hoje.toLocaleDateString("pt-BR"); // formata como "DD/MM/AAAA"
   });
   const [pixAutoData, setPixAutoData] = useState<PixAuto>({
