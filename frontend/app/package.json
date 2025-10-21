@@ -27,6 +27,7 @@
     "jwt-decode": "^4.0.0",
     "npm": "^10.9.2",
     "qrcode": "^1.5.4",
+    "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.3.1",

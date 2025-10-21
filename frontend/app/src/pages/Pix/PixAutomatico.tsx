@@ -4,6 +4,8 @@ import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { CiFilter, CiSettings } from "react-icons/ci";
 import { useNavigate } from "react-router-dom";
+import { QRCodeCanvas } from "qrcode.react";
+
 import {
   FiltrosPix,
   ParametrosPixAutomaticoList,
@@ -15,7 +17,7 @@ import {
 export const PixAutomatico = () => {
   const [remover, setRemover] = useState(false);
   const [parametros, setParametros] = useState<ParametrosPixAutomaticoList>();
-  const [qr, setQrCode] = useState('');
+  const [qr, setQrCode] = useState("");
   const [people, setPeople] = useState<
     PixAutomaticoListPeople | PixAutomaticoListOnePeople
   >();
@@ -236,12 +238,12 @@ export const PixAutomatico = () => {
             className="absolute inset-0 appearance-none focus:outline-none"
           />
         </label>
-{qr && (
-  <img
-    src={`https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(qr)}`}
-    alt="QR Code Pix Automático"
-  />
-)}
+        {qr && (
+        <div className="flex gap-5 flex-col justify-center"><QRCodeCanvas className="self-center"
+            value={qr} // texto Pix Copia e Cola
+            size={256} // tamanho do QR
+          /><p>Pix Copia e Cola: </p><p className="cursor-pointer  text-blue-600 hover:underline select-text" onClick={() => navigator.clipboard.writeText(qr)}>{qr}</p></div>
+      )}
 
         {/* Texto dinâmico */}
         <div className="mt-3 text-lg font-semibold">
