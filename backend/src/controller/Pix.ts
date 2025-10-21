@@ -235,9 +235,38 @@ class Pix {
   }
 
   async PixAutomaticWebhookCobr(req: Request, res: Response) {
-    console.log("wfwe");
+    try {
+      const efipay = new EfiPay(options);
 
-    res.status(200).json();
+      const cobr = req.body;
+
+      console.log(cobr);
+      
+
+      const response = await efipay.pixDetailRecurrenceAutomatic({
+        idRec: cobr.cobsr[0].idRec,
+      });
+
+      console.log(response);
+
+      const cliente = await this.recordRepo.findOne({
+        where: { login: response.vinculo.devedor.nome, status: Not("pago"), datadel: IsNull() },
+        order: { datavenc: "ASC" as const },
+      });
+
+      console.log(cliente);
+      
+      const fatura = await this.recordRepo.update(String(cliente?.id), {status: 'pago', coletor: 'api_mk_pedro', formapag: 'pix_automatico'});
+
+      console.log(fatura);
+      
+      res.status(200).json(fatura)
+
+    } catch (error) {
+      console.log(error);
+      
+      res.status(500).json(error);
+    }
   }
 
   validarCPF(cpfCnpj: string): boolean {
@@ -816,10 +845,9 @@ class Pix {
         todasAsCobsr.map(async (f) => {
           // 🔹 Busca o cliente no banco de dados
           const cliente = await this.recordRepo.findOne({
-            where: { login: f.pppoe, status: Not("pago"), datadel: IsNull() },
+            where: { login: f.vinculo.devedor.nome, status: Not("pago"), datadel: IsNull() },
             order: { datavenc: "ASC" as const },
           });
-
           // 🔸 Se não encontrar, apenas loga (não pode usar res.status dentro do loop)
           if (!cliente) {
             console.warn(
@@ -828,15 +856,13 @@ class Pix {
             return null; // sai desta iteração
           }
 
-          // 🔹 Gera um txid único (requerido pela Efí)
-
           // 🔹 Cria cobrança automática vinculada a uma recorrência
           const result = await efipay.pixCreateAutomaticCharge("", {
             idRec: f.idRec, // ID da recorrência já existente
             ajusteDiaUtil: true, // Ajusta vencimento se cair em fim de semana
             calendario: {
-              // dataDeVencimento: cliente.datavenc.toISOString().split("T")[0], // Data da cobrança
-              dataDeVencimento: '2025-10-24', // Data da cobrança
+              dataDeVencimento: cliente.datavenc.toISOString().split("T")[0], // Data da cobrança
+              // dataDeVencimento: '2025-10-24', // Data da cobrança
             },
             recebedor: {
               agencia: process.env.AGENCIA!,
@@ -844,8 +870,8 @@ class Pix {
               tipoConta: "PAGAMENTO", // Tipo da conta bancária
             },
             valor: {
-              // original: cliente.valor, // Valor da cobrança
-              original: '1.00'
+              original: cliente.valor, // Valor da cobrança
+              // original: '1.00'
             },
             infoAdicional: "Mensalidade gerada automaticamente",
           });
@@ -927,6 +953,44 @@ class Pix {
       );
       res.status(200).json(response);
     } catch (error) {
+      res.status(500).json(error);
+    }
+  }
+
+  simularPagamentoWebhookPixAutomatico = async (
+    req: Request,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const efipay = new EfiPay(options);
+
+      const simular = req.body;
+
+      console.log(simular);
+      
+
+      const response = await efipay.pixDetailRecurrenceAutomatic({
+        idRec: simular.cobsr[0].idRec,
+      });
+
+      console.log(response);
+
+      const cliente = await this.recordRepo.findOne({
+        where: { login: response.vinculo.devedor.nome, status: Not("pago"), datadel: IsNull() },
+        order: { datavenc: "ASC" as const },
+      });
+
+      console.log(cliente);
+      
+      const fatura = await this.recordRepo.update(String(cliente?.id), {status: 'pago', coletor: 'api_mk_pedro', formapag: 'pix_automatico'});
+
+      console.log(fatura);
+      
+      res.status(200).json(fatura)
+
+    } catch (error) {
+      console.log(error);
+      
       res.status(500).json(error);
     }
   }
