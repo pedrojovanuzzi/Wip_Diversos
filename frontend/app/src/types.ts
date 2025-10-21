@@ -83,7 +83,7 @@ export interface PixAutomaticoListOnePeople {
 
 
 export interface FiltrosPix {
-  status?: 'CRIADA' | 'CANCELADA' | 'TODOS';
+  status?: 'CRIADA' | 'CANCELADA' | 'APROVADA' | 'TODOS';
   periodicidade?: 'SEMANAL' | 'MENSAL' | 'ANUAL' | 'TODOS';
   idRec? : string,
 }
