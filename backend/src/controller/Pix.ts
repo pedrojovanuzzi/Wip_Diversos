@@ -647,7 +647,7 @@ class Pix {
 
       const documento = cpf.replace(/\D/g, "");
 
-            const validarCPF = (cpf: string): boolean => {
+      const validarCPF = (cpf: string): boolean => {
         if (!cpf || cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
         let soma = 0;
         for (let i = 0; i < 9; i++) soma += parseInt(cpf[i]) * (10 - i);
@@ -690,7 +690,7 @@ class Pix {
       const isCNPJ = validarCNPJ(documento);
 
       const cliente = await this.recordRepo.findOne({
-      where: { login: nome, status: Not('pago'), datadel: IsNull() },
+        where: { login: nome, status: Not("pago"), datadel: IsNull() },
         order: { datavenc: "ASC" as const },
       });
 
@@ -705,32 +705,25 @@ class Pix {
       const locResponse = await efipay.pixCreateLocationRecurrenceAutomatic();
 
       console.log(locResponse);
-      
-      
 
       const params = { txid: crypto.randomBytes(16).toString("hex") };
 
       const payload1 = {
-      calendario: { expiracao: 3600 },
-      chave: String(process.env.CHAVE_PIX),
-      valor: { original: Number(valor).toFixed(2) },
-      // loc: {id: locResponse.id},
-      devedor: isCPF
-        ? { nome, cpf: documento }
-        : { nome, cnpj: documento },
-      infoAdicionais: [{ nome: "TITULO", valor: String(cliente.id) }],
-      solicitacaoPagador: "Mensalidade",
-    };
+        calendario: { expiracao: 3600 },
+        chave: String(process.env.CHAVE_PIX),
+        valor: { original: Number(valor).toFixed(2) },
+        // loc: {id: locResponse.id},
+        devedor: isCPF ? { nome, cpf: documento } : { nome, cnpj: documento },
+        infoAdicionais: [{ nome: "TITULO", valor: String(cliente.id) }],
+        solicitacaoPagador: "Mensalidade",
+      };
 
-    console.log(params.txid);
-    console.log(options.sandbox);
-    
-    
-      
+      console.log(params.txid);
+      console.log(options.sandbox);
+
       const cobv = await efipay.pixCreateCharge(params, payload1);
 
       console.log(cobv);
-      
 
       if (data_inicial.includes("/")) {
         const [dia, mes, ano] = data_inicial.split("/");
@@ -776,72 +769,54 @@ class Pix {
         },
       };
 
-      const responseRecurrence = await efipay.pixCreateRecurrenceAutomatic("", payload2);
-        
-      const response = await efipay.pixDetailRecurrenceAutomatic({idRec: responseRecurrence.idRec})
+      const responseRecurrence = await efipay.pixCreateRecurrenceAutomatic(
+        "",
+        payload2
+      );
+
+      const response = await efipay.pixDetailRecurrenceAutomatic({
+        idRec: responseRecurrence.idRec,
+      });
 
       console.log(response);
-      
 
       res.status(200).json(response);
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
     }
-  }
+  };
 
   pegarUltimoBoletoGerarPixAutomatico = async (req: Request, res: Response) => {
     try {
-      const efi = new EfiPay(options);
+      const todasAsCobsr: any[] = [];
+      let paginaAtual = 0;
+      let quantidadeDePaginas = 1;
+
+      const efipay = new EfiPay(options);
       const hoje = new Date().toISOString().split(".")[0] + "Z";
-      const response = await efi.pixListRecurrenceAutomatic({
-        inicio: "2025-10-17T00:00:00Z",
-        fim: hoje,
-        status: "APROVADA",
+
+      while (paginaAtual < quantidadeDePaginas) {
+        const response = await efipay.pixListRecurrenceAutomatic({
+          inicio: "2025-10-17T00:00:00Z",
+          fim: hoje,
+          "paginacao.itensPorPagina": 100,
+          "paginacao.paginaAtual": paginaAtual,
+        });
+
+        todasAsCobsr.push(...response.recs);
+        quantidadeDePaginas = response.parametros.paginacao.quantidadeDePaginas;
+        paginaAtual++;
+      }
+
+      console.log(todasAsCobsr);
+      
+
+      res.status(200).json({
+        total: todasAsCobsr.length,
+        cobrancas: todasAsCobsr,
       });
 
-      console.log(response);
-
-      await Promise.all(
-        response.recs.map(async (f) => {
-          const cpf = f.vinculo.devedor.cpf ?? f.vinculo.devedor.cnpj;
-          const pppoe = f.vinculo.devedor.nome;
-
-          if (!cpf) {
-            res.status(500).json("Sem CPF");
-            return;
-          }
-
-          const cpfLimpo = cpf.replace(/\D/g, "");
-
-          const cliente = await this.recordRepo.findOne({
-            where: { login: pppoe, status: "vencido", datadel: IsNull() },
-            order: { datavenc: "ASC" as const },
-          });
-
-          if (!cliente) {
-            throw new Error(
-              `Usuário ${pppoe} não encontrado ou sem mensalidades vencidas`
-            );
-          }
-
-          console.log(f.calendario.dataInicial);
-          console.log(process.env.CONTA);
-
-          await efi.pixCreateAutomaticCharge("", {
-            idRec: f.idRec,
-            ajusteDiaUtil: true,
-            calendario: { dataDeVencimento: f.calendario.dataInicial },
-            recebedor: {
-              agencia: "0001",
-              conta: "600911",
-              tipoConta: "PAGAMENTO",
-            },
-            valor: { original: String(f.valor.valorRec) },
-            infoAdicional: String(cliente.id),
-          });
-        })
-      );
     } catch (error) {
       console.log(error);
       res.status(500).json(error);
@@ -860,7 +835,7 @@ class Pix {
           inicio: "2025-10-17T00:00:00Z",
           status: filtros.status,
           fim: hoje,
-          "paginacao.itensPorPagina": 100,
+          "paginacao.itensPorPagina": 2000,
         });
         res.status(200).json(response);
         return;
