@@ -23,11 +23,21 @@ export const PixAutomatico = () => {
   >();
   const [status, setStatus] = useState<"CANCELADA">("CANCELADA");
   const [filtrosActive, setFiltrosActive] = useState(false);
-  const [date, setDate] = useState(() => {
-    const hoje = new Date(); // pega a data atual
-    hoje.setDate(hoje.getDate() + 1); // adiciona +1 mês
-    return hoje.toLocaleDateString("pt-BR"); // formata como "DD/MM/AAAA"
-  });
+  // Cria um estado "date" com valor inicial calculado dinamicamente
+const [date, setDate] = useState(() => {
+  // 🔹 Pega a data atual
+  const hoje = new Date();
+
+  // 🔹 Avança para o próximo mês
+  hoje.setMonth(hoje.getMonth() + 1);
+
+  // 🔹 Define o dia como o primeiro (01)
+  hoje.setDate(1);
+
+  // 🔹 Formata no padrão brasileiro "DD/MM/AAAA"
+  return hoje.toLocaleDateString("pt-BR");
+});
+
   const [pixAutoData, setPixAutoData] = useState<PixAuto>({
     contrato: "",
     cpf: "",
