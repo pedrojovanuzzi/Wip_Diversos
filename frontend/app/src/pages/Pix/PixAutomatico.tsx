@@ -167,6 +167,7 @@ useEffect(() => {
           { filtros },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+
         console.log(response.data);
         setPeople(response.data);
         setParametros(response.data.parametros);
@@ -177,6 +178,7 @@ useEffect(() => {
           { filtros },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+
         console.log(response.data);
         setPeople(response.data);
         setParametros(response.data.parametros);
@@ -540,13 +542,13 @@ useEffect(() => {
             </button> */}
           </div>
           {people && (
-            <div className="flex flex-col justify-center mt-6">
-              <div className="self-center w-full sm:w-11/12 md:w-3/4 lg:w-2/3">
-                <div className="w-full overflow-x-auto">
+            <div className="flex flex-col  justify-center mt-6">
+              <div className="self-center  w-full sm:w-11/12 md:w-3/4 lg:w-2/3">
+                <div className="w-full scrollbar-track-transparent  scrollbar-thumb-blue-400 scrollbar-corner-blue-400  h-[30vh] scrollbar  overflow-auto">
                   {/* CASO SEJA UMA LISTA */}
                   {Array.isArray((people as PixAutomaticoListPeople)?.recs) &&
                   (people as PixAutomaticoListPeople).recs.length > 0 ? (
-                    <div className="p-2 flex flex-col justify-center w-[70vw] sm:w-full sm:p-0 overflow-auto">
+                    <div className="p-2 flex flex-col justify-center w-[70vw] sm:w-full sm:p-0">
                       <table className="min-w-full border-separate border-spacing-0 text-left my-4 bg-white rounded-md shadow-sm">
                         <thead className="bg-gray-50 border-b">
                           <tr>
