@@ -797,7 +797,7 @@ class Pix {
       const response = await efi.pixListRecurrenceAutomatic({
         inicio: "2025-10-17T00:00:00Z",
         fim: hoje,
-        status: "CRIADA",
+        status: "APROVADA",
       });
 
       console.log(response);

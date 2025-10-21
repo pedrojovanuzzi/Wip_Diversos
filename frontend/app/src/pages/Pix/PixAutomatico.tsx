@@ -416,12 +416,14 @@ export const PixAutomatico = () => {
                       status: e.target.value as
                         | "CRIADA"
                         | "CANCELADA"
+                        | "APROVADA"
                         | "TODOS",
                     }))
                   }
                 >
                   <option value="CRIADA">ATIVO</option>
                   <option value="CANCELADA">CANCELADO</option>
+                  <option value="APROVADA">APROVADA</option>
                   <option value="TODOS">TODOS</option>
                 </select>
                 {/* <label htmlFor="Status">Periodicidade</label>
