@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { NavBar } from "../../components/navbar/NavBar";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
@@ -37,6 +37,10 @@ const [date, setDate] = useState(() => {
   // 🔹 Formata no padrão brasileiro "DD/MM/AAAA"
   return hoje.toLocaleDateString("pt-BR");
 });
+
+useEffect(() => {
+  setPixAutoData((prev) => ({ ...prev, data_inicial: date }));
+}, [date]);
 
   const [pixAutoData, setPixAutoData] = useState<PixAuto>({
     contrato: "",
@@ -81,8 +85,8 @@ const [date, setDate] = useState(() => {
 
   async function gerarCobranca(e: React.FormEvent) {
     try {
+      setQrCode('');
       console.log(pixAutoData);
-
       e.preventDefault();
       setError("");
       setLoading(true);
@@ -92,6 +96,7 @@ const [date, setDate] = useState(() => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       console.log(response.data);
+      
     } catch (error: any) {
       const msg = extractErrorMessage(error.response.data);
       setError(msg);
@@ -99,6 +104,49 @@ const [date, setDate] = useState(() => {
       setLoading(false);
     }
   }
+
+//    async function pagarCobrancaTest(e: React.FormEvent) {
+//     try {
+//       console.log(pixAutoData);
+
+//       e.preventDefault();
+//       setError("");
+//       setLoading(true);
+//       const response = await axios.post(
+//         `${process.env.REACT_APP_URL}/Pix/simularPagamento`,
+//         {
+//   "cobsr": [
+//     {
+//       "idRec": "RN0908935620251021580c6680ae7",
+//       "txid": "3136957d93134f2184b369e8f1c0729d",
+//       "status": "ATIVA",
+//       "atualizacao": [
+//         {
+//           "status": "ATIVA",
+//           "data": "2024-08-20T12:34:21.300Z"
+//         }
+//       ],
+//       "tentativas": [
+//         {
+//           "dataLiquidacao": "2024-20-08",
+//           "tipo": "AGND",
+//           "status": "SOLICITADA",
+//           "endToEndId": "E12345678202406201221abcdef12345"
+//         }
+//       ]
+//     }
+//   ]
+// },
+//         { headers: { Authorization: `Bearer ${token}` } }
+//       );
+//       console.log(response.data);
+//     } catch (error: any) {
+//       const msg = extractErrorMessage(error.response.data);
+//       setError(msg);
+//     } finally {
+//       setLoading(false);
+//     }
+//   }
 
   async function getClientesPixAutomatico() {
     try {
@@ -122,6 +170,7 @@ const [date, setDate] = useState(() => {
         console.log(response.data);
         setPeople(response.data);
         setParametros(response.data.parametros);
+        setQrCode(response.data.dadosQR.pixCopiaECola);
       } else if (filtrosActive && !filtros.idRec) {
         const response = await axios.post(
           `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoClients`,
@@ -131,6 +180,7 @@ const [date, setDate] = useState(() => {
         console.log(response.data);
         setPeople(response.data);
         setParametros(response.data.parametros);
+        setQrCode(response.data.dadosQR.pixCopiaECola);
       }
     } catch (error: any) {
       const msg = extractErrorMessage(error.response.data);
@@ -139,6 +189,8 @@ const [date, setDate] = useState(() => {
       setLoading(false);
     }
   }
+
+
 
   async function atualizarPixAutomatico(e: React.FormEvent) {
     try {
@@ -248,12 +300,7 @@ const [date, setDate] = useState(() => {
             className="absolute inset-0 appearance-none focus:outline-none"
           />
         </label>
-        {qr && (
-        <div className="flex gap-5 flex-col justify-center"><QRCodeCanvas className="self-center"
-            value={qr} // texto Pix Copia e Cola
-            size={256} // tamanho do QR
-          /><p>Pix Copia e Cola: </p><p className="cursor-pointer  text-blue-600 hover:underline select-text" onClick={() => navigator.clipboard.writeText(qr)}>{qr}</p></div>
-      )}
+        
 
         {/* Texto dinâmico */}
         <div className="mt-3 text-lg font-semibold">
@@ -479,6 +526,18 @@ const [date, setDate] = useState(() => {
             >
               Gerar Cobrança (Teste)
             </button>
+            {qr && (
+        <div className="flex gap-5 flex-col my-2 justify-center"><QRCodeCanvas className="self-center"
+            value={qr} // texto Pix Copia e Cola
+            size={256} // tamanho do QR
+          /><p>Pix Copia e Cola: </p><p className="cursor-pointer  text-blue-600 hover:underline select-text" onClick={() => navigator.clipboard.writeText(qr)}>{qr}</p></div>
+      )}
+            {/* <button
+              className="rounded-md ring-1 p-2 bg-cyan-600 text-white w-full sm:w-60"
+              onClick={pagarCobrancaTest}
+            >
+              Teste de Pagamento
+            </button> */}
           </div>
           {people && (
             <div className="flex flex-col justify-center mt-6">
@@ -540,7 +599,8 @@ const [date, setDate] = useState(() => {
                                     className={`px-2 py-1 rounded-full text-xs font-semibold ${
                                       person.status === "CRIADA"
                                         ? "bg-yellow-100 text-yellow-800"
-                                        : "bg-gray-100 text-gray-700"
+                                        : person.status === 'APROVADA' ? "bg-green-100 text-green-800" :
+                                        "bg-red-100 text-gray-700"
                                     }`}
                                   >
                                     {person.status}
@@ -657,7 +717,8 @@ const [date, setDate] = useState(() => {
                                     (people as PixAutomaticoListOnePeople)
                                       .status === "CRIADA"
                                       ? "bg-yellow-100 text-yellow-800"
-                                      : "bg-gray-100 text-gray-700"
+                                      : (people as PixAutomaticoListOnePeople).status === "APROVADA" ?
+                                      "bg-green-100 text-green-600" : "bg-red-100 text-gray-700"
                                   }`}
                                 >
                                   {

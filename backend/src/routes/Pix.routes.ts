@@ -27,6 +27,8 @@ router.post('/getPixAutomaticoClients', AuthGuard, pixController.listaPixAutomat
 router.post('/getPixAutomaticoOneClient', AuthGuard, pixController.listarPixAutomaticoUmCliente);
 router.post('/atualizarPixAutomaticoClients', AuthGuard, pixController.atualizarPixAutomatico);
 
+router.post('/simularPagamento', AuthGuard, pixController.simularPagamentoWebhookPixAutomatico);
+
 
 // router.post('/PixUnicoVencido/webhook', pixController.StatusUpdatePixUnicoVencido);
 router.post('/PixTodosVencidos/webhook', pixController.StatusUpdatePixTodosVencidos);
