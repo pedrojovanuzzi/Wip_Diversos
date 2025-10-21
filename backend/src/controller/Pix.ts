@@ -40,6 +40,7 @@ class Pix {
   private recordRepo = AppDataSource.getRepository(Faturas);
   private clienteRepo = AppDataSource.getRepository(ClientesEntities);
 
+
   AlterarWebhook(url: string, chave: string): void {
     options.validateMtls = false;
     const efipay = new EfiPay(options);
@@ -241,7 +242,6 @@ class Pix {
       const cobr = req.body;
 
       console.log(cobr);
-      
 
       const response = await efipay.pixDetailRecurrenceAutomatic({
         idRec: cobr.cobsr[0].idRec,
@@ -250,21 +250,28 @@ class Pix {
       console.log(response);
 
       const cliente = await this.recordRepo.findOne({
-        where: { login: response.vinculo.devedor.nome, status: Not("pago"), datadel: IsNull() },
+        where: {
+          login: response.vinculo.devedor.nome,
+          status: Not("pago"),
+          datadel: IsNull(),
+        },
         order: { datavenc: "ASC" as const },
       });
 
       console.log(cliente);
-      
-      const fatura = await this.recordRepo.update(String(cliente?.id), {status: 'pago', coletor: 'api_mk_pedro', formapag: 'pix_automatico'});
+
+      const fatura = await this.recordRepo.update(String(cliente?.id), {
+        status: "pago",
+        coletor: "api_mk_pedro",
+        formapag: "pix_automatico",
+      });
 
       console.log(fatura);
-      
-      res.status(200).json(fatura)
 
+      res.status(200).json(fatura);
     } catch (error) {
       console.log(error);
-      
+
       res.status(500).json(error);
     }
   }
@@ -845,7 +852,11 @@ class Pix {
         todasAsCobsr.map(async (f) => {
           // 🔹 Busca o cliente no banco de dados
           const cliente = await this.recordRepo.findOne({
-            where: { login: f.vinculo.devedor.nome, status: Not("pago"), datadel: IsNull() },
+            where: {
+              login: f.vinculo.devedor.nome,
+              status: Not("pago"),
+              datadel: IsNull(),
+            },
             order: { datavenc: "ASC" as const },
           });
           // 🔸 Se não encontrar, apenas loga (não pode usar res.status dentro do loop)
@@ -921,10 +932,10 @@ class Pix {
     }
   }
 
-  async listarPixAutomaticoUmCliente(
+  listarPixAutomaticoUmCliente = async (
     req: Request,
     res: Response
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const { filtros } = req.body;
       console.log(filtros.idRec);
@@ -933,11 +944,36 @@ class Pix {
       const response = await efi.pixDetailRecurrenceAutomatic({
         idRec: filtros.idRec,
       });
-      console.log(response);
+      const response2 = await this.listarPixAgendados(filtros.idRec);
+      
+      
 
-      res.status(200).json(response);
+      const finalResponse = {
+        response,
+        response2
+      }
+
+      res.status(200).json(finalResponse);
     } catch (error) {
+      console.log(error);
+      
       res.status(500).json(error);
+    }
+  }
+
+  listarPixAgendados = async (idRec: string) => {
+    try {
+      const efipay = new EfiPay(options);
+      
+      const hoje = new Date().toISOString().split(".")[0] + "Z";
+      const response = await efipay.pixListAutomaticCharge({
+        idRec: idRec,
+        inicio: "2025-10-17T00:00:00Z",
+        fim: hoje,
+      });
+      return response;
+    } catch (error) {
+      return error;
     }
   }
 
@@ -967,7 +1003,6 @@ class Pix {
       const simular = req.body;
 
       console.log(simular);
-      
 
       const response = await efipay.pixDetailRecurrenceAutomatic({
         idRec: simular.cobsr[0].idRec,
@@ -976,24 +1011,31 @@ class Pix {
       console.log(response);
 
       const cliente = await this.recordRepo.findOne({
-        where: { login: response.vinculo.devedor.nome, status: Not("pago"), datadel: IsNull() },
+        where: {
+          login: response.vinculo.devedor.nome,
+          status: Not("pago"),
+          datadel: IsNull(),
+        },
         order: { datavenc: "ASC" as const },
       });
 
       console.log(cliente);
-      
-      const fatura = await this.recordRepo.update(String(cliente?.id), {status: 'pago', coletor: 'api_mk_pedro', formapag: 'pix_automatico'});
+
+      const fatura = await this.recordRepo.update(String(cliente?.id), {
+        status: "pago",
+        coletor: "api_mk_pedro",
+        formapag: "pix_automatico",
+      });
 
       console.log(fatura);
-      
-      res.status(200).json(fatura)
 
+      res.status(200).json(fatura);
     } catch (error) {
       console.log(error);
-      
+
       res.status(500).json(error);
     }
-  }
+  };
 }
 
 export default Pix;
