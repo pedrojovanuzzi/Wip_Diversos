@@ -16,7 +16,6 @@ import {
 
 export const PixAutomatico = () => {
   const [remover, setRemover] = useState(false);
-  const [parametros, setParametros] = useState<ParametrosPixAutomaticoList>();
   const [qr, setQrCode] = useState("");
   const navigate = useNavigate();
   const [cobrancas, setCobrancas] = useState<any>();
@@ -160,7 +159,7 @@ export const PixAutomatico = () => {
         );
         console.log(response.data);
         setPeople(response.data);
-        setParametros(response.data.parametros);
+        
       } else if (filtrosActive && filtros.idRec) {
         const response = await axios.post(
           `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoOneClient`,
@@ -170,7 +169,7 @@ export const PixAutomatico = () => {
 
         console.log(response.data);
         setPeople(response.data.response);
-        setParametros(response.data.response.parametros);
+       
         setQrCode(response.data.response.dadosQR.pixCopiaECola);
         setCobrancas(response.data.response2.cobsr);
       } else if (filtrosActive && !filtros.idRec) {
@@ -182,13 +181,22 @@ export const PixAutomatico = () => {
 
         console.log(response.data);
         setPeople(response.data.response);
-        setParametros(response.data.response.parametros);
+        
         setQrCode(response.data.response.dadosQR.pixCopiaECola);
         setCobrancas(response.data.response2.cobsr);
       }
     } catch (error: any) {
-      const msg = extractErrorMessage(error.response.data);
-      setError(msg);
+      // Se existir resposta HTTP, extrai a mensagem normalmente
+      if (error.response && error.response.data) {
+        const msg = extractErrorMessage(error.response.data);
+        setError(msg);
+      } else {
+        // Caso contrário, trata como erro genérico ou de rede
+        console.error("Erro inesperado:", error);
+        setError(
+          "Erro de conexão com o servidor. Verifique sua rede ou tente novamente."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -213,8 +221,8 @@ export const PixAutomatico = () => {
     }
   }
 
-  function navegarCancelar(){
-    navigate('/Pix/Cancelar/Cobranca');
+  function navegarCancelar() {
+    navigate("/Pix/Cancelar/Cobranca");
   }
 
   // 🔧 Função que converte qualquer tipo de erro em string segura
@@ -450,11 +458,11 @@ export const PixAutomatico = () => {
         <div>
           <h1 className="text-xl my-2">Cancelar Cobrança</h1>
           <button
-              className="rounded-md ring-1 my-2 p-2 bg-cyan-600 text-white w-full sm:w-60"
-              onClick={navegarCancelar}
-            >
-              Cancelar
-            </button>
+            className="rounded-md ring-1 my-2 p-2 bg-cyan-600 text-white w-full sm:w-60"
+            onClick={navegarCancelar}
+          >
+            Cancelar
+          </button>
           <h1 className="text-xl my-2">Buscar Clientes Já Cadastrados</h1>
           <div className="flex flex-col items-center gap-3">
             <div className="flex gap-2 items-center">
@@ -532,12 +540,12 @@ export const PixAutomatico = () => {
             >
               Buscar
             </button>
-            {/* <button
+            <button
               className="rounded-md ring-1 p-2 bg-cyan-600 text-white w-full sm:w-60"
               onClick={gerarCobranca}
             >
               Gerar Cobrança (Teste)
-            </button> */}
+            </button>
             {qr && (
               <div className="flex gap-5 flex-col my-2 justify-center">
                 <QRCodeCanvas
@@ -564,7 +572,7 @@ export const PixAutomatico = () => {
           {people && (
             <div className="flex flex-col  justify-center mt-6">
               <div className="self-center flex justify-center w-full sm:w-11/12 md:w-3/4 lg:w-2/3">
-                <div className="w-3/4 sm:w-full scrollbar-track-transparent  scrollbar-thumb-blue-400 scrollbar-corner-blue-400  sm:h-[30vh] scrollbar overflow-scroll  sm:overflow-auto">
+                <div className="w-3/4 sm:w-full scrollbar-track-transparent  scrollbar-thumb-blue-400 scrollbar-corner-blue-400 scrollbar overflow-scroll  sm:overflow-auto">
                   {/* CASO SEJA UMA LISTA */}
                   {Array.isArray((people as PixAutomaticoListPeople)?.recs) &&
                   (people as PixAutomaticoListPeople).recs.length > 0 ? (
@@ -815,7 +823,9 @@ export const PixAutomatico = () => {
                               <td className="py-2 px-4">
                                 {cobrancas.map((c: any, i: number) => (
                                   <div>
-                                    <p>Cobrança {i + 1} {c.txid}</p>
+                                    <p>
+                                      Cobrança {i + 1} {c.txid}
+                                    </p>
                                   </div>
                                 ))}
                               </td>
@@ -827,7 +837,10 @@ export const PixAutomatico = () => {
                               <td className="py-2 px-4">
                                 {cobrancas.map((c: any, i: number) => (
                                   <div>
-                                    <p>Cobrança {i + 1} {c.calendario.dataDeVencimento}</p>
+                                    <p>
+                                      Cobrança {i + 1}{" "}
+                                      {c.calendario.dataDeVencimento}
+                                    </p>
                                   </div>
                                 ))}
                               </td>
@@ -839,7 +852,7 @@ export const PixAutomatico = () => {
                               <td className="py-2 px-4">
                                 {cobrancas.map((c: any, i: number) => (
                                   <div>
-                                    {c.tentativas.map((t: any) => 
+                                    {c.tentativas.map((t: any) =>
                                       t.atualizacao.map((a: any) => (
                                         <div className="my-2">
                                           <p>Cobrança {i + 1}</p>

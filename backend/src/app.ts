@@ -77,6 +77,7 @@ export class App {
   private agendarPixAutomatico(){
         // 🕒 Agendar para todo dia às 03:00
     cron.schedule("0 3 * * *", async () => {
+      // cron.schedule("* * * * *", async () => {
       
       console.log("⏰ Executando Pix automático", new Date().toLocaleString());
       try {
