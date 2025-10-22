@@ -70,6 +70,26 @@ class Pix {
     }
   }
 
+  async AlterarWebhookPixAutomaticoRecorrencia(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { urlWebhookRecurrency } = req.body;
+      console.log(urlWebhookRecurrency);
+
+      options.validateMtls = false;
+      const efipay = new EfiPay(options);
+      const response = await efipay.pixConfigWebhookRecurrenceAutomatic(
+        {},
+        { webhookUrl: String(urlWebhookRecurrency) }
+      );
+      res.status(200).json(response);
+    } catch (error) {
+      res.status(500).json(error);
+    }
+  }
+
   async getAccessToken(): Promise<string | null> {
     const url = "https://cobrancas.api.efipay.com.br/v1/authorize";
     const clientId = process.env.CLIENT_ID_SEM_SDK!;
@@ -242,6 +262,57 @@ class Pix {
       const cobr = req.body;
 
       console.log(cobr);
+
+      if(!cobr.cobsr){
+        res.status(200).json();
+        return;
+      }
+
+      const response = await efipay.pixDetailRecurrenceAutomatic({
+        idRec: cobr.cobsr[0].idRec,
+      });
+
+      console.log(response);
+
+      const cliente = await this.recordRepo.findOne({
+        where: {
+          login: response.vinculo.devedor.nome,
+          status: Not("pago"),
+          datadel: IsNull(),
+        },
+        order: { datavenc: "ASC" as const },
+      });
+
+      console.log(cliente);
+
+      const fatura = await this.recordRepo.update(String(cliente?.id), {
+        status: "pago",
+        coletor: "api_mk_pedro",
+        formapag: "pix_automatico",
+      });
+
+      console.log(fatura);
+
+      res.status(200).json(fatura);
+    } catch (error) {
+      console.log(error);
+
+      res.status(500).json(error);
+    }
+  }
+
+  async PixAutomaticWebhookRec(req: Request, res: Response) {
+    try {
+      const efipay = new EfiPay(options);
+
+      const cobr = req.body;
+
+      console.log(cobr);
+
+      if(!cobr.cobsr){
+        res.status(200).json();
+        return;
+      }
 
       const response = await efipay.pixDetailRecurrenceAutomatic({
         idRec: cobr.cobsr[0].idRec,
@@ -979,7 +1050,7 @@ class Pix {
     try {
       const {txid} = req.body;
       const efi = new EfiPay(options);
-      const response = await efi.pixUpdateAutomaticCharge({txid: txid}, {status: 'REMOVIDA_PELO_USUARIO_RECEBEDOR'});
+      const response = await efi.pixUpdateAutomaticCharge({txid: txid}, {status: 'CANCELADA'});
       console.log(response);
       res.status(200).json(response);
     } catch (error) {
@@ -994,9 +1065,11 @@ class Pix {
       const efi = new EfiPay(options);
       const hoje = new Date().toISOString().split(".")[0] + "Z";
 
+      const inicio = "2025-10-22T00:00:00Z";
+
       if (filtros && filtros.status && filtros.status != "TODOS") {
         const response = await efi.pixListRecurrenceAutomatic({
-          inicio: "2025-10-17T00:00:00Z",
+          inicio: inicio,
           status: filtros.status,
           fim: hoje,
           "paginacao.itensPorPagina": 2000,
@@ -1006,7 +1079,7 @@ class Pix {
       }
 
       const response = await efi.pixListRecurrenceAutomatic({
-        inicio: "2025-10-17T00:00:00Z",
+        inicio: inicio,
         fim: hoje,
         "paginacao.itensPorPagina": 100,
       });

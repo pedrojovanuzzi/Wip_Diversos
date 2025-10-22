@@ -7,6 +7,7 @@ export const PixAutomaticoAdmin = () => {
 
 
 const [urlWebhook, setUrlWebhook] = useState('');
+const [urlWebhookRecurrency, setUrlWebhookRecurrency] = useState('');
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -18,9 +19,34 @@ const [urlWebhook, setUrlWebhook] = useState('');
       e.preventDefault();
       setError("");
       setLoading(true);
+      if(!urlWebhook){
+        return;
+      }
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/Pix/criarWebhookPixAutomatico`,
         { urlWebhook },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log(response.data);
+    } catch (error: any) {
+      const msg = extractErrorMessage(error.response.data);
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function criarWebhookPixRecorrenciaAutomatico(e: React.FormEvent) {
+    try {
+      e.preventDefault();
+      setError("");
+      setLoading(true);
+       if(!urlWebhookRecurrency){
+        return;
+      }
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Pix/criarWebhookPixAutomaticoRecurrency`,
+        { urlWebhookRecurrency },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       console.log(response.data);
@@ -73,16 +99,27 @@ const [urlWebhook, setUrlWebhook] = useState('');
 
             <div>
               <form
-                onSubmit={criarWebhookPixAutomatico}
+                onSubmit={(e) => (
+                  criarWebhookPixRecorrenciaAutomatico(e),
+                  criarWebhookPixAutomatico(e)
+                )}
                 className="flex flex-col gap-3"
               >
                 <div className="[&>*:nth-child(odd)]:bg-gray-100 flex flex-col gap-3">
                   <input
                     className="ring-1 rounded-sm p-2"
                     type="text"
-                    placeholder="Link Webhook"
+                    placeholder="Link Webhook Cobrs"
                     onChange={(e) => 
                       (setUrlWebhook(e.target.value))
+                    }
+                  />
+                  <input
+                    className="ring-1 rounded-sm p-2"
+                    type="text"
+                    placeholder="Link Webhook Recorrencia"
+                    onChange={(e) => 
+                      (setUrlWebhookRecurrency(e.target.value))
                     }
                   />
                 </div>
