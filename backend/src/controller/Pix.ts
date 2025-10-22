@@ -62,10 +62,10 @@ class Pix {
     }
   }
 
-  async AlterarWebhookPixAutomatico(
+  AlterarWebhookPixAutomatico = async (
     req: Request,
     res: Response
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const { urlWebhook } = req.body;
       console.log(urlWebhook);
@@ -82,10 +82,10 @@ class Pix {
     }
   }
 
-  async AlterarWebhookPixAutomaticoRecorrencia(
+  AlterarWebhookPixAutomaticoRecorrencia = async (
     req: Request,
     res: Response
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const { urlWebhookRecurrency } = req.body;
       console.log(urlWebhookRecurrency);
@@ -102,7 +102,7 @@ class Pix {
     }
   }
 
-  async getAccessToken(): Promise<string | null> {
+  getAccessToken = async (): Promise<string | null> => {
     const url = "https://cobrancas.api.efipay.com.br/v1/authorize";
     const clientId = process.env.CLIENT_ID_SEM_SDK!;
     const clientSecret = process.env.CLIENT_SECRET_SEM_SDK!;
@@ -126,7 +126,7 @@ class Pix {
     }
   }
 
-  async setPaid(token: string, chargeId: string): Promise<any> {
+  setPaid = async (token: string, chargeId: string): Promise<any> => {
     const url = `https://cobrancas.api.efipay.com.br/v1/charge/${chargeId}/settle`;
     const headers = {
       Authorization: `Bearer ${token}`,
@@ -144,10 +144,10 @@ class Pix {
     }
   }
 
-  async StatusUpdatePixTodosVencidos(
+  StatusUpdatePixTodosVencidos = async (
     req: Request,
     res: Response
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const pixData = req.body.pix;
       if (!pixData || pixData.length === 0) {
@@ -267,7 +267,7 @@ class Pix {
     }
   }
 
-  async PixAutomaticWebhookCobr(req: Request, res: Response) {
+  PixAutomaticWebhookCobr = async (req: Request, res: Response) => {
     try {
       const efipay = new EfiPay(options);
 
@@ -313,7 +313,7 @@ class Pix {
     }
   }
 
-  async PixAutomaticWebhookRec(req: Request, res: Response) {
+  PixAutomaticWebhookRec = async (req: Request, res: Response) => {
     try {
       const efipay = new EfiPay(options);
 
@@ -403,7 +403,7 @@ class Pix {
     return false;
   }
 
-  async gerarPix(req: Request, res: Response): Promise<void> {
+   gerarPix = async (req: Request, res: Response): Promise<void> => {
     try {
       let { pppoe, cpf } = req.body as { pppoe: string; cpf: string };
       cpf = cpf.replace(/\D/g, "");
@@ -476,7 +476,7 @@ class Pix {
     }
   }
 
-  async gerarPixAberto(req: Request, res: Response): Promise<void> {
+   gerarPixAberto = async (req: Request, res: Response): Promise<void> => {
     try {
       let { pppoe, cpf } = req.body as { pppoe: string; cpf: string };
       cpf = cpf.replace(/\D/g, "");
@@ -546,7 +546,7 @@ class Pix {
     }
   }
 
-  async gerarPixAll(req: Request, res: Response): Promise<void> {
+   gerarPixAll = async (req: Request, res: Response): Promise<void> => {
     try {
       let { pppoe, cpf } = req.body as { pppoe: string; cpf: string };
       cpf = cpf.replace(/\D/g, "");
@@ -621,7 +621,7 @@ class Pix {
     }
   }
 
-  async gerarPixVariasContas(req: Request, res: Response): Promise<void> {
+   gerarPixVariasContas = async (req: Request, res: Response): Promise<void> => {
     try {
       let { nome_completo, cpf } = req.body as {
         nome_completo: string;
@@ -1070,7 +1070,7 @@ class Pix {
     }
   }
 
-  async listaPixAutomatico(req: Request, res: Response): Promise<void> {
+  listaPixAutomatico = async (req: Request, res: Response): Promise<void> => {
     try {
       const { filtros } = req.body;
 
@@ -1148,7 +1148,7 @@ class Pix {
     }
   }
 
-  async atualizarPixAutomatico(req: Request, res: Response): Promise<void> {
+  atualizarPixAutomatico = async (req: Request, res: Response): Promise<void> => {
     try {
       const { idRec, status } = req.body;
       console.log(idRec, status);
