@@ -18,29 +18,30 @@ export const PixAutomatico = () => {
   const [remover, setRemover] = useState(false);
   const [parametros, setParametros] = useState<ParametrosPixAutomaticoList>();
   const [qr, setQrCode] = useState("");
+  const [cobrancas, setCobrancas] = useState<any>();
   const [people, setPeople] = useState<
     PixAutomaticoListPeople | PixAutomaticoListOnePeople
   >();
   const [status, setStatus] = useState<"CANCELADA">("CANCELADA");
   const [filtrosActive, setFiltrosActive] = useState(false);
   // Cria um estado "date" com valor inicial calculado dinamicamente
-const [date, setDate] = useState(() => {
-  // 🔹 Pega a data atual
-  const hoje = new Date();
+  const [date, setDate] = useState(() => {
+    // 🔹 Pega a data atual
+    const hoje = new Date();
 
-  // 🔹 Avança para o próximo mês
-  hoje.setMonth(hoje.getMonth() + 1);
+    // 🔹 Avança para o próximo mês
+    hoje.setMonth(hoje.getMonth() + 1);
 
-  // 🔹 Define o dia como o primeiro (01)
-  hoje.setDate(1);
+    // 🔹 Define o dia como o primeiro (01)
+    hoje.setDate(1);
 
-  // 🔹 Formata no padrão brasileiro "DD/MM/AAAA"
-  return hoje.toLocaleDateString("pt-BR");
-});
+    // 🔹 Formata no padrão brasileiro "DD/MM/AAAA"
+    return hoje.toLocaleDateString("pt-BR");
+  });
 
-useEffect(() => {
-  setPixAutoData((prev) => ({ ...prev, data_inicial: date }));
-}, [date]);
+  useEffect(() => {
+    setPixAutoData((prev) => ({ ...prev, data_inicial: date }));
+  }, [date]);
 
   const [pixAutoData, setPixAutoData] = useState<PixAuto>({
     contrato: "",
@@ -85,7 +86,7 @@ useEffect(() => {
 
   async function gerarCobranca(e: React.FormEvent) {
     try {
-      setQrCode('');
+      setQrCode("");
       console.log(pixAutoData);
       e.preventDefault();
       setError("");
@@ -96,7 +97,6 @@ useEffect(() => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       console.log(response.data);
-      
     } catch (error: any) {
       const msg = extractErrorMessage(error.response.data);
       setError(msg);
@@ -105,48 +105,48 @@ useEffect(() => {
     }
   }
 
-//    async function pagarCobrancaTest(e: React.FormEvent) {
-//     try {
-//       console.log(pixAutoData);
+  //    async function pagarCobrancaTest(e: React.FormEvent) {
+  //     try {
+  //       console.log(pixAutoData);
 
-//       e.preventDefault();
-//       setError("");
-//       setLoading(true);
-//       const response = await axios.post(
-//         `${process.env.REACT_APP_URL}/Pix/simularPagamento`,
-//         {
-//   "cobsr": [
-//     {
-//       "idRec": "RN0908935620251021580c6680ae7",
-//       "txid": "3136957d93134f2184b369e8f1c0729d",
-//       "status": "ATIVA",
-//       "atualizacao": [
-//         {
-//           "status": "ATIVA",
-//           "data": "2024-08-20T12:34:21.300Z"
-//         }
-//       ],
-//       "tentativas": [
-//         {
-//           "dataLiquidacao": "2024-20-08",
-//           "tipo": "AGND",
-//           "status": "SOLICITADA",
-//           "endToEndId": "E12345678202406201221abcdef12345"
-//         }
-//       ]
-//     }
-//   ]
-// },
-//         { headers: { Authorization: `Bearer ${token}` } }
-//       );
-//       console.log(response.data);
-//     } catch (error: any) {
-//       const msg = extractErrorMessage(error.response.data);
-//       setError(msg);
-//     } finally {
-//       setLoading(false);
-//     }
-//   }
+  //       e.preventDefault();
+  //       setError("");
+  //       setLoading(true);
+  //       const response = await axios.post(
+  //         `${process.env.REACT_APP_URL}/Pix/simularPagamento`,
+  //         {
+  //   "cobsr": [
+  //     {
+  //       "idRec": "RN0908935620251021580c6680ae7",
+  //       "txid": "3136957d93134f2184b369e8f1c0729d",
+  //       "status": "ATIVA",
+  //       "atualizacao": [
+  //         {
+  //           "status": "ATIVA",
+  //           "data": "2024-08-20T12:34:21.300Z"
+  //         }
+  //       ],
+  //       "tentativas": [
+  //         {
+  //           "dataLiquidacao": "2024-20-08",
+  //           "tipo": "AGND",
+  //           "status": "SOLICITADA",
+  //           "endToEndId": "E12345678202406201221abcdef12345"
+  //         }
+  //       ]
+  //     }
+  //   ]
+  // },
+  //         { headers: { Authorization: `Bearer ${token}` } }
+  //       );
+  //       console.log(response.data);
+  //     } catch (error: any) {
+  //       const msg = extractErrorMessage(error.response.data);
+  //       setError(msg);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   }
 
   async function getClientesPixAutomatico() {
     try {
@@ -169,9 +169,10 @@ useEffect(() => {
         );
 
         console.log(response.data);
-        setPeople(response.data);
-        setParametros(response.data.parametros);
-        setQrCode(response.data.dadosQR.pixCopiaECola);
+        setPeople(response.data.response);
+        setParametros(response.data.response.parametros);
+        setQrCode(response.data.response.dadosQR.pixCopiaECola);
+        setCobrancas(response.data.response2.cobsr);
       } else if (filtrosActive && !filtros.idRec) {
         const response = await axios.post(
           `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoClients`,
@@ -180,9 +181,10 @@ useEffect(() => {
         );
 
         console.log(response.data);
-        setPeople(response.data);
-        setParametros(response.data.parametros);
-        setQrCode(response.data.dadosQR.pixCopiaECola);
+        setPeople(response.data.response);
+        setParametros(response.data.response.parametros);
+        setQrCode(response.data.response.dadosQR.pixCopiaECola);
+        setCobrancas(response.data.response2.cobsr);
       }
     } catch (error: any) {
       const msg = extractErrorMessage(error.response.data);
@@ -191,8 +193,6 @@ useEffect(() => {
       setLoading(false);
     }
   }
-
-
 
   async function atualizarPixAutomatico(e: React.FormEvent) {
     try {
@@ -239,7 +239,7 @@ useEffect(() => {
   }
 
   return (
-    <div className="sm:p-5 bg-slate-800 min-h-screen text-gray-200">
+    <div className="lg:p-5 bg-slate-800 min-h-screen text-gray-200">
       <NavBar />
 
       <div className="bg-gray-100 text-gray-900 relative p-10 rounded-md flex flex-col gap-4 items-center">
@@ -302,7 +302,6 @@ useEffect(() => {
             className="absolute inset-0 appearance-none focus:outline-none"
           />
         </label>
-        
 
         {/* Texto dinâmico */}
         <div className="mt-3 text-lg font-semibold">
@@ -529,11 +528,21 @@ useEffect(() => {
               Gerar Cobrança (Teste)
             </button>
             {qr && (
-        <div className="flex gap-5 flex-col my-2 justify-center"><QRCodeCanvas className="self-center"
-            value={qr} // texto Pix Copia e Cola
-            size={256} // tamanho do QR
-          /><p>Pix Copia e Cola: </p><p className="cursor-pointer  text-blue-600 hover:underline select-text" onClick={() => navigator.clipboard.writeText(qr)}>{qr}</p></div>
-      )}
+              <div className="flex gap-5 flex-col my-2 justify-center">
+                <QRCodeCanvas
+                  className="self-center"
+                  value={qr} // texto Pix Copia e Cola
+                  size={256} // tamanho do QR
+                />
+                <p>Pix Copia e Cola: </p>
+                <p
+                  className="cursor-pointer break-all text-blue-600 hover:underline select-text"
+                  onClick={() => navigator.clipboard.writeText(qr)}
+                >
+                  {qr}
+                </p>
+              </div>
+            )}
             {/* <button
               className="rounded-md ring-1 p-2 bg-cyan-600 text-white w-full sm:w-60"
               onClick={pagarCobrancaTest}
@@ -543,12 +552,12 @@ useEffect(() => {
           </div>
           {people && (
             <div className="flex flex-col  justify-center mt-6">
-              <div className="self-center  w-full sm:w-11/12 md:w-3/4 lg:w-2/3">
-                <div className="w-full scrollbar-track-transparent  scrollbar-thumb-blue-400 scrollbar-corner-blue-400  h-[30vh] scrollbar  overflow-auto">
+              <div className="self-center flex justify-center w-full sm:w-11/12 md:w-3/4 lg:w-2/3">
+                <div className="w-3/4 sm:w-full scrollbar-track-transparent  scrollbar-thumb-blue-400 scrollbar-corner-blue-400  sm:h-[30vh] scrollbar overflow-scroll  sm:overflow-auto">
                   {/* CASO SEJA UMA LISTA */}
                   {Array.isArray((people as PixAutomaticoListPeople)?.recs) &&
                   (people as PixAutomaticoListPeople).recs.length > 0 ? (
-                    <div className="p-2 flex flex-col justify-center w-[70vw] sm:w-full sm:p-0">
+                    <div className="p-2 flex flex-col justify-center w-[40vw] sm:w-full sm:p-0">
                       <table className="min-w-full border-separate border-spacing-0 text-left my-4 bg-white rounded-md shadow-sm">
                         <thead className="bg-gray-50 border-b">
                           <tr>
@@ -601,8 +610,9 @@ useEffect(() => {
                                     className={`px-2 py-1 rounded-full text-xs font-semibold ${
                                       person.status === "CRIADA"
                                         ? "bg-yellow-100 text-yellow-800"
-                                        : person.status === 'APROVADA' ? "bg-green-100 text-green-800" :
-                                        "bg-red-100 text-gray-700"
+                                        : person.status === "APROVADA"
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-gray-700"
                                     }`}
                                   >
                                     {person.status}
@@ -719,8 +729,10 @@ useEffect(() => {
                                     (people as PixAutomaticoListOnePeople)
                                       .status === "CRIADA"
                                       ? "bg-yellow-100 text-yellow-800"
-                                      : (people as PixAutomaticoListOnePeople).status === "APROVADA" ?
-                                      "bg-green-100 text-green-600" : "bg-red-100 text-gray-700"
+                                      : (people as PixAutomaticoListOnePeople)
+                                          .status === "APROVADA"
+                                      ? "bg-green-100 text-green-600"
+                                      : "bg-red-100 text-gray-700"
                                   }`}
                                 >
                                   {
@@ -747,7 +759,7 @@ useEffect(() => {
                                 )
                               </td>
                             </tr>
-                            <tr>
+                            <tr className="border-b">
                               <th className="py-2 px-4 text-gray-700">
                                 Atualização
                               </th>
@@ -760,6 +772,23 @@ useEffect(() => {
                                     <p className="text-green-600">{f.status}</p>
                                   </div>
                                 ))}{" "}
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                Cobranças
+                              </th>
+                              <td className="py-2 px-4">
+                                {cobrancas[0].atualizacao.map(
+                                  (f: { status: string; data: string }) => {
+                                    return (
+                                      <div className="flex gap-2">
+                                        <p>{f.status}</p>
+                                        <p>{f.data}</p>
+                                      </div>
+                                    );
+                                  }
+                                )}
                               </td>
                             </tr>
                           </tbody>
