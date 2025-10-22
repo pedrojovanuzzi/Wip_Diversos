@@ -618,11 +618,6 @@ export const PixAutomatico = () => {
                                     {person.status}
                                   </span>
                                 </td>
-                                <td className="py-3 px-4 text-right text-sm">
-                                  <button className="text-indigo-600 hover:text-indigo-900">
-                                    Editar
-                                  </button>
-                                </td>
                               </tr>
                             )
                           )}
