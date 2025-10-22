@@ -823,7 +823,7 @@ class Pix {
     }
   };
 
-  pegarUltimoBoletoGerarPixAutomatico = async (req: Request, res: Response) => {
+  pegarUltimoBoletoGerarPixAutomaticoSimular = async (req: Request, res: Response) => {
     try {
       const todasAsCobsr: any[] = [];
       let paginaAtual = 0;
@@ -834,7 +834,7 @@ class Pix {
 
       while (paginaAtual < quantidadeDePaginas) {
         const response = await efipay.pixListRecurrenceAutomatic({
-          inicio: "2025-10-17T00:00:00Z",
+          inicio: "2025-10-18T00:00:00Z",
           fim: hoje,
           status: "APROVADA",
           "paginacao.itensPorPagina": 100,
@@ -900,6 +900,92 @@ class Pix {
       res.status(500).json(error);
     }
   };
+
+  pegarUltimoBoletoGerarPixAutomatico = async () => {
+    try {
+      const todasAsCobsr: any[] = [];
+      let paginaAtual = 0;
+      let quantidadeDePaginas = 1;
+
+      const efipay = new EfiPay(options);
+      const hoje = new Date().toISOString().split(".")[0] + "Z";
+
+      while (paginaAtual < quantidadeDePaginas) {
+        const response = await efipay.pixListRecurrenceAutomatic({
+          inicio: "2025-10-18T00:00:00Z",
+          fim: hoje,
+          status: "APROVADA",
+          "paginacao.itensPorPagina": 100,
+          "paginacao.paginaAtual": paginaAtual,
+        });
+
+        todasAsCobsr.push(...response.recs);
+        quantidadeDePaginas = response.parametros.paginacao.quantidadeDePaginas;
+        paginaAtual++;
+      }
+
+      console.log(todasAsCobsr);
+
+      const response = await Promise.all(
+        todasAsCobsr.map(async (f) => {
+          // 🔹 Busca o cliente no banco de dados
+          const cliente = await this.recordRepo.findOne({
+            where: {
+              login: f.vinculo.devedor.nome,
+              status: Not("pago"),
+              datadel: IsNull(),
+            },
+            order: { datavenc: "ASC" as const },
+          });
+          // 🔸 Se não encontrar, apenas loga (não pode usar res.status dentro do loop)
+          if (!cliente) {
+            console.warn(
+              `Usuário ${f.pppoe} não encontrado ou sem mensalidades vencidas`
+            );
+            return null; // sai desta iteração
+          }
+
+          // 🔹 Cria cobrança automática vinculada a uma recorrência
+          const result = await efipay.pixCreateAutomaticCharge("", {
+            idRec: f.idRec, // ID da recorrência já existente
+            ajusteDiaUtil: true, // Ajusta vencimento se cair em fim de semana
+            calendario: {
+              dataDeVencimento: cliente.datavenc.toISOString().split("T")[0], // Data da cobrança
+              // dataDeVencimento: '2025-10-24', // Data da cobrança
+            },
+            recebedor: {
+              agencia: process.env.AGENCIA!,
+              conta: process.env.CONTA!,
+              tipoConta: "PAGAMENTO", // Tipo da conta bancária
+            },
+            valor: {
+              original: cliente.valor, // Valor da cobrança
+              // original: '1.00'
+            },
+            infoAdicional: "Mensalidade gerada automaticamente",
+          });
+
+          console.log(`Cobrança criada para ${cliente.login}:`, result);
+          return result;
+        })
+      );
+      console.log(response);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  cancelarCobranca = async (req: Request, res: Response) => {
+    try {
+      const {txid} = req.body;
+      const efi = new EfiPay(options);
+      const response = await efi.pixUpdateAutomaticCharge({txid: txid}, {status: 'REMOVIDA_PELO_USUARIO_RECEBEDOR'});
+      console.log(response);
+      res.status(200).json(response);
+    } catch (error) {
+      res.status(500).json(error);
+    }
+  }
 
   async listaPixAutomatico(req: Request, res: Response): Promise<void> {
     try {

@@ -18,6 +18,7 @@ export const PixAutomatico = () => {
   const [remover, setRemover] = useState(false);
   const [parametros, setParametros] = useState<ParametrosPixAutomaticoList>();
   const [qr, setQrCode] = useState("");
+  const navigate = useNavigate();
   const [cobrancas, setCobrancas] = useState<any>();
   const [people, setPeople] = useState<
     PixAutomaticoListPeople | PixAutomaticoListOnePeople
@@ -55,7 +56,6 @@ export const PixAutomatico = () => {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [idRec, setIdRec] = useState("");
   const token = user?.token;
@@ -211,6 +211,10 @@ export const PixAutomatico = () => {
     } finally {
       setLoading(false);
     }
+  }
+
+  function navegarCancelar(){
+    navigate('/Pix/Cancelar/Cobranca');
   }
 
   // 🔧 Função que converte qualquer tipo de erro em string segura
@@ -444,6 +448,13 @@ export const PixAutomatico = () => {
         {loading && <p>Carregando ....</p>}
         {error && <p className="text-red-500">{error}</p>}
         <div>
+          <h1 className="text-xl my-2">Cancelar Cobrança</h1>
+          <button
+              className="rounded-md ring-1 my-2 p-2 bg-cyan-600 text-white w-full sm:w-60"
+              onClick={navegarCancelar}
+            >
+              Cancelar
+            </button>
           <h1 className="text-xl my-2">Buscar Clientes Já Cadastrados</h1>
           <div className="flex flex-col items-center gap-3">
             <div className="flex gap-2 items-center">
@@ -521,12 +532,12 @@ export const PixAutomatico = () => {
             >
               Buscar
             </button>
-            <button
+            {/* <button
               className="rounded-md ring-1 p-2 bg-cyan-600 text-white w-full sm:w-60"
               onClick={gerarCobranca}
             >
               Gerar Cobrança (Teste)
-            </button>
+            </button> */}
             {qr && (
               <div className="flex gap-5 flex-col my-2 justify-center">
                 <QRCodeCanvas
