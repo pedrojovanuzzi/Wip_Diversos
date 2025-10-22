@@ -129,7 +129,7 @@ export const PixDetalhe = () => {
     <div className="sm:p-5 bg-slate-800 min-h-screen text-gray-200">
       <NavBar />
       <form>
-        <div className="bg-gray-100 text-gray-900 p-10 rounded-md">
+        <div className="bg-gray-100 min-h-screen sm:min-h-full text-gray-900 p-10 rounded-md">
           <h1 className="text-2xl font-bold">{modo.titulo}</h1>
           <p className="mt-2">{modo.descricao}</p>
           <div className="flex flex-col mt-5 items-center gap-4">

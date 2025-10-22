@@ -540,12 +540,12 @@ export const PixAutomatico = () => {
             >
               Buscar
             </button>
-            <button
+            {/* <button
               className="rounded-md ring-1 p-2 bg-cyan-600 text-white w-full sm:w-60"
               onClick={gerarCobranca}
             >
               Gerar Cobrança (Teste)
-            </button>
+            </button> */}
             {qr && (
               <div className="flex gap-5 flex-col my-2 justify-center">
                 <QRCodeCanvas

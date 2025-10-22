@@ -18,7 +18,7 @@ export const Pix = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="p-2 bg-slate-800 min-h-screen">
+    <div className="sm:p-2 bg-slate-800 min-h-screen">
       <NavBar />
       
       <div className="p-5 bg-gray-100 rounded-t-sm font-semibold">
