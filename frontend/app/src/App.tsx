@@ -30,6 +30,7 @@ import { PixDetalhe } from './pages/Pix/PixDetalhe';
 import { PixAutomatico } from './pages/Pix/PixAutomatico';
 import { PixAutomaticoAdmin } from './pages/Pix/PixAutomaticoAdmin';
 import { PixCancelarCobranca } from './pages/Pix/PixCancelarCobranca';
+import { PixAdmin } from './pages/Pix/PixAdmin';
 
 
 function App() {
@@ -84,6 +85,7 @@ function App() {
           <Route path="/Pix" element={user?.token ? <Pix /> : <Navigate to="/auth/login" />} />
           <Route path="/Pix/automatico" element={user?.token ? <PixAutomatico /> : <Navigate to="/auth/login" />} />
           <Route path="/Pix/automaticoAdmin" element={user?.token && user.permission >= 5 ? <PixAutomaticoAdmin /> : <Navigate to="/auth/login" />} />
+          <Route path="/Pix/Admin" element={user?.token && user.permission >= 5 ? <PixAdmin /> : <Navigate to="/auth/login" />} />
           <Route path="/Pix/:tipo" element={<PixDetalhe />} /> {/* ← rota dinâmica */}
           <Route path="/Pix/Cancelar/Cobranca" element={<PixCancelarCobranca />} /> {/* ← rota dinâmica */}
           <Route path="*" element={user?.token ? <HomePage /> : <Navigate to="/auth/login" />} />

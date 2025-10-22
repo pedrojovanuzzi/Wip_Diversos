@@ -24,6 +24,7 @@ router.post('/criarCobrancaPixAutomatico', AuthGuard, pixController.pegarUltimoB
 router.post('/cancelarCobranca', AuthGuard, pixController.cancelarCobranca);
 
 
+router.post('/criarWebhookPix', AuthGuard, pixController.AlterarWebhook);
 router.post('/criarWebhookPixAutomatico', AuthGuard, pixController.AlterarWebhookPixAutomatico);
 router.post('/criarWebhookPixAutomaticoRecurrency', AuthGuard, pixController.AlterarWebhookPixAutomaticoRecorrencia);
 router.post('/getPixAutomaticoClients', AuthGuard, pixController.listaPixAutomatico);
