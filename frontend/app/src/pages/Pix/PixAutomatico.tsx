@@ -756,7 +756,7 @@ export const PixAutomatico = () => {
                             </tr>
                             <tr className="border-b">
                               <th className="py-2 px-4 text-gray-700">
-                                Atualização
+                                Atualização Recorrencia
                               </th>
                               <td className="py-2 px-4">
                                 {(
@@ -773,17 +773,72 @@ export const PixAutomatico = () => {
                               <th className="py-2 px-4 text-gray-700">
                                 Cobranças
                               </th>
+                              <td className="py-2 px-4">{cobrancas.length}</td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                Atualização Cobranças
+                              </th>
                               <td className="py-2 px-4">
-                                {cobrancas[0].atualizacao.map(
-                                  (f: { status: string; data: string }) => {
-                                    return (
-                                      <div className="flex gap-2">
-                                        <p>{f.status}</p>
-                                        <p>{f.data}</p>
-                                      </div>
-                                    );
-                                  }
-                                )}
+                                {cobrancas.map((c: any, i: number) => (
+                                  <div>
+                                    {c.atualizacao.map(
+                                      (f: { status: string; data: string }) => {
+                                        return (
+                                          <div className="flex gap-2">
+                                            <p>Cobrança {i + 1}</p>
+                                            <p>{f.status}</p>
+                                            <p>{f.data}</p>
+                                          </div>
+                                        );
+                                      }
+                                    )}
+                                  </div>
+                                ))}
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                TxId Cobranças
+                              </th>
+                              <td className="py-2 px-4">
+                                {cobrancas.map((c: any, i: number) => (
+                                  <div>
+                                    <p>Cobrança {i + 1} {c.txid}</p>
+                                  </div>
+                                ))}
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                Datas de Vencimento
+                              </th>
+                              <td className="py-2 px-4">
+                                {cobrancas.map((c: any, i: number) => (
+                                  <div>
+                                    <p>Cobrança {i + 1} {c.calendario.dataDeVencimento}</p>
+                                  </div>
+                                ))}
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <th className="py-2 px-4 text-gray-700">
+                                Tentativas
+                              </th>
+                              <td className="py-2 px-4">
+                                {cobrancas.map((c: any, i: number) => (
+                                  <div>
+                                    {c.tentativas.map((t: any) => 
+                                      t.atualizacao.map((a: any) => (
+                                        <div className="my-2">
+                                          <p>Cobrança {i + 1}</p>
+                                          <p>{a.status}</p>
+                                          <p>{a.data}</p>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                ))}
                               </td>
                             </tr>
                           </tbody>
