@@ -27,12 +27,13 @@ router.post('/cancelarCobranca', AuthGuard, pixController.cancelarCobranca);
 router.post('/criarWebhookPix', AuthGuard, pixController.AlterarWebhook);
 router.post('/criarWebhookPixAutomatico', AuthGuard, pixController.AlterarWebhookPixAutomatico);
 router.post('/criarWebhookPixAutomaticoRecurrency', AuthGuard, pixController.AlterarWebhookPixAutomaticoRecorrencia);
+
 router.post('/getPixAutomaticoClients', AuthGuard, pixController.listaPixAutomatico);
 router.post('/getPixAutomaticoOneClient', AuthGuard, pixController.listarPixAutomaticoUmCliente);
+
 router.post('/atualizarPixAutomaticoClients', AuthGuard, pixController.atualizarPixAutomatico);
 
 router.post('/simularPagamento', AuthGuard, pixController.simularPagamentoWebhookPixAutomatico);
-
 
 // router.post('/PixUnicoVencido/webhook', pixController.StatusUpdatePixUnicoVencido);
 router.post('/PixTodosVencidos/webhook', pixController.StatusUpdatePixTodosVencidos);
