@@ -42,10 +42,10 @@ class Pix {
   private clienteRepo = AppDataSource.getRepository(ClientesEntities);
 
 
-   async AlterarWebhook(
+  AlterarWebhook = async (
     req: Request,
     res: Response
-  ): Promise<void> {
+  ): Promise<void> => {
     try {
       const { urlWebhook } = req.body;
       console.log(urlWebhook);
