@@ -19,9 +19,10 @@ import PowerDNS from './routes/PowerDns.routes';
 import Onu from './routes/Onu.routes';
 import BackupRoutes from './routes/Backup.routes';
 import PixRoutes from './routes/Pix.routes';
+import Pix from './controller/Pix';
 const backup = new Backup();
-import session from "express-session";
-import flash from "connect-flash";
+const pix = new Pix();
+
 
 
 export class App {
@@ -32,6 +33,7 @@ export class App {
     this.middleware();
     this.router();
     this.agendarBackup();
+    this.agendarPixAutomatico();
     // this.verificaDDOS();
   }
 
@@ -64,6 +66,21 @@ export class App {
       console.log("⏰ Executando backup automático", new Date().toLocaleString());
       try {
         await backup.gerarTodos();
+      } catch (err) {
+        console.error("❌ Falha no backup agendado:", err);
+      }
+    });
+
+    console.log("📅 Agendador de backup inicializado.");
+  }
+
+  private agendarPixAutomatico(){
+        // 🕒 Agendar para todo dia às 03:00
+    cron.schedule("0 3 * * *", async () => {
+      
+      console.log("⏰ Executando Pix automático", new Date().toLocaleString());
+      try {
+        await pix.pegarUltimoBoletoGerarPixAutomatico();
       } catch (err) {
         console.error("❌ Falha no backup agendado:", err);
       }
