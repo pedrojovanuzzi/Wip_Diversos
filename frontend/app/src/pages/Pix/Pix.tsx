@@ -1,19 +1,35 @@
 import React from "react";
-import { Link } from "react-router-dom"; // 👈 importante
+import { Link, useNavigate } from "react-router-dom"; // 👈 importante
 import { NavBar } from "../../components/navbar/NavBar";
 import { ClockIcon } from "@heroicons/react/24/outline";
 import { IoDocuments } from "react-icons/io5";
 import { FaBoxOpen, FaUsers } from "react-icons/fa";
 import { MdOutlineAutoMode } from "react-icons/md";
 import PixCard from "./components/PixCard";
+import { useAuth } from "../../context/AuthContext";
+import { CiSettings } from "react-icons/ci";
 
 
 
 export const Pix = () => {
+
+  const {user} = useAuth();
+  const permission = user?.permission;
+  const navigate = useNavigate();
+
   return (
     <div className="p-2 bg-slate-800 min-h-screen">
       <NavBar />
+      
       <div className="p-5 bg-gray-100 rounded-t-sm font-semibold">
+        {permission! >= 5 && (
+                <CiSettings
+                  onClick={() => {
+                    navigate("/Pix/Admin");
+                  }}
+                  className="text-4xl sm:text-4xl sm:top-5 sm:absolute sm:right-10 cursor-pointer"
+                />
+              )}
         <div className="pt-2">
           <p className="text-xs text-start text-gray-600">ℹ️ Vencida = Mensalidade atrasada</p>
           <p className="text-xs text-start text-gray-600">ℹ️ Aberta = Mensalidade ainda não paga</p>
@@ -71,6 +87,7 @@ export const Pix = () => {
           descricao="Gerencie e adicione clientes ao Pix Automático"
           spanFull
         />
+        
       </div>
     </div>
   );

@@ -32,6 +32,7 @@ const options = {
 };
 
 const chave_pix = process.env.CHAVE_PIX as string;
+
 const urlPix = isSandbox
   ? "https://pix-h.api.efipay.com.br"
   : "https://pix.api.efipay.com.br";
@@ -41,13 +42,24 @@ class Pix {
   private clienteRepo = AppDataSource.getRepository(ClientesEntities);
 
 
-  AlterarWebhook(url: string, chave: string): void {
-    options.validateMtls = false;
-    const efipay = new EfiPay(options);
-    efipay
-      .pixConfigWebhook({ chave: String(chave) }, { webhookUrl: String(url) })
-      .then(console.log)
-      .catch(console.log);
+   async AlterarWebhook(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { urlWebhook } = req.body;
+      console.log(urlWebhook);
+
+      options.validateMtls = false;
+      const efipay = new EfiPay(options);
+      const response = await efipay.pixConfigWebhook(
+        {chave: chave_pix},
+        { webhookUrl: String(urlWebhook) }
+      );
+      res.status(200).json(response);
+    } catch (error) {
+      res.status(500).json(error);
+    }
   }
 
   async AlterarWebhookPixAutomatico(
