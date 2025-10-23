@@ -150,7 +150,7 @@ class Pix {
     try {
       const pixData = req.body.pix;
       if (!pixData || pixData.length === 0) {
-        res.status(400).json("Nenhum dado de PIX recebido");
+        res.status(200).json("Nenhum dado de PIX recebido");
         return;
       }
 
