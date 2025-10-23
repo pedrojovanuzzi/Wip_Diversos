@@ -1,88 +1,118 @@
+// Importa os decoradores do TypeORM usados para definir a entidade e suas colunas
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
+// Define que esta classe representa a tabela "radacct" no banco de dados
 @Entity('radacct')
 export class Radacct {
+  // Define uma coluna chave primária auto incrementável chamada "radacctid"
   @PrimaryGeneratedColumn()
-    radacctid!: number;
+  radacctid!: number;
 
-  @Column({ nullable: true })
-    acctsessionid!: string;
+  // Define uma coluna do tipo VARCHAR, aceita nulo, representa o ID da sessão
+  @Column({ type: 'varchar', nullable: true })
+  acctsessionid!: string;
 
-  @Column({ nullable: true })
-    acctuniqueid!: string;
+  // Define uma coluna do tipo VARCHAR para o identificador único da sessão
+  @Column({ type: 'varchar', nullable: true })
+  acctuniqueid!: string;
 
-  @Column({ nullable: true })
-    username!: string;
+  // Nome de usuário autenticado (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  username!: string;
 
-  @Column({ nullable: true })
-    groupname!: string;
+  // Grupo ao qual o usuário pertence (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  groupname!: string;
 
-  @Column({ nullable: true })
-    realm!: string;
+  // Domínio/realm de autenticação (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  realm!: string;
 
-  @Column({ nullable: true })
-    nasipaddress!: string;
+  // Endereço IP do NAS (equipamento de rede) - VARCHAR
+  @Column({ type: 'varchar', nullable: true })
+  nasipaddress!: string;
 
-  @Column({ nullable: true })
-    nasportid!: string;
+  // Identificador da porta do NAS (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  nasportid!: string;
 
-  @Column({ nullable: true })
-    nasporttype!: string;
+  // Tipo de porta do NAS (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  nasporttype!: string;
 
+  // Data/hora de início da sessão (TIMESTAMP)
   @Column({ type: 'timestamp', nullable: true })
-    acctstarttime!: Date;
+  acctstarttime!: Date;
 
+  // Data/hora de término da sessão (TIMESTAMP)
   @Column({ type: 'timestamp', nullable: true })
-    acctstoptime!: Date;
+  acctstoptime!: Date;
 
+  // Duração total da sessão em segundos (FLOAT)
   @Column({ type: 'float', nullable: true })
-    acctsessiontime!: number;
+  acctsessiontime!: number;
 
-  @Column({ nullable: true })
-    acctauthentic!: string;
+  // Método de autenticação utilizado (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  acctauthentic!: string;
 
+  // Data/hora de início da conexão (TIMESTAMP)
   @Column({ type: 'timestamp', nullable: true })
-    connectinfo_start!: Date;
+  connectinfo_start!: Date;
 
+  // Data/hora de término da conexão (TIMESTAMP)
   @Column({ type: 'timestamp', nullable: true })
-    connectinfo_stop!: Date;
+  connectinfo_stop!: Date;
 
+  // Quantidade de bytes recebidos (BIGINT)
   @Column({ type: 'bigint', nullable: true })
-    acctinputoctets!: string;
+  acctinputoctets!: number;
 
+  // Quantidade de bytes enviados (BIGINT)
   @Column({ type: 'bigint', nullable: true })
-    acctoutputoctets!: string;
+  acctoutputoctets!: number;
 
-  @Column({ nullable: true })
-    calledstationid!: string;
+  // MAC Address ou identificador da estação chamada (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  calledstationid!: string;
 
-  @Column({ nullable: true })
-    callingstationid!: string;
+  // MAC Address ou identificador da estação que chamou (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  callingstationid!: string;
 
-  @Column({ nullable: true })
-    acctterminatecause!: string;
+  // Causa do encerramento da sessão (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  acctterminatecause!: string;
 
-  @Column({ nullable: true })
-    servicetype!: string;
+  // Tipo de serviço prestado (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  servicetype!: string;
 
-  @Column({ nullable: true })
-    framedprotocol!: string;
+  // Protocolo de enquadramento (ex: PPP) (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  framedprotocol!: string;
 
-  @Column({ nullable: true })
-    framedipaddress!: string;
+  // Endereço IP atribuído ao usuário (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  framedipaddress!: string;
 
+  // Atraso no início da sessão em segundos (FLOAT)
   @Column({ type: 'float', nullable: true })
-    acctstartdelay!: number;
+  acctstartdelay!: number;
 
+  // Atraso no término da sessão em segundos (FLOAT)
   @Column({ type: 'float', nullable: true })
-    acctstopdelay!: number;
+  acctstopdelay!: number;
 
-  @Column({ nullable: true })
-    xascendsessionsvrkey!: string;
+  // Chave do servidor Ascend Session (VARCHAR)
+  @Column({ type: 'varchar', nullable: true })
+  xascendsessionsvrkey!: string;
 
+  // Data/hora da última atualização da sessão (TIMESTAMP)
   @Column({ type: 'timestamp', nullable: true })
-    acctupdatetime!: Date;
+  acctupdatetime!: Date;
 
+  // Intervalo de atualização da sessão (INT)
   @Column({ type: 'int', nullable: true })
-    acctinterval!: number;
+  acctinterval!: number;
 }

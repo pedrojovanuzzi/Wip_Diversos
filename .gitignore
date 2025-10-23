@@ -2,3 +2,4 @@
 node_modules
 *.sql
 /backend/dist/*
+*.p12

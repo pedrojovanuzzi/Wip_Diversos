@@ -25,6 +25,12 @@ import { useAuth } from './context/AuthContext';
 import { OnuSettings } from './pages/onu/OnuSettings';
 import { LogsClient } from './pages/ClientAnalytics/LogsClient';
 import { Create } from './pages/create_users/Create';
+import { Pix } from './pages/Pix/Pix';
+import { PixDetalhe } from './pages/Pix/PixDetalhe';
+import { PixAutomatico } from './pages/Pix/PixAutomatico';
+import { PixAutomaticoAdmin } from './pages/Pix/PixAutomaticoAdmin';
+import { PixCancelarCobranca } from './pages/Pix/PixCancelarCobranca';
+import { PixAdmin } from './pages/Pix/PixAdmin';
 
 
 function App() {
@@ -76,6 +82,12 @@ function App() {
           <Route path="/Onu/AutorizarOnu" element={user?.token ? <AutorizarOnu /> : <Navigate to="/auth/login" />} />
           <Route path="/Onu/DesautorizarOnu" element={user?.token ? <DesautorizaOnu /> : <Navigate to="/auth/login" />} />
           <Route path="/Onu/Settings" element={user?.token && user.permission >= 5 ? <OnuSettings /> : <Navigate to="/auth/login" />} />
+          <Route path="/Pix" element={user?.token ? <Pix /> : <Navigate to="/auth/login" />} />
+          <Route path="/Pix/automatico" element={user?.token ? <PixAutomatico /> : <Navigate to="/auth/login" />} />
+          <Route path="/Pix/automaticoAdmin" element={user?.token && user.permission >= 5 ? <PixAutomaticoAdmin /> : <Navigate to="/auth/login" />} />
+          <Route path="/Pix/Admin" element={user?.token && user.permission >= 5 ? <PixAdmin /> : <Navigate to="/auth/login" />} />
+          <Route path="/Pix/:tipo" element={<PixDetalhe />} /> {/* ← rota dinâmica */}
+          <Route path="/Pix/Cancelar/Cobranca" element={<PixCancelarCobranca />} /> {/* ← rota dinâmica */}
           <Route path="*" element={user?.token ? <HomePage /> : <Navigate to="/auth/login" />} />
         </Routes>
       </div>
