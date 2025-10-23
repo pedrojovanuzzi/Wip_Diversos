@@ -16,7 +16,7 @@ export type ErrorArray = {
   path: string;
   msg: string;
   location: string;
-}
+};
 
 export type LogsPPPoes = {
   servidor: string;
@@ -34,3 +34,111 @@ export type WifiData = {
   wifi_5ghz: string;
   senha_wifi: string;
 };
+
+export interface PixAuto {
+  contrato: string;
+  cpf: string;
+  nome: string;
+  servico: string;
+  data_inicial: string;
+  periodicidade: string;
+  valor: string;
+  politica: string;
+}
+
+export interface PixAutomaticoListPeople {
+  recs: PixRecurrence[];
+}
+
+export interface PixAutomaticoListOnePeople {
+  idRec: string;
+  ativacao: {
+    tipoJornada: string;
+  };
+  atualizacao: Array<{
+    status: string;
+    data: string;
+  }>;
+  calendario: {
+    dataInicial: string;
+    periodicidade: string;
+  };
+  politicaRetentativa: string;
+  recebedor: {
+    nome: string;
+    cnpj: string;
+  };
+  status: string;
+  valor: {
+    valorRec: string;
+  };
+  vinculo: {
+    contrato: string;
+    devedor: {
+      cpf: string;
+      nome: string;
+    };
+  };
+}
+
+
+export interface FiltrosPix {
+  status?: 'CRIADA' | 'CANCELADA' | 'APROVADA' | 'TODOS';
+  periodicidade?: 'SEMANAL' | 'MENSAL' | 'ANUAL' | 'TODOS';
+  idRec? : string,
+}
+
+export interface PixRecurrence {
+  idRec: string;
+  status: string;
+  valor: {
+    valorRec: string;
+  };
+  vinculo: {
+    contrato: string;
+    devedor: {
+      cpf?: string;
+      cnpj?: string;
+      nome: string;
+    };
+    objeto: string;
+  };
+  calendario: {
+    dataInicial: string;
+    dataFinal: string;
+    periodicidade: "MENSAL" | "ANUAL" | string;
+  };
+  politicaRetentativa: string;
+  loc: {
+    criacao: string;
+    id: number;
+    location: string;
+    idRec: string;
+  };
+  pagador?: {
+    codMun: string;
+    cpf?: string;
+    cnpj?: string;
+    ispbParticipante: string;
+  };
+  recebedor: {
+    cpf?: string;
+    cnpj?: string;
+    nome: string;
+  };
+  atualizacao: {
+    data: string;
+    nome: string;
+  }[];
+}
+
+export interface ParametrosPixAutomaticoList {
+  fim: string;
+  inicio: string;
+  paginacao: {
+    itensPorPagina: 100;
+    paginaAtual: 0;
+    quantidadeDePaginas: 0;
+    quantidadeTotalDeItens: 0;
+  };
+}
