@@ -13,7 +13,6 @@ import { isNotIn } from "class-validator";
 
 dotenv.config();
 
-const __dirname = path.resolve();
 const logFilePath = path.join(__dirname, "..", "..", "/log", "logPix.json");
 const isSandbox = process.env.SERVIDOR_HOMOLOGACAO === "true";
 
