@@ -149,6 +149,10 @@ class Pix {
   ): Promise<void> => {
     try {
       const pixData = req.body.pix;
+
+      console.log(pixData);
+      
+
       if (!pixData || pixData.length === 0) {
         res.status(200).json("Nenhum dado de PIX recebido");
         return;
