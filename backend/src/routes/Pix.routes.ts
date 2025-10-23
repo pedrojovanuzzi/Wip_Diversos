@@ -23,7 +23,6 @@ router.post('/criarPixAutomatico', AuthGuard, pixController.PixAutomaticoCriar);
 router.post('/criarCobrancaPixAutomatico', AuthGuard, pixController.pegarUltimoBoletoGerarPixAutomaticoSimular);
 router.post('/cancelarCobranca', AuthGuard, pixController.cancelarCobranca);
 
-// Exemplo: /api/Pix/PixTodosVencidos/webhook
 router.post('/criarWebhookPix', AuthGuard, pixController.AlterarWebhook);
 router.post('/criarWebhookPixAutomatico', AuthGuard, pixController.AlterarWebhookPixAutomatico);
 router.post('/criarWebhookPixAutomaticoRecurrency', AuthGuard, pixController.AlterarWebhookPixAutomaticoRecorrencia);
@@ -34,6 +33,10 @@ router.post('/getPixAutomaticoOneClient', AuthGuard, pixController.listarPixAuto
 router.post('/atualizarPixAutomaticoClients', AuthGuard, pixController.atualizarPixAutomatico);
 
 router.post('/simularPagamento', AuthGuard, pixController.simularPagamentoWebhookPixAutomatico);
+
+// Exemplo: /api/Pix/PixTodosVencidos/webhook
+// Exemplo: /api/Pix/PixAutomatico/webhookCobr
+// Exemplo: /api/Pix/PixAutomatico/webhookRec
 
 // router.post('/PixUnicoVencido/webhook', pixController.StatusUpdatePixUnicoVencido);
 router.post('/PixTodosVencidos/webhook', pixController.StatusUpdatePixTodosVencidos);
