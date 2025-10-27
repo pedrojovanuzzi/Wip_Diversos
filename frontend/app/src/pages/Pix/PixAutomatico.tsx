@@ -456,12 +456,12 @@ export const PixAutomatico = () => {
         {loading && <p>Carregando ....</p>}
         {error && <p className="text-red-500">{error}</p>}
         <div>
-          <h1 className="text-xl my-2">Cancelar Cobrança</h1>
+          <h1 className="text-xl my-2">Info Cobrança</h1>
           <button
             className="rounded-md ring-1 my-2 p-2 bg-cyan-600 text-white w-full sm:w-60"
             onClick={navegarCancelar}
           >
-            Cancelar
+            Buscar Cobranças
           </button>
           <h1 className="text-xl my-2">Buscar Clientes Já Cadastrados</h1>
           <div className="flex flex-col items-center gap-3">
