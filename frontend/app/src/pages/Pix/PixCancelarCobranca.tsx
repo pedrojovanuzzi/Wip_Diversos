@@ -174,10 +174,10 @@ export const PixCancelarCobranca = () => {
               <tr className="border-b">
                 <td className="py-2 px-4 font-semibold">Encerramento</td>
                 <td className="py-2 px-4 break-all">
-                  Codigo: {tabelaCancelada.encerramento?.rejeicao.codigo} /
+                  Codigo: {tabelaCancelada.encerramento?.rejeicao?.codigo} /
                   <span>
                     {" "}
-                    {tabelaCancelada.encerramento?.rejeicao.descricao}
+                    {tabelaCancelada.encerramento?.rejeicao?.descricao}
                   </span>
                 </td>
                 <br />
