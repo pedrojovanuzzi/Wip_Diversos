@@ -161,17 +161,17 @@ export const PixAutomatico = () => {
         setPeople(response.data);
         
       } else if (filtrosActive && filtros.idRec) {
-        const response = await axios.post(
+        const client = await axios.post(
           `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoOneClient`,
           { filtros },
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        console.log(response.data);
-        setPeople(response.data.response);
+        console.log(client.data.response);
+        setPeople(client.data?.response ?? null);
        
-        setQrCode(response.data.response.dadosQR.pixCopiaECola);
-        setCobrancas(response.data.response2.cobsr);
+        setQrCode(client.data.response.dadosQR.pixCopiaECola);
+        setCobrancas(client.data.response2.cobsr);
       } else if (filtrosActive && !filtros.idRec) {
         const response = await axios.post(
           `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoClients`,
@@ -648,229 +648,137 @@ export const PixAutomatico = () => {
                   ) : (
                     // CASO SEJA UM ÚNICO REGISTRO
                     (people as PixAutomaticoListOnePeople)?.idRec && (
-                      <div className="p-2 flex flex-col justify-center w-[70vw] sm:min-w-full sm:p-0 overflow-auto">
-                        <table className="text-left bg-white rounded-md shadow-sm border">
-                          <tbody>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                ID Recorrência
-                              </th>
-                              <td className="py-2 px-4">
-                                {(people as PixAutomaticoListOnePeople).idRec}
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Contrato
-                              </th>
-                              <td className="py-2 px-4">
-                                {
-                                  (people as PixAutomaticoListOnePeople).vinculo
-                                    .contrato
-                                }
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Nome do Devedor
-                              </th>
-                              <td className="py-2 px-4">
-                                {
-                                  (people as PixAutomaticoListOnePeople).vinculo
-                                    .devedor.nome
-                                }
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">CPF</th>
-                              <td className="py-2 px-4">
-                                {
-                                  (people as PixAutomaticoListOnePeople).vinculo
-                                    .devedor.cpf
-                                }
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Valor Recorrente
-                              </th>
-                              <td className="py-2 px-4">
-                                R${" "}
-                                {parseFloat(
-                                  (people as PixAutomaticoListOnePeople).valor
-                                    .valorRec
-                                ).toFixed(2)}
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Periodicidade
-                              </th>
-                              <td className="py-2 px-4">
-                                {
-                                  (people as PixAutomaticoListOnePeople)
-                                    .calendario.periodicidade
-                                }
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Data Inicial
-                              </th>
-                              <td className="py-2 px-4">
-                                {
-                                  (people as PixAutomaticoListOnePeople)
-                                    .calendario.dataInicial
-                                }
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Política de Retentativa
-                              </th>
-                              <td className="py-2 px-4">
-                                {
-                                  (people as PixAutomaticoListOnePeople)
-                                    .politicaRetentativa
-                                }
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Status
-                              </th>
-                              <td className="py-2 px-4">
-                                <span
-                                  className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                    (people as PixAutomaticoListOnePeople)
-                                      .status === "CRIADA"
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : (people as PixAutomaticoListOnePeople)
-                                          .status === "APROVADA"
-                                      ? "bg-green-100 text-green-600"
-                                      : "bg-red-100 text-gray-700"
-                                  }`}
-                                >
-                                  {
-                                    (people as PixAutomaticoListOnePeople)
-                                      .status
-                                  }
-                                </span>
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Recebedor
-                              </th>
-                              <td className="py-2 px-4">
-                                {
-                                  (people as PixAutomaticoListOnePeople)
-                                    .recebedor.nome
-                                }{" "}
-                                (
-                                {
-                                  (people as PixAutomaticoListOnePeople)
-                                    .recebedor.cnpj
-                                }
-                                )
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Atualização Recorrencia
-                              </th>
-                              <td className="py-2 px-4">
-                                {(
-                                  people as PixAutomaticoListOnePeople
-                                ).atualizacao.map((f) => (
-                                  <div className="flex gap-2">
-                                    <p className="text-blue-500">{f.data}</p>
-                                    <p className="text-green-600">{f.status}</p>
-                                  </div>
-                                ))}{" "}
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Cobranças
-                              </th>
-                              <td className="py-2 px-4">{cobrancas.length}</td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Atualização Cobranças
-                              </th>
-                              <td className="py-2 px-4">
-                                {cobrancas.map((c: any, i: number) => (
-                                  <div>
-                                    {c.atualizacao.map(
-                                      (f: { status: string; data: string }) => {
-                                        return (
-                                          <div className="flex gap-2">
-                                            <p>Cobrança {i + 1}</p>
-                                            <p>{f.status}</p>
-                                            <p>{f.data}</p>
-                                          </div>
-                                        );
-                                      }
-                                    )}
-                                  </div>
-                                ))}
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                TxId Cobranças
-                              </th>
-                              <td className="py-2 px-4">
-                                {cobrancas.map((c: any, i: number) => (
-                                  <div>
-                                    <p>
-                                      Cobrança {i + 1} {c.txid}
-                                    </p>
-                                  </div>
-                                ))}
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Datas de Vencimento
-                              </th>
-                              <td className="py-2 px-4">
-                                {cobrancas.map((c: any, i: number) => (
-                                  <div>
-                                    <p>
-                                      Cobrança {i + 1}{" "}
-                                      {c.calendario.dataDeVencimento}
-                                    </p>
-                                  </div>
-                                ))}
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <th className="py-2 px-4 text-gray-700">
-                                Tentativas
-                              </th>
-                              <td className="py-2 px-4">
-                                {cobrancas.map((c: any, i: number) => (
-                                  <div>
-                                    {c.tentativas.map((t: any) =>
-                                      t.atualizacao.map((a: any) => (
-                                        <div className="my-2">
-                                          <p>Cobrança {i + 1}</p>
-                                          <p>{a.status}</p>
-                                          <p>{a.data}</p>
-                                        </div>
-                                      ))
-                                    )}
-                                  </div>
-                                ))}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    )
+  <div className="p-2 flex flex-col justify-center w-[70vw] sm:min-w-full sm:p-0 overflow-auto">
+    <table className="text-left bg-white rounded-md shadow-sm border">
+      <tbody>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">ID Recorrência</th>
+          <td className="py-2 px-4">{(people as PixAutomaticoListOnePeople).idRec}</td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Contrato</th>
+          <td className="py-2 px-4">{(people as PixAutomaticoListOnePeople).vinculo?.contrato ?? "-"}</td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Nome do Devedor</th>
+          <td className="py-2 px-4">{(people as PixAutomaticoListOnePeople).vinculo?.devedor?.nome ?? "-"}</td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">CPF</th>
+          <td className="py-2 px-4">{(people as PixAutomaticoListOnePeople).vinculo?.devedor?.cpf ?? "-"}</td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Valor Recorrente</th>
+          <td className="py-2 px-4">R$ {Number((people as PixAutomaticoListOnePeople).valor?.valorRec ?? 0).toFixed(2)}</td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Periodicidade</th>
+          <td className="py-2 px-4">{(people as PixAutomaticoListOnePeople).calendario?.periodicidade ?? "-"}</td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Data Inicial</th>
+          <td className="py-2 px-4">{(people as PixAutomaticoListOnePeople).calendario?.dataInicial ?? "-"}</td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Política de Retentativa</th>
+          <td className="py-2 px-4">{(people as PixAutomaticoListOnePeople).politicaRetentativa ?? "-"}</td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Status</th>
+          <td className="py-2 px-4">
+            <span
+              className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                (people as PixAutomaticoListOnePeople).status === "CRIADA"
+                  ? "bg-yellow-100 text-yellow-800"
+                  : (people as PixAutomaticoListOnePeople).status === "APROVADA"
+                  ? "bg-green-100 text-green-600"
+                  : "bg-red-100 text-gray-700"
+              }`}
+            >
+              {(people as PixAutomaticoListOnePeople).status ?? "-"}
+            </span>
+          </td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Recebedor</th>
+          <td className="py-2 px-4">
+            {(people as PixAutomaticoListOnePeople).recebedor?.nome ?? "-"} ({(people as PixAutomaticoListOnePeople).recebedor?.cnpj ?? "-"})
+          </td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Atualização Recorrencia</th>
+          <td className="py-2 px-4">
+            {(people as PixAutomaticoListOnePeople).atualizacao?.map((f, idx) => (
+              <div key={idx} className="flex gap-2">
+                <p className="text-blue-500">{f?.data ?? "-"}</p>
+                <p className="text-green-600">{f?.status ?? "-"}</p>
+              </div>
+            )) ?? null}
+          </td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Cobranças</th>
+          <td className="py-2 px-4">{(cobrancas ?? []).length}</td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Atualização Cobranças</th>
+          <td className="py-2 px-4">
+            {(cobrancas ?? []).map((c: any, i: number) => (
+              <div key={i}>
+                {(c?.atualizacao ?? []).map((f: any, j: number) => (
+                  <div key={j} className="flex gap-2">
+                    <p>Cobrança {i + 1}</p>
+                    <p>{f?.status ?? "-"}</p>
+                    <p>{f?.data ?? "-"}</p>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">TxId Cobranças</th>
+          <td className="py-2 px-4">
+            {(cobrancas ?? []).map((c: any, i: number) => (
+              <div key={i}>
+                <p>Cobrança {i + 1} {c?.txid ?? "-"}</p>
+              </div>
+            ))}
+          </td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Datas de Vencimento</th>
+          <td className="py-2 px-4">
+            {(cobrancas ?? []).map((c: any, i: number) => (
+              <div key={i}>
+                <p>Cobrança {i + 1} {c?.calendario?.dataDeVencimento ?? "-"}</p>
+              </div>
+            ))}
+          </td>
+        </tr>
+        <tr className="border-b">
+          <th className="py-2 px-4 text-gray-700">Tentativas</th>
+          <td className="py-2 px-4">
+            {(cobrancas ?? []).map((c: any, i: number) => (
+              <div key={i}>
+                {(c?.tentativas ?? []).map((t: any, j: number) =>
+                  (t?.atualizacao ?? []).map((a: any, k: number) => (
+                    <div key={`${i}-${j}-${k}`} className="my-2">
+                      <p>Cobrança {i + 1}</p>
+                      <p>{a?.status ?? "-"}</p>
+                      <p>{a?.data ?? "-"}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            ))}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+)
+
                   )}
                 </div>
               </div>
