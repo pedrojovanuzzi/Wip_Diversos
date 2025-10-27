@@ -87,7 +87,7 @@ export class App {
       }
     });
 
-    console.log("📅 Agendador de backup inicializado.");
+    console.log("📅 Agendador de Pix");
   }
 
   // private verificaDDOS(){
