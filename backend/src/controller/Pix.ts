@@ -1126,7 +1126,7 @@ class Pix {
       const response = await efi.pixListRecurrenceAutomatic({
         inicio: inicio,
         fim: hoje,
-        status: 'APROVADO',
+        status: 'APROVADA',
         "paginacao.itensPorPagina": 100,
       });
       res.status(200).json(response);
