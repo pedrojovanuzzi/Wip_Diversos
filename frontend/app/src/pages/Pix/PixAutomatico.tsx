@@ -422,7 +422,7 @@ export const PixAutomatico = () => {
                   <input
                     className="ring-1 rounded-sm p-2"
                     type="text"
-                    placeholder="Valor"
+                    placeholder="89,90"
                     value={pixAutoData.valor}
                     onChange={(e) =>
                       setPixAutoData((prev) => ({
