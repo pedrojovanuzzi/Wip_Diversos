@@ -1073,6 +1073,18 @@ class Pix {
     }
   }
 
+  buscarCobranca = async (req: Request, res: Response) => {
+    try {
+      const {txid} = req.body;
+      const efi = new EfiPay(options);
+      const response = await efi.pixDetailAutomaticCharge({txid: txid});
+      console.log(response);
+      res.status(200).json(response);
+    } catch (error) {
+      res.status(500).json(error);
+    }
+  }
+
   listaPixAutomatico = async (req: Request, res: Response): Promise<void> => {
     try {
       const { filtros } = req.body;

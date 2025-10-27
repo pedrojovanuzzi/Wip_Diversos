@@ -56,11 +56,31 @@ export const PixCancelarCobranca = () => {
     }
   }
 
+  async function buscarCobranca() {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Pix/buscarCobranca`,
+        { txid },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log(response.data);
+      setTabelaCancelada(response.data);
+    } catch (error: any) {
+      console.log(error);
+      const msg = extractErrorMessage(error);
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col">
         <NavBar></NavBar>
-        <h1 className="text-2xl my-2 font-bold">Cancelar Cobrança</h1>
+        <h1 className="text-2xl my-2 font-bold">Cobrança</h1>
         <p>TxId:</p>
         <input
           type="text"
@@ -70,9 +90,15 @@ export const PixCancelarCobranca = () => {
         />
         <button
           onClick={cancelarCobranca}
+          className=" sm:rounded-md ring-1 p-4 sm:p-2 self-center mt-4 bg-red-800 text-white w-full sm:w-[30vw]"
+        >
+          Cancelar
+        </button>{" "}
+        <button
+          onClick={buscarCobranca}
           className=" sm:rounded-md ring-1 p-4 sm:p-2 self-center mt-4 bg-slate-800 text-white w-full sm:w-[30vw]"
         >
-          Enviar
+          Buscar Cobrança
         </button>{" "}
         {loading && <p className="mt-2">Carregando ....</p>}
         {error && (
@@ -143,6 +169,18 @@ export const PixCancelarCobranca = () => {
                 <td className="py-2 px-4">
                   {tabelaCancelada.calendario.dataDeVencimento}
                 </td>
+              </tr>
+
+              <tr className="border-b">
+                <td className="py-2 px-4 font-semibold">Encerramento</td>
+                <td className="py-2 px-4 break-all">
+                  Codigo: {tabelaCancelada.encerramento?.rejeicao.codigo} /
+                  <span>
+                    {" "}
+                    {tabelaCancelada.encerramento?.rejeicao.descricao}
+                  </span>
+                </td>
+                <br />
               </tr>
 
               {/* Informações do recebedor */}

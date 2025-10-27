@@ -22,6 +22,7 @@ router.get('/geradorTitulos', AuthGuard, pixController.gerarPixVariasContas);
 router.post('/criarPixAutomatico', AuthGuard, pixController.PixAutomaticoCriar);
 router.post('/criarCobrancaPixAutomatico', AuthGuard, pixController.pegarUltimoBoletoGerarPixAutomaticoSimular);
 router.post('/cancelarCobranca', AuthGuard, pixController.cancelarCobranca);
+router.post('/buscarCobranca', AuthGuard, pixController.buscarCobranca);
 
 router.post('/criarWebhookPix', AuthGuard, pixController.AlterarWebhook);
 router.post('/criarWebhookPixAutomatico', AuthGuard, pixController.AlterarWebhookPixAutomatico);
