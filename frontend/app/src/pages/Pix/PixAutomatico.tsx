@@ -185,6 +185,19 @@ export const PixAutomatico = () => {
         setQrCode(response.data.response.dadosQR.pixCopiaECola);
         setCobrancas(response.data.response2.cobsr);
       }
+      else if (!filtrosActive && !filtros.idRec) {
+        const response = await axios.post(
+          `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoClients`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        console.log(response.data);
+        setPeople(response.data.response);
+        
+        setQrCode(response.data.response.dadosQR.pixCopiaECola);
+        setCobrancas(response.data.response2.cobsr);
+      }
     } catch (error: any) {
       // Se existir resposta HTTP, extrai a mensagem normalmente
       if (error.response && error.response.data) {
