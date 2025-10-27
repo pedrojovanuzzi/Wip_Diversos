@@ -830,10 +830,13 @@ class Pix {
 
       const params = { txid: crypto.randomBytes(16).toString("hex") };
 
+      const num = Number(String(valor).replace(",", "."));
+      console.log(num.toFixed(2));
+
       const payload1 = {
         calendario: { expiracao: 3600 },
         chave: String(process.env.CHAVE_PIX),
-        valor: { original: Number(valor).toFixed(2) },
+        valor: { original: num.toFixed(2) },
         // loc: {id: locResponse.id},
         devedor: isCPF ? { nome, cpf: documento } : { nome, cnpj: documento },
         infoAdicionais: [{ nome: "TITULO", valor: String(cliente.id) }],
@@ -884,7 +887,7 @@ class Pix {
         politicaRetentativa: politica,
         // ativacao: {dadosJornada: {txid: }},
         loc: locResponse.id,
-        valor: { valorRec: valor },
+        valor: { valorRec: num.toFixed(2) },
         vinculo: {
           contrato,
           devedor: isCPF ? { nome, cpf: documento } : { nome, cnpj: documento },
@@ -945,6 +948,9 @@ class Pix {
             },
             order: { datavenc: "ASC" as const },
           });
+
+          console.log(f.vinculo.devedor.nome);
+          
           // 🔸 Se não encontrar, apenas loga (não pode usar res.status dentro do loop)
           if (!cliente) {
             console.warn(
@@ -952,6 +958,13 @@ class Pix {
             );
             return null; // sai desta iteração
           }
+
+          const cadastroCliente = await this.clienteRepo.findOne({where: {login: cliente.login}});
+
+          console.log(Number(cliente.valor) - cadastroCliente?.desconto!);
+          const valorComDesconto = Number(cliente.valor) - cadastroCliente?.desconto!
+
+          
 
           // 🔹 Cria cobrança automática vinculada a uma recorrência
           const result = await efipay.pixCreateAutomaticCharge("", {
@@ -967,7 +980,7 @@ class Pix {
               tipoConta: "PAGAMENTO", // Tipo da conta bancária
             },
             valor: {
-              original: cliente.valor, // Valor da cobrança
+              original: String(valorComDesconto), // Valor da cobrança
               // original: '1.00'
             },
             infoAdicional: "Mensalidade gerada automaticamente",
@@ -1031,6 +1044,11 @@ class Pix {
             return null; // sai desta iteração
           }
 
+          const cadastroCliente = await this.clienteRepo.findOne({where: {login: cliente.login}});
+
+          console.log(Number(cliente.valor) - cadastroCliente?.desconto!);
+          const valorComDesconto = Number(cliente.valor) - cadastroCliente?.desconto!
+
           // 🔹 Cria cobrança automática vinculada a uma recorrência
           const result = await efipay.pixCreateAutomaticCharge("", {
             idRec: f.idRec, // ID da recorrência já existente
@@ -1045,7 +1063,7 @@ class Pix {
               tipoConta: "PAGAMENTO", // Tipo da conta bancária
             },
             valor: {
-              original: cliente.valor, // Valor da cobrança
+              original: String(valorComDesconto), // Valor da cobrança
               // original: '1.00'
             },
             infoAdicional: "Mensalidade gerada automaticamente",
