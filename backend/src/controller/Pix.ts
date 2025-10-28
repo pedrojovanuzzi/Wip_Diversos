@@ -8,7 +8,7 @@ import path from "path";
 import fs from "fs";
 import axios from "axios";
 import { Request, Response } from "express";
-import { IsNull, Not } from "typeorm";
+import { IsNull, Not, Repository } from "typeorm";
 import { isNotIn } from "class-validator";
 
 dotenv.config();
@@ -78,6 +78,14 @@ class Pix {
       res.status(200).json(response);
     } catch (error) {
       res.status(500).json(error);
+    }
+  }
+
+  aplicarJuros_Desconto = async (valor : string | number, sis_cliente : ClientesEntities, desconto: string | number, dataVenc: Date | string) => {
+    try {
+      
+    } catch (error) {
+      return error;
     }
   }
 
@@ -427,6 +435,7 @@ class Pix {
       const loc = await efipay.pixCreateLocation([], { tipoCob: "cob" });
       const qrlink = await efipay.pixGenerateQRCode({ id: loc.id });
 
+      
       const valor = Number(cliente.valor).toFixed(2);
       const params = { txid: crypto.randomBytes(16).toString("hex") };
       const body =
