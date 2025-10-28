@@ -151,6 +151,8 @@ export const PixAutomatico = () => {
     try {
       setLoading(true);
       setError("");
+      console.log(filtrosActive + ' ' + filtros.idRec);
+      
       if (!filtrosActive) {
         const response = await axios.post(
           `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoClients`,
@@ -175,29 +177,13 @@ export const PixAutomatico = () => {
       } else if (filtrosActive && !filtros.idRec) {
         const response = await axios.post(
           `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoClients`,
-          { filtros },
+          {filtros},
           { headers: { Authorization: `Bearer ${token}` } }
         );
-
         console.log(response.data);
-        setPeople(response.data.response);
-        
-        setQrCode(response.data.response.dadosQR.pixCopiaECola);
-        setCobrancas(response.data.response2.cobsr);
+        setPeople(response.data);
       }
-      else if (!filtrosActive && !filtros.idRec) {
-        const response = await axios.post(
-          `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoClients`,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
 
-        console.log(response.data);
-        setPeople(response.data.response);
-        
-        setQrCode(response.data.response.dadosQR.pixCopiaECola);
-        setCobrancas(response.data.response2.cobsr);
-      }
     } catch (error: any) {
       // Se existir resposta HTTP, extrai a mensagem normalmente
       if (error.response && error.response.data) {
@@ -511,10 +497,10 @@ export const PixAutomatico = () => {
                     }))
                   }
                 >
-                  <option value="CRIADA">ATIVO</option>
+                  <option value="CRIADA">CRIADA</option>
                   <option value="CANCELADA">CANCELADO</option>
                   <option value="APROVADA">APROVADA</option>
-                  <option value="TODOS">TODOS</option>
+                  <option selected={true} value="TODOS">TODOS</option>
                 </select>
                 {/* <label htmlFor="Status">Periodicidade</label>
                 <select

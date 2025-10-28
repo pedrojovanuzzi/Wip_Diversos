@@ -937,7 +937,7 @@ class Pix {
 
       console.log(todasAsCobsr);
 
-      const response = await Promise.all(
+      const response = await Promise.allSettled(
         todasAsCobsr.map(async (f) => {
           // 🔹 Busca o cliente no banco de dados
           const cliente = await this.recordRepo.findOne({
@@ -1025,7 +1025,7 @@ class Pix {
 
       console.log(todasAsCobsr);
 
-      const response = await Promise.all(
+      const response = await Promise.allSettled(
         todasAsCobsr.map(async (f) => {
           // 🔹 Busca o cliente no banco de dados
           const cliente = await this.recordRepo.findOne({
@@ -1126,7 +1126,7 @@ class Pix {
       const response = await efi.pixListRecurrenceAutomatic({
         inicio: inicio,
         fim: hoje,
-        status: 'APROVADA',
+        
         "paginacao.itensPorPagina": 100,
       });
       res.status(200).json(response);
