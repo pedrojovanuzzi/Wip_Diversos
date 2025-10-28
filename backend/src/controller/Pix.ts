@@ -527,7 +527,7 @@ class Pix {
           ? {
               calendario: { expiracao: 43200 },
               devedor: { cpf, nome: pppoe },
-              valor: { original: valor },
+              valor: { original: valorFinal },
               chave: chave_pix,
               solicitacaoPagador: "Mensalidade",
               infoAdicionais: [
@@ -540,7 +540,7 @@ class Pix {
           : {
               calendario: { expiracao: 43200 },
               devedor: { cnpj: cpf, nome: pppoe },
-              valor: { original: valor },
+              valor: { original: valorFinal },
               chave: chave_pix,
               solicitacaoPagador: "Mensalidade",
               infoAdicionais: [
@@ -618,7 +618,7 @@ class Pix {
           ? {
               calendario: { expiracao: 43200 },
               devedor: { cpf, nome: pppoe },
-              valor: { original: valor },
+              valor: { original: valorFinal },
               chave: chave_pix,
               solicitacaoPagador: "Mensalidade",
               infoAdicionais: [
@@ -631,7 +631,7 @@ class Pix {
           : {
               calendario: { expiracao: 43200 },
               devedor: { cnpj: cpf, nome: pppoe },
-              valor: { original: valor },
+              valor: { original: valorFinal },
               chave: chave_pix,
               solicitacaoPagador: "Mensalidade",
               infoAdicionais: [
