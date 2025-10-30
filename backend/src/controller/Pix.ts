@@ -435,6 +435,8 @@ class Pix {
         status: "pago",
         coletor: "api_mk_pedro",
         formapag: "pix_automatico",
+        valorpag: response.valor.valorRec ?? response.valor.valorMinimoRecebedor,
+        datapag: new Date()
       });
 
       console.log(fatura);
