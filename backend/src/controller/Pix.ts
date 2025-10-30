@@ -8,7 +8,7 @@ import path from "path";
 import fs from "fs";
 import axios from "axios";
 import { Request, Response } from "express";
-import { In, IsNull, Not, Repository } from "typeorm";
+import { Between, In, IsNull, Not, Repository } from "typeorm";
 import { isNotIn } from "class-validator";
 
 dotenv.config();
@@ -1063,12 +1063,18 @@ class Pix {
 
       const response = await Promise.allSettled(
         todasAsCobsr.map(async (f) => {
+
+          const agora = new Date();
+          const inicioDoMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
+          const fimDoMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 0, 23, 59, 59);
+
           // 🔹 Busca o cliente no banco de dados
           const cliente = await this.recordRepo.findOne({
             where: {
               login: f.vinculo.devedor.nome,
               status: Not("pago"),
               datadel: IsNull(),
+              datavenc: Between(inicioDoMes, fimDoMes)
             },
             order: { datavenc: "ASC" as const },
           });
