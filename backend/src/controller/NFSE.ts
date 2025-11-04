@@ -418,8 +418,12 @@ class NFSEController {
             <Contato>
               <Telefone>${ClientData?.celular.replace(/[^0-9]/g, "")}</Telefone>
               <Email>${
-                this.homologacao ? "suporte_wiptelecom@outlook.com" : ClientData?.email
-              }</Email>
+              this.homologacao
+                ? "suporte_wiptelecom@outlook.com"
+                : (ClientData?.email && ClientData.email.trim() !== ""
+                    ? ClientData.email.trim()
+                    : "sememail@wiptelecom.com.br")
+            }</Email>
             </Contato>
           </Tomador>
           ${
