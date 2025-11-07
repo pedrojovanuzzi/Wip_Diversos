@@ -4,35 +4,36 @@ import { NavBar } from "../../components/navbar/NavBar";
 import { ClockIcon } from "@heroicons/react/24/outline";
 import { IoDocuments } from "react-icons/io5";
 import { FaBoxOpen, FaUsers } from "react-icons/fa";
-import { MdOutlineAutoMode } from "react-icons/md";
+import { MdOutlineAutoMode, MdPaid } from "react-icons/md";
 import PixCard from "./components/PixCard";
 import { useAuth } from "../../context/AuthContext";
 import { CiSettings } from "react-icons/ci";
 
-
-
 export const Pix = () => {
-
-  const {user} = useAuth();
+  const { user } = useAuth();
   const permission = user?.permission;
   const navigate = useNavigate();
 
   return (
     <div className="sm:p-2 bg-slate-800 min-h-screen">
       <NavBar />
-      
+
       <div className="p-5 bg-gray-100 rounded-t-sm font-semibold">
         {permission! >= 5 && (
-                <CiSettings
-                  onClick={() => {
-                    navigate("/Pix/Admin");
-                  }}
-                  className="text-4xl sm:text-4xl sm:top-5 sm:absolute sm:right-10 cursor-pointer"
-                />
-              )}
+          <CiSettings
+            onClick={() => {
+              navigate("/Pix/Admin");
+            }}
+            className="text-4xl sm:text-4xl sm:top-5 sm:absolute sm:right-10 cursor-pointer"
+          />
+        )}
         <div className="pt-2">
-          <p className="text-xs text-start text-gray-600">ℹ️ Vencida = Mensalidade atrasada</p>
-          <p className="text-xs text-start text-gray-600">ℹ️ Aberta = Mensalidade ainda não paga</p>
+          <p className="text-xs text-start text-gray-600">
+            ℹ️ Vencida = Mensalidade atrasada
+          </p>
+          <p className="text-xs text-start text-gray-600">
+            ℹ️ Aberta = Mensalidade ainda não paga
+          </p>
         </div>
       </div>
 
@@ -42,7 +43,7 @@ export const Pix = () => {
           link="/Pix/ultimo"
           icon={<ClockIcon className="size-6" />}
           cor="bg-teal-100 text-teal-700"
-          bg='bg-gray-100 sm:bg-gray-100'
+          bg="bg-gray-100 sm:bg-gray-100"
           titulo="Pix do Último Vencimento"
           descricao="Gera o Pix da última mensalidade vencida"
         />
@@ -52,7 +53,7 @@ export const Pix = () => {
           link="/Pix/todos"
           icon={<IoDocuments className="size-6" />}
           cor="bg-purple-100 text-purple-700"
-          bg='bg-gray-200 sm:bg-gray-200'
+          bg="bg-gray-200 sm:bg-gray-200"
           titulo="Pix de Todos os Vencimentos"
           descricao="Gera um Pix com todas as mensalidades vencidas do cliente"
         />
@@ -62,7 +63,7 @@ export const Pix = () => {
           link="/Pix/aberto"
           icon={<FaBoxOpen className="size-6" />}
           cor="bg-sky-100 text-sky-700"
-          bg='bg-gray-100 sm:bg-gray-200'
+          bg="bg-gray-100 sm:bg-gray-200"
           titulo="Pix Mensalidade em Aberto"
           descricao="Gera um Pix da mensalidade em aberto"
         />
@@ -72,7 +73,7 @@ export const Pix = () => {
           link="/Pix/varias"
           icon={<FaUsers className="size-6" />}
           cor="bg-yellow-100 text-yellow-700"
-          bg='bg-gray-200 sm:bg-gray-100'
+          bg="bg-gray-200 sm:bg-gray-100"
           titulo="Pix de Várias Contas"
           descricao="Gera um Pix de várias mensalidades (ou várias contas)"
         />
@@ -82,14 +83,32 @@ export const Pix = () => {
           link="/Pix/automatico"
           icon={<MdOutlineAutoMode className="size-6" />}
           cor="bg-yellow-100 text-yellow-700"
-          bg='bg-gray-100 sm:bg-gray-100'
+          bg="bg-gray-100 sm:bg-gray-100"
           titulo="Pix Automático"
           descricao="Gerencie e adicione clientes ao Pix Automático"
-          spanFull
         />
-        
+
+        {/* --- Buscar pagamento --- */}
+        <div
+          className={`group relative ring-1 ring-gray-400 bg-gray-200 sm:bg-gray-200 hover:bg-green-300 transition-all p-6`}
+        >
+          <span className={`inline-flex rounded-lg p-3 bg-orange-100 text-orange-700`}>
+            <MdPaid />
+          </span>
+          <div className="mt-8">
+            <h3 className="text-base font-semibold text-gray-900">
+              {/* 🔹 Troquei o <a> por <Link> */}
+              <Link to={"/Pix/findPaid"} className="focus:outline-none">
+                <span aria-hidden="true" className="absolute inset-0" />
+                Buscar Pix Pagos
+              </Link>
+            </h3>
+            <p className="mt-2 text-sm text-gray-600">
+              Busque pelo ID de Transação do Pix
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
-

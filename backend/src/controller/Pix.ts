@@ -387,8 +387,9 @@ class Pix {
         status: "pago",
         coletor: "api_mk_pedro",
         formapag: "pix_automatico",
-        valorpag: response.valor.valorRec ?? response.valor.valorMinimoRecebedor,
-        datapag: new Date()
+        valorpag:
+          response.valor.valorRec ?? response.valor.valorMinimoRecebedor,
+        datapag: new Date(),
       });
 
       console.log(fatura);
@@ -435,8 +436,9 @@ class Pix {
         status: "pago",
         coletor: "api_mk_pedro",
         formapag: "pix_automatico",
-        valorpag: response.valor.valorRec ?? response.valor.valorMinimoRecebedor,
-        datapag: new Date()
+        valorpag:
+          response.valor.valorRec ?? response.valor.valorMinimoRecebedor,
+        datapag: new Date(),
       });
 
       console.log(fatura);
@@ -565,14 +567,12 @@ class Pix {
         cliente.datavenc as Date
       );
 
-      res
-        .status(200)
-        .json({
-          valor: valorFinal,
-          pppoe,
-          link: qrlink.linkVisualizacao,
-          formattedDate,
-        });
+      res.status(200).json({
+        valor: valorFinal,
+        pppoe,
+        link: qrlink.linkVisualizacao,
+        formattedDate,
+      });
       return;
     } catch (error: any) {
       console.error("Erro em gerarPix:", error);
@@ -771,103 +771,106 @@ class Pix {
   };
 
   gerarPixVariasContas = async (req: Request, res: Response): Promise<void> => {
-  try {
-    // 🔹 Extrai os dados principais do corpo da requisição
-    let { nome_completo, cpf } = req.body as { nome_completo: string; cpf: string };
+    try {
+      // 🔹 Extrai os dados principais do corpo da requisição
+      let { nome_completo, cpf } = req.body as {
+        nome_completo: string;
+        cpf: string;
+      };
 
-    // 🔹 Extrai os IDs dos títulos (ex: "101,102,103")
-    const titulos: string[] = String(req.body.titulos || "")
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
+      // 🔹 Extrai os IDs dos títulos (ex: "101,102,103")
+      const titulos: string[] = String(req.body.titulos || "")
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
 
-    // 🔹 Normaliza os dados de entrada
-    nome_completo = String(nome_completo || "").toUpperCase();
-    cpf = String(cpf || "").replace(/[^\d]+/g, "");
+      // 🔹 Normaliza os dados de entrada
+      nome_completo = String(nome_completo || "").toUpperCase();
+      cpf = String(cpf || "").replace(/[^\d]+/g, "");
 
-    // 🔹 Busca as faturas no banco de dados com base nos IDs recebidos
-    const clientes = await this.recordRepo.find({
-      where: { id: In(titulos.map((t) => Number(t))) },
-    });
-
-    // 🔹 Se nenhuma fatura foi encontrada, retorna erro
-    if (!clientes || clientes.length === 0) {
-      res.status(404).json("Nenhum título válido encontrado");
-      return;
-    }
-
-    // 🔹 Cria array com dados estruturados aplicando juros e desconto
-    const structuredData: { id: number; dataVenc: Date; valor: number }[] = [];
-
-    for (const cliente of clientes) {
-      // 🔸 Chama a função centralizada de cálculo (sem duplicar lógica)
-      const valorCorrigido = await this.aplicarJuros_Desconto(
-        cliente.valor, // valor original da fatura
-        cliente.login, // login (pppoe)
-        cliente.datavenc // data de vencimento
-      );
-
-      // 🔹 Armazena o resultado no array final
-      structuredData.push({
-        id: cliente.id,
-        dataVenc: cliente.datavenc as Date,
-        valor: Number(valorCorrigido),
+      // 🔹 Busca as faturas no banco de dados com base nos IDs recebidos
+      const clientes = await this.recordRepo.find({
+        where: { id: In(titulos.map((t) => Number(t))) },
       });
-    }
 
-    // 🔹 Soma o total corrigido
-    const valorSomado = structuredData
-      .reduce((acc, c) => acc + c.valor, 0)
-      .toFixed(2);
+      // 🔹 Se nenhuma fatura foi encontrada, retorna erro
+      if (!clientes || clientes.length === 0) {
+        res.status(404).json("Nenhum título válido encontrado");
+        return;
+      }
 
-    // 🔹 Instancia única do cliente Efipay
-    const efipay = new EfiPay(options);
+      // 🔹 Cria array com dados estruturados aplicando juros e desconto
+      const structuredData: { id: number; dataVenc: Date; valor: number }[] =
+        [];
 
-    // 🔹 Cria a localização e o QR Code
-    const loc = await efipay.pixCreateLocation([], { tipoCob: "cob" });
-    const qrlink = await efipay.pixGenerateQRCode({ id: loc.id });
+      for (const cliente of clientes) {
+        // 🔸 Chama a função centralizada de cálculo (sem duplicar lógica)
+        const valorCorrigido = await this.aplicarJuros_Desconto(
+          cliente.valor, // valor original da fatura
+          cliente.login, // login (pppoe)
+          cliente.datavenc // data de vencimento
+        );
 
-    // 🔹 Corpo da cobrança PIX (único para CPF e CNPJ)
-    const body: any = {
-      calendario: { expiracao: 43200 },
-      devedor:
-        cpf.length === 11
-          ? { cpf, nome: nome_completo }
-          : { cnpj: cpf, nome: nome_completo },
-      valor: { original: valorSomado },
-      chave: chave_pix,
-      solicitacaoPagador: "Mensalidade",
-      loc: { id: loc.id },
-      infoAdicionais: [{ nome: "QR", valor: qrlink.linkVisualizacao }],
-    };
+        // 🔹 Armazena o resultado no array final
+        structuredData.push({
+          id: cliente.id,
+          dataVenc: cliente.datavenc as Date,
+          valor: Number(valorCorrigido),
+        });
+      }
 
-    // 🔹 Adiciona as informações de cada título (ID, valor e vencimento)
-    structuredData.forEach((c) => {
-      body.infoAdicionais.push({ nome: "ID", valor: String(c.id) });
-      body.infoAdicionais.push({ nome: "VALOR", valor: String(c.valor) });
-      body.infoAdicionais.push({
-        nome: "VENCIMENTO",
-        valor: c.dataVenc.toISOString().split("T")[0],
+      // 🔹 Soma o total corrigido
+      const valorSomado = structuredData
+        .reduce((acc, c) => acc + c.valor, 0)
+        .toFixed(2);
+
+      // 🔹 Instancia única do cliente Efipay
+      const efipay = new EfiPay(options);
+
+      // 🔹 Cria a localização e o QR Code
+      const loc = await efipay.pixCreateLocation([], { tipoCob: "cob" });
+      const qrlink = await efipay.pixGenerateQRCode({ id: loc.id });
+
+      // 🔹 Corpo da cobrança PIX (único para CPF e CNPJ)
+      const body: any = {
+        calendario: { expiracao: 43200 },
+        devedor:
+          cpf.length === 11
+            ? { cpf, nome: nome_completo }
+            : { cnpj: cpf, nome: nome_completo },
+        valor: { original: valorSomado },
+        chave: chave_pix,
+        solicitacaoPagador: "Mensalidade",
+        loc: { id: loc.id },
+        infoAdicionais: [{ nome: "QR", valor: qrlink.linkVisualizacao }],
+      };
+
+      // 🔹 Adiciona as informações de cada título (ID, valor e vencimento)
+      structuredData.forEach((c) => {
+        body.infoAdicionais.push({ nome: "ID", valor: String(c.id) });
+        body.infoAdicionais.push({ nome: "VALOR", valor: String(c.valor) });
+        body.infoAdicionais.push({
+          nome: "VENCIMENTO",
+          valor: c.dataVenc.toISOString().split("T")[0],
+        });
       });
-    });
 
-    // 🔹 Cria a cobrança PIX somando todos os títulos
-    const params = { txid: crypto.randomBytes(16).toString("hex") };
-    await efipay.pixCreateCharge(params, body);
+      // 🔹 Cria a cobrança PIX somando todos os títulos
+      const params = { txid: crypto.randomBytes(16).toString("hex") };
+      await efipay.pixCreateCharge(params, body);
 
-    // 🔹 Retorna o resultado ao frontend
-    res.status(200).json({
-      valor: valorSomado,
-      nome_completo,
-      link: qrlink.linkVisualizacao,
-      titulos: structuredData,
-    });
-  } catch (error: any) {
-    console.error("❌ Erro em gerarPixVariasContas:", error);
-    res.status(500).json({ erro: error.message || error });
-  }
-};
-
+      // 🔹 Retorna o resultado ao frontend
+      res.status(200).json({
+        valor: valorSomado,
+        nome_completo,
+        link: qrlink.linkVisualizacao,
+        titulos: structuredData,
+      });
+    } catch (error: any) {
+      console.error("❌ Erro em gerarPixVariasContas:", error);
+      res.status(500).json({ erro: error.message || error });
+    }
+  };
 
   PixAutomaticoCriar = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -1063,10 +1066,20 @@ class Pix {
 
       const response = await Promise.allSettled(
         todasAsCobsr.map(async (f) => {
-
           const agora = new Date();
-          const inicioDoMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
-          const fimDoMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 0, 23, 59, 59);
+          const inicioDoMes = new Date(
+            agora.getFullYear(),
+            agora.getMonth(),
+            1
+          );
+          const fimDoMes = new Date(
+            agora.getFullYear(),
+            agora.getMonth() + 1,
+            0,
+            23,
+            59,
+            59
+          );
 
           // 🔹 Busca o cliente no banco de dados
           const cliente = await this.recordRepo.findOne({
@@ -1074,7 +1087,7 @@ class Pix {
               login: f.vinculo.devedor.nome,
               status: Not("pago"),
               datadel: IsNull(),
-              datavenc: Between(inicioDoMes, fimDoMes)
+              datavenc: Between(inicioDoMes, fimDoMes),
             },
             order: { datavenc: "ASC" as const },
           });
@@ -1376,6 +1389,16 @@ class Pix {
     } catch (error) {
       console.log(error);
 
+      res.status(500).json(error);
+    }
+  };
+
+  BuscarPixPago = async (req: Request, res: Response) => {
+    try {
+      const efi = new EfiPay(options);
+      const response = await efi.pixDetailCharge({txid: req.body.chargeId})
+      res.status(200).json(response);
+    } catch (error) {
       res.status(500).json(error);
     }
   };
