@@ -36,6 +36,7 @@ router.post('/atualizarPixAutomaticoClients', AuthGuard, pixController.atualizar
 router.post('/simularPagamento', AuthGuard, pixController.simularPagamentoWebhookPixAutomatico);
 
 router.post('/BuscarPixPago', AuthGuard, pixController.BuscarPixPago);
+router.post('/BuscarPixPagoData', AuthGuard, pixController.BuscarPixPagoData);
 
 // Exemplo: /api/Pix/PixTodosVencidos/webhook
 // Exemplo: /api/Pix/PixAutomatico/webhookCobr
