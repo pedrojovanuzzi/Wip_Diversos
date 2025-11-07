@@ -3,7 +3,6 @@ import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 
-// Tipos do objeto retornado pela API
 interface InfoAdicional {
   nome: string;
   valor: string;
@@ -42,33 +41,64 @@ interface StatusPix {
     criacao: string;
   };
   pix?: PixDetalhe[];
+  pixCopiaECola?: string;
+  location?: string;
 }
 
 export const PixfindPaid: React.FC = () => {
   const [chargeId, setChargeId] = useState("");
-  const [status, setStatus] = useState<StatusPix | null>(null);
+  const [inicio, setInicio] = useState("");
+  const [fim, setFim] = useState("");
+  const [porData, setPorData] = useState(false);
+  const [status, setStatus] = useState<StatusPix | StatusPix[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const token = user?.token;
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setStatus(null);
-    try {
-      const response = await axios.post<StatusPix>(
-        `${process.env.REACT_APP_URL}/Pix/BuscarPixPago`,
-        { chargeId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+const handleSubmit = async (e: FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setError(null);
+  setStatus(null);
+
+  try {
+    const url = porData
+      ? `${process.env.REACT_APP_URL}/Pix/BuscarPixPagoData`
+      : `${process.env.REACT_APP_URL}/Pix/BuscarPixPago`;
+
+    const formatToUTC = (dateStr: string) => {
+      if (!dateStr) return "";
+      const date = new Date(dateStr);
+      return date.toISOString();
+    };
+
+    const payload = porData
+      ? { inicio: formatToUTC(inicio), fim: formatToUTC(fim) }
+      : { chargeId };
+
+    const response = await axios.post(url, payload, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    // ✅ Corrige: se for busca por data, extrai o array interno
+    if (porData) {
+      const data = response.data?.cobs || response.data;
+      setStatus(Array.isArray(data) ? data : []);
+    } else {
       setStatus(response.data);
-    } catch (err: any) {
-      setError(err.message || "Erro ao buscar status");
-    } finally {
-      setLoading(false);
     }
+  } catch (err: any) {
+    setError(err.message || "Erro ao buscar status");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  const handleCopy = (texto: string) => {
+    navigator.clipboard.writeText(texto);
+    alert("✅ Pix Copia e Cola copiado!");
   };
 
   return (
@@ -80,29 +110,71 @@ export const PixfindPaid: React.FC = () => {
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            placeholder="Digite o ID da cobrança"
-            value={chargeId}
-            onChange={(e) => setChargeId(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400"
-            required
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={porData}
+              onChange={() => setPorData(!porData)}
+              className="w-4 h-4 accent-cyan-500"
+            />
+            <label className="text-sm text-gray-700">
+              Buscar por intervalo de datas
+            </label>
+          </div>
+
+          {!porData ? (
+            <input
+              type="text"
+              placeholder="Digite o ID da cobrança"
+              value={chargeId}
+              onChange={(e) => setChargeId(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              required
+            />
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <label className="block text-gray-700 text-sm mb-1">
+                  Início
+                </label>
+                <input
+                  type="datetime-local"
+                  value={inicio}
+                  onChange={(e) => setInicio(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                  required
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-gray-700 text-sm mb-1">Fim</label>
+                <input
+                  type="datetime-local"
+                  value={fim}
+                  onChange={(e) => setFim(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                  required
+                />
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-cyan-400 text-black font-semibold py-3 rounded-lg hover:bg-cyan-300 transition disabled:opacity-50"
           >
-            {loading ? "Consultando..." : "Consultar Status"}
+            {loading
+              ? "Consultando..."
+              : porData
+              ? "Buscar por Data"
+              : "Consultar por ID"}
           </button>
         </form>
 
-        {error && (
-          <p className="text-red-500 mt-4 text-center">{error}</p>
-        )}
+        {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
 
-        {status && (
+        {/* 🔹 Caso venha UM resultado */}
+        {status && !Array.isArray(status) && (
           <div className="mt-6 bg-gray-50 border border-gray-200 p-5 rounded-lg">
             <h3 className="text-lg font-bold text-gray-800 mb-3">
               🔹 Detalhes da Cobrança
@@ -140,7 +212,7 @@ export const PixfindPaid: React.FC = () => {
               </p>
             </div>
 
-            {status.infoAdicionais && status.infoAdicionais.length > 0 && (
+            {status.infoAdicionais?.length ? (
               <div className="mt-4">
                 <h4 className="font-semibold text-gray-800 mb-2">
                   📋 Informações Adicionais:
@@ -153,9 +225,9 @@ export const PixfindPaid: React.FC = () => {
                   ))}
                 </ul>
               </div>
-            )}
+            ) : null}
 
-            {status.pix && status.pix.length > 0 && (
+            {status.pix?.length ? (
               <div className="mt-4">
                 <h4 className="font-semibold text-gray-800 mb-2">
                   💸 Detalhes do PIX:
@@ -175,22 +247,84 @@ export const PixfindPaid: React.FC = () => {
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
 
-            {status.infoAdicionais?.find((i) => i.nome === "QR") && (
-              <div className="mt-4">
+            {status.pixCopiaECola && (
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <button
+                  onClick={() => handleCopy(status.pixCopiaECola!)}
+                  className="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-400 transition"
+                >
+                  📋 Copiar Pix Copia e Cola
+                </button>
                 <a
-                  href={
-                    status.infoAdicionais.find((i) => i.nome === "QR")?.valor
-                  }
+                  href={`https://${status.location}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-cyan-600 font-medium hover:underline"
                 >
-                  🔗 Ver QR Code de Pagamento
+                  🔗 Ver QR Code
                 </a>
               </div>
             )}
+          </div>
+        )}
+
+        {/* 🔸 Caso venha MAIS DE UM resultado */}
+        {Array.isArray(status) && (
+          <div className="mt-8 space-y-4">
+            <h1>Quantidade de Titulos: {status.length}</h1>
+            {status.map((pix, index) => (
+              <div
+                key={index}
+                className="bg-gray-50 border border-gray-200 p-5 rounded-lg"
+              >
+                
+                <h3 className="text-lg font-bold text-gray-800 mb-3">
+                  💳 Cobrança #{index + 1}
+                </h3>
+                <p>
+                  <strong>Status:</strong> {pix.status}
+                </p>
+                <p>
+                  <strong>Valor:</strong> R$ {pix.valor?.original}
+                </p>
+                <p>
+                  <strong>TXID:</strong> {pix.txid}
+                </p>
+                <p>
+                  <strong>PPPOE:</strong> {pix.devedor?.nome}
+                </p>
+                <p>
+                  <strong>TITULO:</strong> {pix.infoAdicionais![0].valor}
+                </p>
+                <p>
+                  <strong>Data:</strong>{" "}
+                  {pix.calendario?.criacao
+                    ? new Date(pix.calendario.criacao).toLocaleString()
+                    : "—"}
+                </p>
+
+                {pix.pixCopiaECola && (
+                  <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <button
+                      onClick={() => handleCopy(pix.pixCopiaECola!)}
+                      className="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-400 transition"
+                    >
+                      📋 Copiar Pix Copia e Cola
+                    </button>
+                    <a
+                      href={`https://${pix.location}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-600 font-medium hover:underline"
+                    >
+                      🔗 Ver QR Code
+                    </a>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>

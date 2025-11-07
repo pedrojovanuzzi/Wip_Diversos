@@ -1397,11 +1397,25 @@ class Pix {
     try {
       const efi = new EfiPay(options);
       const response = await efi.pixDetailCharge({txid: req.body.chargeId})
+      console.log(response);
+      
       res.status(200).json(response);
     } catch (error) {
       res.status(500).json(error);
     }
   };
+
+  BuscarPixPagoData = async (req: Request, res: Response) => {
+    try {
+      const {inicio, fim} = req.body;
+      const efi = new EfiPay(options);
+      const response = await efi.pixListCharges({inicio, fim, status: 'CONCLUIDA'});
+      res.status(200).json(response);
+    } catch (error) {
+      res.status(500).json(error);
+    }
+  };
+
 }
 
 export default Pix;
