@@ -93,7 +93,7 @@ export const Pix = () => {
           className={`group relative ring-1 ring-gray-400 bg-gray-200 sm:bg-gray-200 hover:bg-green-300 transition-all p-6`}
         >
           <span className={`inline-flex rounded-lg p-3 bg-orange-100 text-orange-700`}>
-            <MdPaid />
+            <MdPaid className="size-6" />
           </span>
           <div className="mt-8">
             <h3 className="text-base font-semibold text-gray-900">
