@@ -1393,6 +1393,68 @@ class Pix {
     }
   };
 
+  listarTodasCobrancas = async (
+    inicio: string, // recebe a data/hora inicial em ISO
+    fim: string, // recebe a data/hora final em ISO
+    status = "CONCLUIDA" // por padrão busca somente CONCLUIDA
+  ) => {
+    const efi = new EfiPay(options); // instancia o cliente EfiPay
+    const todasCobs: any[] = []; // acumulador de todas as cobranças coletadas
+    const vistos = new Set<string>(); // conjunto para deduplicar por txid
+
+    let start = new Date(inicio); // cursor de início da janela atual
+    const endFinal = new Date(fim); // limite final absoluto do período
+    let janelaMs = 6 * 60 * 60 * 1000; // tamanho da janela (6h) — adaptativo
+
+    while (start <= endFinal) {
+      // laço até cobrir todo o período
+      const end = new Date( // calcula o fim da janela atual
+        Math.min(start.getTime() + janelaMs, endFinal.getTime()) // não ultrapassa o fim final
+      );
+
+      const resp = await efi.pixListCharges({
+        // chama a API para a janela atual
+        inicio: start.toISOString(), // início da janela em ISO
+        fim: end.toISOString(), // fim da janela em ISO
+        status, // filtro de status
+      });
+
+      const cobs = resp.cobs || []; // extrai as cobranças da resposta
+
+      if (cobs.length >= 100 && janelaMs > 60 * 1000) {
+        // se bateu o limite (100) e a janela ainda é > 1min
+        janelaMs = Math.max(Math.floor(janelaMs / 2), 60 * 1000); // reduz a janela pela metade (mínimo 1min)
+        continue; // refaz a mesma janela (start igual) com menor duração
+      }
+
+      for (const c of cobs) {
+        // itera sobre as cobranças retornadas
+        const key = c.txid || `${c.chave}-${c.calendario?.criacao}`; // chave única para deduplicação (prioriza txid)
+        if (!vistos.has(key)) {
+          // se ainda não vimos esta cobrança
+          vistos.add(key); // marca como vista
+          todasCobs.push(c); // adiciona ao acumulado
+        }
+      }
+
+      start = new Date(end.getTime() + 1000); // avança o cursor para 1s após o fim da janela
+      if (cobs.length < 50 && janelaMs < 24 * 60 * 60 * 1000) {
+        // se veio pouco dado, podemos acelerar aumentando a janela
+        janelaMs = Math.min(janelaMs * 2, 24 * 60 * 60 * 1000); // dobra a janela até no máx. 24h
+      }
+    }
+
+    return {
+      // retorna no mesmo formato que você já usa
+      parametros: {
+        inicio, // início original solicitado
+        fim, // fim original solicitado
+        totalCobrancas: todasCobs.length, // total após deduplicação
+      },
+      cobs: todasCobs, // lista completa (única) de cobranças
+    };
+  };
+
   BuscarPixPago = async (req: Request, res: Response) => {
     try {
       const efi = new EfiPay(options);
@@ -1408,12 +1470,11 @@ class Pix {
   BuscarPixPagoData = async (req: Request, res: Response) => {
     try {
       const { inicio, fim } = req.body;
-      const efi = new EfiPay(options);
-      const response = await efi.pixListCharges({
+      const response = await this.listarTodasCobrancas(
         inicio,
         fim,
-        status: "CONCLUIDA",
-      });
+        "CONCLUIDA"
+      );
       res.status(200).json(response);
     } catch (error) {
       res.status(500).json(error);
@@ -1424,26 +1485,25 @@ class Pix {
     try {
       const { inicio, fim } = req.body;
       const efi = new EfiPay(options);
-      const response = await efi.pixListCharges({
+
+      const response = await this.listarTodasCobrancas(
         inicio,
         fim,
-        status: "CONCLUIDA",
-      });
+        "CONCLUIDA"
+      );
 
       const e2eids: string[] = [];
 
       for (const cob of response.cobs || []) {
         if (cob.pix && Array.isArray(cob.pix)) {
           for (const pix of cob.pix) {
-            if (pix.endToEndId) {
-              e2eids.push(pix.endToEndId);
-            }
+            if (pix.endToEndId) e2eids.push(pix.endToEndId);
           }
         }
       }
 
       if (e2eids.length === 0) {
-        console.log("⚠️ Nenhum endToEndId encontrado para reenviar webhook.");
+        res.status(200).json({ message: "Nenhum endToEndId encontrado" });
         return;
       }
 
@@ -1452,11 +1512,7 @@ class Pix {
         { tipo: "PIX_RECEBIDO", e2eids }
       );
 
-      console.log(
-        `✅ Webhook reenviado com sucesso para ${e2eids.length} transações.`
-      );
-
-      res.status(200).json(result);
+      res.status(200).json({ reenviados: e2eids, result });
     } catch (error) {
       res.status(500).json(error);
     }
