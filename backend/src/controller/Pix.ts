@@ -1396,9 +1396,9 @@ class Pix {
   BuscarPixPago = async (req: Request, res: Response) => {
     try {
       const efi = new EfiPay(options);
-      const response = await efi.pixDetailCharge({txid: req.body.chargeId})
+      const response = await efi.pixDetailCharge({ txid: req.body.chargeId });
       console.log(response);
-      
+
       res.status(200).json(response);
     } catch (error) {
       res.status(500).json(error);
@@ -1407,15 +1407,60 @@ class Pix {
 
   BuscarPixPagoData = async (req: Request, res: Response) => {
     try {
-      const {inicio, fim} = req.body;
+      const { inicio, fim } = req.body;
       const efi = new EfiPay(options);
-      const response = await efi.pixListCharges({inicio, fim, status: 'CONCLUIDA'});
+      const response = await efi.pixListCharges({
+        inicio,
+        fim,
+        status: "CONCLUIDA",
+      });
       res.status(200).json(response);
     } catch (error) {
       res.status(500).json(error);
     }
   };
 
+  ReenviarNotificacoes = async (req: Request, res: Response) => {
+    try {
+      const { inicio, fim } = req.body;
+      const efi = new EfiPay(options);
+      const response = await efi.pixListCharges({
+        inicio,
+        fim,
+        status: "CONCLUIDA",
+      });
+
+      const e2eids: string[] = [];
+
+      for (const cob of response.cobs || []) {
+        if (cob.pix && Array.isArray(cob.pix)) {
+          for (const pix of cob.pix) {
+            if (pix.endToEndId) {
+              e2eids.push(pix.endToEndId);
+            }
+          }
+        }
+      }
+
+      if (e2eids.length === 0) {
+        console.log("⚠️ Nenhum endToEndId encontrado para reenviar webhook.");
+        return;
+      }
+
+      const result = await efi.pixResendWebhook(
+        {},
+        { tipo: "PIX_RECEBIDO", e2eids }
+      );
+
+      console.log(
+        `✅ Webhook reenviado com sucesso para ${e2eids.length} transações.`
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      res.status(500).json(error);
+    }
+  };
 }
 
 export default Pix;

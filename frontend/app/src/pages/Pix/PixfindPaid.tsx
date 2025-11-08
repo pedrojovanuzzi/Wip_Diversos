@@ -56,45 +56,77 @@ export const PixfindPaid: React.FC = () => {
   const { user } = useAuth();
   const token = user?.token;
 
-const handleSubmit = async (e: FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setError(null);
-  setStatus(null);
+  // 🔹 Função para consultar PIX
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setStatus(null);
 
-  try {
-    const url = porData
-      ? `${process.env.REACT_APP_URL}/Pix/BuscarPixPagoData`
-      : `${process.env.REACT_APP_URL}/Pix/BuscarPixPago`;
+    try {
+      const url = porData
+        ? `${process.env.REACT_APP_URL}/Pix/BuscarPixPagoData`
+        : `${process.env.REACT_APP_URL}/Pix/BuscarPixPago`;
 
-    const formatToUTC = (dateStr: string) => {
-      if (!dateStr) return "";
-      const date = new Date(dateStr);
-      return date.toISOString();
-    };
+      const formatToUTC = (dateStr: string) => {
+        if (!dateStr) return "";
+        const date = new Date(dateStr);
+        return date.toISOString();
+      };
 
-    const payload = porData
-      ? { inicio: formatToUTC(inicio), fim: formatToUTC(fim) }
-      : { chargeId };
+      const payload = porData
+        ? { inicio: formatToUTC(inicio), fim: formatToUTC(fim) }
+        : { chargeId };
 
-    const response = await axios.post(url, payload, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+      const response = await axios.post(url, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    // ✅ Corrige: se for busca por data, extrai o array interno
-    if (porData) {
-      const data = response.data?.cobs || response.data;
-      setStatus(Array.isArray(data) ? data : []);
-    } else {
-      setStatus(response.data);
+      if (porData) {
+        const data = response.data?.cobs || response.data;
+        setStatus(Array.isArray(data) ? data : []);
+      } else {
+        setStatus(response.data);
+      }
+    } catch (err: any) {
+      setError(err.message || "Erro ao buscar status");
+    } finally {
+      setLoading(false);
     }
-  } catch (err: any) {
-    setError(err.message || "Erro ao buscar status");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
+  // 🔹 Função para reenviar notificações PIX do período
+  const handleReenviarNotificacoes = async () => {
+    try {
+      if (!inicio || !fim) {
+        alert("Informe o intervalo de datas antes de reenviar!");
+        return;
+      }
+
+      setLoading(true);
+      const formatToUTC = (dateStr: string) => new Date(dateStr).toISOString();
+
+      const payload = {
+        inicio: formatToUTC(inicio),
+        fim: formatToUTC(fim),
+      };
+
+      // 🔸 Chama o endpoint que usa pixResendWebhook no backend
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Pix/ReenviarNotificacoes`,
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      alert("✅ Notificações reenviadas com sucesso!");
+      console.log(response.data);
+    } catch (error: any) {
+      console.error(error);
+      alert("❌ Erro ao reenviar notificações!");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCopy = (texto: string) => {
     navigator.clipboard.writeText(texto);
@@ -110,6 +142,7 @@ const handleSubmit = async (e: FormEvent) => {
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* 🔹 Checkbox para ativar busca por data */}
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -122,6 +155,7 @@ const handleSubmit = async (e: FormEvent) => {
             </label>
           </div>
 
+          {/* 🔹 Se não for por data, mostra campo de TXID */}
           {!porData ? (
             <input
               type="text"
@@ -133,6 +167,7 @@ const handleSubmit = async (e: FormEvent) => {
             />
           ) : (
             <div className="flex flex-col sm:flex-row gap-3">
+              {/* Campo de início */}
               <div className="flex-1">
                 <label className="block text-gray-700 text-sm mb-1">
                   Início
@@ -145,6 +180,8 @@ const handleSubmit = async (e: FormEvent) => {
                   required
                 />
               </div>
+
+              {/* Campo de fim */}
               <div className="flex-1">
                 <label className="block text-gray-700 text-sm mb-1">Fim</label>
                 <input
@@ -155,9 +192,22 @@ const handleSubmit = async (e: FormEvent) => {
                   required
                 />
               </div>
+
+              {/* 🔁 Novo botão: Reenviar notificações */}
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={handleReenviarNotificacoes}
+                  disabled={loading}
+                  className="w-full sm:w-auto bg-yellow-400 text-black font-semibold py-2 px-4 rounded-lg hover:bg-yellow-300 transition disabled:opacity-50"
+                >
+                  🔁 Reenviar Webhooks
+                </button>
+              </div>
             </div>
           )}
 
+          {/* Botão principal de consulta */}
           <button
             type="submit"
             disabled={loading}
@@ -173,8 +223,8 @@ const handleSubmit = async (e: FormEvent) => {
 
         {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
 
-        {/* 🔹 Caso venha UM resultado */}
-        {status && !Array.isArray(status) && (
+        {/* 🔹 Renderização dos resultados abaixo (sem alteração) */}
+                {status && !Array.isArray(status) && (
           <div className="mt-6 bg-gray-50 border border-gray-200 p-5 rounded-lg">
             <h3 className="text-lg font-bold text-gray-800 mb-3">
               🔹 Detalhes da Cobrança
