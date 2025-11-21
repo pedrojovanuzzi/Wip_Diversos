@@ -698,10 +698,10 @@ class Pix {
           cliente.datavenc // data de vencimento
         );
 
-        if(index == 2) {
+        if (index == 2) {
           const valorOriginal = Number(valorCorrigido);
           const desconto = valorOriginal * 0.5;
-          valorCorrigido = (valorOriginal - desconto);
+          valorCorrigido = valorOriginal - desconto;
         }
 
         structuredData.push({
@@ -1177,12 +1177,28 @@ class Pix {
 
       const response = await Promise.allSettled(
         todasAsCobsr.map(async (f) => {
+          const agora = new Date();
+          const inicioDoMes = new Date(
+            agora.getFullYear(),
+            agora.getMonth(),
+            1
+          );
+          const fimDoMes = new Date(
+            agora.getFullYear(),
+            agora.getMonth() + 1,
+            0,
+            23,
+            59,
+            59
+          );
+
           // 🔹 Busca o cliente no banco de dados
           const cliente = await this.recordRepo.findOne({
             where: {
               login: f.vinculo.devedor.nome,
               status: Not("pago"),
               datadel: IsNull(),
+              datavenc: Between(inicioDoMes, fimDoMes),
             },
             order: { datavenc: "ASC" as const },
           });
