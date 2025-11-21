@@ -165,6 +165,33 @@ class Pix {
     }
   };
 
+  aplicar_Desconto = async (
+    valor: string | number,
+    pppoe: string
+  ): Promise<number> => {
+    try {
+      // 🔹 Busca o cliente no banco de dados pelo login (pppoe)
+      const client = await this.clienteRepo.findOne({
+        where: { login: pppoe },
+      });
+
+      // 🔹 Pega o desconto do cliente (ou 0 se não tiver)
+      const desconto = client?.desconto || 0;
+
+      // 🔹 Converte o valor recebido em número e aplica o desconto
+      let valorFinal = Number(valor) - desconto;
+
+      // 🔹 Garante que o valor nunca fique negativo
+      if (valorFinal < 0) valorFinal = 0;
+
+      return Number(valorFinal.toFixed(2));
+    } catch (error) {
+      console.error("❌ Erro em aplicarJuros_Desconto:", error);
+      // 🔹 Em caso de erro, retorna o valor original sem alteração
+      return Number(valor);
+    }
+  };
+
   AlterarWebhookPixAutomaticoRecorrencia = async (
     req: Request,
     res: Response
@@ -497,7 +524,11 @@ class Pix {
 
   gerarPix = async (req: Request, res: Response): Promise<void> => {
     try {
-      let { pppoe, cpf } = req.body as { pppoe: string; cpf: string };
+      let { pppoe, cpf, perdoarjuros } = req.body as {
+        pppoe: string;
+        cpf: string;
+        perdoarjuros: boolean;
+      };
       cpf = cpf.replace(/\D/g, "");
 
       const cliente = await this.recordRepo.findOne({
@@ -528,52 +559,102 @@ class Pix {
 
       const valorFinal = Number(valorDesconto).toFixed(2);
 
-      const body =
-        cpf.length === 11
-          ? {
-              calendario: { expiracao: 43200 },
-              devedor: { cpf, nome: pppoe },
-              valor: { original: valorFinal },
-              chave: chave_pix,
-              solicitacaoPagador: "Mensalidade",
-              infoAdicionais: [
-                { nome: "ID", valor: String(cliente.id) },
-                { nome: "VALOR", valor: valorFinal },
-                { nome: "QR", valor: String(qrlink.linkVisualizacao) },
-              ],
-              loc: { id: loc.id },
-            }
-          : {
-              calendario: { expiracao: 43200 },
-              devedor: { cnpj: cpf, nome: pppoe },
-              valor: { original: valorFinal },
-              chave: chave_pix,
-              solicitacaoPagador: "Mensalidade",
-              infoAdicionais: [
-                { nome: "ID", valor: String(cliente.id) },
-                { nome: "VALOR", valor: valorFinal },
-                { nome: "QR", valor: String(qrlink.linkVisualizacao) },
-              ],
-              loc: { id: loc.id },
-            };
+      if (perdoarjuros) {
+        const body =
+          cpf.length === 11
+            ? {
+                calendario: { expiracao: 43200 },
+                devedor: { cpf, nome: pppoe },
+                valor: { original: valorFinal },
+                chave: chave_pix,
+                solicitacaoPagador: "Mensalidade",
+                infoAdicionais: [
+                  { nome: "ID", valor: String(cliente.id) },
+                  { nome: "VALOR", valor: valorFinal },
+                  { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+                ],
+                loc: { id: loc.id },
+              }
+            : {
+                calendario: { expiracao: 43200 },
+                devedor: { cnpj: cpf, nome: pppoe },
+                valor: { original: valorFinal },
+                chave: chave_pix,
+                solicitacaoPagador: "Mensalidade",
+                infoAdicionais: [
+                  { nome: "ID", valor: String(cliente.id) },
+                  { nome: "VALOR", valor: valorFinal },
+                  { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+                ],
+                loc: { id: loc.id },
+              };
 
-      await efipay.pixCreateCharge(params, body);
+        await efipay.pixCreateCharge(params, body);
 
-      const options2 = {
-        month: "2-digit",
-        day: "2-digit",
-      } as Intl.DateTimeFormatOptions;
-      const formattedDate = new Intl.DateTimeFormat("pt-BR", options2).format(
-        cliente.datavenc as Date
-      );
+        const options2 = {
+          month: "2-digit",
+          day: "2-digit",
+        } as Intl.DateTimeFormatOptions;
+        const formattedDate = new Intl.DateTimeFormat("pt-BR", options2).format(
+          cliente.datavenc as Date
+        );
 
-      res.status(200).json({
-        valor: valorFinal,
-        pppoe,
-        link: qrlink.linkVisualizacao,
-        formattedDate,
-      });
-      return;
+        const valorPerdoado = await this.aplicar_Desconto(cliente.valor, pppoe);
+        res.status(200).json({
+          valor: Number(valorPerdoado).toFixed(2),
+          pppoe,
+          link: qrlink.linkVisualizacao,
+          formattedDate,
+        });
+        return;
+      } else {
+        const body =
+          cpf.length === 11
+            ? {
+                calendario: { expiracao: 43200 },
+                devedor: { cpf, nome: pppoe },
+                valor: { original: valorFinal },
+                chave: chave_pix,
+                solicitacaoPagador: "Mensalidade",
+                infoAdicionais: [
+                  { nome: "ID", valor: String(cliente.id) },
+                  { nome: "VALOR", valor: valorFinal },
+                  { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+                ],
+                loc: { id: loc.id },
+              }
+            : {
+                calendario: { expiracao: 43200 },
+                devedor: { cnpj: cpf, nome: pppoe },
+                valor: { original: valorFinal },
+                chave: chave_pix,
+                solicitacaoPagador: "Mensalidade",
+                infoAdicionais: [
+                  { nome: "ID", valor: String(cliente.id) },
+                  { nome: "VALOR", valor: valorFinal },
+                  { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+                ],
+                loc: { id: loc.id },
+              };
+
+        await efipay.pixCreateCharge(params, body);
+
+        const options2 = {
+          month: "2-digit",
+          day: "2-digit",
+        } as Intl.DateTimeFormatOptions;
+        const formattedDate = new Intl.DateTimeFormat("pt-BR", options2).format(
+          cliente.datavenc as Date
+        );
+
+        res.status(200).json({
+          valor: valorFinal,
+          pppoe,
+          link: qrlink.linkVisualizacao,
+          formattedDate,
+        });
+        return;
+      }
     } catch (error: any) {
       console.error("Erro em gerarPix:", error);
       res.status(500).json(error);
