@@ -1216,7 +1216,7 @@ class Pix {
               tipoConta: "PAGAMENTO", // Tipo da conta bancária
             },
             valor: {
-              original: String(valorComDesconto), // Valor da cobrança
+              original: valorComDesconto.toFixed(2), // Valor da cobrança
               // original: '1.00'
             },
             infoAdicional: "Mensalidade gerada automaticamente",
@@ -1318,7 +1318,7 @@ class Pix {
               tipoConta: "PAGAMENTO", // Tipo da conta bancária
             },
             valor: {
-              original: String(valorComDesconto), // Valor da cobrança
+              original: valorComDesconto.toFixed(2), // Valor da cobrança
               // original: '1.00'
             },
             infoAdicional: "Mensalidade gerada automaticamente",
