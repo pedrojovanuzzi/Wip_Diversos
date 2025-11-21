@@ -560,17 +560,23 @@ class Pix {
       const valorFinal = Number(valorDesconto).toFixed(2);
 
       if (perdoarjuros) {
+        let valorPerdoado: string | number = await this.aplicar_Desconto(
+          cliente.valor,
+          pppoe
+        );
+        valorPerdoado = valorPerdoado.toFixed(2);
+
         const body =
           cpf.length === 11
             ? {
                 calendario: { expiracao: 43200 },
                 devedor: { cpf, nome: pppoe },
-                valor: { original: valorFinal },
+                valor: { original: valorPerdoado },
                 chave: chave_pix,
                 solicitacaoPagador: "Mensalidade",
                 infoAdicionais: [
                   { nome: "ID", valor: String(cliente.id) },
-                  { nome: "VALOR", valor: valorFinal },
+                  { nome: "VALOR", valor: valorPerdoado },
                   { nome: "QR", valor: String(qrlink.linkVisualizacao) },
                 ],
                 loc: { id: loc.id },
@@ -578,12 +584,12 @@ class Pix {
             : {
                 calendario: { expiracao: 43200 },
                 devedor: { cnpj: cpf, nome: pppoe },
-                valor: { original: valorFinal },
+                valor: { original: valorPerdoado },
                 chave: chave_pix,
                 solicitacaoPagador: "Mensalidade",
                 infoAdicionais: [
                   { nome: "ID", valor: String(cliente.id) },
-                  { nome: "VALOR", valor: valorFinal },
+                  { nome: "VALOR", valor: valorPerdoado },
                   { nome: "QR", valor: String(qrlink.linkVisualizacao) },
                 ],
                 loc: { id: loc.id },
@@ -598,10 +604,9 @@ class Pix {
         const formattedDate = new Intl.DateTimeFormat("pt-BR", options2).format(
           cliente.datavenc as Date
         );
-
-        const valorPerdoado = await this.aplicar_Desconto(cliente.valor, pppoe);
+        console.log("Juros Perdoado");
         res.status(200).json({
-          valor: Number(valorPerdoado).toFixed(2),
+          valor: valorPerdoado,
           pppoe,
           link: qrlink.linkVisualizacao,
           formattedDate,
