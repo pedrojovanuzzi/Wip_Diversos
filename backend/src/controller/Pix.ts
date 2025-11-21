@@ -739,7 +739,7 @@ class Pix {
                 loc: { id: loc.id },
               };
 
-        await efipay.pixCreateCharge(params, body);
+        await efipay.pixCreateCharge(params, body); //efipay
 
         res.status(200).json({
           valor: valorsemJuros,
