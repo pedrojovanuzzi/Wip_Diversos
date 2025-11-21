@@ -163,18 +163,18 @@ export const PixDetalhe = () => {
                 />
               </>
             )}
-            {modo.titulo === "Pix do Último Vencimento" && (
-              <div className="flex gap-5">
-                <p>Perdoar Juros?</p>
-                <input
-                  className="p-2 rounded-sm"
-                  type="checkbox"
-                  autoComplete="name"
-                  placeholder="Perdoar Juros da Parcela?"
-                  onChange={(e) => setPerdoarJuros(e.target.checked)}
-                />
-              </div>
-            )}
+            {modo.titulo === "Pix do Último Vencimento" ||
+              (modo.titulo === "Pix Mensalidade em Aberto" && (
+                <div className="flex gap-5">
+                  <p>Perdoar Juros?</p>
+                  <input
+                    className="p-2 rounded-sm"
+                    type="checkbox"
+                    placeholder="Perdoar Juros da Parcela?"
+                    onChange={(e) => setPerdoarJuros(e.target.checked)}
+                  />
+                </div>
+              ))}
             <input
               className="p-2 rounded-sm ring-1"
               type="text"

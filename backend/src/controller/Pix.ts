@@ -669,7 +669,11 @@ class Pix {
 
   gerarPixAberto = async (req: Request, res: Response): Promise<void> => {
     try {
-      let { pppoe, cpf } = req.body as { pppoe: string; cpf: string };
+      let { pppoe, cpf, perdoarjuros } = req.body as {
+        pppoe: string;
+        cpf: string;
+        perdoarjuros: boolean;
+      };
       cpf = cpf.replace(/\D/g, "");
 
       const cliente = await this.recordRepo.findOne({
@@ -703,44 +707,87 @@ class Pix {
 
       const valorFinal = Number(valorDesconto).toFixed(2);
 
-      const body =
-        cpf.length === 11
-          ? {
-              calendario: { expiracao: 43200 },
-              devedor: { cpf, nome: pppoe },
-              valor: { original: valorFinal },
-              chave: chave_pix,
-              solicitacaoPagador: "Mensalidade",
-              infoAdicionais: [
-                { nome: "ID", valor: String(cliente.id) },
-                { nome: "VALOR", valor: valorFinal },
-                { nome: "QR", valor: String(qrlink.linkVisualizacao) },
-              ],
-              loc: { id: loc.id },
-            }
-          : {
-              calendario: { expiracao: 43200 },
-              devedor: { cnpj: cpf, nome: pppoe },
-              valor: { original: valorFinal },
-              chave: chave_pix,
-              solicitacaoPagador: "Mensalidade",
-              infoAdicionais: [
-                { nome: "ID", valor: String(cliente.id) },
-                { nome: "VALOR", valor: valorFinal },
-                { nome: "QR", valor: String(qrlink.linkVisualizacao) },
-              ],
-              loc: { id: loc.id },
-            };
+      if (perdoarjuros) {
+        const valorsemJuros = await this.aplicar_Desconto(valor, pppoe);
 
-      await efipay.pixCreateCharge(params, body);
+        const body =
+          cpf.length === 11
+            ? {
+                calendario: { expiracao: 43200 },
+                devedor: { cpf, nome: pppoe },
+                valor: { original: valorsemJuros.toFixed(2) },
+                chave: chave_pix,
+                solicitacaoPagador: "Mensalidade",
+                infoAdicionais: [
+                  { nome: "ID", valor: String(cliente.id) },
+                  { nome: "VALOR", valor: valorsemJuros.toFixed(2) },
+                  { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+                ],
+                loc: { id: loc.id },
+              }
+            : {
+                calendario: { expiracao: 43200 },
+                devedor: { cnpj: cpf, nome: pppoe },
+                valor: { original: valorsemJuros.toFixed(2) },
+                chave: chave_pix,
+                solicitacaoPagador: "Mensalidade",
+                infoAdicionais: [
+                  { nome: "ID", valor: String(cliente.id) },
+                  { nome: "VALOR", valor: valorsemJuros.toFixed(2) },
+                  { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+                ],
+                loc: { id: loc.id },
+              };
 
-      res.status(200).json({
-        valor: valorFinal,
-        pppoe,
-        link: qrlink.linkVisualizacao,
-        dataVenc: cliente.datavenc,
-      });
-      return;
+        await efipay.pixCreateCharge(params, body);
+
+        res.status(200).json({
+          valor: valorsemJuros,
+          pppoe,
+          link: qrlink.linkVisualizacao,
+          dataVenc: cliente.datavenc,
+        });
+        return;
+      } else {
+        const body =
+          cpf.length === 11
+            ? {
+                calendario: { expiracao: 43200 },
+                devedor: { cpf, nome: pppoe },
+                valor: { original: valorFinal },
+                chave: chave_pix,
+                solicitacaoPagador: "Mensalidade",
+                infoAdicionais: [
+                  { nome: "ID", valor: String(cliente.id) },
+                  { nome: "VALOR", valor: valorFinal },
+                  { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+                ],
+                loc: { id: loc.id },
+              }
+            : {
+                calendario: { expiracao: 43200 },
+                devedor: { cnpj: cpf, nome: pppoe },
+                valor: { original: valorFinal },
+                chave: chave_pix,
+                solicitacaoPagador: "Mensalidade",
+                infoAdicionais: [
+                  { nome: "ID", valor: String(cliente.id) },
+                  { nome: "VALOR", valor: valorFinal },
+                  { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+                ],
+                loc: { id: loc.id },
+              };
+
+        await efipay.pixCreateCharge(params, body);
+
+        res.status(200).json({
+          valor: valorFinal,
+          pppoe,
+          link: qrlink.linkVisualizacao,
+          dataVenc: cliente.datavenc,
+        });
+        return;
+      }
     } catch (error: any) {
       console.error("Erro em gerarPixAberto:", error);
       res.status(500).json(error);
