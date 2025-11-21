@@ -17,11 +17,15 @@ export const PixDetalhe = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [pixUrl, setPixUrl] = useState("");
-  const [valor, setValor] = useState('');
-  const [dataVencimento, setDataVencimento] = useState('');
-  const [cliente, setCliente] = useState('');
+  const [valor, setValor] = useState("");
+  const [dataVencimento, setDataVencimento] = useState("");
+  const [cliente, setCliente] = useState("");
+  const [perdoarjuros, setPerdoarJuros] = useState(false);
 
-  const modos: Record<ModoKey, { titulo: string; descricao: string; url: string }> = {
+  const modos: Record<
+    ModoKey,
+    { titulo: string; descricao: string; url: string }
+  > = {
     ultimo: {
       titulo: "Pix do Último Vencimento",
       descricao:
@@ -40,7 +44,8 @@ export const PixDetalhe = () => {
     },
     varias: {
       titulo: "Pix de Várias Contas",
-      descricao: "Combine várias mensalidades ou várias contas em um único Pix.",
+      descricao:
+        "Combine várias mensalidades ou várias contas em um único Pix.",
       url: `${process.env.REACT_APP_URL}/Pix/geradorTitulos`,
     },
   };
@@ -81,7 +86,7 @@ export const PixDetalhe = () => {
 
   async function gerarPix(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
     if (isVarias) {
       try {
@@ -106,7 +111,7 @@ export const PixDetalhe = () => {
       try {
         const response = await axios.post(
           modo.url,
-          { pppoe: user, cpf: cpf },
+          { pppoe: user, cpf: cpf, perdoarjuros: perdoarjuros },
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setPixUrl(response.data.link);
@@ -158,6 +163,18 @@ export const PixDetalhe = () => {
                 />
               </>
             )}
+            {modo.titulo === "Pix do Último Vencimento" && (
+              <div className="flex gap-5">
+                <p>Perdoar Juros?</p>
+                <input
+                  className="p-2 rounded-sm"
+                  type="checkbox"
+                  autoComplete="name"
+                  placeholder="Perdoar Juros da Parcela?"
+                  onChange={(e) => setPerdoarJuros(e.target.checked)}
+                />
+              </div>
+            )}
             <input
               className="p-2 rounded-sm ring-1"
               type="text"
@@ -171,49 +188,51 @@ export const PixDetalhe = () => {
               Gerar Pix
             </button>
             {pixUrl && (
-  <div className="w-full sm:w-2/3 mt-6 p-5 bg-white rounded-lg shadow-md text-gray-800 space-y-3">
-    <h2 className="text-xl font-bold text-center border-b pb-2 text-slate-800">
-      Detalhes do Pix Gerado
-    </h2>
+              <div className="w-full sm:w-2/3 mt-6 p-5 bg-white rounded-lg shadow-md text-gray-800 space-y-3">
+                <h2 className="text-xl font-bold text-center border-b pb-2 text-slate-800">
+                  Detalhes do Pix Gerado
+                </h2>
 
-    <div className="flex flex-col gap-1">
-      <p className="text-sm text-gray-600">URL do Pix / Resposta:</p>
-      <span
-        className="font-mono text-blue-600 underline cursor-pointer break-all hover:text-blue-800 transition"
-        onClick={() => {
-          navigator.clipboard.writeText(pixUrl);
-          alert("Link copiado para a área de transferência!");
-        }}
-        title="Clique para copiar"
-      >
-        {pixUrl}
-      </span>
-    </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm text-gray-600">
+                    URL do Pix / Resposta:
+                  </p>
+                  <span
+                    className="font-mono text-blue-600 underline cursor-pointer break-all hover:text-blue-800 transition"
+                    onClick={() => {
+                      navigator.clipboard.writeText(pixUrl);
+                      alert("Link copiado para a área de transferência!");
+                    }}
+                    title="Clique para copiar"
+                  >
+                    {pixUrl}
+                  </span>
+                </div>
 
-    {valor && (
-      <div>
-        <p className="text-sm text-gray-600">Valor:</p>
-        <p className="font-semibold text-green-600 text-lg">
-          R$ {Number(valor).toFixed(2)}
-        </p>
-      </div>
-    )}
+                {valor && (
+                  <div>
+                    <p className="text-sm text-gray-600">Valor:</p>
+                    <p className="font-semibold text-green-600 text-lg">
+                      R$ {Number(valor).toFixed(2)}
+                    </p>
+                  </div>
+                )}
 
-    {dataVencimento && (
-      <div>
-        <p className="text-sm text-gray-600">Data de Vencimento:</p>
-        <p className="font-medium">{dataVencimento}</p>
-      </div>
-    )}
+                {dataVencimento && (
+                  <div>
+                    <p className="text-sm text-gray-600">Data de Vencimento:</p>
+                    <p className="font-medium">{dataVencimento}</p>
+                  </div>
+                )}
 
-    {cliente && (
-      <div>
-        <p className="text-sm text-gray-600">Cliente:</p>
-        <p className="font-medium">{cliente}</p>
-      </div>
-    )}
-  </div>
-)}
+                {cliente && (
+                  <div>
+                    <p className="text-sm text-gray-600">Cliente:</p>
+                    <p className="font-medium">{cliente}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {loading && <p>Carregando...</p>}
             {error && <p className="text-red-500">{error}</p>}
