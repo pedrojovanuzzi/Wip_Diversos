@@ -133,25 +133,45 @@ class Nfcom {
     return xml;
   }
 
+  /**
+   * Gera o XML da NFCom (Modelo 62) com base nos dados fornecidos e assina digitalmente.
+   * @param data Dados da NFCom tipados conforme interface INFComData
+   * @returns String contendo o XML assinado
+   */
   public gerarXml(data: INFComData): string {
-    // Cria a estrutura do XML usando xmlbuilder2
-    const root = create({ version: "1.0", encoding: "UTF-8" })
-      .ele("NFCom", {
-        xmlns: "http://www.portalfiscal.inf.br/nfcom",
-        versao: "1.00",
-      })
-      .ele("infNFCom", {
-        Id: `NFCom${data.ide.cUF}${data.gFat.CompetFat.substring(
-          2,
-          4
-        )}${data.emit.CNPJ.padStart(14, "0")}62${data.ide.serie.padStart(
-          3,
-          "0"
-        )}${data.ide.nNF.padStart(9, "0")}1${data.ide.cNF.padStart(8, "0")}`, // Chave de acesso simplificada para exemplo
-      });
+    // Extrai o ano e mês da emissão para a chave de acesso (YYMM)
+    // Supondo dhEmi no formato ISO: YYYY-MM-DDThh:mm:ss...
+    const anoMes =
+      data.ide.dhEmi.substring(2, 4) + data.ide.dhEmi.substring(5, 7);
+
+    // Monta a chave de acesso
+    const chaveAcesso = `${data.ide.cUF}${anoMes}${data.emit.CNPJ.padStart(
+      14,
+      "0"
+    )}62${data.ide.serie.padStart(3, "0")}${data.ide.nNF.padStart(9, "0")}${
+      data.ide.tpEmis
+    }${data.ide.cNF.padStart(8, "0")}`;
+
+    // O ID deve ser "NFCom" + chave de acesso
+    const id = `NFCom${chaveAcesso}`;
+
+    // Cria o documento XML
+    const doc = create({ version: "1.0", encoding: "UTF-8" });
+
+    // Elemento raiz NFCom
+    const nfCom = doc.ele("NFCom", {
+      xmlns: "http://www.portalfiscal.inf.br/nfcom",
+      versao: "1.00",
+    });
+
+    // Elemento infNFCom (filho de NFCom)
+    const infNFCom = nfCom.ele("infNFCom", {
+      // versao: "1.00", // Removido atributo versao daqui
+      Id: id,
+    });
 
     // Grupo de Identificação da NFCom
-    const ide = root.ele("ide");
+    const ide = infNFCom.ele("ide");
     ide.ele("cUF").txt(data.ide.cUF);
     ide.ele("tpAmb").txt(data.ide.tpAmb);
     ide.ele("mod").txt(data.ide.mod);
@@ -168,7 +188,7 @@ class Nfcom {
     ide.ele("verProc").txt(data.ide.verProc);
 
     // Grupo de Emitente
-    const emit = root.ele("emit");
+    const emit = infNFCom.ele("emit");
     emit.ele("CNPJ").txt(data.emit.CNPJ);
     emit.ele("IE").txt(data.emit.IE);
     emit.ele("CRT").txt(data.emit.CRT);
@@ -184,7 +204,7 @@ class Nfcom {
     enderEmit.ele("UF").txt(data.emit.enderEmit.UF);
 
     // Grupo de Destinatário
-    const dest = root.ele("dest");
+    const dest = infNFCom.ele("dest");
     dest.ele("xNome").txt(data.dest.xNome);
     if (data.dest.CPF) dest.ele("CPF").txt(data.dest.CPF);
     if (data.dest.CNPJ) dest.ele("CNPJ").txt(data.dest.CNPJ);
@@ -199,7 +219,7 @@ class Nfcom {
     enderDest.ele("UF").txt(data.dest.enderDest.UF);
 
     // Grupo de Assinante
-    const assinante = root.ele("assinante");
+    const assinante = infNFCom.ele("assinante");
     assinante.ele("iCodAssinante").txt(data.assinante.iCodAssinante);
     assinante.ele("tpAssinante").txt(data.assinante.tpAssinante);
     assinante.ele("tpServUtil").txt(data.assinante.tpServUtil);
@@ -208,7 +228,7 @@ class Nfcom {
 
     // Itens (Detalhes)
     data.det.forEach((item) => {
-      const det = root.ele("det", { nItem: item.nItem });
+      const det = infNFCom.ele("det", { nItem: item.nItem });
 
       const prod = det.ele("prod");
       prod.ele("cProd").txt(item.prod.cProd);
@@ -244,7 +264,7 @@ class Nfcom {
     });
 
     // Totais
-    const total = root.ele("total");
+    const total = infNFCom.ele("total");
     total.ele("vProd").txt(data.total.vProd);
 
     const icmsTot = total.ele("ICMSTot");
@@ -269,30 +289,30 @@ class Nfcom {
     total.ele("vNF").txt(data.total.vNF);
 
     // Grupo de Fatura
-    const gFat = root.ele("gFat");
+    const gFat = infNFCom.ele("gFat");
     gFat.ele("CompetFat").txt(data.gFat.CompetFat);
     gFat.ele("dVencFat").txt(data.gFat.dVencFat);
     gFat.ele("codBarras").txt(data.gFat.codBarras);
 
     // Informações Suplementares (QR Code)
-    const infNFComSupl = root.ele("infNFComSupl");
+    const infNFComSupl = nfCom.ele("infNFComSupl");
     infNFComSupl.ele("qrCodNFCom").txt(data.infNFComSupl.qrCodNFCom);
 
     // Gera o XML sem assinatura
-    const xmlSemAssinatura = root.end({ prettyPrint: false }); // Importante: prettyPrint false para assinatura
+    const xmlSemAssinatura = doc.end({ prettyPrint: false });
 
     // Assina o XML
     try {
       return this.assinarXml(xmlSemAssinatura);
     } catch (error) {
       console.error("Erro ao assinar XML:", error);
-      return xmlSemAssinatura; // Retorna sem assinatura em caso de erro (ou poderia lançar exceção)
+      return xmlSemAssinatura;
     }
   }
 
   private assinarXml(xml: string): string {
     const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
-    const password = process.env.CANCELAR_NFSE_SENHA || ""; // Usa a mesma variável de ambiente do projeto
+    const password = process.env.CANCELAR_NFSE_SENHA || "";
 
     if (!fs.existsSync(certPath)) {
       throw new Error(`Certificado não encontrado em: ${certPath}`);
@@ -323,21 +343,26 @@ class Nfcom {
     const signer = new SignedXml();
     signer.privateKey = keyPem;
     signer.publicCert = certPem;
+
+    // Alterado para C14N Inclusivo (padrão NFe)
     signer.canonicalizationAlgorithm =
-      "http://www.w3.org/2001/10/xml-exc-c14n#";
+      "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
     signer.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
 
     signer.addReference({
       xpath: "//*[local-name(.)='infNFCom']",
       transforms: [
         "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-        "http://www.w3.org/2001/10/xml-exc-c14n#",
+        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315", // Alterado para C14N Inclusivo
       ],
       digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
     });
 
     signer.computeSignature(xml, {
-      location: { reference: "//*[local-name(.)='infNFCom']", action: "after" }, // Assinatura após infNFCom
+      location: {
+        reference: "//*[local-name(.)='infNFComSupl']",
+        action: "after",
+      },
     });
 
     return signer.getSignedXml();
