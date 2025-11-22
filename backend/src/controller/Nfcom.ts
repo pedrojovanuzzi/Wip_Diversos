@@ -1,4 +1,5 @@
 import { create } from "xmlbuilder2";
+import { Request, Response } from "express";
 import * as fs from "fs";
 import * as path from "path";
 import forge from "node-forge";
@@ -126,11 +127,12 @@ export interface INFComData {
 }
 
 class Nfcom {
-  /**
-   * Gera o XML da NFCom (Modelo 62) com base nos dados fornecidos e assina digitalmente.
-   * @param data Dados da NFCom tipados conforme interface INFComData
-   * @returns String contendo o XML assinado
-   */
+  public gerarNfcom(req: Request, res: Response): string {
+    const data: INFComData = req.body;
+    const xml = this.gerarXml(data);
+    return xml;
+  }
+
   public gerarXml(data: INFComData): string {
     // Cria a estrutura do XML usando xmlbuilder2
     const root = create({ version: "1.0", encoding: "UTF-8" })
