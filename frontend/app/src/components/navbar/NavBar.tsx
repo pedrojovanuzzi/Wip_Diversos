@@ -7,7 +7,7 @@ import {
   HiHome,
 } from "react-icons/hi2";
 import { MdDns, MdOutlineFeedback } from "react-icons/md";
-import { FaUserPlus, FaWhatsapp } from "react-icons/fa";
+import { FaUserPlus, FaWhatsapp, FaFileInvoice } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 import { FaRegFolder } from "react-icons/fa";
 import { FaPlugCirclePlus } from "react-icons/fa6";
@@ -20,12 +20,12 @@ import Cookies from "js-cookie";
 
 type Color = {
   color?: string;
-}
+};
 
-export const NavBar = ({color = 'black'}: Color) => {
+export const NavBar = ({ color = "black" }: Color) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const {user} = useAuth();
+  const { user } = useAuth();
   const token = user?.token;
   const permission = user?.permission;
 
@@ -40,10 +40,9 @@ export const NavBar = ({color = 'black'}: Color) => {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-  
 
-  function clearCookies(){
-    Cookies.remove('user');
+  function clearCookies() {
+    Cookies.remove("user");
     window.location.reload();
   }
 
@@ -101,13 +100,13 @@ export const NavBar = ({color = 'black'}: Color) => {
                 <VscGraph className='text-white size-8 transition-all hover:text-green-400' />
               </Link>
             </li> */}
-            {permission! >= 5 && 
-            <li className="p-2 grid place-items-center col-span-2">
-              <Link to="/Create">
-                <FaUserPlus className="text-white size-8 transition-all hover:text-green-400" />
-              </Link>
-            </li>
-            }
+            {permission! >= 5 && (
+              <li className="p-2 grid place-items-center col-span-2">
+                <Link to="/Create">
+                  <FaUserPlus className="text-white size-8 transition-all hover:text-green-400" />
+                </Link>
+              </li>
+            )}
             <li className="p-2 grid place-items-center col-span-2">
               <Link to="/feedbackCreate">
                 <MdOutlineFeedback className="text-white size-8 transition-all hover:text-green-400" />
@@ -116,6 +115,11 @@ export const NavBar = ({color = 'black'}: Color) => {
             <li className="p-2 grid place-items-center col-span-2">
               <Link to="/Nfe">
                 <HiDocumentText className="text-white size-8 transition-all hover:text-green-400" />
+              </Link>
+            </li>
+            <li className="p-2 grid place-items-center col-span-2">
+              <Link to="/Nfcom">
+                <FaFileInvoice className="text-white size-8 transition-all hover:text-green-400" />
               </Link>
             </li>
             <li className="p-2 grid place-items-center col-span-2">
@@ -140,7 +144,7 @@ export const NavBar = ({color = 'black'}: Color) => {
             </li>
             <li className="p-2 grid place-items-center col-span-2">
               <Link to="/PowerDns">
-                <MdDns  className="text-white size-8 transition-all hover:text-green-400" />
+                <MdDns className="text-white size-8 transition-all hover:text-green-400" />
               </Link>
             </li>
             <li className="p-2 grid place-items-center col-span-2">
