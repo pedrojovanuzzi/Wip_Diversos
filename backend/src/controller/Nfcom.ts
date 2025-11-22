@@ -161,12 +161,12 @@ class Nfcom {
     // Elemento raiz NFCom
     const nfCom = doc.ele("NFCom", {
       xmlns: "http://www.portalfiscal.inf.br/nfcom",
-      versao: "1.00",
+      // versao: "1.00", // Removido da raiz
     });
 
     // Elemento infNFCom (filho de NFCom)
     const infNFCom = nfCom.ele("infNFCom", {
-      // versao: "1.00", // Removido atributo versao daqui
+      versao: "1.00", // Adicionado em infNFCom
       Id: id,
     });
 
