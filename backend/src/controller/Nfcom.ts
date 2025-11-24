@@ -244,8 +244,8 @@ class Nfcom {
 
     // Grupo de Emitente
     const emit = infNFCom.ele("emit");
-    emit.ele("CNPJ").txt(process.env.CPF_CNPJ as string);
-    emit.ele("IE").txt("183013286115");
+    emit.ele("CNPJ").txt(data.emit.CNPJ);
+    emit.ele("IE").txt(data.emit.IE);
     emit.ele("CRT").txt(data.emit.CRT);
     emit.ele("xNome").txt(data.emit.xNome);
     emit.ele("xFant").txt(data.emit.xFant);
