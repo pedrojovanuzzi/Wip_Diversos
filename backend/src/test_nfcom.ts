@@ -133,17 +133,17 @@ try {
   const xml = nfcom.gerarNfcomWit(mockData);
   console.log("XML Gerado com Sucesso. Enviando...");
   console.log(xml);
-  // nfcom
-  //   .enviarNfcom(xml)
-  //   .then((response) => {
-  //     console.log("Resposta do Servidor:", response);
-  //   })
-  //   .catch((error) => {
-  //     console.error(
-  //       "Erro no envio:",
-  //       error.response ? error.response.data : error.message
-  //     );
-  //   });
+  nfcom
+    .enviarNfcom(xml)
+    .then((response) => {
+      console.log("Resposta do Servidor:", response);
+    })
+    .catch((error) => {
+      console.error(
+        "Erro no envio:",
+        error.response ? error.response.data : error.message
+      );
+    });
 } catch (error) {
   console.error("Erro fatal:", error);
 }
