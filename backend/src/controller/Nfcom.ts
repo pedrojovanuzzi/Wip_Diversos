@@ -142,7 +142,18 @@ class Nfcom {
 
   public async enviarNfcom(xml: string): Promise<any> {
     try {
+      const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
+      const password = process.env.FACILITA_PASS || "";
+
+      if (!fs.existsSync(certPath)) {
+        throw new Error(`Certificado não encontrado em: ${certPath}`);
+      }
+
+      const pfxBuffer = fs.readFileSync(certPath);
+
       const httpsAgent = new https.Agent({
+        pfx: pfxBuffer,
+        passphrase: password,
         rejectUnauthorized: false,
       });
 
