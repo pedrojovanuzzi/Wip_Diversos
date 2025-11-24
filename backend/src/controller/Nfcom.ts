@@ -4,6 +4,8 @@ import * as fs from "fs";
 import * as path from "path";
 import forge from "node-forge";
 import { SignedXml } from "xml-crypto";
+import axios from "axios";
+import * as https from "https";
 
 // Interfaces para tipagem dos dados da NFCom
 export interface INFComData {
@@ -130,7 +132,49 @@ class Nfcom {
   public gerarNfcom(req: Request, res: Response): string {
     const data: INFComData = req.body;
     const xml = this.gerarXml(data);
-    return xml;
+    return this.enveloparXml(xml);
+  }
+
+  public gerarNfcomWit(data: INFComData): string {
+    const xml = this.gerarXml(data);
+    return this.enveloparXml(xml);
+  }
+
+  public async enviarNfcom(xml: string): Promise<any> {
+    try {
+      const httpsAgent = new https.Agent({
+        rejectUnauthorized: false,
+      });
+
+      const response = await axios.post(
+        "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx",
+        xml,
+        {
+          httpsAgent,
+          headers: {
+            "Content-Type": "application/soap+xml; charset=utf-8",
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Erro ao enviar NFCom:", error);
+      throw error;
+    }
+  }
+
+  private enveloparXml(signedXml: string): string {
+    // Remove a declaração XML se existir, pois ela não pode aparecer no meio do documento
+    const xmlContent = signedXml.replace(/<\?xml.*?\?>/, "").trim();
+
+    return `<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <soap12:Body>
+        <nfcomDadosMsg xmlns="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcao">
+            ${xmlContent}
+        </nfcomDadosMsg>
+    </soap12:Body>
+</soap12:Envelope>`;
   }
 
   /**
