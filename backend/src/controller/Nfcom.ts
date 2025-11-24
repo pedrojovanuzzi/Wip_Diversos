@@ -6,6 +6,7 @@ import forge from "node-forge";
 import { SignedXml } from "xml-crypto";
 import axios from "axios";
 import * as https from "https";
+import { processarCertificado } from "../utils/certUtils";
 
 // Interfaces para tipagem dos dados da NFCom
 export interface INFComData {
@@ -132,12 +133,12 @@ class Nfcom {
   public gerarNfcom(req: Request, res: Response): string {
     const data: INFComData = req.body;
     const xml = this.gerarXml(data);
-    return this.enveloparXml(xml);
+    return xml;
   }
 
   public gerarNfcomWit(data: INFComData): string {
     const xml = this.gerarXml(data);
-    return this.enveloparXml(xml);
+    return xml;
   }
 
   public async enviarNfcom(xml: string): Promise<any> {
@@ -149,7 +150,18 @@ class Nfcom {
         throw new Error(`Certificado não encontrado em: ${certPath}`);
       }
 
-      const pfxBuffer = fs.readFileSync(certPath);
+      // Define o diretório temporário para o certificado processado
+      const tempDir = path.join(__dirname, "..", "temp");
+
+      // Processa o certificado usando a utilidade
+      const processedCertPath = processarCertificado(
+        certPath,
+        password,
+        tempDir
+      );
+
+      // Lê o certificado processado
+      const pfxBuffer = fs.readFileSync(processedCertPath);
 
       const httpsAgent = new https.Agent({
         pfx: pfxBuffer,
@@ -172,20 +184,6 @@ class Nfcom {
       console.error("Erro ao enviar NFCom:", error);
       throw error;
     }
-  }
-
-  private enveloparXml(signedXml: string): string {
-    // Remove a declaração XML se existir, pois ela não pode aparecer no meio do documento
-    const xmlContent = signedXml.replace(/<\?xml.*?\?>/, "").trim();
-
-    return `<?xml version="1.0" encoding="utf-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-    <soap12:Body>
-        <nfcomDadosMsg xmlns="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcao">
-            ${xmlContent}
-        </nfcomDadosMsg>
-    </soap12:Body>
-</soap12:Envelope>`;
   }
 
   /**
