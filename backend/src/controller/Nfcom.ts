@@ -216,7 +216,8 @@ class Nfcom {
         {
           httpsAgent,
           headers: {
-            "Content-Type": "application/soap+xml; charset=utf-8",
+            "Content-Type":
+              'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcao/nfcomRecepcao"',
           },
         }
       );
