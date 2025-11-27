@@ -8,6 +8,7 @@ import axios from "axios";
 import * as https from "https";
 import * as zlib from "zlib";
 import { processarCertificado } from "../utils/certUtils";
+import { gzipSync } from "zlib";
 
 // Interfaces para tipagem dos dados da NFCom
 export interface INFComData {
@@ -183,6 +184,28 @@ class Nfcom {
     return xml;
   }
 
+  public compactarXML(xmlString: string): string {
+    let cleanXml = xmlString;
+
+    // 1. Remove BOM (Byte Order Mark) se existir (CRÍTICO)
+    if (cleanXml.charCodeAt(0) === 0xfeff) {
+      cleanXml = cleanXml.slice(1);
+    }
+
+    // 2. Remove declaração XML (<?xml...?>) se existir
+    // A SEFAZ espera que o GZIP comece direto com <nfcomProc> ou <NFCom>
+    cleanXml = cleanXml.replace(/^\s*<\?xml[^>]*\?>/i, "");
+
+    // 3. Limpeza de espaços (remove quebras de linha e espaços entre tags)
+    cleanXml = cleanXml.replace(/>\s+</g, "><").trim();
+
+    // 4. Compactação
+    const buffer = Buffer.from(cleanXml, "utf-8");
+    const compressedBuffer = gzipSync(buffer);
+
+    return compressedBuffer.toString("base64");
+  }
+
   public async enviarNfcom(xml: string): Promise<any> {
     try {
       const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
@@ -260,13 +283,13 @@ class Nfcom {
     // Primeiro, gera o XML NFCom interno (que será compactado)
     const docInterno = create({ version: "1.0", encoding: "UTF-8" });
 
-    const nfcomProc = docInterno.ele("nfcomProc", {
-      xmlns: "http://www.portalfiscal.inf.br/nfcom",
-      versao: "1.00",
-    });
+    // const nfcomProc = docInterno.ele("nfcomProc", {
+    //   xmlns: "http://www.portalfiscal.inf.br/nfcom",
+    //   versao: "1.00",
+    // });
 
     // Elemento raiz NFCom
-    const nfCom = nfcomProc.ele("NFCom", {
+    const nfCom = docInterno.ele("NFCom", {
       xmlns: "http://www.portalfiscal.inf.br/nfcom",
     });
 
@@ -415,7 +438,12 @@ class Nfcom {
     infNFComSupl.ele("qrCodNFCom").txt(data.infNFComSupl.qrCodNFCom);
 
     // Gera o XML interno sem assinatura
-    const xmlInternoSemAssinatura = docInterno.end({ prettyPrint: false });
+    // Importante: headless: true para não gerar a declaração XML novamente se o assinador já tratar,
+    // mas aqui queremos garantir que o XML a ser assinado esteja limpo.
+    const xmlInternoSemAssinatura = docInterno.end({
+      prettyPrint: false,
+      headless: true,
+    });
 
     // Assina o XML interno
     let xmlInternoAssinado: string;
@@ -426,10 +454,15 @@ class Nfcom {
       xmlInternoAssinado = xmlInternoSemAssinatura;
     }
 
-    // Compacta o XML assinado com GZip e converte para Base64
-    const xmlComprimidoBase64 = zlib
-      .gzipSync(xmlInternoAssinado)
-      .toString("base64");
+    // Remove declaração XML se existir (apenas por precaução para o teste)
+    const xmlParaCompactar = xmlInternoAssinado.replace(/^<\?xml.+?\?>/, "");
+
+    const xmlComprimidoBase64 = this.compactarXML(xmlInternoAssinado);
+
+    console.log(
+      "Base64 gerado (inicio):",
+      xmlComprimidoBase64.substring(0, 50)
+    );
 
     // Agora cria o envelope SOAP com o conteúdo comprimido
     const docSoap = create({ version: "1.0", encoding: "UTF-8" });
