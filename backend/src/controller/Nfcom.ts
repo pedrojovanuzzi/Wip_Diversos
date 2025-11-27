@@ -259,7 +259,9 @@ class Nfcom {
 
     const soapBody = soapEnvelope.ele("soap:Body");
 
-    const nfcomProc = soapBody.ele("nfcomProc", {
+    const NfComDadosMsg = soapBody.ele("NfComDadosMsg");
+
+    const nfcomProc = NfComDadosMsg.ele("nfcomProc", {
       xmlns: "http://www.portalfiscal.inf.br/nfcom",
       versao: "1.00",
     });
