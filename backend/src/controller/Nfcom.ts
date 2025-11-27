@@ -6,6 +6,7 @@ import forge from "node-forge";
 import { SignedXml } from "xml-crypto";
 import axios from "axios";
 import * as https from "https";
+import * as zlib from "zlib";
 import { processarCertificado } from "../utils/certUtils";
 
 // Interfaces para tipagem dos dados da NFCom
@@ -210,8 +211,14 @@ class Nfcom {
         rejectUnauthorized: false,
       });
 
+      console.log(
+        "Servidor de Homologação?: " + process.env.SERVIDOR_HOMOLOGACAO
+      );
+
       const response = await axios.post(
-        "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx?wsdl",
+        process.env.SERVIDOR_HOMOLOGACAO
+          ? "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx?wsdl"
+          : "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx?wsdl",
         xml,
         {
           httpsAgent,
@@ -250,18 +257,10 @@ class Nfcom {
     // O ID deve ser "NFCom" + chave de acesso
     const id = `NFCom${chaveAcesso}`;
 
-    // Cria o documento XML
-    const doc = create({ version: "1.0", encoding: "UTF-8" });
+    // Primeiro, gera o XML NFCom interno (que será compactado)
+    const docInterno = create({ version: "1.0", encoding: "UTF-8" });
 
-    const soapEnvelope = doc.ele("soap:Envelope", {
-      "xmlns:soap": "http://www.w3.org/2003/05/soap-envelope",
-    });
-
-    const soapBody = soapEnvelope.ele("soap:Body");
-
-    const NfComDadosMsg = soapBody.ele("NfComDadosMsg");
-
-    const nfcomProc = NfComDadosMsg.ele("nfcomProc", {
+    const nfcomProc = docInterno.ele("nfcomProc", {
       xmlns: "http://www.portalfiscal.inf.br/nfcom",
       versao: "1.00",
     });
@@ -269,12 +268,11 @@ class Nfcom {
     // Elemento raiz NFCom
     const nfCom = nfcomProc.ele("NFCom", {
       xmlns: "http://www.portalfiscal.inf.br/nfcom",
-      // versao: "1.00", // Removido da raiz
     });
 
     // Elemento infNFCom (filho de NFCom)
     const infNFCom = nfCom.ele("infNFCom", {
-      versao: "1.00", // Adicionado em infNFCom
+      versao: "1.00",
       Id: id,
     });
 
@@ -416,16 +414,39 @@ class Nfcom {
     const infNFComSupl = nfCom.ele("infNFComSupl");
     infNFComSupl.ele("qrCodNFCom").txt(data.infNFComSupl.qrCodNFCom);
 
-    // Gera o XML sem assinatura
-    const xmlSemAssinatura = doc.end({ prettyPrint: false });
+    // Gera o XML interno sem assinatura
+    const xmlInternoSemAssinatura = docInterno.end({ prettyPrint: false });
 
-    // Assina o XML
+    // Assina o XML interno
+    let xmlInternoAssinado: string;
     try {
-      return this.assinarXml(xmlSemAssinatura);
+      xmlInternoAssinado = this.assinarXml(xmlInternoSemAssinatura);
     } catch (error) {
       console.error("Erro ao assinar XML:", error);
-      return xmlSemAssinatura;
+      xmlInternoAssinado = xmlInternoSemAssinatura;
     }
+
+    // Compacta o XML assinado com GZip e converte para Base64
+    const xmlComprimidoBase64 = zlib
+      .gzipSync(xmlInternoAssinado)
+      .toString("base64");
+
+    // Agora cria o envelope SOAP com o conteúdo comprimido
+    const docSoap = create({ version: "1.0", encoding: "UTF-8" });
+
+    const soapEnvelope = docSoap.ele("soap:Envelope", {
+      "xmlns:soap": "http://www.w3.org/2003/05/soap-envelope",
+    });
+
+    const soapBody = soapEnvelope.ele("soap:Body");
+
+    const NfComDadosMsg = soapBody.ele("NFComDadosMsg", {
+      xmlns: "http://www.portalfiscal.inf.br/NFCom/wsdl/NFComRecepcao",
+    });
+    NfComDadosMsg.txt(xmlComprimidoBase64);
+
+    // Retorna o XML SOAP final
+    return docSoap.end({ prettyPrint: false });
   }
 
   private assinarXml(xml: string): string {
