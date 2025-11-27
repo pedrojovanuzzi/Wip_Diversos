@@ -10,10 +10,11 @@ import { processarCertificado } from "../utils/certUtils";
 
 // Interfaces para tipagem dos dados da NFCom
 export interface INFComData {
+  /** Bloco de Identificação da NFCom (ide) */
   ide: {
     cUF: string;
     tpAmb: string;
-    mod: string;
+    mod: "62"; // Modelo NFCom
     serie: string;
     nNF: string;
     cNF: string;
@@ -26,6 +27,8 @@ export interface INFComData {
     tpFat: string;
     verProc: string;
   };
+
+  /** Bloco do Emitente (emit) */
   emit: {
     CNPJ: string;
     IE: string;
@@ -40,8 +43,12 @@ export interface INFComData {
       xMun: string;
       CEP: string;
       UF: string;
+      fone?: string; // Opcional (presente no XML de exemplo)
+      email?: string; // Opcional (presente no XML de exemplo)
     };
   };
+
+  /** Bloco do Destinatário (dest) */
   dest: {
     xNome: string;
     CPF?: string;
@@ -50,53 +57,69 @@ export interface INFComData {
     enderDest: {
       xLgr: string;
       nro: string;
+      xCpl?: string; // Complemento (Opcional, presente no XML de exemplo)
       xBairro: string;
       cMun: string;
       xMun: string;
       CEP: string;
       UF: string;
+      fone?: string; // Opcional (presente no XML de exemplo)
+      email?: string; // Opcional (presente no XML de exemplo)
     };
   };
+
+  /** Bloco Assinante (assinante) */
   assinante: {
     iCodAssinante: string;
     tpAssinante: string;
     tpServUtil: string;
-    NroTermPrinc: string;
-    cUFPrinc: string;
+    NroTermPrinc?: string; // Opcional
+    cUFPrinc?: string; // Opcional
+    nContrato?: string; // Opcional (presente no XML de exemplo)
+    dContratoIni?: string; // Opcional (presente no XML de exemplo)
+    dContratoFim?: string; // Opcional (presente no XML de exemplo)
   };
+
+  /** Array de Detalhes de Produtos/Serviços (det) */
   det: Array<{
     nItem: string;
     prod: {
       cProd: string;
       xProd: string;
       cClass: string;
-      CFOP: string;
+      CFOP?: string; // Opcional (foi removido no XML simplificado)
       uMed: string;
       qFaturada: string;
       vItem: string;
+      vDesc?: string; // Opcional (presente no XML de exemplo)
       vProd: string;
     };
     imposto: {
+      /** Imposto normal (usado fora do Simples Nacional) */
       ICMS00?: {
         CST: string;
         vBC: string;
         pICMS: string;
         vICMS: string;
       };
-      PIS: {
+      PIS?: {
         CST: string;
         vBC: string;
         pPIS: string;
         vPIS: string;
       };
-      COFINS: {
+      COFINS?: {
         CST: string;
         vBC: string;
         pCOFINS: string;
         vCOFINS: string;
       };
+      /** Imposto simplificado (usado no Simples Nacional - CRT 1) */
+      indSemCST?: "1"; // Opcional (presente no XML de exemplo)
     };
   }>;
+
+  /** Bloco de Valores Totais (total) */
   total: {
     vProd: string;
     ICMSTot: {
@@ -119,11 +142,29 @@ export interface INFComData {
     vOutro: string;
     vNF: string;
   };
+
+  /** Bloco de Faturamento (gFat) */
   gFat: {
     CompetFat: string;
     dVencFat: string;
     codBarras: string;
+    dPerUsoIni?: string; // Opcional (presente no XML de exemplo)
+    dPerUsoFim?: string; // Opcional (presente no XML de exemplo)
+    codDebAuto?: string; // Opcional (presente no XML de exemplo)
+    codBanco?: string; // Opcional (presente no XML de exemplo)
+    codAgencia?: string; // Opcional (presente no XML de exemplo)
   };
+
+  /** Bloco de Responsável Técnico (gRespTec) */
+  gRespTec?: {
+    // Opcional (presente no XML de exemplo)
+    CNPJ: string;
+    xContato: string;
+    email: string;
+    fone: string;
+  };
+
+  /** Bloco Suplementar (infNFComSupl) */
   infNFComSupl: {
     qrCodNFCom: string;
   };
@@ -170,7 +211,7 @@ class Nfcom {
       });
 
       const response = await axios.post(
-        "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx",
+        "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx?wsdl",
         xml,
         {
           httpsAgent,
@@ -211,8 +252,19 @@ class Nfcom {
     // Cria o documento XML
     const doc = create({ version: "1.0", encoding: "UTF-8" });
 
+    const soapEnvelope = doc.ele("soap:Envelope", {
+      "xmlns:soap": "http://www.w3.org/2003/05/soap-envelope",
+    });
+
+    const soapBody = soapEnvelope.ele("soap:Body");
+
+    const nfcomProc = soapBody.ele("nfcomProc", {
+      xmlns: "http://www.portalfiscal.inf.br/nfcom",
+      versao: "1.00",
+    });
+
     // Elemento raiz NFCom
-    const nfCom = doc.ele("NFCom", {
+    const nfCom = nfcomProc.ele("NFCom", {
       xmlns: "http://www.portalfiscal.inf.br/nfcom",
       // versao: "1.00", // Removido da raiz
     });
@@ -276,8 +328,12 @@ class Nfcom {
     assinante.ele("iCodAssinante").txt(data.assinante.iCodAssinante);
     assinante.ele("tpAssinante").txt(data.assinante.tpAssinante);
     assinante.ele("tpServUtil").txt(data.assinante.tpServUtil);
-    assinante.ele("NroTermPrinc").txt(data.assinante.NroTermPrinc);
-    assinante.ele("cUFPrinc").txt(data.assinante.cUFPrinc);
+    if (data.assinante.NroTermPrinc) {
+      assinante.ele("NroTermPrinc").txt(data.assinante.NroTermPrinc);
+    }
+    if (data.assinante.cUFPrinc) {
+      assinante.ele("cUFPrinc").txt(data.assinante.cUFPrinc);
+    }
 
     // Itens (Detalhes)
     data.det.forEach((item) => {
@@ -287,7 +343,9 @@ class Nfcom {
       prod.ele("cProd").txt(item.prod.cProd);
       prod.ele("xProd").txt(item.prod.xProd);
       prod.ele("cClass").txt(item.prod.cClass);
-      prod.ele("CFOP").txt(item.prod.CFOP);
+      if (item.prod.CFOP) {
+        prod.ele("CFOP").txt(item.prod.CFOP);
+      }
       prod.ele("uMed").txt(item.prod.uMed);
       prod.ele("qFaturada").txt(item.prod.qFaturada);
       prod.ele("vItem").txt(item.prod.vItem);
@@ -303,17 +361,21 @@ class Nfcom {
         icms.ele("vICMS").txt(item.imposto.ICMS00.vICMS);
       }
 
-      const pis = imposto.ele("PIS");
-      pis.ele("CST").txt(item.imposto.PIS.CST);
-      pis.ele("vBC").txt(item.imposto.PIS.vBC);
-      pis.ele("pPIS").txt(item.imposto.PIS.pPIS);
-      pis.ele("vPIS").txt(item.imposto.PIS.vPIS);
+      if (item.imposto.PIS) {
+        const pis = imposto.ele("PIS");
+        pis.ele("CST").txt(item.imposto.PIS.CST);
+        pis.ele("vBC").txt(item.imposto.PIS.vBC);
+        pis.ele("pPIS").txt(item.imposto.PIS.pPIS);
+        pis.ele("vPIS").txt(item.imposto.PIS.vPIS);
+      }
 
-      const cofins = imposto.ele("COFINS");
-      cofins.ele("CST").txt(item.imposto.COFINS.CST);
-      cofins.ele("vBC").txt(item.imposto.COFINS.vBC);
-      cofins.ele("pCOFINS").txt(item.imposto.COFINS.pCOFINS);
-      cofins.ele("vCOFINS").txt(item.imposto.COFINS.vCOFINS);
+      if (item.imposto.COFINS) {
+        const cofins = imposto.ele("COFINS");
+        cofins.ele("CST").txt(item.imposto.COFINS.CST);
+        cofins.ele("vBC").txt(item.imposto.COFINS.vBC);
+        cofins.ele("pCOFINS").txt(item.imposto.COFINS.pCOFINS);
+        cofins.ele("vCOFINS").txt(item.imposto.COFINS.vCOFINS);
+      }
     });
 
     // Totais
