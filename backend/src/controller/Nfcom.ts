@@ -327,6 +327,15 @@ class Nfcom {
     if (data.assinante.cUFPrinc) {
       assinante.ele("cUFPrinc").txt(data.assinante.cUFPrinc);
     }
+    if (data.assinante.nContrato) {
+      assinante.ele("nContrato").txt(data.assinante.nContrato);
+    }
+    if (data.assinante.dContratoIni) {
+      assinante.ele("dContratoIni").txt(data.assinante.dContratoIni);
+    }
+    if (data.assinante.dContratoFim) {
+      assinante.ele("dContratoFim").txt(data.assinante.dContratoFim);
+    }
 
     data.det.forEach((item) => {
       const det = infNFCom.ele("det", { nItem: item.nItem });
