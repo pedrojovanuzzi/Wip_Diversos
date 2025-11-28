@@ -8,6 +8,9 @@ import axios from "axios";
 import * as https from "https";
 import { gzipSync } from "zlib";
 import { processarCertificado } from "../utils/certUtils";
+import MkauthSource from "../database/MkauthSource";
+import { ClientesEntities } from "../entities/ClientesEntities";
+import { Faturas } from "../entities/Faturas";
 
 // Interfaces para tipagem dos dados da NFCom
 export interface INFComData {
@@ -177,7 +180,44 @@ class Nfcom {
 
     reducao = Number(reducaoStr) / 100;
 
-    console.log(password, clientesSelecionados, service, reducao, ambiente);
+    // 1. Defina um array de Promises
+    const promises = clientesSelecionados.map(async (item: any) => {
+      // Repositórios não precisam ser criados a cada iteração, mas se for o padrão do seu ORM, mantenha.
+      const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+      const FaturasRepository = MkauthSource.getRepository(Faturas);
+
+      // Garante que o findOne seja feito por item.id (da requisição)
+      const FaturasData = await FaturasRepository.findOne({
+        where: { id: item.id },
+      });
+
+      // Verifica se a fatura foi encontrada antes de buscar o cliente
+      if (!FaturasData || !FaturasData.login) {
+        console.warn(`Fatura com ID ${item.id} não encontrada ou sem login.`);
+        return null; // Retorna null para este item
+      }
+
+      const ClientData = await ClientRepository.findOne({
+        where: { login: FaturasData.login },
+      });
+
+      // 2. O map deve retornar um objeto que você deseja usar
+      // Se você deseja retornar os dados da NFCom, use a variável 'data'
+      const data = {
+        cliente: ClientData,
+        fatura: FaturasData,
+        // ... outros dados da NFCom
+      };
+
+      return data;
+    });
+
+    const resultados = await Promise.all(promises);
+
+    // 4. Filtra resultados nulos (se algum item não foi encontrado)
+    const dadosFinaisNFCom = resultados.filter((data) => data !== null);
+
+    console.log(dadosFinaisNFCom);
 
     // const xml = this.gerarXml(data, password);
     // const response = await this.enviarNfcom(xml, password);
