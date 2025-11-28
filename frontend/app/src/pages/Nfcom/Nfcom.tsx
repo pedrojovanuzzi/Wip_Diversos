@@ -13,6 +13,7 @@ import { useAuth } from "../../context/AuthContext";
 export default function Nfcom() {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
+  const [ambiente, setAmbiente] = useState("homologacao");
 
   // Estados para controlar envio do certificado e senha
   const [showCertPasswordPopUp, setShowCertPasswordPopUp] = useState(false);
@@ -78,15 +79,22 @@ export default function Nfcom() {
     handleSearch();
   }, []);
 
-  const emitirNFe = async () => {
+  const emitirNFCom = async () => {
     try {
       setLoading(true);
       setError("");
       setSuccess("");
 
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/`,
-        { password, clientesSelecionados, aliquota, service, reducao },
+        `${process.env.REACT_APP_URL}/NFCom/emitirNFCom`,
+        {
+          password,
+          clientesSelecionados,
+          aliquota,
+          service,
+          reducao,
+          ambiente,
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -309,6 +317,13 @@ export default function Nfcom() {
         >
           Emitir NF-e
         </button>
+        <select
+          onChange={(e) => setAmbiente(e.target.value)}
+          className="bg-slate-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-600 transition-all"
+        >
+          <option value="homologacao">Homologação</option>
+          <option value="producao">Produção</option>
+        </select>
         <input
           type="text"
           onChange={(e) => {
@@ -361,7 +376,7 @@ export default function Nfcom() {
           showPopUp={showPopUp}
           setPassword={setPassword}
           password={password}
-          emitirNFe={emitirNFe}
+          emitirNFe={emitirNFCom}
         />
       )}
 

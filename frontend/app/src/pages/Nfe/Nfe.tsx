@@ -25,9 +25,15 @@ export const Nfe = () => {
   const [success, setSuccess] = useState("");
   const [service, setService] = useState("");
   const [loading, setLoading] = useState(false);
+  const [ambiente, setAmbiente] = useState("homologacao");
   const [reducao, setReducao] = useState("");
-  const [clientesSelecionados, setClientesSelecionados] = useState<number[]>([]);
-  const [dateFilter, setDateFilter] = useState<{ start: string; end: string } | null>(null);
+  const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
+    []
+  );
+  const [dateFilter, setDateFilter] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
   const [activeFilters, setActiveFilters] = useState<{
     plano: string[];
     vencimento: string[];
@@ -81,20 +87,32 @@ export const Nfe = () => {
 
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/`,
-        { password, clientesSelecionados, aliquota, service, reducao },
+        {
+          password,
+          clientesSelecionados,
+          aliquota,
+          service,
+          reducao,
+          ambiente,
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
-            
-          }, timeout: 480000,
+          },
+          timeout: 480000,
         }
       );
       setDadosNFe(resposta.data);
       setSuccess("NF-e emitida com sucesso.");
     } catch (erro) {
       console.error("Erro ao emitir NF-e:", erro);
-      if (axios.isAxiosError(erro) && erro.response && erro.response.data && erro.response.data.erro) {
+      if (
+        axios.isAxiosError(erro) &&
+        erro.response &&
+        erro.response.data &&
+        erro.response.data.erro
+      ) {
         setError(`Erro ao emitir NF-e: ${erro.response.data.erro}`);
       } else {
         setError("Erro desconhecido ao emitir NF-e.");
@@ -168,8 +186,14 @@ export const Nfe = () => {
       setClientes(resposta.data);
     } catch (erro) {
       console.error("Erro ao Buscar Clientes:", erro);
-      if (axios.isAxiosError(erro) && erro.response && erro.response.status === 500) {
-        setError("Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde.");
+      if (
+        axios.isAxiosError(erro) &&
+        erro.response &&
+        erro.response.status === 500
+      ) {
+        setError(
+          "Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde."
+        );
       } else if (axios.isAxiosError(erro) && erro.response) {
         setError(`Erro: ${erro.response.data.error || "Algo deu errado."}`);
       } else {
@@ -182,15 +206,26 @@ export const Nfe = () => {
     <div>
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
-      <Filter setActiveFilters={setActiveFilters} setDate={setDateFilter} setArquivo={setArquivo} enviarCertificado={handleEnviarCertificado} />
+      <Filter
+        setActiveFilters={setActiveFilters}
+        setDate={setDateFilter}
+        setArquivo={setArquivo}
+        enviarCertificado={handleEnviarCertificado}
+      />
       {error && <Error message={error} />}
       {success && <Success message={success} />}
       {clientes.length > 0 && (
         <>
-        <h1 className="text-center mt-2 self-center text-2xl font-semibold text-gray-900">
-          Total de Resultados: {clientes.length}
-        </h1>
-        {loading && <><h1 className="text-center mt-2 self-center text-2xl text-gray-500">Carregando ...</h1></>}
+          <h1 className="text-center mt-2 self-center text-2xl font-semibold text-gray-900">
+            Total de Resultados: {clientes.length}
+          </h1>
+          {loading && (
+            <>
+              <h1 className="text-center mt-2 self-center text-2xl text-gray-500">
+                Carregando ...
+              </h1>
+            </>
+          )}
         </>
       )}
       {clientes.length > 0 ? (
@@ -203,17 +238,32 @@ export const Nfe = () => {
                     <input
                       className="cursor-pointer"
                       type="checkbox"
-                      checked={clientesSelecionados.length > 0 && clientesSelecionados.length === clientes.length}
+                      checked={
+                        clientesSelecionados.length > 0 &&
+                        clientesSelecionados.length === clientes.length
+                      }
                       onChange={handleSelectAll}
                     />
                   </th>
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900" />
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">Titulo</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">Login</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">Vencimento</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">Tipo</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">Valor</th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">Status</th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
+                    Titulo
+                  </th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
+                    Login
+                  </th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
+                    Vencimento
+                  </th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
+                    Tipo
+                  </th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
+                    Valor
+                  </th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
+                    Status
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
@@ -223,8 +273,12 @@ export const Nfe = () => {
                       <input
                         className="cursor-pointer"
                         type="checkbox"
-                        checked={clientesSelecionados.includes(cliente.fatura.titulo)}
-                        onChange={() => handleCheckboxChange(cliente.fatura.titulo)}
+                        checked={clientesSelecionados.includes(
+                          cliente.fatura.titulo
+                        )}
+                        onChange={() =>
+                          handleCheckboxChange(cliente.fatura.titulo)
+                        }
                       />
                     </td>
                     <td className="px-6 py-4" />
@@ -233,7 +287,9 @@ export const Nfe = () => {
                     <td className="px-6 py-4">{cliente.fatura.datavenc}</td>
                     <td className="px-6 py-4">{cliente.fatura.tipo}</td>
                     <td className="px-6 py-4">{cliente.fatura.valor}</td>
-                    <td className="px-6 py-4">{cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}</td>
+                    <td className="px-6 py-4">
+                      {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -241,14 +297,19 @@ export const Nfe = () => {
           </div>
         </div>
       ) : (
-        <p className="text-center mt-10 text-gray-500">Nenhum cliente encontrado</p>
+        <p className="text-center mt-10 text-gray-500">
+          Nenhum cliente encontrado
+        </p>
       )}
 
       <main className="flex justify-center mt-2" />
 
       <div className="relative">
         <span className="absolute translate-x-8 top-11 text-gray-200 -translate-y-1/2 text-4xl">
-          <BsFiletypeDoc className="cursor-pointer" onClick={() => setShowPopUp(true)} />
+          <BsFiletypeDoc
+            className="cursor-pointer"
+            onClick={() => setShowPopUp(true)}
+          />
         </span>
         <button
           className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
@@ -256,6 +317,13 @@ export const Nfe = () => {
         >
           Emitir NF-e
         </button>
+        <select
+          onChange={(e) => setAmbiente(e.target.value)}
+          className="bg-slate-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-600 transition-all"
+        >
+          <option value="homologacao">Homologação</option>
+          <option value="producao">Produção</option>
+        </select>
         <input
           type="text"
           onChange={(e) => {
@@ -297,7 +365,8 @@ export const Nfe = () => {
 
       {arquivo && (
         <p className="text-sm text-gray-500 m-5">
-          Arquivo selecionado: <span className="font-semibold">{arquivo.name}</span>
+          Arquivo selecionado:{" "}
+          <span className="font-semibold">{arquivo.name}</span>
         </p>
       )}
 
@@ -315,7 +384,9 @@ export const Nfe = () => {
       {showCertPasswordPopUp && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/30">
           <div className="bg-white p-6 rounded-md shadow-lg">
-            <h2 className="text-lg font-semibold">Digite a senha do Certificado:</h2>
+            <h2 className="text-lg font-semibold">
+              Digite a senha do Certificado:
+            </h2>
             <input
               type="password"
               value={certPassword}

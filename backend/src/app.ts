@@ -1,4 +1,4 @@
-import 'reflect-metadata';
+import "reflect-metadata";
 import express from "express";
 
 import ChamadosRouter from "./routes/Chamados.Routes"; // Caminho correto para o arquivo de rotas
@@ -12,18 +12,17 @@ import Prefeitura from "./routes/PrefeituraUser.routes";
 import ClientAnalytics from "./routes/ClientAnalytics.routes";
 import cron from "node-cron";
 import Backup from "./controller/Backup"; // Caminho para sua classe de backup
-import DosProtect from './routes/DosProtect.Routes';
-import DosProtectController from './controller/DosProtect';
+import DosProtect from "./routes/DosProtect.Routes";
+import DosProtectController from "./controller/DosProtect";
 import ServerLogs from "./routes/ServerLogs.Routes";
-import PowerDNS from './routes/PowerDns.routes';
-import Onu from './routes/Onu.routes';
-import BackupRoutes from './routes/Backup.routes';
-import PixRoutes from './routes/Pix.routes';
-import Pix from './controller/Pix';
+import PowerDNS from "./routes/PowerDns.routes";
+import Onu from "./routes/Onu.routes";
+import BackupRoutes from "./routes/Backup.routes";
+import PixRoutes from "./routes/Pix.routes";
+import Pix from "./controller/Pix";
+import NFCom from "./routes/NFCom.routes";
 const backup = new Backup();
 const pix = new Pix();
-
-
 
 export class App {
   public server: express.Application;
@@ -49,6 +48,7 @@ export class App {
     this.server.use("/api/auth", Auth);
     this.server.use("/api/feedback", Feed);
     this.server.use("/api/Nfe", NFSE);
+    this.server.use("/api/NFCom", NFCom);
     this.server.use("/api/whatsapp", Whatsapp);
     this.server.use("/api/Prefeitura", Prefeitura);
     this.server.use("/api/ClientAnalytics", ClientAnalytics);
@@ -63,7 +63,10 @@ export class App {
   private agendarBackup() {
     // 🕒 Agendar para todo dia às 03:00
     cron.schedule("0 3 * * *", async () => {
-      console.log("⏰ Executando backup automático", new Date().toLocaleString());
+      console.log(
+        "⏰ Executando backup automático",
+        new Date().toLocaleString()
+      );
       try {
         await backup.gerarTodos();
       } catch (err) {
@@ -74,11 +77,11 @@ export class App {
     console.log("📅 Agendador de backup inicializado.");
   }
 
-  private agendarPixAutomatico(){
-        // 🕒 Agendar para todo dia às 03:00
+  private agendarPixAutomatico() {
+    // 🕒 Agendar para todo dia às 03:00
     cron.schedule("0 3 1 * *", async () => {
       // cron.schedule("* * * * *", async () => {
-      
+
       console.log("⏰ Executando Pix automático", new Date().toLocaleString());
       try {
         await pix.pegarUltimoBoletoGerarPixAutomatico();
@@ -92,7 +95,7 @@ export class App {
 
   // private verificaDDOS(){
   //   console.log('Verificando DDDOS');
-    
+
   //   cron.schedule("* * * * *", async () => {
   //     try {
   //       await new DosProtectController().startFunctions();
@@ -103,5 +106,4 @@ export class App {
 
   //   console.log("📅 Agendador de backup inicializado.");
   // }
-
 }

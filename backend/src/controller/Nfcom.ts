@@ -150,16 +150,49 @@ export interface INFComData {
 }
 
 class Nfcom {
-  public gerarNfcom(req: Request, res: Response): string {
-    const data: INFComData = req.body;
-    const xml = this.gerarXml(data);
-    return xml;
-  }
+  private homologacao: boolean = false;
+  private WSDL_URL = "";
 
-  public gerarNfcomWit(data: INFComData): string {
-    const xml = this.gerarXml(data);
-    return xml;
-  }
+  public gerarNfcom = async (req: Request, res: Response): Promise<void> => {
+    const {
+      password,
+      clientesSelecionados,
+      aliquota,
+      service,
+      reducao,
+      ambiente,
+    } = req.body;
+
+    if (ambiente === "homologacao") {
+      this.homologacao = true;
+      this.WSDL_URL =
+        "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
+    } else {
+      this.homologacao = false;
+      this.WSDL_URL =
+        "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
+    }
+
+    console.log(this.WSDL_URL);
+
+    console.log(
+      password,
+      clientesSelecionados,
+      aliquota,
+      service,
+      reducao,
+      ambiente
+    );
+
+    // const xml = this.gerarXml(data, password);
+    // const response = await this.enviarNfcom(xml);
+    // res.status(200).json(response);
+  };
+
+  // public gerarNfcomWit(data: INFComData, password: string): string {
+  //   const xml = this.gerarXml(data);
+  //   return xml;
+  // }
 
   public compactarXML(xmlString: string): string {
     let cleanXml = xmlString;
@@ -215,9 +248,7 @@ class Nfcom {
       });
 
       // URL sem ?wsdl para evitar erro 244/500
-      const urlEnvio = process.env.SERVIDOR_HOMOLOGACAO
-        ? "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx"
-        : "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
+      const urlEnvio = this.WSDL_URL;
 
       console.log("Enviando para:", urlEnvio);
 
@@ -236,7 +267,7 @@ class Nfcom {
     }
   }
 
-  public gerarXml(data: INFComData): string {
+  public gerarXml(data: INFComData, password: string): string {
     // 1. Gera Chave de Acesso
     const anoMes =
       data.ide.dhEmi.substring(2, 4) + data.ide.dhEmi.substring(5, 7);
@@ -391,7 +422,11 @@ class Nfcom {
     // 4. Assina (Passando o ID para o campo URI)
     let xmlInternoAssinado: string;
     try {
-      xmlInternoAssinado = this.assinarXml(xmlInternoSemAssinatura, id);
+      xmlInternoAssinado = this.assinarXml(
+        xmlInternoSemAssinatura,
+        id,
+        password
+      );
     } catch (error) {
       console.error("Erro ao assinar XML:", error);
       xmlInternoAssinado = xmlInternoSemAssinatura;
@@ -419,9 +454,8 @@ class Nfcom {
     return soapEnvelope;
   }
 
-  private assinarXml(xml: string, idTag: string): string {
+  private assinarXml(xml: string, idTag: string, password: string): string {
     const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
-    const password = process.env.CANCELAR_NFSE_SENHA || "";
 
     if (!fs.existsSync(certPath)) {
       throw new Error(`Certificado não encontrado em: ${certPath}`);
