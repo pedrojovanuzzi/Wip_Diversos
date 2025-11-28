@@ -187,6 +187,7 @@ class Nfcom {
     // const xml = this.gerarXml(data, password);
     // const response = await this.enviarNfcom(xml);
     // res.status(200).json(response);
+    res.status(200).json({ message: "Nfcom gerada com sucesso" });
   };
 
   // public gerarNfcomWit(data: INFComData, password: string): string {
