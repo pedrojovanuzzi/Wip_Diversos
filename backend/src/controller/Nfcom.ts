@@ -97,25 +97,6 @@ export interface INFComData {
       vProd: string;
     };
     imposto: {
-      /** Imposto normal (usado fora do Simples Nacional) */
-      ICMS00?: {
-        CST: string;
-        vBC: string;
-        pICMS: string;
-        vICMS: string;
-      };
-      PIS?: {
-        CST: string;
-        vBC: string;
-        pPIS: string;
-        vPIS: string;
-      };
-      COFINS?: {
-        CST: string;
-        vBC: string;
-        pCOFINS: string;
-        vCOFINS: string;
-      };
       /** Imposto simplificado (usado no Simples Nacional - CRT 1) */
       indSemCST?: "1"; // Opcional (presente no XML de exemplo)
     };
@@ -237,6 +218,8 @@ class Nfcom {
       console.log(
         "Servidor de Homologação?: " + process.env.SERVIDOR_HOMOLOGACAO
       );
+
+      console.log(xml);
 
       const response = await axios.post(
         process.env.SERVIDOR_HOMOLOGACAO
@@ -377,29 +360,9 @@ class Nfcom {
 
       const imposto = det.ele("imposto");
 
-      if (item.imposto.ICMS00) {
-        const icms = imposto.ele("ICMS00");
-        icms.ele("CST").txt(item.imposto.ICMS00.CST);
-        icms.ele("vBC").txt(item.imposto.ICMS00.vBC);
-        icms.ele("pICMS").txt(item.imposto.ICMS00.pICMS);
-        icms.ele("vICMS").txt(item.imposto.ICMS00.vICMS);
-      }
-
-      if (item.imposto.PIS) {
-        const pis = imposto.ele("PIS");
-        pis.ele("CST").txt(item.imposto.PIS.CST);
-        pis.ele("vBC").txt(item.imposto.PIS.vBC);
-        pis.ele("pPIS").txt(item.imposto.PIS.pPIS);
-        pis.ele("vPIS").txt(item.imposto.PIS.vPIS);
-      }
-
-      if (item.imposto.COFINS) {
-        const cofins = imposto.ele("COFINS");
-        cofins.ele("CST").txt(item.imposto.COFINS.CST);
-        cofins.ele("vBC").txt(item.imposto.COFINS.vBC);
-        cofins.ele("pCOFINS").txt(item.imposto.COFINS.pCOFINS);
-        cofins.ele("vCOFINS").txt(item.imposto.COFINS.vCOFINS);
-      }
+      const indSemCST = imposto
+        .ele("indSemCST")
+        .txt(item.imposto.indSemCST as string);
     });
 
     // Totais
