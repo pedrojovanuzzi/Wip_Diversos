@@ -173,6 +173,8 @@ class Nfcom {
       cleanXml = cleanXml.slice(1);
     }
 
+    console.log(cleanXml);
+
     // 2. Remove declaração XML (<?xml...?>) se existir
     // A SEFAZ espera que o GZIP comece direto com <nfcomProc> ou <NFCom>
     cleanXml = cleanXml.replace(/^\s*<\?xml[^>]*\?>/i, "");
@@ -219,8 +221,6 @@ class Nfcom {
         "Servidor de Homologação?: " + process.env.SERVIDOR_HOMOLOGACAO
       );
 
-      console.log(xml);
-
       const response = await axios.post(
         process.env.SERVIDOR_HOMOLOGACAO
           ? "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx?wsdl"
@@ -260,8 +260,23 @@ class Nfcom {
       data.ide.tpEmis
     }${data.ide.cNF.padStart(8, "0")}`;
 
+    let chaveSemDV = `${data.ide.cUF}${anoMes}${data.emit.CNPJ.padStart(
+      14,
+      "0"
+    )}62${data.ide.serie.padStart(3, "0")}${data.ide.nNF.padStart(9, "0")}${
+      data.ide.tpEmis
+    }${data.ide.nSiteAutoriz || "0"}${data.ide.cNF.padStart(7, "0")}`;
+
+    const chaveAcessoCompleta = `${chaveSemDV}${data.ide.cDV}`;
+
+    if (chaveAcessoCompleta.length !== 44) {
+      throw new Error(
+        `Chave de acesso gerada tem tamanho inválido: ${chaveAcessoCompleta.length} (esperado 44). Verifique cNF e nSiteAutoriz.`
+      );
+    }
+
     // O ID deve ser "NFCom" + chave de acesso
-    const id = `NFCom${chaveAcesso}`;
+    const id = `NFCom${chaveAcessoCompleta}`;
 
     // Primeiro, gera o XML NFCom interno (que será compactado)
     const docInterno = create({ version: "1.0", encoding: "UTF-8" });
@@ -273,7 +288,7 @@ class Nfcom {
 
     // Elemento raiz NFCom
     const nfCom = docInterno.ele("NFCom", {
-      xmlns: "http://www.portalfiscal.inf.br/nfcom",
+      xmlns: "http://www.portalfiscal.inf.br/NFCom",
     });
 
     // Elemento infNFCom (filho de NFCom)
@@ -437,7 +452,7 @@ class Nfcom {
     const soapBody = soapEnvelope.ele("soap:Body");
 
     const NfComDadosMsg = soapBody.ele("NFComDadosMsg", {
-      xmlns: "http://www.portalfiscal.inf.br/NFCom/wsdl/NFComRecepcao",
+      xmlns: "http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcao",
     });
     NfComDadosMsg.txt(xmlComprimidoBase64);
 
