@@ -6,9 +6,8 @@ import forge from "node-forge";
 import { SignedXml } from "xml-crypto";
 import axios from "axios";
 import * as https from "https";
-import * as zlib from "zlib";
-import { processarCertificado } from "../utils/certUtils";
 import { gzipSync } from "zlib";
+import { processarCertificado } from "../utils/certUtils";
 
 // Interfaces para tipagem dos dados da NFCom
 export interface INFComData {
@@ -45,8 +44,8 @@ export interface INFComData {
       xMun: string;
       CEP: string;
       UF: string;
-      fone?: string; // Opcional (presente no XML de exemplo)
-      email?: string; // Opcional (presente no XML de exemplo)
+      fone?: string;
+      email?: string;
     };
   };
 
@@ -59,14 +58,13 @@ export interface INFComData {
     enderDest: {
       xLgr: string;
       nro: string;
-      xCpl?: string; // Complemento (Opcional, presente no XML de exemplo)
       xBairro: string;
       cMun: string;
       xMun: string;
       CEP: string;
       UF: string;
-      fone?: string; // Opcional (presente no XML de exemplo)
-      email?: string; // Opcional (presente no XML de exemplo)
+      fone?: string;
+      email?: string;
     };
   };
 
@@ -75,11 +73,11 @@ export interface INFComData {
     iCodAssinante: string;
     tpAssinante: string;
     tpServUtil: string;
-    NroTermPrinc?: string; // Opcional
-    cUFPrinc?: string; // Opcional
-    nContrato?: string; // Opcional (presente no XML de exemplo)
-    dContratoIni?: string; // Opcional (presente no XML de exemplo)
-    dContratoFim?: string; // Opcional (presente no XML de exemplo)
+    NroTermPrinc?: string;
+    cUFPrinc?: string;
+    nContrato?: string;
+    dContratoIni?: string;
+    dContratoFim?: string;
   };
 
   /** Array de Detalhes de Produtos/Serviços (det) */
@@ -89,16 +87,15 @@ export interface INFComData {
       cProd: string;
       xProd: string;
       cClass: string;
-      CFOP?: string; // Opcional (foi removido no XML simplificado)
+      CFOP?: string;
       uMed: string;
       qFaturada: string;
       vItem: string;
-      vDesc?: string; // Opcional (presente no XML de exemplo)
+      vDesc?: string;
       vProd: string;
     };
     imposto: {
-      /** Imposto simplificado (usado no Simples Nacional - CRT 1) */
-      indSemCST?: "1"; // Opcional (presente no XML de exemplo)
+      indSemCST?: "1";
     };
   }>;
 
@@ -131,16 +128,15 @@ export interface INFComData {
     CompetFat: string;
     dVencFat: string;
     codBarras: string;
-    dPerUsoIni?: string; // Opcional (presente no XML de exemplo)
-    dPerUsoFim?: string; // Opcional (presente no XML de exemplo)
-    codDebAuto?: string; // Opcional (presente no XML de exemplo)
-    codBanco?: string; // Opcional (presente no XML de exemplo)
-    codAgencia?: string; // Opcional (presente no XML de exemplo)
+    dPerUsoIni?: string;
+    dPerUsoFim?: string;
+    codDebAuto?: string;
+    codBanco?: string;
+    codAgencia?: string;
   };
 
   /** Bloco de Responsável Técnico (gRespTec) */
   gRespTec?: {
-    // Opcional (presente no XML de exemplo)
     CNPJ: string;
     xContato: string;
     email: string;
@@ -168,23 +164,28 @@ class Nfcom {
   public compactarXML(xmlString: string): string {
     let cleanXml = xmlString;
 
-    // 1. Remove BOM (Byte Order Mark) se existir (CRÍTICO)
+    // 1. Remove BOM (Byte Order Mark) se existir
     if (cleanXml.charCodeAt(0) === 0xfeff) {
       cleanXml = cleanXml.slice(1);
     }
 
-    console.log(cleanXml);
-
     // 2. Remove declaração XML (<?xml...?>) se existir
-    // A SEFAZ espera que o GZIP comece direto com <nfcomProc> ou <NFCom>
+    // A SEFAZ espera que o GZIP comece direto com a tag raiz
     cleanXml = cleanXml.replace(/^\s*<\?xml[^>]*\?>/i, "");
 
-    // 3. Limpeza de espaços (remove quebras de linha e espaços entre tags)
-    cleanXml = cleanXml.replace(/>\s+</g, "><").trim();
+    // 3. ATENÇÃO: Removi o replace(/>\s+</g, "><") daqui.
+    // A limpeza de espaços deve ser feita ANTES de assinar.
+    // Se fizer depois, quebra o hash da assinatura (Erro 297).
+    cleanXml = cleanXml.trim();
 
     // 4. Compactação
     const buffer = Buffer.from(cleanXml, "utf-8");
     const compressedBuffer = gzipSync(buffer);
+
+    console.log(
+      "Magic Bytes (GZIP Check - deve começar com 1f8b):",
+      compressedBuffer.toString("hex").substring(0, 4)
+    );
 
     return compressedBuffer.toString("base64");
   }
@@ -198,17 +199,13 @@ class Nfcom {
         throw new Error(`Certificado não encontrado em: ${certPath}`);
       }
 
-      // Define o diretório temporário para o certificado processado
       const tempDir = path.join(__dirname, "..", "temp");
-
-      // Processa o certificado usando a utilidade
       const processedCertPath = processarCertificado(
         certPath,
         password,
         tempDir
       );
 
-      // Lê o certificado processado
       const pfxBuffer = fs.readFileSync(processedCertPath);
 
       const httpsAgent = new https.Agent({
@@ -217,23 +214,21 @@ class Nfcom {
         rejectUnauthorized: false,
       });
 
-      console.log(
-        "Servidor de Homologação?: " + process.env.SERVIDOR_HOMOLOGACAO
-      );
+      // URL sem ?wsdl para evitar erro 244/500
+      const urlEnvio = process.env.SERVIDOR_HOMOLOGACAO
+        ? "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx"
+        : "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
 
-      const response = await axios.post(
-        process.env.SERVIDOR_HOMOLOGACAO
-          ? "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx?wsdl"
-          : "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx?wsdl",
-        xml,
-        {
-          httpsAgent,
-          headers: {
-            "Content-Type":
-              'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcao/nfcomRecepcao"',
-          },
-        }
-      );
+      console.log("Enviando para:", urlEnvio);
+
+      const response = await axios.post(urlEnvio, xml, {
+        httpsAgent,
+        headers: {
+          // Action minúscula conforme WSDL
+          "Content-Type":
+            'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcao/nfcomRecepcao"',
+        },
+      });
       return response.data;
     } catch (error) {
       console.error("Erro ao enviar NFCom:", error);
@@ -241,24 +236,10 @@ class Nfcom {
     }
   }
 
-  /**
-   * Gera o XML da NFCom (Modelo 62) com base nos dados fornecidos e assina digitalmente.
-   * @param data Dados da NFCom tipados conforme interface INFComData
-   * @returns String contendo o XML assinado
-   */
   public gerarXml(data: INFComData): string {
-    // Extrai o ano e mês da emissão para a chave de acesso (YYMM)
-    // Supondo dhEmi no formato ISO: YYYY-MM-DDThh:mm:ss...
+    // 1. Gera Chave de Acesso
     const anoMes =
       data.ide.dhEmi.substring(2, 4) + data.ide.dhEmi.substring(5, 7);
-
-    // Monta a chave de acesso
-    const chaveAcesso = `${data.ide.cUF}${anoMes}${data.emit.CNPJ.padStart(
-      14,
-      "0"
-    )}62${data.ide.serie.padStart(3, "0")}${data.ide.nNF.padStart(9, "0")}${
-      data.ide.tpEmis
-    }${data.ide.cNF.padStart(8, "0")}`;
 
     let chaveSemDV = `${data.ide.cUF}${anoMes}${data.emit.CNPJ.padStart(
       14,
@@ -275,29 +256,22 @@ class Nfcom {
       );
     }
 
-    // O ID deve ser "NFCom" + chave de acesso
     const id = `NFCom${chaveAcessoCompleta}`;
 
-    // Primeiro, gera o XML NFCom interno (que será compactado)
+    // 2. Gera XML Interno
     const docInterno = create({ version: "1.0", encoding: "UTF-8" });
 
-    // const nfcomProc = docInterno.ele("nfcomProc", {
-    //   xmlns: "http://www.portalfiscal.inf.br/nfcom",
-    //   versao: "1.00",
-    // });
-
-    // Elemento raiz NFCom
+    // Namespace 'nfcom' minúsculo na tag raiz
     const nfCom = docInterno.ele("NFCom", {
-      xmlns: "http://www.portalfiscal.inf.br/NFCom",
+      xmlns: "http://www.portalfiscal.inf.br/nfcom",
     });
 
-    // Elemento infNFCom (filho de NFCom)
     const infNFCom = nfCom.ele("infNFCom", {
       versao: "1.00",
       Id: id,
     });
 
-    // Grupo de Identificação da NFCom
+    // --- Preenchimento dos dados ---
     const ide = infNFCom.ele("ide");
     ide.ele("cUF").txt(data.ide.cUF);
     ide.ele("tpAmb").txt(data.ide.tpAmb);
@@ -314,7 +288,6 @@ class Nfcom {
     ide.ele("tpFat").txt(data.ide.tpFat);
     ide.ele("verProc").txt(data.ide.verProc);
 
-    // Grupo de Emitente
     const emit = infNFCom.ele("emit");
     emit.ele("CNPJ").txt(data.emit.CNPJ);
     emit.ele("IE").txt(data.emit.IE);
@@ -330,7 +303,6 @@ class Nfcom {
     enderEmit.ele("CEP").txt(data.emit.enderEmit.CEP);
     enderEmit.ele("UF").txt(data.emit.enderEmit.UF);
 
-    // Grupo de Destinatário
     const dest = infNFCom.ele("dest");
     dest.ele("xNome").txt(data.dest.xNome);
     if (data.dest.CPF) dest.ele("CPF").txt(data.dest.CPF);
@@ -345,7 +317,6 @@ class Nfcom {
     enderDest.ele("CEP").txt(data.dest.enderDest.CEP);
     enderDest.ele("UF").txt(data.dest.enderDest.UF);
 
-    // Grupo de Assinante
     const assinante = infNFCom.ele("assinante");
     assinante.ele("iCodAssinante").txt(data.assinante.iCodAssinante);
     assinante.ele("tpAssinante").txt(data.assinante.tpAssinante);
@@ -357,84 +328,67 @@ class Nfcom {
       assinante.ele("cUFPrinc").txt(data.assinante.cUFPrinc);
     }
 
-    // Itens (Detalhes)
     data.det.forEach((item) => {
       const det = infNFCom.ele("det", { nItem: item.nItem });
-
       const prod = det.ele("prod");
       prod.ele("cProd").txt(item.prod.cProd);
       prod.ele("xProd").txt(item.prod.xProd);
       prod.ele("cClass").txt(item.prod.cClass);
-      if (item.prod.CFOP) {
-        prod.ele("CFOP").txt(item.prod.CFOP);
-      }
+      if (item.prod.CFOP) prod.ele("CFOP").txt(item.prod.CFOP);
       prod.ele("uMed").txt(item.prod.uMed);
       prod.ele("qFaturada").txt(item.prod.qFaturada);
       prod.ele("vItem").txt(item.prod.vItem);
       prod.ele("vProd").txt(item.prod.vProd);
-
       const imposto = det.ele("imposto");
-
-      const indSemCST = imposto
-        .ele("indSemCST")
-        .txt(item.imposto.indSemCST as string);
+      imposto.ele("indSemCST").txt(item.imposto.indSemCST as string);
     });
 
-    // Totais
     const total = infNFCom.ele("total");
     total.ele("vProd").txt(data.total.vProd);
-
     const icmsTot = total.ele("ICMSTot");
     icmsTot.ele("vBC").txt(data.total.ICMSTot.vBC);
     icmsTot.ele("vICMS").txt(data.total.ICMSTot.vICMS);
     icmsTot.ele("vICMSDeson").txt(data.total.ICMSTot.vICMSDeson);
     icmsTot.ele("vFCP").txt(data.total.ICMSTot.vFCP);
-
     total.ele("vCOFINS").txt(data.total.vCOFINS);
     total.ele("vPIS").txt(data.total.vPIS);
     total.ele("vFUNTTEL").txt(data.total.vFUNTTEL);
     total.ele("vFUST").txt(data.total.vFUST);
-
     const vRetTribTot = total.ele("vRetTribTot");
     vRetTribTot.ele("vRetPIS").txt(data.total.vRetTribTot.vRetPIS);
     vRetTribTot.ele("vRetCofins").txt(data.total.vRetTribTot.vRetCofins);
     vRetTribTot.ele("vRetCSLL").txt(data.total.vRetTribTot.vRetCSLL);
     vRetTribTot.ele("vIRRF").txt(data.total.vRetTribTot.vIRRF);
-
     total.ele("vDesc").txt(data.total.vDesc);
     total.ele("vOutro").txt(data.total.vOutro);
     total.ele("vNF").txt(data.total.vNF);
 
-    // Grupo de Fatura
     const gFat = infNFCom.ele("gFat");
     gFat.ele("CompetFat").txt(data.gFat.CompetFat);
     gFat.ele("dVencFat").txt(data.gFat.dVencFat);
     gFat.ele("codBarras").txt(data.gFat.codBarras);
 
-    // Informações Suplementares (QR Code)
     const infNFComSupl = nfCom.ele("infNFComSupl");
-    infNFComSupl.ele("qrCodNFCom").txt(data.infNFComSupl.qrCodNFCom);
+    // CDATA no QR Code
+    infNFComSupl.ele("qrCodNFCom").dat(data.infNFComSupl.qrCodNFCom.trim());
 
-    // Gera o XML interno sem assinatura
-    // Importante: headless: true para não gerar a declaração XML novamente se o assinador já tratar,
-    // mas aqui queremos garantir que o XML a ser assinado esteja limpo.
+    // 3. Serializa sem formatação (headless) para assinar
+    // O 'headless: true' remove o <?xml ...?>
     const xmlInternoSemAssinatura = docInterno.end({
       prettyPrint: false,
       headless: true,
     });
 
-    // Assina o XML interno
+    // 4. Assina (Passando o ID para o campo URI)
     let xmlInternoAssinado: string;
     try {
-      xmlInternoAssinado = this.assinarXml(xmlInternoSemAssinatura);
+      xmlInternoAssinado = this.assinarXml(xmlInternoSemAssinatura, id);
     } catch (error) {
       console.error("Erro ao assinar XML:", error);
       xmlInternoAssinado = xmlInternoSemAssinatura;
     }
 
-    // Remove declaração XML se existir (apenas por precaução para o teste)
-    const xmlParaCompactar = xmlInternoAssinado.replace(/^<\?xml.+?\?>/, "");
-
+    // 5. Compacta GZIP
     const xmlComprimidoBase64 = this.compactarXML(xmlInternoAssinado);
 
     console.log(
@@ -442,25 +396,21 @@ class Nfcom {
       xmlComprimidoBase64.substring(0, 50)
     );
 
-    // Agora cria o envelope SOAP com o conteúdo comprimido
-    const docSoap = create({ version: "1.0", encoding: "UTF-8" });
+    // 6. Montagem MANUAL do Envelope SOAP (A alteração solicitada)
+    // Isso garante que o namespace esteja correto e o Base64 não seja alterado
+    const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <soap12:Body>
+        <nfcomDadosMsg xmlns="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcao">
+            ${xmlComprimidoBase64}
+        </nfcomDadosMsg>
+    </soap12:Body>
+</soap12:Envelope>`;
 
-    const soapEnvelope = docSoap.ele("soap:Envelope", {
-      "xmlns:soap": "http://www.w3.org/2003/05/soap-envelope",
-    });
-
-    const soapBody = soapEnvelope.ele("soap:Body");
-
-    const NfComDadosMsg = soapBody.ele("NFComDadosMsg", {
-      xmlns: "http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcao",
-    });
-    NfComDadosMsg.txt(xmlComprimidoBase64);
-
-    // Retorna o XML SOAP final
-    return docSoap.end({ prettyPrint: false });
+    return soapEnvelope;
   }
 
-  private assinarXml(xml: string): string {
+  private assinarXml(xml: string, idTag: string): string {
     const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
     const password = process.env.CANCELAR_NFSE_SENHA || "";
 
@@ -494,7 +444,6 @@ class Nfcom {
     signer.privateKey = keyPem;
     signer.publicCert = certPem;
 
-    // Alterado para C14N Inclusivo (padrão NFe)
     signer.canonicalizationAlgorithm =
       "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
     signer.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
@@ -503,9 +452,10 @@ class Nfcom {
       xpath: "//*[local-name(.)='infNFCom']",
       transforms: [
         "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315", // Alterado para C14N Inclusivo
+        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
       ],
       digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
+      uri: "#" + idTag,
     });
 
     signer.computeSignature(xml, {

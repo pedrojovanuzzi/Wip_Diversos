@@ -49,7 +49,6 @@ const mockData: INFComData = {
     enderDest: {
       xLgr: "RUA EMILIO CARRARO",
       nro: "945",
-      xCpl: "CASA", // Campo opcional que estava no seu XML
       xBairro: "ALTOS DA CIDADE",
       cMun: "3503406",
       xMun: "Arealva",
