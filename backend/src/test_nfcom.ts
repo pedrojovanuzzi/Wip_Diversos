@@ -7,6 +7,19 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 const nfcom = new Nfcom();
 
+function getDataHoraAtual(): string {
+  const now = new Date();
+  // Ajuste manual para garantir o fuso horário de Brasília/SP se o servidor estiver em UTC
+  // Ou simplesmente use toISOString se garantir que o offset está correto.
+  // O formato esperado é: AAAA-MM-DDThh:mm:ss-03:00
+
+  // Exemplo simples forçando o offset -03:00:
+  const iso = new Date(
+    now.getTime() - now.getTimezoneOffset() * 60000
+  ).toISOString();
+  return iso.slice(0, 19) + "-03:00";
+}
+
 const mockData: INFComData = {
   ide: {
     cUF: "35", // UF de São Paulo
@@ -16,7 +29,7 @@ const mockData: INFComData = {
     nNF: "3", // Número da Nota
     cNF: "0229297", // Código Numérico
     cDV: "4", // Dígito Verificador
-    dhEmi: "2025-11-10T03:15:31-03:00", // Data e hora de emissão (com fuso)
+    dhEmi: getDataHoraAtual(), // Data e hora de emissão (com fuso)
     tpEmis: "1", // Tipo de Emissão (Normal)
     nSiteAutoriz: "0", // Site de Autorização
     cMunFG: "3503406", // Município de Arealva/SP
