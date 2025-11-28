@@ -11,12 +11,14 @@ import { processarCertificado } from "../utils/certUtils";
 import MkauthSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
+import dotenv from "dotenv";
+dotenv.config();
 
 // Interfaces para tipagem dos dados da NFCom
 export interface INFComData {
   /** Bloco de Identificação da NFCom (ide) */
   ide: {
-    cUF: string;
+    cUF: "35";
     tpAmb: string;
     mod: "62"; // Modelo NFCom
     serie: string;
@@ -24,12 +26,12 @@ export interface INFComData {
     cNF: string;
     cDV: string;
     dhEmi: string;
-    tpEmis: string;
-    nSiteAutoriz: string;
-    cMunFG: string;
-    finNFCom: string;
-    tpFat: string;
-    verProc: string;
+    tpEmis: "1";
+    nSiteAutoriz: "0";
+    cMunFG: "3503406";
+    finNFCom: "0";
+    tpFat: "0";
+    verProc: "1";
   };
 
   /** Bloco do Emitente (emit) */
