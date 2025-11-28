@@ -10,7 +10,7 @@ const nfcom = new Nfcom();
 const mockData: INFComData = {
   ide: {
     cUF: "35", // UF de São Paulo
-    tpAmb: "1", // 1=Produção
+    tpAmb: "2", // 1=Produção
     mod: "62", // Modelo NFCom
     serie: "1", // Série da Nota
     nNF: "3", // Número da Nota
