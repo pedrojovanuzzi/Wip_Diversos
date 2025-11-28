@@ -180,7 +180,7 @@ class Nfcom {
     console.log(password, clientesSelecionados, service, reducao, ambiente);
 
     // const xml = this.gerarXml(data, password);
-    // const response = await this.enviarNfcom(xml);
+    // const response = await this.enviarNfcom(xml, password);
     // res.status(200).json(response);
     res.status(200).json({ message: "Nfcom gerada com sucesso" });
   };
@@ -219,10 +219,9 @@ class Nfcom {
     return compressedBuffer.toString("base64");
   }
 
-  public async enviarNfcom(xml: string): Promise<any> {
+  public async enviarNfcom(xml: string, password: string): Promise<any> {
     try {
       const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
-      const password = process.env.FACILITA_PASS || "";
 
       if (!fs.existsSync(certPath)) {
         throw new Error(`Certificado não encontrado em: ${certPath}`);
