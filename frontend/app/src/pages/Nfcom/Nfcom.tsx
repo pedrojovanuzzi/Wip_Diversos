@@ -21,7 +21,6 @@ export default function Nfcom() {
 
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
-  const [aliquota, setAliquota] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [service, setService] = useState("");
@@ -90,7 +89,6 @@ export default function Nfcom() {
         {
           password,
           clientesSelecionados,
-          aliquota,
           service,
           reducao,
           ambiente,
@@ -324,14 +322,6 @@ export default function Nfcom() {
           <option value="homologacao">Homologação</option>
           <option value="producao">Produção</option>
         </select>
-        <input
-          type="text"
-          onChange={(e) => {
-            setAliquota(e.target.value);
-          }}
-          placeholder="Exemplo 4,4249%"
-          className="ring-2 ring-gray-500 p-2 rounded m-5"
-        />
       </div>
 
       <div className="relative">
@@ -358,7 +348,7 @@ export default function Nfcom() {
                 .replace(/[^a-zA-Z0-9 ]/g, "")
             );
           }}
-          placeholder="Redução"
+          placeholder="Redução Ex: 60%"
           className="ring-2 ring-gray-500 p-2 rounded m-5"
         />
       </div>

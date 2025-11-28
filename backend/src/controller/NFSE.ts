@@ -93,8 +93,19 @@ class NFSEController {
       aliquota = aliquota?.trim() ? aliquota : "5.0000";
       aliquota = aliquota.replace(",", ".").replace("%", "");
       if (!service) service = "Servico de Suporte Tecnico";
+
       if (!reducao) reducao = 40;
-      reducao = Number(reducao) / 100;
+
+      // Garante que o valor é uma string antes de manipulá-la
+      let reducaoStr = String(reducao);
+
+      reducaoStr = reducaoStr.replace(",", ".").replace("%", "");
+
+      // Converte para Number APENAS para o cálculo final
+      reducao = Number(reducaoStr) / 100;
+
+      console.log(reducao);
+
       const result = await this.gerarNFSE(
         password,
         clientesSelecionados,

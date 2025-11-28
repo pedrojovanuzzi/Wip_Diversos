@@ -154,14 +154,8 @@ class Nfcom {
   private WSDL_URL = "";
 
   public gerarNfcom = async (req: Request, res: Response): Promise<void> => {
-    const {
-      password,
-      clientesSelecionados,
-      aliquota,
-      service,
-      reducao,
-      ambiente,
-    } = req.body;
+    let { password, clientesSelecionados, service, reducao, ambiente } =
+      req.body;
 
     if (ambiente === "homologacao") {
       this.homologacao = true;
@@ -173,16 +167,17 @@ class Nfcom {
         "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
     }
 
-    console.log(this.WSDL_URL);
+    if (!reducao) reducao = 60;
 
-    console.log(
-      password,
-      clientesSelecionados,
-      aliquota,
-      service,
-      reducao,
-      ambiente
-    );
+    console.log(this.WSDL_URL);
+    let reducaoStr = String(reducao);
+
+    // 3. Agora você pode fazer a manipulação de string com segurança
+    reducaoStr = reducaoStr.replace(",", ".").replace("%", "");
+
+    reducao = Number(reducaoStr) / 100;
+
+    console.log(password, clientesSelecionados, service, reducao, ambiente);
 
     // const xml = this.gerarXml(data, password);
     // const response = await this.enviarNfcom(xml);
