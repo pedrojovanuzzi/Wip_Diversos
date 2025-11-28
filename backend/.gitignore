@@ -3,4 +3,4 @@ xml_log.txt
 cancelamento-assinado.xml
 uploads/*
 dist/*
-src/test_nfcom.ts
+test_nfcom.ts
