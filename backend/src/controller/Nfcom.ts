@@ -188,7 +188,7 @@ class Nfcom {
 
       // Garante que o findOne seja feito por item.id (da requisição)
       const FaturasData = await FaturasRepository.findOne({
-        where: { id: item.id },
+        where: { id: item },
       });
 
       // Verifica se a fatura foi encontrada antes de buscar o cliente
