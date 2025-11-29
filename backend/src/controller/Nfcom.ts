@@ -252,7 +252,7 @@ class Nfcom {
         },
         emit: {
           CNPJ: process.env.CPF_CNPJ as string,
-          IE: "185038930110",
+          IE: "183013286115",
           CRT: "1",
           xNome: "WIP TELECOM MULTIMIDIA EIRELI ME",
           xFant: "WIP TELECOM MULTIMIDIA EIRELI ME",
@@ -302,7 +302,6 @@ class Nfcom {
               cProd: "001",
               xProd: "ASSINATURA INTERNET",
               cClass: "0100401",
-              CFOP: "5307",
               uMed: "1",
               qFaturada: "1",
               vItem: vItem,
@@ -348,7 +347,7 @@ class Nfcom {
           codBarras: FaturasData.nossonum,
         },
         infNFComSupl: {
-          qrCodNFCom: "this.qrCodeUrl",
+          qrCodNFCom: "",
         },
       };
 
@@ -508,7 +507,7 @@ class Nfcom {
       );
     }
 
-    const qrCodeContent = `http://dfe-portal.svrs.rs.gov.br/NFCom/QRCode?chNFCom=${chaveAcessoCompleta}&tpAmb=${
+    const qrCodeContent = `https://dfe-portal.svrs.rs.gov.br/NFCom/QRCode?chNFCom=${chaveAcessoCompleta}&tpAmb=${
       this.homologacao ? "2" : "1"
     }`;
     this.qrCodeUrl = qrCodeContent;
@@ -636,7 +635,7 @@ class Nfcom {
 
     const infNFComSupl = nfCom.ele("infNFComSupl");
     // CDATA no QR Code
-    infNFComSupl.ele("qrCodNFCom").dat(data.infNFComSupl.qrCodNFCom.trim());
+    infNFComSupl.ele("qrCodNFCom").dat(qrCodeContent);
 
     // 3. Serializa sem formatação (headless) para assinar
     // O 'headless: true' remove o <?xml ...?>
