@@ -450,6 +450,7 @@ class Nfcom {
       // Tentar converter IDs para número
       novaNFCom.cliente_id = parseInt(nfComData.assinante.iCodAssinante) || 0;
       novaNFCom.fatura_id = parseInt(nfComData.ide.nNF) || 0; // Assumindo que nNF é o ID da fatura conforme lógica anterior
+      novaNFCom.qrcodeLink = this.qrCodeUrl;
 
       await NFComRepository.save(novaNFCom);
       console.log(`NFCom ${novaNFCom.nNF} salva no banco com sucesso.`);

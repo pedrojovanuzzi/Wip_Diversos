@@ -31,4 +31,7 @@ export class NFCom {
 
   @Column({ type: "int", nullable: true })
   fatura_id!: number;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  qrcodeLink!: string;
 }
