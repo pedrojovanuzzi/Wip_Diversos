@@ -23,10 +23,8 @@ dotenv.config();
 
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
-  private homologacao = process.env.SERVIDOR_HOMOLOGACAO === "true";
-  private WSDL_URL = this.homologacao
-    ? "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS?wsdl"
-    : "https://wsnfe.arealva.sp.gov.br:8443/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
+  private homologacao: boolean = false;
+  private WSDL_URL = "";
   private TEMP_DIR = path.resolve(__dirname, "../files");
   private PASSWORD = "";
   private DECRYPTED_CERT_PATH = path.join(
@@ -52,8 +50,6 @@ class NFSEController {
     this.BuscarNSFEDetalhes = this.BuscarNSFEDetalhes.bind(this);
     this.BuscarClientes = this.BuscarClientes.bind(this);
     this.removerAcentos = this.removerAcentos.bind(this);
-    console.log('Servidor Localhost?: ' + this.homologacao);
-    console.log(this.WSDL_URL);
   }
 
   public async uploadCertificado(req: Request, res: Response) {
@@ -68,16 +64,48 @@ class NFSEController {
 
   async iniciar(req: Request, res: Response) {
     try {
-      let { password, clientesSelecionados, aliquota, service, reducao } =
-        req.body;
+      let {
+        password,
+        clientesSelecionados,
+        aliquota,
+        service,
+        reducao,
+        ambiente,
+      } = req.body;
       this.PASSWORD = password;
       console.log(aliquota);
-      
+
+      console.log(ambiente);
+
+      if (ambiente === "homologacao") {
+        this.homologacao = true;
+        this.WSDL_URL =
+          "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
+      } else {
+        this.homologacao = false;
+        this.WSDL_URL =
+          "https://wsnfe.arealva.sp.gov.br:8443/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
+      }
+
+      console.log("Servidor Localhost?: " + this.homologacao);
+      console.log(this.WSDL_URL);
+
       aliquota = aliquota?.trim() ? aliquota : "5.0000";
       aliquota = aliquota.replace(",", ".").replace("%", "");
       if (!service) service = "Servico de Suporte Tecnico";
+
       if (!reducao) reducao = 40;
-      reducao = Number(reducao) / 100;
+
+      // Garante que o valor é uma string antes de manipulá-la
+      let reducaoStr = String(reducao);
+
+      reducaoStr = reducaoStr.replace(",", ".").replace("%", "");
+
+      // Converte para Number APENAS para o cálculo final
+      reducao = Number(reducaoStr) / 100;
+
+      console.log(reducao);
+
       const result = await this.gerarNFSE(
         password,
         clientesSelecionados,
@@ -88,10 +116,10 @@ class NFSEController {
       );
       if (Array.isArray(result)) {
         const ok = result.every((r) => r.status === "200");
-        console.log('Result: ' + JSON.stringify(result));
-        
-        console.log('okTest: ' + result.every((r) => r.status === "200"));
-        
+        console.log("Result: " + JSON.stringify(result));
+
+        console.log("okTest: " + result.every((r) => r.status === "200"));
+
         if (ok)
           res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
         else res.status(500).json({ erro: "Erro ao criar o RPS." });
@@ -155,10 +183,7 @@ class NFSEController {
           );
 
           // Assinar cada RPS individualmente
-          let signedRps = this.assinarXml(
-            rps,
-            "InfDeclaracaoPrestacaoServico"
-          );
+          let signedRps = this.assinarXml(rps, "InfDeclaracaoPrestacaoServico");
 
           // Remove a tag <Signature> se estiver em homologação
           // if (this.homologacao) {
@@ -171,7 +196,6 @@ class NFSEController {
           // Incrementar o número do RPS
           nfseNumber++;
 
-         
           const RPSQuery = MkauthSource.getRepository(Faturas);
           const rpsData = await RPSQuery.findOne({
             where: { id: Number(bid) },
@@ -196,7 +220,7 @@ class NFSEController {
               ? valorMenosDesconto
               : Number(valorMenosDesconto) * Number(reducao);
           valorReduzido = Number(valorReduzido.toFixed(2));
-          const novoRegistro  = NsfeData.create({
+          const novoRegistro = NsfeData.create({
             login: rpsData?.login || "",
             numeroRps: nfseNumber - 1,
             serieRps: nfseResponse[0]?.serieRps || "",
@@ -232,10 +256,8 @@ class NFSEController {
             optanteSimplesNacional: 1,
             incentivoFiscal: 2,
           });
-  
-            await NsfeData.save(novoRegistro);
 
-
+          await NsfeData.save(novoRegistro);
         }
 
         // Criar o LoteRps contendo todos os RPS assinados
@@ -293,21 +315,25 @@ class NFSEController {
         const xml = response.data;
         const parsed = await parseStringPromise(xml, { explicitArray: false });
 
-        
-
         // Caminho até a resposta SOAP
-        const resposta = parsed?.["soap:Envelope"]?.["soap:Body"]?.["ns3:recepcionarLoteRpsSincronoResponse"]?.["ns2:EnviarLoteRpsSincronoResposta"];
-
+        const resposta =
+          parsed?.["soap:Envelope"]?.["soap:Body"]?.[
+            "ns3:recepcionarLoteRpsSincronoResponse"
+          ]?.["ns2:EnviarLoteRpsSincronoResposta"];
 
         // Verifica se existe mensagem de erro
-        const temErro = resposta?.["ns2:ListaMensagemRetorno"]?.["ns2:MensagemRetorno"];
+        const temErro =
+          resposta?.["ns2:ListaMensagemRetorno"]?.["ns2:MensagemRetorno"];
 
-        console.log('Tem erro: ' + temErro);
-        
+        console.log("Tem erro: " + temErro);
 
         if (temErro) {
           console.log("Erro detectado na resposta SOAP:", temErro);
-          respArr.push({ status: "500", response: "Erro na geração da NFSe", detalhes: temErro });
+          respArr.push({
+            status: "500",
+            response: "Erro na geração da NFSe",
+            detalhes: temErro,
+          });
           continue; // pula este lote, não insere no banco
         }
 
@@ -316,7 +342,8 @@ class NFSEController {
         respArr.push({ status: "200", response: "ok" });
       }
       if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
-      if (fs.existsSync(this.DECRYPTED_CERT_PATH)) fs.unlinkSync(this.DECRYPTED_CERT_PATH);
+      if (fs.existsSync(this.DECRYPTED_CERT_PATH))
+        fs.unlinkSync(this.DECRYPTED_CERT_PATH);
       return respArr;
     } catch (error: any) {
       console.log(error);
@@ -418,12 +445,12 @@ class NFSEController {
             <Contato>
               <Telefone>${ClientData?.celular.replace(/[^0-9]/g, "")}</Telefone>
               <Email>${
-              this.homologacao
-                ? "suporte_wiptelecom@outlook.com"
-                : (ClientData?.email && ClientData.email.trim() !== ""
-                    ? ClientData.email.trim()
-                    : "sememail@wiptelecom.com.br")
-            }</Email>
+                this.homologacao
+                  ? "suporte_wiptelecom@outlook.com"
+                  : ClientData?.email && ClientData.email.trim() !== ""
+                  ? ClientData.email.trim()
+                  : "sememail@wiptelecom.com.br"
+              }</Email>
             </Contato>
           </Tomador>
           ${
@@ -663,7 +690,7 @@ class NFSEController {
         },
       });
       console.log("Setado Status NFSE: RPS: " + rpsNumber);
-      
+
       const match = response.data.match(/<ns2:Numero>(\d+)<\/ns2:Numero>/);
       if (match && match[1]) return match[1];
       return null;
@@ -756,10 +783,10 @@ class NFSEController {
           const nfseDoCliente = nfseResponse.filter(
             (nf) => nf.login === c.login
           );
-        
+
           const nfseValidas: typeof nfseDoCliente = [];
           const nfseNumberArray: string[] = [];
-        
+
           for (const nf of nfseDoCliente) {
             const isCancelada = await this.setNfseStatus(nf.numeroRps);
             if (!isCancelada) {
@@ -768,53 +795,80 @@ class NFSEController {
               nfseNumberArray.push(numeroNfse);
             }
           }
-        
+
           if (!nfseValidas.length) return null;
-        
+
           return {
             ...c,
             nfse: {
               id: nfseValidas.map((nf) => nf.id).join(", ") || null,
               login: nfseValidas.map((nf) => nf.login).join(", ") || null,
-              numero_rps: nfseValidas.map((nf) => nf.numeroRps).join(", ") || null,
-              serie_rps: nfseValidas.map((nf) => nf.serieRps).join(", ") || null,
+              numero_rps:
+                nfseValidas.map((nf) => nf.numeroRps).join(", ") || null,
+              serie_rps:
+                nfseValidas.map((nf) => nf.serieRps).join(", ") || null,
               tipo_rps: nfseValidas.map((nf) => nf.tipoRps).join(", ") || null,
-              data_emissao: nfseValidas
-                .map((nf) =>
-                  moment
-                    .tz(nf.dataEmissao, "America/Sao_Paulo")
-                    .format("DD/MM/YYYY")
-                )
-                .join(", ") || null,
-              competencia: nfseValidas
-                .map((nf) =>
-                  moment
-                    .tz(nf.competencia, "America/Sao_Paulo")
-                    .format("DD/MM/YYYY")
-                )
-                .join(", ") || null,
-              valor_servico: nfseValidas.map((nf) => nf.valorServico).join(", ") || null,
+              data_emissao:
+                nfseValidas
+                  .map((nf) =>
+                    moment
+                      .tz(nf.dataEmissao, "America/Sao_Paulo")
+                      .format("DD/MM/YYYY")
+                  )
+                  .join(", ") || null,
+              competencia:
+                nfseValidas
+                  .map((nf) =>
+                    moment
+                      .tz(nf.competencia, "America/Sao_Paulo")
+                      .format("DD/MM/YYYY")
+                  )
+                  .join(", ") || null,
+              valor_servico:
+                nfseValidas.map((nf) => nf.valorServico).join(", ") || null,
               aliquota: nfseValidas.map((nf) => nf.aliquota).join(", ") || null,
-              iss_retido: nfseValidas.map((nf) => nf.issRetido).join(", ") || null,
-              responsavel_retecao: nfseValidas.map((nf) => nf.responsavelRetencao).join(", ") || null,
-              item_lista_servico: nfseValidas.map((nf) => nf.itemListaServico).join(", ") || null,
-              discriminacao: nfseValidas.map((nf) => nf.discriminacao).join(", ") || null,
-              codigo_municipio: nfseValidas.map((nf) => nf.codigoMunicipio).join(", ") || null,
-              exigibilidade_iss: nfseValidas.map((nf) => nf.exigibilidadeIss).join(", ") || null,
-              cnpj_prestador: nfseValidas.map((nf) => nf.cnpjPrestador).join(", ") || null,
-              inscricao_municipal_prestador: nfseValidas.map((nf) => nf.inscricaoMunicipalPrestador).join(", ") || null,
-              cpf_tomador: nfseValidas.map((nf) => nf.cpfTomador).join(", ") || null,
-              razao_social_tomador: nfseValidas.map((nf) => nf.razaoSocialTomador).join(", ") || null,
-              endereco_tomador: nfseValidas.map((nf) => nf.enderecoTomador).join(", ") || null,
-              numero_endereco: nfseValidas.map((nf) => nf.numeroEndereco).join(", ") || null,
-              complemento: nfseValidas.map((nf) => nf.complemento).join(", ") || null,
+              iss_retido:
+                nfseValidas.map((nf) => nf.issRetido).join(", ") || null,
+              responsavel_retecao:
+                nfseValidas.map((nf) => nf.responsavelRetencao).join(", ") ||
+                null,
+              item_lista_servico:
+                nfseValidas.map((nf) => nf.itemListaServico).join(", ") || null,
+              discriminacao:
+                nfseValidas.map((nf) => nf.discriminacao).join(", ") || null,
+              codigo_municipio:
+                nfseValidas.map((nf) => nf.codigoMunicipio).join(", ") || null,
+              exigibilidade_iss:
+                nfseValidas.map((nf) => nf.exigibilidadeIss).join(", ") || null,
+              cnpj_prestador:
+                nfseValidas.map((nf) => nf.cnpjPrestador).join(", ") || null,
+              inscricao_municipal_prestador:
+                nfseValidas
+                  .map((nf) => nf.inscricaoMunicipalPrestador)
+                  .join(", ") || null,
+              cpf_tomador:
+                nfseValidas.map((nf) => nf.cpfTomador).join(", ") || null,
+              razao_social_tomador:
+                nfseValidas.map((nf) => nf.razaoSocialTomador).join(", ") ||
+                null,
+              endereco_tomador:
+                nfseValidas.map((nf) => nf.enderecoTomador).join(", ") || null,
+              numero_endereco:
+                nfseValidas.map((nf) => nf.numeroEndereco).join(", ") || null,
+              complemento:
+                nfseValidas.map((nf) => nf.complemento).join(", ") || null,
               bairro: nfseValidas.map((nf) => nf.bairro).join(", ") || null,
               uf: nfseValidas.map((nf) => nf.uf).join(", ") || null,
               cep: nfseValidas.map((nf) => nf.cep).join(", ") || null,
-              telefone_tomador: nfseValidas.map((nf) => nf.telefoneTomador).join(", ") || null,
-              email_tomador: nfseValidas.map((nf) => nf.emailTomador).join(", ") || null,
-              optante_simples_nacional: nfseValidas.map((nf) => nf.optanteSimplesNacional).join(", ") || null,
-              incentivo_fiscal: nfseValidas.map((nf) => nf.incentivoFiscal).join(", ") || null,
+              telefone_tomador:
+                nfseValidas.map((nf) => nf.telefoneTomador).join(", ") || null,
+              email_tomador:
+                nfseValidas.map((nf) => nf.emailTomador).join(", ") || null,
+              optante_simples_nacional:
+                nfseValidas.map((nf) => nf.optanteSimplesNacional).join(", ") ||
+                null,
+              incentivo_fiscal:
+                nfseValidas.map((nf) => nf.incentivoFiscal).join(", ") || null,
               status: "Ativa",
               numeroNfse: nfseNumberArray.join(", ") || null,
             },
@@ -926,7 +980,7 @@ class NFSEController {
 
   removerAcentos(texto: any): string {
     return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
+  }
 
   async BuscarClientes(req: Request, res: Response) {
     const { cpf, filters, dateFilter } = req.body;

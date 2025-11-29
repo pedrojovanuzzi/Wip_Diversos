@@ -3,16 +3,19 @@ import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import Stacked from "./Components/Stacked";
 import Filter from "./Components/Filter";
+import { useNavigate } from "react-router-dom";
 
 import { BsFiletypeDoc } from "react-icons/bs";
+import { CiSearch } from "react-icons/ci";
 import PopUpButton from "./Components/PopUpButton";
 import Error from "./Components/Error";
 import Success from "./Components/Success";
 import { useAuth } from "../../context/AuthContext";
 
-export const Nfe = () => {
+export default function Nfcom() {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
+  const [ambiente, setAmbiente] = useState("homologacao");
 
   // Estados para controlar envio do certificado e senha
   const [showCertPasswordPopUp, setShowCertPasswordPopUp] = useState(false);
@@ -20,12 +23,10 @@ export const Nfe = () => {
 
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
-  const [aliquota, setAliquota] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [service, setService] = useState("");
   const [loading, setLoading] = useState(false);
-  const [ambiente, setAmbiente] = useState("homologacao");
   const [reducao, setReducao] = useState("");
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     []
@@ -53,6 +54,7 @@ export const Nfe = () => {
 
   const { user } = useAuth();
   const token = user?.token;
+  const navigate = useNavigate();
 
   const handleCheckboxChange = (clienteId: number) => {
     setClientesSelecionados((prevSelecionados) => {
@@ -79,18 +81,17 @@ export const Nfe = () => {
     handleSearch();
   }, []);
 
-  const emitirNFe = async () => {
+  const emitirNFCom = async () => {
     try {
       setLoading(true);
       setError("");
       setSuccess("");
 
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/`,
+        `${process.env.REACT_APP_URL}/NFCom/emitirNFCom`,
         {
           password,
           clientesSelecionados,
-          aliquota,
           service,
           reducao,
           ambiente,
@@ -103,19 +104,81 @@ export const Nfe = () => {
           timeout: 480000,
         }
       );
-      setDadosNFe(resposta.data);
-      setSuccess("NF-e emitida com sucesso.");
+
+      console.log("Resposta da API:", resposta.data);
+
+      // Verificar se a resposta contém erros da SEFAZ
+      if (Array.isArray(resposta.data) && resposta.data.length > 0) {
+        const resultados = resposta.data;
+        const erros = resultados.filter((r: any) => r.error === true);
+        const sucessos = resultados.filter((r: any) => r.success === true);
+
+        if (erros.length > 0) {
+          // Montar mensagem de erro detalhada
+          const mensagensErro = erros
+            .map((erro: any, index: number) => {
+              let msg = `NFCom ${index + 1}:\n`;
+
+              if (erro.cStat) {
+                msg += `Código: ${erro.cStat}\n`;
+              }
+
+              if (erro.message) {
+                // Limpar mensagem removendo prefixos como "Rejeição:"
+                const mensagemLimpa = erro.message.replace(
+                  /^(Rejeição|Erro):\s*/i,
+                  ""
+                );
+                msg += `${mensagemLimpa}\n`;
+              }
+
+              if (erro.id) {
+                msg += `ID: ${erro.id}\n`;
+              }
+
+              return msg;
+            })
+            .join("\n");
+
+          if (sucessos.length > 0) {
+            // Parcialmente bem-sucedido
+            setError(
+              `${sucessos.length} NFCom(s) emitida(s) com sucesso, mas ${erros.length} falharam:\n\n${mensagensErro}`
+            );
+            setSuccess(
+              `${sucessos.length} NFCom(s) processada(s) com sucesso!`
+            );
+          } else {
+            // Todos falharam
+            setError(`Falha ao emitir NFCom:\n\n${mensagensErro}`);
+          }
+        } else if (sucessos.length > 0) {
+          // Todos bem-sucedidos
+          setSuccess(`${sucessos.length} NFCom(s) emitida(s) com sucesso!`);
+        } else {
+          // Resposta inesperada
+          setError("Resposta inesperada do servidor. Verifique os logs.");
+        }
+
+        setDadosNFe(resposta.data);
+      } else {
+        // Formato de resposta antigo ou diferente
+        setDadosNFe(resposta.data);
+        setSuccess("NFCom emitida com sucesso.");
+      }
     } catch (erro) {
-      console.error("Erro ao emitir NF-e:", erro);
+      console.error("Erro ao emitir NFCom:", erro);
       if (
         axios.isAxiosError(erro) &&
         erro.response &&
         erro.response.data &&
         erro.response.data.erro
       ) {
-        setError(`Erro ao emitir NF-e: ${erro.response.data.erro}`);
+        setError(`Erro ao emitir NFCom: ${erro.response.data.erro}`);
+      } else if (axios.isAxiosError(erro) && erro.response) {
+        setError(`Erro ao emitir NFCom: ${JSON.stringify(erro.response.data)}`);
       } else {
-        setError("Erro desconhecido ao emitir NF-e.");
+        setError("Erro desconhecido ao emitir NFCom.");
       }
     } finally {
       setShowPopUp(false);
@@ -206,6 +269,15 @@ export const Nfe = () => {
     <div>
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
+      <div className="flex justify-center sm:justify-start sm:ml-2 px-4 pb-6 sm:px-6 lg:px-8">
+        <button
+          onClick={() => navigate("/Nfcom/Buscar")}
+          className="bg-blue-600 text-white py-5 sm:py-4 px-6 rounded-lg hover:bg-blue-700 transition-all font-medium shadow-md flex items-center gap-2"
+        >
+          <CiSearch className="text-xl" />
+          Buscar NFCom Geradas e Homologadas
+        </button>
+      </div>
       <Filter
         setActiveFilters={setActiveFilters}
         setDate={setDateFilter}
@@ -326,14 +398,6 @@ export const Nfe = () => {
           <option value="homologacao">Homologação</option>
           <option value="producao">Produção</option>
         </select>
-        <input
-          type="text"
-          onChange={(e) => {
-            setAliquota(e.target.value);
-          }}
-          placeholder="Exemplo 4,4249%"
-          className="ring-2 ring-gray-500 p-2 rounded m-5"
-        />
       </div>
 
       <div className="relative">
@@ -360,7 +424,7 @@ export const Nfe = () => {
                 .replace(/[^a-zA-Z0-9 ]/g, "")
             );
           }}
-          placeholder="Redução Ex: 40%"
+          placeholder="Redução Ex: 60%"
           className="ring-2 ring-gray-500 p-2 rounded m-5"
         />
       </div>
@@ -378,7 +442,7 @@ export const Nfe = () => {
           showPopUp={showPopUp}
           setPassword={setPassword}
           password={password}
-          emitirNFe={emitirNFe}
+          emitirNFe={emitirNFCom}
         />
       )}
 
@@ -418,4 +482,4 @@ export const Nfe = () => {
       )}
     </div>
   );
-};
+}
