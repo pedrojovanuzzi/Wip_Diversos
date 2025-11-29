@@ -33,6 +33,7 @@ import { PixCancelarCobranca } from "./pages/Pix/PixCancelarCobranca";
 import { PixAdmin } from "./pages/Pix/PixAdmin";
 import { PixfindPaid } from "./pages/Pix/PixfindPaid";
 import Nfcom from "./pages/Nfcom/Nfcom";
+import SearchInterface from "./pages/Nfcom/SearchInterface";
 
 function App() {
   const { user, loading } = useAuth();
@@ -217,6 +218,12 @@ function App() {
           <Route
             path="/Nfcom"
             element={user?.token ? <Nfcom /> : <Navigate to="/auth/login" />}
+          />
+          <Route
+            path="/Nfcom/Buscar"
+            element={
+              user?.token ? <SearchInterface /> : <Navigate to="/auth/login" />
+            }
           />
           <Route
             path="*"

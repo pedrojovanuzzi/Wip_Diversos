@@ -3,8 +3,10 @@ import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import Stacked from "./Components/Stacked";
 import Filter from "./Components/Filter";
+import { useNavigate } from "react-router-dom";
 
 import { BsFiletypeDoc } from "react-icons/bs";
+import { CiSearch } from "react-icons/ci";
 import PopUpButton from "./Components/PopUpButton";
 import Error from "./Components/Error";
 import Success from "./Components/Success";
@@ -52,6 +54,7 @@ export default function Nfcom() {
 
   const { user } = useAuth();
   const token = user?.token;
+  const navigate = useNavigate();
 
   const handleCheckboxChange = (clienteId: number) => {
     setClientesSelecionados((prevSelecionados) => {
@@ -204,6 +207,15 @@ export default function Nfcom() {
     <div>
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
+      <div className="flex justify-center sm:justify-start sm:ml-2 px-4 pb-6 sm:px-6 lg:px-8">
+        <button
+          onClick={() => navigate("/Nfcom/Buscar")}
+          className="bg-blue-600 text-white py-5 sm:py-4 px-6 rounded-lg hover:bg-blue-700 transition-all font-medium shadow-md flex items-center gap-2"
+        >
+          <CiSearch className="text-xl" />
+          Buscar NFCom Geradas e Homologadas
+        </button>
+      </div>
       <Filter
         setActiveFilters={setActiveFilters}
         setDate={setDateFilter}
