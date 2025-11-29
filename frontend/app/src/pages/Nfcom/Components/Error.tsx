@@ -1,15 +1,20 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react'
+import { useState } from "react";
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
+  DialogTitle,
+} from "@headlessui/react";
 import { VscError } from "react-icons/vsc";
 
 interface Message {
-    message: string
+  message: string;
 }
 
-export default function Error({ message } : Message) {
-  const [open, setOpen] = useState(true)
+export default function Error({ message }: Message) {
+  const [open, setOpen] = useState(true);
 
   return (
     <Dialog open={open} onClose={setOpen} className="relative z-10">
@@ -22,20 +27,21 @@ export default function Error({ message } : Message) {
         <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
           <DialogPanel
             transition
-            className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all data-[closed]:translate-y-4 data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in sm:my-8 sm:w-full sm:max-w-sm sm:p-6 data-[closed]:sm:translate-y-0 data-[closed]:sm:scale-95"
+            className="self-center relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all data-[closed]:translate-y-4 data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in sm:my-8 sm:w-full sm:max-w-sm sm:p-6 data-[closed]:sm:translate-y-0 data-[closed]:sm:scale-95"
           >
             <div>
               <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-red-100">
                 <VscError aria-hidden="true" className="size-6 text-red-600" />
               </div>
               <div className="mt-3 text-center sm:mt-5">
-                <DialogTitle as="h3" className="text-base font-semibold text-gray-900">
+                <DialogTitle
+                  as="h3"
+                  className="text-base font-semibold text-gray-900"
+                >
                   Ocorreu um erro
                 </DialogTitle>
                 <div className="mt-2">
-                  <p className="text-sm text-gray-500">
-                    {message}
-                  </p>
+                  <p className="text-sm text-gray-500">{message}</p>
                 </div>
               </div>
             </div>
@@ -52,5 +58,5 @@ export default function Error({ message } : Message) {
         </div>
       </div>
     </Dialog>
-  )
+  );
 }

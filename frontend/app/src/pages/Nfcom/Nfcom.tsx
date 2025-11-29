@@ -104,20 +104,81 @@ export default function Nfcom() {
           timeout: 480000,
         }
       );
-      setDadosNFe(resposta.data);
-      console.log(resposta.data);
-      setSuccess("NF-e emitida com sucesso.");
+
+      console.log("Resposta da API:", resposta.data);
+
+      // Verificar se a resposta contém erros da SEFAZ
+      if (Array.isArray(resposta.data) && resposta.data.length > 0) {
+        const resultados = resposta.data;
+        const erros = resultados.filter((r: any) => r.error === true);
+        const sucessos = resultados.filter((r: any) => r.success === true);
+
+        if (erros.length > 0) {
+          // Montar mensagem de erro detalhada
+          const mensagensErro = erros
+            .map((erro: any, index: number) => {
+              let msg = `NFCom ${index + 1}:\n`;
+
+              if (erro.cStat) {
+                msg += `Código: ${erro.cStat}\n`;
+              }
+
+              if (erro.message) {
+                // Limpar mensagem removendo prefixos como "Rejeição:"
+                const mensagemLimpa = erro.message.replace(
+                  /^(Rejeição|Erro):\s*/i,
+                  ""
+                );
+                msg += `${mensagemLimpa}\n`;
+              }
+
+              if (erro.id) {
+                msg += `ID: ${erro.id}\n`;
+              }
+
+              return msg;
+            })
+            .join("\n");
+
+          if (sucessos.length > 0) {
+            // Parcialmente bem-sucedido
+            setError(
+              `${sucessos.length} NFCom(s) emitida(s) com sucesso, mas ${erros.length} falharam:\n\n${mensagensErro}`
+            );
+            setSuccess(
+              `${sucessos.length} NFCom(s) processada(s) com sucesso!`
+            );
+          } else {
+            // Todos falharam
+            setError(`Falha ao emitir NFCom:\n\n${mensagensErro}`);
+          }
+        } else if (sucessos.length > 0) {
+          // Todos bem-sucedidos
+          setSuccess(`${sucessos.length} NFCom(s) emitida(s) com sucesso!`);
+        } else {
+          // Resposta inesperada
+          setError("Resposta inesperada do servidor. Verifique os logs.");
+        }
+
+        setDadosNFe(resposta.data);
+      } else {
+        // Formato de resposta antigo ou diferente
+        setDadosNFe(resposta.data);
+        setSuccess("NFCom emitida com sucesso.");
+      }
     } catch (erro) {
-      console.error("Erro ao emitir NF-e:", erro);
+      console.error("Erro ao emitir NFCom:", erro);
       if (
         axios.isAxiosError(erro) &&
         erro.response &&
         erro.response.data &&
         erro.response.data.erro
       ) {
-        setError(`Erro ao emitir NF-e: ${erro.response.data.erro}`);
+        setError(`Erro ao emitir NFCom: ${erro.response.data.erro}`);
+      } else if (axios.isAxiosError(erro) && erro.response) {
+        setError(`Erro ao emitir NFCom: ${JSON.stringify(erro.response.data)}`);
       } else {
-        setError("Erro desconhecido ao emitir NF-e.");
+        setError("Erro desconhecido ao emitir NFCom.");
       }
     } finally {
       setShowPopUp(false);

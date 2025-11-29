@@ -14,6 +14,7 @@ import { Faturas } from "../entities/Faturas";
 import { NFCom } from "../entities/NFCom";
 import dotenv from "dotenv";
 import DataSource from "../database/DataSource";
+import { Between } from "typeorm";
 dotenv.config();
 
 // Interfaces para tipagem dos dados da NFCom
@@ -503,15 +504,26 @@ class Nfcom {
       const { searchParams } = req.body;
       console.log(searchParams);
 
+      const dataStringLocal = `${searchParams.data}T00:00:00`;
+
+      // 2. dataInicio agora será 2025-11-29T00:00:00 no fuso local (-03:00)
+      const dataInicio = new Date(dataStringLocal);
+      // Resultado (em UTC): 2025-11-29T03:00:00.000Z. Correto!
+
+      // 3. dataFim: Calcula o final do dia
+      const dataFim = new Date(dataInicio);
+      dataFim.setDate(dataFim.getDate() + 1);
+      dataFim.setHours(0, 0, 0, 0);
+
       const NFComRepository = DataSource.getRepository(NFCom);
       const nfcom = await NFComRepository.find({
         where: {
           pppoe: searchParams.pppoe,
           fatura_id: searchParams.titulo,
-          data_emissao: searchParams.data,
+          data_emissao: Between(dataInicio, dataFim),
         },
       });
-      res.json(nfcom);
+      res.status(200).json(nfcom);
     } catch (error) {
       console.error("Erro ao buscar NFCom:", error);
       res.status(500).json({ error: "Erro ao buscar NFCom" });

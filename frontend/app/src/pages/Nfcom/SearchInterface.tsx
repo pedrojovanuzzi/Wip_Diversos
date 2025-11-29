@@ -8,16 +8,27 @@ import Success from "./Components/Success";
 import { useAuth } from "../../context/AuthContext";
 
 interface NFComResult {
+  // Dados primários
   id: number;
-  numero: string;
+  fatura_id: number; // ID da fatura (corresponde a 'titulo' na sua interface anterior, mas é um número)
+
+  // Dados da NFCom
+  chave: string; // Chave de acesso da NFCom (Substitui 'chaveAcesso')
+  nNF: string; // Número da NF (equivale a 'numero' anterior)
   serie: string;
-  cliente: string;
-  pppoe: string;
-  titulo: string;
-  dataEmissao: string;
-  valor: string;
-  status: string;
-  chaveAcesso?: string;
+
+  // Dados do Cliente/Serviço
+  cliente_id: number;
+  pppoe: string; // Identificador do assinante (equivale a 'pppoe' anterior)
+
+  // Datas e Status
+  data_emissao: string; // Data e hora da emissão no formato ISO 8601
+  status: "autorizada" | "rejeitada" | "pendente" | string; // Status da NFCom
+
+  // Informações de Consulta e Protocolo
+  protocolo: string; // Número do protocolo de autorização (nProt)
+  qrcodeLink: string; // Link direto para o QRCode (Substitui o 'valor' anterior, que não está presente)
+  xml: string;
 }
 
 export default function SearchInterface() {
@@ -60,6 +71,7 @@ export default function SearchInterface() {
       setSuccess(
         `${resposta.data.length} NFCom(s) encontrada(s) e homologada(s).`
       );
+      console.log(resposta.data);
     } catch (erro) {
       console.error("Erro ao buscar NFCom:", erro);
       if (axios.isAxiosError(erro) && erro.response) {
@@ -233,13 +245,13 @@ export default function SearchInterface() {
                         PPPOE
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Título
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Data Emissão
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Valor
+                        Chave
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Nota Fiscal
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
@@ -250,27 +262,34 @@ export default function SearchInterface() {
                     {nfcomList.map((nfcom) => (
                       <tr key={nfcom.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {nfcom.numero}
+                          {nfcom.nNF}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-500">
                           {nfcom.serie}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {nfcom.cliente}
+                        <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-900">
+                          {nfcom.cliente_id}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-500">
                           {nfcom.pppoe}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {nfcom.titulo}
+                        <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-500">
+                          {nfcom.data_emissao}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {nfcom.dataEmissao}
+                        <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-900">
+                          {nfcom.chave}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          R$ {nfcom.valor}
+                        <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-900">
+                          <a
+                            href={nfcom.qrcodeLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            Ver Nota Fiscal
+                          </a>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 text-left whitespace-nowrap">
                           <span
                             className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                               nfcom.status === "Autorizada"
