@@ -94,7 +94,7 @@ class NFSEController {
       aliquota = aliquota.replace(",", ".").replace("%", "");
       if (!service) service = "Servico de Suporte Tecnico";
 
-      if (!reducao) reducao = 40;
+      if (!reducao) reducao = 60;
 
       // Garante que o valor é uma string antes de manipulá-la
       let reducaoStr = String(reducao);
