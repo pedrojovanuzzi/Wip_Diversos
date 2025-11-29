@@ -11,6 +11,7 @@ import { processarCertificado } from "../utils/certUtils";
 import MkauthSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
+import { NFCom } from "../entities/NFCom";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -405,13 +406,42 @@ class Nfcom {
     xmlRetorno: string,
     nfComData: INFComData
   ): Promise<void> {
-    // TODO: Implementar a inserção dos dados no banco de dados
-    console.log("=== INSERIR DADOS NO BANCO ===");
-    console.log("NFCom Data:", nfComData.ide.nNF);
-    console.log("XML Retorno:", xmlRetorno);
-    console.log("==============================");
-    // Aqui você irá implementar a lógica para salvar as informações
-    // Exemplo: Salvar chave de acesso, protocolo, data de autorização, etc.
+    try {
+      const NFComRepository = MkauthSource.getRepository(NFCom);
+
+      // Extrair protocolo e data de autorização do XML de retorno se possível
+      // Por enquanto, vamos usar valores padrão ou extraídos via regex simples se necessário
+      // O XML de retorno deve conter <nProt> e <dhRecbto>
+
+      let protocolo = "";
+      const matchProt = xmlRetorno.match(/<nProt>(.*?)<\/nProt>/);
+      if (matchProt) {
+        protocolo = matchProt[1];
+      }
+
+      const novaNFCom = new NFCom();
+      novaNFCom.nNF = nfComData.ide.nNF;
+      novaNFCom.serie = nfComData.ide.serie;
+
+      // Recalcular a chave ou extrair do ID
+      const chave =
+        nfComData.infNFComSupl.qrCodNFCom.match(/chNFCom=(\d+)/)?.[1] || "";
+      novaNFCom.chave = chave;
+
+      novaNFCom.xml = xmlRetorno; // Salvando o XML de retorno completo (ou poderia ser o enviado + protocolo)
+      novaNFCom.protocolo = protocolo;
+      novaNFCom.status = "autorizada";
+      novaNFCom.data_emissao = new Date();
+
+      // Tentar converter IDs para número
+      novaNFCom.cliente_id = parseInt(nfComData.assinante.iCodAssinante) || 0;
+      novaNFCom.fatura_id = parseInt(nfComData.ide.nNF) || 0; // Assumindo que nNF é o ID da fatura conforme lógica anterior
+
+      await NFComRepository.save(novaNFCom);
+      console.log(`NFCom ${novaNFCom.nNF} salva no banco com sucesso.`);
+    } catch (error) {
+      console.error("Erro ao salvar NFCom no banco:", error);
+    }
   }
 
   private calcularDV(data: INFComData): string {
