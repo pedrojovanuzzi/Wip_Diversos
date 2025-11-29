@@ -38,19 +38,19 @@ export interface INFComData {
   emit: {
     CNPJ: string;
     IE: string;
-    CRT: string;
-    xNome: string;
-    xFant: string;
+    CRT: "1";
+    xNome: "WIP TELECOM MULTIMIDIA EIRELI ME";
+    xFant: "WIP TELECOM MULTIMIDIA EIRELI ME";
     enderEmit: {
-      xLgr: string;
-      nro: string;
-      xBairro: string;
-      cMun: string;
-      xMun: string;
-      CEP: string;
-      UF: string;
-      fone?: string;
-      email?: string;
+      xLgr: "Rua Emilio Carraro N 945";
+      nro: "945";
+      xBairro: "Altos da Cidade";
+      cMun: "3503406";
+      xMun: "Arealva";
+      CEP: "17160380";
+      UF: "SP";
+      fone?: "1432961608";
+      email?: "wiptelecom@wiptelecom.net.br";
     };
   };
 
@@ -77,7 +77,7 @@ export interface INFComData {
   assinante: {
     iCodAssinante: string;
     tpAssinante: string;
-    tpServUtil: string;
+    tpServUtil: "1";
     NroTermPrinc?: string;
     cUFPrinc?: string;
     nContrato?: string;
@@ -157,6 +157,7 @@ export interface INFComData {
 class Nfcom {
   private homologacao: boolean = false;
   private WSDL_URL = "";
+  private qrCodeUrl = "";
 
   public gerarNfcom = async (req: Request, res: Response): Promise<void> => {
     let { password, clientesSelecionados, service, reducao, ambiente } =
@@ -195,7 +196,7 @@ class Nfcom {
 
       // Verifica se a fatura foi encontrada antes de buscar o cliente
       if (!FaturasData || !FaturasData.login) {
-        console.warn(`Fatura com ID ${item.id} não encontrada ou sem login.`);
+        console.warn(`Fatura com ID ${item} não encontrada ou sem login.`);
         return null; // Retorna null para este item
       }
 
@@ -203,29 +204,212 @@ class Nfcom {
         where: { login: FaturasData.login },
       });
 
-      // 2. O map deve retornar um objeto que você deseja usar
-      // Se você deseja retornar os dados da NFCom, use a variável 'data'
-      const data = {
-        cliente: ClientData,
-        fatura: FaturasData,
-        // ... outros dados da NFCom
+      if (!ClientData) {
+        console.warn(`Cliente com login ${FaturasData.login} não encontrado.`);
+        return null;
+      }
+
+      // Helper para formatar data
+      const formatDate = (date: Date) => {
+        const offset = -3 * 60 * 60 * 1000;
+        const localDate = new Date(date.getTime() + offset);
+        return localDate.toISOString().slice(0, 19) + "-03:00";
       };
 
-      return data;
+      const now = new Date();
+      const dhEmi = formatDate(now);
+
+      const vProd = parseFloat(FaturasData.valor || "0").toFixed(2);
+      const vItem = vProd;
+      const vNF = vProd;
+
+      // Limpeza de strings
+      const cleanString = (str: string) => str.replace(/\D/g, "");
+
+      // Determina CNPJ ou CPF
+      const docCliente = cleanString(ClientData.cpf_cnpj || "");
+      const isCnpj = docCliente.length > 11;
+
+      // Construção do objeto NFCom
+      const nfComData: INFComData = {
+        ide: {
+          cUF: "35",
+          tpAmb: this.homologacao ? "2" : "1",
+          mod: "62",
+          serie: "1",
+          nNF: FaturasData.id.toString(),
+          cNF: Math.floor(Math.random() * 9999999)
+            .toString()
+            .padStart(7, "0"),
+          cDV: "0", // Será calculado
+          dhEmi: dhEmi,
+          tpEmis: "1",
+          nSiteAutoriz: "0",
+          cMunFG: "3503406",
+          finNFCom: "0",
+          tpFat: "0",
+          verProc: "1",
+        },
+        emit: {
+          CNPJ: process.env.CPF_CNPJ as string,
+          IE: "185038930110",
+          CRT: "1",
+          xNome: "WIP TELECOM MULTIMIDIA EIRELI ME",
+          xFant: "WIP TELECOM MULTIMIDIA EIRELI ME",
+          enderEmit: {
+            xLgr: "Rua Emilio Carraro N 945",
+            nro: "945",
+            xBairro: "Altos da Cidade",
+            cMun: "3503406",
+            xMun: "Arealva",
+            CEP: "17160380",
+            UF: "SP",
+            fone: "1432961608",
+            email: "wiptelecom@wiptelecom.net.br",
+          },
+        },
+        dest: {
+          xNome: ClientData.nome || "CLIENTE SEM NOME",
+          ...(isCnpj ? { CNPJ: docCliente } : { CPF: docCliente }),
+          indIEDest: "9",
+          enderDest: {
+            xLgr: ClientData.endereco || "",
+            nro: ClientData.numero || "S/N",
+            xBairro: ClientData.bairro || "",
+            cMun: ClientData.cidade_ibge || "3503406",
+            xMun: ClientData.cidade || "",
+            CEP: cleanString(ClientData.cep || ""),
+            UF: ClientData.estado || "SP",
+            fone: ClientData.celular
+              ? cleanString(ClientData.celular)
+              : undefined,
+            email: ClientData.email || undefined,
+          },
+        },
+        assinante: {
+          iCodAssinante: ClientData.id.toString(),
+          tpAssinante: "1",
+          tpServUtil: "1",
+          nContrato: ClientData.contrato || undefined,
+          dContratoIni: ClientData.data_ins
+            ? new Date(ClientData.data_ins).toISOString().slice(0, 10)
+            : undefined,
+        },
+        det: [
+          {
+            nItem: "1",
+            prod: {
+              cProd: "001",
+              xProd: "ASSINATURA INTERNET",
+              cClass: "0100401",
+              CFOP: "5307",
+              uMed: "1",
+              qFaturada: "1",
+              vItem: vItem,
+              vProd: vProd,
+            },
+            imposto: {
+              indSemCST: "1",
+            },
+          },
+        ],
+        total: {
+          vProd: vProd,
+          ICMSTot: {
+            vBC: "0.00",
+            vICMS: "0.00",
+            vICMSDeson: "0.00",
+            vFCP: "0.00",
+          },
+          vCOFINS: "0.00",
+          vPIS: "0.00",
+          vFUNTTEL: "0.00",
+          vFUST: "0.00",
+          vRetTribTot: {
+            vRetPIS: "0.00",
+            vRetCofins: "0.00",
+            vRetCSLL: "0.00",
+            vIRRF: "0.00",
+          },
+          vDesc: "0.00",
+          vOutro: "0.00",
+          vNF: vNF,
+        },
+        gFat: {
+          CompetFat: FaturasData.datavenc
+            ? new Date(FaturasData.datavenc)
+                .toISOString()
+                .slice(0, 7)
+                .replace("-", "")
+            : new Date().toISOString().slice(0, 7).replace("-", ""),
+          dVencFat: FaturasData.datavenc
+            ? new Date(FaturasData.datavenc).toISOString().slice(0, 10)
+            : new Date().toISOString().slice(0, 10),
+          codBarras: FaturasData.nossonum,
+        },
+        infNFComSupl: {
+          qrCodNFCom: "this.qrCodeUrl",
+        },
+      };
+
+      // Calcular DV
+      nfComData.ide.cDV = this.calcularDV(nfComData);
+
+      return nfComData;
     });
 
     const resultados = await Promise.all(promises);
 
-    // 4. Filtra resultados nulos (se algum item não foi encontrado)
-    const dadosFinaisNFCom = resultados.filter((data) => data !== null);
+    // 4. Filtra resultados nulos e faz o type assertion
+    const dadosFinaisNFCom = resultados.filter(
+      (data): data is INFComData => data !== null
+    );
 
-    console.log(dadosFinaisNFCom);
+    console.log(`Gerando ${dadosFinaisNFCom.length} notas...`);
 
-    // const xml = this.gerarXml(data, password);
-    // const response = await this.enviarNfcom(xml, password);
-    // res.status(200).json(response);
-    res.status(200).json({ message: "Nfcom gerada com sucesso" });
+    const responses = [];
+
+    for (const data of dadosFinaisNFCom) {
+      try {
+        const xml = this.gerarXml(data, password);
+        // console.log(xml);
+        const response = await this.enviarNfcom(xml, password);
+        responses.push(response);
+        console.log(response);
+
+        responses.push({ xmlGenerated: true, id: data.ide.nNF });
+      } catch (e: any) {
+        console.error(`Erro ao gerar nota ${data.ide.nNF}:`, e);
+        responses.push({ error: e.message, id: data.ide.nNF });
+      }
+    }
+
+    res.status(200).json(responses);
   };
+
+  private calcularDV(data: INFComData): string {
+    const chaveSemDV = `${data.ide.cUF}${data.ide.dhEmi.substring(
+      2,
+      4
+    )}${data.ide.dhEmi.substring(5, 7)}${data.emit.CNPJ.padStart(
+      14,
+      "0"
+    )}62${data.ide.serie.padStart(3, "0")}${data.ide.nNF.padStart(9, "0")}${
+      data.ide.tpEmis
+    }${data.ide.nSiteAutoriz || "0"}${data.ide.cNF.padStart(7, "0")}`;
+
+    let soma = 0;
+    let peso = 2;
+    for (let i = chaveSemDV.length - 1; i >= 0; i--) {
+      soma += parseInt(chaveSemDV[i]) * peso;
+      peso++;
+      if (peso > 9) peso = 2;
+    }
+
+    const resto = soma % 11;
+    const dv = resto < 2 ? 0 : 11 - resto;
+    return dv.toString();
+  }
 
   // public gerarNfcomWit(data: INFComData, password: string): string {
   //   const xml = this.gerarXml(data);
@@ -323,6 +507,11 @@ class Nfcom {
         `Chave de acesso gerada tem tamanho inválido: ${chaveAcessoCompleta.length} (esperado 44). Verifique cNF e nSiteAutoriz.`
       );
     }
+
+    const qrCodeContent = `http://dfe-portal.svrs.rs.gov.br/NFCom/QRCode?chNFCom=${chaveAcessoCompleta}&tpAmb=${
+      this.homologacao ? "2" : "1"
+    }`;
+    this.qrCodeUrl = qrCodeContent;
 
     const id = `NFCom${chaveAcessoCompleta}`;
 
@@ -468,6 +657,8 @@ class Nfcom {
       console.error("Erro ao assinar XML:", error);
       xmlInternoAssinado = xmlInternoSemAssinatura;
     }
+
+    console.log(xmlInternoAssinado);
 
     // 5. Compacta GZIP
     const xmlComprimidoBase64 = this.compactarXML(xmlInternoAssinado);
