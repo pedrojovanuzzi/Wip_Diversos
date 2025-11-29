@@ -223,6 +223,8 @@ class Nfcom {
       const dhEmi = formatDate(now);
 
       const vProd = (parseFloat(FaturasData.valor || "0") - reducao).toFixed(2);
+      console.log(vProd);
+
       const vItem = vProd;
       const vNF = vProd;
 
