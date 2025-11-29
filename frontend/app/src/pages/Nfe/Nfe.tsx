@@ -360,7 +360,7 @@ export const Nfe = () => {
                 .replace(/[^a-zA-Z0-9 ]/g, "")
             );
           }}
-          placeholder="Redução Ex: 40%"
+          placeholder="Redução Ex: 60%"
           className="ring-2 ring-gray-500 p-2 rounded m-5"
         />
       </div>

@@ -176,7 +176,7 @@ class Nfcom {
         "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
     }
 
-    if (!reducao) reducao = 60;
+    if (!reducao) reducao = 40;
 
     console.log(this.WSDL_URL);
     let reducaoStr = String(reducao);
@@ -222,7 +222,7 @@ class Nfcom {
       const now = new Date();
       const dhEmi = formatDate(now);
 
-      const vProd = parseFloat(FaturasData.valor || "0").toFixed(2);
+      const vProd = (parseFloat(FaturasData.valor || "0") - reducao).toFixed(2);
       const vItem = vProd;
       const vNF = vProd;
 
