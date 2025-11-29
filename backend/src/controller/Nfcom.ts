@@ -13,6 +13,7 @@ import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
 import { NFCom } from "../entities/NFCom";
 import dotenv from "dotenv";
+import DataSource from "../database/DataSource";
 dotenv.config();
 
 // Interfaces para tipagem dos dados da NFCom
@@ -345,10 +346,7 @@ class Nfcom {
           dVencFat: FaturasData.datavenc
             ? new Date(FaturasData.datavenc).toISOString().slice(0, 10)
             : new Date().toISOString().slice(0, 10),
-          codBarras:
-            cleanString(FaturasData.linhadig) ||
-            cleanString(FaturasData.codigo_barras) ||
-            cleanString(FaturasData.nossonum),
+          codBarras: cleanString(FaturasData.linhadig),
         },
         infNFComSupl: {
           qrCodNFCom: "",
@@ -410,7 +408,7 @@ class Nfcom {
     nfComData: INFComData
   ): Promise<void> {
     try {
-      const NFComRepository = MkauthSource.getRepository(NFCom);
+      const NFComRepository = DataSource.getRepository(NFCom);
 
       // Extrair protocolo e data de autorização do XML de retorno se possível
       // Por enquanto, vamos usar valores padrão ou extraídos via regex simples se necessário
