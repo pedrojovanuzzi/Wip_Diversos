@@ -424,9 +424,22 @@ class Nfcom {
       novaNFCom.nNF = nfComData.ide.nNF;
       novaNFCom.serie = nfComData.ide.serie;
 
-      // Recalcular a chave ou extrair do ID
-      const chave =
-        nfComData.infNFComSupl.qrCodNFCom.match(/chNFCom=(\d+)/)?.[1] || "";
+      // Recalcular a chave de acesso
+      const anoMes =
+        nfComData.ide.dhEmi.substring(2, 4) +
+        nfComData.ide.dhEmi.substring(5, 7);
+      const chaveSemDV = `${
+        nfComData.ide.cUF
+      }${anoMes}${nfComData.emit.CNPJ.padStart(
+        14,
+        "0"
+      )}62${nfComData.ide.serie.padStart(3, "0")}${nfComData.ide.nNF.padStart(
+        9,
+        "0"
+      )}${nfComData.ide.tpEmis}${
+        nfComData.ide.nSiteAutoriz || "0"
+      }${nfComData.ide.cNF.padStart(7, "0")}`;
+      const chave = `${chaveSemDV}${nfComData.ide.cDV}`;
       novaNFCom.chave = chave;
 
       novaNFCom.xml = xmlRetorno; // Salvando o XML de retorno completo (ou poderia ser o enviado + protocolo)
