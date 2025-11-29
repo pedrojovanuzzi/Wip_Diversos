@@ -14,7 +14,7 @@ import { Faturas } from "../entities/Faturas";
 import { NFCom } from "../entities/NFCom";
 import dotenv from "dotenv";
 import DataSource from "../database/DataSource";
-import { Between } from "typeorm";
+import { Between, FindOptionsWhere } from "typeorm";
 dotenv.config();
 
 // Interfaces para tipagem dos dados da NFCom
@@ -503,26 +503,45 @@ class Nfcom {
     try {
       const { searchParams } = req.body;
       console.log(searchParams);
+      type NFComWhere = FindOptionsWhere<NFCom>;
+      // 1. Inicia o objeto WHERE com os filtros obrigatórios
+      const whereConditions: NFComWhere = {
+        // Garante que 'titulo' (ID da fatura) seja tratado como número, se for o caso
+        fatura_id: searchParams.titulo
+          ? Number(searchParams.titulo)
+          : undefined,
+        pppoe: searchParams.pppoe || undefined, // Evita buscar por pppoe vazio se não fornecido
+      };
 
-      const dataStringLocal = `${searchParams.data}T00:00:00`;
+      // 2. Adiciona o filtro de data SOMENTE SE a data for fornecida
+      if (searchParams.data) {
+        // Lógica CORRETA para buscar o dia inteiro, ignorando o problema do fuso
 
-      // 2. dataInicio agora será 2025-11-29T00:00:00 no fuso local (-03:00)
-      const dataInicio = new Date(dataStringLocal);
-      // Resultado (em UTC): 2025-11-29T03:00:00.000Z. Correto!
+        // Define o início do dia no fuso horário local (ex: 2025-11-29T00:00:00 local)
+        const dataStringLocalInicio = `${searchParams.data}T00:00:00`;
+        const dataInicio = new Date(dataStringLocalInicio);
 
-      // 3. dataFim: Calcula o final do dia
-      const dataFim = new Date(dataInicio);
-      dataFim.setDate(dataFim.getDate() + 1);
-      dataFim.setHours(0, 0, 0, 0);
+        // Define o limite superior como o INÍCIO do dia seguinte (ex: 2025-11-30T00:00:00 local)
+        const dataFimLimite = new Date(dataInicio);
+        dataFimLimite.setDate(dataFimLimite.getDate() + 1);
+        // setHours(0, 0, 0, 0) não é necessário aqui, pois já está no início do dia.
 
+        // Adiciona a condição BETWEEN usando o formato ISO string (recomendado pelo TypeORM)
+        // WHERE data_emissao >= dataInicio AND data_emissao < dataFimLimite
+        whereConditions.data_emissao = Between(
+          dataInicio, // Type Date (correto!)
+          dataFimLimite // Type Date (correto!)
+        );
+      }
+
+      // 3. Executa a busca com as condições montadas
       const NFComRepository = DataSource.getRepository(NFCom);
       const nfcom = await NFComRepository.find({
-        where: {
-          pppoe: searchParams.pppoe,
-          fatura_id: searchParams.titulo,
-          data_emissao: Between(dataInicio, dataFim),
-        },
+        where: whereConditions,
       });
+
+      // Se precisar de mais detalhes, considere adicionar .relations, .order, etc.
+
       res.status(200).json(nfcom);
     } catch (error) {
       console.error("Erro ao buscar NFCom:", error);
