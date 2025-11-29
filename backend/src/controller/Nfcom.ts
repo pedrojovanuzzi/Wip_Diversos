@@ -376,6 +376,21 @@ class Nfcom {
         responses.push(response);
         console.log(response);
 
+        // Verifica se a nota foi autorizada (cStat = 100)
+        // A resposta pode vir como objeto (se o axios parsear) ou string.
+        // Assumindo string baseada no log anterior.
+        let responseStr = response;
+        if (typeof response !== "string") {
+          responseStr = JSON.stringify(response);
+        }
+
+        // Verificação simples via Regex para encontrar cStat=100
+        // Pode ser melhorado com parser XML se necessário, mas regex é eficiente para isso.
+        if (responseStr.includes("<cStat>100</cStat>")) {
+          console.log(`Nota ${data.ide.nNF} autorizada! Inserindo no banco...`);
+          await this.inserirDadosBanco(responseStr, data);
+        }
+
         responses.push({ xmlGenerated: true, id: data.ide.nNF });
       } catch (e: any) {
         console.error(`Erro ao gerar nota ${data.ide.nNF}:`, e);
@@ -385,6 +400,19 @@ class Nfcom {
 
     res.status(200).json(responses);
   };
+
+  private async inserirDadosBanco(
+    xmlRetorno: string,
+    nfComData: INFComData
+  ): Promise<void> {
+    // TODO: Implementar a inserção dos dados no banco de dados
+    console.log("=== INSERIR DADOS NO BANCO ===");
+    console.log("NFCom Data:", nfComData.ide.nNF);
+    console.log("XML Retorno:", xmlRetorno);
+    console.log("==============================");
+    // Aqui você irá implementar a lógica para salvar as informações
+    // Exemplo: Salvar chave de acesso, protocolo, data de autorização, etc.
+  }
 
   private calcularDV(data: INFComData): string {
     const chaveSemDV = `${data.ide.cUF}${data.ide.dhEmi.substring(
