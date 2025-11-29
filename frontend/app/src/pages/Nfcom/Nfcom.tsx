@@ -105,6 +105,7 @@ export default function Nfcom() {
         }
       );
       setDadosNFe(resposta.data);
+      console.log(resposta.data);
       setSuccess("NF-e emitida com sucesso.");
     } catch (erro) {
       console.error("Erro ao emitir NF-e:", erro);

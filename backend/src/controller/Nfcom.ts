@@ -374,22 +374,24 @@ class Nfcom {
     for (const item of dadosFinaisNFCom) {
       try {
         const xml = this.gerarXml(item.nfComData, password);
-        // console.log(xml);
         const response = await this.enviarNfcom(xml, password);
-        responses.push(response);
         console.log(response);
 
-        // Verifica se a nota foi autorizada (cStat = 100)
-        // A resposta pode vir como objeto (se o axios parsear) ou string.
-        // Assumindo string baseada no log anterior.
+        // Verifica se a resposta é uma string
         let responseStr = response;
         if (typeof response !== "string") {
           responseStr = JSON.stringify(response);
         }
 
-        // Verificação simples via Regex para encontrar cStat=100
-        // Pode ser melhorado com parser XML se necessário, mas regex é eficiente para isso.
-        if (responseStr.includes("<cStat>100</cStat>")) {
+        // Extrair cStat e xMotivo do XML de resposta
+        const cStatMatch = responseStr.match(/<cStat>(\d+)<\/cStat>/);
+        const xMotivoMatch = responseStr.match(/<xMotivo>(.*?)<\/xMotivo>/);
+
+        const cStat = cStatMatch ? cStatMatch[1] : null;
+        const xMotivo = xMotivoMatch ? xMotivoMatch[1] : "Erro desconhecido";
+
+        if (cStat === "100") {
+          // NFCom autorizada com sucesso
           console.log(
             `Nota ${item.nfComData.ide.nNF} autorizada! Inserindo no banco...`
           );
@@ -398,12 +400,40 @@ class Nfcom {
             item.nfComData,
             item.clientLogin
           );
+          responses.push({
+            success: true,
+            id: item.nfComData.ide.nNF,
+            message: "NFCom autorizada com sucesso",
+          });
+        } else {
+          // Erro na autorização da NFCom
+          console.error(
+            `Erro ao autorizar nota ${item.nfComData.ide.nNF}: ${cStat} - ${xMotivo}`
+          );
+          responses.push({
+            success: false,
+            error: true,
+            id: item.nfComData.ide.nNF,
+            cStat: cStat,
+            message: xMotivo,
+          });
         }
-
-        responses.push({ xmlGenerated: true, id: item.nfComData.ide.nNF });
       } catch (e: any) {
         console.error(`Erro ao gerar nota ${item.nfComData.ide.nNF}:`, e);
-        responses.push({ error: e.message, id: item.nfComData.ide.nNF });
+
+        // Tratamento específico para erros de certificado
+        let errorMessage = e.message;
+        if (e.message && e.message.includes("mac verify failure")) {
+          errorMessage =
+            "Erro no certificado digital: Senha incorreta ou certificado inválido";
+        }
+
+        responses.push({
+          success: false,
+          error: true,
+          id: item.nfComData.ide.nNF,
+          message: errorMessage,
+        });
       }
     }
 
