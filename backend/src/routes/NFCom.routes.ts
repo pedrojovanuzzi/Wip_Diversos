@@ -9,5 +9,6 @@ const nfcom = new Nfcom();
 const router: Router = Router();
 
 router.post("/emitirNFCom", AuthGuard, nfcom.gerarNfcom);
+router.post("/buscarNFCom", AuthGuard, nfcom.buscarNFCom);
 
 export default router;

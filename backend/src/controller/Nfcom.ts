@@ -459,6 +459,20 @@ class Nfcom {
     }
   }
 
+  public async buscarNFCom(req: Request, res: Response) {
+    try {
+      const { searchParams } = req.body;
+      console.log(searchParams);
+
+      // const NFComRepository = DataSource.getRepository(NFCom);
+      // const nfcom = await NFComRepository.find();
+      // res.json(nfcom);
+    } catch (error) {
+      console.error("Erro ao buscar NFCom:", error);
+      res.status(500).json({ error: "Erro ao buscar NFCom" });
+    }
+  }
+
   private calcularDV(data: INFComData): string {
     const chaveSemDV = `${data.ide.cUF}${data.ide.dhEmi.substring(
       2,

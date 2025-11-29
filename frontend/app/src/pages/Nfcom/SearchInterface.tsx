@@ -43,9 +43,11 @@ export default function SearchInterface() {
       if (titulo.trim()) searchParams.titulo = titulo.trim();
       if (data.trim()) searchParams.data = data.trim();
 
+      console.log(searchParams);
+
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/NFCom/buscarNFCom`,
-        searchParams,
+        `${process.env.REACT_APP_URL}/Nfcom/buscarNFCom`,
+        { searchParams },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -82,12 +84,6 @@ export default function SearchInterface() {
     setNfcomList([]);
     setError("");
     setSuccess("");
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
   };
 
   return (
@@ -138,7 +134,6 @@ export default function SearchInterface() {
                       type="text"
                       value={pppoe}
                       onChange={(e) => setPppoe(e.target.value)}
-                      onKeyPress={handleKeyPress}
                       placeholder="Ex: cliente@pppoe"
                       className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
@@ -162,7 +157,6 @@ export default function SearchInterface() {
                       type="text"
                       value={titulo}
                       onChange={(e) => setTitulo(e.target.value)}
-                      onKeyPress={handleKeyPress}
                       placeholder="Ex: 12345"
                       className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
@@ -186,7 +180,6 @@ export default function SearchInterface() {
                       type="date"
                       value={data}
                       onChange={(e) => setData(e.target.value)}
-                      onKeyPress={handleKeyPress}
                       className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
