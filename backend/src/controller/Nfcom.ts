@@ -345,7 +345,10 @@ class Nfcom {
           dVencFat: FaturasData.datavenc
             ? new Date(FaturasData.datavenc).toISOString().slice(0, 10)
             : new Date().toISOString().slice(0, 10),
-          codBarras: FaturasData.nossonum,
+          codBarras:
+            cleanString(FaturasData.linhadig) ||
+            cleanString(FaturasData.codigo_barras) ||
+            cleanString(FaturasData.nossonum),
         },
         infNFComSupl: {
           qrCodNFCom: "",
