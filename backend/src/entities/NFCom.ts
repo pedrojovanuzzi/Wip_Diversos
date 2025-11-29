@@ -34,4 +34,7 @@ export class NFCom {
 
   @Column({ type: "varchar", length: 255, nullable: true })
   qrcodeLink!: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  pppoe!: string;
 }

@@ -356,23 +356,24 @@ class Nfcom {
       // Calcular DV
       nfComData.ide.cDV = this.calcularDV(nfComData);
 
-      return nfComData;
+      return { nfComData, clientLogin: ClientData.login || "" };
     });
 
     const resultados = await Promise.all(promises);
 
     // 4. Filtra resultados nulos e faz o type assertion
     const dadosFinaisNFCom = resultados.filter(
-      (data): data is INFComData => data !== null
+      (data): data is { nfComData: INFComData; clientLogin: string } =>
+        data !== null
     );
 
     console.log(`Gerando ${dadosFinaisNFCom.length} notas...`);
 
     const responses = [];
 
-    for (const data of dadosFinaisNFCom) {
+    for (const item of dadosFinaisNFCom) {
       try {
-        const xml = this.gerarXml(data, password);
+        const xml = this.gerarXml(item.nfComData, password);
         // console.log(xml);
         const response = await this.enviarNfcom(xml, password);
         responses.push(response);
@@ -389,14 +390,20 @@ class Nfcom {
         // Verificação simples via Regex para encontrar cStat=100
         // Pode ser melhorado com parser XML se necessário, mas regex é eficiente para isso.
         if (responseStr.includes("<cStat>100</cStat>")) {
-          console.log(`Nota ${data.ide.nNF} autorizada! Inserindo no banco...`);
-          await this.inserirDadosBanco(responseStr, data);
+          console.log(
+            `Nota ${item.nfComData.ide.nNF} autorizada! Inserindo no banco...`
+          );
+          await this.inserirDadosBanco(
+            responseStr,
+            item.nfComData,
+            item.clientLogin
+          );
         }
 
-        responses.push({ xmlGenerated: true, id: data.ide.nNF });
+        responses.push({ xmlGenerated: true, id: item.nfComData.ide.nNF });
       } catch (e: any) {
-        console.error(`Erro ao gerar nota ${data.ide.nNF}:`, e);
-        responses.push({ error: e.message, id: data.ide.nNF });
+        console.error(`Erro ao gerar nota ${item.nfComData.ide.nNF}:`, e);
+        responses.push({ error: e.message, id: item.nfComData.ide.nNF });
       }
     }
 
@@ -405,7 +412,8 @@ class Nfcom {
 
   private async inserirDadosBanco(
     xmlRetorno: string,
-    nfComData: INFComData
+    nfComData: INFComData,
+    clientLogin: string
   ): Promise<void> {
     try {
       const NFComRepository = DataSource.getRepository(NFCom);
@@ -451,6 +459,7 @@ class Nfcom {
       novaNFCom.cliente_id = parseInt(nfComData.assinante.iCodAssinante) || 0;
       novaNFCom.fatura_id = parseInt(nfComData.ide.nNF) || 0; // Assumindo que nNF é o ID da fatura conforme lógica anterior
       novaNFCom.qrcodeLink = this.qrCodeUrl;
+      novaNFCom.pppoe = clientLogin;
 
       await NFComRepository.save(novaNFCom);
       console.log(`NFCom ${novaNFCom.nNF} salva no banco com sucesso.`);
@@ -464,9 +473,15 @@ class Nfcom {
       const { searchParams } = req.body;
       console.log(searchParams);
 
-      // const NFComRepository = DataSource.getRepository(NFCom);
-      // const nfcom = await NFComRepository.find();
-      // res.json(nfcom);
+      const NFComRepository = DataSource.getRepository(NFCom);
+      const nfcom = await NFComRepository.find({
+        where: {
+          pppoe: searchParams.pppoe,
+          fatura_id: searchParams.titulo,
+          data_emissao: searchParams.data,
+        },
+      });
+      res.json(nfcom);
     } catch (error) {
       console.error("Erro ao buscar NFCom:", error);
       res.status(500).json({ error: "Erro ao buscar NFCom" });
