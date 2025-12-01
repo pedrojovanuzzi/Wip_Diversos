@@ -231,7 +231,7 @@ export default function Nfcom() {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
     try {
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
+        `${process.env.REACT_APP_URL}/NFCom/buscarClientes`,
         {
           cpf: searchCpfRegex,
           filters: activeFilters,

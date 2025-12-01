@@ -1,7 +1,4 @@
-import {
-  Disclosure,
-
-} from "@headlessui/react";
+import { Disclosure } from "@headlessui/react";
 import { FunnelIcon } from "@heroicons/react/20/solid";
 import { useState } from "react";
 import Calendar from "./Calendar";
@@ -26,7 +23,7 @@ const filters = {
     { value: "5_PFJ_FIBRA_800M", label: "800M" },
   ],
   cli_ativado: [{ value: "active_client", label: "Cliente Ativo" }],
-  SCM: [{ value: "SCM", label: "SCM" }],
+  SVA: [{ value: "SVA", label: "SVA" }],
   servicos: [{ value: "servicos", label: "Servicos" }],
   vencimento: [
     { value: "05", label: "Dia 5" },
@@ -86,7 +83,7 @@ export default function Filter({
       plano: [] as string[],
       vencimento: [] as string[],
       cli_ativado: [] as string[],
-      SCM: [] as string[],
+      SVA: [] as string[],
       servicos: [] as string[],
     };
     const planos = [
@@ -104,7 +101,7 @@ export default function Filter({
     const servicos = ["servicos"];
     filtersArray.forEach((f) => {
       if (planos.includes(f)) categorizedFilters.plano.push(f);
-      else if (f === "SCM") categorizedFilters.SCM = [f];
+      else if (f === "SVA") categorizedFilters.SVA = [f];
       else if (f === "active_client") categorizedFilters.cli_ativado = [f];
       else if (vencimentos.includes(f)) categorizedFilters.vencimento.push(f);
       else if (servicos.includes(f)) categorizedFilters.servicos = [f];
@@ -308,7 +305,7 @@ export default function Filter({
                     </label>
                   </div>
                 ))}
-                {filters.SCM.map((option, optionIdx) => (
+                {filters.SVA.map((option, optionIdx) => (
                   <div key={option.value} className="flex gap-3">
                     <div className="flex h-5 shrink-0 items-center">
                       <div className="group grid size-4 grid-cols-1">

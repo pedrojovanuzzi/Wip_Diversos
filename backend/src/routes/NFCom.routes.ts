@@ -10,5 +10,6 @@ const router: Router = Router();
 
 router.post("/emitirNFCom", AuthGuard, nfcom.gerarNfcom);
 router.post("/buscarNFCom", AuthGuard, nfcom.buscarNFCom);
+router.post("/buscarClientes", AuthGuard, nfcom.BuscarClientes);
 
 export default router;

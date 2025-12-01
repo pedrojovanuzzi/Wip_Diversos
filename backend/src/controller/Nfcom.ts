@@ -6,7 +6,7 @@ import forge from "node-forge";
 import { SignedXml } from "xml-crypto";
 import axios from "axios";
 import * as https from "https";
-import { gzipSync } from "zlib";
+import { gunzipSync, gzipSync } from "zlib";
 import { processarCertificado } from "../utils/certUtils";
 import MkauthSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
@@ -14,7 +14,7 @@ import { Faturas } from "../entities/Faturas";
 import { NFCom } from "../entities/NFCom";
 import dotenv from "dotenv";
 import DataSource from "../database/DataSource";
-import { Between, FindOptionsWhere } from "typeorm";
+import { Between, FindOptionsWhere, In, IsNull } from "typeorm";
 dotenv.config();
 
 // Interfaces para tipagem dos dados da NFCom
@@ -378,17 +378,21 @@ class Nfcom {
 
     for (const item of dadosFinaisNFCom) {
       try {
-        const xml = this.gerarXml(item.nfComData, password);
-        const response = await this.enviarNfcom(xml, password);
+        // 1. Recebe o objeto desestruturado
+        const { soapEnvelope, xmlAssinado } = this.gerarXml(
+          item.nfComData,
+          password
+        );
+
+        // Envia apenas o envelope SOAP
+        const response = await this.enviarNfcom(soapEnvelope, password);
         console.log(response);
 
-        // Verifica se a resposta é uma string
         let responseStr = response;
         if (typeof response !== "string") {
           responseStr = JSON.stringify(response);
         }
 
-        // Extrair cStat e xMotivo do XML de resposta
         const cStatMatch = responseStr.match(/<cStat>(\d+)<\/cStat>/);
         const xMotivoMatch = responseStr.match(/<xMotivo>(.*?)<\/xMotivo>/);
 
@@ -396,15 +400,35 @@ class Nfcom {
         const xMotivo = xMotivoMatch ? xMotivoMatch[1] : "Erro desconhecido";
 
         if (cStat === "100") {
-          // NFCom autorizada com sucesso
           console.log(
-            `Nota ${item.nfComData.ide.nNF} autorizada! Inserindo no banco...`
+            `Nota ${item.nfComData.ide.nNF} autorizada! Montando XML Final...`
           );
+
+          // 2. Extrai APENAS o bloco do Protocolo da resposta
+          // Regex busca <protNFCom ...> até </protNFCom>
+          const protMatch = responseStr.match(
+            /<protNFCom[^>]*>[\s\S]*?<\/protNFCom>/
+          );
+
+          if (!protMatch) {
+            throw new Error(
+              "Nota autorizada, mas protocolo não encontrado na resposta."
+            );
+          }
+
+          const protocoloXml = protMatch[0];
+
+          // 3. Monta o XML de Distribuição (nfcomProc)
+          // Padrão: <nfcomProc> <NFCom>...</NFCom> <protNFCom>...</protNFCom> </nfcomProc>
+          const xmlFinalDistrib = `<?xml version="1.0" encoding="UTF-8"?><nfcomProc xmlns="http://www.portalfiscal.inf.br/nfcom" versao="1.00">${xmlAssinado}${protocoloXml}</nfcomProc>`;
+
+          // 4. Passa o XML FINAL (String pura) para o banco
           await this.inserirDadosBanco(
-            responseStr,
+            xmlFinalDistrib,
             item.nfComData,
             item.clientLogin
           );
+
           responses.push({
             success: true,
             id: item.nfComData.ide.nNF,
@@ -446,62 +470,70 @@ class Nfcom {
   };
 
   private async inserirDadosBanco(
-    xmlRetorno: string,
+    xmlRetorno: string, // Agora recebe o XML Final (nfcomProc) em texto puro
     nfComData: INFComData,
     clientLogin: string
   ): Promise<void> {
     try {
       const NFComRepository = DataSource.getRepository(NFCom);
 
-      // Extrair protocolo e data de autorização do XML de retorno se possível
-      // Por enquanto, vamos usar valores padrão ou extraídos via regex simples se necessário
-      // O XML de retorno deve conter <nProt> e <dhRecbto>
+      const xmlFinal = xmlRetorno;
 
+      // Extração do Protocolo (para garantir que temos o dado)
       let protocolo = "";
-      const matchProt = xmlRetorno.match(/<nProt>(.*?)<\/nProt>/);
+      const matchProt = xmlFinal.match(/<nProt>(\d+)<\/nProt>/);
       if (matchProt) {
         protocolo = matchProt[1];
       }
 
       const novaNFCom = new NFCom();
+
+      // Recalcula ou usa a chave existente
+      const chaveAcesso = this.calcularChaveAcesso(nfComData);
+
+      novaNFCom.chave = chaveAcesso;
       novaNFCom.nNF = nfComData.ide.nNF;
       novaNFCom.serie = nfComData.ide.serie;
 
-      // Recalcular a chave de acesso
-      const anoMes =
-        nfComData.ide.dhEmi.substring(2, 4) +
-        nfComData.ide.dhEmi.substring(5, 7);
-      const chaveSemDV = `${
-        nfComData.ide.cUF
-      }${anoMes}${nfComData.emit.CNPJ.padStart(
-        14,
-        "0"
-      )}62${nfComData.ide.serie.padStart(3, "0")}${nfComData.ide.nNF.padStart(
-        9,
-        "0"
-      )}${nfComData.ide.tpEmis}${
-        nfComData.ide.nSiteAutoriz || "0"
-      }${nfComData.ide.cNF.padStart(7, "0")}`;
-      const chave = `${chaveSemDV}${nfComData.ide.cDV}`;
-      novaNFCom.chave = chave;
+      // Salva o XML Completo (<nfcomProc>...</nfcomProc>)
+      novaNFCom.xml = xmlFinal;
 
-      novaNFCom.xml = xmlRetorno; // Salvando o XML de retorno completo (ou poderia ser o enviado + protocolo)
       novaNFCom.protocolo = protocolo;
-      novaNFCom.status = "autorizada";
-      novaNFCom.data_emissao = new Date();
+      novaNFCom.status = protocolo ? "autorizada" : "pendente"; // Se chegou aqui com XML montado, é autorizada
 
-      // Tentar converter IDs para número
-      novaNFCom.cliente_id = parseInt(nfComData.assinante.iCodAssinante) || 0;
-      novaNFCom.fatura_id = parseInt(nfComData.ide.nNF) || 0; // Assumindo que nNF é o ID da fatura conforme lógica anterior
+      novaNFCom.data_emissao = new Date(nfComData.ide.dhEmi);
+      novaNFCom.cliente_id =
+        parseInt(nfComData.assinante.iCodAssinante || "0") || 0;
+      novaNFCom.fatura_id = parseInt(nfComData.ide.nNF || "0") || 0;
       novaNFCom.qrcodeLink = this.qrCodeUrl;
       novaNFCom.pppoe = clientLogin;
-      novaNFCom.value = parseFloat(nfComData.total.vNF) || 0;
+      novaNFCom.value = parseFloat(nfComData.total.vNF || "0") || 0;
 
       await NFComRepository.save(novaNFCom);
-      console.log(`NFCom ${novaNFCom.nNF} salva no banco com sucesso.`);
+      console.log(`✅ NFCom ${novaNFCom.nNF} salva no banco com sucesso.`);
     } catch (error) {
-      console.error("Erro ao salvar NFCom no banco:", error);
+      console.error("Erro no TypeORM ao salvar NFCom:", error);
+      throw new Error("Falha ao salvar a NFCom no banco de dados.");
     }
+  }
+
+  private calcularChaveAcesso(nfComData: INFComData): string {
+    const anoMes =
+      nfComData.ide.dhEmi.substring(2, 4) + nfComData.ide.dhEmi.substring(5, 7);
+
+    const chaveSemDV = `${
+      nfComData.ide.cUF
+    }${anoMes}${nfComData.emit.CNPJ.padStart(
+      14,
+      "0"
+    )}62${nfComData.ide.serie.padStart(3, "0")}${nfComData.ide.nNF.padStart(
+      9,
+      "0"
+    )}${nfComData.ide.tpEmis}${
+      nfComData.ide.nSiteAutoriz || "0"
+    }${nfComData.ide.cNF.padStart(7, "0")}`;
+
+    return `${chaveSemDV}${nfComData.ide.cDV}`;
   }
 
   public async buscarNFCom(req: Request, res: Response) {
@@ -551,6 +583,94 @@ class Nfcom {
     } catch (error) {
       console.error("Erro ao buscar NFCom:", error);
       res.status(500).json({ error: "Erro ao buscar NFCom" });
+    }
+  }
+
+  public async BuscarClientes(req: Request, res: Response) {
+    const { cpf, filters, dateFilter } = req.body;
+    const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+    const w: any = {};
+    let servicosFilter: string[] = ["mensalidade"];
+    if (cpf) w.cpf_cnpj = cpf;
+    if (filters) {
+      let { plano, vencimento, cli_ativado, SVA, servicos } = filters;
+      if (plano?.length) w.plano = In(plano);
+      if (vencimento?.length) w.venc = In(vencimento);
+      if (cli_ativado?.length) w.cli_ativado = In(["s"]);
+      if (SVA?.length) {
+        w.vendedor = In(SVA);
+      } else {
+        w.vendedor = In(["SCM"]);
+      }
+      if (servicos?.length) servicosFilter = servicos;
+    }
+    try {
+      const clientesResponse = await ClientRepository.find({
+        where: w,
+        select: {
+          login: true,
+          cpf_cnpj: true,
+          cli_ativado: true,
+          desconto: true,
+        },
+        order: { id: "DESC" },
+      });
+      const faturasData = MkauthSource.getRepository(Faturas);
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const startDate = dateFilter
+        ? new Date(dateFilter.start)
+        : firstDayOfMonth;
+      const endDate = dateFilter ? new Date(dateFilter.end) : lastDayOfMonth;
+      startDate.setHours(startDate.getHours() + 3);
+      endDate.setHours(endDate.getHours() + 3);
+      const faturasResponse = await faturasData.find({
+        where: {
+          login: In(clientesResponse.map((c) => c.login)),
+          datavenc: Between(startDate, endDate),
+          datadel: IsNull(),
+          tipo: In(servicosFilter),
+        },
+        select: {
+          id: true,
+          login: true,
+          datavenc: true,
+          tipo: true,
+          valor: true,
+        },
+        order: { id: "DESC" },
+      });
+      const arr = clientesResponse
+        .map((cliente) => {
+          const fat = faturasResponse.filter((f) => f.login === cliente.login);
+          if (!fat.length) return null;
+          return {
+            ...cliente,
+            fatura: {
+              titulo: fat.map((f) => f.id).join(", ") || null,
+              login: fat.map((f) => f.login).join(", ") || null,
+              datavenc:
+                fat
+                  .map((f) => new Date(f.datavenc).toLocaleDateString("pt-BR"))
+                  .join(", ") || null,
+              tipo: fat.map((f) => f.tipo).join(", ") || null,
+              valor:
+                fat
+                  .map((f) =>
+                    (Number(f.valor) - (cliente.desconto || 0)).toFixed(2)
+                  )
+                  .join(", ") || null,
+            },
+          };
+        })
+        .filter((i): i is NonNullable<typeof i> => i !== null)
+        .sort((a, b) =>
+          (b?.fatura?.titulo || "").localeCompare(a?.fatura?.titulo || "")
+        );
+      res.status(200).json(arr);
+    } catch {
+      res.status(500).json({ message: "Erro ao buscar clientes" });
     }
   }
 
@@ -655,7 +775,10 @@ class Nfcom {
     }
   }
 
-  public gerarXml(data: INFComData, password: string): string {
+  public gerarXml(
+    data: INFComData,
+    password: string
+  ): { soapEnvelope: string; xmlAssinado: string } {
     // 1. Gera Chave de Acesso
     const anoMes =
       data.ide.dhEmi.substring(2, 4) + data.ide.dhEmi.substring(5, 7);
@@ -846,7 +969,7 @@ class Nfcom {
     </soap12:Body>
 </soap12:Envelope>`;
 
-    return soapEnvelope;
+    return { soapEnvelope, xmlAssinado: xmlInternoAssinado };
   }
 
   private assinarXml(xml: string, idTag: string, password: string): string {

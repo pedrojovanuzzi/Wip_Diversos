@@ -44,6 +44,11 @@ export default function SearchInterface() {
   const { user } = useAuth();
   const token = user?.token;
 
+  const createXmlDownloadUrl = (xmlContent: string): string => {
+    const blob = new Blob([xmlContent], { type: "text/xml" });
+    return URL.createObjectURL(blob);
+  };
+
   const handleSearch = async () => {
     try {
       setLoading(true);
@@ -258,6 +263,9 @@ export default function SearchInterface() {
                         Valor
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Download XML
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
                     </tr>
@@ -295,6 +303,25 @@ export default function SearchInterface() {
                         </td>
                         <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-900">
                           {nfcom.value}
+                        </td>
+                        <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-900">
+                          {/* A tag <a> com 'download' é usada para baixar o arquivo */}
+                          <a
+                            // 1. O 'href' usa a função auxiliar para gerar a URL temporária do Blob
+                            href={createXmlDownloadUrl(nfcom.xml)}
+                            // 2. O atributo 'download' força o salvamento e define o nome do arquivo sugerido
+                            download={`nfcom_${nfcom.nNF}_${nfcom.serie}.xml`}
+                            // Estilização
+                            className="text-indigo-600 hover:text-indigo-900 font-medium underline"
+                            // Boa prática: Liberar o recurso após o download ser iniciado (embora o navegador geralmente gerencie isso)
+                            onClick={(e) => {
+                              // Obter a URL gerada (por motivos de performance e segurança,
+                              // a URL deve ser revogada, idealmente após o download)
+                              // Por ser um Blob URL de criação instantânea, é seguro usá-lo diretamente no href.
+                            }}
+                          >
+                            Baixar XML ({nfcom.nNF})
+                          </a>
                         </td>
                         <td className="px-6 py-4 text-left whitespace-nowrap">
                           <span
