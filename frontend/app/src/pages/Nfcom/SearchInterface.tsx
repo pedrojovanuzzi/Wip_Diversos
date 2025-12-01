@@ -6,7 +6,6 @@ import { BiCalendar, BiUser, BiReceipt } from "react-icons/bi";
 import Error from "./Components/Error";
 import Success from "./Components/Success";
 import { useAuth } from "../../context/AuthContext";
-import PopUpButton from "./Components/PopUpButton";
 import PopUpCancelNFCom from "./Components/PopUpCancelNFCom";
 interface NFComResult {
   // Dados primários
@@ -59,27 +58,34 @@ export default function SearchInterface() {
     pppoe: string,
     password: string
   ) => {
-    setLoading(true);
-    setError("");
-    setSuccess("");
-    setShowPopUp(true);
-    const response = await axios.post(
-      `${process.env.REACT_APP_URL}/NFCom/cancelarNFCom`,
-      {
-        nNF: nnf,
-        pppoe: pppoe,
-        password: password,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+    try {
+      setLoading(true);
+      setError("");
+      setSuccess("");
+      setShowPopUp(true);
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/NFCom/cancelarNFCom`,
+        {
+          nNF: nnf,
+          pppoe: pppoe,
+          password: password,
         },
-      }
-    );
-    console.log("Resposta da API:", response.data);
-    setShowPopUp(false);
-    setLoading(false);
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      console.log("Resposta da API:", response.data);
+      setShowPopUp(false);
+      setLoading(false);
+    } catch (error) {
+      console.error("Erro ao cancelar NFCom:", error);
+      setError("Erro ao cancelar NFCom. Verifique os dados e tente novamente.");
+      setLoading(false);
+      setShowPopUp(false);
+    }
   };
 
   function handleCancelar(cliente: any): void {

@@ -592,25 +592,62 @@ class Nfcom {
     }
   }
 
-  public criarXMLCancelamento(protocolo: string) {
-    const docInterno = create({ version: "1.0", encoding: "UTF-8" });
+  private cleanXml(xml: string): string {
+    return xml
+      .replace(/>\s+</g, "><") // Remove espaços entre tags
+      .replace(/\s+xmlns/g, " xmlns") // Garante espaço único antes de xmlns (opcional, segurança)
+      .trim(); // Remove espaços do início e fim
+  }
 
-    // Namespace 'nfcom' minúsculo na tag raiz
-    const evCancNFCom = docInterno.ele("evCancNFCom", {
+  public criarXMLCancelamento(
+    chaveNFCom: string,
+    protocoloAutorizacao: string,
+    cnpjEmitente: string,
+    justificativa: string,
+    tpAmb: number
+  ) {
+    // 1. Definições
+    const tpEvento = "110111";
+    const nSeqEvento = "01";
+    // Data atual formatada (ajuste conforme necessidade de fuso)
+    const dataHora = new Date().toISOString().split(".")[0] + "-03:00";
+    const codigoUF = "35";
+
+    // 2. ID (Fundamental para a assinatura)
+    const idEvento = `ID${tpEvento}${chaveNFCom}${nSeqEvento}`;
+
+    // 3. Criação do Documento - Raiz agora é 'eventoNFCom'
+    const doc = create({ version: "1.0", encoding: "UTF-8" });
+
+    // A raiz é definida diretamente pelo tipo TEvento do XSD
+    const eventoNFCom = doc.ele("eventoNFCom", {
       xmlns: "http://www.portalfiscal.inf.br/nfcom",
-      targetNamespace: "http://www.portalfiscal.inf.br/nfcom",
+      versao: "1.00",
     });
 
-    const descEvento = evCancNFCom.ele("descEvento");
-    descEvento.txt("Cancelamento");
+    // 4. infEvento (O alvo da assinatura)
+    const infEvento = eventoNFCom.ele("infEvento", { Id: idEvento });
 
-    const nProt = evCancNFCom.ele("nProt");
-    nProt.txt(protocolo);
+    infEvento.ele("cOrgao").txt(codigoUF);
+    infEvento.ele("tpAmb").txt(String(tpAmb)); // 1=Prod, 2=Homolog
+    infEvento.ele("CNPJ").txt(cnpjEmitente);
+    infEvento.ele("chNFCom").txt(chaveNFCom);
+    infEvento.ele("dhEvento").txt(dataHora);
+    infEvento.ele("tpEvento").txt(tpEvento);
+    infEvento.ele("nSeqEvento").txt("1"); // Verifique se SEFAZ pede com ou sem zero à esquerda aqui. O XSD diz pattern [0-9]{1,3}, então '1' é válido.
 
-    const xJust = evCancNFCom.ele("xJust");
-    xJust.txt("Cancelamento de Nota Fiscal");
+    // 5. detEvento (Obrigatório segundo XSD)
+    const detEvento = infEvento.ele("detEvento", { versaoEvento: "1.00" });
 
-    return docInterno;
+    // 6. Dados específicos do Cancelamento
+    const evCancNFCom = detEvento.ele("evCancNFCom");
+
+    evCancNFCom.ele("descEvento").txt("Cancelamento");
+    evCancNFCom.ele("nProt").txt(protocoloAutorizacao);
+    evCancNFCom.ele("xJust").txt(justificativa);
+
+    // Retorna string para assinatura
+    return doc.end({ headless: true });
   }
 
   public cancelarNFcom = async (req: Request, res: Response) => {
@@ -618,16 +655,43 @@ class Nfcom {
       const { nNF, pppoe, password } = req.body;
       const NFComRepository = DataSource.getRepository(NFCom);
 
-      const xmlCancelamento = this.criarXMLCancelamento(nNF);
+      const nfcom = await NFComRepository.findOne({
+        where: {
+          nNF,
+          pppoe,
+        },
+      });
+      if (!nfcom) {
+        res.status(404).json({ error: "NFCom não encontrada" });
+        return;
+      }
+
+      const xmlCancelamento = this.criarXMLCancelamento(
+        nNF,
+        pppoe,
+        process.env.CPF_CNPJ as string,
+        "Cancelamento",
+        nfcom.tpAmb
+      );
+
+      const assinado = this.assinarXmlCancelamento(
+        xmlCancelamento,
+        `evCancNFCom${nNF}`,
+        password
+      );
 
       const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
       <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
           <soap12:Body>
-              <nfcomDadosMsg xmlns="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcao">
-                  ${xmlCancelamento.end({ prettyPrint: true })}
+              <nfcomDadosMsg xmlns="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcaoEvento">
+                  ${assinado}
               </nfcomDadosMsg>
           </soap12:Body>
       </soap12:Envelope>`;
+
+      const xmlBodyToSend = this.cleanXml(soapEnvelope);
+
+      console.log(xmlBodyToSend);
 
       const urlEnvio = this.homologacao
         ? "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcaoEvento/NFComRecepcaoEvento.asmx"
@@ -654,12 +718,12 @@ class Nfcom {
         rejectUnauthorized: false,
       });
 
-      const response = await axios.post(urlEnvio, soapEnvelope, {
+      const response = await axios.post(urlEnvio, xmlBodyToSend, {
         httpsAgent,
         headers: {
           // Action minúscula conforme WSDL
           "Content-Type":
-            'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcaoEvento"',
+            'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcaoEvento/nfcomRecepcaoEvento"',
         },
       });
 
@@ -1153,6 +1217,67 @@ class Nfcom {
     signer.computeSignature(xml, {
       location: {
         reference: "//*[local-name(.)='infNFComSupl']",
+        action: "after",
+      },
+    });
+
+    return signer.getSignedXml();
+  }
+
+  private assinarXmlCancelamento(
+    xml: string,
+    idTag: string,
+    password: string
+  ): string {
+    const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
+
+    if (!fs.existsSync(certPath)) {
+      throw new Error(`Certificado não encontrado em: ${certPath}`);
+    }
+
+    const pfxBuffer = fs.readFileSync(certPath);
+    const pfxAsn1 = forge.asn1.fromDer(
+      forge.util.createBuffer(pfxBuffer.toString("binary"))
+    );
+    const pfx = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, false, password);
+
+    const certBags = pfx.getBags({ bagType: forge.pki.oids.certBag })[
+      forge.pki.oids.certBag
+    ];
+    const keyBags = pfx.getBags({
+      bagType: forge.pki.oids.pkcs8ShroudedKeyBag,
+    })[forge.pki.oids.pkcs8ShroudedKeyBag];
+
+    if (!certBags || !keyBags) {
+      throw new Error(
+        "Não foi possível extrair certificado ou chave privada do PFX."
+      );
+    }
+
+    const certPem = forge.pki.certificateToPem(certBags[0]!.cert!);
+    const keyPem = forge.pki.privateKeyToPem(keyBags[0]!.key!);
+
+    const signer = new SignedXml();
+    signer.privateKey = keyPem;
+    signer.publicCert = certPem;
+
+    signer.canonicalizationAlgorithm =
+      "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
+    signer.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+
+    signer.addReference({
+      xpath: "//*[local-name(.)='infEvento']",
+      transforms: [
+        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      ],
+      digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
+      uri: "#" + idTag,
+    });
+
+    signer.computeSignature(xml, {
+      location: {
+        reference: "//*[local-name(.)='infEvento']",
         action: "after",
       },
     });
