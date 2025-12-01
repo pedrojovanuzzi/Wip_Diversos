@@ -212,13 +212,14 @@ class NFSEController {
             `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
           );
           const municipio = resp.data.id;
+
           let valorMenosDesconto = ClientData?.desconto
             ? Number(rpsData?.valor) - Number(ClientData?.desconto)
             : Number(rpsData?.valor);
           let valorReduzido =
             Number(reducao) === 0
               ? valorMenosDesconto
-              : Number(valorMenosDesconto) * Number(reducao);
+              : Number(valorMenosDesconto) * reducao;
           valorReduzido = Number(valorReduzido.toFixed(2));
           const novoRegistro = NsfeData.create({
             login: rpsData?.login || "",
@@ -375,7 +376,7 @@ class NFSEController {
     let val = ClientData?.desconto
       ? Number(rpsData?.valor) - Number(ClientData?.desconto)
       : Number(rpsData?.valor);
-    val = val * reducao;
+    val = val * (1 - reducao);
     val = Number(val.toFixed(2));
     let xml = `
       <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">

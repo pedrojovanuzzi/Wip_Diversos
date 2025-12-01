@@ -222,7 +222,9 @@ class Nfcom {
       const now = new Date();
       const dhEmi = formatDate(now);
 
-      const vProd = (parseFloat(FaturasData.valor || "0") - reducao).toFixed(2);
+      const value = parseFloat(FaturasData.valor) - ClientData.desconto;
+
+      const vProd = (value * (1 - reducao)).toFixed(2);
       console.log(vProd);
 
       const vItem = vProd;
@@ -493,6 +495,7 @@ class Nfcom {
       novaNFCom.fatura_id = parseInt(nfComData.ide.nNF) || 0; // Assumindo que nNF é o ID da fatura conforme lógica anterior
       novaNFCom.qrcodeLink = this.qrCodeUrl;
       novaNFCom.pppoe = clientLogin;
+      novaNFCom.value = parseFloat(nfComData.total.vNF) || 0;
 
       await NFComRepository.save(novaNFCom);
       console.log(`NFCom ${novaNFCom.nNF} salva no banco com sucesso.`);

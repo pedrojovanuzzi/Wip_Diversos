@@ -37,4 +37,7 @@ export class NFCom {
 
   @Column({ type: "varchar", length: 255, nullable: true })
   pppoe!: string;
+
+  @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
+  value!: number;
 }
