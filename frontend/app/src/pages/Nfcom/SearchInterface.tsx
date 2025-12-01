@@ -16,6 +16,7 @@ interface NFComResult {
   chave: string; // Chave de acesso da NFCom (Substitui 'chaveAcesso')
   nNF: string; // Número da NF (equivale a 'numero' anterior)
   serie: string;
+  value: string;
 
   // Dados do Cliente/Serviço
   cliente_id: number;
@@ -254,6 +255,9 @@ export default function SearchInterface() {
                         Nota Fiscal
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Valor
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
                     </tr>
@@ -288,6 +292,9 @@ export default function SearchInterface() {
                           >
                             Ver Nota Fiscal
                           </a>
+                        </td>
+                        <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-900">
+                          {nfcom.value}
                         </td>
                         <td className="px-6 py-4 text-left whitespace-nowrap">
                           <span
