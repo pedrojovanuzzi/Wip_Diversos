@@ -40,4 +40,7 @@ export class NFCom {
 
   @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
   value!: number;
+
+  @Column({ type: "int", nullable: true, default: 1 })
+  tpAmb!: number;
 }

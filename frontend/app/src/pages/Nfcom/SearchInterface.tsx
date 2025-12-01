@@ -25,7 +25,7 @@ interface NFComResult {
   // Datas e Status
   data_emissao: string; // Data e hora da emissão no formato ISO 8601
   status: "autorizada" | "rejeitada" | "pendente" | string; // Status da NFCom
-
+  tpAmb: number;
   // Informações de Consulta e Protocolo
   protocolo: string; // Número do protocolo de autorização (nProt)
   qrcodeLink: string; // Link direto para o QRCode (Substitui o 'valor' anterior, que não está presente)
@@ -40,6 +40,7 @@ export default function SearchInterface() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [tpAmb, settpAmb] = useState<number>(1);
 
   const { user } = useAuth();
   const token = user?.token;
@@ -59,6 +60,7 @@ export default function SearchInterface() {
       if (pppoe.trim()) searchParams.pppoe = pppoe.trim();
       if (titulo.trim()) searchParams.titulo = titulo.trim();
       if (data.trim()) searchParams.data = data.trim();
+      if (tpAmb) searchParams.tpAmb = tpAmb;
 
       console.log(searchParams);
 
@@ -134,7 +136,7 @@ export default function SearchInterface() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 {/* Campo PPPOE */}
                 <div className="relative">
                   <label
@@ -202,6 +204,26 @@ export default function SearchInterface() {
                     />
                   </div>
                 </div>
+                <div className="relative">
+                  <label
+                    htmlFor="tpAmb"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Produção (1) ou Homologação (2)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <BiCalendar />
+                    </span>
+                    <input
+                      id="tpAmb"
+                      type="number"
+                      value={tpAmb}
+                      onChange={(e) => settpAmb(Number(e.target.value))}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Botões */}
@@ -239,6 +261,9 @@ export default function SearchInterface() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Produção/Homologação
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Número
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -273,6 +298,9 @@ export default function SearchInterface() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {nfcomList.map((nfcom) => (
                       <tr key={nfcom.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {nfcom.tpAmb === 1 ? "Produção" : "Homologação"}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {nfcom.nNF}
                         </td>

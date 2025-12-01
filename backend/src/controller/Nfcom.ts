@@ -508,6 +508,7 @@ class Nfcom {
       novaNFCom.qrcodeLink = this.qrCodeUrl;
       novaNFCom.pppoe = clientLogin;
       novaNFCom.value = parseFloat(nfComData.total.vNF || "0") || 0;
+      novaNFCom.tpAmb = this.homologacao ? 2 : 1;
 
       await NFComRepository.save(novaNFCom);
       console.log(`✅ NFCom ${novaNFCom.nNF} salva no banco com sucesso.`);
@@ -548,7 +549,10 @@ class Nfcom {
           ? Number(searchParams.titulo)
           : undefined,
         pppoe: searchParams.pppoe || undefined, // Evita buscar por pppoe vazio se não fornecido
+        tpAmb: searchParams.tpAmb || undefined,
       };
+
+      console.log(whereConditions);
 
       // 2. Adiciona o filtro de data SOMENTE SE a data for fornecida
       if (searchParams.data) {
