@@ -161,6 +161,7 @@ class Nfcom {
   private homologacao: boolean = false;
   private WSDL_URL = "";
   private qrCodeUrl = "";
+  private numeracao: number = 1;
 
   public gerarNfcom = async (req: Request, res: Response): Promise<void> => {
     let { password, clientesSelecionados, service, reducao, ambiente } =
@@ -379,7 +380,7 @@ class Nfcom {
     for (const item of dadosFinaisNFCom) {
       try {
         // 1. Recebe o objeto desestruturado
-        const { soapEnvelope, xmlAssinado } = this.gerarXml(
+        const { soapEnvelope, xmlAssinado } = await this.gerarXml(
           item.nfComData,
           password
         );
@@ -491,6 +492,7 @@ class Nfcom {
       // Recalcula ou usa a chave existente
       const chaveAcesso = this.calcularChaveAcesso(nfComData);
 
+      novaNFCom.numeracao = this.numeracao || novaNFCom.fatura_id;
       novaNFCom.chave = chaveAcesso;
       novaNFCom.nNF = nfComData.ide.nNF;
       novaNFCom.serie = nfComData.ide.serie;
@@ -588,6 +590,98 @@ class Nfcom {
       console.error("Erro ao buscar NFCom:", error);
       res.status(500).json({ error: "Erro ao buscar NFCom" });
     }
+  }
+
+  public criarXMLCancelamento(protocolo: string) {
+    const docInterno = create({ version: "1.0", encoding: "UTF-8" });
+
+    // Namespace 'nfcom' minúsculo na tag raiz
+    const evCancNFCom = docInterno.ele("evCancNFCom", {
+      xmlns: "http://www.portalfiscal.inf.br/nfcom",
+    });
+
+    const descEvento = evCancNFCom.ele("descEvento");
+    descEvento.txt("Cancelamento");
+
+    const nProt = evCancNFCom.ele("nProt");
+    nProt.txt(protocolo);
+
+    const xJust = evCancNFCom.ele("xJust");
+    xJust.txt("Cancelamento de Nota Fiscal");
+
+    return docInterno;
+  }
+
+  public async cancelarNFcom(req: Request, res: Response) {
+    const { nNF, pppoe, password } = req.body;
+    const NFComRepository = DataSource.getRepository(NFCom);
+
+    const xmlCancelamento = this.criarXMLCancelamento(nNF);
+
+    const urlEnvio = this.homologacao
+      ? "https://homologacao.nfcom.fazenda.gov.br/nfcom/services/NFComRecepcao"
+      : "https://nfcom.fazenda.gov.br/nfcom/services/NFComRecepcao";
+
+    const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
+
+    if (!fs.existsSync(certPath)) {
+      throw new Error(`Certificado não encontrado em: ${certPath}`);
+    }
+
+    const tempDir = path.join(__dirname, "..", "temp");
+    const processedCertPath = processarCertificado(certPath, password, tempDir);
+
+    const pfxBuffer = fs.readFileSync(processedCertPath);
+
+    const httpsAgent = new https.Agent({
+      pfx: pfxBuffer,
+      passphrase: password,
+      rejectUnauthorized: false,
+    });
+
+    const response = await axios.post(urlEnvio, xmlCancelamento, {
+      httpsAgent,
+      headers: {
+        // Action minúscula conforme WSDL
+        "Content-Type":
+          'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcaoEvento"',
+      },
+    });
+
+    const xmlResponse = response.data;
+
+    const cStatMatch = xmlResponse.match(/<cStat>(\d+)<\/cStat>/);
+    const xMotivoMatch = xmlResponse.match(/<xMotivo>(.*?)<\/xMotivo>/);
+
+    const cStat = cStatMatch ? cStatMatch[1] : null;
+    const xMotivo = xMotivoMatch ? xMotivoMatch[1] : "Erro desconhecido";
+
+    if (cStat === "100") {
+      console.log(`Nota ${nNF} cancelada!`);
+
+      const nfcom = await NFComRepository.findOne({
+        where: {
+          nNF,
+          pppoe,
+        },
+      });
+      if (!nfcom) {
+        res.status(404).json({ error: "NFCom não encontrada" });
+        return;
+      }
+      nfcom.status = "cancelada";
+      await NFComRepository.save(nfcom);
+      res.status(200).json(nfcom);
+      return;
+    } else {
+      console.log(`Erro ao cancelar nota ${nNF}: ${cStat} - ${xMotivo}`);
+    }
+
+    res.status(200).json({
+      cStat,
+      xMotivo,
+    });
+    return;
   }
 
   public async BuscarClientes(req: Request, res: Response) {
@@ -779,10 +873,10 @@ class Nfcom {
     }
   }
 
-  public gerarXml(
+  public async gerarXml(
     data: INFComData,
     password: string
-  ): { soapEnvelope: string; xmlAssinado: string } {
+  ): Promise<{ soapEnvelope: string; xmlAssinado: string }> {
     // 1. Gera Chave de Acesso
     const anoMes =
       data.ide.dhEmi.substring(2, 4) + data.ide.dhEmi.substring(5, 7);
@@ -829,7 +923,21 @@ class Nfcom {
     ide.ele("mod").txt(data.ide.mod);
     ide.ele("serie").txt(data.ide.serie);
     ide.ele("nNF").txt(data.ide.nNF);
-    ide.ele("cNF").txt(data.ide.cNF);
+
+    const lastNumber = await DataSource.getRepository(NFCom).find({
+      order: {
+        numeracao: "DESC",
+      },
+      take: 1,
+    });
+
+    console.log(lastNumber[0].numeracao);
+
+    const numeracao = lastNumber[0].numeracao + 1;
+
+    this.numeracao = numeracao;
+
+    ide.ele("cNF").txt(String(numeracao));
     ide.ele("cDV").txt(data.ide.cDV);
     ide.ele("dhEmi").txt(data.ide.dhEmi);
     ide.ele("tpEmis").txt(data.ide.tpEmis);

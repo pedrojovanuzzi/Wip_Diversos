@@ -6,7 +6,8 @@ import { BiCalendar, BiUser, BiReceipt } from "react-icons/bi";
 import Error from "./Components/Error";
 import Success from "./Components/Success";
 import { useAuth } from "../../context/AuthContext";
-
+import PopUpButton from "./Components/PopUpButton";
+import PopUpCancelNFCom from "./Components/PopUpCancelNFCom";
 interface NFComResult {
   // Dados primários
   id: number;
@@ -41,6 +42,9 @@ export default function SearchInterface() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [tpAmb, settpAmb] = useState<number>(1);
+  const [showPopUp, setShowPopUp] = useState(false);
+  const [password, setPassword] = useState<string>("");
+  const [selectedNfcom, setSelectedNfcom] = useState<NFComResult | null>(null);
 
   const { user } = useAuth();
   const token = user?.token;
@@ -48,6 +52,45 @@ export default function SearchInterface() {
   const createXmlDownloadUrl = (xmlContent: string): string => {
     const blob = new Blob([xmlContent], { type: "text/xml" });
     return URL.createObjectURL(blob);
+  };
+
+  const cancelarNFCom = async (
+    nnf: string,
+    pppoe: string,
+    password: string
+  ) => {
+    setLoading(true);
+    setError("");
+    setSuccess("");
+    setShowPopUp(true);
+    const response = await axios.post(
+      `${process.env.REACT_APP_URL}/NFCom/cancelarNFCom`,
+      {
+        nNF: nnf,
+        pppoe: pppoe,
+        password: password,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    console.log("Resposta da API:", response.data);
+    setShowPopUp(false);
+    setLoading(false);
+  };
+
+  function handleCancelar(cliente: any): void {
+    setSelectedNfcom(cliente);
+    setShowPopUp(true);
+  }
+
+  const confirmCancellation = () => {
+    if (selectedNfcom) {
+      cancelarNFCom(selectedNfcom.nNF, selectedNfcom.pppoe, password);
+    }
   };
 
   const handleSearch = async () => {
@@ -250,6 +293,14 @@ export default function SearchInterface() {
           {error && <Error message={error} />}
           {success && <Success message={success} />}
 
+          <PopUpCancelNFCom
+            setShowPopUp={setShowPopUp}
+            showPopUp={showPopUp}
+            setPassword={setPassword}
+            password={password}
+            cancelNFCom={confirmCancellation}
+          />
+
           {/* Results Table */}
           {nfcomList.length > 0 && (
             <div className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
@@ -361,6 +412,14 @@ export default function SearchInterface() {
                           >
                             {nfcom.status}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 text-left whitespace-nowrap">
+                          <button
+                            onClick={() => handleCancelar(nfcom)}
+                            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-all"
+                          >
+                            Cancelar
+                          </button>
                         </td>
                       </tr>
                     ))}
