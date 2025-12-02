@@ -44,6 +44,7 @@ export default function SearchInterface() {
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");
   const [selectedNfcom, setSelectedNfcom] = useState<NFComResult | null>(null);
+  const [ambiente, setAmbiente] = useState<number>(1);
 
   const { user } = useAuth();
   const token = user?.token;
@@ -56,7 +57,8 @@ export default function SearchInterface() {
   const cancelarNFCom = async (
     nnf: string,
     pppoe: string,
-    password: string
+    password: string,
+    ambiente: number
   ) => {
     try {
       setLoading(true);
@@ -69,6 +71,7 @@ export default function SearchInterface() {
           nNF: nnf,
           pppoe: pppoe,
           password: password,
+          tpAmb: ambiente,
         },
         {
           headers: {
@@ -95,7 +98,12 @@ export default function SearchInterface() {
 
   const confirmCancellation = () => {
     if (selectedNfcom) {
-      cancelarNFCom(selectedNfcom.nNF, selectedNfcom.pppoe, password);
+      cancelarNFCom(
+        selectedNfcom.nNF,
+        selectedNfcom.pppoe,
+        password,
+        selectedNfcom.tpAmb
+      );
     }
   };
 

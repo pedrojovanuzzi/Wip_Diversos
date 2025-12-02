@@ -608,9 +608,14 @@ class Nfcom {
   ) {
     // 1. Definições
     const tpEvento = "110111";
-    const nSeqEvento = "01";
-    // Data atual formatada (ajuste conforme necessidade de fuso)
-    const dataHora = new Date().toISOString().split(".")[0] + "-03:00";
+    const nSeqEvento = "001";
+    const dataObj = new Date();
+
+    dataObj.setMinutes(dataObj.getMinutes() - 5);
+
+    dataObj.setHours(dataObj.getHours() - 3);
+
+    const dataHora = dataObj.toISOString().replace(/\.\d{3}Z$/, "") + "-03:00";
     const codigoUF = "35";
 
     // 2. ID (Fundamental para a assinatura)
@@ -652,7 +657,7 @@ class Nfcom {
 
   public cancelarNFcom = async (req: Request, res: Response) => {
     try {
-      const { nNF, pppoe, password } = req.body;
+      const { nNF, pppoe, password, tpAmb } = req.body;
       const NFComRepository = DataSource.getRepository(NFCom);
 
       const nfcom = await NFComRepository.findOne({
@@ -666,11 +671,21 @@ class Nfcom {
         return;
       }
 
+      if (tpAmb === 2) {
+        this.homologacao = true;
+        this.WSDL_URL =
+          "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
+      } else {
+        this.homologacao = false;
+        this.WSDL_URL =
+          "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
+      }
+
       const xmlCancelamento = this.criarXMLCancelamento(
-        nNF,
-        pppoe,
+        nfcom.chave,
+        nfcom.protocolo,
         process.env.CPF_CNPJ as string,
-        "Cancelamento",
+        "Cancelamento por erro de cadastro",
         nfcom.tpAmb
       );
 
@@ -696,6 +711,8 @@ class Nfcom {
       const urlEnvio = this.homologacao
         ? "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcaoEvento/NFComRecepcaoEvento.asmx"
         : "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcaoEvento/NFComRecepcaoEvento.asmx";
+
+      console.log(urlEnvio);
 
       const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
 
