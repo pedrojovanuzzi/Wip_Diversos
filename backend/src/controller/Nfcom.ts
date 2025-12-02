@@ -243,6 +243,7 @@ class Nfcom {
           tpAmb: this.homologacao ? 2 : 1,
         },
         order: {
+          serie: "DESC",
           numeracao: "DESC",
         },
       });
@@ -259,7 +260,7 @@ class Nfcom {
           cUF: "35",
           tpAmb: this.homologacao ? "2" : "1",
           mod: "62",
-          serie: "1",
+          serie: "2",
           nNF: String(numeracao),
           cNF: Math.floor(Math.random() * 9999999)
             .toString()
