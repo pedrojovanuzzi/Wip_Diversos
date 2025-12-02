@@ -1016,16 +1016,18 @@ class Nfcom {
       Id: id,
     });
 
-    const lastNumber = await DataSource.getRepository(NFCom).find({
+    const lastNumber = await DataSource.getRepository(NFCom).findOne({
+      where: {
+        tpAmb: Number(data.ide.tpAmb),
+      },
       order: {
         numeracao: "DESC",
       },
-      take: 1,
     });
 
-    console.log(lastNumber[0].numeracao);
+    console.log(lastNumber?.numeracao);
 
-    const numeracao = lastNumber[0].numeracao + 1 || 1;
+    const numeracao = lastNumber?.numeracao ? lastNumber?.numeracao + 1 : 1;
 
     this.numeracao = numeracao;
 
