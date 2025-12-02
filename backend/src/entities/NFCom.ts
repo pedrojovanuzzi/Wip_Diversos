@@ -43,4 +43,7 @@ export class NFCom {
 
   @Column({ type: "int", nullable: true, default: 1 })
   tpAmb!: number;
+
+  @Column({ type: "int", nullable: false })
+  numeracao!: number;
 }

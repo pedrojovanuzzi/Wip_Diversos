@@ -6,7 +6,9 @@ import { BiCalendar, BiUser, BiReceipt } from "react-icons/bi";
 import Error from "./Components/Error";
 import Success from "./Components/Success";
 import { useAuth } from "../../context/AuthContext";
-
+import PopUpCancelNFCom from "./Components/PopUpCancelNFCom";
+import { GoNumber } from "react-icons/go";
+import { VscSymbolBoolean } from "react-icons/vsc";
 interface NFComResult {
   // Dados primários
   id: number;
@@ -17,7 +19,7 @@ interface NFComResult {
   nNF: string; // Número da NF (equivale a 'numero' anterior)
   serie: string;
   value: string;
-
+  numeracao: number;
   // Dados do Cliente/Serviço
   cliente_id: number;
   pppoe: string; // Identificador do assinante (equivale a 'pppoe' anterior)
@@ -41,6 +43,10 @@ export default function SearchInterface() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [tpAmb, settpAmb] = useState<number>(1);
+  const [showPopUp, setShowPopUp] = useState(false);
+  const [password, setPassword] = useState<string>("");
+  const [selectedNfcom, setSelectedNfcom] = useState<NFComResult | null>(null);
+  const [serie, setSerie] = useState<string>("");
 
   const { user } = useAuth();
   const token = user?.token;
@@ -48,6 +54,59 @@ export default function SearchInterface() {
   const createXmlDownloadUrl = (xmlContent: string): string => {
     const blob = new Blob([xmlContent], { type: "text/xml" });
     return URL.createObjectURL(blob);
+  };
+
+  const cancelarNFCom = async (
+    nnf: string,
+    pppoe: string,
+    password: string,
+    ambiente: number
+  ) => {
+    try {
+      setLoading(true);
+      setError("");
+      setSuccess("");
+      setShowPopUp(true);
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/NFCom/cancelarNFCom`,
+        {
+          nNF: nnf,
+          pppoe: pppoe,
+          password: password,
+          tpAmb: ambiente,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      console.log("Resposta da API:", response.data);
+      setShowPopUp(false);
+      setLoading(false);
+    } catch (error) {
+      console.error("Erro ao cancelar NFCom:", error);
+      setError("Erro ao cancelar NFCom. Verifique os dados e tente novamente.");
+      setLoading(false);
+      setShowPopUp(false);
+    }
+  };
+
+  function handleCancelar(cliente: any): void {
+    setSelectedNfcom(cliente);
+    setShowPopUp(true);
+  }
+
+  const confirmCancellation = () => {
+    if (selectedNfcom) {
+      cancelarNFCom(
+        selectedNfcom.nNF,
+        selectedNfcom.pppoe,
+        password,
+        selectedNfcom.tpAmb
+      );
+    }
   };
 
   const handleSearch = async () => {
@@ -61,6 +120,7 @@ export default function SearchInterface() {
       if (titulo.trim()) searchParams.titulo = titulo.trim();
       if (data.trim()) searchParams.data = data.trim();
       if (tpAmb) searchParams.tpAmb = tpAmb;
+      if (serie.trim()) searchParams.serie = serie.trim();
 
       console.log(searchParams);
 
@@ -136,7 +196,7 @@ export default function SearchInterface() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
                 {/* Campo PPPOE */}
                 <div className="relative">
                   <label
@@ -213,13 +273,33 @@ export default function SearchInterface() {
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <BiCalendar />
+                      <VscSymbolBoolean />
                     </span>
                     <input
                       id="tpAmb"
                       type="number"
                       value={tpAmb}
                       onChange={(e) => settpAmb(Number(e.target.value))}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div className="relative">
+                  <label
+                    htmlFor="serie"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Série
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <GoNumber />
+                    </span>
+                    <input
+                      id="serie"
+                      type="number"
+                      value={serie}
+                      onChange={(e) => setSerie(String(e.target.value))}
                       className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -250,6 +330,14 @@ export default function SearchInterface() {
           {error && <Error message={error} />}
           {success && <Success message={success} />}
 
+          <PopUpCancelNFCom
+            setShowPopUp={setShowPopUp}
+            showPopUp={showPopUp}
+            setPassword={setPassword}
+            password={password}
+            cancelNFCom={confirmCancellation}
+          />
+
           {/* Results Table */}
           {nfcomList.length > 0 && (
             <div className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
@@ -265,6 +353,9 @@ export default function SearchInterface() {
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Número
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Titulo
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Série
@@ -302,7 +393,10 @@ export default function SearchInterface() {
                           {nfcom.tpAmb === 1 ? "Produção" : "Homologação"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {nfcom.nNF}
+                          {nfcom.numeracao}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {nfcom.fatura_id}
                         </td>
                         <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-500">
                           {nfcom.serie}
@@ -354,13 +448,21 @@ export default function SearchInterface() {
                         <td className="px-6 py-4 text-left whitespace-nowrap">
                           <span
                             className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              nfcom.status === "Autorizada"
+                              nfcom.status === "autorizada"
                                 ? "bg-green-100 text-green-800"
                                 : "bg-yellow-100 text-yellow-800"
                             }`}
                           >
                             {nfcom.status}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 text-left whitespace-nowrap">
+                          <button
+                            onClick={() => handleCancelar(nfcom)}
+                            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-all"
+                          >
+                            Cancelar
+                          </button>
                         </td>
                       </tr>
                     ))}
