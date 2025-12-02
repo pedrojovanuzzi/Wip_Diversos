@@ -407,6 +407,7 @@ class Nfcom {
       try {
         item.nfComData.ide.nNF = String(this.numeracao);
         item.nfComData.ide.serie = this.serie;
+        item.nfComData.ide.cDV = this.calcularDV(item.nfComData);
         // 1. Recebe o objeto desestruturado
         const { soapEnvelope, xmlAssinado } = await this.gerarXml(
           item.nfComData,
@@ -586,6 +587,7 @@ class Nfcom {
         pppoe: searchParams.pppoe || undefined, // Evita buscar por pppoe vazio se não fornecido
         tpAmb: searchParams.tpAmb || undefined,
         serie: searchParams.serie || undefined,
+        status: searchParams.status || undefined,
       };
 
       console.log(whereConditions);
