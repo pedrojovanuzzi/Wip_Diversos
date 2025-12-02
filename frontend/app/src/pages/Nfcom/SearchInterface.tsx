@@ -7,6 +7,8 @@ import Error from "./Components/Error";
 import Success from "./Components/Success";
 import { useAuth } from "../../context/AuthContext";
 import PopUpCancelNFCom from "./Components/PopUpCancelNFCom";
+import { GoNumber } from "react-icons/go";
+import { VscSymbolBoolean } from "react-icons/vsc";
 interface NFComResult {
   // Dados primários
   id: number;
@@ -44,7 +46,7 @@ export default function SearchInterface() {
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");
   const [selectedNfcom, setSelectedNfcom] = useState<NFComResult | null>(null);
-  const [ambiente, setAmbiente] = useState<number>(1);
+  const [serie, setSerie] = useState<string>("");
 
   const { user } = useAuth();
   const token = user?.token;
@@ -118,6 +120,7 @@ export default function SearchInterface() {
       if (titulo.trim()) searchParams.titulo = titulo.trim();
       if (data.trim()) searchParams.data = data.trim();
       if (tpAmb) searchParams.tpAmb = tpAmb;
+      if (serie.trim()) searchParams.serie = serie.trim();
 
       console.log(searchParams);
 
@@ -193,7 +196,7 @@ export default function SearchInterface() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
                 {/* Campo PPPOE */}
                 <div className="relative">
                   <label
@@ -270,13 +273,33 @@ export default function SearchInterface() {
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <BiCalendar />
+                      <VscSymbolBoolean />
                     </span>
                     <input
                       id="tpAmb"
                       type="number"
                       value={tpAmb}
                       onChange={(e) => settpAmb(Number(e.target.value))}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div className="relative">
+                  <label
+                    htmlFor="serie"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Série
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <GoNumber />
+                    </span>
+                    <input
+                      id="serie"
+                      type="number"
+                      value={serie}
+                      onChange={(e) => setSerie(String(e.target.value))}
                       className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>

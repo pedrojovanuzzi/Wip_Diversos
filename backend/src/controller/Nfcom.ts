@@ -162,6 +162,7 @@ class Nfcom {
   private WSDL_URL = "";
   private qrCodeUrl = "";
   private numeracao: number = 1;
+  private serie: string = "3";
 
   public gerarNfcom = async (req: Request, res: Response): Promise<void> => {
     let { password, clientesSelecionados, service, reducao, ambiente } =
@@ -241,9 +242,9 @@ class Nfcom {
       const lastNumber = await DataSource.getRepository(NFCom).findOne({
         where: {
           tpAmb: this.homologacao ? 2 : 1,
+          serie: this.serie,
         },
         order: {
-          serie: "DESC",
           numeracao: "DESC",
         },
       });
@@ -260,7 +261,7 @@ class Nfcom {
           cUF: "35",
           tpAmb: this.homologacao ? "2" : "1",
           mod: "62",
-          serie: "2",
+          serie: this.serie,
           nNF: String(numeracao),
           cNF: Math.floor(Math.random() * 9999999)
             .toString()
@@ -580,6 +581,7 @@ class Nfcom {
           : undefined,
         pppoe: searchParams.pppoe || undefined, // Evita buscar por pppoe vazio se não fornecido
         tpAmb: searchParams.tpAmb || undefined,
+        serie: searchParams.serie || undefined,
       };
 
       console.log(whereConditions);
@@ -1046,9 +1048,12 @@ class Nfcom {
       Id: id,
     });
 
+    const serieAtual = data.ide.serie;
+
     const lastNumber = await DataSource.getRepository(NFCom).findOne({
       where: {
-        tpAmb: Number(data.ide.tpAmb),
+        tpAmb: this.homologacao ? 2 : 1,
+        serie: serieAtual,
       },
       order: {
         numeracao: "DESC",
