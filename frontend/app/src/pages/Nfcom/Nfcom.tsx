@@ -336,9 +336,6 @@ export default function Nfcom() {
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Cancelar
-                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
