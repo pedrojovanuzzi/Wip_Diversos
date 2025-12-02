@@ -162,7 +162,8 @@ class Nfcom {
   private WSDL_URL = "";
   private qrCodeUrl = "";
   private numeracao: number = 1;
-  private serie: string = process.env.SERVIDOR_HOMOLOGACAO ? "99" : "3";
+  private serie: string =
+    process.env.SERVIDOR_HOMOLOGACAO === "true" ? "99" : "3";
 
   public gerarNfcom = async (req: Request, res: Response): Promise<void> => {
     let { password, clientesSelecionados, service, reducao, ambiente } =
