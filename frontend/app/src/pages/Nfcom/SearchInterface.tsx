@@ -373,7 +373,7 @@ export default function SearchInterface() {
                           {nfcom.numeracao}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {nfcom.nNF}
+                          {nfcom.fatura_id}
                         </td>
                         <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-500">
                           {nfcom.serie}

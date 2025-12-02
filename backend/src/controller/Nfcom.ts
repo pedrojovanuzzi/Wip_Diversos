@@ -238,6 +238,21 @@ class Nfcom {
       const docCliente = cleanString(ClientData.cpf_cnpj || "");
       const isCnpj = docCliente.length > 11;
 
+      const lastNumber = await DataSource.getRepository(NFCom).findOne({
+        where: {
+          tpAmb: this.homologacao ? 2 : 1,
+        },
+        order: {
+          numeracao: "DESC",
+        },
+      });
+
+      console.log(lastNumber?.numeracao);
+
+      const numeracao = lastNumber?.numeracao ? lastNumber?.numeracao + 1 : 1;
+
+      this.numeracao = numeracao;
+
       // Construção do objeto NFCom
       const nfComData: INFComData = {
         ide: {
@@ -245,7 +260,7 @@ class Nfcom {
           tpAmb: this.homologacao ? "2" : "1",
           mod: "62",
           serie: "1",
-          nNF: FaturasData.id.toString(),
+          nNF: String(numeracao),
           cNF: Math.floor(Math.random() * 9999999)
             .toString()
             .padStart(7, "0"),
@@ -362,15 +377,24 @@ class Nfcom {
       // Calcular DV
       nfComData.ide.cDV = this.calcularDV(nfComData);
 
-      return { nfComData, clientLogin: ClientData.login || "" };
+      return {
+        nfComData,
+        clientLogin: ClientData.login || "",
+        faturaId: FaturasData.id,
+      };
     });
 
     const resultados = await Promise.all(promises);
 
     // 4. Filtra resultados nulos e faz o type assertion
     const dadosFinaisNFCom = resultados.filter(
-      (data): data is { nfComData: INFComData; clientLogin: string } =>
-        data !== null
+      (
+        data
+      ): data is {
+        nfComData: INFComData;
+        clientLogin: string;
+        faturaId: number;
+      } => data !== null
     );
 
     console.log(`Gerando ${dadosFinaisNFCom.length} notas...`);
@@ -427,7 +451,8 @@ class Nfcom {
           await this.inserirDadosBanco(
             xmlFinalDistrib,
             item.nfComData,
-            item.clientLogin
+            item.clientLogin,
+            item.faturaId
           );
 
           responses.push({
@@ -473,7 +498,8 @@ class Nfcom {
   private async inserirDadosBanco(
     xmlRetorno: string, // Agora recebe o XML Final (nfcomProc) em texto puro
     nfComData: INFComData,
-    clientLogin: string
+    clientLogin: string,
+    faturaId: number
   ): Promise<void> {
     try {
       const NFComRepository = DataSource.getRepository(NFCom);
@@ -506,7 +532,8 @@ class Nfcom {
       novaNFCom.data_emissao = new Date(nfComData.ide.dhEmi);
       novaNFCom.cliente_id =
         parseInt(nfComData.assinante.iCodAssinante || "0") || 0;
-      novaNFCom.fatura_id = parseInt(nfComData.ide.nNF || "0") || 0;
+
+      novaNFCom.fatura_id = faturaId;
       novaNFCom.qrcodeLink = this.qrCodeUrl;
       novaNFCom.pppoe = clientLogin;
       novaNFCom.value = parseFloat(nfComData.total.vNF || "0") || 0;
@@ -1039,7 +1066,7 @@ class Nfcom {
     ide.ele("tpAmb").txt(data.ide.tpAmb);
     ide.ele("mod").txt(data.ide.mod);
     ide.ele("serie").txt(data.ide.serie);
-    ide.ele("nNF").txt(data.ide.nNF);
+    ide.ele("nNF").txt(String(numeracao));
 
     ide.ele("cNF").txt(data.ide.cNF);
     ide.ele("cDV").txt(data.ide.cDV);
