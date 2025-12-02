@@ -611,7 +611,7 @@ class Nfcom {
     const nSeqEvento = "001";
     const dataObj = new Date();
 
-    dataObj.setMinutes(dataObj.getMinutes() - 5);
+    dataObj.setMinutes(dataObj.getMinutes() - 2);
 
     dataObj.setHours(dataObj.getHours() - 3);
 
@@ -752,7 +752,9 @@ class Nfcom {
       const cStat = cStatMatch ? cStatMatch[1] : null;
       const xMotivo = xMotivoMatch ? xMotivoMatch[1] : "Erro desconhecido";
 
-      if (cStat === "100") {
+      console.log(xmlResponse);
+
+      if (cStat === "135") {
         console.log(`Nota ${nNF} cancelada!`);
 
         const nfcom = await NFComRepository.findOne({
