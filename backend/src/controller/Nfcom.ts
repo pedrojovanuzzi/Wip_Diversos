@@ -162,7 +162,7 @@ class Nfcom {
   private WSDL_URL = "";
   private qrCodeUrl = "";
   private numeracao: number = 1;
-  private serie: string = "3";
+  private serie: string = process.env.SERVIDOR_HOMOLOGACAO ? "99" : "3";
 
   public gerarNfcom = async (req: Request, res: Response): Promise<void> => {
     let { password, clientesSelecionados, service, reducao, ambiente } =
@@ -251,7 +251,7 @@ class Nfcom {
 
       console.log(lastNumber?.numeracao);
 
-      const numeracao = lastNumber?.numeracao ? lastNumber?.numeracao + 1 : 1;
+      const numeracao = (lastNumber?.numeracao || 0) + 1;
 
       this.numeracao = numeracao;
 
@@ -405,11 +405,15 @@ class Nfcom {
 
     for (const item of dadosFinaisNFCom) {
       try {
+        item.nfComData.ide.nNF = String(this.numeracao);
+        item.nfComData.ide.serie = this.serie;
         // 1. Recebe o objeto desestruturado
         const { soapEnvelope, xmlAssinado } = await this.gerarXml(
           item.nfComData,
           password
         );
+
+        this.numeracao++;
 
         // Envia apenas o envelope SOAP
         const response = await this.enviarNfcom(soapEnvelope, password);
@@ -1048,31 +1052,13 @@ class Nfcom {
       Id: id,
     });
 
-    const serieAtual = data.ide.serie;
-
-    const lastNumber = await DataSource.getRepository(NFCom).findOne({
-      where: {
-        tpAmb: this.homologacao ? 2 : 1,
-        serie: serieAtual,
-      },
-      order: {
-        numeracao: "DESC",
-      },
-    });
-
-    console.log(lastNumber?.numeracao);
-
-    const numeracao = lastNumber?.numeracao ? lastNumber?.numeracao + 1 : 1;
-
-    this.numeracao = numeracao;
-
     // --- Preenchimento dos dados ---
     const ide = infNFCom.ele("ide");
     ide.ele("cUF").txt(data.ide.cUF);
     ide.ele("tpAmb").txt(data.ide.tpAmb);
     ide.ele("mod").txt(data.ide.mod);
     ide.ele("serie").txt(data.ide.serie);
-    ide.ele("nNF").txt(String(numeracao));
+    ide.ele("nNF").txt(data.ide.nNF);
 
     ide.ele("cNF").txt(data.ide.cNF);
     ide.ele("cDV").txt(data.ide.cDV);
