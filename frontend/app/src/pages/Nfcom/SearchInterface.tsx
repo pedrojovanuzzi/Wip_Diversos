@@ -9,6 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import PopUpCancelNFCom from "./Components/PopUpCancelNFCom";
 import { GoNumber } from "react-icons/go";
 import { VscSymbolBoolean } from "react-icons/vsc";
+import { MdOutlineConfirmationNumber } from "react-icons/md";
 interface NFComResult {
   // Dados primários
   id: number;
@@ -42,11 +43,12 @@ export default function SearchInterface() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [tpAmb, settpAmb] = useState<number>(1);
+  const [tpAmb, settpAmb] = useState<number>(1 || 2);
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");
   const [selectedNfcom, setSelectedNfcom] = useState<NFComResult | null>(null);
   const [serie, setSerie] = useState<string>("");
+  const [status, setStatus] = useState<string>("");
 
   const { user } = useAuth();
   const token = user?.token;
@@ -121,6 +123,7 @@ export default function SearchInterface() {
       if (data.trim()) searchParams.data = data.trim();
       if (tpAmb) searchParams.tpAmb = tpAmb;
       if (serie.trim()) searchParams.serie = serie.trim();
+      if (status.trim()) searchParams.status = status.trim();
 
       console.log(searchParams);
 
@@ -196,7 +199,7 @@ export default function SearchInterface() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-4">
                 {/* Campo PPPOE */}
                 <div className="relative">
                   <label
@@ -269,7 +272,7 @@ export default function SearchInterface() {
                     htmlFor="tpAmb"
                     className="block text-sm font-medium text-gray-700 mb-1"
                   >
-                    Produção (1) ou Homologação (2)
+                    Ambiente
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -278,6 +281,8 @@ export default function SearchInterface() {
                     <input
                       id="tpAmb"
                       type="number"
+                      min={0}
+                      max={2}
                       value={tpAmb}
                       onChange={(e) => settpAmb(Number(e.target.value))}
                       className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -298,10 +303,34 @@ export default function SearchInterface() {
                     <input
                       id="serie"
                       type="number"
+                      placeholder="Ex: 3"
                       value={serie}
                       onChange={(e) => setSerie(String(e.target.value))}
                       className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
+                  </div>
+                </div>
+                <div className="relative">
+                  <label
+                    htmlFor="status"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Status
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <MdOutlineConfirmationNumber />
+                    </span>
+                    <select
+                      id="status"
+                      value={status}
+                      onChange={(e) => setStatus(String(e.target.value))}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Selecione</option>
+                      <option value="autorizada">Autorizada</option>
+                      <option value="cancelada">Cancelada</option>
+                    </select>
                   </div>
                 </div>
               </div>
