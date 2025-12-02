@@ -1016,14 +1016,6 @@ class Nfcom {
       Id: id,
     });
 
-    // --- Preenchimento dos dados ---
-    const ide = infNFCom.ele("ide");
-    ide.ele("cUF").txt(data.ide.cUF);
-    ide.ele("tpAmb").txt(data.ide.tpAmb);
-    ide.ele("mod").txt(data.ide.mod);
-    ide.ele("serie").txt(data.ide.serie);
-    ide.ele("nNF").txt(data.ide.nNF);
-
     const lastNumber = await DataSource.getRepository(NFCom).find({
       order: {
         numeracao: "DESC",
@@ -1033,11 +1025,19 @@ class Nfcom {
 
     console.log(lastNumber[0].numeracao);
 
-    const numeracao = lastNumber[0].numeracao + 1;
+    const numeracao = lastNumber[0].numeracao + 1 || 1;
 
     this.numeracao = numeracao;
 
-    ide.ele("cNF").txt(String(numeracao));
+    // --- Preenchimento dos dados ---
+    const ide = infNFCom.ele("ide");
+    ide.ele("cUF").txt(data.ide.cUF);
+    ide.ele("tpAmb").txt(data.ide.tpAmb);
+    ide.ele("mod").txt(data.ide.mod);
+    ide.ele("serie").txt(data.ide.serie);
+    ide.ele("nNF").txt(data.ide.nNF);
+
+    ide.ele("cNF").txt(data.ide.cNF);
     ide.ele("cDV").txt(data.ide.cDV);
     ide.ele("dhEmi").txt(data.ide.dhEmi);
     ide.ele("tpEmis").txt(data.ide.tpEmis);

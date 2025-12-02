@@ -17,7 +17,7 @@ interface NFComResult {
   nNF: string; // Número da NF (equivale a 'numero' anterior)
   serie: string;
   value: string;
-
+  numeracao: number;
   // Dados do Cliente/Serviço
   cliente_id: number;
   pppoe: string; // Identificador do assinante (equivale a 'pppoe' anterior)
@@ -332,6 +332,9 @@ export default function SearchInterface() {
                         Número
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Titulo
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Série
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -365,6 +368,9 @@ export default function SearchInterface() {
                       <tr key={nfcom.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {nfcom.tpAmb === 1 ? "Produção" : "Homologação"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {nfcom.numeracao}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {nfcom.nNF}
