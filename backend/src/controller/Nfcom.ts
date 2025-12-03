@@ -434,7 +434,10 @@ class Nfcom {
 
     this.processarFilaBackground(dadosFinaisNFCom, job, password, responses);
 
-    res.status(200).json("Notas Sendo Geradas em Segundo Plano!");
+    res.status(200).json({
+      message: "Notas Sendo Geradas em Segundo Plano!",
+      job: job.id,
+    });
   };
 
   private async processarFilaBackground(
@@ -621,6 +624,16 @@ class Nfcom {
     }${nfComData.ide.cNF.padStart(7, "0")}`;
 
     return `${chaveSemDV}${nfComData.ide.cDV}`;
+  }
+
+  public async getStatusJob(req: Request, res: Response) {
+    const { id } = req.body;
+    const response = await DataSource.getRepository(Jobs).findOne({
+      where: { id },
+    });
+    console.log(response);
+    res.status(200).json(response);
+    return;
   }
 
   public async buscarNFCom(req: Request, res: Response) {

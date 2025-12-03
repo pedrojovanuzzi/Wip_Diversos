@@ -26,6 +26,8 @@ export default function Nfcom() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [service, setService] = useState("");
+  const [fetchStatus, setFetchStatus] = useState(false);
+  const [fetchId, setFetchId] = useState("");
   const [loading, setLoading] = useState(false);
   const [reducao, setReducao] = useState("");
   const [isReducaoActive, setIsReducaoActive] = useState(true);
@@ -107,7 +109,8 @@ export default function Nfcom() {
       );
 
       console.log("Resposta da API:", resposta.data);
-
+      setFetchStatus(true);
+      setFetchId(resposta.data.job);
       // Verificar se a resposta contém erros da SEFAZ
       if (Array.isArray(resposta.data) && resposta.data.length > 0) {
         const resultados = resposta.data;
@@ -227,6 +230,33 @@ export default function Nfcom() {
       setShowCertPasswordPopUp(false);
     }
   };
+
+  useEffect(() => {
+    if (fetchStatus) {
+      setTimeout(async () => {
+        try {
+          const response = await axios.post(
+            `${process.env.REACT_APP_URL}/NFCom/statusJob`,
+            {
+              id: fetchId,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          console.log("Resposta da API:", response.data);
+          setSuccess(response.data.resultado);
+          setFetchStatus(false);
+        } catch (error) {
+          console.error("Erro ao buscar NFCom:", error);
+          setError("Não foi possível buscar NFCom.");
+        }
+      }, 5000);
+    }
+  }, [fetchStatus]);
 
   const handleSearch = async () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
