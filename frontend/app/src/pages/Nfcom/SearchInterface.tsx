@@ -136,7 +136,7 @@ export default function SearchInterface() {
               headers: {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
-                timeout: 480000,
+                timeout: 3600000,
               },
             }
           );

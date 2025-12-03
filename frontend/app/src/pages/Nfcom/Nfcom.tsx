@@ -102,7 +102,7 @@ export default function Nfcom() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          timeout: 480000,
+          timeout: 3600000,
         }
       );
 
