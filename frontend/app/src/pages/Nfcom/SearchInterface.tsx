@@ -49,6 +49,7 @@ export default function SearchInterface() {
   const [selectedNfcom, setSelectedNfcom] = useState<NFComResult | null>(null);
   const [serie, setSerie] = useState<string>("");
   const [status, setStatus] = useState<string>("");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   const { user } = useAuth();
   const token = user?.token;
@@ -100,15 +101,77 @@ export default function SearchInterface() {
     setShowPopUp(true);
   }
 
-  const confirmCancellation = () => {
+  const confirmCancellation = async () => {
     if (selectedNfcom) {
-      cancelarNFCom(
+      await cancelarNFCom(
         selectedNfcom.nNF,
         selectedNfcom.pppoe,
         password,
         selectedNfcom.tpAmb
       );
+    } else if (selectedIds.length > 0) {
+      setLoading(true);
+      setShowPopUp(false);
+      setError("");
+      setSuccess("");
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const id of selectedIds) {
+        const nfcom = nfcomList.find((n) => n.id === id);
+        if (!nfcom) continue;
+
+        try {
+          await axios.post(
+            `${process.env.REACT_APP_URL}/NFCom/cancelarNFCom`,
+            {
+              nNF: nfcom.nNF,
+              pppoe: nfcom.pppoe,
+              password: password,
+              tpAmb: nfcom.tpAmb,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          successCount++;
+        } catch (error) {
+          console.error(`Erro ao cancelar NFCom ${nfcom.nNF}:`, error);
+          errorCount++;
+        }
+      }
+
+      setLoading(false);
+      setSuccess(
+        `Processo finalizado. Sucessos: ${successCount}, Erros: ${errorCount}`
+      );
+      setSelectedIds([]);
+      handleSearch();
     }
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIds(nfcomList.map((n) => n.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkCancel = () => {
+    if (selectedIds.length === 0) return;
+    setSelectedNfcom(null);
+    setShowPopUp(true);
   };
 
   const handleSearch = async () => {
@@ -139,6 +202,7 @@ export default function SearchInterface() {
       );
 
       setNfcomList(resposta.data);
+      setSelectedIds([]);
       setSuccess(
         `${resposta.data.length} NFCom(s) encontrada(s) e homologada(s).`
       );
@@ -165,6 +229,7 @@ export default function SearchInterface() {
     setTitulo("");
     setData("");
     setNfcomList([]);
+    setSelectedIds([]);
     setError("");
     setSuccess("");
   };
@@ -352,6 +417,18 @@ export default function SearchInterface() {
                   {loading ? "Buscando..." : "Buscar"}
                 </button>
               </div>
+
+              {/* Botão de Cancelamento em Lote */}
+              {selectedIds.length > 0 && (
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={handleBulkCancel}
+                    className="px-5 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-all font-medium flex items-center gap-2"
+                  >
+                    Cancelar Selecionadas ({selectedIds.length})
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -377,6 +454,17 @@ export default function SearchInterface() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <input
+                          type="checkbox"
+                          onChange={handleSelectAll}
+                          checked={
+                            nfcomList.length > 0 &&
+                            selectedIds.length === nfcomList.length
+                          }
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Produção/Homologação
                       </th>
@@ -418,6 +506,14 @@ export default function SearchInterface() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {nfcomList.map((nfcom) => (
                       <tr key={nfcom.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(nfcom.id)}
+                            onChange={() => handleSelectOne(nfcom.id)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {nfcom.tpAmb === 1 ? "Produção" : "Homologação"}
                         </td>
