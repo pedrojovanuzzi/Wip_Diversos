@@ -488,6 +488,7 @@ class Nfcom {
             success: false,
             error: true,
             id: item.nfComData.ide.nNF,
+            clientLogin: item.clientLogin,
             cStat: cStat,
             message: xMotivo,
           });
@@ -1108,6 +1109,7 @@ class Nfcom {
     dest.ele("xNome").txt(data.dest.xNome);
     if (data.dest.CPF) dest.ele("CPF").txt(data.dest.CPF);
     if (data.dest.CNPJ) dest.ele("CNPJ").txt(data.dest.CNPJ);
+    data.dest.indIEDest = data.dest.CPF ? "9" : "2";
     dest.ele("indIEDest").txt(data.dest.indIEDest);
     const enderDest = dest.ele("enderDest");
     enderDest.ele("xLgr").txt(data.dest.enderDest.xLgr);
