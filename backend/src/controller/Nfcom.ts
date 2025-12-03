@@ -447,6 +447,7 @@ class Nfcom {
       try {
         await DataSource.getRepository(Jobs).update(job.id, {
           processados: job.processados + 1,
+          total: job.total,
           status: "processando",
         });
 
@@ -547,7 +548,6 @@ class Nfcom {
         await DataSource.getRepository(Jobs).update(job.id, {
           status: "concluido",
           resultado: responses,
-          total: dadosFinaisNFCom.length,
         });
       }
     }

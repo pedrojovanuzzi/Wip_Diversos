@@ -8,10 +8,11 @@ export class Jobs1764784187393 implements MigrationInterface {
         columns: [
           {
             name: "id",
-            type: "int",
+            type: "varchar", // UUID no MySQL é salvo como varchar(36)
+            length: "36",
             isPrimary: true,
             isGenerated: true,
-            generationStrategy: "increment",
+            generationStrategy: "uuid", // <--- Mudou de 'increment' para 'uuid'
           },
           {
             name: "name",
@@ -36,6 +37,7 @@ export class Jobs1764784187393 implements MigrationInterface {
           {
             name: "resultado",
             type: "json",
+            isNullable: true,
           },
           {
             name: "created_at",
