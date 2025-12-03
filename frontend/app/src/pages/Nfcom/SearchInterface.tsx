@@ -90,6 +90,7 @@ export default function SearchInterface() {
       );
       console.log("Resposta da API:", response.data);
       setFetchId(response.data.id);
+      setFetchStatus(true);
       setShowPopUp(false);
       setLoading(false);
     } catch (error) {
@@ -170,6 +171,7 @@ export default function SearchInterface() {
 
           const job = response.data;
           console.log("Status do Job:", job.status);
+          console.log("Resultado do Job:", job);
 
           // 1. Se estiver CONCLUÍDO
           if (job.status === "concluido") {
@@ -181,12 +183,12 @@ export default function SearchInterface() {
             // setDadosFinais(job.resultado);
             let errors = 0;
             let success = 0;
-            job.resultado.map((item: any) => {
+            job.map((item: any) => {
               console.log(item);
-              if (item.success === false) {
-                errors++;
-              } else {
+              if (item.resultado.CStat == "135") {
                 success++;
+              } else {
+                errors++;
               }
             });
             if (errors > 0) {
@@ -194,18 +196,11 @@ export default function SearchInterface() {
                 "Ocorreu um erro no processamento das notas, Numero de erros: " +
                   errors +
                   "\n" +
-                  JSON.stringify(
-                    job.resultado.filter((item: any) => item.success === false)
-                  )
+                  JSON.stringify(job)
               );
             }
             if (success > 0) {
-              setSuccess(
-                "Notas emitidas com sucesso!" +
-                  JSON.stringify(
-                    job.resultado.filter((item: any) => item.success === true)
-                  )
-              );
+              setSuccess("Notas emitidas com sucesso!" + JSON.stringify(job));
             }
           }
 
