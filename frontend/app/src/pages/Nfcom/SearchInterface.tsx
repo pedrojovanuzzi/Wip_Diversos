@@ -116,41 +116,32 @@ export default function SearchInterface() {
       setError("");
       setSuccess("");
 
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (const id of selectedIds) {
-        const nfcom = nfcomList.find((n) => n.id === id);
-        if (!nfcom) continue;
-
-        try {
-          await axios.post(
-            `${process.env.REACT_APP_URL}/NFCom/cancelarNFCom`,
-            {
-              nNF: nfcom.nNF,
-              pppoe: nfcom.pppoe,
-              password: password,
-              tpAmb: nfcom.tpAmb,
+      try {
+        const response = await axios.post(
+          `${process.env.REACT_APP_URL}/NFCom/cancelarNFCom`,
+          {
+            nNF: selectedIds,
+            password: password,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              timeout: 3600000,
             },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-                timeout: 3600000,
-              },
-            }
-          );
-          successCount++;
-        } catch (error) {
-          console.error(`Erro ao cancelar NFCom ${nfcom.nNF}:`, error);
-          errorCount++;
-        }
+          }
+        );
+
+        setSuccess(response.data.message);
+      } catch (error) {
+        console.error(`Erro ao cancelar NFCom ${selectedIds}:`, error);
+        setError(
+          "Erro ao cancelar NFCom. Verifique os dados e tente novamente."
+        );
       }
 
       setLoading(false);
-      setSuccess(
-        `Processo finalizado. Sucessos: ${successCount}, Erros: ${errorCount}`
-      );
+
       setSelectedIds([]);
       handleSearch();
     }
@@ -180,7 +171,6 @@ export default function SearchInterface() {
     try {
       setLoading(true);
       setError("");
-      setSuccess("");
 
       const searchParams: any = {};
       if (pppoe.trim()) searchParams.pppoe = pppoe.trim();
@@ -206,9 +196,7 @@ export default function SearchInterface() {
 
       setNfcomList(resposta.data);
       setSelectedIds([]);
-      setSuccess(
-        `${resposta.data.length} NFCom(s) encontrada(s) e homologada(s).`
-      );
+
       console.log(resposta.data);
     } catch (erro) {
       console.error("Erro ao buscar NFCom:", erro);

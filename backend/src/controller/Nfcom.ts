@@ -14,9 +14,17 @@ import { Faturas } from "../entities/Faturas";
 import { NFCom } from "../entities/NFCom";
 import dotenv from "dotenv";
 import DataSource from "../database/DataSource";
-import { Between, FindOptionsWhere, In, IsNull, Not } from "typeorm";
+import {
+  Between,
+  FindOptionsWhere,
+  In,
+  IsNull,
+  Not,
+  Repository,
+} from "typeorm";
 import { isNotEmpty } from "class-validator";
 import { Jobs } from "../entities/Jobs";
+import AppDataSource from "../database/MkauthSource";
 dotenv.config();
 
 // Interfaces para tipagem dos dados da NFCom
@@ -759,10 +767,89 @@ class Nfcom {
     return doc.end({ headless: true });
   }
 
-  public cancelarNFcom = async (req: Request, res: Response) => {
-    try {
-      const { nNF, pppoe, password, tpAmb } = req.body;
-      const NFComRepository = DataSource.getRepository(NFCom);
+  private async cancelarNoBackground(
+    nfcom: NFCom,
+    pppoe: string,
+    nNF: string,
+    password: string,
+    NFComRepository: Repository<NFCom>,
+    jobRepository: Repository<Jobs>,
+    job: Jobs
+  ) {
+    job.processados += 1;
+    await jobRepository.save(job);
+
+    const xmlCancelamento = this.criarXMLCancelamento(
+      nfcom.chave,
+      nfcom.protocolo,
+      process.env.CPF_CNPJ as string,
+      "Cancelamento por erro de cadastro",
+      nfcom.tpAmb
+    );
+
+    const assinado = this.assinarXmlCancelamento(
+      xmlCancelamento,
+      `evCancNFCom${nNF}`,
+      password
+    );
+
+    const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+      <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <soap12:Body>
+              <nfcomDadosMsg xmlns="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcaoEvento">
+                  ${assinado}
+              </nfcomDadosMsg>
+          </soap12:Body>
+      </soap12:Envelope>`;
+
+    const xmlBodyToSend = this.cleanXml(soapEnvelope);
+
+    console.log(xmlBodyToSend);
+
+    const urlEnvio = this.homologacao
+      ? "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcaoEvento/NFComRecepcaoEvento.asmx"
+      : "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcaoEvento/NFComRecepcaoEvento.asmx";
+
+    console.log(urlEnvio);
+
+    const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
+
+    if (!fs.existsSync(certPath)) {
+      throw new Error(`Certificado não encontrado em: ${certPath}`);
+    }
+
+    const tempDir = path.join(__dirname, "..", "temp");
+    const processedCertPath = processarCertificado(certPath, password, tempDir);
+
+    const pfxBuffer = fs.readFileSync(processedCertPath);
+
+    const httpsAgent = new https.Agent({
+      pfx: pfxBuffer,
+      passphrase: password,
+      rejectUnauthorized: false,
+    });
+
+    const response = await axios.post(urlEnvio, xmlBodyToSend, {
+      httpsAgent,
+      headers: {
+        // Action minúscula conforme WSDL
+        "Content-Type":
+          'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcaoEvento/nfcomRecepcaoEvento"',
+      },
+    });
+
+    const xmlResponse = response.data;
+
+    const cStatMatch = xmlResponse.match(/<cStat>(\d+)<\/cStat>/);
+    const xMotivoMatch = xmlResponse.match(/<xMotivo>(.*?)<\/xMotivo>/);
+
+    const cStat = cStatMatch ? cStatMatch[1] : null;
+    const xMotivo = xMotivoMatch ? xMotivoMatch[1] : "Erro desconhecido";
+
+    console.log(xmlResponse);
+
+    if (cStat === "135") {
+      console.log(`Nota ${nNF} cancelada!`);
 
       const nfcom = await NFComRepository.findOne({
         where: {
@@ -771,11 +858,65 @@ class Nfcom {
         },
       });
       if (!nfcom) {
+        return;
+      }
+      nfcom.status = "cancelada";
+      await NFComRepository.save(nfcom);
+      job.status = "concluido";
+      job.resultado = {
+        cStat,
+        xMotivo,
+      };
+      await jobRepository.save(job);
+      return;
+    } else {
+      console.log(`Erro ao cancelar nota ${nNF}: ${cStat} - ${xMotivo}`);
+      return;
+    }
+  }
+
+  public cancelarNFcom = async (req: Request, res: Response) => {
+    try {
+      const { nNF, password } = req.body;
+      const NFComRepository = DataSource.getRepository(NFCom);
+
+      const jobRepository = DataSource.getRepository(Jobs);
+
+      const job = jobRepository.create({
+        name: "cancelarNFCom",
+        description: "Cancelamento de NFCom",
+        status: "pendente",
+        total: nNF.length,
+        processados: 0,
+        resultado: null,
+      });
+
+      await jobRepository.save(job);
+
+      const nfcom = await NFComRepository.findOne({
+        where: {
+          nNF,
+        },
+      });
+      if (!nfcom) {
         res.status(404).json({ error: "NFCom não encontrada" });
         return;
       }
 
-      if (tpAmb === 2) {
+      const client = await AppDataSource.getRepository(
+        ClientesEntities
+      ).findOne({
+        where: {
+          login: nfcom.pppoe,
+        },
+      });
+
+      if (!client) {
+        res.status(404).json({ error: "Cliente não encontrado" });
+        return;
+      }
+
+      if (nfcom.tpAmb === 2) {
         this.homologacao = true;
         this.WSDL_URL =
           "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
@@ -785,104 +926,17 @@ class Nfcom {
           "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
       }
 
-      const xmlCancelamento = this.criarXMLCancelamento(
-        nfcom.chave,
-        nfcom.protocolo,
-        process.env.CPF_CNPJ as string,
-        "Cancelamento por erro de cadastro",
-        nfcom.tpAmb
-      );
-
-      const assinado = this.assinarXmlCancelamento(
-        xmlCancelamento,
-        `evCancNFCom${nNF}`,
-        password
-      );
-
-      const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
-      <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-          <soap12:Body>
-              <nfcomDadosMsg xmlns="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcaoEvento">
-                  ${assinado}
-              </nfcomDadosMsg>
-          </soap12:Body>
-      </soap12:Envelope>`;
-
-      const xmlBodyToSend = this.cleanXml(soapEnvelope);
-
-      console.log(xmlBodyToSend);
-
-      const urlEnvio = this.homologacao
-        ? "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcaoEvento/NFComRecepcaoEvento.asmx"
-        : "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcaoEvento/NFComRecepcaoEvento.asmx";
-
-      console.log(urlEnvio);
-
-      const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
-
-      if (!fs.existsSync(certPath)) {
-        throw new Error(`Certificado não encontrado em: ${certPath}`);
-      }
-
-      const tempDir = path.join(__dirname, "..", "temp");
-      const processedCertPath = processarCertificado(
-        certPath,
+      this.cancelarNoBackground(
+        nfcom,
+        client.login,
+        nNF,
         password,
-        tempDir
+        NFComRepository,
+        jobRepository,
+        job
       );
 
-      const pfxBuffer = fs.readFileSync(processedCertPath);
-
-      const httpsAgent = new https.Agent({
-        pfx: pfxBuffer,
-        passphrase: password,
-        rejectUnauthorized: false,
-      });
-
-      const response = await axios.post(urlEnvio, xmlBodyToSend, {
-        httpsAgent,
-        headers: {
-          // Action minúscula conforme WSDL
-          "Content-Type":
-            'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfcom/wsdl/NFComRecepcaoEvento/nfcomRecepcaoEvento"',
-        },
-      });
-
-      const xmlResponse = response.data;
-
-      const cStatMatch = xmlResponse.match(/<cStat>(\d+)<\/cStat>/);
-      const xMotivoMatch = xmlResponse.match(/<xMotivo>(.*?)<\/xMotivo>/);
-
-      const cStat = cStatMatch ? cStatMatch[1] : null;
-      const xMotivo = xMotivoMatch ? xMotivoMatch[1] : "Erro desconhecido";
-
-      console.log(xmlResponse);
-
-      if (cStat === "135") {
-        console.log(`Nota ${nNF} cancelada!`);
-
-        const nfcom = await NFComRepository.findOne({
-          where: {
-            nNF,
-            pppoe,
-          },
-        });
-        if (!nfcom) {
-          res.status(404).json({ error: "NFCom não encontrada" });
-          return;
-        }
-        nfcom.status = "cancelada";
-        await NFComRepository.save(nfcom);
-        res.status(200).json(nfcom);
-        return;
-      } else {
-        console.log(`Erro ao cancelar nota ${nNF}: ${cStat} - ${xMotivo}`);
-        res.status(500).json({
-          cStat,
-          xMotivo,
-        });
-        return;
-      }
+      res.status(200).json({ message: "NFCom em processo de cancelamento!" });
     } catch (error) {
       console.error("Erro ao cancelar NFCom:", error);
       res.status(500).json({ error: "Erro ao cancelar NFCom" });
