@@ -38,7 +38,8 @@ interface NFComResult {
 export default function SearchInterface() {
   const [pppoe, setPppoe] = useState<string>("");
   const [titulo, setTitulo] = useState<string>("");
-  const [data, setData] = useState<string>("");
+  const [dataInicio, setDataInicio] = useState<string>("");
+  const [dataFim, setDataFim] = useState<string>("");
   const [nfcomList, setNfcomList] = useState<NFComResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -184,7 +185,8 @@ export default function SearchInterface() {
       const searchParams: any = {};
       if (pppoe.trim()) searchParams.pppoe = pppoe.trim();
       if (titulo.trim()) searchParams.titulo = titulo.trim();
-      if (data.trim()) searchParams.data = data.trim();
+      if (dataInicio.trim()) searchParams.dataInicio = dataInicio.trim();
+      if (dataFim.trim()) searchParams.dataFim = dataFim.trim();
       if (tpAmb) searchParams.tpAmb = tpAmb;
       if (serie.trim()) searchParams.serie = serie.trim();
       if (status.trim()) searchParams.status = status.trim();
@@ -228,7 +230,8 @@ export default function SearchInterface() {
   const handleClear = () => {
     setPppoe("");
     setTitulo("");
-    setData("");
+    setDataInicio("");
+    setDataFim("");
     setNfcomList([]);
     setSelectedIds([]);
     setError("");
@@ -265,7 +268,7 @@ export default function SearchInterface() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-7 gap-4 mb-4">
                 {/* Campo PPPOE */}
                 <div className="relative">
                   <label
@@ -312,23 +315,45 @@ export default function SearchInterface() {
                   </div>
                 </div>
 
-                {/* Campo Data */}
+                {/* Campo Data Inicial */}
                 <div className="relative">
                   <label
-                    htmlFor="data"
+                    htmlFor="dataInicio"
                     className="block text-sm font-medium text-gray-700 mb-1"
                   >
-                    Data Específica
+                    Data Inicial
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                       <BiCalendar />
                     </span>
                     <input
-                      id="data"
+                      id="dataInicio"
                       type="date"
-                      value={data}
-                      onChange={(e) => setData(e.target.value)}
+                      value={dataInicio}
+                      onChange={(e) => setDataInicio(e.target.value)}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Campo Data Final */}
+                <div className="relative">
+                  <label
+                    htmlFor="dataFim"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Data Final
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <BiCalendar />
+                    </span>
+                    <input
+                      id="dataFim"
+                      type="date"
+                      value={dataFim}
+                      onChange={(e) => setDataFim(e.target.value)}
                       className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>

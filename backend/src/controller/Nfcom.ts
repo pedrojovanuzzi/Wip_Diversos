@@ -604,8 +604,13 @@ class Nfcom {
 
       console.log(whereConditions);
 
-      // 2. Adiciona o filtro de data SOMENTE SE a data for fornecida
-      if (searchParams.data) {
+      // 2. Adiciona o filtro de data
+      if (searchParams.dataInicio && searchParams.dataFim) {
+        const dataInicio = new Date(`${searchParams.dataInicio}T00:00:00`);
+        const dataFim = new Date(`${searchParams.dataFim}T23:59:59`);
+
+        whereConditions.data_emissao = Between(dataInicio, dataFim);
+      } else if (searchParams.data) {
         // Lógica CORRETA para buscar o dia inteiro, ignorando o problema do fuso
 
         // Define o início do dia no fuso horário local (ex: 2025-11-29T00:00:00 local)
