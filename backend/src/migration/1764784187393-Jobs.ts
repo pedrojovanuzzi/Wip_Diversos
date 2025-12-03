@@ -25,6 +25,29 @@ export class Jobs1764784187393 implements MigrationInterface {
             name: "status",
             type: "varchar",
           },
+          {
+            name: "total",
+            type: "int",
+          },
+          {
+            name: "processados",
+            type: "int",
+          },
+          {
+            name: "resultado",
+            type: "json",
+          },
+          {
+            name: "created_at",
+            type: "timestamp",
+            default: "CURRENT_TIMESTAMP",
+          },
+          {
+            name: "updated_at",
+            type: "timestamp",
+            default: "CURRENT_TIMESTAMP",
+            onUpdate: "CURRENT_TIMESTAMP",
+          },
         ],
       })
     );

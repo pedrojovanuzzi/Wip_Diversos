@@ -16,6 +16,7 @@ import dotenv from "dotenv";
 import DataSource from "../database/DataSource";
 import { Between, FindOptionsWhere, In, IsNull, Not } from "typeorm";
 import { isNotEmpty } from "class-validator";
+import { Jobs } from "../entities/Jobs";
 dotenv.config();
 
 // Interfaces para tipagem dos dados da NFCom
@@ -420,10 +421,35 @@ class Nfcom {
 
     console.log(`Gerando ${dadosFinaisNFCom.length} notas...`);
 
-    const responses = [];
+    const responses: never[] = [];
 
+    const job = DataSource.getRepository(Jobs).create({
+      name: "Gerar Notas",
+      description: "Notas Sendo Geradas em Segundo Plano",
+      status: "pendente",
+      total: dadosFinaisNFCom.length,
+      processados: 0,
+    });
+    await DataSource.getRepository(Jobs).save(job);
+
+    this.processarFilaBackground(dadosFinaisNFCom, job, password, responses);
+
+    res.status(200).json("Notas Sendo Geradas em Segundo Plano!");
+  };
+
+  private async processarFilaBackground(
+    dadosFinaisNFCom: any[],
+    job: any,
+    password: string,
+    responses: any[]
+  ) {
     for (const item of dadosFinaisNFCom) {
       try {
+        await DataSource.getRepository(Jobs).update(job.id, {
+          processados: job.processados + 1,
+          status: "processando",
+        });
+
         item.nfComData.ide.nNF = String(this.numeracao);
         item.nfComData.ide.serie = this.serie;
         item.nfComData.ide.cDV = this.calcularDV(item.nfComData);
@@ -517,11 +543,15 @@ class Nfcom {
           clientLogin: item.clientLogin,
           message: errorMessage,
         });
+
+        await DataSource.getRepository(Jobs).update(job.id, {
+          status: "concluido",
+          resultado: responses,
+          total: dadosFinaisNFCom.length,
+        });
       }
     }
-
-    res.status(200).json(responses);
-  };
+  }
 
   private async inserirDadosBanco(
     xmlRetorno: string, // Agora recebe o XML Final (nfcomProc) em texto puro
