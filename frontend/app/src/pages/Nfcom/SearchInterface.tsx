@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import { CiSearch } from "react-icons/ci";
@@ -44,6 +44,8 @@ export default function SearchInterface() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [fetchStatus, setFetchStatus] = useState(false);
+  const [fetchId, setFetchId] = useState("");
   const [tpAmb, settpAmb] = useState<number>(1 || 2);
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");
@@ -87,6 +89,7 @@ export default function SearchInterface() {
         }
       );
       console.log("Resposta da API:", response.data);
+      setFetchId(response.data.id);
       setShowPopUp(false);
       setLoading(false);
     } catch (error) {
@@ -146,6 +149,89 @@ export default function SearchInterface() {
       handleSearch();
     }
   };
+
+  useEffect(() => {
+    let intervalo: NodeJS.Timer;
+
+    if (fetchStatus) {
+      // Inicia um loop que roda a cada 3 segundos (3000ms)
+      intervalo = setInterval(async () => {
+        try {
+          const response = await axios.post(
+            `${process.env.REACT_APP_URL}/NFCom/statusJob`,
+            { id: fetchId },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          const job = response.data;
+          console.log("Status do Job:", job.status);
+
+          // 1. Se estiver CONCLUÍDO
+          if (job.status === "concluido") {
+            // Para o loop
+            clearInterval(intervalo);
+            setFetchStatus(false); // Para de tentar buscar
+
+            // Salva os dados das notas (se precisar usar em outra tabela)
+            // setDadosFinais(job.resultado);
+            let errors = 0;
+            let success = 0;
+            job.resultado.map((item: any) => {
+              console.log(item);
+              if (item.success === false) {
+                errors++;
+              } else {
+                success++;
+              }
+            });
+            if (errors > 0) {
+              setError(
+                "Ocorreu um erro no processamento das notas, Numero de erros: " +
+                  errors +
+                  "\n" +
+                  JSON.stringify(
+                    job.resultado.filter((item: any) => item.success === false)
+                  )
+              );
+            }
+            if (success > 0) {
+              setSuccess(
+                "Notas emitidas com sucesso!" +
+                  JSON.stringify(
+                    job.resultado.filter((item: any) => item.success === true)
+                  )
+              );
+            }
+          }
+
+          // 2. Se der ERRO no processamento
+          else if (job.status === "erro") {
+            clearInterval(intervalo);
+            setFetchStatus(false);
+            setError(
+              "Ocorreu um erro no processamento das notas: " +
+                JSON.stringify(job.resultado)
+            );
+          }
+
+          // 3. Se estiver "pendente" ou "processando", o loop continua rodando...
+        } catch (error) {
+          console.error("Erro ao buscar status:", error);
+          // Opcional: parar o loop em caso de erro de rede
+          // clearInterval(intervalo);
+          // setFetchStatus(false);
+        }
+      }, 3000); // Verifica a cada 3 segundos
+    }
+
+    // Limpeza: Garante que o loop pare se o componente desmontar
+    return () => clearInterval(intervalo);
+  }, [fetchStatus, fetchId, token]);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {

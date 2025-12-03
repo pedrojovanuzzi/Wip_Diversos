@@ -936,7 +936,9 @@ class Nfcom {
         job
       );
 
-      res.status(200).json({ message: "NFCom em processo de cancelamento!" });
+      res
+        .status(200)
+        .json({ message: "NFCom em processo de cancelamento!", id: job.id });
     } catch (error) {
       console.error("Erro ao cancelar NFCom:", error);
       res.status(500).json({ error: "Erro ao cancelar NFCom" });
