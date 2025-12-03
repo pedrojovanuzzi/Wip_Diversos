@@ -1114,23 +1114,35 @@ class Nfcom {
     enderEmit.ele("UF").txt(data.emit.enderEmit.UF);
 
     const dest = infNFCom.ele("dest");
-    dest.ele("xNome").txt(data.dest.xNome);
-    if (data.dest.CPF) dest.ele("CPF").txt(data.dest.CPF);
-    if (data.dest.CNPJ) dest.ele("CNPJ").txt(data.dest.CNPJ);
+    dest.ele("xNome").txt(data.dest.xNome.trim());
+    if (data.dest.CPF) dest.ele("CPF").txt(data.dest.CPF.trim());
+    if (data.dest.CNPJ) dest.ele("CNPJ").txt(data.dest.CNPJ.trim());
+    // 1. Definição inicial (Provisória)
     data.dest.indIEDest = data.dest.CPF ? "9" : "1";
-    dest.ele("indIEDest").txt(data.dest.indIEDest);
 
+    // 2. Limpeza da IE (Saneamento)
     if (data.dest.IE) {
       data.dest.IE = this.cleanString(data.dest.IE);
     }
 
+    // 3. LÓGICA DE CORREÇÃO (Onde corrigimos o erro 426)
+    // Se o sistema marcou como '1', mas a IE está vazia/nula, força ser '9'
+    if (
+      data.dest.indIEDest === "1" &&
+      (!data.dest.IE || data.dest.IE.length === 0)
+    ) {
+      data.dest.indIEDest = "9";
+    }
+
+    // 4. Regras de Valor da IE baseadas no indicador final
     if (data.dest.indIEDest === "2") {
       data.dest.IE = "ISENTO";
     } else if (data.dest.indIEDest === "9") {
       delete data.dest.IE;
-    } else if (data.dest.IE) {
-      data.dest.IE = data.dest.IE.trim();
     }
+
+    // 5. GERAÇÃO DO XML (Só escreve agora que o valor é definitivo)
+    dest.ele("indIEDest").txt(data.dest.indIEDest);
 
     if (data.dest.IE) {
       dest.ele("IE").txt(data.dest.IE);
