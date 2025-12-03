@@ -544,13 +544,12 @@ class Nfcom {
           clientLogin: item.clientLogin,
           message: errorMessage,
         });
-
-        await DataSource.getRepository(Jobs).update(job.id, {
-          status: "concluido",
-          resultado: responses,
-        });
       }
     }
+    await DataSource.getRepository(Jobs).update(job.id, {
+      status: "concluido",
+      resultado: responses,
+    });
   }
 
   private async inserirDadosBanco(
