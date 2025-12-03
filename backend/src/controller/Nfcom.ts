@@ -537,7 +537,7 @@ class Nfcom {
       // Recalcula ou usa a chave existente
       const chaveAcesso = this.calcularChaveAcesso(nfComData);
 
-      novaNFCom.numeracao = this.numeracao || novaNFCom.fatura_id;
+      novaNFCom.numeracao = parseInt(nfComData.ide.nNF);
       novaNFCom.chave = chaveAcesso;
       novaNFCom.nNF = nfComData.ide.nNF;
       novaNFCom.serie = nfComData.ide.serie;

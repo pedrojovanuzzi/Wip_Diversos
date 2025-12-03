@@ -28,6 +28,7 @@ export default function Nfcom() {
   const [service, setService] = useState("");
   const [loading, setLoading] = useState(false);
   const [reducao, setReducao] = useState("");
+  const [isReducaoActive, setIsReducaoActive] = useState(true);
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     []
   );
@@ -93,7 +94,7 @@ export default function Nfcom() {
           password,
           clientesSelecionados,
           service,
-          reducao,
+          reducao: isReducaoActive ? reducao : "1.0",
           ambiente,
         },
         {
@@ -414,19 +415,42 @@ export default function Nfcom() {
           placeholder="Servico de Manutencao"
           className="ring-2 ring-gray-500 p-2 rounded m-5"
         />
-        <input
-          type="text"
-          onChange={(e) => {
-            setReducao(
-              e.target.value
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-zA-Z0-9 ]/g, "")
-            );
-          }}
-          placeholder="Redução Ex: 40%"
-          className="ring-2 ring-gray-500 p-2 rounded m-5"
-        />
+        <div className="flex  justify-center items-center gap-5 mb-5">
+          <input
+            type="text"
+            value={reducao} // Adicionado value para controle visual
+            onChange={(e) => {
+              setReducao(
+                e.target.value
+                  .normalize("NFD")
+                  .replace(/[\u0300-\u036f]/g, "")
+                  .replace(/[^a-zA-Z0-9,.]/g, "") // Permite números e separadores (vírgula/ponto)
+              );
+            }}
+            placeholder={
+              isReducaoActive
+                ? "Redução Ex: 40% (ou 0.4)"
+                : "Redução Desativada: 1.0"
+            }
+            className={`ring-2 ring-gray-500 p-2 rounded ${
+              !isReducaoActive ? "bg-gray-200 cursor-not-allowed" : ""
+            }`}
+            disabled={!isReducaoActive} // Desabilita o input se a redução não estiver ativa
+          />
+          <input
+            type="checkbox"
+            id="toggleReducao"
+            checked={isReducaoActive}
+            onChange={() => setIsReducaoActive(!isReducaoActive)}
+            className="h-4 w-4 text-indigo-600 border-gray-300 rounded cursor-pointer focus:ring-indigo-500"
+          />
+          <label
+            htmlFor="toggleReducao"
+            className="ml-2 text-gray-700 select-none"
+          >
+            Aplicar Redução
+          </label>
+        </div>
       </div>
 
       {arquivo && (

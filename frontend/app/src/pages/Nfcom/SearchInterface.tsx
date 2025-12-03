@@ -135,6 +135,7 @@ export default function SearchInterface() {
               headers: {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
+                timeout: 480000,
               },
             }
           );
@@ -450,7 +451,7 @@ export default function SearchInterface() {
               <h2 className="text-center mt-4 mb-4 text-2xl font-semibold text-gray-900">
                 Resultados: {nfcomList.length} NFCom(s)
               </h2>
-              <div className="overflow-auto rounded-lg shadow">
+              <div className="overflow-auto max-h-[40vh] rounded-lg shadow">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
