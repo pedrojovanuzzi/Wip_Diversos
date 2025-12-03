@@ -64,6 +64,7 @@ export interface INFComData {
     CPF?: string;
     CNPJ?: string;
     indIEDest: string;
+    IE?: string;
     enderDest: {
       xLgr: string;
       nro: string;
@@ -165,6 +166,11 @@ class Nfcom {
   private numeracao: number = 1;
   private serie: string =
     process.env.SERVIDOR_HOMOLOGACAO === "true" ? "99" : "3";
+
+  private cleanString = (str: string) => {
+    console.log(str);
+    return str.replace(/\D/g, "");
+  };
 
   public gerarNfcom = async (req: Request, res: Response): Promise<void> => {
     let { password, clientesSelecionados, service, reducao, ambiente } =
@@ -304,6 +310,7 @@ class Nfcom {
           xNome: ClientData.nome || "CLIENTE SEM NOME",
           ...(isCnpj ? { CNPJ: docCliente } : { CPF: docCliente }),
           indIEDest: "9",
+          IE: ClientData.rg || "",
           enderDest: {
             xLgr: ClientData.endereco || "",
             nro: ClientData.numero || "S/N",
@@ -507,6 +514,7 @@ class Nfcom {
           success: false,
           error: true,
           id: item.nfComData.ide.nNF,
+          clientLogin: item.clientLogin,
           message: errorMessage,
         });
       }
@@ -1109,16 +1117,33 @@ class Nfcom {
     dest.ele("xNome").txt(data.dest.xNome);
     if (data.dest.CPF) dest.ele("CPF").txt(data.dest.CPF);
     if (data.dest.CNPJ) dest.ele("CNPJ").txt(data.dest.CNPJ);
-    data.dest.indIEDest = data.dest.CPF ? "9" : "2";
+    data.dest.indIEDest = data.dest.CPF ? "9" : "1";
     dest.ele("indIEDest").txt(data.dest.indIEDest);
+
+    if (data.dest.IE) {
+      data.dest.IE = this.cleanString(data.dest.IE);
+    }
+
+    if (data.dest.indIEDest === "2") {
+      data.dest.IE = "ISENTO";
+    } else if (data.dest.indIEDest === "9") {
+      delete data.dest.IE;
+    } else if (data.dest.IE) {
+      data.dest.IE = data.dest.IE.trim();
+    }
+
+    if (data.dest.IE) {
+      dest.ele("IE").txt(data.dest.IE);
+    }
+
     const enderDest = dest.ele("enderDest");
-    enderDest.ele("xLgr").txt(data.dest.enderDest.xLgr);
-    enderDest.ele("nro").txt(data.dest.enderDest.nro);
-    enderDest.ele("xBairro").txt(data.dest.enderDest.xBairro);
-    enderDest.ele("cMun").txt(data.dest.enderDest.cMun);
-    enderDest.ele("xMun").txt(data.dest.enderDest.xMun);
-    enderDest.ele("CEP").txt(data.dest.enderDest.CEP);
-    enderDest.ele("UF").txt(data.dest.enderDest.UF);
+    enderDest.ele("xLgr").txt(data.dest.enderDest.xLgr.trim());
+    enderDest.ele("nro").txt(data.dest.enderDest.nro.trim());
+    enderDest.ele("xBairro").txt(data.dest.enderDest.xBairro.trim());
+    enderDest.ele("cMun").txt(data.dest.enderDest.cMun.trim());
+    enderDest.ele("xMun").txt(data.dest.enderDest.xMun.trim());
+    enderDest.ele("CEP").txt(data.dest.enderDest.CEP.trim());
+    enderDest.ele("UF").txt(data.dest.enderDest.UF.trim());
 
     const assinante = infNFCom.ele("assinante");
     assinante.ele("iCodAssinante").txt(data.assinante.iCodAssinante);
