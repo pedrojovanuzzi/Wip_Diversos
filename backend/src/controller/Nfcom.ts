@@ -14,7 +14,8 @@ import { Faturas } from "../entities/Faturas";
 import { NFCom } from "../entities/NFCom";
 import dotenv from "dotenv";
 import DataSource from "../database/DataSource";
-import { Between, FindOptionsWhere, In, IsNull } from "typeorm";
+import { Between, FindOptionsWhere, In, IsNull, Not } from "typeorm";
+import { isNotEmpty } from "class-validator";
 dotenv.config();
 
 // Interfaces para tipagem dos dados da NFCom
@@ -207,7 +208,7 @@ class Nfcom {
       }
 
       const ClientData = await ClientRepository.findOne({
-        where: { login: FaturasData.login },
+        where: { login: FaturasData.login, cpf_cnpj: Not(IsNull()) },
       });
 
       if (!ClientData) {
@@ -233,11 +234,16 @@ class Nfcom {
       const vItem = vProd;
       const vNF = vProd;
 
+      console.log(ClientData.login);
+      console.log(ClientData.cpf_cnpj);
       // Limpeza de strings
-      const cleanString = (str: string) => str.replace(/\D/g, "");
+      const cleanString = (str: string) => {
+        console.log(str);
+        return str.replace(/\D/g, "");
+      };
 
       // Determina CNPJ ou CPF
-      const docCliente = cleanString(ClientData.cpf_cnpj || "");
+      const docCliente = cleanString(ClientData.cpf_cnpj);
       const isCnpj = docCliente.length > 11;
 
       const lastNumber = await DataSource.getRepository(NFCom).findOne({
@@ -370,7 +376,12 @@ class Nfcom {
           dVencFat: FaturasData.datavenc
             ? new Date(FaturasData.datavenc).toISOString().slice(0, 10)
             : new Date().toISOString().slice(0, 10),
-          codBarras: cleanString(FaturasData.linhadig),
+          codBarras: cleanString(
+            FaturasData.linhadig ||
+              FaturasData.chave_gnet2 ||
+              FaturasData.nossonum ||
+              ""
+          ),
         },
         infNFComSupl: {
           qrCodNFCom: "",
