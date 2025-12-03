@@ -111,79 +111,9 @@ export default function Nfcom() {
       console.log("Resposta da API:", resposta.data);
       setFetchStatus(true);
       setFetchId(resposta.data.job);
-      // Verificar se a resposta contém erros da SEFAZ
-      if (Array.isArray(resposta.data) && resposta.data.length > 0) {
-        const resultados = resposta.data;
-        const erros = resultados.filter((r: any) => r.error === true);
-        const sucessos = resultados.filter((r: any) => r.success === true);
-
-        if (erros.length > 0) {
-          // Montar mensagem de erro detalhada
-          const mensagensErro = erros
-            .map((erro: any, index: number) => {
-              let msg = `NFCom ${index + 1}:\n`;
-
-              if (erro.cStat) {
-                msg += `Código: ${erro.cStat}\n`;
-              }
-
-              if (erro.message) {
-                // Limpar mensagem removendo prefixos como "Rejeição:"
-                const mensagemLimpa = erro.message.replace(
-                  /^(Rejeição|Erro):\s*/i,
-                  ""
-                );
-                msg += `${mensagemLimpa}\n`;
-              }
-
-              if (erro.id) {
-                msg += `ID: ${erro.id}\n`;
-              }
-
-              return msg;
-            })
-            .join("\n");
-
-          if (sucessos.length > 0) {
-            // Parcialmente bem-sucedido
-            setError(
-              `${sucessos.length} NFCom(s) emitida(s) com sucesso, mas ${erros.length} falharam:\n\n${mensagensErro}`
-            );
-            setSuccess(
-              `${sucessos.length} NFCom(s) processada(s) com sucesso!`
-            );
-          } else {
-            // Todos falharam
-            setError(`Falha ao emitir NFCom:\n\n${mensagensErro}`);
-          }
-        } else if (sucessos.length > 0) {
-          // Todos bem-sucedidos
-          setSuccess(`${sucessos.length} NFCom(s) emitida(s) com sucesso!`);
-        } else {
-          // Resposta inesperada
-          setError("Resposta inesperada do servidor. Verifique os logs.");
-        }
-
-        setDadosNFe(resposta.data);
-      } else {
-        // Formato de resposta antigo ou diferente
-        setDadosNFe(resposta.data);
-        setSuccess("NFCom emitida com sucesso.");
-      }
     } catch (erro) {
       console.error("Erro ao emitir NFCom:", erro);
-      if (
-        axios.isAxiosError(erro) &&
-        erro.response &&
-        erro.response.data &&
-        erro.response.data.erro
-      ) {
-        setError(`Erro ao emitir NFCom: ${erro.response.data.erro}`);
-      } else if (axios.isAxiosError(erro) && erro.response) {
-        setError(`Erro ao emitir NFCom: ${JSON.stringify(erro.response.data)}`);
-      } else {
-        setError("Erro desconhecido ao emitir NFCom.");
-      }
+      setError("Erro desconhecido ao emitir NFCom. " + erro);
     } finally {
       setShowPopUp(false);
       setLoading(false);
@@ -232,14 +162,15 @@ export default function Nfcom() {
   };
 
   useEffect(() => {
+    let intervalo: NodeJS.Timer;
+
     if (fetchStatus) {
-      setTimeout(async () => {
+      // Inicia um loop que roda a cada 3 segundos (3000ms)
+      intervalo = setInterval(async () => {
         try {
           const response = await axios.post(
             `${process.env.REACT_APP_URL}/NFCom/statusJob`,
-            {
-              id: fetchId,
-            },
+            { id: fetchId },
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -247,16 +178,71 @@ export default function Nfcom() {
               },
             }
           );
-          console.log("Resposta da API:", response.data);
-          setSuccess(response.data.resultado);
-          setFetchStatus(false);
+
+          const job = response.data;
+          console.log("Status do Job:", job.status);
+
+          // 1. Se estiver CONCLUÍDO
+          if (job.status === "concluido") {
+            // Para o loop
+            clearInterval(intervalo);
+            setFetchStatus(false); // Para de tentar buscar
+
+            // Salva os dados das notas (se precisar usar em outra tabela)
+            // setDadosFinais(job.resultado);
+            let errors = 0;
+            let success = 0;
+            job.resultado.map((item: any) => {
+              console.log(item);
+              if (item.success === false) {
+                errors++;
+              } else {
+                success++;
+              }
+            });
+            if (errors > 0) {
+              setError(
+                "Ocorreu um erro no processamento das notas, Numero de erros: " +
+                  errors +
+                  "\n" +
+                  JSON.stringify(
+                    job.resultado.filter((item: any) => item.success === false)
+                  )
+              );
+            }
+            if (success > 0) {
+              setSuccess(
+                "Notas emitidas com sucesso!" +
+                  JSON.stringify(
+                    job.resultado.filter((item: any) => item.success === true)
+                  )
+              );
+            }
+          }
+
+          // 2. Se der ERRO no processamento
+          else if (job.status === "erro") {
+            clearInterval(intervalo);
+            setFetchStatus(false);
+            setError(
+              "Ocorreu um erro no processamento das notas: " +
+                JSON.stringify(job.resultado)
+            );
+          }
+
+          // 3. Se estiver "pendente" ou "processando", o loop continua rodando...
         } catch (error) {
-          console.error("Erro ao buscar NFCom:", error);
-          setError("Não foi possível buscar NFCom.");
+          console.error("Erro ao buscar status:", error);
+          // Opcional: parar o loop em caso de erro de rede
+          // clearInterval(intervalo);
+          // setFetchStatus(false);
         }
-      }, 5000);
+      }, 3000); // Verifica a cada 3 segundos
     }
-  }, [fetchStatus]);
+
+    // Limpeza: Garante que o loop pare se o componente desmontar
+    return () => clearInterval(intervalo);
+  }, [fetchStatus, fetchId, token]);
 
   const handleSearch = async () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
