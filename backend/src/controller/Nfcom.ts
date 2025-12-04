@@ -975,9 +975,7 @@ class Nfcom {
       return;
     } catch (error) {
       console.error(error);
-      if (!res.headersSent) {
-        res.status(500).json({ error: "Erro ao cancelar NFCom" });
-      }
+      res.status(500).json({ error: "Erro ao cancelar NFCom" });
     }
   };
 

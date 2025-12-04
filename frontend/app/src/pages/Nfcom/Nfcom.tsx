@@ -301,8 +301,8 @@ export default function Nfcom() {
         setArquivo={setArquivo}
         enviarCertificado={handleEnviarCertificado}
       />
-      {error && <Error message={error} />}
-      {success && <Success message={success} />}
+      {error && <Error message={error} onClose={() => setError("")} />}
+      {success && <Success message={success} onClose={() => setSuccess("")} />}
       {clientes.length > 0 && (
         <>
           <h1 className="text-center mt-2 self-center text-2xl font-semibold text-gray-900">

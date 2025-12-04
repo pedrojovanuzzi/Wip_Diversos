@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Dialog,
   DialogBackdrop,
@@ -9,15 +8,14 @@ import {
 } from "@headlessui/react";
 import { CheckIcon } from "@heroicons/react/24/outline";
 
-interface Message {
+interface SuccessProps {
   message: string;
+  onClose: () => void;
 }
 
-export default function Success({ message }: Message) {
-  const [open, setOpen] = useState(true);
-
+export default function Success({ message, onClose }: SuccessProps) {
   return (
-    <Dialog open={open} onClose={setOpen} className="relative z-10">
+    <Dialog open={true} onClose={onClose} className="relative z-10">
       <DialogBackdrop
         transition
         className="fixed inset-0 bg-gray-500/75 transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in"
@@ -51,7 +49,7 @@ export default function Success({ message }: Message) {
             <div className="mt-5 sm:mt-6">
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={onClose}
                 className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
               >
                 Ok

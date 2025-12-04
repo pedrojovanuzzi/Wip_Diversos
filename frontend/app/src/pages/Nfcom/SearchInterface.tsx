@@ -146,11 +146,8 @@ export default function SearchInterface() {
           "Erro ao cancelar NFCom. Verifique os dados e tente novamente."
         );
       }
-
       setLoading(false);
-
       setSelectedIds([]);
-      handleSearch();
     }
   };
 
@@ -185,8 +182,8 @@ export default function SearchInterface() {
 
             // Salva os dados das notas (se precisar usar em outra tabela)
             // setDadosFinais(job.resultado);
-            let errors = 0;
-            let success = 0;
+            let errorsCount = 0;
+            let successCount = 0;
 
             const results = Array.isArray(job.resultado)
               ? job.resultado
@@ -196,24 +193,27 @@ export default function SearchInterface() {
               console.log(item);
               const cStat = item.cStat || item.CStat;
               if (cStat == "135") {
-                success++;
+                successCount++;
               } else {
-                errors++;
+                errorsCount++;
               }
             });
-            if (errors > 0) {
+            if (errorsCount > 0) {
               setError(
                 "Ocorreu um erro no processamento das notas, Numero de erros: " +
-                  errors +
+                  errorsCount +
                   "\n" +
                   JSON.stringify(job)
               );
             }
-            if (success > 0) {
+            if (successCount > 0) {
               setSuccess("Notas Canceladas com sucesso!" + JSON.stringify(job));
+              handleSearch();
             }
-            console.log("success", success);
-            console.log("errors", errors);
+            console.log(success);
+
+            console.log("success", successCount);
+            console.log("errors", errorsCount);
           }
 
           // 2. Se der ERRO no processamento
@@ -543,8 +543,10 @@ export default function SearchInterface() {
           </div>
 
           {/* Error and Success Messages */}
-          {error && <Error message={error} />}
-          {success && <Success message={success} />}
+          {error && <Error message={error} onClose={() => setError("")} />}
+          {success && (
+            <Success message={success} onClose={() => setSuccess("")} />
+          )}
 
           <PopUpCancelNFCom
             setShowPopUp={setShowPopUp}
