@@ -454,10 +454,14 @@ class Nfcom {
     password: string,
     responses: any[]
   ) {
+    let contadorProcessados = job.processados || 0;
+
     for (const item of dadosFinaisNFCom) {
       try {
+        contadorProcessados++;
+
         await DataSource.getRepository(Jobs).update(job.id, {
-          processados: job.processados + 1,
+          processados: contadorProcessados,
           total: job.total,
           status: "processando",
         });

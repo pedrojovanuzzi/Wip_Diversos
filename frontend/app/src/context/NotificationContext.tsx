@@ -97,25 +97,34 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
             if (errorsCount > 0) {
               showError(
-                "Ocorreu um erro no processamento das notas. Erros: " +
+                `Processamento concluído com erros (${jobData.processados}/${jobData.total}).\n` +
+                  "Erros: " +
                   errorsCount +
                   "\n" +
                   JSON.stringify(jobData)
               );
             }
             if (successCount > 0) {
-              showSuccess(
+              const baseMessage =
                 job.type === "cancelamento"
                   ? "Notas Canceladas com sucesso!"
-                  : "Notas emitidas com sucesso!"
-              );
+                  : "Notas emitidas com sucesso!";
+
+              const progressMessage = ` (${jobData.processados}/${jobData.total})`;
+              const warningMessage =
+                jobData.processados < jobData.total
+                  ? "\nATENÇÃO: O processamento parou antes de completar todos os itens."
+                  : "";
+
+              showSuccess(baseMessage + progressMessage + warningMessage);
             }
           } else if (jobData.status === "erro") {
             removeJob(job.id);
             showError(
-              "Ocorreu um erro no processamento das notas: " +
+              `Ocorreu um erro no processamento das notas (${jobData.processados}/${jobData.total}): ` +
                 JSON.stringify(jobData.resultado)
             );
+            console.log(jobData);
           }
         } catch (err) {
           console.error(`Erro ao verificar job ${job.id}:`, err);
