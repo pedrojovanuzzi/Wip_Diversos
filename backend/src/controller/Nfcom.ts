@@ -848,8 +848,12 @@ class Nfcom {
 
     console.log(xmlResponse);
 
-    if (cStat === "135") {
-      console.log(`Nota ${nNF} cancelada!`);
+    if (cStat === "135" || cStat === "631") {
+      console.log(
+        `Nota ${nNF} cancelada! ${
+          cStat === "631" ? "(Duplicidade de evento)" : ""
+        }`
+      );
 
       const nfcom = await NFComRepository.findOne({
         where: {
@@ -908,30 +912,35 @@ class Nfcom {
         status: "pendente",
         total: listaNfcom.length,
         processados: 0,
-        resultado: null,
+        resultado: [], // Inicializa array vazio
       });
 
       await jobRepository.save(job);
 
+      // ==========================================================
+      // 1. RESPOSTA IMEDIATA (O usuário é liberado aqui)
+      // ==========================================================
       res
         .status(200)
         .json({ message: "NFCom em processo de cancelamento!", id: job.id });
 
+      // ==========================================================
+      // 2. BACKGROUND (O Node continua rodando isso sozinho)
+      // ==========================================================
       (async () => {
+        console.log("Iniciando background...");
+
         for (const nf of listaNfcom) {
           try {
             const client = await AppDataSource.getRepository(
               ClientesEntities
             ).findOne({
-              where: {
-                login: nf.pppoe,
-              },
+              where: { login: nf.pppoe },
             });
 
-            if (!client) {
-              continue;
-            }
+            if (!client) continue;
 
+            // Define ambiente
             if (nf.tpAmb === 2) {
               this.homologacao = true;
               this.WSDL_URL =
@@ -942,7 +951,11 @@ class Nfcom {
                 "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
             }
 
-            this.cancelarNoBackground(
+            console.log("Processando NF:", nf.nNF);
+
+            // Esse await NÃO segura o usuário (ele já recebeu a resposta lá em cima).
+            // Ele serve apenas para o servidor processar Nota 1, depois Nota 2, etc.
+            await this.cancelarNoBackground(
               nf,
               client.login,
               nf.nNF,
@@ -952,10 +965,14 @@ class Nfcom {
               job
             );
           } catch (error) {
-            console.error(error);
+            console.error("Erro no loop de background:", error);
           }
         }
+        console.log("Fim do processamento em background.");
       })();
+
+      // Removi o segundo res.json que estava aqui causando o erro
+      return;
     } catch (error) {
       console.error(error);
       if (!res.headersSent) {

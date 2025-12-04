@@ -135,7 +135,10 @@ export default function SearchInterface() {
             },
           }
         );
-
+        console.log("Resposta da API:", response.data);
+        setFetchId(response.data.id);
+        setFetchStatus(true);
+        setLoading(false);
         setSuccess(response.data.message);
       } catch (error) {
         console.error(`Erro ao cancelar NFCom ${selectedIds}:`, error);
@@ -154,7 +157,7 @@ export default function SearchInterface() {
   useEffect(() => {
     let intervalo: NodeJS.Timer;
 
-    if (fetchStatus) {
+    if (fetchStatus || fetchId) {
       // Inicia um loop que roda a cada 3 segundos (3000ms)
       intervalo = setInterval(async () => {
         try {
@@ -178,6 +181,7 @@ export default function SearchInterface() {
             // Para o loop
             clearInterval(intervalo);
             setFetchStatus(false); // Para de tentar buscar
+            setFetchId("");
 
             // Salva os dados das notas (se precisar usar em outra tabela)
             // setDadosFinais(job.resultado);
@@ -206,14 +210,17 @@ export default function SearchInterface() {
               );
             }
             if (success > 0) {
-              setSuccess("Notas emitidas com sucesso!" + JSON.stringify(job));
+              setSuccess("Notas Canceladas com sucesso!" + JSON.stringify(job));
             }
+            console.log("success", success);
+            console.log("errors", errors);
           }
 
           // 2. Se der ERRO no processamento
           else if (job.status === "erro") {
             clearInterval(intervalo);
             setFetchStatus(false);
+            setFetchId("");
             setError(
               "Ocorreu um erro no processamento das notas: " +
                 JSON.stringify(job.resultado)
@@ -236,15 +243,17 @@ export default function SearchInterface() {
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedIds(nfcomList.map((n) => n.id));
+      setSelectedIds(nfcomList.map((n) => n.numeracao));
     } else {
       setSelectedIds([]);
     }
   };
 
-  const handleSelectOne = (id: number) => {
+  const handleSelectOne = (number: number) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+      prev.includes(number)
+        ? prev.filter((i) => i !== number)
+        : [...prev, number]
     );
   };
 
@@ -610,8 +619,12 @@ export default function SearchInterface() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <input
                             type="checkbox"
-                            checked={selectedIds.includes(nfcom.id)}
-                            onChange={() => handleSelectOne(nfcom.id)}
+                            checked={selectedIds.includes(
+                              Number(nfcom.numeracao)
+                            )}
+                            onChange={() =>
+                              handleSelectOne(Number(nfcom.numeracao))
+                            }
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
                         </td>
