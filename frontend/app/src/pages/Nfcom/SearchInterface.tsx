@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import { CiSearch } from "react-icons/ci";
 import { BiCalendar, BiUser, BiReceipt } from "react-icons/bi";
-import Error from "./Components/Error";
-import Success from "./Components/Success";
 import { useAuth } from "../../context/AuthContext";
 import PopUpCancelNFCom from "./Components/PopUpCancelNFCom";
 import { GoNumber } from "react-icons/go";
 import { VscSymbolBoolean } from "react-icons/vsc";
 import { MdOutlineConfirmationNumber } from "react-icons/md";
+import { useNotification } from "../../context/NotificationContext";
+
 interface NFComResult {
   // Dados primários
   id: number;
@@ -42,10 +42,6 @@ export default function SearchInterface() {
   const [dataFim, setDataFim] = useState<string>("");
   const [nfcomList, setNfcomList] = useState<NFComResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [fetchStatus, setFetchStatus] = useState(false);
-  const [fetchId, setFetchId] = useState("");
   const [tpAmb, settpAmb] = useState<number>(1 || 2);
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");
@@ -56,6 +52,7 @@ export default function SearchInterface() {
 
   const { user } = useAuth();
   const token = user?.token;
+  const { addJob, showError, showSuccess } = useNotification();
 
   const createXmlDownloadUrl = (xmlContent: string): string => {
     const blob = new Blob([xmlContent], { type: "text/xml" });
@@ -70,8 +67,6 @@ export default function SearchInterface() {
   ) => {
     try {
       setLoading(true);
-      setError("");
-      setSuccess("");
       setShowPopUp(true);
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/NFCom/cancelarNFCom`,
@@ -89,13 +84,17 @@ export default function SearchInterface() {
         }
       );
       console.log("Resposta da API:", response.data);
-      setFetchId(response.data.id);
-      setFetchStatus(true);
+      addJob(response.data.id, "cancelamento");
+      showSuccess(
+        "Solicitação de cancelamento enviada! Processando em segundo plano."
+      );
       setShowPopUp(false);
       setLoading(false);
     } catch (error) {
       console.error("Erro ao cancelar NFCom:", error);
-      setError("Erro ao cancelar NFCom. Verifique os dados e tente novamente.");
+      showError(
+        "Erro ao cancelar NFCom. Verifique os dados e tente novamente."
+      );
       setLoading(false);
       setShowPopUp(false);
     }
@@ -117,8 +116,6 @@ export default function SearchInterface() {
     } else if (selectedIds.length > 0) {
       setLoading(true);
       setShowPopUp(false);
-      setError("");
-      setSuccess("");
 
       try {
         const response = await axios.post(
@@ -136,13 +133,13 @@ export default function SearchInterface() {
           }
         );
         console.log("Resposta da API:", response.data);
-        setFetchId(response.data.id);
-        setFetchStatus(true);
-        setLoading(false);
-        setSuccess(response.data.message);
+        addJob(response.data.id, "cancelamento");
+        showSuccess(
+          "Solicitação de cancelamento em lote enviada! Processando em segundo plano."
+        );
       } catch (error) {
         console.error(`Erro ao cancelar NFCom ${selectedIds}:`, error);
-        setError(
+        showError(
           "Erro ao cancelar NFCom. Verifique os dados e tente novamente."
         );
       }
@@ -150,96 +147,6 @@ export default function SearchInterface() {
       setSelectedIds([]);
     }
   };
-
-  useEffect(() => {
-    let intervalo: NodeJS.Timer;
-
-    if (fetchStatus || fetchId) {
-      // Inicia um loop que roda a cada 3 segundos (3000ms)
-      intervalo = setInterval(async () => {
-        try {
-          const response = await axios.post(
-            `${process.env.REACT_APP_URL}/NFCom/statusJob`,
-            { id: fetchId },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-
-          const job = response.data;
-          console.log("Status do Job:", job.status);
-          console.log("Resultado do Job:", job);
-
-          // 1. Se estiver CONCLUÍDO
-          if (job.status === "concluido") {
-            // Para o loop
-            clearInterval(intervalo);
-            setFetchStatus(false); // Para de tentar buscar
-            setFetchId("");
-
-            // Salva os dados das notas (se precisar usar em outra tabela)
-            // setDadosFinais(job.resultado);
-            let errorsCount = 0;
-            let successCount = 0;
-
-            const results = Array.isArray(job.resultado)
-              ? job.resultado
-              : [job.resultado];
-
-            results.map((item: any) => {
-              console.log(item);
-              const cStat = item.cStat || item.CStat;
-              if (cStat == "135") {
-                successCount++;
-              } else {
-                errorsCount++;
-              }
-            });
-            if (errorsCount > 0) {
-              setError(
-                "Ocorreu um erro no processamento das notas, Numero de erros: " +
-                  errorsCount +
-                  "\n" +
-                  JSON.stringify(job)
-              );
-            }
-            if (successCount > 0) {
-              setSuccess("Notas Canceladas com sucesso!" + JSON.stringify(job));
-              handleSearch();
-            }
-            console.log(success);
-
-            console.log("success", successCount);
-            console.log("errors", errorsCount);
-          }
-
-          // 2. Se der ERRO no processamento
-          else if (job.status === "erro") {
-            clearInterval(intervalo);
-            setFetchStatus(false);
-            setFetchId("");
-            setError(
-              "Ocorreu um erro no processamento das notas: " +
-                JSON.stringify(job.resultado)
-            );
-          }
-
-          // 3. Se estiver "pendente" ou "processando", o loop continua rodando...
-        } catch (error) {
-          console.error("Erro ao buscar status:", error);
-          // Opcional: parar o loop em caso de erro de rede
-          // clearInterval(intervalo);
-          // setFetchStatus(false);
-        }
-      }, 3000); // Verifica a cada 3 segundos
-    }
-
-    // Limpeza: Garante que o loop pare se o componente desmontar
-    return () => clearInterval(intervalo);
-  }, [fetchStatus, fetchId, token]);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -266,7 +173,6 @@ export default function SearchInterface() {
   const handleSearch = async () => {
     try {
       setLoading(true);
-      setError("");
 
       const searchParams: any = {};
       if (pppoe.trim()) searchParams.pppoe = pppoe.trim();
@@ -297,13 +203,13 @@ export default function SearchInterface() {
     } catch (erro) {
       console.error("Erro ao buscar NFCom:", erro);
       if (axios.isAxiosError(erro) && erro.response) {
-        setError(
+        showError(
           `Erro ao buscar NFCom: ${
             erro.response.data.erro || "Erro desconhecido."
           }`
         );
       } else {
-        setError("Erro de rede. Verifique sua conexão e tente novamente.");
+        showError("Erro de rede. Verifique sua conexão e tente novamente.");
       }
       setNfcomList([]);
     } finally {
@@ -318,8 +224,6 @@ export default function SearchInterface() {
     setDataFim("");
     setNfcomList([]);
     setSelectedIds([]);
-    setError("");
-    setSuccess("");
   };
 
   return (
@@ -542,12 +446,6 @@ export default function SearchInterface() {
             </div>
           </div>
 
-          {/* Error and Success Messages */}
-          {error && <Error message={error} onClose={() => setError("")} />}
-          {success && (
-            <Success message={success} onClose={() => setSuccess("")} />
-          )}
-
           <PopUpCancelNFCom
             setShowPopUp={setShowPopUp}
             showPopUp={showPopUp}
@@ -713,7 +611,7 @@ export default function SearchInterface() {
             </div>
           )}
 
-          {!loading && nfcomList.length === 0 && !error && (
+          {!loading && nfcomList.length === 0 && (
             <p className="text-center mt-10 text-gray-500">
               Use os filtros acima para buscar NFCom geradas e homologadas
             </p>

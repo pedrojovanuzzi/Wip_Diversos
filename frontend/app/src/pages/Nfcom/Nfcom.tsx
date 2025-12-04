@@ -8,9 +8,8 @@ import { useNavigate } from "react-router-dom";
 import { BsFiletypeDoc } from "react-icons/bs";
 import { CiSearch } from "react-icons/ci";
 import PopUpButton from "./Components/PopUpButton";
-import Error from "./Components/Error";
-import Success from "./Components/Success";
 import { useAuth } from "../../context/AuthContext";
+import { useNotification } from "../../context/NotificationContext";
 
 export default function Nfcom() {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -23,11 +22,7 @@ export default function Nfcom() {
 
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [service, setService] = useState("");
-  const [fetchStatus, setFetchStatus] = useState(false);
-  const [fetchId, setFetchId] = useState("");
   const [loading, setLoading] = useState(false);
   const [reducao, setReducao] = useState("");
   const [isReducaoActive, setIsReducaoActive] = useState(true);
@@ -58,6 +53,7 @@ export default function Nfcom() {
   const { user } = useAuth();
   const token = user?.token;
   const navigate = useNavigate();
+  const { addJob, showError, showSuccess } = useNotification();
 
   const handleCheckboxChange = (clienteId: number) => {
     setClientesSelecionados((prevSelecionados) => {
@@ -87,8 +83,6 @@ export default function Nfcom() {
   const emitirNFCom = async () => {
     try {
       setLoading(true);
-      setError("");
-      setSuccess("");
 
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/NFCom/emitirNFCom`,
@@ -109,11 +103,13 @@ export default function Nfcom() {
       );
 
       console.log("Resposta da API:", resposta.data);
-      setFetchStatus(true);
-      setFetchId(resposta.data.job);
+      addJob(resposta.data.job, "emissao");
+      showSuccess(
+        "Solicitação de emissão enviada! Processando em segundo plano."
+      );
     } catch (erro) {
       console.error("Erro ao emitir NFCom:", erro);
-      setError("Erro desconhecido ao emitir NFCom. " + erro);
+      showError("Erro desconhecido ao emitir NFCom. " + erro);
     } finally {
       setShowPopUp(false);
       setLoading(false);
@@ -151,98 +147,15 @@ export default function Nfcom() {
         }
       );
       console.log("Certificado enviado:", resposta.data);
-      setSuccess("Certificado enviado com sucesso!");
+      showSuccess("Certificado enviado com sucesso!");
       setShowCertPasswordPopUp(false);
       setCertPassword("");
     } catch (erro) {
       console.error("Erro ao enviar o certificado:", erro);
-      setError("Não foi possível enviar o certificado.");
+      showError("Não foi possível enviar o certificado.");
       setShowCertPasswordPopUp(false);
     }
   };
-
-  useEffect(() => {
-    let intervalo: NodeJS.Timer;
-
-    if (fetchStatus) {
-      // Inicia um loop que roda a cada 3 segundos (3000ms)
-      intervalo = setInterval(async () => {
-        try {
-          const response = await axios.post(
-            `${process.env.REACT_APP_URL}/NFCom/statusJob`,
-            { id: fetchId },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-
-          const job = response.data;
-          console.log("Status do Job:", job.status);
-
-          // 1. Se estiver CONCLUÍDO
-          if (job.status === "concluido") {
-            // Para o loop
-            clearInterval(intervalo);
-            setFetchStatus(false); // Para de tentar buscar
-
-            // Salva os dados das notas (se precisar usar em outra tabela)
-            // setDadosFinais(job.resultado);
-            let errors = 0;
-            let success = 0;
-            job.resultado.map((item: any) => {
-              console.log(item);
-              if (item.success === false) {
-                errors++;
-              } else {
-                success++;
-              }
-            });
-            if (errors > 0) {
-              setError(
-                "Ocorreu um erro no processamento das notas, Numero de erros: " +
-                  errors +
-                  "\n" +
-                  JSON.stringify(
-                    job.resultado.filter((item: any) => item.success === false)
-                  )
-              );
-            }
-            if (success > 0) {
-              setSuccess(
-                "Notas emitidas com sucesso!" +
-                  JSON.stringify(
-                    job.resultado.filter((item: any) => item.success === true)
-                  )
-              );
-            }
-          }
-
-          // 2. Se der ERRO no processamento
-          else if (job.status === "erro") {
-            clearInterval(intervalo);
-            setFetchStatus(false);
-            setError(
-              "Ocorreu um erro no processamento das notas: " +
-                JSON.stringify(job.resultado)
-            );
-          }
-
-          // 3. Se estiver "pendente" ou "processando", o loop continua rodando...
-        } catch (error) {
-          console.error("Erro ao buscar status:", error);
-          // Opcional: parar o loop em caso de erro de rede
-          // clearInterval(intervalo);
-          // setFetchStatus(false);
-        }
-      }, 3000); // Verifica a cada 3 segundos
-    }
-
-    // Limpeza: Garante que o loop pare se o componente desmontar
-    return () => clearInterval(intervalo);
-  }, [fetchStatus, fetchId, token]);
 
   const handleSearch = async () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
@@ -261,7 +174,6 @@ export default function Nfcom() {
           },
         }
       );
-      setError("");
       console.log("Clientes encontrados:", resposta.data);
       setClientes(resposta.data);
     } catch (erro) {
@@ -271,13 +183,13 @@ export default function Nfcom() {
         erro.response &&
         erro.response.status === 500
       ) {
-        setError(
+        showError(
           "Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde."
         );
       } else if (axios.isAxiosError(erro) && erro.response) {
-        setError(`Erro: ${erro.response.data.error || "Algo deu errado."}`);
+        showError(`Erro: ${erro.response.data.error || "Algo deu errado."}`);
       } else {
-        setError("Erro de rede. Verifique sua conexão e tente novamente.");
+        showError("Erro de rede. Verifique sua conexão e tente novamente.");
       }
     }
   };
@@ -301,8 +213,6 @@ export default function Nfcom() {
         setArquivo={setArquivo}
         enviarCertificado={handleEnviarCertificado}
       />
-      {error && <Error message={error} onClose={() => setError("")} />}
-      {success && <Success message={success} onClose={() => setSuccess("")} />}
       {clientes.length > 0 && (
         <>
           <h1 className="text-center mt-2 self-center text-2xl font-semibold text-gray-900">
