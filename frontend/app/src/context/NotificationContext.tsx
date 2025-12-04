@@ -125,6 +125,8 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
                 JSON.stringify(jobData.resultado)
             );
             console.log(jobData);
+          } else if (jobData.status === "pendente") {
+            console.log(jobData);
           }
         } catch (err) {
           console.error(`Erro ao verificar job ${job.id}:`, err);
