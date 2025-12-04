@@ -871,78 +871,96 @@ class Nfcom {
       return;
     } else {
       console.log(`Erro ao cancelar nota ${nNF}: ${cStat} - ${xMotivo}`);
+      job.status = "concluido";
+      job.resultado = {
+        cStat,
+        xMotivo,
+      };
+      await jobRepository.save(job);
+
       return;
     }
   }
 
   public cancelarNFcom = async (req: Request, res: Response) => {
     try {
-      const { nNF, password } = req.body;
-      const NFComRepository = DataSource.getRepository(NFCom);
+      let { nNF, password } = req.body;
 
+      const NFComRepository = DataSource.getRepository(NFCom);
       const jobRepository = DataSource.getRepository(Jobs);
+
+      const numerosParaBuscar = Array.isArray(nNF) ? nNF : [nNF];
+
+      const listaNfcom = await NFComRepository.find({
+        where: {
+          nNF: In(numerosParaBuscar),
+        },
+      });
+
+      if (!listaNfcom || listaNfcom.length === 0) {
+        res.status(404).json({ error: "NFCom não encontrada" });
+        return;
+      }
 
       const job = jobRepository.create({
         name: "cancelarNFCom",
         description: "Cancelamento de NFCom",
         status: "pendente",
-        total: nNF.length,
+        total: listaNfcom.length,
         processados: 0,
         resultado: null,
       });
 
       await jobRepository.save(job);
 
-      const nfcom = await NFComRepository.findOne({
-        where: {
-          nNF,
-        },
-      });
-      if (!nfcom) {
-        res.status(404).json({ error: "NFCom não encontrada" });
-        return;
-      }
-
-      const client = await AppDataSource.getRepository(
-        ClientesEntities
-      ).findOne({
-        where: {
-          login: nfcom.pppoe,
-        },
-      });
-
-      if (!client) {
-        res.status(404).json({ error: "Cliente não encontrado" });
-        return;
-      }
-
-      if (nfcom.tpAmb === 2) {
-        this.homologacao = true;
-        this.WSDL_URL =
-          "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
-      } else {
-        this.homologacao = false;
-        this.WSDL_URL =
-          "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
-      }
-
-      this.cancelarNoBackground(
-        nfcom,
-        client.login,
-        nNF,
-        password,
-        NFComRepository,
-        jobRepository,
-        job
-      );
-
       res
         .status(200)
         .json({ message: "NFCom em processo de cancelamento!", id: job.id });
+
+      (async () => {
+        for (const nf of listaNfcom) {
+          try {
+            const client = await AppDataSource.getRepository(
+              ClientesEntities
+            ).findOne({
+              where: {
+                login: nf.pppoe,
+              },
+            });
+
+            if (!client) {
+              continue;
+            }
+
+            if (nf.tpAmb === 2) {
+              this.homologacao = true;
+              this.WSDL_URL =
+                "https://nfcom-homologacao.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
+            } else {
+              this.homologacao = false;
+              this.WSDL_URL =
+                "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
+            }
+
+            this.cancelarNoBackground(
+              nf,
+              client.login,
+              nf.nNF,
+              password,
+              NFComRepository,
+              jobRepository,
+              job
+            );
+          } catch (error) {
+            console.error(error);
+          }
+        }
+      })();
     } catch (error) {
-      console.error("Erro ao cancelar NFCom:", error);
-      res.status(500).json({ error: "Erro ao cancelar NFCom" });
-      return;
+      console.error(error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Erro ao cancelar NFCom" });
+      }
     }
   };
 

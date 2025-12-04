@@ -183,9 +183,15 @@ export default function SearchInterface() {
             // setDadosFinais(job.resultado);
             let errors = 0;
             let success = 0;
-            job.map((item: any) => {
+
+            const results = Array.isArray(job.resultado)
+              ? job.resultado
+              : [job.resultado];
+
+            results.map((item: any) => {
               console.log(item);
-              if (item.resultado.CStat == "135") {
+              const cStat = item.cStat || item.CStat;
+              if (cStat == "135") {
                 success++;
               } else {
                 errors++;
