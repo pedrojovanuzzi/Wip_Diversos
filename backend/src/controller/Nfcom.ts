@@ -870,7 +870,7 @@ class Nfcom {
       }
       nfcom.status = "cancelada";
       await NFComRepository.save(nfcom);
-      job.status = "concluido";
+      job.status = "processando";
       job.resultado = {
         cStat,
         xMotivo,
@@ -973,6 +973,8 @@ class Nfcom {
           }
         }
         console.log("Fim do processamento em background.");
+        job.status = "concluido";
+        await jobRepository.save(job);
       })();
 
       // Removi o segundo res.json que estava aqui causando o erro
