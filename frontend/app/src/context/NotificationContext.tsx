@@ -30,11 +30,38 @@ export const useNotification = () => {
 };
 
 export const NotificationProvider = ({ children }: { children: ReactNode }) => {
-  const [success, setSuccess] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [activeJobs, setActiveJobs] = useState<Job[]>([]);
+  const [success, setSuccess] = useState<string | null>(() => {
+    return localStorage.getItem("notification_success");
+  });
+  const [error, setError] = useState<string | null>(() => {
+    return localStorage.getItem("notification_error");
+  });
+  const [activeJobs, setActiveJobs] = useState<Job[]>(() => {
+    const savedJobs = localStorage.getItem("notification_activeJobs");
+    return savedJobs ? JSON.parse(savedJobs) : [];
+  });
   const { user } = useAuth();
   const token = user?.token;
+
+  useEffect(() => {
+    if (success) {
+      localStorage.setItem("notification_success", success);
+    } else {
+      localStorage.removeItem("notification_success");
+    }
+  }, [success]);
+
+  useEffect(() => {
+    if (error) {
+      localStorage.setItem("notification_error", error);
+    } else {
+      localStorage.removeItem("notification_error");
+    }
+  }, [error]);
+
+  useEffect(() => {
+    localStorage.setItem("notification_activeJobs", JSON.stringify(activeJobs));
+  }, [activeJobs]);
 
   const showSuccess = (message: string) => setSuccess(message);
   const showError = (message: string) => setError(message);
