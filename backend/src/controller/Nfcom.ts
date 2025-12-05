@@ -1350,7 +1350,12 @@ class Nfcom {
     const gFat = infNFCom.ele("gFat");
     gFat.ele("CompetFat").txt(data.gFat.CompetFat);
     gFat.ele("dVencFat").txt(data.gFat.dVencFat);
-    gFat.ele("codBarras").txt(data.gFat.codBarras);
+    gFat
+      .ele("codBarras")
+      .txt(
+        data.gFat.codBarras ||
+          "000000000000000000000000000000000000000000000000"
+      );
 
     const infNFComSupl = nfCom.ele("infNFComSupl");
     // CDATA no QR Code
