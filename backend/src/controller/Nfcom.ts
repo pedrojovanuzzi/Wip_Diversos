@@ -2117,7 +2117,6 @@ class Nfcom {
 
         y += 40;
 
-        // --- BARCODE CORRIGIDO ---
         // --- BARCODE (Correção 47 -> 44 Dígitos) ---
         if (data.gFat && data.gFat.codBarras) {
           try {
