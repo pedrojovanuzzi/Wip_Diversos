@@ -17,6 +17,7 @@
     "@types/soap": "^0.18.0",
     "axios": "^1.7.9",
     "bcrypt": "^5.1.1",
+    "bwip-js": "^4.8.0",
     "class-validator": "^0.14.1",
     "connect-flash": "^0.1.1",
     "cors": "^2.8.5",
@@ -59,6 +60,7 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
+    "@types/bwip-js": "^3.2.3",
     "@types/connect-flash": "^0.0.40",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",

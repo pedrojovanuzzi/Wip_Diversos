@@ -1,6 +1,7 @@
 import { create } from "xmlbuilder2";
 import { XMLParser } from "fast-xml-parser";
 import QRCode from "qrcode";
+import bwipjs from "bwip-js";
 import { Request, Response } from "express";
 import * as fs from "fs";
 import * as path from "path";
@@ -1605,6 +1606,7 @@ class Nfcom {
         const parser = new XMLParser({
           ignoreAttributes: false,
           attributeNamePrefix: "",
+          parseTagValue: false,
         });
 
         const xmlString = nfcom.xml;
@@ -1862,16 +1864,17 @@ class Nfcom {
         y += rightBoxH + 15;
 
         // --- TABELA DE ITENS ---
+        // Total Available Width: 555 (approx)
         const cols = [
-          { name: "ITENS DA FATURA", x: margin, w: 200, align: "left" },
-          { name: "UN", x: margin + 200, w: 30, align: "center" },
-          { name: "QUANT", x: margin + 230, w: 50, align: "right" },
-          { name: "PREÇO UNIT", x: margin + 280, w: 60, align: "right" },
-          { name: "VALOR TOTAL", x: margin + 340, w: 60, align: "right" },
-          { name: "PIS/COFINS", x: margin + 400, w: 50, align: "right" },
-          { name: "BC ICMS", x: margin + 450, w: 50, align: "right" },
-          { name: "ALIQ", x: margin + 500, w: 30, align: "right" },
-          { name: "VALOR ICMS", x: margin + 530, w: 45, align: "right" }, // Ajustado para totalizar width correto
+          { name: "ITENS DA FATURA", x: margin, w: 175, align: "left" },
+          { name: "UN", x: margin + 175, w: 25, align: "center" },
+          { name: "QUANT", x: margin + 200, w: 45, align: "right" },
+          { name: "PREÇO UNIT", x: margin + 245, w: 55, align: "right" },
+          { name: "VALOR TOTAL", x: margin + 300, w: 55, align: "right" },
+          { name: "PIS/COFINS", x: margin + 355, w: 50, align: "right" },
+          { name: "BC ICMS", x: margin + 405, w: 50, align: "right" },
+          { name: "ALIQ", x: margin + 455, w: 30, align: "right" },
+          { name: "VALOR ICMS", x: margin + 485, w: 50, align: "right" },
         ];
 
         // Header Table
@@ -2072,20 +2075,38 @@ class Nfcom {
 
         y += 40;
 
-        // --- BARCODE (Simulado) ---
+        // --- BARCODE (Simulado -> Real) ---
         if (data.gFat && data.gFat.codBarras) {
-          doc.rect(margin, y, contentWidth, 30).fill("#F0F0F0");
-          doc.rect(margin, y + 5, contentWidth, 25).fill("white"); // Area branca pro barcode
-          // Como nao temos fonte de barcode ou imagem, imprimir numeros
-          doc
-            .fillColor("black")
-            .font("Helvetica-Bold")
-            .fontSize(10)
-            .text(data.gFat.codBarras, margin, y + 15, {
-              width: contentWidth,
-              align: "center",
-              characterSpacing: 2,
+          try {
+            // Generate Barcode Buffer
+            const barcodeBuffer = await bwipjs.toBuffer({
+              bcid: "code128", // Barcode type
+              text: String(data.gFat.codBarras), // Text to encode
+              scale: 3, // 3x scaling factor
+              height: 10, // Bar height, in millimeters
+              includetext: true, // Show human-readable text
+              textxalign: "center", // Always good to align this
             });
+
+            // Background for Barcode
+            doc.rect(margin, y, contentWidth, 40).fill("#F0F0F0");
+            doc.image(barcodeBuffer, margin + (contentWidth - 200) / 2, y + 5, {
+              width: 200,
+              height: 30,
+            });
+          } catch (e) {
+            console.error("Erro ao gerar Barcode:", e);
+            doc.rect(margin, y, contentWidth, 30).fill("#F0F0F0");
+            doc
+              .fillColor("black")
+              .font("Helvetica-Bold")
+              .fontSize(10)
+              .text(data.gFat.codBarras, margin, y + 15, {
+                width: contentWidth,
+                align: "center",
+                characterSpacing: 2,
+              });
+          }
         }
 
         doc.end();
