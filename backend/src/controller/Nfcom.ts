@@ -1,4 +1,5 @@
 import { create } from "xmlbuilder2";
+import { XMLParser } from "fast-xml-parser";
 import { Request, Response } from "express";
 import * as fs from "fs";
 import * as path from "path";
@@ -1596,6 +1597,122 @@ class Nfcom {
       }
     });
   }
+
+  private generateXmlPdf = async (nfcom: NFCom) => {
+    return new Promise((resolve, reject) => {
+      try {
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: "",
+        });
+
+        const xmlString = nfcom.xml;
+        const parsed = parser.parse(xmlString);
+
+        const root = parsed.NFCom || parsed.nfCom || parsed["ns:NFCom"];
+        if (!root) throw new Error("Elemento raiz NFCom não encontrado no XML");
+
+        const inf = root.infNFCom || root["ns:infNFCom"];
+        if (!inf) throw new Error("Elemento infNFCom não encontrado");
+
+        const data = {
+          ide: inf.ide,
+          emit: inf.emit,
+          dest: inf.dest,
+          det: Array.isArray(inf.det) ? inf.det : [inf.det],
+          total: inf.total,
+          qrCode: inf.infNFComSupl?.qrCodNFCom,
+          chave: nfcom.chave || inf.ide.cNF,
+        };
+
+        const doc = new PDFDocument({ margin: 50 });
+        const buffers: Buffer[] = [];
+        doc.on("data", (chunk) => buffers.push(chunk));
+        doc.on("end", () => resolve(Buffer.concat(buffers)));
+
+        // Title
+        doc
+          .fontSize(16)
+          .text("Documento Auxiliar da NFCom", { align: "center" });
+        doc.moveDown();
+
+        // Details
+        doc.fontSize(10);
+        doc.text(`Chave de Acesso: ${data.chave}`);
+        doc.text(`Série: ${data.ide.serie}  Número: ${data.ide.nNF}`);
+        doc.text(`Data Emissão: ${data.ide.dhEmi}`);
+        doc.moveDown();
+
+        // Emitente
+        doc.text("EMITENTE", { underline: true });
+        doc.text(`${data.emit.xNome}`);
+        doc.text(`CNPJ: ${data.emit.CNPJ}  IE: ${data.emit.IE}`);
+        doc.moveDown();
+
+        // Destinatario
+        doc.text("DESTINATÁRIO", { underline: true });
+        doc.text(`${data.dest.xNome}`);
+        doc.text(`CNPJ/CPF: ${data.dest.CNPJ || data.dest.CPF}`);
+        doc.moveDown();
+
+        // Items
+        doc.text("ITENS DA FATURA", { underline: true });
+        data.det.forEach((item: any, i: number) => {
+          doc.text(
+            `${i + 1}. ${item.prod.xProd.substring(0, 50)} | Qtd: ${
+              item.prod.qFaturada
+            } | Total: ${item.prod.vItem}`
+          );
+        });
+        doc.moveDown();
+
+        // Totals
+        doc.text("TOTAIS", { underline: true });
+        doc.text(`Valor Total: ${data.total.vNF}`);
+        doc.text(`Base Calc ICMS: ${data.total.ICMSTot.vBC}`);
+        doc.text(`Valor ICMS: ${data.total.ICMSTot.vICMS}`);
+
+        // QR Code
+        if (data.qrCode) {
+          doc.moveDown();
+          doc.text("QR Code Link:");
+          doc.fillColor("blue").text(data.qrCode, { link: data.qrCode });
+        }
+
+        doc.end();
+      } catch (error) {
+        console.error("Erro ao gerar PDF XML:", error);
+        reject(error);
+      }
+    }); // End Promise
+  }; // End Method
+
+  public generatePdfFromNfXML = async (req: Request, res: Response) => {
+    try {
+      const { nNF } = req.body;
+
+      const NFComRepository = DataSource.getRepository(NFCom);
+      const nfcom = await NFComRepository.findOne({
+        where: {
+          nNF: nNF,
+        },
+      });
+      if (!nfcom) {
+        res.status(404).json({ error: "NFCom não encontrada" });
+        return;
+      }
+      const pdf = await this.generateXmlPdf(nfcom);
+      res.set("Content-Type", "application/pdf");
+      res.set(
+        "Content-Disposition",
+        "attachment; filename=" + nfcom.nNF + ".pdf"
+      );
+      res.send(pdf);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Erro ao gerar PDF" });
+    }
+  };
 
   public generateReportPdf = async (req: Request, res: Response) => {
     try {

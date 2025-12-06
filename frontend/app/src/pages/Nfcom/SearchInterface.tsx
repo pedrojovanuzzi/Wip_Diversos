@@ -215,6 +215,44 @@ export default function SearchInterface() {
     }
   };
 
+  const generatePdfFromNfXML = async (nNF: string) => {
+    try {
+      const newWindow = window.open("", "_blank");
+      if (newWindow) {
+        newWindow.document.write("Aguarde, gerando Layout...");
+      }
+
+      setLoading(true);
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/NFCom/generatePdfFromNfXML`,
+        {
+          nNF: nNF,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          responseType: "blob",
+        }
+      );
+      const file = new Blob([response.data], { type: "application/pdf" });
+      const fileURL = URL.createObjectURL(file);
+      if (newWindow) {
+        newWindow.location.href = fileURL;
+      } else {
+        window.open(fileURL, "_blank");
+      }
+      showSuccess("Relatório gerado com sucesso!");
+      setLoading(false);
+      setSelectedIds([]);
+    } catch (error) {
+      console.error(`Erro ao gerar relatório:`, error);
+      showError("Erro ao gerar relatório.");
+      setLoading(false);
+    }
+  };
+
   const handleSelectOne = (number: number) => {
     setSelectedIds((prev) =>
       prev.includes(number)
@@ -668,6 +706,14 @@ export default function SearchInterface() {
                             className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-all"
                           >
                             Cancelar
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-left whitespace-nowrap">
+                          <button
+                            onClick={() => generatePdfFromNfXML(nfcom.nNF)}
+                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-all"
+                          >
+                            PDF
                           </button>
                         </td>
                       </tr>
