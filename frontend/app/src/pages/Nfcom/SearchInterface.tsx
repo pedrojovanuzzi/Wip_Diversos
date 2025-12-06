@@ -218,10 +218,6 @@ export default function SearchInterface() {
   const generatePdfFromNfXML = async (nNF: string) => {
     try {
       const newWindow = window.open("", "_blank");
-      if (newWindow) {
-        newWindow.document.write("Aguarde, gerando Layout...");
-      }
-
       setLoading(true);
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/NFCom/generatePdfFromNfXML`,
