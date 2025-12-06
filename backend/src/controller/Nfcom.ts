@@ -1600,6 +1600,48 @@ class Nfcom {
     });
   }
 
+  private converterLinhaDigitavelParaBarras = (linha: string): string => {
+    // Remove qualquer caractere que não seja número
+    const codigo = linha.replace(/[^0-9]/g, "");
+
+    // Se já tiver 44 dígitos, retorna ele mesmo
+    if (codigo.length === 44) return codigo;
+
+    // Se tiver 47 dígitos (Padrão Boleto Bancário)
+    if (codigo.length === 47) {
+      // Pega as partes "úteis" ignorando os Dígitos Verificadores (posições 9, 20 e 31)
+      // Estrutura da Linha Digitável:
+      // Campo 1: pos 0-8 (9 dígitos) + DV (1)
+      // Campo 2: pos 10-19 (10 dígitos) + DV (1)
+      // Campo 3: pos 21-30 (10 dígitos) + DV (1)
+      // Campo 4: pos 32 (DV Geral)
+      // Campo 5: pos 33-46 (Fator + Valor)
+
+      // Remontagem para o padrão de Barras (44 dígitos):
+      // pos 0-2 (Banco)
+      // pos 3 (Moeda)
+      // pos 32 (DV Geral - vai para a posição 4 do código de barras)
+      // pos 33-46 (Fator Vencimento + Valor)
+      // pos 4-8 (Campo Livre 1)
+      // pos 10-19 (Campo Livre 2)
+      // pos 21-30 (Campo Livre 3)
+
+      const p1 = codigo.substring(0, 4); // Banco + Moeda
+      const p2 = codigo.substring(32, 33); // DV Geral (K)
+      const p3 = codigo.substring(33, 47); // Fator + Valor
+      const p4 = codigo.substring(4, 9); // Campo Livre Bloco 1
+      const p5 = codigo.substring(10, 20); // Campo Livre Bloco 2
+      const p6 = codigo.substring(21, 31); // Campo Livre Bloco 3
+
+      return `${p1}${p2}${p3}${p4}${p5}${p6}`;
+    }
+
+    // Se for Arrecadação (Começa com 8 e tem 48 dígitos), a lógica é outra.
+    // Mas seu código começa com 364 (Banco), então é o caso acima de 47 dígitos.
+
+    return codigo; // Retorna original se não souber tratar
+  };
+
   private generateXmlPdf = async (nfcom: NFCom): Promise<Buffer> => {
     return new Promise<Buffer>(async (resolve, reject) => {
       try {
@@ -2076,64 +2118,83 @@ class Nfcom {
         y += 40;
 
         // --- BARCODE CORRIGIDO ---
+        // --- BARCODE (Correção 47 -> 44 Dígitos) ---
         if (data.gFat && data.gFat.codBarras) {
           try {
-            // 1. Limpeza e Validação
-            let codigoLimpo = String(data.gFat.codBarras).replace(/\D/g, "");
+            const linhaDigitavel = String(data.gFat.codBarras).replace(
+              /\D/g,
+              ""
+            );
 
-            // O padrão Interleaved 2 of 5 EXIGE número par de dígitos.
-            // Se for ímpar (ex: 47), adiciona 0 à esquerda.
-            if (codigoLimpo.length % 2 !== 0) {
-              codigoLimpo = "0" + codigoLimpo;
-            }
+            // 1. Converte para o formato de barras (44 dígitos) para gerar a IMAGEM
+            const codigoParaBarras =
+              this.converterLinhaDigitavelParaBarras(linhaDigitavel);
 
-            // 2. Gerar Buffer da Imagem (Apenas as barras)
+            console.log(
+              `Barcode Debug | Linha: ${linhaDigitavel.length} chars | Barras: ${codigoParaBarras.length} chars`
+            );
+
+            // 2. Gera a imagem usando os 44 dígitos (agora par e correto)
             const barcodeBuffer = await bwipjs.toBuffer({
-              bcid: "interleaved2of5", // Padrão de Boletos/Utility BR
-              text: codigoLimpo,
-              scale: 3, // Escala 3x (melhor resolução)
-              height: 12, // Altura em mm (12-15mm é o ideal para leitura)
-              includetext: false, // Desliga texto automático (vamos fazer manual)
+              bcid: "interleaved2of5",
+              text: codigoParaBarras, // Usa o código convertido!
+              scale: 3,
+              height: 12,
+              includetext: false,
               textxalign: "center",
             });
 
-            const barcodeHeight = 35; // Altura visual no PDF
-            const barcodeWidth = 300; // Largura visual no PDF
-            const barcodeX = margin + (contentWidth - barcodeWidth) / 2;
-
-            // Fundo para destacar
+            // Fundo cinza
             doc.rect(margin, y, contentWidth, 55).fill("#F0F0F0");
 
-            // Desenha as Barras
-            doc.image(barcodeBuffer, barcodeX, y + 10, {
-              width: barcodeWidth,
-              height: barcodeHeight,
+            // Desenha a imagem
+            const imgWidth = 300;
+            const imgHeight = 35;
+            const xPos = margin + (contentWidth - imgWidth) / 2;
+            doc.image(barcodeBuffer, xPos, y + 5, {
+              width: imgWidth,
+              height: imgHeight,
             });
 
-            // 3. Desenha o Texto Formatado (Legível para digitação)
-            // Formata em 4 grupos de 12 dígitos (Padrão Arrecadação/NFCom)
-            // Ou apenas exibe o número espaçado
-            const linhaDigitavel =
-              codigoLimpo.match(/.{1,12}/g)?.join("  ") || codigoLimpo;
+            // 3. Escreve a LINHA DIGITÁVEL original formatada (para leitura humana)
+            // Formata: 36490.00050 00006.009104 ... (Padrão visual de boleto)
+            let textoLegivel = linhaDigitavel;
+            if (linhaDigitavel.length === 47) {
+              textoLegivel = `${linhaDigitavel.substring(
+                0,
+                5
+              )}.${linhaDigitavel.substring(5, 10)}  ${linhaDigitavel.substring(
+                10,
+                15
+              )}.${linhaDigitavel.substring(
+                15,
+                21
+              )}  ${linhaDigitavel.substring(
+                21,
+                26
+              )}.${linhaDigitavel.substring(
+                26,
+                32
+              )}  ${linhaDigitavel.substring(
+                32,
+                33
+              )}  ${linhaDigitavel.substring(33)}`;
+            }
 
             doc
               .fillColor("black")
               .font("Helvetica-Bold")
               .fontSize(10)
-              .text(linhaDigitavel, margin, y + barcodeHeight + 15, {
+              .text(textoLegivel, margin, y + 45, {
                 width: contentWidth,
                 align: "center",
-                characterSpacing: 1, // Espaçamento leve para leitura fácil
               });
-          } catch (e) {
-            console.error("Erro crítico ao gerar Barcode:", e);
-            // Fallback visual em caso de erro na lib
-            doc.rect(margin, y, contentWidth, 40).stroke();
-            doc.text(
-              `Erro Barcode: ${data.gFat.codBarras}`,
-              margin + 10,
-              y + 15
-            );
+          } catch (e: any) {
+            console.error("Erro Barcode:", e);
+            doc.rect(margin, y, contentWidth, 50).stroke();
+            doc
+              .fillColor("red")
+              .text("Erro no código de barras", margin + 10, y + 20);
           }
         }
 
