@@ -1609,8 +1609,25 @@ class Nfcom {
         const xmlString = nfcom.xml;
         const parsed = parser.parse(xmlString);
 
-        const root = parsed.NFCom || parsed.nfCom || parsed["ns:NFCom"];
-        if (!root) throw new Error("Elemento raiz NFCom não encontrado no XML");
+        console.log("XML Parsing Debug:", Object.keys(parsed));
+
+        // Tenta encontrar o root diretamente ou dentro de nfcomProc
+        let root = parsed.NFCom || parsed.nfCom || parsed["ns:NFCom"];
+
+        if (!root && parsed.nfcomProc) {
+          console.log("Found nfcomProc root");
+          // Se for string (XML assinado/envelopado as vezes faz isso), parseia de novo ?
+          // Geralmente o fast-xml-parser já traz objeto.
+          root = parsed.nfcomProc.NFCom || parsed.nfcomProc["ns:NFCom"];
+        }
+
+        if (!root) {
+          console.error("XML Structure:", JSON.stringify(parsed, null, 2));
+          throw new Error(
+            "Elemento raiz NFCom não encontrado no XML. Chaves encontradas: " +
+              Object.keys(parsed).join(", ")
+          );
+        }
 
         const inf = root.infNFCom || root["ns:infNFCom"];
         if (!inf) throw new Error("Elemento infNFCom não encontrado");
