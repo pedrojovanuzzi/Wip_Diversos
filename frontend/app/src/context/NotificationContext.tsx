@@ -12,13 +12,13 @@ import Error from "../pages/Nfcom/Components/Error";
 
 interface Job {
   id: string;
-  type: "cancelamento" | "emissao";
+  type: "cancelamento" | "emissao" | "relatório";
 }
 
 interface NotificationContextData {
   showSuccess: (message: string) => void;
   showError: (message: string) => void;
-  addJob: (id: string, type: "cancelamento" | "emissao") => void;
+  addJob: (id: string, type: "cancelamento" | "emissao" | "relatório") => void;
 }
 
 const NotificationContext = createContext<NotificationContextData>(
@@ -66,7 +66,10 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   const showSuccess = (message: string) => setSuccess(message);
   const showError = (message: string) => setError(message);
 
-  const addJob = (id: string, type: "cancelamento" | "emissao") => {
+  const addJob = (
+    id: string,
+    type: "cancelamento" | "emissao" | "relatório"
+  ) => {
     setActiveJobs((prev) => [...prev, { id, type }]);
   };
 

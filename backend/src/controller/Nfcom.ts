@@ -12,6 +12,7 @@ import MkauthSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
 import { NFCom } from "../entities/NFCom";
+import PDFDocument from "pdfkit";
 import dotenv from "dotenv";
 import DataSource from "../database/DataSource";
 import {
@@ -1524,6 +1525,105 @@ class Nfcom {
 
     return signer.getSignedXml();
   }
+
+  private async generatePdf(
+    nfcom: NFCom[],
+    dataInicio: string,
+    dataFim: string
+  ): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument();
+        const buffers: Buffer[] = [];
+
+        doc.on("data", (chunk) => buffers.push(chunk));
+        doc.on("end", () => resolve(Buffer.concat(buffers)));
+
+        doc
+          .fontSize(20)
+          .text(`COMPROVANTE DE TRANSMISSÃO DE ARQUIVO`, { align: "center" });
+        doc.moveDown();
+        doc.fontSize(12);
+        doc.text(
+          `Identificação Contribuinte: WIP TELECOM MULTIMIDIA EIRELI ME`
+        );
+        doc.text(`CNPJ Contribuinte: 20.843.290/0001-42`);
+        doc.text(`IE Contribuinte: 183013286115`);
+        doc.text(
+          `Data de Emissão: ${new Date().toLocaleDateString()}  Hora: ${new Date()
+            .getHours()
+            .toString()
+            .padStart(2, "0")}:${new Date()
+            .getMinutes()
+            .toString()
+            .padStart(2, "0")}:${new Date()
+            .getSeconds()
+            .toString()
+            .padStart(2, "0")}`
+        );
+        doc.moveDown();
+        doc.text(`Documentos Fiscais Apresentados`);
+        doc.text(`Periodo de  Emissão: ${dataInicio} a ${dataFim}`);
+        doc.text(
+          `Faixa de Numeração de ${nfcom[0].nNF} até ${
+            nfcom[nfcom.length - 1].nNF
+          }`
+        );
+        doc.text(`Total de Documentos: ${nfcom.length}`);
+        doc.moveDown();
+        doc.text("Somatorio de Valores");
+        const totalValor = nfcom.reduce((total, item) => {
+          // O Number() remove os zeros a esquerda e prepara para calculo
+          return total + Number(item.value || 0);
+        }, 0);
+
+        const valorFormatado = totalValor.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+
+        doc.text(`Total: ${valorFormatado}`);
+        doc.moveDown();
+        doc.text("Certificado Digital Utilizado na Assinatura Digital:");
+        doc.text("WIP TELECOM MULTIMIDIA LTDA: 20.843.290/0001-42");
+        doc.text("Numero de Serie: 280EF663570172E9");
+        doc.text("Validade: 27/06/2025");
+        doc.text("Emissor: AC VALID RFB V5");
+
+        doc.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public generateReportPdf = async (req: Request, res: Response) => {
+    try {
+      const { nNF, dataInicio, dataFim } = req.body;
+      console.log(nNF, dataInicio, dataFim);
+
+      const NFComRepository = DataSource.getRepository(NFCom);
+      const nfcom = await NFComRepository.find({
+        where: {
+          nNF: In(nNF),
+        },
+      });
+      if (!nfcom) {
+        res.status(404).json({ error: "NFCom não encontrada" });
+        return;
+      }
+      const pdf = await this.generatePdf(nfcom, dataInicio, dataFim);
+      res.set("Content-Type", "application/pdf");
+      res.set(
+        "Content-Disposition",
+        "attachment; filename=" + nfcom[0].nNF + ".pdf"
+      );
+      res.send(pdf);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Erro ao gerar PDF" });
+    }
+  };
 }
 
 export default Nfcom;
