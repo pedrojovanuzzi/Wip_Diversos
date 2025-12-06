@@ -2075,37 +2075,65 @@ class Nfcom {
 
         y += 40;
 
-        // --- BARCODE (Simulado -> Real) ---
+        // --- BARCODE CORRIGIDO ---
         if (data.gFat && data.gFat.codBarras) {
           try {
-            // Generate Barcode Buffer
+            // 1. Limpeza e Validação
+            let codigoLimpo = String(data.gFat.codBarras).replace(/\D/g, "");
+
+            // O padrão Interleaved 2 of 5 EXIGE número par de dígitos.
+            // Se for ímpar (ex: 47), adiciona 0 à esquerda.
+            if (codigoLimpo.length % 2 !== 0) {
+              codigoLimpo = "0" + codigoLimpo;
+            }
+
+            // 2. Gerar Buffer da Imagem (Apenas as barras)
             const barcodeBuffer = await bwipjs.toBuffer({
-              bcid: "interleaved2of5", // Barcode type
-              text: String(data.gFat.codBarras), // Text to encode
-              scale: 3, // 3x scaling factor
-              height: 10, // Bar height, in millimeters
-              includetext: true, // Show human-readable text
-              textxalign: "center", // Always good to align this
+              bcid: "interleaved2of5", // Padrão de Boletos/Utility BR
+              text: codigoLimpo,
+              scale: 3, // Escala 3x (melhor resolução)
+              height: 12, // Altura em mm (12-15mm é o ideal para leitura)
+              includetext: false, // Desliga texto automático (vamos fazer manual)
+              textxalign: "center",
             });
 
-            // Background for Barcode
-            doc.rect(margin, y, contentWidth, 40).fill("#F0F0F0");
-            doc.image(barcodeBuffer, margin + (contentWidth - 200) / 2, y + 5, {
-              width: 200,
-              height: 30,
+            const barcodeHeight = 35; // Altura visual no PDF
+            const barcodeWidth = 300; // Largura visual no PDF
+            const barcodeX = margin + (contentWidth - barcodeWidth) / 2;
+
+            // Fundo para destacar
+            doc.rect(margin, y, contentWidth, 55).fill("#F0F0F0");
+
+            // Desenha as Barras
+            doc.image(barcodeBuffer, barcodeX, y + 10, {
+              width: barcodeWidth,
+              height: barcodeHeight,
             });
-          } catch (e) {
-            console.error("Erro ao gerar Barcode:", e);
-            doc.rect(margin, y, contentWidth, 30).fill("#F0F0F0");
+
+            // 3. Desenha o Texto Formatado (Legível para digitação)
+            // Formata em 4 grupos de 12 dígitos (Padrão Arrecadação/NFCom)
+            // Ou apenas exibe o número espaçado
+            const linhaDigitavel =
+              codigoLimpo.match(/.{1,12}/g)?.join("  ") || codigoLimpo;
+
             doc
               .fillColor("black")
               .font("Helvetica-Bold")
               .fontSize(10)
-              .text(data.gFat.codBarras, margin, y + 15, {
+              .text(linhaDigitavel, margin, y + barcodeHeight + 15, {
                 width: contentWidth,
                 align: "center",
-                characterSpacing: 2,
+                characterSpacing: 1, // Espaçamento leve para leitura fácil
               });
+          } catch (e) {
+            console.error("Erro crítico ao gerar Barcode:", e);
+            // Fallback visual em caso de erro na lib
+            doc.rect(margin, y, contentWidth, 40).stroke();
+            doc.text(
+              `Erro Barcode: ${data.gFat.codBarras}`,
+              margin + 10,
+              y + 15
+            );
           }
         }
 
