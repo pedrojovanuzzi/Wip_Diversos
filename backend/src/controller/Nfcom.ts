@@ -2080,7 +2080,7 @@ class Nfcom {
           try {
             // Generate Barcode Buffer
             const barcodeBuffer = await bwipjs.toBuffer({
-              bcid: "code128", // Barcode type
+              bcid: "interleaved2of5", // Barcode type
               text: String(data.gFat.codBarras), // Text to encode
               scale: 3, // 3x scaling factor
               height: 10, // Bar height, in millimeters
