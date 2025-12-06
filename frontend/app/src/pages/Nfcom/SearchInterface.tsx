@@ -9,6 +9,7 @@ import { GoNumber } from "react-icons/go";
 import { VscSymbolBoolean } from "react-icons/vsc";
 import { MdOutlineConfirmationNumber } from "react-icons/md";
 import { useNotification } from "../../context/NotificationContext";
+import { FaFileSignature } from "react-icons/fa";
 
 interface NFComResult {
   // Dados primários
@@ -147,6 +148,8 @@ export default function SearchInterface() {
       setSelectedIds([]);
     }
   };
+
+  const handleGenerateReport = () => {};
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -429,6 +432,14 @@ export default function SearchInterface() {
                 >
                   <CiSearch className="text-xl" />
                   {loading ? "Buscando..." : "Buscar"}
+                </button>
+                <button
+                  onClick={handleGenerateReport}
+                  disabled={loading}
+                  className="px-5 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-700 transition-all font-medium flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  <FaFileSignature className="text-xl" />
+                  {loading ? "Gerando..." : "Gerar Relatorio"}
                 </button>
               </div>
 
