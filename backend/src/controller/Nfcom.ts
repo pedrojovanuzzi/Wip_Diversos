@@ -1898,7 +1898,7 @@ class Nfcom {
             align: "center",
             width: rightBoxW,
           });
-        doc.font("Helvetica").text("Teste Emissão", rightBoxX, y + 25, {
+        doc.font("Helvetica").text("", rightBoxX, y + 25, {
           align: "center",
           width: rightBoxW,
         });
