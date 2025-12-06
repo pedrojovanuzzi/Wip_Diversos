@@ -1,5 +1,6 @@
 import { create } from "xmlbuilder2";
 import { XMLParser } from "fast-xml-parser";
+import QRCode from "qrcode";
 import { Request, Response } from "express";
 import * as fs from "fs";
 import * as path from "path";
@@ -1599,7 +1600,7 @@ class Nfcom {
   }
 
   private generateXmlPdf = async (nfcom: NFCom): Promise<Buffer> => {
-    return new Promise<Buffer>((resolve, reject) => {
+    return new Promise<Buffer>(async (resolve, reject) => {
       try {
         const parser = new XMLParser({
           ignoreAttributes: false,
@@ -1624,6 +1625,17 @@ class Nfcom {
 
         if (!inf) throw new Error("Elemento infNFCom não encontrado");
 
+        // Handle Namespaces for Supl
+        const supl = inf.infNFComSupl || inf["ns:infNFComSupl"];
+        const qrCodeValue = supl
+          ? supl.qrCodNFCom || supl["ns:qrCodNFCom"]
+          : nfcom.qrcodeLink;
+
+        console.log("QR Code Debug:", {
+          suplKeys: supl ? Object.keys(supl) : "no-supl",
+          extractedValue: qrCodeValue,
+        });
+
         const data = {
           ide: inf.ide,
           emit: inf.emit,
@@ -1632,7 +1644,7 @@ class Nfcom {
           total: inf.total,
           gFat: inf.gFat,
           prot: prot,
-          qrCode: inf.infNFComSupl?.qrCodNFCom,
+          qrCode: qrCodeValue,
           chave: nfcom.chave || inf.ide.cNF,
         };
 
@@ -1736,20 +1748,21 @@ class Nfcom {
         doc.text(`TELEFONE: ${fone || ""}`, margin, y + 62);
 
         // Coluna 2: Dados da Nota + QR Code
-        // QR Code
         const qrBoxSize = 65;
-        // doc.rect(col2X, y, qrBoxSize, qrBoxSize).stroke(); // Debug box
         if (data.qrCode) {
           try {
-            // Nota: Para renderizar QR Code real precisaria de lib externa ou API.
-            // Como não podemos instalar deps agora sem permissão e `qrcode` package nao está,
-            // vamos renderizar um placeholder ou tentar usar google charts api se permitido (melhor não arriscar request externo).
-            // Vou deixar um espaço reservado com link.
-            doc
-              .rect(col2X, y, qrBoxSize, qrBoxSize)
-              .fillAndStroke("#EEE", "#000");
-            doc.fillColor("black").text("QR CODE", col2X + 10, y + 25);
-          } catch (e) {}
+            const qrBase64 = await QRCode.toDataURL(data.qrCode);
+            if (qrBase64) {
+              doc.image(qrBase64, col2X, y, {
+                width: qrBoxSize,
+                height: qrBoxSize,
+              });
+            }
+          } catch (e) {
+            console.error("Erro ao gerar QRCode:", e);
+            doc.rect(col2X, y, qrBoxSize, qrBoxSize).stroke();
+            doc.fontSize(8).text("QR Inválido", col2X + 5, y + 25);
+          }
         }
 
         const infoX = col2X + qrBoxSize + 10;
