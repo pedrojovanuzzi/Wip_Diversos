@@ -91,6 +91,9 @@ class NFSEController {
       console.log(this.WSDL_URL);
 
       aliquota = aliquota?.trim() ? aliquota : "5.0000";
+      if (this.homologacao) {
+        aliquota = "2.5000";
+      }
       aliquota = aliquota.replace(",", ".").replace("%", "");
       if (!service) service = "Servico de Suporte Tecnico";
 
