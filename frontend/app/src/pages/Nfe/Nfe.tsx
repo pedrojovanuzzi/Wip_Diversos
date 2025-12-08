@@ -50,7 +50,7 @@ export const Nfe = () => {
 
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>(""); // senha para emitir nf
-
+  let [valueSome, setValueSome] = useState<number>(0);
   const { user } = useAuth();
   const token = user?.token;
 
@@ -290,6 +290,9 @@ export const Nfe = () => {
                     <td className="px-6 py-4">
                       {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
                     </td>
+                    <td className="px-6 py-4 hidden">
+                      {(valueSome += Number(cliente.fatura.valor))}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -303,7 +306,10 @@ export const Nfe = () => {
       )}
 
       <main className="flex justify-center mt-2" />
-
+      <h1>
+        Valores Somados das mensalidades:{" "}
+        <span className="text-green-500">R${valueSome.toFixed(2)}</span>
+      </h1>
       <div className="flex flex-col justify-center sm:flex-row">
         <div className="relative">
           <span className="absolute translate-x-8 top-11 text-gray-200 -translate-y-1/2 text-4xl">
