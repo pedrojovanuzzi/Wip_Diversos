@@ -66,7 +66,13 @@ function App() {
         <Routes>
           <Route
             path="/"
-            element={user?.token ? <HomePage /> : <Navigate to="/auth/login" />}
+            element={
+              user?.token && user.permission >= 2 ? (
+                <HomePage />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
           />
           <Route
             path="/auth/login"
@@ -85,7 +91,7 @@ function App() {
           <Route
             path="/feedbackCreate"
             element={
-              user?.token ? (
+              user?.token && user.permission >= 2 ? (
                 <FeedbackLinkGenerator />
               ) : (
                 <Navigate to="/auth/login" />
@@ -97,12 +103,22 @@ function App() {
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
           <Route
             path="/Nfe"
-            element={user?.token ? <Nfe /> : <Navigate to="/auth/login" />}
+            element={
+              user?.token && user.permission >= 2 ? (
+                <Nfe />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
           />
           <Route
             path="/BuscarNfeGerada"
             element={
-              user?.token ? <BuscarNfeGerada /> : <Navigate to="/auth/login" />
+              user?.token && user.permission >= 2 ? (
+                <BuscarNfeGerada />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
             }
           />
           <Route path="/Prefeitura/Login" element={<PrefeituraLogin />} />
@@ -110,61 +126,111 @@ function App() {
           <Route
             path="/Whatsapp"
             element={
-              user?.token ? <WhatsappChat /> : <Navigate to="/auth/login" />
+              user?.token && user.permission >= 2 ? (
+                <WhatsappChat />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
             }
           />
           <Route
             path="/Whatsapp/:id"
-            element={user?.token ? <UserChat /> : <Navigate to="/auth/login" />}
+            element={
+              user?.token && user.permission >= 2 ? (
+                <UserChat />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
           />
           <Route
             path="/ClientAnalytics"
             element={
-              user?.token ? <ClientAnalytics /> : <Navigate to="/auth/login" />
+              user?.token && user.permission >= 2 ? (
+                <ClientAnalytics />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
             }
           />
           <Route
             path="/ClientAnalytics/Logs"
             element={
-              user?.token ? <LogsClient /> : <Navigate to="/auth/login" />
+              user?.token && user.permission >= 2 ? (
+                <LogsClient />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
             }
           />
           <Route
             path="/DDDOS"
             element={
-              user?.token ? <DDDOS_Home /> : <Navigate to="/auth/login" />
+              user?.token && user.permission >= 2 ? (
+                <DDDOS_Home />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
             }
           />
           <Route
             path="/ServerLogs"
             element={
-              user?.token ? <ServerLogs /> : <Navigate to="/auth/login" />
+              user?.token && user.permission >= 2 ? (
+                <ServerLogs />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
             }
           />
           <Route
             path="/LogViewer"
             element={
-              user?.token ? <LogViewer /> : <Navigate to="/auth/login" />
+              user?.token && user.permission >= 2 ? (
+                <LogViewer />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
             }
           />
           <Route
             path="/PowerDns"
-            element={user?.token ? <PowerDns /> : <Navigate to="/auth/login" />}
+            element={
+              user?.token && user.permission >= 2 ? (
+                <PowerDns />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
           />
           <Route
             path="/Onu"
-            element={user?.token ? <OnuHome /> : <Navigate to="/auth/login" />}
+            element={
+              user?.token && user.permission >= 2 ? (
+                <OnuHome />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
           />
           <Route
             path="/Onu/AutorizarOnu"
             element={
-              user?.token ? <AutorizarOnu /> : <Navigate to="/auth/login" />
+              user?.token && user.permission >= 2 ? (
+                <AutorizarOnu />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
             }
           />
           <Route
             path="/Onu/DesautorizarOnu"
             element={
-              user?.token ? <DesautorizaOnu /> : <Navigate to="/auth/login" />
+              user?.token && user.permission >= 2 ? (
+                <DesautorizaOnu />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
             }
           />
           <Route
@@ -179,12 +245,22 @@ function App() {
           />
           <Route
             path="/Pix"
-            element={user?.token ? <Pix /> : <Navigate to="/auth/login" />}
+            element={
+              user?.token && user.permission >= 2 ? (
+                <Pix />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
           />
           <Route
             path="/Pix/automatico"
             element={
-              user?.token ? <PixAutomatico /> : <Navigate to="/auth/login" />
+              user?.token && user.permission >= 2 ? (
+                <PixAutomatico />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
             }
           />
           <Route
@@ -217,17 +293,33 @@ function App() {
           {/* ← rota dinâmica */}
           <Route
             path="/Nfcom"
-            element={user?.token ? <Nfcom /> : <Navigate to="/auth/login" />}
+            element={
+              user?.token && user.permission >= 2 ? (
+                <Nfcom />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
           />
           <Route
             path="/Nfcom/Buscar"
             element={
-              user?.token ? <SearchInterface /> : <Navigate to="/auth/login" />
+              user?.token && user.permission >= 1 ? (
+                <SearchInterface />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
             }
           />
           <Route
             path="*"
-            element={user?.token ? <HomePage /> : <Navigate to="/auth/login" />}
+            element={
+              user?.token && user.permission >= 2 ? (
+                <HomePage />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
           />
         </Routes>
       </div>
