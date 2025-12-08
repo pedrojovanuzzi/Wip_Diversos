@@ -42,6 +42,7 @@ export default function SearchInterface() {
   const [dataInicio, setDataInicio] = useState<string>("");
   const [dataFim, setDataFim] = useState<string>("");
   const [nfcomList, setNfcomList] = useState<NFComResult[]>([]);
+  const [pdfList, setPdfList] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [tpAmb, settpAmb] = useState<number>(1 || 2);
   const [showPopUp, setShowPopUp] = useState(false);
@@ -149,13 +150,102 @@ export default function SearchInterface() {
     }
   };
 
-  const handleGenerateReport = () => {};
+  const generateReportPdf = async () => {
+    // Truque para evitar bloqueadores de popup: abre a janela antes da requisição
+    const newWindow = window.open("", "_blank");
+    if (newWindow) {
+      newWindow.document.write("Aguarde, gerando relatório...");
+    }
+
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/NFCom/generateReportPdf`,
+        {
+          nNF: selectedIds,
+          dataInicio: new Date(dataInicio || new Date()).toLocaleDateString(
+            "pt-BR",
+            {
+              timeZone: "America/Sao_Paulo",
+            }
+          ),
+          dataFim: new Date(dataFim || new Date()).toLocaleDateString("pt-BR", {
+            timeZone: "America/Sao_Paulo",
+          }),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          // IMPORTANTE: Informa ao axios que a resposta é um arquivo binário
+          responseType: "blob",
+        }
+      );
+
+      // Cria um Blob com o tipo PDF
+      const file = new Blob([response.data], { type: "application/pdf" });
+
+      // Cria uma URL temporária para o arquivo
+      const fileURL = URL.createObjectURL(file);
+
+      // Redireciona a janela que abrimos anteriormente para o PDF
+      if (newWindow) {
+        newWindow.location.href = fileURL;
+      } else {
+        // Fallback caso o popup tenha sido bloqueado
+        window.open(fileURL, "_blank");
+      }
+
+      showSuccess("Relatório gerado com sucesso!");
+      setLoading(false);
+      setSelectedIds([]);
+    } catch (error) {
+      console.error(`Erro ao gerar relatório:`, error);
+      if (newWindow) newWindow.close(); // Fecha a janela se der erro
+      showError("Erro ao gerar relatório.");
+      setLoading(false);
+    }
+  };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
       setSelectedIds(nfcomList.map((n) => n.numeracao));
     } else {
       setSelectedIds([]);
+    }
+  };
+
+  const generatePdfFromNfXML = async (nNF: string) => {
+    try {
+      const newWindow = window.open("", "_blank");
+      setLoading(true);
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/NFCom/generatePdfFromNfXML`,
+        {
+          nNF: nNF,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          responseType: "blob",
+        }
+      );
+      const file = new Blob([response.data], { type: "application/pdf" });
+      const fileURL = URL.createObjectURL(file);
+      if (newWindow) {
+        newWindow.location.href = fileURL;
+      } else {
+        window.open(fileURL, "_blank");
+      }
+      showSuccess("Relatório gerado com sucesso!");
+      setLoading(false);
+      setSelectedIds([]);
+    } catch (error) {
+      console.error(`Erro ao gerar relatório:`, error);
+      showError("Erro ao gerar relatório.");
+      setLoading(false);
     }
   };
 
@@ -434,7 +524,7 @@ export default function SearchInterface() {
                   {loading ? "Buscando..." : "Buscar"}
                 </button>
                 <button
-                  onClick={handleGenerateReport}
+                  onClick={generateReportPdf}
                   disabled={loading}
                   className="px-5 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-700 transition-all font-medium flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
@@ -612,6 +702,14 @@ export default function SearchInterface() {
                             className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-all"
                           >
                             Cancelar
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-left whitespace-nowrap">
+                          <button
+                            onClick={() => generatePdfFromNfXML(nfcom.nNF)}
+                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-all"
+                          >
+                            PDF
                           </button>
                         </td>
                       </tr>

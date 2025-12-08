@@ -819,6 +819,15 @@ class Pix {
         return;
       }
 
+      const cliente_ativado = await this.clienteRepo.findOne({
+        where: { login: pppoe },
+      });
+
+      if (!cliente_ativado) {
+        res.status(404).json("Usuário não encontrado");
+        return;
+      }
+
       // 🔹 Array para armazenar dados estruturados após aplicar juros/desconto
       const structuredData: { id: number; valor: number; dataVenc: Date }[] =
         [];
@@ -831,10 +840,12 @@ class Pix {
           cliente.datavenc // data de vencimento
         );
 
-        if (index == 2) {
+        if (index == 2 && cliente_ativado.cli_ativado == "s") {
           const valorOriginal = Number(valorCorrigido);
           const desconto = valorOriginal * 0.5;
           valorCorrigido = valorOriginal - desconto;
+        } else {
+          valorCorrigido = Number(valorCorrigido);
         }
 
         structuredData.push({
