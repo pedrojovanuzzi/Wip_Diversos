@@ -6,6 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 
 export const HomePage = () => {
   const { user } = useAuth();
+  const permission = user?.permission;
   const token = user?.token;
 
   useEffect(() => {
@@ -34,32 +35,36 @@ export const HomePage = () => {
         <h2 className="col-span-1">Por Enquanto Não Temos Nada Aqui</h2>
         <HiCheckCircle className="size-40 col-span-1 self-start text-green-500" />
         <div className="flex justify-center flex-col items-center gap-5">
-          <h1>Gerar Backup das outras Paginas</h1>
-          <button
-            onClick={backup}
-            className="bg-orange-500 text-black border-black transition-colors hover:bg-orange-300 w-full rounded-md  p-2"
-          >
-            Gerar Backup
-          </button>
-          <h2>Links da nossas outras Paginas</h2>
-          <a
-            className="bg-green-500 text-black border-black transition-colors hover:bg-green-300 w-full rounded-md  p-2"
-            href="https://apimk.wiptelecomunicacoes.com.br/"
-          >
-            Pix
-          </a>
-          <a
-            className="bg-green-500 text-black border-black transition-colors hover:bg-green-300 w-full rounded-md  p-2"
-            href="https://wippainel.wiptelecomunicacoes.com.br/"
-          >
-            Wip Painel
-          </a>
-          <a
-            className="bg-green-500 text-black border-black transition-colors hover:bg-green-300 w-full rounded-md  p-2 mb-10"
-            href="https://whatsemail.wiptelecomunicacoes.com.br/"
-          >
-            Mensagens Whatsapp
-          </a>
+          {permission! >= 2 && (
+            <>
+              <h1>Gerar Backup das outras Paginas</h1>
+              <button
+                onClick={backup}
+                className="bg-orange-500 text-black border-black transition-colors hover:bg-orange-300 w-full rounded-md  p-2"
+              >
+                Gerar Backup
+              </button>
+              <h2>Links da nossas outras Paginas</h2>
+              <a
+                className="bg-green-500 text-black border-black transition-colors hover:bg-green-300 w-full rounded-md  p-2"
+                href="https://apimk.wiptelecomunicacoes.com.br/"
+              >
+                Pix
+              </a>
+              <a
+                className="bg-green-500 text-black border-black transition-colors hover:bg-green-300 w-full rounded-md  p-2"
+                href="https://wippainel.wiptelecomunicacoes.com.br/"
+              >
+                Wip Painel
+              </a>
+              <a
+                className="bg-green-500 text-black border-black transition-colors hover:bg-green-300 w-full rounded-md  p-2 mb-10"
+                href="https://whatsemail.wiptelecomunicacoes.com.br/"
+              >
+                Mensagens Whatsapp
+              </a>
+            </>
+          )}
         </div>
       </div>
     </div>

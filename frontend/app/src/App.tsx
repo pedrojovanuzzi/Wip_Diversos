@@ -67,7 +67,7 @@ function App() {
           <Route
             path="/"
             element={
-              user?.token && user.permission >= 2 ? (
+              user?.token && user.permission >= 1 ? (
                 <HomePage />
               ) : (
                 <Navigate to="/auth/login" />
