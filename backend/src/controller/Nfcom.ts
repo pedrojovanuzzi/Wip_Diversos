@@ -1590,7 +1590,7 @@ class Nfcom {
         doc.text("Certificado Digital Utilizado na Assinatura Digital:");
         doc.text("WIP TELECOM MULTIMIDIA LTDA: 20.843.290/0001-42");
         doc.text("Numero de Serie: 280EF663570172E9");
-        doc.text("Validade: 27/06/2025");
+        doc.text("Validade: 27/06/2026");
         doc.text("Emissor: AC VALID RFB V5");
 
         doc.end();
