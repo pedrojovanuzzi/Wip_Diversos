@@ -840,7 +840,7 @@ class Pix {
           cliente.datavenc // data de vencimento
         );
 
-        if (index == 2 && cliente_ativado.cli_ativado == "s") {
+        if (index == 2 && cliente_ativado.cli_ativado === "s") {
           const valorOriginal = Number(valorCorrigido);
           const desconto = valorOriginal * 0.5;
           valorCorrigido = valorOriginal - desconto;
