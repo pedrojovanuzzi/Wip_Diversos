@@ -22,10 +22,9 @@ export default function Nfcom() {
 
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
-  const [service, setService] = useState("");
   const [loading, setLoading] = useState(false);
   const [reducao, setReducao] = useState("");
-  const [isReducaoActive, setIsReducaoActive] = useState(true);
+  const [isReducaoActive, setIsReducaoActive] = useState(false);
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     []
   );
@@ -89,7 +88,6 @@ export default function Nfcom() {
         {
           password,
           clientesSelecionados,
-          service,
           reducao: isReducaoActive ? reducao : "1.0",
           ambiente,
         },
@@ -336,19 +334,6 @@ export default function Nfcom() {
       </div>
 
       <div className="relative">
-        <input
-          type="text"
-          onChange={(e) => {
-            setService(
-              e.target.value
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-zA-Z0-9 ]/g, "")
-            );
-          }}
-          placeholder="Servico de Manutencao"
-          className="ring-2 ring-gray-500 p-2 rounded m-5"
-        />
         <div className="flex  justify-center items-center gap-5 mb-5">
           <input
             type="text"
