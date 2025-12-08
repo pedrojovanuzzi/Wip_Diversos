@@ -352,7 +352,7 @@ class Nfcom {
             nItem: "1",
             prod: {
               cProd: "001",
-              xProd: "ASSINATURA INTERNET",
+              xProd: ClientData.plano || "",
               cClass: "0100401",
               uMed: "1",
               qFaturada: "1",
@@ -1642,7 +1642,10 @@ class Nfcom {
     return codigo; // Retorna original se não souber tratar
   };
 
-  private generateXmlPdf = async (nfcom: NFCom): Promise<Buffer> => {
+  private generateXmlPdf = async (
+    nfcom: NFCom,
+    obs: string
+  ): Promise<Buffer> => {
     return new Promise<Buffer>(async (resolve, reject) => {
       try {
         const parser = new XMLParser({
@@ -1682,6 +1685,7 @@ class Nfcom {
 
         const data = {
           ide: inf.ide,
+          obs: obs,
           emit: inf.emit,
           dest: inf.dest,
           det: Array.isArray(inf.det) ? inf.det : [inf.det],
@@ -2115,7 +2119,37 @@ class Nfcom {
             y + 20
           );
 
-        y += 40;
+        y += 20;
+
+        doc.rect(margin, y, contentWidth, 30).fill("#F0F0F0");
+        doc
+          .fillColor("black")
+          .font("Helvetica-Bold")
+          .text("OBSERVAÇÃO", margin, y + 5, {
+            width: contentWidth,
+            align: "center",
+          });
+
+        doc
+          .rect(margin, y + 15, contentWidth, 40)
+          .fill("white")
+          .stroke();
+
+        doc
+          .font("Helvetica")
+          .fontSize(7)
+          .fillColor("black")
+          .text(
+            `I Documento emitido por ME ou EPP optante do Simples Nacional \nII Não gera direito a crédito fiscal de IPI \nValor Aproximado dos tributos federais 13,45% e municipais 2,00% Fonte: IBPT Chave ${data.obs}`,
+            margin + 5,
+            y + 20,
+            {
+              width: contentWidth - 10,
+              align: "left",
+            }
+          );
+
+        y += 60;
 
         // --- BARCODE (Correção 47 -> 44 Dígitos) ---
         if (data.gFat && data.gFat.codBarras) {
@@ -2207,7 +2241,7 @@ class Nfcom {
 
   public generatePdfFromNfXML = async (req: Request, res: Response) => {
     try {
-      const { nNF } = req.body;
+      const { nNF, obs } = req.body;
 
       const NFComRepository = DataSource.getRepository(NFCom);
       const nfcom = await NFComRepository.findOne({
@@ -2219,7 +2253,7 @@ class Nfcom {
         res.status(404).json({ error: "NFCom não encontrada" });
         return;
       }
-      const pdf = await this.generateXmlPdf(nfcom);
+      const pdf = await this.generateXmlPdf(nfcom, obs);
       res.set("Content-Type", "application/pdf");
       res.set(
         "Content-Disposition",

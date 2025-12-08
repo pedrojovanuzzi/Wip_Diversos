@@ -10,29 +10,28 @@ import { VscSymbolBoolean } from "react-icons/vsc";
 import { MdOutlineConfirmationNumber } from "react-icons/md";
 import { useNotification } from "../../context/NotificationContext";
 import { FaFileSignature } from "react-icons/fa";
+import PopUpObs from "./Components/PopUpObs";
 
 interface NFComResult {
   // Dados primários
   id: number;
-  fatura_id: number; // ID da fatura (corresponde a 'titulo' na sua interface anterior, mas é um número)
-
+  fatura_id: number;
   // Dados da NFCom
-  chave: string; // Chave de acesso da NFCom (Substitui 'chaveAcesso')
-  nNF: string; // Número da NF (equivale a 'numero' anterior)
+  chave: string;
+  nNF: string;
   serie: string;
   value: string;
   numeracao: number;
   // Dados do Cliente/Serviço
   cliente_id: number;
-  pppoe: string; // Identificador do assinante (equivale a 'pppoe' anterior)
-
+  pppoe: string;
   // Datas e Status
-  data_emissao: string; // Data e hora da emissão no formato ISO 8601
-  status: "autorizada" | "rejeitada" | "pendente" | string; // Status da NFCom
+  data_emissao: string;
+  status: "autorizada" | "rejeitada" | "pendente" | string;
   tpAmb: number;
   // Informações de Consulta e Protocolo
-  protocolo: string; // Número do protocolo de autorização (nProt)
-  qrcodeLink: string; // Link direto para o QRCode (Substitui o 'valor' anterior, que não está presente)
+  protocolo: string;
+  qrcodeLink: string;
   xml: string;
 }
 
@@ -42,15 +41,22 @@ export default function SearchInterface() {
   const [dataInicio, setDataInicio] = useState<string>("");
   const [dataFim, setDataFim] = useState<string>("");
   const [nfcomList, setNfcomList] = useState<NFComResult[]>([]);
-  const [pdfList, setPdfList] = useState<string[]>([]);
+  // const [pdfList, setPdfList] = useState<string[]>([]); // Unused
   const [loading, setLoading] = useState(false);
-  const [tpAmb, settpAmb] = useState<number>(1 || 2);
+  const [tpAmb, settpAmb] = useState<number>(1); // Fixed default to number
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");
   const [selectedNfcom, setSelectedNfcom] = useState<NFComResult | null>(null);
   const [serie, setSerie] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  // States for PDF Obs PopUp
+  const [obsPopUp, setObsPopUp] = useState<boolean>(false);
+  const [obs, setObs] = useState<string>("");
+  const [pdfTargetNfcom, setPdfTargetNfcom] = useState<NFComResult | null>(
+    null
+  );
 
   const { user } = useAuth();
   const token = user?.token;
@@ -151,7 +157,6 @@ export default function SearchInterface() {
   };
 
   const generateReportPdf = async () => {
-    // Truque para evitar bloqueadores de popup: abre a janela antes da requisição
     const newWindow = window.open("", "_blank");
     if (newWindow) {
       newWindow.document.write("Aguarde, gerando relatório...");
@@ -177,22 +182,16 @@ export default function SearchInterface() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          // IMPORTANTE: Informa ao axios que a resposta é um arquivo binário
           responseType: "blob",
         }
       );
 
-      // Cria um Blob com o tipo PDF
       const file = new Blob([response.data], { type: "application/pdf" });
-
-      // Cria uma URL temporária para o arquivo
       const fileURL = URL.createObjectURL(file);
 
-      // Redireciona a janela que abrimos anteriormente para o PDF
       if (newWindow) {
         newWindow.location.href = fileURL;
       } else {
-        // Fallback caso o popup tenha sido bloqueado
         window.open(fileURL, "_blank");
       }
 
@@ -201,7 +200,7 @@ export default function SearchInterface() {
       setSelectedIds([]);
     } catch (error) {
       console.error(`Erro ao gerar relatório:`, error);
-      if (newWindow) newWindow.close(); // Fecha a janela se der erro
+      if (newWindow) newWindow.close();
       showError("Erro ao gerar relatório.");
       setLoading(false);
     }
@@ -215,14 +214,25 @@ export default function SearchInterface() {
     }
   };
 
-  const generatePdfFromNfXML = async (nNF: string) => {
+  // 1. Function to open the PopUp and save the target NFCom
+  const handleOpenPdfPopUp = (nfcom: NFComResult) => {
+    setPdfTargetNfcom(nfcom);
+    setObs("");
+    setObsPopUp(true);
+  };
+
+  const generatePdfFromNfXML = async (nNF: string, obs: string) => {
     try {
       const newWindow = window.open("", "_blank");
+      // Optional: Give user feedback in the new tab
+      if (newWindow) newWindow.document.write("Gerando PDF...");
+
       setLoading(true);
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/NFCom/generatePdfFromNfXML`,
         {
           nNF: nNF,
+          obs: obs,
         },
         {
           headers: {
@@ -239,13 +249,22 @@ export default function SearchInterface() {
       } else {
         window.open(fileURL, "_blank");
       }
-      showSuccess("Relatório gerado com sucesso!");
+      showSuccess("PDF gerado com sucesso!");
       setLoading(false);
-      setSelectedIds([]);
     } catch (error) {
-      console.error(`Erro ao gerar relatório:`, error);
-      showError("Erro ao gerar relatório.");
+      console.error(`Erro ao gerar PDF:`, error);
+      showError("Erro ao gerar PDF.");
       setLoading(false);
+    }
+  };
+
+  // 2. The Bridge function that the PopUp calls
+  const confirmPdfGeneration = async () => {
+    if (pdfTargetNfcom) {
+      // Close popup first or after? Usually better after success or immediately to show loading
+      setObsPopUp(false);
+      await generatePdfFromNfXML(pdfTargetNfcom.nNF, obs);
+      setPdfTargetNfcom(null);
     }
   };
 
@@ -350,6 +369,7 @@ export default function SearchInterface() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-7 gap-4 mb-4">
+                {/* Inputs ... (Code omitted for brevity, logic unchanged) */}
                 {/* Campo PPPOE */}
                 <div className="relative">
                   <label
@@ -439,6 +459,7 @@ export default function SearchInterface() {
                     />
                   </div>
                 </div>
+
                 <div className="relative">
                   <label
                     htmlFor="tpAmb"
@@ -461,6 +482,7 @@ export default function SearchInterface() {
                     />
                   </div>
                 </div>
+
                 <div className="relative">
                   <label
                     htmlFor="serie"
@@ -482,6 +504,7 @@ export default function SearchInterface() {
                     />
                   </div>
                 </div>
+
                 <div className="relative">
                   <label
                     htmlFor="status"
@@ -555,6 +578,15 @@ export default function SearchInterface() {
             cancelNFCom={confirmCancellation}
           />
 
+          {/* Corrected PopUp usage */}
+          <PopUpObs
+            setShowPopUp={setObsPopUp}
+            showPopUp={obsPopUp}
+            setObs={setObs}
+            obs={obs}
+            confirmAction={confirmPdfGeneration}
+          />
+
           {/* Results Table */}
           {nfcomList.length > 0 && (
             <div className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
@@ -612,6 +644,9 @@ export default function SearchInterface() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
+                      {/* Empty Headers for Action Buttons */}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -667,20 +702,10 @@ export default function SearchInterface() {
                           {nfcom.value}
                         </td>
                         <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-900">
-                          {/* A tag <a> com 'download' é usada para baixar o arquivo */}
                           <a
-                            // 1. O 'href' usa a função auxiliar para gerar a URL temporária do Blob
                             href={createXmlDownloadUrl(nfcom.xml)}
-                            // 2. O atributo 'download' força o salvamento e define o nome do arquivo sugerido
                             download={`nfcom_${nfcom.nNF}_${nfcom.serie}.xml`}
-                            // Estilização
                             className="text-indigo-600 hover:text-indigo-900 font-medium underline"
-                            // Boa prática: Liberar o recurso após o download ser iniciado (embora o navegador geralmente gerencie isso)
-                            onClick={(e) => {
-                              // Obter a URL gerada (por motivos de performance e segurança,
-                              // a URL deve ser revogada, idealmente após o download)
-                              // Por ser um Blob URL de criação instantânea, é seguro usá-lo diretamente no href.
-                            }}
                           >
                             Baixar XML ({nfcom.nNF})
                           </a>
@@ -706,7 +731,7 @@ export default function SearchInterface() {
                         </td>
                         <td className="px-6 py-4 text-left whitespace-nowrap">
                           <button
-                            onClick={() => generatePdfFromNfXML(nfcom.nNF)}
+                            onClick={() => handleOpenPdfPopUp(nfcom)}
                             className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-all"
                           >
                             PDF
@@ -725,6 +750,8 @@ export default function SearchInterface() {
               Use os filtros acima para buscar NFCom geradas e homologadas
             </p>
           )}
+
+          {/* Removed the raw <div> PopUp that was here causing errors */}
         </main>
       </div>
     </div>
