@@ -79,20 +79,22 @@ export const Pix = () => {
         />
 
         {/* --- Pix Automático --- */}
-        <PixCard
+        {/* <PixCard
           link="/Pix/automatico"
           icon={<MdOutlineAutoMode className="size-6" />}
           cor="bg-yellow-100 text-yellow-700"
           bg="bg-gray-100 sm:bg-gray-100"
           titulo="Pix Automático"
           descricao="Gerencie e adicione clientes ao Pix Automático"
-        />
+        /> */}
 
         {/* --- Buscar pagamento --- */}
         <div
           className={`group relative ring-1 ring-gray-400 bg-gray-200 sm:bg-gray-200 hover:bg-green-300 transition-all p-6`}
         >
-          <span className={`inline-flex rounded-lg p-3 bg-orange-100 text-orange-700`}>
+          <span
+            className={`inline-flex rounded-lg p-3 bg-orange-100 text-orange-700`}
+          >
             <MdPaid className="size-6" />
           </span>
           <div className="mt-8">
