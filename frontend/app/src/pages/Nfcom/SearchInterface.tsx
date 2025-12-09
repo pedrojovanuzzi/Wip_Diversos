@@ -89,7 +89,6 @@ export default function SearchInterface() {
   ) => {
     try {
       setLoading(true);
-      setShowPopUp(true);
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/NFCom/cancelarNFCom`,
         {
@@ -135,6 +134,8 @@ export default function SearchInterface() {
         password,
         selectedNfcom.tpAmb
       );
+      setSelectedNfcom(null);
+      setShowPopUp(false);
     } else if (selectedIds.length > 0) {
       setLoading(true);
       setShowPopUp(false);
@@ -233,6 +234,8 @@ export default function SearchInterface() {
       setSelectedIds(nfcomList.map((n) => n.numeracao));
     } else {
       setSelectedIds([]);
+      setExcludedIds([]);
+      setIsSelectAllMode(false);
       setSelectAllPopUp(false);
     }
   };
@@ -293,11 +296,19 @@ export default function SearchInterface() {
 
   const handleSelectOne = (number: number) => {
     if (isSelectAllMode) {
-      setExcludedIds((prev) =>
-        prev.includes(number)
+      setExcludedIds((prev) => {
+        const newExcluded = prev.includes(number)
           ? prev.filter((i) => i !== number)
-          : [...prev, number]
-      );
+          : [...prev, number];
+
+        if (newExcluded.length === selectedIds.length) {
+          setIsSelectAllMode(false);
+          setSelectedIds([]);
+          return [];
+        }
+
+        return newExcluded;
+      });
     } else {
       setSelectedIds((prev) =>
         prev.includes(number)
@@ -671,6 +682,7 @@ export default function SearchInterface() {
                     <input
                       id="cpf_cnpj"
                       type="text"
+                      placeholder="CPF/CNPJ"
                       value={cpf_cnpj}
                       onChange={(e) => setCpfCnpj(e.target.value)}
                       className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -785,8 +797,9 @@ export default function SearchInterface() {
                           type="checkbox"
                           onChange={handleSelectAll}
                           checked={
-                            nfcomList.length > 0 &&
-                            selectedIds.length === nfcomList.length
+                            isSelectAllMode ||
+                            (nfcomList.length > 0 &&
+                              selectedIds.length === nfcomList.length)
                           }
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
@@ -957,6 +970,15 @@ export default function SearchInterface() {
                       onChange={(event, value) => changePage(value)}
                     />
                   </>
+                ) ? (
+                  <></>
+                ) : (
+                  <h1>
+                    Valor total das faturas:{" "}
+                    <span className="font-bold text-green-600">
+                      R$ {value.toFixed(2)}
+                    </span>
+                  </h1>
                 )}
               </div>
             </div>
