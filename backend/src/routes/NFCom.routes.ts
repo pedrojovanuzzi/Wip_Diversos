@@ -15,5 +15,6 @@ router.post("/statusJob", AuthGuard, nfcom.getStatusJob);
 router.post("/generateReportPdf", AuthGuard, nfcom.generateReportPdf);
 router.post("/generatePdfFromNfXML", AuthGuard, nfcom.generatePdfFromNfXML);
 router.post("/NfComPages", AuthGuard, nfcom.NFComPages);
+router.post("/buscarNFComAll", AuthGuard, nfcom.buscarNFComAll);
 
 export default router;

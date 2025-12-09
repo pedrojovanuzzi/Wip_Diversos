@@ -437,7 +437,7 @@ export default function SearchInterface() {
       if (clientType.trim()) searchParams.clientType = clientType.trim();
 
       const response = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfcom/buscarNFCom`,
+        `${process.env.REACT_APP_URL}/Nfcom/buscarNFComAll`,
         {
           searchParams: searchParams,
           pagination: pagination,
@@ -450,6 +450,7 @@ export default function SearchInterface() {
           },
         }
       );
+      console.log(response.data);
       setSelectedIds(
         response.data.map((item: { numeracao: any }) => item.numeracao)
       );
