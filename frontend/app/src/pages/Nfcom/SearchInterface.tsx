@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import { CiSearch } from "react-icons/ci";
@@ -7,10 +7,13 @@ import { useAuth } from "../../context/AuthContext";
 import PopUpCancelNFCom from "./Components/PopUpCancelNFCom";
 import { GoNumber } from "react-icons/go";
 import { VscSymbolBoolean } from "react-icons/vsc";
-import { MdOutlineConfirmationNumber } from "react-icons/md";
+import { MdMergeType, MdOutlineConfirmationNumber } from "react-icons/md";
 import { useNotification } from "../../context/NotificationContext";
 import { FaFileSignature } from "react-icons/fa";
 import PopUpObs from "./Components/PopUpObs";
+import SelectAllPopUp from "./Components/SelectAllPopUp";
+import { Pagination } from "@mui/material";
+import { AiOutlineUser } from "react-icons/ai";
 
 interface NFComResult {
   // Dados primários
@@ -52,6 +55,12 @@ export default function SearchInterface() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isSelectAllMode, setIsSelectAllMode] = useState<boolean>(false);
   const [excludedIds, setExcludedIds] = useState<number[]>([]);
+  const [selectAllPopUp, setSelectAllPopUp] = useState<boolean>(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    take: 50,
+    totalPages: 0,
+  });
   const [cpf_cnpj, setCpfCnpj] = useState<string>("");
   const [clientType, setClientType] = useState<"SVA" | "SCM" | "" | string>("");
   let [value, setValue] = useState<number>(0);
@@ -213,9 +222,11 @@ export default function SearchInterface() {
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
+      setSelectAllPopUp(true);
       setSelectedIds(nfcomList.map((n) => n.numeracao));
     } else {
       setSelectedIds([]);
+      setSelectAllPopUp(false);
     }
   };
 
@@ -274,22 +285,39 @@ export default function SearchInterface() {
   };
 
   const handleSelectOne = (number: number) => {
-    setSelectedIds((prev) =>
-      prev.includes(number)
-        ? prev.filter((i) => i !== number)
-        : [...prev, number]
-    );
+    if (isSelectAllMode) {
+      setExcludedIds((prev) =>
+        prev.includes(number)
+          ? prev.filter((i) => i !== number)
+          : [...prev, number]
+      );
+    } else {
+      setSelectedIds((prev) =>
+        prev.includes(number)
+          ? prev.filter((i) => i !== number)
+          : [...prev, number]
+      );
+    }
   };
 
   const handleBulkCancel = () => {
+    if (isSelectAllMode) {
+      setExcludedIds([]);
+    } else {
+      setSelectedIds([]);
+    }
     if (selectedIds.length === 0) return;
     setSelectedNfcom(null);
     setShowPopUp(true);
   };
 
-  const handleSearch = async () => {
+  const handleSearch = async (pageOverride?: number | any) => {
     try {
       setLoading(true);
+
+      const pageToUse =
+        typeof pageOverride === "number" ? pageOverride : pagination.page;
+      const paginationToSend = { ...pagination, page: pageToUse };
 
       const searchParams: any = {};
       if (pppoe.trim()) searchParams.pppoe = pppoe.trim();
@@ -306,7 +334,7 @@ export default function SearchInterface() {
 
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfcom/buscarNFCom`,
-        { searchParams },
+        { searchParams: searchParams, pagination: paginationToSend },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -317,7 +345,7 @@ export default function SearchInterface() {
 
       setNfcomList(resposta.data);
       setSelectedIds([]);
-
+      handlePages();
       console.log(resposta.data);
     } catch (erro) {
       console.error("Erro ao buscar NFCom:", erro);
@@ -336,6 +364,87 @@ export default function SearchInterface() {
     }
   };
 
+  const changePage = (page: number) => {
+    setPagination({ ...pagination, page });
+    handleSearch(page);
+  };
+
+  const handlePages = async () => {
+    try {
+      const searchParams: any = {};
+      if (pppoe.trim()) searchParams.pppoe = pppoe.trim();
+      if (titulo.trim()) searchParams.titulo = titulo.trim();
+      if (dataInicio.trim()) searchParams.dataInicio = dataInicio.trim();
+      if (dataFim.trim()) searchParams.dataFim = dataFim.trim();
+      if (tpAmb) searchParams.tpAmb = tpAmb;
+      if (serie.trim()) searchParams.serie = serie.trim();
+      if (status.trim()) searchParams.status = status.trim();
+      if (cpf_cnpj.trim()) searchParams.cpf_cnpj = cpf_cnpj.trim();
+      if (clientType.trim()) searchParams.clientType = clientType.trim();
+
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Nfcom/NfComPages`,
+        { searchParams: searchParams },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      setPagination((prev) => ({ ...prev, totalPages: Number(response.data) }));
+      console.log(response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Erro ao buscar NFCom:", error);
+      if (axios.isAxiosError(error) && error.response) {
+        showError(
+          `Erro ao buscar NFCom: ${
+            error.response.data.erro || "Erro desconhecido."
+          }`
+        );
+      } else {
+        showError("Erro de rede. Verifique sua conexão e tente novamente.");
+      }
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    const exec = async () => {
+      const searchParams: any = {};
+      if (pppoe.trim()) searchParams.pppoe = pppoe.trim();
+      if (titulo.trim()) searchParams.titulo = titulo.trim();
+      if (dataInicio.trim()) searchParams.dataInicio = dataInicio.trim();
+      if (dataFim.trim()) searchParams.dataFim = dataFim.trim();
+      if (tpAmb) searchParams.tpAmb = tpAmb;
+      if (serie.trim()) searchParams.serie = serie.trim();
+      if (status.trim()) searchParams.status = status.trim();
+      if (cpf_cnpj.trim()) searchParams.cpf_cnpj = cpf_cnpj.trim();
+      if (clientType.trim()) searchParams.clientType = clientType.trim();
+
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Nfcom/buscarNFCom`,
+        {
+          searchParams: searchParams,
+          pagination: pagination,
+          excludedIds: excludedIds,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      setSelectedIds(response.data.map((item: { id: any }) => item.id));
+    };
+
+    if (isSelectAllMode) {
+      exec();
+    }
+  }, [isSelectAllMode]);
+
   const handleClear = () => {
     setPppoe("");
     setTitulo("");
@@ -343,6 +452,14 @@ export default function SearchInterface() {
     setDataFim("");
     setNfcomList([]);
     setSelectedIds([]);
+    setIsSelectAllMode(false);
+    setShowPopUp(false);
+    setExcludedIds([]);
+    setSelectAllPopUp(false);
+    setPdfTargetNfcom(null);
+    setObsPopUp(false);
+    setObs("");
+    setLoading(false);
   };
 
   return (
@@ -545,7 +662,7 @@ export default function SearchInterface() {
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <MdOutlineConfirmationNumber />
+                      <AiOutlineUser />
                     </span>
                     <input
                       id="cpf_cnpj"
@@ -566,7 +683,7 @@ export default function SearchInterface() {
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <MdOutlineConfirmationNumber />
+                      <MdMergeType />
                     </span>
                     <select
                       id="clientType"
@@ -638,6 +755,12 @@ export default function SearchInterface() {
             obs={obs}
             confirmAction={confirmPdfGeneration}
           />
+          <SelectAllPopUp
+            showPopUp={selectAllPopUp}
+            setShowPopUp={setSelectAllPopUp}
+            selectedIds={selectedIds}
+            setIsSelectAllMode={setIsSelectAllMode}
+          />
 
           {/* Results Table */}
           {nfcomList.length > 0 && (
@@ -705,16 +828,29 @@ export default function SearchInterface() {
                     {nfcomList.map((nfcom) => (
                       <tr key={nfcom.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(
-                              Number(nfcom.numeracao)
-                            )}
-                            onChange={() =>
-                              handleSelectOne(Number(nfcom.numeracao))
-                            }
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
+                          {isSelectAllMode ? (
+                            <input
+                              type="checkbox"
+                              checked={excludedIds.includes(
+                                Number(nfcom.numeracao)
+                              )}
+                              onChange={() =>
+                                handleSelectOne(Number(nfcom.numeracao))
+                              }
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          ) : (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(
+                                Number(nfcom.numeracao)
+                              )}
+                              onChange={() =>
+                                handleSelectOne(Number(nfcom.numeracao))
+                              }
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {nfcom.tpAmb === 1 ? "Produção" : "Homologação"}
@@ -796,12 +932,24 @@ export default function SearchInterface() {
                     ))}
                   </tbody>
                 </table>
-                <h1>
-                  Valor total das faturas:{" "}
-                  <span className="font-bold text-green-600">
-                    R$ {value.toFixed(2)}
-                  </span>
-                </h1>
+              </div>
+              <div className="flex justify-between mt-2">
+                {pagination.totalPages > 1 && (
+                  <>
+                    <h1>Pagina: {pagination.page}</h1>
+                    <h1>
+                      Valor total das faturas:{" "}
+                      <span className="font-bold text-green-600">
+                        R$ {value.toFixed(2)}
+                      </span>
+                    </h1>
+                    <Pagination
+                      count={pagination.totalPages}
+                      page={pagination.page}
+                      onChange={(event, value) => changePage(value)}
+                    />
+                  </>
+                )}
               </div>
             </div>
           )}

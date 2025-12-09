@@ -616,6 +616,8 @@ class Nfcom {
       novaNFCom.data_emissao = new Date(nfComData.ide.dhEmi);
       novaNFCom.cliente_id =
         parseInt(nfComData.assinante.iCodAssinante || "0") || 0;
+      novaNFCom.tipo = clientType;
+      novaNFCom.cpf_cnpj = cpf_cnpj;
 
       novaNFCom.fatura_id = faturaId;
       novaNFCom.qrcodeLink = this.qrCodeUrl;
@@ -662,8 +664,9 @@ class Nfcom {
 
   public async buscarNFCom(req: Request, res: Response) {
     try {
-      const { searchParams } = req.body;
+      const { searchParams, excludedIds, pagination } = req.body;
       console.log(searchParams);
+      console.log(excludedIds);
       type NFComWhere = FindOptionsWhere<NFCom>;
       // 1. Inicia o objeto WHERE com os filtros obrigatórios
       const whereConditions: NFComWhere = {
@@ -707,6 +710,56 @@ class Nfcom {
         );
       }
 
+      if (excludedIds) {
+        whereConditions.nNF = Not(In(excludedIds));
+      }
+
+      const pageNumber = Number(pagination.page);
+
+      console.log(pageNumber);
+
+      // Verifica se o número da página é válido e calcula o 'skip'
+      if (pageNumber > 0) {
+        // CORREÇÃO: (Página Atual - 1) * Itens por página
+        pagination.skip = (pageNumber - 1) * pagination.take;
+      } else {
+        pagination.skip = 0; // Se for página 0 ou inválida, começa do zero
+      }
+
+      // 3. Executa a busca com as condições montadas
+      const NFComRepository = DataSource.getRepository(NFCom);
+      const nfcom = await NFComRepository.find({
+        where: whereConditions,
+        skip: pagination.skip,
+        take: pagination.take,
+      });
+
+      // Se precisar de mais detalhes, considere adicionar .relations, .order, etc.
+
+      res.status(200).json(nfcom);
+    } catch (error) {
+      console.error("Erro ao buscar NFCom:", error);
+      res.status(500).json({ error: "Erro ao buscar NFCom" });
+    }
+  }
+
+  public async NFComPages(req: Request, res: Response) {
+    try {
+      const { searchParams } = req.body;
+      type NFComWhere = FindOptionsWhere<NFCom>;
+
+      const whereConditions: NFComWhere = {
+        // Garante que 'titulo' (ID da fatura) seja tratado como número, se for o caso
+        fatura_id: searchParams.titulo
+          ? Number(searchParams.titulo)
+          : undefined,
+        pppoe: searchParams.pppoe || undefined, // Evita buscar por pppoe vazio se não fornecido
+        tpAmb: searchParams.tpAmb || undefined,
+        serie: searchParams.serie || undefined,
+        status: searchParams.status || undefined,
+        tipo: searchParams.clientType || undefined,
+        cpf_cnpj: searchParams.cpf_cnpj || undefined,
+      };
       // 3. Executa a busca com as condições montadas
       const NFComRepository = DataSource.getRepository(NFCom);
       const nfcom = await NFComRepository.find({
@@ -714,8 +767,9 @@ class Nfcom {
       });
 
       // Se precisar de mais detalhes, considere adicionar .relations, .order, etc.
+      const pages = Math.ceil(nfcom.length / 50);
 
-      res.status(200).json(nfcom);
+      res.status(200).json(pages);
     } catch (error) {
       console.error("Erro ao buscar NFCom:", error);
       res.status(500).json({ error: "Erro ao buscar NFCom" });
