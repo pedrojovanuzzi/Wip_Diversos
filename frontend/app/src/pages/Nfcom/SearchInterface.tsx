@@ -507,7 +507,7 @@ export default function SearchInterface() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-7 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 {/* Inputs ... (Code omitted for brevity, logic unchanged) */}
                 {/* Campo PPPOE */}
                 <div className="relative">
