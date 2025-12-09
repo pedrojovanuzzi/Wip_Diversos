@@ -37,12 +37,14 @@ export default function Nfcom() {
     vencimento: string[];
     cli_ativado: string[];
     nova_nfe: string[];
+    SVA: string[];
     servicos: string[];
   }>({
     plano: [],
     vencimento: [],
     cli_ativado: [],
     nova_nfe: [],
+    SVA: [],
     servicos: [],
   });
 
@@ -158,6 +160,12 @@ export default function Nfcom() {
   const handleSearch = async () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
     try {
+      if (activeFilters.SVA[0] === "SVA") {
+        setIsReducaoActive(true);
+      } else {
+        setIsReducaoActive(false);
+      }
+
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/NFCom/buscarClientes`,
         {
@@ -356,19 +364,6 @@ export default function Nfcom() {
             }`}
             disabled={!isReducaoActive} // Desabilita o input se a redução não estiver ativa
           />
-          <input
-            type="checkbox"
-            id="toggleReducao"
-            checked={isReducaoActive}
-            onChange={() => setIsReducaoActive(!isReducaoActive)}
-            className="h-4 w-4 text-indigo-600 border-gray-300 rounded cursor-pointer focus:ring-indigo-500"
-          />
-          <label
-            htmlFor="toggleReducao"
-            className="ml-2 text-gray-700 select-none"
-          >
-            Aplicar Redução
-          </label>
         </div>
       </div>
 
