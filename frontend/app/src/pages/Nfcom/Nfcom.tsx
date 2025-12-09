@@ -90,7 +90,7 @@ export default function Nfcom() {
         {
           password,
           clientesSelecionados,
-          reducao: isReducaoActive ? reducao : "1.0",
+          reducao: isReducaoActive ? reducao : "0.0",
           ambiente,
         },
         {

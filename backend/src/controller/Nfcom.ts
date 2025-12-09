@@ -245,10 +245,12 @@ class Nfcom {
       const now = new Date();
       const dhEmi = formatDate(now);
 
-      const value = parseFloat(FaturasData.valor) - ClientData.desconto;
+      const value = Number(FaturasData.valor) - ClientData.desconto;
+      console.log(value);
 
       const vProd = (value * (1 - reducao)).toFixed(2);
       console.log(vProd);
+      console.log(reducao);
 
       const vItem = vProd;
       const vNF = vProd;
