@@ -11,6 +11,12 @@ export class NFCom {
   @Column({ type: "varchar", length: 5 })
   serie!: string;
 
+  @Column({ type: "varchar", length: 38 })
+  cpf_cnpj!: string;
+
+  @Column({ type: "varchar", length: 50 })
+  tipo!: string;
+
   @Column({ type: "varchar", length: 44, unique: true })
   chave!: string;
 

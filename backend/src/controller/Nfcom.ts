@@ -415,6 +415,8 @@ class Nfcom {
         nfComData,
         clientLogin: ClientData.login || "",
         faturaId: FaturasData.id,
+        clientType: ClientData.vendedor || "",
+        cpf_cnpj: ClientData.cpf_cnpj || "",
       };
     });
 
@@ -428,6 +430,8 @@ class Nfcom {
         nfComData: INFComData;
         clientLogin: string;
         faturaId: number;
+        clientType: string;
+        cpf_cnpj: string;
       } => data !== null
     );
 
@@ -524,7 +528,9 @@ class Nfcom {
             xmlFinalDistrib,
             item.nfComData,
             item.clientLogin,
-            item.faturaId
+            item.faturaId,
+            item.clientType,
+            item.cpf_cnpj
           );
 
           responses.push({
@@ -575,7 +581,9 @@ class Nfcom {
     xmlRetorno: string, // Agora recebe o XML Final (nfcomProc) em texto puro
     nfComData: INFComData,
     clientLogin: string,
-    faturaId: number
+    faturaId: number,
+    clientType: string,
+    cpf_cnpj: string
   ): Promise<void> {
     try {
       const NFComRepository = DataSource.getRepository(NFCom);
@@ -667,6 +675,8 @@ class Nfcom {
         tpAmb: searchParams.tpAmb || undefined,
         serie: searchParams.serie || undefined,
         status: searchParams.status || undefined,
+        tipo: searchParams.clientType || undefined,
+        cpf_cnpj: searchParams.cpf_cnpj || undefined,
       };
 
       console.log(whereConditions);

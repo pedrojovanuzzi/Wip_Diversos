@@ -50,6 +50,8 @@ export default function SearchInterface() {
   const [serie, setSerie] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [cpf_cnpj, setCpfCnpj] = useState<string>("");
+  const [clientType, setClientType] = useState<"SVA" | "SCM" | "" | string>("");
   let [value, setValue] = useState<number>(0);
 
   // States for PDF Obs PopUp
@@ -295,6 +297,8 @@ export default function SearchInterface() {
       if (tpAmb) searchParams.tpAmb = tpAmb;
       if (serie.trim()) searchParams.serie = serie.trim();
       if (status.trim()) searchParams.status = status.trim();
+      if (cpf_cnpj.trim()) searchParams.cpf_cnpj = cpf_cnpj.trim();
+      if (clientType.trim()) searchParams.clientType = clientType.trim();
 
       console.log(searchParams);
 
@@ -526,6 +530,51 @@ export default function SearchInterface() {
                       <option value="">Selecione</option>
                       <option value="autorizada">Autorizada</option>
                       <option value="cancelada">Cancelada</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <label
+                    htmlFor="cpf_cnpj"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    CPF/CNPJ
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <MdOutlineConfirmationNumber />
+                    </span>
+                    <input
+                      id="cpf_cnpj"
+                      type="text"
+                      value={cpf_cnpj}
+                      onChange={(e) => setCpfCnpj(e.target.value)}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <label
+                    htmlFor="clientType"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Tipo de Cliente
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <MdOutlineConfirmationNumber />
+                    </span>
+                    <select
+                      id="clientType"
+                      value={clientType}
+                      onChange={(e) => setClientType(e.target.value)}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Selecione</option>
+                      <option value="SVA">SVA</option>
+                      <option value="SCM">SCM</option>
                     </select>
                   </div>
                 </div>

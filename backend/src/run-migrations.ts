@@ -11,6 +11,7 @@ async function runMigrations() {
 
     const { stdout, stderr } = await execAsync(
       "npx ts-node ./node_modules/typeorm/cli.js migration:run -d src/database/DataSource.ts"
+      // npx ts-node ./node_modules/typeorm/cli.js migration:create .\src\migration\CPF_CPNJType
     );
 
     if (stdout) console.log(stdout);
