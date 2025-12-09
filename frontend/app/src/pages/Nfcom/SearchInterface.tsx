@@ -139,11 +139,16 @@ export default function SearchInterface() {
       setLoading(true);
       setShowPopUp(false);
 
+      let idsToSend = selectedIds;
+      if (isSelectAllMode && excludedIds.length > 0) {
+        idsToSend = selectedIds.filter((id) => !excludedIds.includes(id));
+      }
+
       try {
         const response = await axios.post(
           `${process.env.REACT_APP_URL}/NFCom/cancelarNFCom`,
           {
-            nNF: selectedIds,
+            nNF: idsToSend,
             password: password,
           },
           {
@@ -167,6 +172,8 @@ export default function SearchInterface() {
       }
       setLoading(false);
       setSelectedIds([]);
+      setExcludedIds([]);
+      setIsSelectAllMode(false);
     }
   };
 
@@ -301,11 +308,6 @@ export default function SearchInterface() {
   };
 
   const handleBulkCancel = () => {
-    if (isSelectAllMode) {
-      setExcludedIds([]);
-    } else {
-      setSelectedIds([]);
-    }
     if (selectedIds.length === 0) return;
     setSelectedNfcom(null);
     setShowPopUp(true);
@@ -437,7 +439,9 @@ export default function SearchInterface() {
           },
         }
       );
-      setSelectedIds(response.data.map((item: { id: any }) => item.id));
+      setSelectedIds(
+        response.data.map((item: { numeracao: any }) => item.numeracao)
+      );
     };
 
     if (isSelectAllMode) {
@@ -726,13 +730,17 @@ export default function SearchInterface() {
               </div>
 
               {/* Botão de Cancelamento em Lote */}
-              {selectedIds.length > 0 && (
+              {selectedIds.length - (isSelectAllMode ? excludedIds.length : 0) >
+                0 && (
                 <div className="mt-4 flex justify-end">
                   <button
                     onClick={handleBulkCancel}
                     className="px-5 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-all font-medium flex items-center gap-2"
                   >
-                    Cancelar Selecionadas ({selectedIds.length})
+                    Cancelar Selecionadas (
+                    {selectedIds.length -
+                      (isSelectAllMode ? excludedIds.length : 0)}
+                    )
                   </button>
                 </div>
               )}
@@ -831,9 +839,9 @@ export default function SearchInterface() {
                           {isSelectAllMode ? (
                             <input
                               type="checkbox"
-                              checked={excludedIds.includes(
-                                Number(nfcom.numeracao)
-                              )}
+                              checked={
+                                !excludedIds.includes(Number(nfcom.numeracao))
+                              }
                               onChange={() =>
                                 handleSelectOne(Number(nfcom.numeracao))
                               }
