@@ -50,6 +50,7 @@ export default function SearchInterface() {
   const [serie, setSerie] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  let [value, setValue] = useState<number>(0);
 
   // States for PDF Obs PopUp
   const [obsPopUp, setObsPopUp] = useState<boolean>(false);
@@ -701,6 +702,9 @@ export default function SearchInterface() {
                         <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-900">
                           {nfcom.value}
                         </td>
+                        <td className="px-6 py-4 text-left hidden whitespace-nowrap text-sm text-gray-900">
+                          {(value += Number(nfcom.value))}
+                        </td>
                         <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-900">
                           <a
                             href={createXmlDownloadUrl(nfcom.xml)}
@@ -741,6 +745,12 @@ export default function SearchInterface() {
                     ))}
                   </tbody>
                 </table>
+                <h1>
+                  Valor total das faturas:{" "}
+                  <span className="font-bold text-green-600">
+                    R$ {value.toFixed(2)}
+                  </span>
+                </h1>
               </div>
             </div>
           )}

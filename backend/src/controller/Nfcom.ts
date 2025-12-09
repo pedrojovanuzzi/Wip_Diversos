@@ -1577,7 +1577,9 @@ class Nfcom {
         doc.text("Somatorio de Valores");
         const totalValor = nfcom.reduce((total, item) => {
           // O Number() remove os zeros a esquerda e prepara para calculo
-          return total + Number(item.value || 0);
+          console.log(total + Number(item.value));
+
+          return total + Number(item.value);
         }, 0);
 
         const valorFormatado = totalValor.toLocaleString("pt-BR", {
