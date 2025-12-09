@@ -314,7 +314,9 @@ export default function Nfcom() {
       <div>
         <h1>
           Valores Somados das mensalidades:{" "}
-          <span className="text-green-500">R${valueSome.toFixed(2)}</span>
+          <span className="text-green-500">
+            R${valueSome.toFixed(2).replace(".", ",")}
+          </span>
         </h1>
       </div>
       <div className="flex flex-col justify-center sm:flex-row">

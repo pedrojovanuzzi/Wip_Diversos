@@ -308,7 +308,9 @@ export const Nfe = () => {
       <main className="flex justify-center mt-2" />
       <h1>
         Valores Somados das mensalidades:{" "}
-        <span className="text-green-500">R${valueSome.toFixed(2)}</span>
+        <span className="text-green-500">
+          R${valueSome.toFixed(2).replace(".", ",")}
+        </span>
       </h1>
       <div className="flex flex-col justify-center sm:flex-row">
         <div className="relative">
