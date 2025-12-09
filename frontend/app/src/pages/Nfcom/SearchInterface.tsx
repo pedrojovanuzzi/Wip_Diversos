@@ -50,6 +50,8 @@ export default function SearchInterface() {
   const [serie, setSerie] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [isSelectAllMode, setIsSelectAllMode] = useState<boolean>(false);
+  const [excludedIds, setExcludedIds] = useState<number[]>([]);
   const [cpf_cnpj, setCpfCnpj] = useState<string>("");
   const [clientType, setClientType] = useState<"SVA" | "SCM" | "" | string>("");
   let [value, setValue] = useState<number>(0);
