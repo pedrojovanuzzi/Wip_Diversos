@@ -955,7 +955,7 @@ export default function SearchInterface() {
                 </table>
               </div>
               <div className="flex justify-between mt-2">
-                {pagination.totalPages > 1 && (
+                {(pagination.totalPages > 1 && (
                   <>
                     <h1>Pagina: {pagination.page}</h1>
                     <h1>
@@ -970,9 +970,7 @@ export default function SearchInterface() {
                       onChange={(event, value) => changePage(value)}
                     />
                   </>
-                ) ? (
-                  <></>
-                ) : (
+                )) || (
                   <h1>
                     Valor total das faturas:{" "}
                     <span className="font-bold text-green-600">
