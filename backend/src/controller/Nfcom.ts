@@ -459,35 +459,67 @@ class Nfcom {
     });
   };
 
-  public async baixarZipXml(req: Request, res: Response) {
+  public baixarZipXml = async (req: Request, res: Response) => {
     try {
       const { nfcomIds } = req.body;
+
+      // Busca as notas
       const nfcoms = await DataSource.getRepository(NFCom).find({
-        where: {
-          numeracao: In(nfcomIds),
-        },
+        where: { numeracao: In(nfcomIds) },
       });
 
-      const zip = new JSZip();
-
-      for (const nfcom of nfcoms) {
-        const xml = nfcom.xml;
-        const fileName = `${nfcom.numeracao}.xml`;
-        zip.file(fileName, xml);
+      if (!nfcoms.length) {
+        res.status(404).json({ message: "Nenhuma nota encontrada." });
+        return;
       }
 
-      const zipFile = await zip.generateAsync({ type: "nodebuffer" });
+      const zip = new JSZip();
+      const folderXml = zip.folder("xmls");
+      const folderPdf = zip.folder("pdfs");
 
+      // Processa em paralelo para ser mais rápido
+      await Promise.all(
+        nfcoms.map(async (nfcom) => {
+          const nomeArquivo =
+            nfcom.numeracao || nfcom.nNF || `nota_${nfcom.id}`;
+
+          // 1. Adiciona o XML
+          if (nfcom.xml) {
+            folderXml?.file(`${nomeArquivo}.xml`, nfcom.xml);
+          }
+
+          // 2. Gera e Adiciona o PDF
+          try {
+            // Passe uma observação padrão ou pegue do banco se tiver
+            const obs = "Documento gerado via sistema para conferência.";
+            const pdfBuffer = await this.generateXmlPdf(nfcom, obs);
+
+            folderPdf?.file(`${nomeArquivo}.pdf`, pdfBuffer);
+          } catch (err) {
+            console.error(`Erro ao gerar PDF da nota ${nomeArquivo}:`, err);
+            folderPdf?.file(
+              `ERRO_${nomeArquivo}.txt`,
+              `Falha ao gerar PDF: ${err}`
+            );
+          }
+        })
+      );
+
+      // Gera o binário do ZIP
+      const zipContent = await zip.generateAsync({ type: "nodebuffer" });
+
+      // Envia resposta
       res.setHeader("Content-Type", "application/zip");
-      res.setHeader("Content-Disposition", "attachment; filename=notas.zip");
-      res.send(zipFile);
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=notas_fiscais.zip"
+      );
+      res.send(zipContent);
     } catch (error) {
-      console.log(error);
-      res.status(500).json({
-        message: "Erro ao gerar zip",
-      });
+      console.error(error);
+      res.status(500).json({ message: "Erro ao processar download em lote." });
     }
-  }
+  };
 
   private async processarFilaBackground(
     dadosFinaisNFCom: any[],

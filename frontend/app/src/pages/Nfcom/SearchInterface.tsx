@@ -14,6 +14,8 @@ import PopUpObs from "./Components/PopUpObs";
 import SelectAllPopUp from "./Components/SelectAllPopUp";
 import { Pagination } from "@mui/material";
 import { AiOutlineUser } from "react-icons/ai";
+import saveAs from "file-saver";
+import { BsDownload } from "react-icons/bs";
 
 interface NFComResult {
   // Dados primários
@@ -125,6 +127,35 @@ export default function SearchInterface() {
     setSelectedNfcom(cliente);
     setShowPopUp(true);
   }
+
+  const downloadZipXMLs = async () => {
+    try {
+      setLoading(true);
+      const resposta = await axios.post(
+        `${process.env.REACT_APP_URL}/NFCom/downloadZipXMLs`,
+        {
+          nfcomIds: selectedIds,
+        },
+        {
+          responseType: "blob",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const blob = new Blob([resposta.data], { type: "application/zip" });
+      saveAs(blob, "notas_exportadas.zip");
+      console.log("Resposta da API:", resposta.data);
+      showSuccess("XMLs baixados com sucesso!");
+    } catch (erro) {
+      console.error("Erro ao baixar XMLs:", erro);
+      showError("Erro desconhecido ao baixar XMLs.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const confirmCancellation = async () => {
     if (selectedNfcom) {
@@ -243,8 +274,7 @@ export default function SearchInterface() {
   // 1. Function to open the PopUp and save the target NFCom
   const handleOpenPdfPopUp = (nfcom: NFComResult) => {
     setPdfTargetNfcom(nfcom);
-    setObs("");
-    setObsPopUp(true);
+    confirmPdfGeneration();
   };
 
   const generatePdfFromNfXML = async (nNF: string, obs: string) => {
@@ -745,7 +775,7 @@ export default function SearchInterface() {
               {/* Botão de Cancelamento em Lote */}
               {selectedIds.length - (isSelectAllMode ? excludedIds.length : 0) >
                 0 && (
-                <div className="mt-4 flex justify-end">
+                <div className="mt-4 flex gap-5 justify-end">
                   <button
                     onClick={handleBulkCancel}
                     className="px-5 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-all font-medium flex items-center gap-2"
@@ -754,6 +784,14 @@ export default function SearchInterface() {
                     {selectedIds.length -
                       (isSelectAllMode ? excludedIds.length : 0)}
                     )
+                  </button>
+                  <button
+                    onClick={downloadZipXMLs}
+                    disabled={loading}
+                    className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all font-medium flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    <BsDownload className="text-xl" />
+                    {loading ? "Baixar XMLs..." : "Baixar XMLs"}
                   </button>
                 </div>
               )}
@@ -769,13 +807,14 @@ export default function SearchInterface() {
           />
 
           {/* Corrected PopUp usage */}
-          <PopUpObs
+          {/* <PopUpObs
             setShowPopUp={setObsPopUp}
             showPopUp={obsPopUp}
             setObs={setObs}
             obs={obs}
             confirmAction={confirmPdfGeneration}
-          />
+          /> */}
+
           <SelectAllPopUp
             showPopUp={selectAllPopUp}
             setShowPopUp={setSelectAllPopUp}

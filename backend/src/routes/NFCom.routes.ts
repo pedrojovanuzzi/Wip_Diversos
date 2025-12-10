@@ -16,5 +16,6 @@ router.post("/generateReportPdf", AuthGuard, nfcom.generateReportPdf);
 router.post("/generatePdfFromNfXML", AuthGuard, nfcom.generatePdfFromNfXML);
 router.post("/NfComPages", AuthGuard, nfcom.NFComPages);
 router.post("/buscarNFComAll", AuthGuard, nfcom.buscarNFComAll);
+router.post("/downloadZipXMLs", AuthGuard, nfcom.baixarZipXml);
 
 export default router;
