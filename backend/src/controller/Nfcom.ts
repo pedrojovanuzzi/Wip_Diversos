@@ -459,34 +459,74 @@ class Nfcom {
     });
   };
 
-  public async baixarZipXml(req: Request, res: Response) {
+  public baixarZipXml = async (req: Request, res: Response) => {
     try {
       const { nfcomIds } = req.body;
+
+      // Busca as notas
       const nfcoms = await DataSource.getRepository(NFCom).find({
-        where: {
-          numeracao: In(nfcomIds),
-        },
+        where: { numeracao: In(nfcomIds) },
       });
 
-      const zip = new JSZip();
-
-      for (const nfcom of nfcoms) {
-        const xml = nfcom.xml;
-        const fileName = `${nfcom.numeracao}.xml`;
-        zip.file(fileName, xml);
+      if (!nfcoms.length) {
+        res.status(404).json({ message: "Nenhuma nota encontrada." });
+        return;
       }
 
-      const zipFile = await zip.generateAsync({ type: "nodebuffer" });
+      const zip = new JSZip();
+      const folderXml = zip.folder("xmls");
+      const folderPdf = zip.folder("pdfs");
 
+      // Processa em paralelo para ser mais rápido
+      await Promise.all(
+        nfcoms.map(async (nfcom) => {
+          const nomeArquivo =
+            nfcom.numeracao || nfcom.nNF || `nota_${nfcom.id}`;
+
+          // 1. Adiciona o XML
+          if (nfcom.xml) {
+            folderXml?.file(`${nomeArquivo}.xml`, nfcom.xml);
+          }
+
+          // 2. Gera e Adiciona o PDF
+          try {
+            // Passe uma observação padrão ou pegue do banco se tiver
+            const obs = await this.getNfcomByChaveDeOlhoNoImposto();
+            const pdfBuffer = await this.generateXmlPdf(nfcom, obs.Chave);
+
+            folderPdf?.file(`${nomeArquivo}.pdf`, pdfBuffer);
+          } catch (err) {
+            console.error(`Erro ao gerar PDF da nota ${nomeArquivo}:`, err);
+            folderPdf?.file(
+              `ERRO_${nomeArquivo}.txt`,
+              `Falha ao gerar PDF: ${err}`
+            );
+          }
+        })
+      );
+
+      // Gera o binário do ZIP
+      const zipContent = await zip.generateAsync({ type: "nodebuffer" });
+
+      // Envia resposta
       res.setHeader("Content-Type", "application/zip");
-      res.setHeader("Content-Disposition", "attachment; filename=notas.zip");
-      res.send(zipFile);
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=notas_fiscais.zip"
+      );
+      res.send(zipContent);
     } catch (error) {
-      console.log(error);
-      res.status(500).json({
-        message: "Erro ao gerar zip",
-      });
+      console.error(error);
+      res.status(500).json({ message: "Erro ao processar download em lote." });
     }
+  };
+
+  public async getNfcomByChaveDeOlhoNoImposto() {
+    const response = await axios.get(
+      `https://apidoni.ibpt.org.br/api/v1/servicos?token=${process.env.OLHO_NO_IMPOSTO_TOKEN}&cnpj=${process.env.OLHO_NO_IMPOSTO_CNPJ}&codigo=${process.env.OLHO_NO_IMPOSTO_CODIGO}&uf=${process.env.OLHO_NO_IMPOSTO_UF}&descricao=${process.env.OLHO_NO_IMPOSTO_DESCRICAO}&unidadeMedida=${process.env.OLHO_NO_IMPOSTO_UNIDADEMEDIDA}&valor=${process.env.OLHO_NO_IMPOSTO_VALOR}`
+    );
+
+    return response.data;
   }
 
   private async processarFilaBackground(
@@ -686,7 +726,7 @@ class Nfcom {
   }
 
   public async getStatusJob(req: Request, res: Response) {
-    const { id } = req.body;
+    const { id } = process.env;
     const response = await DataSource.getRepository(Jobs).findOne({
       where: { id },
     });
@@ -2329,9 +2369,9 @@ class Nfcom {
             const codigoParaBarras =
               this.converterLinhaDigitavelParaBarras(linhaDigitavel);
 
-            console.log(
-              `Barcode Debug | Linha: ${linhaDigitavel.length} chars | Barras: ${codigoParaBarras.length} chars`
-            );
+            // console.log(
+            //   `Barcode Debug | Linha: ${linhaDigitavel.length} chars | Barras: ${codigoParaBarras.length} chars`
+            // );
 
             // 2. Gera a imagem usando os 44 dígitos (agora par e correto)
             const barcodeBuffer = await bwipjs.toBuffer({
