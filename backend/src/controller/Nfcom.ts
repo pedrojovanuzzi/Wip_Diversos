@@ -491,8 +491,8 @@ class Nfcom {
           // 2. Gera e Adiciona o PDF
           try {
             // Passe uma observação padrão ou pegue do banco se tiver
-            const obs = "Documento gerado via sistema para conferência.";
-            const pdfBuffer = await this.generateXmlPdf(nfcom, obs);
+            const obs = await this.getNfcomByChaveDeOlhoNoImposto();
+            const pdfBuffer = await this.generateXmlPdf(nfcom, obs.Chave);
 
             folderPdf?.file(`${nomeArquivo}.pdf`, pdfBuffer);
           } catch (err) {
@@ -520,6 +520,14 @@ class Nfcom {
       res.status(500).json({ message: "Erro ao processar download em lote." });
     }
   };
+
+  public async getNfcomByChaveDeOlhoNoImposto() {
+    const response = await axios.get(
+      `https://apidoni.ibpt.org.br/api/v1/servicos?token=${process.env.OLHO_NO_IMPOSTO_TOKEN}&cnpj=${process.env.OLHO_NO_IMPOSTO_CNPJ}&codigo=${process.env.OLHO_NO_IMPOSTO_CODIGO}&uf=${process.env.OLHO_NO_IMPOSTO_UF}&descricao=${process.env.OLHO_NO_IMPOSTO_DESCRICAO}&unidadeMedida=${process.env.OLHO_NO_IMPOSTO_UNIDADEMEDIDA}&valor=${process.env.OLHO_NO_IMPOSTO_VALOR}`
+    );
+
+    return response.data;
+  }
 
   private async processarFilaBackground(
     dadosFinaisNFCom: any[],
@@ -718,7 +726,7 @@ class Nfcom {
   }
 
   public async getStatusJob(req: Request, res: Response) {
-    const { id } = req.body;
+    const { id } = process.env;
     const response = await DataSource.getRepository(Jobs).findOne({
       where: { id },
     });
@@ -2361,9 +2369,9 @@ class Nfcom {
             const codigoParaBarras =
               this.converterLinhaDigitavelParaBarras(linhaDigitavel);
 
-            console.log(
-              `Barcode Debug | Linha: ${linhaDigitavel.length} chars | Barras: ${codigoParaBarras.length} chars`
-            );
+            // console.log(
+            //   `Barcode Debug | Linha: ${linhaDigitavel.length} chars | Barras: ${codigoParaBarras.length} chars`
+            // );
 
             // 2. Gera a imagem usando os 44 dígitos (agora par e correto)
             const barcodeBuffer = await bwipjs.toBuffer({

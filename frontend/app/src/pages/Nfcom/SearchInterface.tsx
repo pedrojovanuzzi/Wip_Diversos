@@ -10,7 +10,7 @@ import { VscSymbolBoolean } from "react-icons/vsc";
 import { MdMergeType, MdOutlineConfirmationNumber } from "react-icons/md";
 import { useNotification } from "../../context/NotificationContext";
 import { FaFileSignature } from "react-icons/fa";
-import PopUpObs from "./Components/PopUpObs";
+
 import SelectAllPopUp from "./Components/SelectAllPopUp";
 import { Pagination } from "@mui/material";
 import { AiOutlineUser } from "react-icons/ai";
@@ -58,6 +58,7 @@ export default function SearchInterface() {
   const [isSelectAllMode, setIsSelectAllMode] = useState<boolean>(false);
   const [excludedIds, setExcludedIds] = useState<number[]>([]);
   const [selectAllPopUp, setSelectAllPopUp] = useState<boolean>(false);
+  const [chaveDeOlhoNoImposto, setChaveDeOlhoNoImposto] = useState<string>("");
   const [pagination, setPagination] = useState({
     page: 1,
     take: 50,
@@ -66,13 +67,6 @@ export default function SearchInterface() {
   const [cpf_cnpj, setCpfCnpj] = useState<string>("");
   const [clientType, setClientType] = useState<"SVA" | "SCM" | "" | string>("");
   let [value, setValue] = useState<number>(0);
-
-  // States for PDF Obs PopUp
-  const [obsPopUp, setObsPopUp] = useState<boolean>(false);
-  const [obs, setObs] = useState<string>("");
-  const [pdfTargetNfcom, setPdfTargetNfcom] = useState<NFComResult | null>(
-    null
-  );
 
   const { user } = useAuth();
   const token = user?.token;
@@ -271,13 +265,8 @@ export default function SearchInterface() {
     }
   };
 
-  // 1. Function to open the PopUp and save the target NFCom
-  const handleOpenPdfPopUp = (nfcom: NFComResult) => {
-    setPdfTargetNfcom(nfcom);
-    confirmPdfGeneration();
-  };
-
-  const generatePdfFromNfXML = async (nNF: string, obs: string) => {
+  // Função para gerar PDF diretamente sem popup
+  const handleOpenPdfPopUp = async (nfcom: NFComResult) => {
     try {
       const newWindow = window.open("", "_blank");
       // Optional: Give user feedback in the new tab
@@ -287,8 +276,8 @@ export default function SearchInterface() {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/NFCom/generatePdfFromNfXML`,
         {
-          nNF: nNF,
-          obs: obs,
+          nNF: nfcom.nNF,
+          obs: chaveDeOlhoNoImposto,
         },
         {
           headers: {
@@ -311,16 +300,6 @@ export default function SearchInterface() {
       console.error(`Erro ao gerar PDF:`, error);
       showError("Erro ao gerar PDF.");
       setLoading(false);
-    }
-  };
-
-  // 2. The Bridge function that the PopUp calls
-  const confirmPdfGeneration = async () => {
-    if (pdfTargetNfcom) {
-      // Close popup first or after? Usually better after success or immediately to show loading
-      setObsPopUp(false);
-      await generatePdfFromNfXML(pdfTargetNfcom.nNF, obs);
-      setPdfTargetNfcom(null);
     }
   };
 
@@ -502,11 +481,24 @@ export default function SearchInterface() {
     setShowPopUp(false);
     setExcludedIds([]);
     setSelectAllPopUp(false);
-    setPdfTargetNfcom(null);
-    setObsPopUp(false);
-    setObs("");
     setLoading(false);
   };
+
+  useEffect(() => {
+    const exec = async () => {
+      const response = await axios.get(
+        `${process.env.REACT_APP_URL}/NFCom/getNfcomByChaveDeOlhoNoImposto`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      setChaveDeOlhoNoImposto(response.data.Chave);
+    };
+    exec();
+  }, []);
 
   return (
     <div>
@@ -805,15 +797,6 @@ export default function SearchInterface() {
             password={password}
             cancelNFCom={confirmCancellation}
           />
-
-          {/* Corrected PopUp usage */}
-          {/* <PopUpObs
-            setShowPopUp={setObsPopUp}
-            showPopUp={obsPopUp}
-            setObs={setObs}
-            obs={obs}
-            confirmAction={confirmPdfGeneration}
-          /> */}
 
           <SelectAllPopUp
             showPopUp={selectAllPopUp}
