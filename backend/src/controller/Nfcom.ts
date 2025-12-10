@@ -17,6 +17,7 @@ import { Faturas } from "../entities/Faturas";
 import { NFCom } from "../entities/NFCom";
 import PDFDocument from "pdfkit";
 import dotenv from "dotenv";
+import JSZip from "jszip";
 import DataSource from "../database/DataSource";
 import {
   Between,
@@ -457,6 +458,36 @@ class Nfcom {
       job: job.id,
     });
   };
+
+  public async baixarZipXml(req: Request, res: Response) {
+    try {
+      const { nfcomIds } = req.body;
+      const nfcoms = await DataSource.getRepository(NFCom).find({
+        where: {
+          numeracao: In(nfcomIds),
+        },
+      });
+
+      const zip = new JSZip();
+
+      for (const nfcom of nfcoms) {
+        const xml = nfcom.xml;
+        const fileName = `${nfcom.numeracao}.xml`;
+        zip.file(fileName, xml);
+      }
+
+      const zipFile = await zip.generateAsync({ type: "nodebuffer" });
+
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", "attachment; filename=notas.zip");
+      res.send(zipFile);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({
+        message: "Erro ao gerar zip",
+      });
+    }
+  }
 
   private async processarFilaBackground(
     dadosFinaisNFCom: any[],
