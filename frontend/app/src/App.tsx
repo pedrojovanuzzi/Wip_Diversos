@@ -36,7 +36,7 @@ import Nfcom from "./pages/Nfcom/Nfcom";
 import SearchInterface from "./pages/Nfcom/SearchInterface";
 
 function App() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
 
   const manutencao = false;
 

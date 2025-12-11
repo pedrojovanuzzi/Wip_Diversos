@@ -146,7 +146,7 @@ export const NavBar = ({ color = "black" }: Color) => {
                 </li>
               </>
             )}
-            {permission! >= 1 && (
+            {permission! === 1 && (
               <>
                 <li className="p-2 grid place-items-center col-span-2">
                   <Link to="/Nfcom/Buscar">
@@ -181,6 +181,11 @@ export const NavBar = ({ color = "black" }: Color) => {
                   <Link to="/Onu">
                     <FaPlugCirclePlus className="text-white size-8 transition-all hover:text-green-400" />
                   </Link>
+                </li>
+                <li className="p-2 grid place-items-center col-span-2">
+                  <button onClick={clearCookies}>
+                    <ImExit className="text-white size-8 transition-all hover:text-green-400" />
+                  </button>
                 </li>
               </>
             )}

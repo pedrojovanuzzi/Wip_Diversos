@@ -1,5 +1,11 @@
 // Importa os hooks e o Context do React
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useEffect,
+} from "react";
 // Importa a lib js-cookie para manipular cookies
 import Cookies from "js-cookie";
 
@@ -17,8 +23,6 @@ interface AuthContextType {
   logout: () => void; // Função para limpar o token ao deslogar
   loading: boolean;
 }
-
-
 
 // Cria o contexto inicial, com valores padrão (nulo e funções vazias)
 export const AuthContext = createContext<AuthContextType>({
@@ -51,11 +55,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Função chamada quando o usuário faz login
   const loginIn = (userData: UserData) => {
     setUser(userData);
-    
-    Cookies.set("user", JSON.stringify(userData), { expires: 7},);
+
+    Cookies.set("user", JSON.stringify(userData), { expires: 7 });
   };
-
-
 
   // Função chamada quando o usuário faz logout
   const logout = () => {
