@@ -36,7 +36,8 @@ interface CertificadoDados {
   nomeEmpresa: string;
   cnpj: string;
   numeroSerie: string;
-  validade: string;
+  dataInicio: string;
+  dataFim: string;
   emissor: string;
 }
 
@@ -1797,7 +1798,7 @@ class Nfcom {
         doc.text("Somatorio de Valores");
         const totalValor = nfcom.reduce((total, item) => {
           // O Number() remove os zeros a esquerda e prepara para calculo
-          console.log(total + Number(item.value));
+          // console.log(total + Number(item.value));
 
           return total + Number(item.value);
         }, 0);
@@ -1818,7 +1819,7 @@ class Nfcom {
           doc.text("Certificado Digital Utilizado na Assinatura Digital:");
           doc.text(linhaIdentificacao); // Ex: WIP TELECOM... : 20.843...
           doc.text(`Numero de Serie: ${dadosCert.numeroSerie}`);
-          doc.text(`Validade: ${dadosCert.validade}`);
+          doc.text(`Validade: ${dadosCert.dataInicio} a ${dadosCert.dataFim}`);
           doc.text(`Emissor: ${dadosCert.emissor}`);
         }
 
@@ -1834,64 +1835,72 @@ class Nfcom {
     password: string
   ): CertificadoDados | null => {
     try {
-      // 1. Decodificar o Base64 para binário
-      const p12Der = forge.util.decode64(p12Base64);
+      // --- CORREÇÃO AQUI ---
+      // 1. Limpeza da string Base64
+      // Remove prefixos como "data:application/x-pkcs12;base64," se existirem
+      let base64Clean = p12Base64;
+
+      if (base64Clean.includes(",")) {
+        base64Clean = base64Clean.split(",")[1];
+      }
+
+      // Remove espaços em branco e quebras de linha (\n, \r) que podem corromper o decode
+      base64Clean = base64Clean.replace(/\s/g, "");
+      // ---------------------
+
+      // 2. Decodificar o Base64 limpo para binário
+      const p12Der = forge.util.decode64(base64Clean);
       const p12Asn1 = forge.asn1.fromDer(p12Der);
 
-      // 2. Abrir o PKCS#12 com a senha
+      // 3. Abrir o PKCS#12 com a senha
       const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
 
-      // 3. Encontrar a "bag" que contém o certificado do usuário
-      // O ID 1.2.840.113549.1.12.10.1.3 corresponde a pkcs-12-certBag
-      const bags = p12.getBags({ bagType: forge.pki.oids.certBag });
+      // ... (Restante do código permanece igual)
 
-      // Pega o primeiro certificado encontrado (geralmente é o do usuário)
+      const bags = p12.getBags({ bagType: forge.pki.oids.certBag });
       const certBag = bags[forge.pki.oids.certBag]?.[0];
 
       if (!certBag) {
-        throw new Error("Certificado não encontrado no arquivo P12.");
+        throw new Error("Certificado não encontrado no arquivo P12/PFX.");
       }
 
       const cert = certBag.cert;
       if (!cert) return null;
 
-      // --- Extração dos Dados ---
-
-      // A. Nome e CNPJ (Geralmente no Common Name "CN")
-      // Certificados BR geralmente são: "NOME DA EMPRESA:CNPJ" ou apenas o Nome
       const cnAttr = cert.subject.getField("CN");
       const commonName = cnAttr ? cnAttr.value : "";
 
-      // Tenta separar Nome e CNPJ se estiverem juntos (padrão ICP-Brasil antigo e atual misturados)
       let nomeEmpresa = commonName;
       let cnpj = "";
 
       if (commonName.includes(":")) {
         const parts = commonName.split(":");
         nomeEmpresa = parts[0];
-        cnpj = parts[1]; // O CNPJ bruto
+        cnpj = parts[1];
       }
 
-      // B. Número de Série (Vem em hex, convertemos para UpperCase)
       const numeroSerie = cert.serialNumber.toUpperCase();
-
-      // C. Validade (Formata data)
-      const validade = cert.validity.notAfter;
-      const validadeFormatada = validade.toLocaleDateString("pt-BR");
-
-      // D. Emissor (Common Name do Issuer)
+      const dataInicio = cert.validity.notBefore;
+      const dataFim = cert.validity.notAfter;
+      const inicioFormatado = dataInicio.toLocaleDateString("pt-BR");
+      const fimFormatado = dataFim.toLocaleDateString("pt-BR");
       const issuerAttr = cert.issuer.getField("CN");
       const emissor = issuerAttr ? issuerAttr.value : "Desconhecido";
 
       return {
         nomeEmpresa,
-        cnpj: this.formatarCNPJ(cnpj), // Função auxiliar para pontuação
+        cnpj: this.formatarCNPJ(cnpj),
         numeroSerie,
-        validade: validadeFormatada,
+        dataInicio: inicioFormatado,
+        dataFim: fimFormatado,
         emissor,
       };
     } catch (error) {
-      console.error("Erro ao ler certificado:", error);
+      // Dica: Logar o tamanho da string ajuda a debugar se ela veio vazia
+      console.error(
+        `Erro ao ler certificado (Tamanho base64: ${p12Base64?.length})`,
+        error
+      );
       return null;
     }
   };
@@ -2579,10 +2588,14 @@ class Nfcom {
         return;
       }
 
-      let pfxFileBase64 = Buffer.from(
-        "../files/certificado.pfx",
-        "base64"
-      ).toString("binary");
+      const caminhoArquivo = path.resolve(
+        __dirname,
+        "../files/certificado.pfx"
+      );
+
+      const fileBuffer = fs.readFileSync(caminhoArquivo);
+
+      const pfxFileBase64 = fileBuffer.toString("base64");
 
       const pdf = await this.generatePdf(
         nfcom,
