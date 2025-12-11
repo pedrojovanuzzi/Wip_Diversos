@@ -5,6 +5,7 @@ import { CiSearch } from "react-icons/ci";
 import { BiCalendar, BiUser, BiReceipt } from "react-icons/bi";
 import { useAuth } from "../../context/AuthContext";
 import PopUpCancelNFCom from "./Components/PopUpCancelNFCom";
+import PopUpReportPassword from "./Components/PopUpReportPassword";
 import { GoNumber } from "react-icons/go";
 import { VscSymbolBoolean } from "react-icons/vsc";
 import { MdMergeType, MdOutlineConfirmationNumber } from "react-icons/md";
@@ -51,6 +52,8 @@ export default function SearchInterface() {
   const [tpAmb, settpAmb] = useState<number>(1); // Fixed default to number
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>("");
+  const [showReportPopUp, setShowReportPopUp] = useState(false);
+  const [reportPassword, setReportPassword] = useState<string>("");
   const [selectedNfcom, setSelectedNfcom] = useState<NFComResult | null>(null);
   const [serie, setSerie] = useState<string>("");
   const [status, setStatus] = useState<string>("");
@@ -210,6 +213,7 @@ export default function SearchInterface() {
     }
 
     try {
+      setShowReportPopUp(false);
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/NFCom/generateReportPdf`,
         {
@@ -223,6 +227,7 @@ export default function SearchInterface() {
           dataFim: new Date(dataFim || new Date()).toLocaleDateString("pt-BR", {
             timeZone: "America/Sao_Paulo",
           }),
+          password: reportPassword,
         },
         {
           headers: {
@@ -769,7 +774,7 @@ export default function SearchInterface() {
                   {loading ? "Buscando..." : "Buscar"}
                 </button>
                 <button
-                  onClick={generateReportPdf}
+                  onClick={() => setShowReportPopUp(true)}
                   disabled={loading}
                   className="px-5 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-700 transition-all font-medium flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
@@ -810,6 +815,14 @@ export default function SearchInterface() {
             setPassword={setPassword}
             password={password}
             cancelNFCom={confirmCancellation}
+          />
+
+          <PopUpReportPassword
+            setShowPopUp={setShowReportPopUp}
+            showPopUp={showReportPopUp}
+            setPassword={setReportPassword}
+            password={reportPassword}
+            generateReport={generateReportPdf}
           />
 
           <SelectAllPopUp

@@ -32,6 +32,14 @@ import { Jobs } from "../entities/Jobs";
 import AppDataSource from "../database/MkauthSource";
 dotenv.config();
 
+interface CertificadoDados {
+  nomeEmpresa: string;
+  cnpj: string;
+  numeroSerie: string;
+  validade: string;
+  emissor: string;
+}
+
 // Interfaces para tipagem dos dados da NFCom
 export interface INFComData {
   /** Bloco de Identificação da NFCom (ide) */
@@ -1740,10 +1748,14 @@ class Nfcom {
   private async generatePdf(
     nfcom: NFCom[],
     dataInicio: string,
-    dataFim: string
+    dataFim: string,
+    password: string,
+    p12FileBase64: string
   ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       try {
+        const dadosCert = this.extractCertData(p12FileBase64, password);
+
         const doc = new PDFDocument();
         const buffers: Buffer[] = [];
 
@@ -1797,11 +1809,18 @@ class Nfcom {
 
         doc.text(`Total: ${valorFormatado}`);
         doc.moveDown();
-        doc.text("Certificado Digital Utilizado na Assinatura Digital:");
-        doc.text("WIP TELECOM MULTIMIDIA LTDA: 20.843.290/0001-42");
-        doc.text("Numero de Serie: 280EF663570172E9");
-        doc.text("Validade: 27/06/2026");
-        doc.text("Emissor: AC VALID RFB V5");
+        if (dadosCert) {
+          // Monta a string do nome + CNPJ conforme seu exemplo
+          const linhaIdentificacao = dadosCert.cnpj
+            ? `${dadosCert.nomeEmpresa}: ${dadosCert.cnpj}`
+            : dadosCert.nomeEmpresa;
+
+          doc.text("Certificado Digital Utilizado na Assinatura Digital:");
+          doc.text(linhaIdentificacao); // Ex: WIP TELECOM... : 20.843...
+          doc.text(`Numero de Serie: ${dadosCert.numeroSerie}`);
+          doc.text(`Validade: ${dadosCert.validade}`);
+          doc.text(`Emissor: ${dadosCert.emissor}`);
+        }
 
         doc.end();
       } catch (error) {
@@ -1809,6 +1828,79 @@ class Nfcom {
       }
     });
   }
+
+  private extractCertData = (
+    p12Base64: string,
+    password: string
+  ): CertificadoDados | null => {
+    try {
+      // 1. Decodificar o Base64 para binário
+      const p12Der = forge.util.decode64(p12Base64);
+      const p12Asn1 = forge.asn1.fromDer(p12Der);
+
+      // 2. Abrir o PKCS#12 com a senha
+      const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
+
+      // 3. Encontrar a "bag" que contém o certificado do usuário
+      // O ID 1.2.840.113549.1.12.10.1.3 corresponde a pkcs-12-certBag
+      const bags = p12.getBags({ bagType: forge.pki.oids.certBag });
+
+      // Pega o primeiro certificado encontrado (geralmente é o do usuário)
+      const certBag = bags[forge.pki.oids.certBag]?.[0];
+
+      if (!certBag) {
+        throw new Error("Certificado não encontrado no arquivo P12.");
+      }
+
+      const cert = certBag.cert;
+      if (!cert) return null;
+
+      // --- Extração dos Dados ---
+
+      // A. Nome e CNPJ (Geralmente no Common Name "CN")
+      // Certificados BR geralmente são: "NOME DA EMPRESA:CNPJ" ou apenas o Nome
+      const cnAttr = cert.subject.getField("CN");
+      const commonName = cnAttr ? cnAttr.value : "";
+
+      // Tenta separar Nome e CNPJ se estiverem juntos (padrão ICP-Brasil antigo e atual misturados)
+      let nomeEmpresa = commonName;
+      let cnpj = "";
+
+      if (commonName.includes(":")) {
+        const parts = commonName.split(":");
+        nomeEmpresa = parts[0];
+        cnpj = parts[1]; // O CNPJ bruto
+      }
+
+      // B. Número de Série (Vem em hex, convertemos para UpperCase)
+      const numeroSerie = cert.serialNumber.toUpperCase();
+
+      // C. Validade (Formata data)
+      const validade = cert.validity.notAfter;
+      const validadeFormatada = validade.toLocaleDateString("pt-BR");
+
+      // D. Emissor (Common Name do Issuer)
+      const issuerAttr = cert.issuer.getField("CN");
+      const emissor = issuerAttr ? issuerAttr.value : "Desconhecido";
+
+      return {
+        nomeEmpresa,
+        cnpj: this.formatarCNPJ(cnpj), // Função auxiliar para pontuação
+        numeroSerie,
+        validade: validadeFormatada,
+        emissor,
+      };
+    } catch (error) {
+      console.error("Erro ao ler certificado:", error);
+      return null;
+    }
+  };
+
+  // Função auxiliar simples para formatar CNPJ
+  private formatarCNPJ = (v: string) => {
+    v = v.replace(/\D/g, "");
+    return v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+  };
 
   private converterLinhaDigitavelParaBarras = (linha: string): string => {
     // Remove qualquer caractere que não seja número
@@ -2473,7 +2565,7 @@ class Nfcom {
 
   public generateReportPdf = async (req: Request, res: Response) => {
     try {
-      const { nNF, dataInicio, dataFim } = req.body;
+      const { nNF, dataInicio, dataFim, password } = req.body;
       console.log(nNF, dataInicio, dataFim);
 
       const NFComRepository = DataSource.getRepository(NFCom);
@@ -2486,7 +2578,19 @@ class Nfcom {
         res.status(404).json({ error: "NFCom não encontrada" });
         return;
       }
-      const pdf = await this.generatePdf(nfcom, dataInicio, dataFim);
+
+      let pfxFileBase64 = Buffer.from(
+        "../files/certificado.pfx",
+        "base64"
+      ).toString("binary");
+
+      const pdf = await this.generatePdf(
+        nfcom,
+        dataInicio,
+        dataFim,
+        password,
+        pfxFileBase64
+      );
       res.set("Content-Type", "application/pdf");
       res.set(
         "Content-Disposition",
