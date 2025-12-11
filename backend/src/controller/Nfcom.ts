@@ -521,12 +521,16 @@ class Nfcom {
     }
   };
 
-  public async getNfcomByChaveDeOlhoNoImposto() {
+  public async getNfcomByChaveDeOlhoNoImposto(req?: Request, res?: Response) {
     const response = await axios.get(
       `https://apidoni.ibpt.org.br/api/v1/servicos?token=${process.env.OLHO_NO_IMPOSTO_TOKEN}&cnpj=${process.env.OLHO_NO_IMPOSTO_CNPJ}&codigo=${process.env.OLHO_NO_IMPOSTO_CODIGO}&uf=${process.env.OLHO_NO_IMPOSTO_UF}&descricao=${process.env.OLHO_NO_IMPOSTO_DESCRICAO}&unidadeMedida=${process.env.OLHO_NO_IMPOSTO_UNIDADEMEDIDA}&valor=${process.env.OLHO_NO_IMPOSTO_VALOR}`
     );
 
-    return response.data;
+    if (req || res) {
+      res?.status(200).json(response.data);
+    } else {
+      return response.data;
+    }
   }
 
   private async processarFilaBackground(
@@ -1883,11 +1887,6 @@ class Nfcom {
         const qrCodeValue = supl
           ? supl.qrCodNFCom || supl["ns:qrCodNFCom"]
           : nfcom.qrcodeLink;
-
-        console.log("QR Code Debug:", {
-          suplKeys: supl ? Object.keys(supl) : "no-supl",
-          extractedValue: qrCodeValue,
-        });
 
         const data = {
           ide: inf.ide,

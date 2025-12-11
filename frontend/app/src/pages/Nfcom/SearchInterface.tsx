@@ -485,19 +485,33 @@ export default function SearchInterface() {
   };
 
   useEffect(() => {
-    const exec = async () => {
-      const response = await axios.get(
-        `${process.env.REACT_APP_URL}/NFCom/getNfcomByChaveDeOlhoNoImposto`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      setChaveDeOlhoNoImposto(response.data.Chave);
-    };
-    exec();
+    try {
+      const exec = async () => {
+        const response = await axios.get(
+          `${process.env.REACT_APP_URL}/NFCom/getNfcomByChaveDeOlhoNoImposto`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        console.log(response.data);
+        setChaveDeOlhoNoImposto(response.data.Chave);
+      };
+      exec();
+    } catch (error) {
+      console.error("Erro ao buscar NFCom:", error);
+      if (axios.isAxiosError(error) && error.response) {
+        showError(
+          `Erro ao buscar NFCom: ${
+            error.response.data.erro || "Erro desconhecido."
+          }`
+        );
+      } else {
+        showError("Erro de rede. Verifique sua conexão e tente novamente.");
+      }
+    }
   }, []);
 
   return (
