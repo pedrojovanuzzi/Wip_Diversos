@@ -272,6 +272,7 @@ export const BuscarNfeGerada = () => {
 
   useEffect(() => {
     handleSearch();
+    setShowPasswordPopUp(true);
   }, []);
 
   return (
