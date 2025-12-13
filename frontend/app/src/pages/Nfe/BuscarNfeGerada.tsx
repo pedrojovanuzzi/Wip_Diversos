@@ -391,20 +391,6 @@ export const BuscarNfeGerada = () => {
                 </div>
               </div>
 
-              {/* Filtros Extras (Planos, Vencimentos - Mantidos do componente antigo) */}
-              <div className="border-t pt-4 mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">
-                  Filtros Adicionais:
-                </p>
-                <Filter
-                  setActiveFilters={setActiveFilters}
-                  setDate={setDateFilter}
-                  setArquivo={setArquivo}
-                  enviarCertificado={handleEnviarCertificado as any}
-                  BuscarNfe={false}
-                />
-              </div>
-
               {/* Botões de Ação do Form */}
               <div className="flex justify-end gap-3 flex-wrap">
                 <button
@@ -416,7 +402,7 @@ export const BuscarNfeGerada = () => {
                 </button>
                 <button
                   className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-500 transition-all flex items-center gap-2"
-                  onClick={enviarCertificado}
+                  onClick={handleEnviarCertificado}
                   disabled={!arquivo}
                 >
                   <IoArrowUpCircleOutline className="text-xl" />

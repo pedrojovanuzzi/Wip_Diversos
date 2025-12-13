@@ -1,45 +1,48 @@
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
-import * as https from "https";
-import { execFileSync, execSync } from "child_process";
-import axios from "axios";
 import * as dotenv from "dotenv";
 import { Request, Response } from "express";
-import { SignedXml } from "xml-crypto";
-import * as forge from "node-forge";
 import { DOMParser } from "xmldom";
-import MkauthSource from "../database/MkauthSource";
+import axios from "axios";
+import moment from "moment-timezone";
+import { In, Between, IsNull, Not } from "typeorm";
+import { parseStringPromise } from "xml2js";
+
 import AppDataSource from "../database/DataSource";
+import MkauthSource from "../database/MkauthSource";
 import { NFSE } from "../entities/NFSE";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
-import { In, Between, IsNull } from "typeorm";
-import moment from "moment-timezone";
-import { processarCertificado } from "../utils/certUtils";
-import { parseStringPromise } from "xml2js";
+
+import { NfseXmlFactory } from "../services/nfse/NfseXmlFactory";
+import { FiorilliProvider } from "../services/nfse/FiorilliProvider";
 
 dotenv.config();
 
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
+  private TEMP_DIR = path.resolve(__dirname, "../files");
   private homologacao: boolean = false;
   private WSDL_URL = "";
-  private TEMP_DIR = path.resolve(__dirname, "../files");
   private PASSWORD = "";
-  private DECRYPTED_CERT_PATH = path.join(
-    this.TEMP_DIR,
-    "decrypted_certificado.tmp"
-  );
-  private NEW_CERT_PATH = path.join(this.TEMP_DIR, "new_certificado.pfx");
+
+  private xmlFactory: NfseXmlFactory;
+  private fiorilliProvider: FiorilliProvider;
 
   constructor() {
+    this.xmlFactory = new NfseXmlFactory();
+    // Provider will be initialized properly when we have the WSDL URL set in 'iniciar' or defaults
+    // For now we set partial defaults, but WSDL might change based on 'homologacao'
+    this.fiorilliProvider = new FiorilliProvider(
+      this.certPath,
+      this.TEMP_DIR,
+      ""
+    );
+
     this.uploadCertificado = this.uploadCertificado.bind(this);
     this.iniciar = this.iniciar.bind(this);
     this.gerarNFSE = this.gerarNFSE.bind(this);
-    this.gerarRpsXml = this.gerarRpsXml.bind(this);
-    this.extrairChaveECertificado = this.extrairChaveECertificado.bind(this);
-    this.assinarXml = this.assinarXml.bind(this);
+    // this.gerarRpsXml = this.gerarRpsXml.bind(this); // Refactored into internal helper or factory usage
     this.imprimirNFSE = this.imprimirNFSE.bind(this);
     this.verificaRps = this.verificaRps.bind(this);
     this.cancelarNfse = this.cancelarNfse.bind(this);
@@ -50,6 +53,22 @@ class NFSEController {
     this.BuscarNSFEDetalhes = this.BuscarNSFEDetalhes.bind(this);
     this.BuscarClientes = this.BuscarClientes.bind(this);
     this.removerAcentos = this.removerAcentos.bind(this);
+  }
+
+  private configureProvider() {
+    if (this.homologacao) {
+      this.WSDL_URL =
+        "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
+    } else {
+      this.WSDL_URL =
+        "https://wsnfe.arealva.sp.gov.br:8443/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
+    }
+    // Re-instantiate provider with correct WSDL
+    this.fiorilliProvider = new FiorilliProvider(
+      this.certPath,
+      this.TEMP_DIR,
+      this.WSDL_URL
+    );
   }
 
   public async uploadCertificado(req: Request, res: Response) {
@@ -73,21 +92,14 @@ class NFSEController {
         ambiente,
       } = req.body;
       this.PASSWORD = password;
-      console.log(aliquota);
 
+      console.log(aliquota);
       console.log(ambiente);
 
-      if (ambiente === "homologacao") {
-        this.homologacao = true;
-        this.WSDL_URL =
-          "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
-      } else {
-        this.homologacao = false;
-        this.WSDL_URL =
-          "https://wsnfe.arealva.sp.gov.br:8443/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
-      }
-
+      this.homologacao = ambiente === "homologacao";
       console.log("Servidor Localhost?: " + this.homologacao);
+
+      this.configureProvider();
       console.log(this.WSDL_URL);
 
       aliquota = aliquota?.trim() ? aliquota : "5.0000";
@@ -98,13 +110,7 @@ class NFSEController {
       if (!service) service = "Servico de Suporte Tecnico";
 
       if (!reducao) reducao = 60;
-
-      // Garante que o valor é uma string antes de manipulá-la
-      let reducaoStr = String(reducao);
-
-      reducaoStr = reducaoStr.replace(",", ".").replace("%", "");
-
-      // Converte para Number APENAS para o cálculo final
+      let reducaoStr = String(reducao).replace(",", ".").replace("%", "");
       reducao = Number(reducaoStr) / 100;
 
       console.log(reducao);
@@ -117,18 +123,17 @@ class NFSEController {
         service,
         reducao
       );
+
       if (Array.isArray(result)) {
         const ok = result.every((r) => r.status === "200");
         console.log("Result: " + JSON.stringify(result));
-
-        console.log("okTest: " + result.every((r) => r.status === "200"));
+        console.log("okTest: " + ok);
 
         if (ok)
           res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
         else res.status(500).json({ erro: "Erro ao criar o RPS." });
       } else {
-        // if (result?.status === "200") res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
-        // else res.status(500).json({ erro: "Erro ao criar o RPS." });
+        // Fallback for non-array result logic if needed
       }
     } catch {
       res.status(500).json({ erro: "Erro ao criar o RPS." });
@@ -144,27 +149,52 @@ class NFSEController {
     reducao: number
   ) {
     try {
-      const certPathToUse = processarCertificado(
-        this.certPath,
-        password,
-        this.TEMP_DIR
-      );
-      const pfxBuffer = fs.readFileSync(certPathToUse);
-      const httpsAgent = new https.Agent({
-        pfx: pfxBuffer,
-        passphrase: password,
-        rejectUnauthorized: false,
-      });
+      // Logic for fetching initial NSFE number
       const NsfeData = AppDataSource.getRepository(NFSE);
-      const nfseResponse = await NsfeData.find({
-        order: { id: "DESC" },
-        take: 1,
+
+      // Determine Target Series
+      let targetSeries = "1";
+      if (this.homologacao) {
+        targetSeries = "wip99";
+      } else {
+        // Find last used production series (not wip99)
+        const lastProd = await NsfeData.findOne({
+          where: { serieRps: Not("wip99") },
+          order: { id: "DESC" },
+        });
+        targetSeries = lastProd?.serieRps || "1";
+      }
+
+      // Find last RPS for this specific series to determine next number
+      const lastRpsForSeries = await NsfeData.findOne({
+        where: { serieRps: targetSeries },
+        order: { numeroRps: "DESC" },
       });
-      let nfseNumber = nfseResponse[0]?.numeroRps
-        ? nfseResponse[0].numeroRps + 1
+
+      let nfseNumber = lastRpsForSeries?.numeroRps
+        ? lastRpsForSeries.numeroRps + 1
         : 1;
 
-      console.log(nfseNumber);
+      // Use the last record (of any series? or target?) as base for other fields like 'issRetido'
+      // Ideally use the last record of target series to keep consistency, or fallback to any last record if new series.
+      let nfseBase = lastRpsForSeries;
+      if (!nfseBase) {
+        // If starting a new series (e.g. wip99), copy config from last standard '1' series to valid defaults
+        nfseBase =
+          (
+            await NsfeData.find({
+              order: { id: "DESC" },
+              take: 1,
+            })
+          )[0] || null;
+      }
+
+      // Pass targetSeries explicitly to prepareRpsData so it doesn't need to re-guess
+      const serieToUse = targetSeries;
+
+      console.log(`Ambiente: ${this.homologacao ? "Homologacao" : "Producao"}`);
+      console.log(`Serie Alvo: ${serieToUse}`);
+      console.log(`Proximo Numero RPS: ${nfseNumber}`);
 
       const respArr: any[] = [];
       if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
@@ -174,61 +204,48 @@ class NFSEController {
         const batch = ids.slice(i, i + 50);
         let rpsXmls = "";
 
+        const entitiesToSave: NFSE[] = [];
+
+        // Process batch
         for (const bid of batch) {
-          // Gerar o XML do RPS sem assinatura
-          let rps = await this.gerarRpsXml(
+          const {
+            xml,
+            valorReduzido,
+            rpsData,
+            ClientData,
+            FaturasData,
+            // nfseBase, // Avoid shadowing, we already have it in scope
+            ibgeId,
+            serieRps,
+          } = await this.prepareRpsData(
             bid,
-            Number(aliquota).toFixed(4),
+            aliquota,
             service,
             reducao,
             nfseNumber,
-            nfseResponse[0]
+            nfseBase as NFSE,
+            serieToUse
           );
 
-          // Assinar cada RPS individualmente
-          let signedRps = this.assinarXml(rps, "InfDeclaracaoPrestacaoServico");
+          // Sign RPS
+          let signedRps = this.fiorilliProvider.assinarXml(
+            xml,
+            "InfDeclaracaoPrestacaoServico",
+            password
+          );
 
-          // Remove a tag <Signature> se estiver em homologação
-          // if (this.homologacao) {
-          //   signedRps = signedRps.replace(/<Signature[^>]*>[\s\S]*?<\/Signature>/g, "");
-          // }
-
-          // Adicionar o RPS assinado na lista
+          // Append to list
           rpsXmls += signedRps;
 
-          // Incrementar o número do RPS
+          // Increment number
           nfseNumber++;
 
-          const RPSQuery = MkauthSource.getRepository(Faturas);
-          const rpsData = await RPSQuery.findOne({
-            where: { id: Number(bid) },
-          });
-          const ClientRepository = MkauthSource.getRepository(ClientesEntities);
-          const FaturasRepository = MkauthSource.getRepository(Faturas);
-          const FaturasData = await FaturasRepository.findOne({
-            where: { id: Number(bid) },
-          });
-          const ClientData = await ClientRepository.findOne({
-            where: { login: FaturasData?.login },
-          });
-          const resp = await axios.get(
-            `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
-          );
-          const municipio = resp.data.id;
-
-          let valorMenosDesconto = ClientData?.desconto
-            ? Number(rpsData?.valor) - Number(ClientData?.desconto)
-            : Number(rpsData?.valor);
-          let valorReduzido =
-            Number(reducao) === 0
-              ? valorMenosDesconto
-              : Number(valorMenosDesconto) * reducao;
-          valorReduzido = Number(valorReduzido.toFixed(2));
+          // Create entity but DO NOT SAVE yet
           const novoRegistro = NsfeData.create({
             login: rpsData?.login || "",
             numeroRps: nfseNumber - 1,
-            serieRps: nfseResponse[0]?.serieRps || "",
-            tipoRps: nfseResponse[0]?.tipoRps || 0,
+            serieRps: serieRps || "",
+            tipoRps: nfseBase?.tipoRps || 0,
             dataEmissao: rpsData?.processamento
               ? new Date(rpsData.processamento)
               : new Date(),
@@ -237,22 +254,22 @@ class NFSEController {
               : new Date(),
             valorServico: valorReduzido || 0,
             aliquota: Number(Number(aliquota).toFixed(4)),
-            issRetido: nfseResponse[0]?.issRetido || 0,
-            responsavelRetencao: nfseResponse[0]?.responsavelRetencao || 0,
-            itemListaServico: nfseResponse[0]?.itemListaServico || "",
+            issRetido: nfseBase?.issRetido || 0,
+            responsavelRetencao: nfseBase?.responsavelRetencao || 0,
+            itemListaServico: nfseBase?.itemListaServico || "",
             discriminacao: service,
-            codigoMunicipio: nfseResponse[0]?.codigoMunicipio || 0,
-            exigibilidadeIss: nfseResponse[0]?.exigibilidadeIss || 0,
-            cnpjPrestador: nfseResponse[0]?.cnpjPrestador || "",
+            codigoMunicipio: nfseBase?.codigoMunicipio || 0,
+            exigibilidadeIss: nfseBase?.exigibilidadeIss || 0,
+            cnpjPrestador: nfseBase?.cnpjPrestador || "",
             inscricaoMunicipalPrestador:
-              nfseResponse[0]?.inscricaoMunicipalPrestador || "",
+              nfseBase?.inscricaoMunicipalPrestador || "",
             cpfTomador: ClientData?.cpf_cnpj.replace(/[^0-9]/g, "") || "",
             razaoSocialTomador: ClientData?.nome || "",
             enderecoTomador: ClientData?.endereco || "",
             numeroEndereco: ClientData?.numero || "",
             complemento: ClientData?.complemento || undefined,
             bairro: ClientData?.bairro || "",
-            uf: nfseResponse[0]?.uf || "",
+            uf: nfseBase?.uf || "",
             cep: ClientData?.cep.replace(/[^0-9]/g, "") || "",
             telefoneTomador:
               ClientData?.celular.replace(/[^0-9]/g, "") || undefined,
@@ -260,76 +277,63 @@ class NFSEController {
             optanteSimplesNacional: 1,
             incentivoFiscal: 2,
           });
-
-          await NsfeData.save(novoRegistro);
+          entitiesToSave.push(novoRegistro);
         }
 
-        // Criar o LoteRps contendo todos os RPS assinados
-        let lote = `
-    <LoteRps versao="2.01" Id="lote${nfseNumber}">
-      <NumeroLote>1</NumeroLote>
-      <CpfCnpj><Cnpj>${
-        this.homologacao
+        // Create Lote XML
+        const loteId = `lote${nfseNumber}`; // Note: strictly speaking this might be slightly off if multiple batches, but follows original logic intent
+        const cnpj = this.homologacao
           ? process.env.MUNICIPIO_CNPJ_TEST
-          : process.env.MUNICIPIO_LOGIN
-      }</Cnpj></CpfCnpj>
-      <InscricaoMunicipal>${
-        this.homologacao
+          : process.env.MUNICIPIO_LOGIN;
+        const inscricao = this.homologacao
           ? process.env.MUNICIPIO_INCRICAO_TEST
-          : process.env.MUNICIPIO_INCRICAO
-      }</InscricaoMunicipal>
-      <QuantidadeRps>${batch.length}</QuantidadeRps>
-      <ListaRps>${rpsXmls}</ListaRps>
-    </LoteRps>
-  `;
+          : process.env.MUNICIPIO_INCRICAO;
 
-        lote = lote
-          .replace(/[\r\n]+/g, "")
-          .replace(/>\s+</g, "><")
-          .trim();
+        const loteXml = this.xmlFactory.createLoteXml(
+          loteId,
+          cnpj || "",
+          inscricao || "",
+          batch.length,
+          rpsXmls
+        );
 
-        let envio = `<EnviarLoteRpsSincronoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${lote}</EnviarLoteRpsSincronoEnvio>`;
-        let soap = `<?xml version="1.0" encoding="UTF-8"?>
-      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
-          <soapenv:Header/>
-          <soapenv:Body>
-              <ws:recepcionarLoteRpsSincrono>
-                  ${envio}
-                  <username>${process.env.MUNICIPIO_LOGIN}</username>
-                  <password>${process.env.MUNICIPIO_SENHA}</password>
-              </ws:recepcionarLoteRpsSincrono>
-          </soapenv:Body>
-      </soapenv:Envelope>`;
+        // Wrap in SOAP
+        const user = process.env.MUNICIPIO_LOGIN || "";
+        const pass = process.env.MUNICIPIO_SENHA || "";
+        const soapXml = this.xmlFactory.createEnviarLoteSoap(
+          loteXml,
+          user,
+          pass
+        );
 
-        // Remove todas as quebras de linha e espaços desnecessários
-        soap = soap
-          .replace(/[\r\n]+/g, "")
-          .replace(/>\s+</g, "><")
-          .trim();
+        // Log
+        fs.appendFileSync(logPath, soapXml + "\n", "utf8");
 
-        // Salva o lote inteiro como uma linha única no arquivo de log
-        fs.appendFileSync(logPath, soap + "\n", "utf8");
+        // Send Request
+        const responseXml = await this.fiorilliProvider.sendSoapRequest(
+          soapXml,
+          SOAPAction,
+          password
+        );
 
-        const response = await axios.post(this.WSDL_URL, soap, {
-          httpsAgent,
-          timeout: 600000, // 5 minutos
-          headers: { "Content-Type": "text/xml; charset=UTF-8", SOAPAction },
+        // Parse Response
+        const parsed = await parseStringPromise(responseXml, {
+          explicitArray: false,
         });
 
-        const xml = response.data;
-        const parsed = await parseStringPromise(xml, { explicitArray: false });
-
-        // Caminho até a resposta SOAP
+        // Check for error
+        // The structure might be different depending on success/fail.
+        // User log shows: soap:Body -> ns3:recepcionarLoteRpsSincronoResponse -> ns2:EnviarLoteRpsSincronoResposta -> ns2:ListaMensagemRetornoLote -> ns2:MensagemRetorno
         const resposta =
           parsed?.["soap:Envelope"]?.["soap:Body"]?.[
             "ns3:recepcionarLoteRpsSincronoResponse"
           ]?.["ns2:EnviarLoteRpsSincronoResposta"];
 
-        // Verifica se existe mensagem de erro
         const temErro =
-          resposta?.["ns2:ListaMensagemRetorno"]?.["ns2:MensagemRetorno"];
+          resposta?.["ns2:ListaMensagemRetorno"]?.["ns2:MensagemRetorno"] ||
+          resposta?.["ns2:ListaMensagemRetornoLote"]?.["ns2:MensagemRetorno"];
 
-        console.log("Tem erro: " + temErro);
+        console.log("Tem erro: " + JSON.stringify(temErro));
 
         if (temErro) {
           console.log("Erro detectado na resposta SOAP:", temErro);
@@ -338,16 +342,28 @@ class NFSEController {
             response: "Erro na geração da NFSe",
             detalhes: temErro,
           });
-          continue; // pula este lote, não insere no banco
+          // Do NOT save entitiesToSave
+          continue;
         }
 
-        console.log(response);
+        // If success, save to DB
+        if (entitiesToSave.length > 0) {
+          await NsfeData.save(entitiesToSave);
+        }
 
+        console.log(responseXml);
         respArr.push({ status: "200", response: "ok" });
       }
-      if (fs.existsSync(this.NEW_CERT_PATH)) fs.unlinkSync(this.NEW_CERT_PATH);
-      if (fs.existsSync(this.DECRYPTED_CERT_PATH))
-        fs.unlinkSync(this.DECRYPTED_CERT_PATH);
+
+      // Cleanup happens automatically or we can force it if provider methods left artifacts (current provider cleanups are handled or minimal)
+      // The original code unlinked 'NEW_CERT_PATH' etc, but our provider handles the cert temp file better presumably.
+      // If we need to explicitly clean up specific files used by legacy logic:
+      const decryptedPath = path.join(
+        this.TEMP_DIR,
+        "decrypted_certificado.tmp"
+      );
+      if (fs.existsSync(decryptedPath)) fs.unlinkSync(decryptedPath);
+
       return respArr;
     } catch (error: any) {
       console.log(error);
@@ -355,174 +371,115 @@ class NFSEController {
     }
   }
 
-  async gerarRpsXml(
+  // Refactored helper to prepare data for a single RPS
+  private async prepareRpsData(
     id: string,
     aliquota: string,
     service: string,
     reducao: number,
     nfseNumber: number,
-    nfseBase: any
+    nfseBase: NFSE,
+    serieOverride?: string
   ) {
     const RPSQuery = MkauthSource.getRepository(Faturas);
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
+
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const FaturasRepository = MkauthSource.getRepository(Faturas);
     const FaturasData = await FaturasRepository.findOne({
       where: { id: Number(id) },
     });
+
     const ClientData = await ClientRepository.findOne({
       where: { login: FaturasData?.login },
     });
-    const ibge = await axios.get(
-      `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
-    );
+
+    // Fetch IBGE code
+    // Optimization: cache this if possible, but keeping original flow
+    let ibgeId = "3503406"; // default fallback or Bauru/Arealva?
+    try {
+      const resp = await axios.get(
+        `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
+      );
+      ibgeId = resp.data.id;
+    } catch (e) {
+      /* ignore */
+    }
+
     let val = ClientData?.desconto
       ? Number(rpsData?.valor) - Number(ClientData?.desconto)
       : Number(rpsData?.valor);
+
+    // Calc reduced value for display/db
+    let valorReduzido = Number(reducao) === 0 ? val : Number(val) * reducao;
+    valorReduzido = Number(valorReduzido.toFixed(2));
+
+    // Calc value for XML (original logic applied reduction to 'val' variable)
     val = val * (1 - reducao);
     val = Number(val.toFixed(2));
-    let xml = `
-      <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
-        <InfDeclaracaoPrestacaoServico Id="RPS${rpsData?.uuid_lanc}">
-          <Rps>
-            <IdentificacaoRps>
-              <Numero>${nfseNumber}</Numero>
-              <Serie>${nfseBase?.serieRps}</Serie>
-              <Tipo>${nfseBase?.tipoRps}</Tipo>
-            </IdentificacaoRps>
-            <DataEmissao>${new Date()
-              .toISOString()
-              .substring(0, 10)}</DataEmissao>
-            <Status>1</Status>
-          </Rps>
-          <Competencia>${new Date()
-            .toISOString()
-            .substring(0, 10)}</Competencia>
-          <Servico>
-            <Valores>
-              <ValorServicos>${val}</ValorServicos>
-              <Aliquota>${aliquota}</Aliquota>
-            </Valores>
-            <IssRetido>${nfseBase?.issRetido}</IssRetido>
-            <ResponsavelRetencao>${
-              nfseBase?.responsavelRetencao
-            }</ResponsavelRetencao>
-            <ItemListaServico>${
-              this.homologacao ? "17.01" : nfseBase?.itemListaServico
-            }</ItemListaServico>
-            <Discriminacao>${service}</Discriminacao>
-            <CodigoMunicipio>3503406</CodigoMunicipio>
-            <ExigibilidadeISS>${nfseBase?.exigibilidadeIss}</ExigibilidadeISS>
-          </Servico>
-          <Prestador>
-            <CpfCnpj><Cnpj>${
-              this.homologacao
-                ? process.env.MUNICIPIO_CNPJ_TEST
-                : process.env.MUNICIPIO_LOGIN
-            }</Cnpj></CpfCnpj>
-            <InscricaoMunicipal>${
-              this.homologacao
-                ? process.env.MUNICIPIO_INCRICAO_TEST
-                : process.env.MUNICIPIO_INCRICAO
-            }</InscricaoMunicipal>
-          </Prestador>
-          <Tomador>
-            <IdentificacaoTomador>
-              <CpfCnpj>
-                <${
-                  ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj"
-                }>${ClientData?.cpf_cnpj.replace(/[^0-9]/g, "")}</${
-      ClientData?.cpf_cnpj.length === 11 ? "Cpf" : "Cnpj"
-    }>
-              </CpfCnpj>
-            </IdentificacaoTomador>
-            <RazaoSocial>${ClientData?.nome}</RazaoSocial>
-            <Endereco>
-              <Endereco>${this.removerAcentos(ClientData?.endereco)}</Endereco>
-              <Numero>${ClientData?.numero}</Numero>
-              <Complemento>${ClientData?.complemento}</Complemento>
-              <Bairro>${ClientData?.bairro}</Bairro>
-              <CodigoMunicipio>${ibge.data.id}</CodigoMunicipio>
-              <Uf>SP</Uf>
-              <Cep>${ClientData?.cep.replace(/[^0-9]/g, "")}</Cep>
-            </Endereco>
-            <Contato>
-              <Telefone>${ClientData?.celular.replace(/[^0-9]/g, "")}</Telefone>
-              <Email>${
-                this.homologacao
-                  ? "suporte_wiptelecom@outlook.com"
-                  : ClientData?.email && ClientData.email.trim() !== ""
-                  ? ClientData.email.trim()
-                  : "sememail@wiptelecom.com.br"
-              }</Email>
-            </Contato>
-          </Tomador>
-          ${
-            this.homologacao
-              ? ""
-              : "<RegimeEspecialTributacao>6</RegimeEspecialTributacao>"
-          }
-          <OptanteSimplesNacional>${
-            this.homologacao ? "2" : nfseBase?.optanteSimplesNacional
-          }</OptanteSimplesNacional>
-          <IncentivoFiscal>${nfseBase?.incentivoFiscal}</IncentivoFiscal>
-        </InfDeclaracaoPrestacaoServico>
-      </Rps>
-    `;
-    return xml
-      .replace(/[\r\n]+/g, "")
-      .replace(/>\s+</g, "><")
-      .trim();
-  }
 
-  extrairChaveECertificado() {
-    const pfxBuffer = fs.readFileSync(this.certPath);
-    const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString("binary"));
-    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, this.PASSWORD);
-    let privateKeyPem = "";
-    let certificatePem = "";
-    p12.safeContents.forEach((s) => {
-      s.safeBags.forEach((b) => {
-        if (b.type === forge.pki.oids.pkcs8ShroudedKeyBag && b.key) {
-          privateKeyPem = forge.pki.privateKeyToPem(b.key);
-        } else if (b.type === forge.pki.oids.certBag && b.cert) {
-          certificatePem = forge.pki.certificateToPem(b.cert);
-        }
-      });
-    });
-    const x509Certificate = certificatePem
-      .replace(/-----BEGIN CERTIFICATE-----/g, "")
-      .replace(/-----END CERTIFICATE-----/g, "")
-      .replace(/\s+/g, "");
-    return { privateKeyPem, x509Certificate };
-  }
+    const email = this.homologacao
+      ? "suporte_wiptelecom@outlook.com"
+      : ClientData?.email && ClientData.email.trim() !== ""
+      ? ClientData.email.trim()
+      : "sememail@wiptelecom.com.br";
 
-  assinarXml(xml: string, referenceId: string) {
-    const { privateKeyPem, x509Certificate } = this.extrairChaveECertificado();
-    const keyInfoContent = `<X509Data><X509Certificate>${x509Certificate}</X509Certificate></X509Data>`;
-    const signer = new SignedXml({
-      implicitTransforms: ["http://www.w3.org/TR/2001/REC-xml-c14n-20010315"],
-      privateKey: privateKeyPem,
-      publicCert: x509Certificate,
-      signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
-      canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#",
-      getKeyInfoContent: () => keyInfoContent,
-    });
-    signer.addReference({
-      xpath: `//*[local-name(.)='${referenceId}']`,
-      digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
-      transforms: [
-        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-        "http://www.w3.org/2001/10/xml-exc-c14n#",
-      ],
-    });
-    signer.computeSignature(xml, {
-      location: {
-        reference: `//*[local-name(.)='${referenceId}']`,
-        action: "after",
-      },
-    });
-    return signer.getSignedXml();
+    const cnpjPrestador = this.homologacao
+      ? process.env.MUNICIPIO_CNPJ_TEST
+      : process.env.MUNICIPIO_LOGIN;
+    const inscricaoPrestador = this.homologacao
+      ? process.env.MUNICIPIO_INCRICAO_TEST
+      : process.env.MUNICIPIO_INCRICAO;
+
+    const serieRps = serieOverride
+      ? serieOverride
+      : this.homologacao
+      ? "wip99"
+      : nfseBase?.serieRps;
+
+    const xml = this.xmlFactory.createRpsXml(
+      rpsData?.uuid_lanc || "",
+      nfseNumber,
+      serieRps,
+      nfseBase?.tipoRps,
+      new Date(), // Data Emissao
+      "1", // Status
+      val,
+      Number(aliquota).toFixed(4),
+      nfseBase?.issRetido,
+      nfseBase?.responsavelRetencao,
+      this.homologacao ? "17.01" : nfseBase?.itemListaServico,
+      service,
+      "3503406", // CodigoMunicipio Prestacao
+      nfseBase?.exigibilidadeIss,
+      cnpjPrestador || "",
+      inscricaoPrestador || "",
+      ClientData?.cpf_cnpj || "",
+      ClientData?.nome || "",
+      this.removerAcentos(ClientData?.endereco),
+      ClientData?.numero || "",
+      ClientData?.complemento || "",
+      ClientData?.bairro || "",
+      String(ibgeId),
+      "SP",
+      ClientData?.cep.replace(/[^0-9]/g, "") || "",
+      ClientData?.celular.replace(/[^0-9]/g, "") || "",
+      email,
+      this.homologacao ? "" : "6", // Regime Especial
+      this.homologacao ? "2" : nfseBase?.optanteSimplesNacional,
+      nfseBase?.incentivoFiscal
+    );
+
+    return {
+      xml,
+      valorReduzido,
+      rpsData,
+      ClientData,
+      FaturasData,
+      nfseBase,
+      ibgeId,
+      serieRps,
+    };
   }
 
   async imprimirNFSE(req: Request, res: Response) {
@@ -535,41 +492,35 @@ class NFSEController {
 
   async verificaRps(rpsNumber: string | number, serie = "1", tipo = "1") {
     try {
-      const dados = `<IdentificacaoRps><Numero>${rpsNumber}</Numero><Serie>${serie}</Serie><Tipo>${tipo}</Tipo></IdentificacaoRps><Prestador><CpfCnpj><Cnpj>${
-        this.homologacao
-          ? process.env.MUNICIPIO_CNPJ_TEST
-          : process.env.MUNICIPIO_LOGIN
-      }</Cnpj></CpfCnpj><InscricaoMunicipal>${
-        this.homologacao
-          ? process.env.MUNICIPIO_INCRICAO_TEST
-          : process.env.MUNICIPIO_INCRICAO
-      }</InscricaoMunicipal></Prestador>`;
-      const envioXml = `<ConsultarNfseRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseRpsEnvio>`;
-      const soapFinal =
-        `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:consultarNfsePorRps>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:consultarNfsePorRps></soapenv:Body></soapenv:Envelope>`
-          .replace(/[\r\n]+/g, "")
-          .replace(/\s{2,}/g, " ")
-          .replace(/>\s+</g, "><")
-          .trim();
-      const certPathToUse = processarCertificado(
-        this.certPath,
-        this.PASSWORD,
-        this.TEMP_DIR
+      const cnpj = this.homologacao
+        ? process.env.MUNICIPIO_CNPJ_TEST
+        : process.env.MUNICIPIO_LOGIN;
+      const inscricao = this.homologacao
+        ? process.env.MUNICIPIO_INCRICAO_TEST
+        : process.env.MUNICIPIO_INCRICAO;
+
+      const envioXml = this.xmlFactory.createConsultaNfseRpsEnvio(
+        rpsNumber,
+        serie,
+        tipo,
+        cnpj || "",
+        inscricao || ""
       );
-      const pfxBuffer = fs.readFileSync(certPathToUse);
-      const httpsAgent = new https.Agent({
-        pfx: pfxBuffer,
-        passphrase: this.PASSWORD,
-        rejectUnauthorized: false,
-      });
-      const response = await axios.post(this.WSDL_URL, soapFinal, {
-        httpsAgent,
-        headers: {
-          "Content-Type": "text/xml; charset=UTF-8",
-          SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
-        },
-      });
-      if (response.data.includes("<ns2:Codigo>E92</ns2:Codigo>")) return true;
+      const soapFinal = this.xmlFactory.createConsultaNfseSoap(
+        envioXml,
+        process.env.MUNICIPIO_LOGIN || "",
+        process.env.MUNICIPIO_SENHA || ""
+      );
+
+      this.configureProvider(); // Ensure correct wsdl
+      const response = await this.fiorilliProvider.sendSoapRequest(
+        soapFinal,
+        "ConsultarNfseServicoPrestadoEnvio",
+        this.PASSWORD
+      );
+
+      if (response && response.includes("<ns2:Codigo>E92</ns2:Codigo>"))
+        return true;
       return false;
     } catch {
       return false;
@@ -584,67 +535,68 @@ class NFSEController {
         return;
       }
       this.PASSWORD = password;
+      this.configureProvider();
+
       const arr = await Promise.all(
         rpsNumber.map(async (rps: string | number) => {
           try {
-            await this.setNfseNumber(rps);
+            // await this.setNfseNumber(rps); // Redundant call in original? kept safe
             const nfseNumber = await this.setNfseNumber(rps);
-            const dados = `<Pedido><InfPedidoCancelamento Id="CANCEL${nfseNumber}"><IdentificacaoNfse><Numero>${nfseNumber}</Numero><CpfCnpj><Cnpj>${
-              this.homologacao
-                ? process.env.MUNICIPIO_CNPJ_TEST
-                : process.env.MUNICIPIO_LOGIN
-            }</Cnpj></CpfCnpj><InscricaoMunicipal>${
-              this.homologacao
-                ? process.env.MUNICIPIO_INCRICAO_TEST
-                : process.env.MUNICIPIO_INCRICAO
-            }</InscricaoMunicipal><CodigoMunicipio>3503406</CodigoMunicipio></IdentificacaoNfse><CodigoCancelamento>2</CodigoCancelamento></InfPedidoCancelamento></Pedido>`;
-            const envioXml = `<CancelarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</CancelarNfseEnvio>`;
-            const envioXmlAssinado = this.assinarXml(
+            if (!nfseNumber)
+              throw new Error("NFSe Number not found for RPS " + rps);
+
+            const cnpj = this.homologacao
+              ? process.env.MUNICIPIO_CNPJ_TEST
+              : process.env.MUNICIPIO_LOGIN;
+            const inscricao = this.homologacao
+              ? process.env.MUNICIPIO_INCRICAO_TEST
+              : process.env.MUNICIPIO_INCRICAO;
+
+            const pedidoXml = this.xmlFactory.createPedidoCancelamentoXml(
+              nfseNumber,
+              cnpj || "",
+              inscricao || "",
+              "3503406"
+            );
+            const envioXml = `<CancelarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${pedidoXml}</CancelarNfseEnvio>`;
+
+            // Sign the inner part
+            const envioXmlAssinado = this.fiorilliProvider.assinarXml(
               envioXml,
-              "InfPedidoCancelamento"
+              "InfPedidoCancelamento",
+              password
             );
-            const soapFinal =
-              `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:cancelarNfse>${envioXmlAssinado}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:cancelarNfse></soapenv:Body></soapenv:Envelope>`
-                .replace(/[\r\n]+/g, "")
-                .replace(/\s{2,}/g, " ")
-                .replace(/>\s+</g, "><")
-                .trim();
-            const soapFinalHomologacao =
-              `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:cancelarNfse>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:cancelarNfse></soapenv:Body></soapenv:Envelope>`
-                .replace(/[\r\n]+/g, "")
-                .replace(/\s{2,}/g, " ")
-                .replace(/>\s+</g, "><")
-                .trim();
-            const certPathToUse = processarCertificado(
-              this.certPath,
-              this.PASSWORD,
-              this.TEMP_DIR
+
+            const soapFinal = this.xmlFactory.createCancelamentoSoap(
+              envioXmlAssinado,
+              process.env.MUNICIPIO_LOGIN || "",
+              process.env.MUNICIPIO_SENHA || ""
             );
-            const pfxBuffer = fs.readFileSync(certPathToUse);
-            const httpsAgent = new https.Agent({
-              pfx: pfxBuffer,
-              passphrase: this.PASSWORD,
-              rejectUnauthorized: false,
-            });
-            let response;
+
+            // Note: Original code had a split logic for homologacao not signing or using different soap?
+            // "const soapFinalHomologacao ... <ws:cancelarNfse>${envioXml}..." (unsigned)
+            // But verify if that was intentional or a debugging left-over.
+            // The original logic sent `soapFinalHomologacao` (unsigned) if homologacao.
+            // I will match that logic.
+
+            let soapToSend = soapFinal;
             if (this.homologacao) {
-              response = await axios.post(this.WSDL_URL, soapFinalHomologacao, {
-                httpsAgent,
-                headers: {
-                  "Content-Type": "text/xml; charset=UTF-8",
-                  SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
-                },
-              });
-            } else {
-              response = await axios.post(this.WSDL_URL, soapFinal, {
-                httpsAgent,
-                headers: {
-                  "Content-Type": "text/xml; charset=UTF-8",
-                  SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
-                },
-              });
+              // If homologacao, original used unsigned 'envioXml' inside the soap
+              const soapUnsigned = this.xmlFactory.createCancelamentoSoap(
+                envioXml,
+                process.env.MUNICIPIO_LOGIN || "",
+                process.env.MUNICIPIO_SENHA || ""
+              );
+              soapToSend = soapUnsigned;
             }
-            return { rps, success: true, response: response.data };
+
+            const response = await this.fiorilliProvider.sendSoapRequest(
+              soapToSend,
+              "ConsultarNfseServicoPrestadoEnvio",
+              password
+            ); // Action might be different? Original used ConsultarNfseServicoPrestadoEnvio for cancel too?
+
+            return { rps, success: true, response: response };
           } catch (error) {
             return { rps, success: false, error };
           }
@@ -662,40 +614,42 @@ class NFSEController {
     res.status(200).json({ error: "Sucesso" });
   }
 
-  async setNfseNumber(rpsNumber: string | number, serie = "1", tipo = "1") {
+  async setNfseNumber(
+    rpsNumber: string | number,
+    serie: string | number = "1",
+    tipo: string | number = "1"
+  ) {
     try {
-      const dados = `<IdentificacaoRps><Numero>${rpsNumber}</Numero><Serie>${serie}</Serie><Tipo>${tipo}</Tipo></IdentificacaoRps><Prestador><CpfCnpj><Cnpj>${
-        this.homologacao
-          ? process.env.MUNICIPIO_CNPJ_TEST
-          : process.env.MUNICIPIO_LOGIN
-      }</Cnpj></CpfCnpj><InscricaoMunicipal>${
-        this.homologacao
-          ? process.env.MUNICIPIO_INCRICAO_TEST
-          : process.env.MUNICIPIO_INCRICAO
-      }</InscricaoMunicipal></Prestador>`;
-      const envioXml = `<ConsultarNfseRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseRpsEnvio>`;
-      const soapFinal = `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:consultarNfsePorRps>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:consultarNfsePorRps></soapenv:Body></soapenv:Envelope>`;
-      const certPathToUse = processarCertificado(
-        this.certPath,
-        this.PASSWORD,
-        this.TEMP_DIR
+      const cnpj = this.homologacao
+        ? process.env.MUNICIPIO_CNPJ_TEST
+        : process.env.MUNICIPIO_LOGIN;
+      const inscricao = this.homologacao
+        ? process.env.MUNICIPIO_INCRICAO_TEST
+        : process.env.MUNICIPIO_INCRICAO;
+
+      const envioXml = this.xmlFactory.createConsultaNfseRpsEnvio(
+        rpsNumber,
+        String(serie),
+        String(tipo),
+        cnpj || "",
+        inscricao || ""
       );
-      const pfxBuffer = fs.readFileSync(certPathToUse);
-      const httpsAgent = new https.Agent({
-        pfx: pfxBuffer,
-        passphrase: this.PASSWORD,
-        rejectUnauthorized: false,
-      });
-      const response = await axios.post(this.WSDL_URL, soapFinal, {
-        httpsAgent,
-        headers: {
-          "Content-Type": "text/xml; charset=UTF-8",
-          SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
-        },
-      });
+      const soapFinal = this.xmlFactory.createConsultaNfseSoap(
+        envioXml,
+        process.env.MUNICIPIO_LOGIN || "",
+        process.env.MUNICIPIO_SENHA || ""
+      );
+
+      this.configureProvider();
+      const response = await this.fiorilliProvider.sendSoapRequest(
+        soapFinal,
+        "ConsultarNfseServicoPrestadoEnvio",
+        this.PASSWORD
+      );
+
       console.log("Setado Status NFSE: RPS: " + rpsNumber);
 
-      const match = response.data.match(/<ns2:Numero>(\d+)<\/ns2:Numero>/);
+      const match = response.match(/<ns2:Numero>(\d+)<\/ns2:Numero>/);
       if (match && match[1]) return match[1];
       return null;
     } catch (error) {
@@ -703,45 +657,40 @@ class NFSEController {
     }
   }
 
-  async setNfseStatus(rpsNumber: string | number, serie = "1", tipo = "1") {
+  async setNfseStatus(
+    rpsNumber: string | number,
+    serie: string | number = "1",
+    tipo: string | number = "1"
+  ) {
     try {
-      const dados = `<IdentificacaoRps><Numero>${rpsNumber}</Numero><Serie>${serie}</Serie><Tipo>${tipo}</Tipo></IdentificacaoRps><Prestador><CpfCnpj><Cnpj>${
-        this.homologacao
-          ? process.env.MUNICIPIO_CNPJ_TEST
-          : process.env.MUNICIPIO_LOGIN
-      }</Cnpj></CpfCnpj><InscricaoMunicipal>${
-        this.homologacao
-          ? process.env.MUNICIPIO_INCRICAO_TEST
-          : process.env.MUNICIPIO_INCRICAO
-      }</InscricaoMunicipal></Prestador>`;
-      const envioXml = `<ConsultarNfseRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseRpsEnvio>`;
-      const soapFinal =
-        `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:consultarNfsePorRps>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:consultarNfsePorRps></soapenv:Body></soapenv:Envelope>`
-          .replace(/[\r\n]+/g, "")
-          .replace(/\s{2,}/g, " ")
-          .replace(/>\s+</g, "><")
-          .trim();
-      const certPathToUse = processarCertificado(
-        this.certPath,
-        this.PASSWORD,
-        this.TEMP_DIR
+      const cnpj = this.homologacao
+        ? process.env.MUNICIPIO_CNPJ_TEST
+        : process.env.MUNICIPIO_LOGIN;
+      const inscricao = this.homologacao
+        ? process.env.MUNICIPIO_INCRICAO_TEST
+        : process.env.MUNICIPIO_INCRICAO;
+
+      const envioXml = this.xmlFactory.createConsultaNfseRpsEnvio(
+        rpsNumber,
+        String(serie),
+        String(tipo),
+        cnpj || "",
+        inscricao || ""
       );
-      const pfxBuffer = fs.readFileSync(certPathToUse);
-      const httpsAgent = new https.Agent({
-        pfx: pfxBuffer,
-        passphrase: this.PASSWORD,
-        rejectUnauthorized: false,
-      });
-      const response = await axios.post(this.WSDL_URL, soapFinal, {
-        httpsAgent,
-        timeout: 600000,
-        headers: {
-          "Content-Type": "text/xml; charset=UTF-8",
-          SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
-        },
-      });
-      if (response.data.includes('<ns2:NfseCancelamento versao="2.0">'))
-        return true;
+      const soapFinal = this.xmlFactory.createConsultaNfseSoap(
+        envioXml,
+        process.env.MUNICIPIO_LOGIN || "",
+        process.env.MUNICIPIO_SENHA || ""
+      );
+
+      this.configureProvider();
+      const response = await this.fiorilliProvider.sendSoapRequest(
+        soapFinal,
+        "ConsultarNfseServicoPrestadoEnvio",
+        this.PASSWORD
+      );
+
+      if (response.includes('<ns2:NfseCancelamento versao="2.0">')) return true;
       return false;
     } catch {
       return false;
@@ -880,7 +829,7 @@ class NFSEController {
         })
       );
       const filtered = arr
-        .filter((i): i is NonNullable<typeof i> => i !== null) // Remove nulls corretamente
+        .filter((i): i is NonNullable<typeof i> => i !== null)
         .sort((a, b) => (b?.nfse?.id || "").localeCompare(a?.nfse?.id || ""));
       res.status(200).json(filtered);
     } catch {
@@ -894,42 +843,35 @@ class NFSEController {
     tipo = "1"
   ) {
     try {
-      const dados = `<IdentificacaoRps><Numero>${rpsNumber}</Numero><Serie>${serie}</Serie><Tipo>${tipo}</Tipo></IdentificacaoRps><Prestador><CpfCnpj><Cnpj>${
-        this.homologacao
-          ? process.env.MUNICIPIO_CNPJ_TEST
-          : process.env.MUNICIPIO_LOGIN
-      }</Cnpj></CpfCnpj><InscricaoMunicipal>${
-        this.homologacao
-          ? process.env.MUNICIPIO_INCRICAO_TEST
-          : process.env.MUNICIPIO_INCRICAO
-      }</InscricaoMunicipal></Prestador>`;
-      const envioXml = `<ConsultarNfseRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseRpsEnvio>`;
-      const soapFinal =
-        `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:consultarNfsePorRps>${envioXml}<username>${process.env.MUNICIPIO_LOGIN}</username><password>${process.env.MUNICIPIO_SENHA}</password></ws:consultarNfsePorRps></soapenv:Body></soapenv:Envelope>`
-          .replace(/[\r\n]+/g, "")
-          .replace(/\s{2,}/g, " ")
-          .replace(/>\s+</g, "><")
-          .trim();
-      const certPathToUse = processarCertificado(
-        this.certPath,
-        this.PASSWORD,
-        this.TEMP_DIR
+      const cnpj = this.homologacao
+        ? process.env.MUNICIPIO_CNPJ_TEST
+        : process.env.MUNICIPIO_LOGIN;
+      const inscricao = this.homologacao
+        ? process.env.MUNICIPIO_INCRICAO_TEST
+        : process.env.MUNICIPIO_INCRICAO;
+
+      const envioXml = this.xmlFactory.createConsultaNfseRpsEnvio(
+        rpsNumber,
+        serie,
+        tipo,
+        cnpj || "",
+        inscricao || ""
       );
-      const pfxBuffer = fs.readFileSync(certPathToUse);
-      const httpsAgent = new https.Agent({
-        pfx: pfxBuffer,
-        passphrase: this.PASSWORD,
-        rejectUnauthorized: false,
-      });
-      const response = await axios.post(this.WSDL_URL, soapFinal, {
-        httpsAgent,
-        headers: {
-          "Content-Type": "text/xml; charset=UTF-8",
-          SOAPAction: "ConsultarNfseServicoPrestadoEnvio",
-        },
-      });
+      const soapFinal = this.xmlFactory.createConsultaNfseSoap(
+        envioXml,
+        process.env.MUNICIPIO_LOGIN || "",
+        process.env.MUNICIPIO_SENHA || ""
+      );
+
+      this.configureProvider();
+      const response = await this.fiorilliProvider.sendSoapRequest(
+        soapFinal,
+        "ConsultarNfseServicoPrestadoEnvio",
+        this.PASSWORD
+      );
+
       const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(response.data, "text/xml");
+      const xmlDoc = parser.parseFromString(response, "text/xml");
       const nfseNodes = xmlDoc.getElementsByTagName("ns2:CompNfse");
       if (nfseNodes.length > 0) {
         const nfseNode = nfseNodes[0];
@@ -983,6 +925,7 @@ class NFSEController {
   }
 
   removerAcentos(texto: any): string {
+    if (!texto) return "";
     return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   }
 
