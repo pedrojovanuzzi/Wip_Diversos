@@ -38,6 +38,8 @@ import SearchInterface from "./pages/Nfcom/SearchInterface";
 function App() {
   const { user, loading, logout } = useAuth();
 
+  console.log(user?.login);
+
   const manutencao = false;
 
   if (loading) {
@@ -76,7 +78,13 @@ function App() {
           />
           <Route
             path="/auth/login"
-            element={!user?.token ? <AuthPage /> : <Navigate to="/" />}
+            element={
+              !user?.token || (user?.permission || 0) < 1 ? (
+                <AuthPage />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
           />
           <Route
             path="/Create"

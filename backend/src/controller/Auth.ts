@@ -216,15 +216,31 @@ class Auth {
         return;
       }
 
-      jwt.verify(token, String(process.env.JWT_SECRET), (err, decoded) => {
-        if (err) {
-          res.status(401).json({ valid: false });
+      jwt.verify(
+        token,
+        String(process.env.JWT_SECRET),
+        async (err, decoded) => {
+          if (err) {
+            res.status(401).json({ valid: false });
+            return;
+          }
+
+          const decodedUser = jwt.decode(token, { complete: true, json: true });
+
+          const userRepository = DataSource.getRepository(User);
+          const user = await userRepository.findOne({
+            where: { id: decodedUser?.payload.id },
+          });
+
+          if (!user) {
+            res.status(401).json({ valid: false });
+            return;
+          }
+
+          res.json({ valid: true, user: user });
           return;
         }
-
-        res.json({ valid: true });
-        return;
-      });
+      );
     } catch (error) {
       res.status(401).json({ errors: [{ msg: "Ocorreu um Erro" }] });
     }
