@@ -649,8 +649,22 @@ class NFSEController {
 
       console.log("Setado Status NFSE: RPS: " + rpsNumber);
 
-      const match = response.match(/<ns2:Numero>(\d+)<\/ns2:Numero>/);
-      if (match && match[1]) return match[1];
+      const parsed = await parseStringPromise(response, {
+        explicitArray: false,
+      });
+
+      const compNfse =
+        parsed?.["soap:Envelope"]?.["soap:Body"]?.[
+          "ns3:consultarNfsePorRpsResponse"
+        ]?.["ns2:ConsultarNfseRpsResposta"]?.["ns2:CompNfse"];
+
+      // If CompNfse is array (multiple results?), take first
+      const nfseNode = Array.isArray(compNfse) ? compNfse[0] : compNfse;
+
+      const numeroNfse =
+        nfseNode?.["ns2:Nfse"]?.["ns2:InfNfse"]?.["ns2:Numero"];
+
+      if (numeroNfse) return numeroNfse;
       return null;
     } catch (error) {
       return error;
