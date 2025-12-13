@@ -3,7 +3,7 @@ import { body, validationResult } from "express-validator";
 import DataSource from "../database/DataSource";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 import { User } from "../entities/User";
 
 dotenv.config();
@@ -229,7 +229,7 @@ class Auth {
 
           const userRepository = DataSource.getRepository(User);
           const user = await userRepository.findOne({
-            where: { id: decodedUser?.payload.id },
+            where: { id: (decodedUser?.payload as JwtPayload).id },
           });
 
           if (!user) {
