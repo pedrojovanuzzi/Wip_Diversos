@@ -9,6 +9,8 @@ import PopUpButton from "./Components/PopUpButton";
 import Error from "./Components/Error";
 import Success from "./Components/Success";
 import { useAuth } from "../../context/AuthContext";
+import { BuscarNfeGerada } from "./BuscarNfeGerada";
+import { Link } from "react-router-dom";
 
 export const Nfe = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -206,6 +208,17 @@ export const Nfe = () => {
     <div>
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
+      <Link
+        className="flex justify-center sm:justify-start"
+        to="/BuscarNfeGerada"
+      >
+        <button
+          className="bg-violet-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
+          onClick={() => setShowPopUp(true)}
+        >
+          NF-es Geradas
+        </button>
+      </Link>
       <Filter
         setActiveFilters={setActiveFilters}
         setDate={setDateFilter}
