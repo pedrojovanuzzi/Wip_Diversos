@@ -21,6 +21,12 @@ interface NotificationContextData {
   addJob: (id: string, type: "cancelamento" | "emissao" | "relatório") => void;
 }
 
+// const NotificationContext = createContext<NotificationContextData>({
+//   showSuccess: () => {},
+//   showError: () => {},
+//   addJob: () => {},
+// });
+
 const NotificationContext = createContext<NotificationContextData>(
   {} as NotificationContextData
 );
