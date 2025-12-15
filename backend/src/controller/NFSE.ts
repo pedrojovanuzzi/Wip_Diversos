@@ -620,6 +620,8 @@ class NFSEController {
     tipo: string | number = "1"
   ) {
     try {
+      console.log(rpsNumber);
+
       const cnpj = this.homologacao
         ? process.env.MUNICIPIO_CNPJ_TEST
         : process.env.MUNICIPIO_LOGIN;
@@ -646,6 +648,8 @@ class NFSEController {
         "ConsultarNfseServicoPrestadoEnvio",
         this.PASSWORD
       );
+
+      console.log(response);
 
       console.log("Setado Status NFSE: RPS: " + rpsNumber);
 

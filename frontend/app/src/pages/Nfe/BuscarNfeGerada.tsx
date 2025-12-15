@@ -138,7 +138,7 @@ export const BuscarNfeGerada = () => {
   const setSessionPassword = async () => {
     try {
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/cancelarNfse`,
+        `${process.env.REACT_APP_URL}/Nfe/setSessionPassword`,
         {
           password: password,
         },
@@ -150,11 +150,11 @@ export const BuscarNfeGerada = () => {
         }
       );
       setSuccess("Senha atualizada");
-      window.location.reload();
+      handleSearch();
     } catch (erro) {
       console.error(erro);
     } finally {
-      setShowCancelPopUp(false);
+      setShowPasswordPopUp(false);
     }
   };
 
@@ -271,7 +271,7 @@ export const BuscarNfeGerada = () => {
   };
 
   useEffect(() => {
-    handleSearch();
+    // handleSearch();
     setShowPasswordPopUp(true);
   }, []);
 
