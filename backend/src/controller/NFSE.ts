@@ -279,6 +279,7 @@ class NFSEController {
             optanteSimplesNacional: 1,
             incentivoFiscal: 2,
             ambiente: ambiente,
+            status: "Ativa",
           });
           entitiesToSave.push(novoRegistro);
         }
@@ -881,7 +882,7 @@ class NFSEController {
                 null,
               incentivo_fiscal:
                 nfseValidas.map((nf) => nf.incentivoFiscal).join(", ") || null,
-              status: "Ativa",
+              status: nfseValidas.map((nf) => nf.status).join(", ") || null,
               numeroNfse: nfseNumberArray.join(", ") || null,
             },
           };

@@ -95,4 +95,7 @@ export class NFSE {
 
   @Column({ name: "ambiente", type: "varchar", length: 20 })
   ambiente!: string;
+
+  @Column({ name: "status", type: "varchar", length: 20 })
+  status!: string;
 }
