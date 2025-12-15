@@ -554,9 +554,9 @@ class NFSEController {
 
   async cancelarNfse(req: Request, res: Response) {
     try {
-      const { rpsNumber, password } = req.body;
-      if (!Array.isArray(rpsNumber)) {
-        res.status(400).json({ error: "rpsNumber must be an array" });
+      const { id, password } = req.body;
+      if (!Array.isArray(id)) {
+        res.status(400).json({ error: "id must be an array" });
         return;
       }
       this.PASSWORD = password;
@@ -565,11 +565,18 @@ class NFSEController {
       const nfseRepository = AppDataSource.getRepository(NFSE);
 
       const arr = await Promise.all(
-        rpsNumber.map(async (rps: string | number) => {
+        id.map(async (nfseId: string | number) => {
           try {
             const nfseEntity = await nfseRepository.findOne({
-              where: { numeroRps: Number(rps) },
+              where: { id: Number(nfseId) },
             });
+
+            if (!nfseEntity) {
+              return { id: nfseId, success: false, error: "NFShe not found" };
+            }
+
+            const rps = nfseEntity.numeroRps;
+
             // await this.setNfseNumber(rps); // Redundant call in original? kept safe
             const nfseNumber = await this.setNfseNumber(
               rps,
@@ -630,9 +637,12 @@ class NFSEController {
               password
             ); // Action might be different? Original used ConsultarNfseServicoPrestadoEnvio for cancel too?
 
-            return { rps, success: true, response: response };
+            nfseEntity.status = "Cancelada";
+            await nfseRepository.save(nfseEntity);
+
+            return { id: nfseId, success: true, response: response };
           } catch (error) {
-            return { rps, success: false, error };
+            return { id: nfseId, success: false, error };
           }
         })
       );
@@ -925,8 +935,6 @@ class NFSEController {
 
       this.configureProvider();
 
-      console.log(soapFinal);
-
       const response = await this.fiorilliProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
@@ -984,6 +992,103 @@ class NFSEController {
         message: "Erro ao buscar detalhes da NFSE.",
         error,
       };
+    }
+  }
+
+  async getLastNfseNumber(ambiente: string = "producao"): Promise<number> {
+    try {
+      this.configureProvider();
+
+      const cnpj =
+        ambiente === "homologacao"
+          ? process.env.MUNICIPIO_CNPJ_TEST
+          : process.env.MUNICIPIO_LOGIN;
+      const inscricao =
+        ambiente === "homologacao"
+          ? process.env.MUNICIPIO_INCRICAO_TEST
+          : process.env.MUNICIPIO_INCRICAO;
+
+      // Date range: Last 30 days to ensure coverage
+      const end = new Date();
+      const start = new Date();
+      start.setDate(end.getDate() - 30);
+
+      const envioXml = this.xmlFactory.createConsultarNfseServicoPrestadoEnvio(
+        cnpj || "",
+        inscricao || "",
+        start,
+        end
+      );
+
+      const soapXml = this.xmlFactory.createConsultarNfseServicoPrestadoSoap(
+        envioXml,
+        process.env.MUNICIPIO_LOGIN || "",
+        process.env.MUNICIPIO_SENHA || ""
+      );
+
+      const response = await this.fiorilliProvider.sendSoapRequest(
+        soapXml,
+        "ConsultarNfseServicoPrestadoEnvio", // Action per doc
+        this.PASSWORD
+      );
+
+      const parsed = await parseStringPromise(response, {
+        explicitArray: false,
+      });
+
+      const listaMensagem =
+        parsed?.["soap:Envelope"]?.["soap:Body"]?.[
+          "ns3:consultarNfseServicoPrestadoResponse"
+        ]?.["ns2:ConsultarNfseServicoPrestadoResposta"]?.[
+          "ns2:ListaMensagemRetorno"
+        ];
+
+      if (listaMensagem) {
+        console.log(
+          "Mensagem Retorno getLastNfseNumber:",
+          JSON.stringify(listaMensagem)
+        );
+      }
+
+      const compNfse =
+        parsed?.["soap:Envelope"]?.["soap:Body"]?.[
+          "ns3:consultarNfseServicoPrestadoResponse"
+        ]?.["ns2:ConsultarNfseServicoPrestadoResposta"]?.["ns2:ListaNfse"]?.[
+          "ns2:CompNfse"
+        ];
+
+      if (!compNfse) {
+        console.log("Nenhuma NFSe encontrada no período. Retornando 1.");
+        return 1;
+      }
+
+      const lista = Array.isArray(compNfse) ? compNfse : [compNfse];
+      let maxRps = 0;
+
+      for (const item of lista) {
+        const rpsNum =
+          item?.["ns2:Nfse"]?.["ns2:InfNfse"]?.[
+            "ns2:DeclaracaoPrestacaoServico"
+          ]?.["ns2:InfDeclaracaoPrestacaoServico"]?.["ns2:Rps"]?.[
+            "ns2:IdentificacaoRps"
+          ]?.["ns2:Numero"];
+
+        if (rpsNum) {
+          const n = Number(rpsNum);
+          if (!isNaN(n) && n > maxRps) {
+            maxRps = n;
+          }
+        }
+      }
+
+      console.log(`Último RPS encontrado: ${maxRps}. Próximo: ${maxRps + 1}`);
+      return maxRps + 1;
+    } catch (error) {
+      console.error("Erro ao buscar último número de RPS:", error);
+      // Fallback: Check DB? Or safe default?
+      // For now, throwing or returning 1 might be risky if existing notes exist.
+      // But adhering to the requested logic:
+      return 1;
     }
   }
 

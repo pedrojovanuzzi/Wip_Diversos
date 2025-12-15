@@ -188,6 +188,45 @@ export class NfseXmlFactory {
       .trim();
   }
 
+  createConsultarNfseServicoPrestadoEnvio(
+    cnpj: string,
+    inscricaoMunicipal: string,
+    dataInicial: Date,
+    dataFinal: Date,
+    pagina: number = 1
+  ): string {
+    const dtIni = dataInicial.toISOString().substring(0, 10);
+    const dtFim = dataFinal.toISOString().substring(0, 10);
+
+    const dados = `
+      <Prestador>
+        <CpfCnpj><Cnpj>${cnpj}</Cnpj></CpfCnpj>
+        <InscricaoMunicipal>${inscricaoMunicipal}</InscricaoMunicipal>
+      </Prestador>
+      <PeriodoEmissao>
+        <DataInicial>${dtIni}</DataInicial>
+        <DataFinal>${dtFim}</DataFinal>
+      </PeriodoEmissao>
+      <Pagina>${pagina}</Pagina>
+    `;
+
+    return `<ConsultarNfseServicoPrestadoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${this.cleanXml(
+      dados
+    )}</ConsultarNfseServicoPrestadoEnvio>`;
+  }
+
+  createConsultarNfseServicoPrestadoSoap(
+    envioXml: string,
+    username: string,
+    password: string
+  ): string {
+    return `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ws="http://ws.issweb.fiorilli.com.br/" xmlns:xd="http://www.w3.org/2000/09/xmldsig#"><soapenv:Header/><soapenv:Body><ws:consultarNfseServicoPrestado>${envioXml}<username>${username}</username><password>${password}</password></ws:consultarNfseServicoPrestado></soapenv:Body></soapenv:Envelope>`
+      .replace(/[\r\n]+/g, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/>\s+</g, "><")
+      .trim();
+  }
+
   private cleanXml(xml: string): string {
     return xml
       .replace(/[\r\n]+/g, "")
