@@ -55,8 +55,8 @@ class NFSEController {
     this.removerAcentos = this.removerAcentos.bind(this);
   }
 
-  private configureProvider() {
-    if (this.homologacao) {
+  private configureProvider(ambiente: string = "producao") {
+    if (ambiente === "homologacao") {
       this.WSDL_URL =
         "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
     } else {
@@ -99,7 +99,7 @@ class NFSEController {
       this.homologacao = ambiente === "homologacao";
       console.log("Servidor Localhost?: " + this.homologacao);
 
-      this.configureProvider();
+      this.configureProvider(ambiente);
       console.log(this.WSDL_URL);
 
       aliquota = aliquota?.trim() ? aliquota : "5.0000";
@@ -226,7 +226,8 @@ class NFSEController {
             reducao,
             nfseNumber,
             nfseBase as NFSE,
-            serieToUse
+            serieToUse,
+            ambiente
           );
 
           // Sign RPS
@@ -286,12 +287,14 @@ class NFSEController {
 
         // Create Lote XML
         const loteId = `lote${nfseNumber}`; // Note: strictly speaking this might be slightly off if multiple batches, but follows original logic intent
-        const cnpj = this.homologacao
-          ? process.env.MUNICIPIO_CNPJ_TEST
-          : process.env.MUNICIPIO_LOGIN;
-        const inscricao = this.homologacao
-          ? process.env.MUNICIPIO_INCRICAO_TEST
-          : process.env.MUNICIPIO_INCRICAO;
+        const cnpj =
+          ambiente === "homologacao"
+            ? process.env.MUNICIPIO_CNPJ_TEST
+            : process.env.MUNICIPIO_LOGIN;
+        const inscricao =
+          ambiente === "homologacao"
+            ? process.env.MUNICIPIO_INCRICAO_TEST
+            : process.env.MUNICIPIO_INCRICAO;
 
         const loteXml = this.xmlFactory.createLoteXml(
           loteId,
@@ -383,7 +386,8 @@ class NFSEController {
     reducao: number,
     nfseNumber: number,
     nfseBase: NFSE,
-    serieOverride?: string
+    serieOverride?: string,
+    ambiente: string = "producao"
   ) {
     const RPSQuery = MkauthSource.getRepository(Faturas);
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
@@ -422,22 +426,25 @@ class NFSEController {
     val = val * (1 - reducao);
     val = Number(val.toFixed(2));
 
-    const email = this.homologacao
-      ? "suporte_wiptelecom@outlook.com"
-      : ClientData?.email && ClientData.email.trim() !== ""
-      ? ClientData.email.trim()
-      : "sememail@wiptelecom.com.br";
+    const email =
+      ambiente === "homologacao"
+        ? "suporte_wiptelecom@outlook.com"
+        : ClientData?.email && ClientData.email.trim() !== ""
+        ? ClientData.email.trim()
+        : "sememail@wiptelecom.com.br";
 
-    const cnpjPrestador = this.homologacao
-      ? process.env.MUNICIPIO_CNPJ_TEST
-      : process.env.MUNICIPIO_LOGIN;
-    const inscricaoPrestador = this.homologacao
-      ? process.env.MUNICIPIO_INCRICAO_TEST
-      : process.env.MUNICIPIO_INCRICAO;
+    const cnpjPrestador =
+      ambiente === "homologacao"
+        ? process.env.MUNICIPIO_CNPJ_TEST
+        : process.env.MUNICIPIO_LOGIN;
+    const inscricaoPrestador =
+      ambiente === "homologacao"
+        ? process.env.MUNICIPIO_INCRICAO_TEST
+        : process.env.MUNICIPIO_INCRICAO;
 
     const serieRps = serieOverride
       ? serieOverride
-      : this.homologacao
+      : ambiente === "homologacao"
       ? "wip99"
       : nfseBase?.serieRps;
 
@@ -452,7 +459,7 @@ class NFSEController {
       Number(aliquota).toFixed(4),
       nfseBase?.issRetido,
       nfseBase?.responsavelRetencao,
-      this.homologacao ? "17.01" : nfseBase?.itemListaServico,
+      ambiente === "homologacao" ? "17.01" : nfseBase?.itemListaServico,
       service,
       "3503406", // CodigoMunicipio Prestacao
       nfseBase?.exigibilidadeIss,
@@ -469,8 +476,8 @@ class NFSEController {
       ClientData?.cep.replace(/[^0-9]/g, "") || "",
       ClientData?.celular.replace(/[^0-9]/g, "") || "",
       email,
-      this.homologacao ? "" : "6", // Regime Especial
-      this.homologacao ? "2" : nfseBase?.optanteSimplesNacional,
+      ambiente === "homologacao" ? "" : "6", // Regime Especial
+      ambiente === "homologacao" ? "2" : nfseBase?.optanteSimplesNacional,
       nfseBase?.incentivoFiscal
     );
 
@@ -500,7 +507,8 @@ class NFSEController {
           return this.BuscarNSFEDetalhes(
             nfse.numeroRps,
             nfse.serieRps,
-            nfse.tipoRps
+            nfse.tipoRps,
+            ambiente
           );
         }
         return { error: `NFSE ${id} não encontrado no banco de dados.` };
@@ -540,7 +548,7 @@ class NFSEController {
         process.env.MUNICIPIO_SENHA || ""
       );
 
-      this.configureProvider(); // Ensure correct wsdl
+      this.configureProvider(ambiente); // Ensure correct wsdl
       const response = await this.fiorilliProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
@@ -563,7 +571,7 @@ class NFSEController {
         return;
       }
       this.PASSWORD = password;
-      this.configureProvider();
+      this.configureProvider(ambiente);
 
       const nfseRepository = AppDataSource.getRepository(NFSE);
 
@@ -584,7 +592,8 @@ class NFSEController {
             const nfseNumber = await this.setNfseNumber(
               rps,
               nfseEntity?.serieRps || "1",
-              nfseEntity?.tipoRps || "1"
+              nfseEntity?.tipoRps || "1",
+              ambiente
             );
             if (!nfseNumber)
               throw new Error("NFSe Number not found for RPS " + rps);
@@ -666,17 +675,20 @@ class NFSEController {
   async setNfseNumber(
     rpsNumber: string | number,
     serie: string | number = "1",
-    tipo: string | number = "1"
+    tipo: string | number = "1",
+    ambiente: string
   ) {
     try {
       console.log(rpsNumber);
 
-      const cnpj = this.homologacao
-        ? process.env.MUNICIPIO_CNPJ_TEST
-        : process.env.MUNICIPIO_LOGIN;
-      const inscricao = this.homologacao
-        ? process.env.MUNICIPIO_INCRICAO_TEST
-        : process.env.MUNICIPIO_INCRICAO;
+      const cnpj =
+        ambiente === "homologacao"
+          ? process.env.MUNICIPIO_CNPJ_TEST
+          : process.env.MUNICIPIO_LOGIN;
+      const inscricao =
+        ambiente === "homologacao"
+          ? process.env.MUNICIPIO_INCRICAO_TEST
+          : process.env.MUNICIPIO_INCRICAO;
 
       const envioXml = this.xmlFactory.createConsultaNfseRpsEnvio(
         rpsNumber,
@@ -691,7 +703,7 @@ class NFSEController {
         process.env.MUNICIPIO_SENHA || ""
       );
 
-      this.configureProvider();
+      this.configureProvider(ambiente);
       const response = await this.fiorilliProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
@@ -727,15 +739,18 @@ class NFSEController {
   async setNfseStatus(
     rpsNumber: string | number,
     serie: string | number = "1",
-    tipo: string | number = "1"
+    tipo: string | number = "1",
+    ambiente: string
   ) {
     try {
-      const cnpj = this.homologacao
-        ? process.env.MUNICIPIO_CNPJ_TEST
-        : process.env.MUNICIPIO_LOGIN;
-      const inscricao = this.homologacao
-        ? process.env.MUNICIPIO_INCRICAO_TEST
-        : process.env.MUNICIPIO_INCRICAO;
+      const cnpj =
+        ambiente === "homologacao"
+          ? process.env.MUNICIPIO_CNPJ_TEST
+          : process.env.MUNICIPIO_LOGIN;
+      const inscricao =
+        ambiente === "homologacao"
+          ? process.env.MUNICIPIO_INCRICAO_TEST
+          : process.env.MUNICIPIO_INCRICAO;
 
       const envioXml = this.xmlFactory.createConsultaNfseRpsEnvio(
         rpsNumber,
@@ -750,7 +765,7 @@ class NFSEController {
         process.env.MUNICIPIO_SENHA || ""
       );
 
-      this.configureProvider();
+      this.configureProvider(ambiente);
       const response = await this.fiorilliProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
@@ -766,7 +781,7 @@ class NFSEController {
 
   async BuscarNSFE(req: Request, res: Response) {
     try {
-      const { cpf, filters, dateFilter, ambiente } = req.body;
+      const { cpf, filters, dateFilter, ambiente, status } = req.body;
       const w: any = {};
       if (cpf) w.cpf_cnpj = cpf;
       if (filters) {
@@ -796,6 +811,7 @@ class NFSEController {
           login: In(clientesResponse.map((c) => c.login)),
           competencia: Between(startDate, endDate),
           ambiente: ambiente,
+          status: status,
         },
         order: { id: "DESC" },
       });
@@ -812,17 +828,21 @@ class NFSEController {
             const isCancelada = await this.setNfseStatus(
               nf.numeroRps,
               nf.serieRps,
-              nf.tipoRps
+              nf.tipoRps,
+              ambiente
             );
-            if (!isCancelada) {
-              nfseValidas.push(nf);
-              const numeroNfse = await this.setNfseNumber(
-                nf.numeroRps,
-                nf.serieRps,
-                nf.tipoRps
-              );
-              nfseNumberArray.push(numeroNfse);
+            if (isCancelada) {
+              nf.status = "Cancelada";
             }
+
+            nfseValidas.push(nf);
+            const numeroNfse = await this.setNfseNumber(
+              nf.numeroRps,
+              nf.serieRps,
+              nf.tipoRps,
+              ambiente
+            );
+            nfseNumberArray.push(numeroNfse);
           }
 
           if (!nfseValidas.length) return null;
@@ -917,15 +937,22 @@ class NFSEController {
     rpsNumber: string | number,
     serie: string | number,
     tipo: string | number,
+    ambiente: string,
     retryCount: number = 0
   ): Promise<any> {
     try {
-      const cnpj = this.homologacao
-        ? process.env.MUNICIPIO_CNPJ_TEST
-        : process.env.MUNICIPIO_LOGIN;
-      const inscricao = this.homologacao
-        ? process.env.MUNICIPIO_INCRICAO_TEST
-        : process.env.MUNICIPIO_INCRICAO;
+      const cnpj =
+        ambiente === "homologacao"
+          ? process.env.MUNICIPIO_CNPJ_TEST
+          : process.env.MUNICIPIO_LOGIN;
+      const inscricao =
+        ambiente === "homologacao"
+          ? process.env.MUNICIPIO_INCRICAO_TEST
+          : process.env.MUNICIPIO_INCRICAO;
+
+      console.log(ambiente);
+
+      this.configureProvider(ambiente);
 
       const envioXml = this.xmlFactory.createConsultaNfseRpsEnvio(
         rpsNumber,
@@ -939,8 +966,6 @@ class NFSEController {
         process.env.MUNICIPIO_LOGIN || "",
         process.env.MUNICIPIO_SENHA || ""
       );
-
-      this.configureProvider();
 
       const response = await this.fiorilliProvider.sendSoapRequest(
         soapFinal,
@@ -1022,7 +1047,7 @@ class NFSEController {
 
   async getLastNfseNumber(ambiente: string = "producao"): Promise<number> {
     try {
-      this.configureProvider();
+      this.configureProvider(ambiente);
 
       const cnpj =
         ambiente === "homologacao"

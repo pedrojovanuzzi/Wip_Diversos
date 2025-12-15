@@ -23,6 +23,7 @@ export const BuscarNfeGerada = () => {
   const [certPassword, setCertPassword] = useState<string>("");
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
+  const [status, setStatus] = useState<string>("");
   const [pdfDados, setPdfDados] = useState<any[]>([]);
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
@@ -106,6 +107,7 @@ export const BuscarNfeGerada = () => {
         `${process.env.REACT_APP_URL}/Nfe/imprimirNFSE`,
         {
           id: clientesSelecionados,
+          ambiente: ambiente || "homologacao",
         },
         {
           headers: {
@@ -165,8 +167,9 @@ export const BuscarNfeGerada = () => {
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/cancelarNfse`,
         {
-          rpsNumber: clientesSelecionados,
+          id: clientesSelecionados,
           password: password,
+          ambiente: ambiente || "homologacao",
         },
         {
           headers: {
@@ -244,7 +247,8 @@ export const BuscarNfeGerada = () => {
           cpf: searchCpfRegex,
           filters: activeFilters,
           dateFilter: dateFilter,
-          ambiente: ambiente,
+          ambiente: ambiente || "homologacao",
+          status: status || null,
         },
         {
           headers: {
@@ -403,9 +407,22 @@ export const BuscarNfeGerada = () => {
                     className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="producao">Produção</option>
-                    <option defaultValue={ambiente} value="homologacao">
-                      Homologação
-                    </option>
+                    <option value="homologacao">Homologação</option>
+                  </select>
+                </div>
+                {/* Status */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Todos</option>
+                    <option value="Ativa">Ativa</option>
+                    <option value="Cancelada">Cancelada</option>
                   </select>
                 </div>
               </div>
@@ -587,9 +604,9 @@ export const BuscarNfeGerada = () => {
                           <td className="px-6 py-4 text-left text-sm">
                             <span
                               className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
-                                cliente.nfse.status === "AUTORIZADA"
+                                cliente.nfse.status === "Ativa"
                                   ? "bg-green-50 text-green-700 ring-green-600/20"
-                                  : cliente.nfse.status === "CANCELADA"
+                                  : cliente.nfse.status === "Cancelada"
                                   ? "bg-red-50 text-red-700 ring-red-600/20"
                                   : "bg-yellow-50 text-yellow-800 ring-yellow-600/20"
                               }`}
