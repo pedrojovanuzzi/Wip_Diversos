@@ -90,11 +90,11 @@ export const BuscarNfeGerada = () => {
     if (clientesSelecionados.length === clientes.length) {
       setClientesSelecionados([]);
     } else {
-      const numeroRpsValidos = clientes
-        .filter((cliente) => cliente.nfse && cliente.nfse.numero_rps)
-        .map((cliente) => cliente.nfse.numero_rps);
+      const idsValidos = clientes
+        .filter((cliente) => cliente.nfse && cliente.nfse.id)
+        .map((cliente) => cliente.nfse.id);
 
-      setClientesSelecionados(numeroRpsValidos);
+      setClientesSelecionados(idsValidos);
     }
   };
 
@@ -104,7 +104,7 @@ export const BuscarNfeGerada = () => {
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/imprimirNFSE`,
         {
-          rpsNumber: clientesSelecionados,
+          id: clientesSelecionados,
         },
         {
           headers: {
@@ -490,6 +490,12 @@ export const BuscarNfeGerada = () => {
                           scope="col"
                           className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
                         >
+                          ID
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                        >
                           Nº NFSE
                         </th>
                         <th
@@ -530,34 +536,37 @@ export const BuscarNfeGerada = () => {
                           key={cliente.id}
                           className="hover:bg-gray-50 transition-colors"
                         >
-                          <td className="px-6 py-4 text-sm text-gray-500">
+                          <td className="px-6 py-4 text-left text-sm text-gray-500">
                             <input
                               type="checkbox"
                               className="cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                               checked={clientesSelecionados.includes(
-                                cliente.nfse.numero_rps
+                                cliente.nfse.id
                               )}
                               onChange={() =>
-                                handleCheckboxChange(cliente.nfse.numero_rps)
+                                handleCheckboxChange(cliente.nfse.id)
                               }
                             />
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">
+                          <td className="px-6 py-4 text-left text-sm text-gray-500">
+                            {cliente.nfse.id}
+                          </td>
+                          <td className="px-6 py-4 text-left text-sm text-gray-900">
                             {cliente.nfse.numeroNfse}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
+                          <td className="px-6 py-4 text-left text-sm text-gray-500">
                             {cliente.login}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
+                          <td className="px-6 py-4 text-left text-sm text-gray-500">
                             {cliente.nfse.competencia}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
+                          <td className="px-6 py-4 text-left text-sm text-gray-500">
                             {cliente.nfse.aliquota}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
+                          <td className="px-6 py-4 text-left text-sm text-gray-500">
                             {cliente.nfse.valor_servico}
                           </td>
-                          <td className="px-6 py-4 text-sm">
+                          <td className="px-6 py-4 text-left text-sm">
                             <span
                               className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
                                 cliente.nfse.status === "AUTORIZADA"

@@ -120,6 +120,7 @@ class NFSEController {
         clientesSelecionados,
         "EnviarLoteRpsSincronoEnvio",
         aliquota,
+        ambiente,
         service,
         reducao
       );
@@ -145,6 +146,7 @@ class NFSEController {
     ids: string[],
     SOAPAction: string,
     aliquota: string,
+    ambiente: string,
     service: string,
     reducao: number
   ) {
@@ -154,7 +156,7 @@ class NFSEController {
 
       // Determine Target Series
       let targetSeries = "1";
-      if (this.homologacao) {
+      if (ambiente === "homologacao") {
         targetSeries = "wip99";
       } else {
         // Find last used production series (not wip99)
@@ -276,6 +278,7 @@ class NFSEController {
             emailTomador: ClientData?.email || undefined,
             optanteSimplesNacional: 1,
             incentivoFiscal: 2,
+            ambiente: ambiente,
           });
           entitiesToSave.push(novoRegistro);
         }
@@ -483,14 +486,35 @@ class NFSEController {
   }
 
   async imprimirNFSE(req: Request, res: Response) {
-    const { rpsNumber } = req.body;
+    const { id } = req.body;
+    const nfseRepository = AppDataSource.getRepository(NFSE);
+
     const result = await Promise.all(
-      rpsNumber.map((rps: string | number) => this.BuscarNSFEDetalhes(rps))
+      id.map(async (id: string | number) => {
+        const nfse = await nfseRepository.findOne({
+          where: { id: Number(id) },
+        });
+
+        if (nfse) {
+          return this.BuscarNSFEDetalhes(
+            nfse.numeroRps,
+            nfse.serieRps,
+            nfse.tipoRps
+          );
+        }
+        return { error: `NFSE ${id} não encontrado no banco de dados.` };
+      })
     );
+    console.log(result);
+
     res.status(200).json(result);
   }
 
-  async verificaRps(rpsNumber: string | number, serie = "1", tipo = "1") {
+  async verificaRps(
+    rpsNumber: string | number,
+    serie: string | number,
+    tipo: string | number
+  ) {
     try {
       const cnpj = this.homologacao
         ? process.env.MUNICIPIO_CNPJ_TEST
@@ -501,8 +525,8 @@ class NFSEController {
 
       const envioXml = this.xmlFactory.createConsultaNfseRpsEnvio(
         rpsNumber,
-        serie,
-        tipo,
+        String(serie),
+        String(tipo),
         cnpj || "",
         inscricao || ""
       );
@@ -537,11 +561,20 @@ class NFSEController {
       this.PASSWORD = password;
       this.configureProvider();
 
+      const nfseRepository = AppDataSource.getRepository(NFSE);
+
       const arr = await Promise.all(
         rpsNumber.map(async (rps: string | number) => {
           try {
+            const nfseEntity = await nfseRepository.findOne({
+              where: { numeroRps: Number(rps) },
+            });
             // await this.setNfseNumber(rps); // Redundant call in original? kept safe
-            const nfseNumber = await this.setNfseNumber(rps);
+            const nfseNumber = await this.setNfseNumber(
+              rps,
+              nfseEntity?.serieRps || "1",
+              nfseEntity?.tipoRps || "1"
+            );
             if (!nfseNumber)
               throw new Error("NFSe Number not found for RPS " + rps);
 
@@ -759,10 +792,18 @@ class NFSEController {
           const nfseNumberArray: string[] = [];
 
           for (const nf of nfseDoCliente) {
-            const isCancelada = await this.setNfseStatus(nf.numeroRps);
+            const isCancelada = await this.setNfseStatus(
+              nf.numeroRps,
+              nf.serieRps,
+              nf.tipoRps
+            );
             if (!isCancelada) {
               nfseValidas.push(nf);
-              const numeroNfse = await this.setNfseNumber(nf.numeroRps);
+              const numeroNfse = await this.setNfseNumber(
+                nf.numeroRps,
+                nf.serieRps,
+                nf.tipoRps
+              );
               nfseNumberArray.push(numeroNfse);
             }
           }
@@ -772,7 +813,7 @@ class NFSEController {
           return {
             ...c,
             nfse: {
-              id: nfseValidas.map((nf) => nf.id).join(", ") || null,
+              id: nfseValidas.map((nf) => nf.id).join(", "),
               login: nfseValidas.map((nf) => nf.login).join(", ") || null,
               numero_rps:
                 nfseValidas.map((nf) => nf.numeroRps).join(", ") || null,
@@ -857,8 +898,8 @@ class NFSEController {
 
   async BuscarNSFEDetalhes(
     rpsNumber: string | number,
-    serie = "1",
-    tipo = "1"
+    serie: string | number,
+    tipo: string | number
   ) {
     try {
       const cnpj = this.homologacao
@@ -870,8 +911,8 @@ class NFSEController {
 
       const envioXml = this.xmlFactory.createConsultaNfseRpsEnvio(
         rpsNumber,
-        serie,
-        tipo,
+        String(serie),
+        String(tipo),
         cnpj || "",
         inscricao || ""
       );
@@ -882,6 +923,9 @@ class NFSEController {
       );
 
       this.configureProvider();
+
+      console.log(soapFinal);
+
       const response = await this.fiorilliProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
