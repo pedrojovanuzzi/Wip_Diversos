@@ -1,17 +1,18 @@
 import { MigrationInterface, QueryRunner, TableColumn } from "typeorm";
 
-export class NFEstatus1765809907195 implements MigrationInterface {
+export class NFEstatus1765810449608 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    queryRunner.addColumn(
+    await queryRunner.addColumn(
       "nfse",
       new TableColumn({
         name: "status",
         type: "varchar",
+        length: "20",
       })
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    queryRunner.dropColumn("nfse", "status");
+    await queryRunner.dropColumn("nfse", "status");
   }
 }
