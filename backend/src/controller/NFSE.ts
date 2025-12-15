@@ -487,13 +487,13 @@ class NFSEController {
   }
 
   async imprimirNFSE(req: Request, res: Response) {
-    const { id } = req.body;
+    const { id, ambiente } = req.body;
     const nfseRepository = AppDataSource.getRepository(NFSE);
 
     const result = await Promise.all(
       id.map(async (id: string | number) => {
         const nfse = await nfseRepository.findOne({
-          where: { id: Number(id) },
+          where: { id: Number(id), ambiente },
         });
 
         if (nfse) {
@@ -514,15 +514,18 @@ class NFSEController {
   async verificaRps(
     rpsNumber: string | number,
     serie: string | number,
-    tipo: string | number
+    tipo: string | number,
+    ambiente: string
   ) {
     try {
-      const cnpj = this.homologacao
-        ? process.env.MUNICIPIO_CNPJ_TEST
-        : process.env.MUNICIPIO_LOGIN;
-      const inscricao = this.homologacao
-        ? process.env.MUNICIPIO_INCRICAO_TEST
-        : process.env.MUNICIPIO_INCRICAO;
+      const cnpj =
+        ambiente === "homologacao"
+          ? process.env.MUNICIPIO_CNPJ_TEST
+          : process.env.MUNICIPIO_LOGIN;
+      const inscricao =
+        ambiente === "homologacao"
+          ? process.env.MUNICIPIO_INCRICAO_TEST
+          : process.env.MUNICIPIO_INCRICAO;
 
       const envioXml = this.xmlFactory.createConsultaNfseRpsEnvio(
         rpsNumber,
@@ -554,7 +557,7 @@ class NFSEController {
 
   async cancelarNfse(req: Request, res: Response) {
     try {
-      const { id, password } = req.body;
+      const { id, password, ambiente } = req.body;
       if (!Array.isArray(id)) {
         res.status(400).json({ error: "id must be an array" });
         return;
@@ -568,7 +571,7 @@ class NFSEController {
         id.map(async (nfseId: string | number) => {
           try {
             const nfseEntity = await nfseRepository.findOne({
-              where: { id: Number(nfseId) },
+              where: { id: Number(nfseId), ambiente },
             });
 
             if (!nfseEntity) {
@@ -586,12 +589,14 @@ class NFSEController {
             if (!nfseNumber)
               throw new Error("NFSe Number not found for RPS " + rps);
 
-            const cnpj = this.homologacao
-              ? process.env.MUNICIPIO_CNPJ_TEST
-              : process.env.MUNICIPIO_LOGIN;
-            const inscricao = this.homologacao
-              ? process.env.MUNICIPIO_INCRICAO_TEST
-              : process.env.MUNICIPIO_INCRICAO;
+            const cnpj =
+              ambiente === "homologacao"
+                ? process.env.MUNICIPIO_CNPJ_TEST
+                : process.env.MUNICIPIO_LOGIN;
+            const inscricao =
+              ambiente === "homologacao"
+                ? process.env.MUNICIPIO_INCRICAO_TEST
+                : process.env.MUNICIPIO_INCRICAO;
 
             const pedidoXml = this.xmlFactory.createPedidoCancelamentoXml(
               nfseNumber,
@@ -761,7 +766,7 @@ class NFSEController {
 
   async BuscarNSFE(req: Request, res: Response) {
     try {
-      const { cpf, filters, dateFilter } = req.body;
+      const { cpf, filters, dateFilter, ambiente } = req.body;
       const w: any = {};
       if (cpf) w.cpf_cnpj = cpf;
       if (filters) {
@@ -790,6 +795,7 @@ class NFSEController {
         where: {
           login: In(clientesResponse.map((c) => c.login)),
           competencia: Between(startDate, endDate),
+          ambiente: ambiente,
         },
         order: { id: "DESC" },
       });
@@ -910,8 +916,9 @@ class NFSEController {
   async BuscarNSFEDetalhes(
     rpsNumber: string | number,
     serie: string | number,
-    tipo: string | number
-  ) {
+    tipo: string | number,
+    retryCount: number = 0
+  ): Promise<any> {
     try {
       const cnpj = this.homologacao
         ? process.env.MUNICIPIO_CNPJ_TEST
@@ -940,6 +947,24 @@ class NFSEController {
         "ConsultarNfseServicoPrestadoEnvio",
         this.PASSWORD
       );
+
+      // Check for E92 - RPS not converted
+      // if (response && response.includes("<ns2:Codigo>E92</ns2:Codigo>")) {
+      //   console.log(
+      //     `[BuscarNSFEDetalhes] RPS ${rpsNumber} ainda não convertido (E92). Tentativa ${
+      //       retryCount + 1
+      //     }/10. Aguardando...`
+      //   );
+      //   // if (retryCount < 10) {
+      //   //   await new Promise((resolve) => setTimeout(resolve, 3000));
+      //   //   return this.BuscarNSFEDetalhes(
+      //   //     rpsNumber,
+      //   //     serie,
+      //   //     tipo,
+      //   //     retryCount + 1
+      //   //   );
+      //   // }
+      // }
 
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(response, "text/xml");

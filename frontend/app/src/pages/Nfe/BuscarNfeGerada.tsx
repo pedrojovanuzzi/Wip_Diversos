@@ -18,6 +18,7 @@ import { useAuth } from "../../context/AuthContext";
 export const BuscarNfeGerada = () => {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
+  const [ambiente, setAmbiente] = useState<string>("homologacao");
   const [showCertPasswordPopUp, setShowCertPasswordPopUp] = useState(false);
   const [certPassword, setCertPassword] = useState<string>("");
   const [searchCpf, setSearchCpf] = useState<string>("");
@@ -243,6 +244,7 @@ export const BuscarNfeGerada = () => {
           cpf: searchCpfRegex,
           filters: activeFilters,
           dateFilter: dateFilter,
+          ambiente: ambiente,
         },
         {
           headers: {
@@ -389,6 +391,22 @@ export const BuscarNfeGerada = () => {
                       className="hidden"
                     />
                   </label>
+                </div>
+                {/* Ambiente */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ambiente
+                  </label>
+                  <select
+                    value={ambiente}
+                    onChange={(e) => setAmbiente(e.target.value)}
+                    className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="producao">Produção</option>
+                    <option defaultValue={ambiente} value="homologacao">
+                      Homologação
+                    </option>
+                  </select>
                 </div>
               </div>
 

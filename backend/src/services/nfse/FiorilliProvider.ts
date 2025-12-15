@@ -80,6 +80,8 @@ export class FiorilliProvider {
       rejectUnauthorized: false,
     });
 
+    console.log(soapXml);
+
     const response = await axios.post(this.wsdlUrl, soapXml, {
       httpsAgent,
       timeout: 600000, // 10 minutes
