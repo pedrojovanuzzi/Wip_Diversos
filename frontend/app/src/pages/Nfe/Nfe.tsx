@@ -97,6 +97,7 @@ export const Nfe = () => {
           service,
           reducao,
           ambiente,
+          lastNfe,
         },
         {
           headers: {
@@ -203,6 +204,14 @@ export const Nfe = () => {
         setError("Erro de rede. Verifique sua conexão e tente novamente.");
       }
     }
+  };
+
+  const handleOpenPopup = () => {
+    if (!lastNfe) {
+      alert("Por favor, preencha o campo 'Ultima NF-e'.");
+      return;
+    }
+    setShowPopUp(true);
   };
 
   return (
@@ -331,12 +340,12 @@ export const Nfe = () => {
           <span className="absolute translate-x-8 top-11 text-gray-200 -translate-y-1/2 text-4xl">
             <BsFiletypeDoc
               className="cursor-pointer"
-              onClick={() => setShowPopUp(true)}
+              onClick={handleOpenPopup}
             />
           </span>
           <button
             className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
-            onClick={() => setShowPopUp(true)}
+            onClick={handleOpenPopup}
           >
             Emitir NF-e
           </button>
@@ -387,13 +396,14 @@ export const Nfe = () => {
         />
         <input
           type="text"
+          required
           onChange={(e) => {
             setLastNfe(
               e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, "")
             );
           }}
-          placeholder="Ultima NF-e"
-          className="ring-2 ring-gray-500 p-2 rounded m-5"
+          placeholder="Ultimo Numero NF-e"
+          className="ring-2 ring-red-500 p-2 rounded m-5 placeholder:text-red-500"
         />
       </div>
 

@@ -90,6 +90,7 @@ class NFSEController {
         service,
         reducao,
         ambiente,
+        lastNfe,
       } = req.body;
       this.PASSWORD = password;
 
@@ -122,7 +123,8 @@ class NFSEController {
         aliquota,
         ambiente,
         service,
-        reducao
+        reducao,
+        lastNfe
       );
 
       if (Array.isArray(result)) {
@@ -148,7 +150,8 @@ class NFSEController {
     aliquota: string,
     ambiente: string,
     service: string,
-    reducao: number
+    reducao: number,
+    lastNfe: number
   ) {
     try {
       // Logic for fetching initial NSFE number
@@ -173,7 +176,13 @@ class NFSEController {
         order: { numeroRps: "DESC" },
       });
 
-      let nfseNumber = await this.getLastNfseNumber(ambiente);
+      const { nextNfseNumber, nextRpsNumber } = await this.getLastNfseNumber(
+        lastNfe,
+        ambiente
+      );
+
+      // We will use nextRpsNumber for the RPS loop counting
+      let currentRpsNumber = nextRpsNumber;
 
       // Use the last record (of any series? or target?) as base for other fields like 'issRetido'
       // Ideally use the last record of target series to keep consistency, or fallback to any last record if new series.
@@ -194,7 +203,8 @@ class NFSEController {
 
       console.log(`Ambiente: ${this.homologacao ? "Homologacao" : "Producao"}`);
       console.log(`Serie Alvo: ${serieToUse}`);
-      console.log(`Proximo Numero RPS: ${nfseNumber}`);
+      console.log(`Proximo Numero RPS: ${currentRpsNumber}`);
+      console.log(`Proximo Numero NFSe: ${nextNfseNumber}`);
 
       const respArr: any[] = [];
       if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
@@ -222,7 +232,7 @@ class NFSEController {
             aliquota,
             service,
             reducao,
-            nfseNumber,
+            currentRpsNumber,
             nfseBase as NFSE,
             serieToUse,
             ambiente
@@ -239,12 +249,12 @@ class NFSEController {
           rpsXmls += signedRps;
 
           // Increment number
-          nfseNumber++;
+          currentRpsNumber++;
 
           // Create entity but DO NOT SAVE yet
           const novoRegistro = NsfeData.create({
             login: rpsData?.login || "",
-            numeroRps: nfseNumber - 1,
+            numeroRps: currentRpsNumber - 1,
             serieRps: serieRps || "",
             tipoRps: nfseBase?.tipoRps || 0,
             dataEmissao: rpsData?.processamento
@@ -284,7 +294,7 @@ class NFSEController {
         }
 
         // Create Lote XML
-        const loteId = `lote${nfseNumber}`; // Note: strictly speaking this might be slightly off if multiple batches, but follows original logic intent
+        const loteId = `lote${currentRpsNumber}`; // Note: strictly speaking this might be slightly off if multiple batches, but follows original logic intent
         const cnpj =
           ambiente === "homologacao"
             ? process.env.MUNICIPIO_CNPJ_TEST
@@ -1043,7 +1053,10 @@ class NFSEController {
     }
   }
 
-  async getLastNfseNumber(ambiente: string = "producao"): Promise<number> {
+  async getLastNfseNumber(
+    lastNfe: number,
+    ambiente: string = "producao"
+  ): Promise<{ nextNfseNumber: number; nextRpsNumber: number }> {
     try {
       this.configureProvider(ambiente);
 
@@ -1056,17 +1069,12 @@ class NFSEController {
           ? process.env.MUNICIPIO_INCRICAO_TEST
           : process.env.MUNICIPIO_INCRICAO;
 
-      // Date range: Last 30 days to ensure coverage
-      const end = new Date();
-      const start = new Date();
-      start.setDate(end.getDate() - 30);
-
-      const envioXml = this.xmlFactory.createConsultarNfseServicoPrestadoEnvio(
-        cnpj || "",
-        inscricao || "",
-        start,
-        end
-      );
+      const envioXml =
+        this.xmlFactory.createConsultarNfseServicoPrestadoPorNumeroEnvio(
+          cnpj || "",
+          inscricao || "",
+          lastNfe
+        );
 
       const soapXml = this.xmlFactory.createConsultarNfseServicoPrestadoSoap(
         envioXml,
@@ -1108,14 +1116,13 @@ class NFSEController {
         ];
 
       if (!compNfse) {
-        console.log("Nenhuma NFSe encontrada no período. Retornando 1.");
-        return 1;
+        console.log("Nenhuma NFSe encontrada. Retornando 1.");
+        return { nextNfseNumber: 1, nextRpsNumber: 1 };
       }
 
       const lista = Array.isArray(compNfse) ? compNfse : [compNfse];
-      let maxRps = 0;
-
       for (const item of lista) {
+        const nfseNum = item?.["ns2:Nfse"]?.["ns2:InfNfse"]?.["ns2:Numero"];
         const rpsNum =
           item?.["ns2:Nfse"]?.["ns2:InfNfse"]?.[
             "ns2:DeclaracaoPrestacaoServico"
@@ -1123,22 +1130,28 @@ class NFSEController {
             "ns2:IdentificacaoRps"
           ]?.["ns2:Numero"];
 
-        if (rpsNum) {
-          const n = Number(rpsNum);
-          if (!isNaN(n) && n > maxRps) {
-            maxRps = n;
-          }
+        if (nfseNum && Number(nfseNum) === lastNfe) {
+          console.log(
+            `NFSe ${lastNfe} encontrada. RPS vinculado: ${rpsNum}. Próximos: ${
+              lastNfe + 1
+            }, RPS ${Number(rpsNum) + 1}`
+          );
+          return {
+            nextNfseNumber: lastNfe + 1,
+            nextRpsNumber: Number(rpsNum) + 1,
+          };
         }
       }
 
-      console.log(`Último RPS encontrado: ${maxRps}. Próximo: ${maxRps + 1}`);
-      return maxRps + 1;
+      console.log(
+        `NFSe ${lastNfe} não encontrada explicitamente. Retornando fallback: ${
+          lastNfe + 1
+        }`
+      );
+      return { nextNfseNumber: lastNfe + 1, nextRpsNumber: 1 };
     } catch (error) {
       console.error("Erro ao buscar último número de RPS:", error);
-      // Fallback: Check DB? Or safe default?
-      // For now, throwing or returning 1 might be risky if existing notes exist.
-      // But adhering to the requested logic:
-      return 1;
+      return { nextNfseNumber: 1, nextRpsNumber: 1 };
     }
   }
 

@@ -215,6 +215,26 @@ export class NfseXmlFactory {
     )}</ConsultarNfseServicoPrestadoEnvio>`;
   }
 
+  createConsultarNfseServicoPrestadoPorNumeroEnvio(
+    cnpj: string,
+    inscricaoMunicipal: string,
+    numeroNfse: number,
+    pagina: number = 1
+  ): string {
+    const dados = `
+      <Prestador>
+        <CpfCnpj><Cnpj>${cnpj}</Cnpj></CpfCnpj>
+        <InscricaoMunicipal>${inscricaoMunicipal}</InscricaoMunicipal>
+      </Prestador>
+      <NumeroNfse>${numeroNfse}</NumeroNfse>
+      <Pagina>${pagina}</Pagina>
+    `;
+
+    return `<ConsultarNfseServicoPrestadoEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${this.cleanXml(
+      dados
+    )}</ConsultarNfseServicoPrestadoEnvio>`;
+  }
+
   createConsultarNfseServicoPrestadoSoap(
     envioXml: string,
     username: string,
