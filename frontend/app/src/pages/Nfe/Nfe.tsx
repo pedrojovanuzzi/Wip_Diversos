@@ -11,6 +11,7 @@ import Success from "./Components/Success";
 import { useAuth } from "../../context/AuthContext";
 import { BuscarNfeGerada } from "./BuscarNfeGerada";
 import { Link } from "react-router-dom";
+import { useNotification } from "../../context/NotificationContext";
 
 export const Nfe = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -56,6 +57,7 @@ export const Nfe = () => {
   let [valueSome, setValueSome] = useState<number>(0);
   const { user } = useAuth();
   const token = user?.token;
+  const { addJob, showError, showSuccess } = useNotification();
 
   const handleCheckboxChange = (clienteId: number) => {
     setClientesSelecionados((prevSelecionados) => {
@@ -86,7 +88,7 @@ export const Nfe = () => {
     try {
       setLoading(true);
       setError("");
-      setSuccess("");
+      // setSuccess("");
 
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/`,
@@ -108,7 +110,17 @@ export const Nfe = () => {
         }
       );
       setDadosNFe(resposta.data);
-      setSuccess("NF-e emitida com sucesso.");
+      // setSuccess("NF-e emitida com sucesso.");
+
+      console.log("Resposta da API:", resposta.data);
+      if (resposta.data.job) {
+        addJob(resposta.data.job, "emissao");
+        showSuccess(
+          "Solicitação de emissão enviada! Processando em segundo plano."
+        );
+      } else {
+        showSuccess("NF-e emitida com sucesso.");
+      }
     } catch (erro) {
       console.error("Erro ao emitir NF-e:", erro);
       if (
@@ -117,9 +129,11 @@ export const Nfe = () => {
         erro.response.data &&
         erro.response.data.erro
       ) {
-        setError(`Erro ao emitir NF-e: ${erro.response.data.erro}`);
+        // setError(`Erro ao emitir NF-e: ${erro.response.data.erro}`);
+        showError(`Erro ao emitir NF-e: ${erro.response.data.erro}`);
       } else {
-        setError("Erro desconhecido ao emitir NF-e.");
+        // setError("Erro desconhecido ao emitir NF-e.");
+        showError("Erro desconhecido ao emitir NF-e.");
       }
     } finally {
       setShowPopUp(false);

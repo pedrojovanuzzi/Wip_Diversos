@@ -13,6 +13,7 @@ import MkauthSource from "../database/MkauthSource";
 import { NFSE } from "../entities/NFSE";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
+import { Jobs } from "../entities/Jobs";
 
 import { NfseXmlFactory } from "../services/nfse/NfseXmlFactory";
 import { FiorilliProvider } from "../services/nfse/FiorilliProvider";
@@ -41,11 +42,13 @@ class NFSEController {
 
     this.uploadCertificado = this.uploadCertificado.bind(this);
     this.iniciar = this.iniciar.bind(this);
-    this.gerarNFSE = this.gerarNFSE.bind(this);
+    this.processarGeracaoNfseJob = this.processarGeracaoNfseJob.bind(this);
     // this.gerarRpsXml = this.gerarRpsXml.bind(this); // Refactored into internal helper or factory usage
     this.imprimirNFSE = this.imprimirNFSE.bind(this);
     this.verificaRps = this.verificaRps.bind(this);
     this.cancelarNfse = this.cancelarNfse.bind(this);
+    this.processarCancelamentoNfseJob =
+      this.processarCancelamentoNfseJob.bind(this);
     this.setPassword = this.setPassword.bind(this);
     this.setNfseNumber = this.setNfseNumber.bind(this);
     this.setNfseStatus = this.setNfseStatus.bind(this);
@@ -116,7 +119,17 @@ class NFSEController {
 
       console.log(reducao);
 
-      const result = await this.gerarNFSE(
+      const job = AppDataSource.getRepository(Jobs).create({
+        name: "Gerar Notas NFSe",
+        description: "Notas Sendo Geradas em Segundo Plano",
+        status: "pendente",
+        total: clientesSelecionados.length,
+        processados: 0,
+      });
+      await AppDataSource.getRepository(Jobs).save(job);
+
+      this.processarGeracaoNfseJob(
+        job,
         password,
         clientesSelecionados,
         "EnviarLoteRpsSincronoEnvio",
@@ -127,23 +140,17 @@ class NFSEController {
         Number(lastNfe)
       );
 
-      if (Array.isArray(result)) {
-        const ok = result.every((r) => r.status === "200");
-        console.log("Result: " + JSON.stringify(result));
-        console.log("okTest: " + ok);
-
-        if (ok)
-          res.status(200).json({ mensagem: "RPS criado com sucesso!", result });
-        else res.status(500).json({ erro: "Erro ao criar o RPS." });
-      } else {
-        // Fallback for non-array result logic if needed
-      }
+      res.status(200).json({
+        message: "Notas Sendo Geradas em Segundo Plano!",
+        job: job.id,
+      });
     } catch {
       res.status(500).json({ erro: "Erro ao criar o RPS." });
     }
   }
 
-  async gerarNFSE(
+  async processarGeracaoNfseJob(
+    job: Jobs,
     password: string,
     ids: string[],
     SOAPAction: string,
@@ -153,6 +160,7 @@ class NFSEController {
     reducao: number,
     lastNfe: number
   ) {
+    const respArr: any[] = [];
     try {
       // Logic for fetching initial NSFE number
       const NsfeData = AppDataSource.getRepository(NFSE);
@@ -208,7 +216,15 @@ class NFSEController {
       console.log(`Proximo Numero RPS: ${currentRpsNumber}`);
       console.log(`Proximo Numero NFSe: ${nextNfseNumber}`);
 
-      const respArr: any[] = [];
+      console.log(`Proximo Numero NFSe: ${nextNfseNumber}`);
+
+      let contadorProcessados = 0;
+      await AppDataSource.getRepository(Jobs).update(job.id, {
+        status: "processando",
+        processados: 0,
+        total: ids.length,
+      });
+
       if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
       const logPath = "./log/xml_log.txt";
 
@@ -220,6 +236,10 @@ class NFSEController {
 
         // Process batch
         for (const bid of batch) {
+          contadorProcessados++;
+          await AppDataSource.getRepository(Jobs).update(job.id, {
+            processados: contadorProcessados,
+          });
           const {
             xml,
             valorReduzido,
@@ -388,6 +408,11 @@ class NFSEController {
     } catch (error: any) {
       console.log(error);
       return { status: "500", response: error || "Erro" };
+    } finally {
+      await AppDataSource.getRepository(Jobs).update(job.id, {
+        status: "concluido",
+        resultado: respArr || [],
+      });
     }
   }
 
@@ -590,98 +615,139 @@ class NFSEController {
       this.PASSWORD = password;
       this.configureProvider(ambiente);
 
+      const job = AppDataSource.getRepository(Jobs).create({
+        name: "Cancelar Notas NFSe",
+        description: "Notas Sendo Canceladas em Segundo Plano",
+        status: "pendente",
+        total: id.length,
+        processados: 0,
+      });
+      await AppDataSource.getRepository(Jobs).save(job);
+
+      this.processarCancelamentoNfseJob(job, id, password, ambiente);
+
+      res.status(200).json({
+        message: "Cancelamento em andamento!",
+        job: job.id,
+      });
+    } catch {
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  }
+
+  async processarCancelamentoNfseJob(
+    job: Jobs,
+    ids: (string | number)[],
+    password: string,
+    ambiente: string
+  ) {
+    const responses: any[] = [];
+    try {
+      this.PASSWORD = password;
+      this.configureProvider(ambiente);
       const nfseRepository = AppDataSource.getRepository(NFSE);
 
-      const arr = await Promise.all(
-        id.map(async (nfseId: string | number) => {
-          try {
-            const nfseEntity = await nfseRepository.findOne({
-              where: { id: Number(nfseId), ambiente },
+      await AppDataSource.getRepository(Jobs).update(job.id, {
+        status: "processando",
+        processados: 0,
+        total: ids.length,
+      });
+
+      let contador = 0;
+
+      for (const nfseId of ids) {
+        contador++;
+        await AppDataSource.getRepository(Jobs).update(job.id, {
+          processados: contador,
+        });
+
+        try {
+          const nfseEntity = await nfseRepository.findOne({
+            where: { id: Number(nfseId), ambiente },
+          });
+
+          if (!nfseEntity) {
+            responses.push({
+              id: nfseId,
+              success: false,
+              error: "NFShe not found",
             });
+            continue;
+          }
 
-            if (!nfseEntity) {
-              return { id: nfseId, success: false, error: "NFShe not found" };
-            }
+          const rps = nfseEntity.numeroRps;
 
-            const rps = nfseEntity.numeroRps;
+          const nfseNumber = await this.setNfseNumber(
+            rps,
+            nfseEntity?.serieRps || "1",
+            nfseEntity?.tipoRps || "1",
+            ambiente
+          );
+          if (!nfseNumber)
+            throw new Error("NFSe Number not found for RPS " + rps);
 
-            // await this.setNfseNumber(rps); // Redundant call in original? kept safe
-            const nfseNumber = await this.setNfseNumber(
-              rps,
-              nfseEntity?.serieRps || "1",
-              nfseEntity?.tipoRps || "1",
-              ambiente
-            );
-            if (!nfseNumber)
-              throw new Error("NFSe Number not found for RPS " + rps);
+          const cnpj =
+            ambiente === "homologacao"
+              ? process.env.MUNICIPIO_CNPJ_TEST
+              : process.env.MUNICIPIO_LOGIN;
+          const inscricao =
+            ambiente === "homologacao"
+              ? process.env.MUNICIPIO_INCRICAO_TEST
+              : process.env.MUNICIPIO_INCRICAO;
 
-            const cnpj =
-              ambiente === "homologacao"
-                ? process.env.MUNICIPIO_CNPJ_TEST
-                : process.env.MUNICIPIO_LOGIN;
-            const inscricao =
-              ambiente === "homologacao"
-                ? process.env.MUNICIPIO_INCRICAO_TEST
-                : process.env.MUNICIPIO_INCRICAO;
+          const pedidoXml = this.xmlFactory.createPedidoCancelamentoXml(
+            nfseNumber,
+            cnpj || "",
+            inscricao || "",
+            "3503406"
+          );
+          const envioXml = `<CancelarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${pedidoXml}</CancelarNfseEnvio>`;
 
-            const pedidoXml = this.xmlFactory.createPedidoCancelamentoXml(
-              nfseNumber,
-              cnpj || "",
-              inscricao || "",
-              "3503406"
-            );
-            const envioXml = `<CancelarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${pedidoXml}</CancelarNfseEnvio>`;
+          const envioXmlAssinado = this.fiorilliProvider.assinarXml(
+            envioXml,
+            "InfPedidoCancelamento",
+            password
+          );
 
-            // Sign the inner part
-            const envioXmlAssinado = this.fiorilliProvider.assinarXml(
+          const soapFinal = this.xmlFactory.createCancelamentoSoap(
+            envioXmlAssinado,
+            process.env.MUNICIPIO_LOGIN || "",
+            process.env.MUNICIPIO_SENHA || ""
+          );
+
+          let soapToSend = soapFinal;
+          if (this.homologacao) {
+            const soapUnsigned = this.xmlFactory.createCancelamentoSoap(
               envioXml,
-              "InfPedidoCancelamento",
-              password
-            );
-
-            const soapFinal = this.xmlFactory.createCancelamentoSoap(
-              envioXmlAssinado,
               process.env.MUNICIPIO_LOGIN || "",
               process.env.MUNICIPIO_SENHA || ""
             );
-
-            // Note: Original code had a split logic for homologacao not signing or using different soap?
-            // "const soapFinalHomologacao ... <ws:cancelarNfse>${envioXml}..." (unsigned)
-            // But verify if that was intentional or a debugging left-over.
-            // The original logic sent `soapFinalHomologacao` (unsigned) if homologacao.
-            // I will match that logic.
-
-            let soapToSend = soapFinal;
-            if (this.homologacao) {
-              // If homologacao, original used unsigned 'envioXml' inside the soap
-              const soapUnsigned = this.xmlFactory.createCancelamentoSoap(
-                envioXml,
-                process.env.MUNICIPIO_LOGIN || "",
-                process.env.MUNICIPIO_SENHA || ""
-              );
-              soapToSend = soapUnsigned;
-            }
-
-            const response = await this.fiorilliProvider.sendSoapRequest(
-              soapToSend,
-              "ConsultarNfseServicoPrestadoEnvio",
-              password
-            ); // Action might be different? Original used ConsultarNfseServicoPrestadoEnvio for cancel too?
-
-            nfseEntity.status = "Cancelada";
-            await nfseRepository.save(nfseEntity);
-
-            console.log(response);
-
-            return { id: nfseId, success: true, response: response };
-          } catch (error) {
-            return { id: nfseId, success: false, error };
+            soapToSend = soapUnsigned;
           }
-        })
-      );
-      res.status(200).json(arr);
-    } catch {
-      res.status(500).json({ error: "Internal Server Error" });
+
+          const response = await this.fiorilliProvider.sendSoapRequest(
+            soapToSend,
+            "ConsultarNfseServicoPrestadoEnvio",
+            password
+          );
+
+          nfseEntity.status = "Cancelada";
+          await nfseRepository.save(nfseEntity);
+
+          console.log(response);
+
+          responses.push({ id: nfseId, success: true, response: response });
+        } catch (error) {
+          responses.push({ id: nfseId, success: false, error });
+        }
+      }
+    } catch (e) {
+      console.log(e);
+    } finally {
+      await AppDataSource.getRepository(Jobs).update(job.id, {
+        status: "concluido",
+        resultado: responses,
+      });
     }
   }
 

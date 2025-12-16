@@ -15,6 +15,8 @@ import Error from "./Components/Error";
 import SetPassword from "./Components/SetPassword";
 import { useAuth } from "../../context/AuthContext";
 
+import { useNotification } from "../../context/NotificationContext";
+
 export const BuscarNfeGerada = () => {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
@@ -65,6 +67,7 @@ export const BuscarNfeGerada = () => {
 
   const { user } = useAuth();
   const token = user?.token;
+  const { addJob, showError, showSuccess } = useNotification();
 
   // Update dateFilter object when individual inputs change
   useEffect(() => {
@@ -178,11 +181,20 @@ export const BuscarNfeGerada = () => {
           },
         }
       );
-      setSuccess("Notas Canceladas com Sucesso!");
-      window.location.reload();
+
       console.log("Notas Canceladas:", resposta.data);
+
+      if (resposta.data.job) {
+        addJob(resposta.data.job, "cancelamento");
+        showSuccess(
+          "Solicitação de cancelamento enviada! Processando em segundo plano."
+        );
+      } else {
+        showSuccess("Notas Canceladas com Sucesso!");
+        window.location.reload();
+      }
     } catch (erro) {
-      setError("Erro ao Cancelar Notas!");
+      showError("Erro ao Cancelar Notas!");
       console.error("Erro ao Buscar Clientes:", erro);
     } finally {
       setShowCancelPopUp(false);
