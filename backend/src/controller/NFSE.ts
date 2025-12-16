@@ -178,11 +178,15 @@ class NFSEController {
         targetSeries = lastProd?.serieRps || "1";
       }
 
+      console.log("Serie alvo: " + targetSeries);
+
       // Find last RPS for this specific series to determine next number
       const lastRpsForSeries = await NsfeData.findOne({
         where: { serieRps: targetSeries },
         order: { numeroRps: "DESC" },
       });
+
+      console.log(lastRpsForSeries);
 
       const { nextNfseNumber, nextRpsNumber } = await this.getLastNfseNumber(
         lastNfe,
@@ -197,16 +201,6 @@ class NFSEController {
       // Use the last record (of any series? or target?) as base for other fields like 'issRetido'
       // Ideally use the last record of target series to keep consistency, or fallback to any last record if new series.
       let nfseBase = lastRpsForSeries;
-      if (!nfseBase) {
-        // If starting a new series (e.g. wip99), copy config from last standard '1' series to valid defaults
-        nfseBase =
-          (
-            await NsfeData.find({
-              order: { id: "DESC" },
-              take: 1,
-            })
-          )[0] || null;
-      }
 
       // Pass targetSeries explicitly to prepareRpsData so it doesn't need to re-guess
       const serieToUse = targetSeries;
@@ -309,7 +303,7 @@ class NFSEController {
               ClientData?.celular.replace(/[^0-9]/g, "") || undefined,
             emailTomador: ClientData?.email || undefined,
             optanteSimplesNacional:
-              Number(nfseBase?.optanteSimplesNacional) || 2, // Default 2 (Não)
+              Number(nfseBase?.optanteSimplesNacional) || 1, // Default 2 (Não)
             incentivoFiscal: Number(nfseBase?.incentivoFiscal) || 2, // Default 2 (Não)
             ambiente: ambiente,
             status: "Ativa",
@@ -430,6 +424,8 @@ class NFSEController {
     const RPSQuery = MkauthSource.getRepository(Faturas);
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
 
+    console.log(nfseBase);
+
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const FaturasRepository = MkauthSource.getRepository(Faturas);
     const FaturasData = await FaturasRepository.findOne({
@@ -499,7 +495,7 @@ class NFSEController {
       nfseBase?.responsavelRetencao || 1, // Default: 1 (Tomador) - Avoid 2 (Intermediario) without data
       ambiente === "homologacao"
         ? "17.01"
-        : nfseBase?.itemListaServico || "17.01",
+        : nfseBase?.itemListaServico || "14.02",
       service,
       "3503406", // CodigoMunicipio Prestacao
       nfseBase?.exigibilidadeIss || 1, // Default: Exigivel=1
@@ -517,9 +513,7 @@ class NFSEController {
       ClientData?.celular.replace(/[^0-9]/g, "") || "",
       email,
       ambiente === "homologacao" ? "" : "6", // Regime Especial
-      ambiente === "homologacao"
-        ? "2"
-        : nfseBase?.optanteSimplesNacional || "2",
+      ambiente === "homologacao" ? "2" : "1", // Force 1 (Sim) as per Error L124 (Contribuinte É Optante)
       nfseBase?.incentivoFiscal || 2
     );
 
