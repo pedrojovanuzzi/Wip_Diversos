@@ -116,7 +116,9 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
             results.forEach((item: any) => {
               if (job.type === "cancelamento") {
                 const cStat = item.cStat || item.CStat;
-                if (cStat == "135") {
+                const isSuccess =
+                  item.success === true || (item.cStat || item.CStat) == "135";
+                if (isSuccess) {
                   successCount++;
                 } else {
                   errorsCount++;
