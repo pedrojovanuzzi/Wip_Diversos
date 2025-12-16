@@ -98,4 +98,7 @@ export class NFSE {
 
   @Column({ name: "status", type: "varchar", length: 20 })
   status!: string;
+
+  @Column({ name: "numeroNfe", type: "int" })
+  numeroNfe!: number;
 }
