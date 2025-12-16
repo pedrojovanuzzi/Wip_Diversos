@@ -671,6 +671,8 @@ class NFSEController {
             nfseEntity.status = "Cancelada";
             await nfseRepository.save(nfseEntity);
 
+            console.log(response);
+
             return { id: nfseId, success: true, response: response };
           } catch (error) {
             return { id: nfseId, success: false, error };
