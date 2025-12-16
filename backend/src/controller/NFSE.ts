@@ -370,23 +370,53 @@ class NFSEController {
         console.log("Tem erro: " + JSON.stringify(temErro));
 
         if (temErro) {
-          console.log("Erro detectado na resposta SOAP:", temErro);
-          respArr.push({
-            status: "500",
-            response: "Erro na geração da NFSe",
-            detalhes: temErro,
-          });
+          console.log(
+            "Erro detectado na resposta SOAP:",
+            JSON.stringify(temErro)
+          );
+          // If batch failed, mark all items in this batch as failed
+          for (const bid of batch) {
+            respArr.push({
+              id: bid,
+              success: false,
+              error: "Erro na geração do lote",
+              detalhes: temErro,
+            });
+          }
           // Do NOT save entitiesToSave
           continue;
         }
 
         // If success, save to DB
         if (entitiesToSave.length > 0) {
-          await NsfeData.save(entitiesToSave);
+          try {
+            await NsfeData.save(entitiesToSave);
+            console.log("✅ Entidades salvas no banco com sucesso!");
+          } catch (err) {
+            console.error("❌ Erro ao salvar entidades no banco:", err);
+            // Verify if we should mark as error if DB save fails
+            for (const bid of batch) {
+              respArr.push({
+                id: bid,
+                success: false,
+                error: "Erro ao salvar no banco",
+                detalhes: err,
+              });
+            }
+            continue;
+          }
         }
 
-        console.log(responseXml);
-        respArr.push({ status: "200", response: "ok" });
+        console.log("XML Response: ", responseXml);
+
+        // Mark all items in batch as success
+        for (const bid of batch) {
+          respArr.push({
+            id: bid,
+            success: true,
+            message: "Nota gerada com sucesso",
+          });
+        }
       }
 
       // Cleanup happens automatically or we can force it if provider methods left artifacts (current provider cleanups are handled or minimal)
@@ -724,6 +754,40 @@ class NFSEController {
             "ConsultarNfseServicoPrestadoEnvio",
             password
           );
+
+          const result = await parseStringPromise(response, {
+            explicitArray: false,
+          });
+
+          const soapBody =
+            result["soap:Envelope"]?.["soap:Body"] || result["soapenv:Body"];
+          const cancelarResp =
+            soapBody?.["ns3:cancelarNfseResponse"] ||
+            soapBody?.["cancelarNfseResponse"] ||
+            soapBody?.["CancelarNfseResposta"];
+          const respostaInterna =
+            cancelarResp?.["ns2:CancelarNfseResposta"] ||
+            cancelarResp?.["CancelarNfseResposta"];
+
+          // Se tiver ListaMensagemRetorno, é erro!
+          if (
+            respostaInterna &&
+            (respostaInterna["ns2:ListaMensagemRetorno"] ||
+              respostaInterna["ListaMensagemRetorno"])
+          ) {
+            const erroMsg =
+              respostaInterna["ns2:ListaMensagemRetorno"]?.[
+                "ns2:MensagemRetorno"
+              ] || respostaInterna["ListaMensagemRetorno"]?.["MensagemRetorno"];
+
+            console.error("ERRO AO CANCELAR:", erroMsg);
+
+            // ATUALIZE O JOB COM ERRO (Se tiver acesso à variavel 'job' aqui)
+            // job.resultado = { erro: true, msg: erroMsg };
+            // await jobRepository.save(job);
+
+            return; // <--- IMPEDE que o código continue e marque como cancelada
+          }
 
           nfseEntity.status = "Cancelada";
           await nfseRepository.save(nfseEntity);
