@@ -181,7 +181,7 @@ class NFSEController {
       console.log("Serie alvo: " + targetSeries);
 
       // Find last RPS for this specific series to determine next number
-      const lastRpsForSeries = await NsfeData.findOne({
+      let lastRpsForSeries = await NsfeData.findOne({
         where: { serieRps: targetSeries },
         order: { numeroRps: "DESC" },
       });
@@ -198,9 +198,31 @@ class NFSEController {
       // Mirror logic for NFSe number counting
       let currentNfseNumber = nextNfseNumber;
 
+      if (!lastRpsForSeries) {
+        lastRpsForSeries = NsfeData.create();
+        lastRpsForSeries.tipoRps = 1;
+        lastRpsForSeries.itemListaServico = "17.01";
+        lastRpsForSeries.issRetido = 2;
+        lastRpsForSeries.responsavelRetencao = 1;
+        lastRpsForSeries.exigibilidadeIss = 1;
+      }
       // Use the last record (of any series? or target?) as base for other fields like 'issRetido'
       // Ideally use the last record of target series to keep consistency, or fallback to any last record if new series.
       let nfseBase = lastRpsForSeries;
+
+      if (ambiente == "homologacao") {
+        nfseBase!.tipoRps = 1;
+        nfseBase!.itemListaServico = "17.01";
+        nfseBase!.issRetido = 2;
+        nfseBase!.responsavelRetencao = 1;
+        nfseBase!.exigibilidadeIss = 1;
+      } else {
+        nfseBase!.tipoRps = 1;
+        nfseBase!.itemListaServico = "14.02";
+        nfseBase!.issRetido = 2;
+        nfseBase!.responsavelRetencao = 1;
+        nfseBase!.exigibilidadeIss = 1;
+      }
 
       // Pass targetSeries explicitly to prepareRpsData so it doesn't need to re-guess
       const serieToUse = targetSeries;
@@ -284,7 +306,7 @@ class NFSEController {
             aliquota: Number(Number(aliquota).toFixed(4)),
             issRetido: nfseBase?.issRetido || 2, // Default 2 (Não)
             responsavelRetencao: nfseBase?.responsavelRetencao || 1, // Default 1 (Tomador)
-            itemListaServico: nfseBase?.itemListaServico || "17.01",
+            itemListaServico: nfseBase?.itemListaServico,
             discriminacao: service,
             codigoMunicipio: nfseBase?.codigoMunicipio || 0,
             exigibilidadeIss: nfseBase?.exigibilidadeIss || 1, // Default 1 (Exigível)
@@ -522,10 +544,8 @@ class NFSEController {
       val,
       Number(aliquota).toFixed(4),
       nfseBase?.issRetido || 2, // Default: Retido=2 (Não)
-      nfseBase?.responsavelRetencao || 1, // Default: 1 (Tomador) - Avoid 2 (Intermediario) without data
-      ambiente === "homologacao"
-        ? "17.01"
-        : nfseBase?.itemListaServico || "14.02",
+      nfseBase?.responsavelRetencao || 1,
+      nfseBase?.itemListaServico,
       service,
       "3503406", // CodigoMunicipio Prestacao
       nfseBase?.exigibilidadeIss || 1, // Default: Exigivel=1
@@ -780,13 +800,22 @@ class NFSEController {
                 "ns2:MensagemRetorno"
               ] || respostaInterna["ListaMensagemRetorno"]?.["MensagemRetorno"];
 
-            console.error("ERRO AO CANCELAR:", erroMsg);
+            console.error("ERRO AO CANCELAR (Job atualizado):", erroMsg);
 
-            // ATUALIZE O JOB COM ERRO (Se tiver acesso à variavel 'job' aqui)
-            // job.resultado = { erro: true, msg: erroMsg };
-            // await jobRepository.save(job);
+            // 1. Atualiza o JOB para ERRO com os detalhes
+            job.status = "erro";
+            job.resultado = {
+              erro: true,
+              mensagem: "Prefeitura rejeitou o cancelamento",
+              detalhes: erroMsg, // Aqui vai o objeto { Codigo: 'E172', ... }
+            };
+            job.processados = (job.processados || 0) + 1; // Incrementa para não travar a contagem
 
-            return; // <--- IMPEDE que o código continue e marque como cancelada
+            await AppDataSource.getRepository(Jobs).save(job);
+
+            // 2. Impede que o código continue e marque como concluído lá embaixo
+            return; // Se estiver dentro de um loop e quiser parar tudo, use 'return'.
+            // Se quiser continuar tentando outras notas, use 'continue' e use uma variável 'hasError' para não marcar 'concluido' no final.
           }
 
           nfseEntity.status = "Cancelada";
