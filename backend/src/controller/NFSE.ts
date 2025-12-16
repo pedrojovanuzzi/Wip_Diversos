@@ -173,9 +173,7 @@ class NFSEController {
         order: { numeroRps: "DESC" },
       });
 
-      let nfseNumber = lastRpsForSeries?.numeroRps
-        ? lastRpsForSeries.numeroRps + 1
-        : 1;
+      let nfseNumber = await this.getLastNfseNumber(ambiente);
 
       // Use the last record (of any series? or target?) as base for other fields like 'issRetido'
       // Ideally use the last record of target series to keep consistency, or fallback to any last record if new series.
@@ -1075,6 +1073,8 @@ class NFSEController {
         process.env.MUNICIPIO_LOGIN || "",
         process.env.MUNICIPIO_SENHA || ""
       );
+
+      console.log("SOAP Request getLastNfseNumber:", soapXml);
 
       const response = await this.fiorilliProvider.sendSoapRequest(
         soapXml,

@@ -23,6 +23,7 @@ export const Nfe = () => {
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
   const [aliquota, setAliquota] = useState("");
+  const [lastNfe, setLastNfe] = useState<string>("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [service, setService] = useState("");
@@ -382,6 +383,16 @@ export const Nfe = () => {
             );
           }}
           placeholder="Redução Ex: 60%"
+          className="ring-2 ring-gray-500 p-2 rounded m-5"
+        />
+        <input
+          type="text"
+          onChange={(e) => {
+            setLastNfe(
+              e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, "")
+            );
+          }}
+          placeholder="Ultima NF-e"
           className="ring-2 ring-gray-500 p-2 rounded m-5"
         />
       </div>
