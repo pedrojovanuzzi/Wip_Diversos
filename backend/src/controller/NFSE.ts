@@ -183,6 +183,8 @@ class NFSEController {
 
       // We will use nextRpsNumber for the RPS loop counting
       let currentRpsNumber = nextRpsNumber;
+      // Mirror logic for NFSe number counting
+      let currentNfseNumber = nextNfseNumber;
 
       // Use the last record (of any series? or target?) as base for other fields like 'issRetido'
       // Ideally use the last record of target series to keep consistency, or fallback to any last record if new series.
@@ -250,6 +252,7 @@ class NFSEController {
 
           // Increment number
           currentRpsNumber++;
+          currentNfseNumber++;
 
           // Create entity but DO NOT SAVE yet
           const novoRegistro = NsfeData.create({
@@ -289,7 +292,7 @@ class NFSEController {
             incentivoFiscal: 2,
             ambiente: ambiente,
             status: "Ativa",
-            numeroNfe: nextNfseNumber,
+            numeroNfe: currentNfseNumber - 1,
           });
           entitiesToSave.push(novoRegistro);
         }
