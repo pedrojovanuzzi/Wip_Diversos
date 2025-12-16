@@ -6,8 +6,6 @@ import Filter from "./Components/Filter";
 
 import { BsFiletypeDoc } from "react-icons/bs";
 import PopUpButton from "./Components/PopUpButton";
-import Error from "./Components/Error";
-import Success from "./Components/Success";
 import { useAuth } from "../../context/AuthContext";
 import { BuscarNfeGerada } from "./BuscarNfeGerada";
 import { Link } from "react-router-dom";
@@ -25,8 +23,6 @@ export const Nfe = () => {
   const [clientes, setClientes] = useState<any[]>([]);
   const [aliquota, setAliquota] = useState("");
   const [lastNfe, setLastNfe] = useState<string>("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [service, setService] = useState("");
   const [loading, setLoading] = useState(false);
   const [ambiente, setAmbiente] = useState("homologacao");
@@ -87,8 +83,6 @@ export const Nfe = () => {
   const emitirNFe = async () => {
     try {
       setLoading(true);
-      setError("");
-      // setSuccess("");
 
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/`,
@@ -172,12 +166,12 @@ export const Nfe = () => {
         }
       );
       console.log("Certificado enviado:", resposta.data);
-      setSuccess("Certificado enviado com sucesso!");
+      showSuccess("Certificado enviado com sucesso!");
       setShowCertPasswordPopUp(false);
       setCertPassword("");
     } catch (erro) {
       console.error("Erro ao enviar o certificado:", erro);
-      setError("Não foi possível enviar o certificado.");
+      showError("Não foi possível enviar o certificado.");
       setShowCertPasswordPopUp(false);
     }
   };
@@ -199,7 +193,6 @@ export const Nfe = () => {
           },
         }
       );
-      setError("");
       console.log("Clientes encontrados:", resposta.data);
       setClientes(resposta.data);
     } catch (erro) {
@@ -209,13 +202,13 @@ export const Nfe = () => {
         erro.response &&
         erro.response.status === 500
       ) {
-        setError(
+        showError(
           "Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde."
         );
       } else if (axios.isAxiosError(erro) && erro.response) {
-        setError(`Erro: ${erro.response.data.error || "Algo deu errado."}`);
+        showError(`Erro: ${erro.response.data.error || "Algo deu errado."}`);
       } else {
-        setError("Erro de rede. Verifique sua conexão e tente novamente.");
+        showError("Erro de rede. Verifique sua conexão e tente novamente.");
       }
     }
   };
@@ -249,8 +242,6 @@ export const Nfe = () => {
         setArquivo={setArquivo}
         enviarCertificado={handleEnviarCertificado}
       />
-      {error && <Error message={error} />}
-      {success && <Success message={success} />}
       {clientes.length > 0 && (
         <>
           <h1 className="text-center mt-2 self-center text-2xl font-semibold text-gray-900">

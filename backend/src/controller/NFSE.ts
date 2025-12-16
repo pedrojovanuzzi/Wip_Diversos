@@ -186,15 +186,31 @@ class NFSEController {
         order: { numeroRps: "DESC" },
       });
 
-      console.log(lastRpsForSeries);
+      console.log("Último RPS no banco local:", lastRpsForSeries);
 
       const { nextNfseNumber, nextRpsNumber } = await this.getLastNfseNumber(
         lastNfe,
         ambiente
       );
 
-      // We will use nextRpsNumber for the RPS loop counting
+      console.log("Próximo RPS da API:", nextRpsNumber);
+      console.log("Próximo NFSe da API:", nextNfseNumber);
+
+      // CORREÇÃO: Usa o MAIOR número entre banco local e API para evitar duplicação
       let currentRpsNumber = nextRpsNumber;
+      if (lastRpsForSeries && lastRpsForSeries.numeroRps) {
+        const localNextRps = lastRpsForSeries.numeroRps + 1;
+        console.log("Próximo RPS calculado do banco local:", localNextRps);
+
+        // Se o banco local tem um número maior, usa ele
+        if (localNextRps > nextRpsNumber) {
+          console.log(
+            `⚠️ ATENÇÃO: Banco local tem RPS mais recente (${localNextRps}) que a API (${nextRpsNumber}). Usando ${localNextRps}.`
+          );
+          currentRpsNumber = localNextRps;
+        }
+      }
+
       // Mirror logic for NFSe number counting
       let currentNfseNumber = nextNfseNumber;
 
@@ -229,10 +245,8 @@ class NFSEController {
 
       console.log(`Ambiente: ${this.homologacao ? "Homologacao" : "Producao"}`);
       console.log(`Serie Alvo: ${serieToUse}`);
-      console.log(`Proximo Numero RPS: ${currentRpsNumber}`);
-      console.log(`Proximo Numero NFSe: ${nextNfseNumber}`);
-
-      console.log(`Proximo Numero NFSe: ${nextNfseNumber}`);
+      console.log(`✅ Proximo Numero RPS (FINAL): ${currentRpsNumber}`);
+      console.log(`✅ Proximo Numero NFSe (FINAL): ${currentNfseNumber}`);
 
       let contadorProcessados = 0;
       await AppDataSource.getRepository(Jobs).update(job.id, {
@@ -389,8 +403,16 @@ class NFSEController {
           resposta?.["ns2:ListaMensagemRetorno"]?.["ns2:MensagemRetorno"] ||
           resposta?.["ns2:ListaMensagemRetornoLote"]?.["ns2:MensagemRetorno"];
 
-        console.log("Tem erro: " + JSON.stringify(temErro));
+        // Verifica se teve sucesso (tem ListaNfse na resposta)
+        const temSucesso = resposta?.["ns2:ListaNfse"]?.["ns2:CompNfse"];
 
+        console.log("Tem erro: " + JSON.stringify(temErro));
+        console.log(
+          "Tem sucesso (ListaNfse): " +
+            JSON.stringify(temSucesso ? true : false)
+        );
+
+        // Se tem mensagem de erro explícita, marca como erro
         if (temErro) {
           console.log(
             "Erro detectado na resposta SOAP:",
@@ -406,6 +428,23 @@ class NFSEController {
             });
           }
           // Do NOT save entitiesToSave
+          continue;
+        }
+
+        // Se não tem sucesso E não tem erro, algo inesperado aconteceu
+        if (!temSucesso && !temErro) {
+          console.log(
+            "Resposta inesperada do SOAP (sem ListaNfse e sem erro):",
+            JSON.stringify(resposta)
+          );
+          for (const bid of batch) {
+            respArr.push({
+              id: bid,
+              success: false,
+              error: "Resposta inesperada do servidor",
+              detalhes: resposta,
+            });
+          }
           continue;
         }
 
@@ -455,10 +494,24 @@ class NFSEController {
       console.log(error);
       return { status: "500", response: error || "Erro" };
     } finally {
+      // --- DEBUG: Log para rastrear o problema ---
+      console.log("=== FINALIZANDO JOB ===");
+      console.log("Job ID:", job.id);
+      console.log("Total de respostas em respArr:", respArr.length);
+      console.log("Respostas:", JSON.stringify(respArr, null, 2));
+
+      // Verifica se algum item do array tem success: false
+      const teveErro = respArr.some((item) => item.success === false);
+
+      console.log("Teve erro?", teveErro);
+      console.log("Status final:", teveErro ? "erro" : "concluido");
+
       await AppDataSource.getRepository(Jobs).update(job.id, {
-        status: "concluido",
+        status: teveErro ? "erro" : "concluido",
         resultado: respArr || [],
       });
+
+      console.log("=== JOB ATUALIZADO ===");
     }
   }
 
@@ -800,22 +853,18 @@ class NFSEController {
                 "ns2:MensagemRetorno"
               ] || respostaInterna["ListaMensagemRetorno"]?.["MensagemRetorno"];
 
-            console.error("ERRO AO CANCELAR (Job atualizado):", erroMsg);
+            console.error("ERRO AO CANCELAR NFSe " + nfseId + ":", erroMsg);
 
-            // 1. Atualiza o JOB para ERRO com os detalhes
-            job.status = "erro";
-            job.resultado = {
-              erro: true,
-              mensagem: "Prefeitura rejeitou o cancelamento",
-              detalhes: erroMsg, // Aqui vai o objeto { Codigo: 'E172', ... }
-            };
-            job.processados = (job.processados || 0) + 1; // Incrementa para não travar a contagem
+            // Adiciona ao array de responses para que o finally possa avaliar corretamente
+            responses.push({
+              id: nfseId,
+              success: false,
+              error: "Prefeitura rejeitou o cancelamento",
+              detalhes: erroMsg,
+            });
 
-            await AppDataSource.getRepository(Jobs).save(job);
-
-            // 2. Impede que o código continue e marque como concluído lá embaixo
-            return; // Se estiver dentro de um loop e quiser parar tudo, use 'return'.
-            // Se quiser continuar tentando outras notas, use 'continue' e use uma variável 'hasError' para não marcar 'concluido' no final.
+            // Continua para processar os próximos itens
+            continue;
           }
 
           nfseEntity.status = "Cancelada";
@@ -831,10 +880,24 @@ class NFSEController {
     } catch (e) {
       console.log(e);
     } finally {
+      // --- DEBUG: Log para rastrear o problema ---
+      console.log("=== FINALIZANDO JOB DE CANCELAMENTO ===");
+      console.log("Job ID:", job.id);
+      console.log("Total de respostas:", responses.length);
+      console.log("Respostas:", JSON.stringify(responses, null, 2));
+
+      // Verifica se algum item do array tem success: false
+      const teveErro = responses.some((item) => item.success === false);
+
+      console.log("Teve erro?", teveErro);
+      console.log("Status final:", teveErro ? "erro" : "concluido");
+
       await AppDataSource.getRepository(Jobs).update(job.id, {
-        status: "concluido",
-        resultado: responses,
+        status: teveErro ? "erro" : "concluido",
+        resultado: responses || [],
       });
+
+      console.log("=== JOB DE CANCELAMENTO ATUALIZADO ===");
     }
   }
 
