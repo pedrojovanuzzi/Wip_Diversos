@@ -499,7 +499,10 @@ export const BuscarNfeGerada = () => {
                       onClick={() => {
                         imprimir(reactToPrintContent);
                       }}
-                      disabled={clientesSelecionados.length === 0}
+                      disabled={
+                        clientesSelecionados.length === 0 ||
+                        clientesSelecionados.length >= 2
+                      }
                     >
                       <BsFiletypeDoc />
                       Imprimir ({clientesSelecionados.length})
