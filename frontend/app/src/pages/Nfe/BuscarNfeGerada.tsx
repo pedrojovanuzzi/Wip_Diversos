@@ -515,7 +515,7 @@ export const BuscarNfeGerada = () => {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto h-[calc(100vh-400px)]">
                   <table className="min-w-full divide-y divide-gray-300">
                     <thead className="bg-gray-50">
                       <tr>
@@ -578,56 +578,58 @@ export const BuscarNfeGerada = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
-                      {clientes.map((cliente) => (
-                        <tr
-                          key={cliente.id}
-                          className="hover:bg-gray-50 transition-colors"
-                        >
-                          <td className="px-6 py-4 text-left text-sm text-gray-500">
-                            <input
-                              type="checkbox"
-                              className="cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                              checked={clientesSelecionados.includes(
-                                cliente.nfse.id
-                              )}
-                              onChange={() =>
-                                handleCheckboxChange(cliente.nfse.id)
-                              }
-                            />
-                          </td>
-                          <td className="px-6 py-4 text-left text-sm text-gray-500">
-                            {cliente.nfse.id}
-                          </td>
-                          <td className="px-6 py-4 text-left text-sm text-gray-900">
-                            {cliente.nfse.numeroNfse}
-                          </td>
-                          <td className="px-6 py-4 text-left text-sm text-gray-500">
-                            {cliente.login}
-                          </td>
-                          <td className="px-6 py-4 text-left text-sm text-gray-500">
-                            {cliente.nfse.competencia}
-                          </td>
-                          <td className="px-6 py-4 text-left text-sm text-gray-500">
-                            {cliente.nfse.aliquota}
-                          </td>
-                          <td className="px-6 py-4 text-left text-sm text-gray-500">
-                            {cliente.nfse.valor_servico}
-                          </td>
-                          <td className="px-6 py-4 text-left text-sm">
-                            <span
-                              className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
-                                cliente.nfse.status === "Ativa"
-                                  ? "bg-green-50 text-green-700 ring-green-600/20"
-                                  : cliente.nfse.status === "Cancelada"
-                                  ? "bg-red-50 text-red-700 ring-red-600/20"
-                                  : "bg-yellow-50 text-yellow-800 ring-yellow-600/20"
-                              }`}
-                            >
-                              {cliente.nfse.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {clientes
+                        .sort((a, b) => b.nfse.id - a.nfse.id)
+                        .map((cliente) => (
+                          <tr
+                            key={cliente.id}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
+                            <td className="px-6 py-4 text-left text-sm text-gray-500">
+                              <input
+                                type="checkbox"
+                                className="cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                checked={clientesSelecionados.includes(
+                                  cliente.nfse.id
+                                )}
+                                onChange={() =>
+                                  handleCheckboxChange(cliente.nfse.id)
+                                }
+                              />
+                            </td>
+                            <td className="px-6 py-4 text-left text-sm text-gray-500">
+                              {cliente.nfse.id}
+                            </td>
+                            <td className="px-6 py-4 text-left text-sm text-gray-900">
+                              {cliente.nfse.numeroNfse}
+                            </td>
+                            <td className="px-6 py-4 text-left text-sm text-gray-500">
+                              {cliente.login}
+                            </td>
+                            <td className="px-6 py-4 text-left text-sm text-gray-500">
+                              {cliente.nfse.competencia}
+                            </td>
+                            <td className="px-6 py-4 text-left text-sm text-gray-500">
+                              {cliente.nfse.aliquota}
+                            </td>
+                            <td className="px-6 py-4 text-left text-sm text-gray-500">
+                              {cliente.nfse.valor_servico}
+                            </td>
+                            <td className="px-6 py-4 text-left text-sm">
+                              <span
+                                className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
+                                  cliente.nfse.status === "Ativa"
+                                    ? "bg-green-50 text-green-700 ring-green-600/20"
+                                    : cliente.nfse.status === "Cancelada"
+                                    ? "bg-red-50 text-red-700 ring-red-600/20"
+                                    : "bg-yellow-50 text-yellow-800 ring-yellow-600/20"
+                                }`}
+                              >
+                                {cliente.nfse.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
