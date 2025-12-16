@@ -289,6 +289,7 @@ class NFSEController {
             incentivoFiscal: 2,
             ambiente: ambiente,
             status: "Ativa",
+            numeroNfe: nextNfseNumber,
           });
           entitiesToSave.push(novoRegistro);
         }
@@ -848,13 +849,6 @@ class NFSEController {
             }
 
             nfseValidas.push(nf);
-            const numeroNfse = await this.setNfseNumber(
-              nf.numeroRps,
-              nf.serieRps,
-              nf.tipoRps,
-              ambiente
-            );
-            nfseNumberArray.push(numeroNfse);
           }
 
           if (!nfseValidas.length) return null;
@@ -931,7 +925,8 @@ class NFSEController {
               incentivo_fiscal:
                 nfseValidas.map((nf) => nf.incentivoFiscal).join(", ") || null,
               status: nfseValidas.map((nf) => nf.status).join(", ") || null,
-              numeroNfse: nfseNumberArray.join(", ") || null,
+              numeroNfse:
+                nfseValidas.map((nf) => nf.numeroNfe).join(", ") || null,
             },
           };
         })
