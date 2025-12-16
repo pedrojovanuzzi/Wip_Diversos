@@ -838,15 +838,15 @@ class NFSEController {
           const nfseNumberArray: string[] = [];
 
           for (const nf of nfseDoCliente) {
-            const isCancelada = await this.setNfseStatus(
-              nf.numeroRps,
-              nf.serieRps,
-              nf.tipoRps,
-              ambiente
-            );
-            if (isCancelada) {
-              nf.status = "Cancelada";
-            }
+            // const isCancelada = await this.setNfseStatus(
+            //   nf.numeroRps,
+            //   nf.serieRps,
+            //   nf.tipoRps,
+            //   ambiente
+            // );
+            // if (isCancelada) {
+            //   nf.status = "Cancelada";
+            // }
 
             nfseValidas.push(nf);
           }
