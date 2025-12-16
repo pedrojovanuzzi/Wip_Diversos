@@ -259,7 +259,7 @@ class NFSEController {
             login: rpsData?.login || "",
             numeroRps: currentRpsNumber - 1,
             serieRps: serieRps || "",
-            tipoRps: nfseBase?.tipoRps || 0,
+            tipoRps: Number(nfseBase?.tipoRps) || 1, // Enforce 1 even if 0
             dataEmissao: rpsData?.processamento
               ? new Date(rpsData.processamento)
               : new Date(),
@@ -268,12 +268,12 @@ class NFSEController {
               : new Date(),
             valorServico: valorReduzido || 0,
             aliquota: Number(Number(aliquota).toFixed(4)),
-            issRetido: nfseBase?.issRetido || 0,
-            responsavelRetencao: nfseBase?.responsavelRetencao || 0,
-            itemListaServico: nfseBase?.itemListaServico || "",
+            issRetido: nfseBase?.issRetido || 2, // Default 2 (Não)
+            responsavelRetencao: nfseBase?.responsavelRetencao || 1, // Default 1 (Tomador)
+            itemListaServico: nfseBase?.itemListaServico || "17.01",
             discriminacao: service,
             codigoMunicipio: nfseBase?.codigoMunicipio || 0,
-            exigibilidadeIss: nfseBase?.exigibilidadeIss || 0,
+            exigibilidadeIss: nfseBase?.exigibilidadeIss || 1, // Default 1 (Exigível)
             cnpjPrestador: nfseBase?.cnpjPrestador || "",
             inscricaoMunicipalPrestador:
               nfseBase?.inscricaoMunicipalPrestador || "",
@@ -288,8 +288,9 @@ class NFSEController {
             telefoneTomador:
               ClientData?.celular.replace(/[^0-9]/g, "") || undefined,
             emailTomador: ClientData?.email || undefined,
-            optanteSimplesNacional: 1,
-            incentivoFiscal: 2,
+            optanteSimplesNacional:
+              Number(nfseBase?.optanteSimplesNacional) || 2, // Default 2 (Não)
+            incentivoFiscal: Number(nfseBase?.incentivoFiscal) || 2, // Default 2 (Não)
             ambiente: ambiente,
             status: "Ativa",
             numeroNfe: currentNfseNumber - 1,
