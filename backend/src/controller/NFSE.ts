@@ -124,7 +124,7 @@ class NFSEController {
         ambiente,
         service,
         reducao,
-        lastNfe
+        Number(lastNfe)
       );
 
       if (Array.isArray(result)) {
@@ -460,17 +460,19 @@ class NFSEController {
       rpsData?.uuid_lanc || "",
       nfseNumber,
       serieRps,
-      nfseBase?.tipoRps,
+      nfseBase?.tipoRps || "1",
       new Date(), // Data Emissao
       "1", // Status
       val,
       Number(aliquota).toFixed(4),
-      nfseBase?.issRetido,
-      nfseBase?.responsavelRetencao,
-      ambiente === "homologacao" ? "17.01" : nfseBase?.itemListaServico,
+      nfseBase?.issRetido || 2, // Default: Retido=2 (Não)
+      nfseBase?.responsavelRetencao || 1, // Default: 1 (Tomador) - Avoid 2 (Intermediario) without data
+      ambiente === "homologacao"
+        ? "17.01"
+        : nfseBase?.itemListaServico || "17.01",
       service,
       "3503406", // CodigoMunicipio Prestacao
-      nfseBase?.exigibilidadeIss,
+      nfseBase?.exigibilidadeIss || 1, // Default: Exigivel=1
       cnpjPrestador || "",
       inscricaoPrestador || "",
       ClientData?.cpf_cnpj || "",
@@ -485,8 +487,10 @@ class NFSEController {
       ClientData?.celular.replace(/[^0-9]/g, "") || "",
       email,
       ambiente === "homologacao" ? "" : "6", // Regime Especial
-      ambiente === "homologacao" ? "2" : nfseBase?.optanteSimplesNacional,
-      nfseBase?.incentivoFiscal
+      ambiente === "homologacao"
+        ? "2"
+        : nfseBase?.optanteSimplesNacional || "2",
+      nfseBase?.incentivoFiscal || 2
     );
 
     return {
