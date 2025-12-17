@@ -261,7 +261,7 @@ export default function SearchInterface() {
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
       setSelectAllPopUp(true);
-      setSelectedIds(nfcomList.map((n) => n.numeracao));
+      setSelectedIds(nfcomList.map((n) => n.id));
     } else {
       setSelectedIds([]);
       setExcludedIds([]);
@@ -465,9 +465,7 @@ export default function SearchInterface() {
         }
       );
       console.log(response.data);
-      setSelectedIds(
-        response.data.map((item: { numeracao: any }) => item.numeracao)
-      );
+      setSelectedIds(response.data.map((item: { id: any }) => item.id));
     };
 
     if (isSelectAllMode) {
@@ -902,23 +900,15 @@ export default function SearchInterface() {
                           {isSelectAllMode ? (
                             <input
                               type="checkbox"
-                              checked={
-                                !excludedIds.includes(Number(nfcom.numeracao))
-                              }
-                              onChange={() =>
-                                handleSelectOne(Number(nfcom.numeracao))
-                              }
+                              checked={!excludedIds.includes(Number(nfcom.id))}
+                              onChange={() => handleSelectOne(Number(nfcom.id))}
                               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                           ) : (
                             <input
                               type="checkbox"
-                              checked={selectedIds.includes(
-                                Number(nfcom.numeracao)
-                              )}
-                              onChange={() =>
-                                handleSelectOne(Number(nfcom.numeracao))
-                              }
+                              checked={selectedIds.includes(Number(nfcom.id))}
+                              onChange={() => handleSelectOne(Number(nfcom.id))}
                               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                           )}
