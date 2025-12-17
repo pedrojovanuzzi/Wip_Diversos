@@ -2,8 +2,14 @@ import { exec } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as dotenv from "dotenv";
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 import { Request, Response } from "express";
+import { send } from "process";
+import { ClientSecretCredential } from "@azure/identity";
+import {
+  AuthenticationProvider,
+  Client,
+} from "@microsoft/microsoft-graph-client";
 
 dotenv.config();
 
@@ -15,186 +21,178 @@ interface DatabaseConfig {
 }
 
 const databases: DatabaseConfig[] = [
-    {
-      name: process.env.DATABASE!,
-      host: process.env.DATABASE_HOST!,
-      user: process.env.DATABASE_USERNAME!,
-      pass: process.env.DATABASE_PASSWORD!,
-    },
-    {
-      name: process.env.DATABASE_API_MK!,
-      host: process.env.DATABASE_HOST_API_MK!,
-      user: process.env.DATABASE_USERNAME_API_MK!,
-      pass: process.env.DATABASE_PASSWORD_API_MK!,
-    },
-    {
-      name: process.env.DATABASE_PAINEL!,
-      host: process.env.DATABASE_HOST_PAINEL!,
-      user: process.env.DATABASE_USERNAME_PAINEL!,
-      pass: process.env.DATABASE_PASSWORD_PAINEL!,
-    },
-    {
-      name: process.env.DATABASE_TVWIP!,
-      host: process.env.DATABASE_HOST_TVWIP!,
-      user: process.env.DATABASE_USERNAME_TVWIP!,
-      pass: process.env.DATABASE_PASSWORD_TVWIP!,
-    },
-  ];
+  {
+    name: process.env.DATABASE!,
+    host: process.env.DATABASE_HOST!,
+    user: process.env.DATABASE_USERNAME!,
+    pass: process.env.DATABASE_PASSWORD!,
+  },
+  {
+    name: process.env.DATABASE_API_MK!,
+    host: process.env.DATABASE_HOST_API_MK!,
+    user: process.env.DATABASE_USERNAME_API_MK!,
+    pass: process.env.DATABASE_PASSWORD_API_MK!,
+  },
+  {
+    name: process.env.DATABASE_PAINEL!,
+    host: process.env.DATABASE_HOST_PAINEL!,
+    user: process.env.DATABASE_USERNAME_PAINEL!,
+    pass: process.env.DATABASE_PASSWORD_PAINEL!,
+  },
+  {
+    name: process.env.DATABASE_TVWIP!,
+    host: process.env.DATABASE_HOST_TVWIP!,
+    user: process.env.DATABASE_USERNAME_TVWIP!,
+    pass: process.env.DATABASE_PASSWORD_TVWIP!,
+  },
+];
+
+class AzureAuthProvider implements AuthenticationProvider {
+  private credential: ClientSecretCredential;
+  private scopes: string[];
+
+  constructor(credential: ClientSecretCredential, scopes: string[]) {
+    this.credential = credential;
+    this.scopes = scopes;
+  }
+
+  // O Graph Client chama essa função automaticamente quando precisa de um token
+  public async getAccessToken(): Promise<string> {
+    const token = await this.credential.getToken(this.scopes);
+    return token?.token || "";
+  }
+}
 
 class Backup {
-  
+  private graphClient: Client;
 
-public async gerarTodos() {
- try {    
-    // obter a data atual no formato YYYY-MM-DD
-  const date = new Date().toISOString().slice(0,10);
+  constructor() {
+    // 1. Cria a credencial com os dados do .env
+    const credential = new ClientSecretCredential(
+      process.env.AZURE_TENANT_ID!,
+      process.env.AZURE_CLIENT_ID!,
+      process.env.AZURE_CLIENT_SECRET!
+    );
 
-  // array para armazenar os arquivos gerados (para enviar depois por e-mail)
-  const attachments: { filename: string; path: string }[] = [];
+    // 2. Cria o provider de autenticação
+    const authProvider = new AzureAuthProvider(credential, [
+      "https://graph.microsoft.com/.default",
+    ]);
 
-  // para cada banco de dados listado
-  for (const db of databases) {
-    // definir o caminho onde o backup será salvo: ./backups/<nome do banco>/<data>
-    const backupDir = path.resolve(__dirname, "..", "backups", db.name, date);
-    // criar a pasta caso não exista
-    fs.mkdirSync(backupDir, {recursive: true});
-    // definir o caminho final do arquivo SQL
-    const filePath = path.join(backupDir, `${db.name}.sql`);
-    // montar o comando mysqldump para gerar o backup
-    const dumpCommand = `mysqldump -h ${db.host} -u ${db.user} -p'${db.pass}' ${db.name} > "${filePath}"`;
-    console.log(dumpCommand);
-    
-    // mostrar no console que o backup está começando
-   console.log(`Iniciando Backup do Banco ${db.name}`);
-  
-    // executar o comando e aguardar ele finalizar
-    //Como nas existe await exec precisamos criar uma promisse e aplicar o await nela
-    await new Promise<void>((resolve, reject) => {
-      exec(dumpCommand, (error, stdout, stderr) => {
-        //Retorna o throw error para o usuario
-          console.log(stdout);
-          console.log(stderr);
-        if (error) {
-          // se der erro, mostrar no console e rejeitar a promessa
-          if(error){
-            console.error(error.message);
-            return reject(error);
-          }
-          
-          
-          return reject(error);
-        }
-        // se der certo, mostrar no console e adicionar o anexo ao array
-        console.log(`Backup de ${db.name} salvo em ${filePath}`);
-        attachments.push({filename: `${db.name}.sql`, path: filePath});
-        resolve();
-      });
-    });
+    // 3. Inicializa o Graph Client
+    this.graphClient = Client.initWithMiddleware({ authProvider });
   }
 
-  // (depois você pode usar o array `attachments` para enviar os backups por e-mail)
-  const send = await this.enviarEmailBackup(attachments, date);
-  console.log(send);
-  
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-public gerarTodosButton = async (req: Request, res: Response) => {
-  try {    
-    // obter a data atual no formato YYYY-MM-DD
-  const date = new Date().toISOString().slice(0,10);
-
-  // array para armazenar os arquivos gerados (para enviar depois por e-mail)
-  const attachments: { filename: string; path: string }[] = [];
-
-  // para cada banco de dados listado
-  for (const db of databases) {
-    // definir o caminho onde o backup será salvo: ./backups/<nome do banco>/<data>
-    const backupDir = path.resolve(__dirname, "..", "backups", db.name, date);
-    // criar a pasta caso não exista
-    fs.mkdirSync(backupDir, {recursive: true});
-    // definir o caminho final do arquivo SQL
-    const filePath = path.join(backupDir, `${db.name}.sql`);
-    // montar o comando mysqldump para gerar o backup
-    const dumpCommand = `mysqldump -h ${db.host} -u ${db.user} -p'${db.pass}' ${db.name} > "${filePath}"`;
-    console.log(dumpCommand);
-    
-    // mostrar no console que o backup está começando
-   console.log(`Iniciando Backup do Banco ${db.name}`);
-  
-    // executar o comando e aguardar ele finalizar
-    //Como nas existe await exec precisamos criar uma promisse e aplicar o await nela
-    await new Promise<void>((resolve, reject) => {
-      exec(dumpCommand, (error, stdout, stderr) => {
-        //Retorna o throw error para o usuario
-          console.log(stdout);
-          console.log(stderr);
-        if (error) {
-          // se der erro, mostrar no console e rejeitar a promessa
-          if(error){
-            console.error(error.message);
-            return reject(error);
-          }
-          
-          
-          return reject(error);
-        }
-        // se der certo, mostrar no console e adicionar o anexo ao array
-        console.log(`Backup de ${db.name} salvo em ${filePath}`);
-        attachments.push({filename: `${db.name}.sql`, path: filePath});
-        resolve();
-      });
-    });
+  // Função auxiliar para obter data/hora formatada para nome de pasta (sem caracteres inválidos)
+  private getFormattedDateTime(): string {
+    const now = new Date();
+    // Retorna algo como: 2023-10-25_14-30-00
+    return now
+      .toISOString()
+      .replace(/T/, "_")
+      .replace(/\..+/, "")
+      .replace(/:/g, "-");
   }
 
-  // (depois você pode usar o array `attachments` para enviar os backups por e-mail)
-  const send = await this.enviarEmailBackup(attachments, date);
-  
-  
-  res.status(200).json('Backup Realizado! ' + send);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json('Erro ' + error);
-  }
-}
+  // Método centralizado que faz o trabalho pesado
+  private async processarBackups() {
+    // 1. Define o nome da pasta no OneDrive com DATA e HORA
+    const folderName = `Backup_${this.getFormattedDateTime()}`;
+    const date = new Date().toISOString().slice(0, 10);
 
-private async enviarEmailBackup(
-  attachments: { filename: string; path: string }[],
-  date: string
-) {
-  // Criar o transporter com os dados do servidor SMTP
-  const transporter = nodemailer.createTransport({
-    host: "smtp.mailgun.org",
-    port: 587,
-    secure: false,
-    auth:{
-      user: process.env.MAILGUNNER_USER,
-      pass: process.env.MAILGUNNER_PASS,
+    const targetUser = process.env.BACKUP_USER_ID;
+
+    console.log(`📂 Criando pasta no OneDrive: ${folderName}`);
+
+    // 2. Cria a pasta no OneDrive
+    let oneDriveFolderId: string;
+    try {
+      const folderPayload = {
+        name: folderName,
+        folder: {},
+        "@microsoft.graph.conflictBehavior": "rename",
+      };
+      // Cria dentro da raiz (ou mude para /drive/root:/NomeDaPastaPai:/children se quiser subpasta)
+      const newFolder = await this.graphClient
+        .api(`/users/${targetUser}/drive/root/children`)
+        .post(folderPayload);
+      oneDriveFolderId = newFolder.id;
+    } catch (err) {
+      console.error("Erro ao criar pasta no OneDrive", err);
+      throw new Error("Falha na conexão com OneDrive");
     }
-  });
 
-  // Montar os dados do e-mail (remetente, destinatário, título, corpo e anexos)
-  const mailOptions = {
-    from: `"Backup Servidor" <${process.env.MAILGUNNER_USER}>`,
-    to: "suporte_wiptelecom@outlook.com",
-    subject: `📦 Backups - ${date}`,
-    html: `<p>Segue em anexo os backups do dia <strong>${date}</strong>.</p>`,
-    attachments,
-  };
+    const attachments: { filename: string; path: string }[] = [];
 
-  try {
-    // Enviar o e-mail com os backups
-    await transporter.sendMail(mailOptions);
-    console.log("📧 Email com backups enviado com sucesso!");
-  } catch (err) {
-    // Se der erro, mostrar no console
-    console.error("❌ Erro ao enviar email de backup:", err);
-    return err;
+    // 3. Loop pelos bancos
+    for (const db of databases) {
+      const backupDir = path.resolve(__dirname, "..", "backups", db.name, date);
+      fs.mkdirSync(backupDir, { recursive: true });
+
+      const fileName = `${db.name}.sql`;
+      const filePath = path.join(backupDir, fileName);
+
+      // Monta o comando (adicionei --column-statistics=0 que é comum dar erro em mariadb/mysql novos)
+      const dumpCommand = `mysqldump -h ${db.host} -u ${db.user} -p'${db.pass}' ${db.name} > "${filePath}"`;
+      console.log(`⏳ Iniciando Backup Local: ${db.name}`);
+
+      await new Promise<void>((resolve, reject) => {
+        exec(dumpCommand, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Erro no dump de ${db.name}:`, error.message);
+            return reject(error);
+          }
+          console.log(`✅ Backup local salvo: ${filePath}`);
+          resolve();
+        });
+      });
+
+      // 4. Upload para o OneDrive
+      try {
+        console.log(`☁️ Enviando ${fileName} para o OneDrive...`);
+        const fileContent = fs.readFileSync(filePath); // Lê o arquivo gerado
+
+        await this.graphClient
+          .api(
+            `/users/${targetUser}/drive/items/${oneDriveFolderId}:/${fileName}:/content`
+          )
+          .put(fileContent);
+
+        console.log(`🚀 Upload concluído: ${fileName}`);
+        attachments.push({ filename: fileName, path: filePath });
+      } catch (uploadError) {
+        console.error(
+          `❌ Erro ao enviar ${db.name} para o OneDrive:`,
+          uploadError
+        );
+      }
+    }
+
+    return attachments;
   }
-}
 
+  // Método público chamado pelo CRON ou agendador
+  public async gerarTodos() {
+    try {
+      await this.processarBackups();
+      console.log("🏁 Processo de backup automático finalizado.");
+    } catch (error) {
+      console.error("Erro crítico no backup automático:", error);
+    }
+  }
+
+  // Método chamado pela API (Botão)
+  public gerarTodosButton = async (req: Request, res: Response) => {
+    try {
+      await this.processarBackups();
+      res
+        .status(200)
+        .json({ message: "Backup Realizado e enviado para nuvem!" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json("Erro " + error);
+    }
+  };
 }
 
 export default Backup;
