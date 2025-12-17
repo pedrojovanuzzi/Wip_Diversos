@@ -2547,12 +2547,12 @@ class Nfcom {
 
   public generatePdfFromNfXML = async (req: Request, res: Response) => {
     try {
-      const { nNF, obs } = req.body;
+      const { id, obs } = req.body;
 
       const NFComRepository = DataSource.getRepository(NFCom);
       const nfcom = await NFComRepository.findOne({
         where: {
-          nNF: nNF,
+          id: id,
         },
       });
       if (!nfcom) {

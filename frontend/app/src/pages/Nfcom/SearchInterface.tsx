@@ -81,7 +81,7 @@ export default function SearchInterface() {
   };
 
   const cancelarNFCom = async (
-    nnf: string,
+    id: string,
     pppoe: string,
     password: string,
     ambiente: number
@@ -91,7 +91,7 @@ export default function SearchInterface() {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/NFCom/cancelarNFCom`,
         {
-          nNF: nnf,
+          id: id,
           pppoe: pppoe,
           password: password,
           tpAmb: ambiente,
@@ -157,7 +157,7 @@ export default function SearchInterface() {
   const confirmCancellation = async () => {
     if (selectedNfcom) {
       await cancelarNFCom(
-        selectedNfcom.nNF,
+        String(selectedNfcom.id),
         selectedNfcom.pppoe,
         password,
         selectedNfcom.tpAmb
@@ -177,7 +177,7 @@ export default function SearchInterface() {
         const response = await axios.post(
           `${process.env.REACT_APP_URL}/NFCom/cancelarNFCom`,
           {
-            nNF: idsToSend,
+            id: idsToSend,
             password: password,
           },
           {
@@ -217,7 +217,7 @@ export default function SearchInterface() {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/NFCom/generateReportPdf`,
         {
-          nNF: selectedIds,
+          id: selectedIds,
           dataInicio: new Date(dataInicio || new Date()).toLocaleDateString(
             "pt-BR",
             {
@@ -281,7 +281,7 @@ export default function SearchInterface() {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/NFCom/generatePdfFromNfXML`,
         {
-          nNF: nfcom.nNF,
+          id: nfcom.id,
           obs: chaveDeOlhoNoImposto,
         },
         {
@@ -956,10 +956,10 @@ export default function SearchInterface() {
                         <td className="px-6 py-4 text-left whitespace-nowrap text-sm text-gray-900">
                           <a
                             href={createXmlDownloadUrl(nfcom.xml)}
-                            download={`nfcom_${nfcom.nNF}_${nfcom.serie}.xml`}
+                            download={`nfcom_${nfcom.id}.xml`}
                             className="text-indigo-600 hover:text-indigo-900 font-medium underline"
                           >
-                            Baixar XML ({nfcom.nNF})
+                            Baixar XML ({nfcom.id})
                           </a>
                         </td>
                         <td className="px-6 py-4 text-left whitespace-nowrap">
