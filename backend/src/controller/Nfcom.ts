@@ -2574,13 +2574,13 @@ class Nfcom {
 
   public generateReportPdf = async (req: Request, res: Response) => {
     try {
-      const { nNF, dataInicio, dataFim, password } = req.body;
-      console.log(nNF, dataInicio, dataFim);
+      const { id, dataInicio, dataFim, password } = req.body;
+      console.log(id, dataInicio, dataFim);
 
       const NFComRepository = DataSource.getRepository(NFCom);
       const nfcom = await NFComRepository.find({
         where: {
-          nNF: In(nNF),
+          id: In(id),
         },
       });
       if (!nfcom) {
