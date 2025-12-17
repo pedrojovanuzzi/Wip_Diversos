@@ -131,7 +131,7 @@ class Backup {
       };
       // Cria dentro da raiz (ou mude para /drive/root:/NomeDaPastaPai:/children se quiser subpasta)
       const newFolder = await this.graphClient
-        .api(`/users/${targetUser}/drive/root/children`)
+        .api(`/users/${targetUser}/drive/root:/Backup:/children`)
         .post(folderPayload);
       oneDriveFolderId = newFolder.id;
     } catch (err) {
