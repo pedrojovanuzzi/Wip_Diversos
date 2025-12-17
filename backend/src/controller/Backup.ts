@@ -104,6 +104,23 @@ class Backup {
 
     console.log(`📂 Criando pasta no OneDrive: ${folderName}`);
 
+    try {
+      let parentFolderId: string;
+      // A sintaxe root:/NOME: pega os dados da pasta pelo nome
+      const parentFolder = await this.graphClient
+        .api(`/users/${targetUser}/drive/root:/Backup`)
+        .get();
+
+      parentFolderId = parentFolder.id;
+      console.log(`✅ Pasta fixa encontrada! ID: ${parentFolderId}`);
+    } catch (err) {
+      console.error(
+        `❌ A pasta "Backup" não existe no OneDrive desse usuário.`
+      );
+      console.error("Crie ela manualmente ou ajuste o nome no .env");
+      return; // Para o script aqui
+    }
+
     // 2. Cria a pasta no OneDrive
     let oneDriveFolderId: string;
     try {
