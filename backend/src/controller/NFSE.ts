@@ -813,14 +813,6 @@ class NFSEController {
           );
 
           let soapToSend = soapFinal;
-          if (this.homologacao) {
-            const soapUnsigned = this.xmlFactory.createCancelamentoSoap(
-              envioXml,
-              process.env.MUNICIPIO_LOGIN || "",
-              process.env.MUNICIPIO_SENHA || ""
-            );
-            soapToSend = soapUnsigned;
-          }
 
           const response = await this.fiorilliProvider.sendSoapRequest(
             soapToSend,
