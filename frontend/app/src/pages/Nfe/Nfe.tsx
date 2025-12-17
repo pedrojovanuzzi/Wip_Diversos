@@ -6,9 +6,10 @@ import Filter from "./Components/Filter";
 
 import { BsFiletypeDoc } from "react-icons/bs";
 import PopUpButton from "./Components/PopUpButton";
-import Error from "./Components/Error";
-import Success from "./Components/Success";
 import { useAuth } from "../../context/AuthContext";
+import { BuscarNfeGerada } from "./BuscarNfeGerada";
+import { Link } from "react-router-dom";
+import { useNotification } from "../../context/NotificationContext";
 
 export const Nfe = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -21,8 +22,7 @@ export const Nfe = () => {
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
   const [aliquota, setAliquota] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [lastNfe, setLastNfe] = useState<string>("");
   const [service, setService] = useState("");
   const [loading, setLoading] = useState(false);
   const [ambiente, setAmbiente] = useState("homologacao");
@@ -53,6 +53,7 @@ export const Nfe = () => {
   let [valueSome, setValueSome] = useState<number>(0);
   const { user } = useAuth();
   const token = user?.token;
+  const { addJob, showError, showSuccess } = useNotification();
 
   const handleCheckboxChange = (clienteId: number) => {
     setClientesSelecionados((prevSelecionados) => {
@@ -82,8 +83,6 @@ export const Nfe = () => {
   const emitirNFe = async () => {
     try {
       setLoading(true);
-      setError("");
-      setSuccess("");
 
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/Nfe/`,
@@ -94,6 +93,7 @@ export const Nfe = () => {
           service,
           reducao,
           ambiente,
+          lastNfe,
         },
         {
           headers: {
@@ -104,7 +104,17 @@ export const Nfe = () => {
         }
       );
       setDadosNFe(resposta.data);
-      setSuccess("NF-e emitida com sucesso.");
+      // setSuccess("NF-e emitida com sucesso.");
+
+      console.log("Resposta da API:", resposta.data);
+      if (resposta.data.job) {
+        addJob(resposta.data.job, "emissao");
+        showSuccess(
+          "Solicitação de emissão enviada! Processando em segundo plano."
+        );
+      } else {
+        showSuccess("NF-e emitida com sucesso.");
+      }
     } catch (erro) {
       console.error("Erro ao emitir NF-e:", erro);
       if (
@@ -113,9 +123,11 @@ export const Nfe = () => {
         erro.response.data &&
         erro.response.data.erro
       ) {
-        setError(`Erro ao emitir NF-e: ${erro.response.data.erro}`);
+        // setError(`Erro ao emitir NF-e: ${erro.response.data.erro}`);
+        showError(`Erro ao emitir NF-e: ${erro.response.data.erro}`);
       } else {
-        setError("Erro desconhecido ao emitir NF-e.");
+        // setError("Erro desconhecido ao emitir NF-e.");
+        showError("Erro desconhecido ao emitir NF-e.");
       }
     } finally {
       setShowPopUp(false);
@@ -154,12 +166,12 @@ export const Nfe = () => {
         }
       );
       console.log("Certificado enviado:", resposta.data);
-      setSuccess("Certificado enviado com sucesso!");
+      showSuccess("Certificado enviado com sucesso!");
       setShowCertPasswordPopUp(false);
       setCertPassword("");
     } catch (erro) {
       console.error("Erro ao enviar o certificado:", erro);
-      setError("Não foi possível enviar o certificado.");
+      showError("Não foi possível enviar o certificado.");
       setShowCertPasswordPopUp(false);
     }
   };
@@ -181,7 +193,6 @@ export const Nfe = () => {
           },
         }
       );
-      setError("");
       console.log("Clientes encontrados:", resposta.data);
       setClientes(resposta.data);
     } catch (erro) {
@@ -191,29 +202,46 @@ export const Nfe = () => {
         erro.response &&
         erro.response.status === 500
       ) {
-        setError(
+        showError(
           "Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde."
         );
       } else if (axios.isAxiosError(erro) && erro.response) {
-        setError(`Erro: ${erro.response.data.error || "Algo deu errado."}`);
+        showError(`Erro: ${erro.response.data.error || "Algo deu errado."}`);
       } else {
-        setError("Erro de rede. Verifique sua conexão e tente novamente.");
+        showError("Erro de rede. Verifique sua conexão e tente novamente.");
       }
     }
+  };
+
+  const handleOpenPopup = () => {
+    if (!lastNfe) {
+      alert("Por favor, preencha o campo 'Ultima NF-e'.");
+      return;
+    }
+    setShowPopUp(true);
   };
 
   return (
     <div>
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
+      <Link
+        className="flex justify-center sm:justify-start"
+        to="/BuscarNfeGerada"
+      >
+        <button
+          className="bg-violet-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
+          onClick={() => setShowPopUp(true)}
+        >
+          NF-es Geradas
+        </button>
+      </Link>
       <Filter
         setActiveFilters={setActiveFilters}
         setDate={setDateFilter}
         setArquivo={setArquivo}
         enviarCertificado={handleEnviarCertificado}
       />
-      {error && <Error message={error} />}
-      {success && <Success message={success} />}
       {clientes.length > 0 && (
         <>
           <h1 className="text-center mt-2 self-center text-2xl font-semibold text-gray-900">
@@ -317,12 +345,12 @@ export const Nfe = () => {
           <span className="absolute translate-x-8 top-11 text-gray-200 -translate-y-1/2 text-4xl">
             <BsFiletypeDoc
               className="cursor-pointer"
-              onClick={() => setShowPopUp(true)}
+              onClick={handleOpenPopup}
             />
           </span>
           <button
             className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
-            onClick={() => setShowPopUp(true)}
+            onClick={handleOpenPopup}
           >
             Emitir NF-e
           </button>
@@ -370,6 +398,17 @@ export const Nfe = () => {
           }}
           placeholder="Redução Ex: 60%"
           className="ring-2 ring-gray-500 p-2 rounded m-5"
+        />
+        <input
+          type="text"
+          required
+          onChange={(e) => {
+            setLastNfe(
+              e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, "")
+            );
+          }}
+          placeholder="Ultimo Numero NF-e"
+          className="ring-2 ring-red-500 p-2 rounded m-5 placeholder:text-red-500"
         />
       </div>
 

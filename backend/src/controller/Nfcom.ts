@@ -739,7 +739,7 @@ class Nfcom {
   }
 
   public async getStatusJob(req: Request, res: Response) {
-    const { id } = process.env;
+    const { id } = req.body;
     const response = await DataSource.getRepository(Jobs).findOne({
       where: { id },
     });
