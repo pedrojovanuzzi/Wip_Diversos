@@ -89,7 +89,7 @@ export const NavBar = ({ color = "black" }: Color) => {
 
       {isOpen && (
         <div className=" w-full text-white rounded-md overflow-y-auto scrollbar-thin scrollbar-thumb-green-600 scrollbar-track-gray-900">
-          <h2 className="text-center p-2 font-bold bg-red-500 p-2">
+          <h2 className="text-center font-bold bg-red-500 p-2">
             <span className="break-all whitespace-normal">{user?.login}</span>
           </h2>
           <ul className="grid grid-cols-2 gap-5 p-4">
