@@ -131,7 +131,7 @@ export default function SearchInterface() {
       const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/NFCom/downloadZipXMLs`,
         {
-          nfcomIds: selectedIds,
+          id: selectedIds,
         },
         {
           responseType: "blob",
@@ -856,6 +856,9 @@ export default function SearchInterface() {
                         Produção/Homologação
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        ID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Número
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -915,6 +918,9 @@ export default function SearchInterface() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {nfcom.tpAmb === 1 ? "Produção" : "Homologação"}
+                        </td>
+                        <td className="px-6 text-blue-500 py-4 whitespace-nowrap text-sm font-medium">
+                          {nfcom.id}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {nfcom.numeracao}

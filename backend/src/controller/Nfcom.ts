@@ -470,11 +470,11 @@ class Nfcom {
 
   public baixarZipXml = async (req: Request, res: Response) => {
     try {
-      const { nfcomIds } = req.body;
+      const { id } = req.body;
 
       // Busca as notas
       const nfcoms = await DataSource.getRepository(NFCom).find({
-        where: { numeracao: In(nfcomIds) },
+        where: { id: In(id) },
       });
 
       if (!nfcoms.length) {
@@ -1801,9 +1801,12 @@ class Nfcom {
         doc.moveDown();
         doc.text(`Documentos Fiscais Apresentados`);
         doc.text(`Periodo de  Emissão: ${dataInicio} a ${dataFim}`);
+        console.log(nfcom[0].numeracao);
+        console.log(nfcom[nfcom.length - 1].numeracao);
+
         doc.text(
-          `Faixa de Numeração de ${nfcom[0].nNF} até ${
-            nfcom[nfcom.length - 1].nNF
+          `Faixa de Numeração de ${nfcom[0].numeracao} até ${
+            nfcom[nfcom.length - 1].numeracao
           }`
         );
         doc.text(`Total de Documentos: ${nfcom.length}`);
