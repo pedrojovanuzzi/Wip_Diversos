@@ -482,6 +482,8 @@ class Nfcom {
         return;
       }
 
+      console.log(id);
+
       const zip = new JSZip();
       const folderXml = zip.folder("xmls");
       const folderPdf = zip.folder("pdfs");
