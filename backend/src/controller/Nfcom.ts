@@ -196,7 +196,7 @@ class Nfcom {
   };
 
   public gerarNfcom = async (req: Request, res: Response): Promise<void> => {
-    let { password, clientesSelecionados, service, reducao, ambiente } =
+    let { password, clientesSelecionados, reducao, ambiente, lastNfcomId } =
       req.body;
 
     if (ambiente === "homologacao") {
@@ -277,19 +277,27 @@ class Nfcom {
       const docCliente = cleanString(ClientData.cpf_cnpj);
       const isCnpj = docCliente.length > 11;
 
-      const lastNumber = await DataSource.getRepository(NFCom).findOne({
+      const lastRecord = await DataSource.getRepository(NFCom).findOne({
         where: {
           tpAmb: this.homologacao ? 2 : 1,
           serie: this.serie,
         },
         order: {
-          numeracao: "DESC",
+          numeracao: "DESC", // Garante que pega o maior número
         },
       });
 
-      console.log(lastNumber?.numeracao);
+      const currentMaxNumber = lastNfcomId
+        ? Number(lastNfcomId)
+        : lastRecord
+        ? Number(lastRecord.numeracao)
+        : 0;
 
-      const numeracao = (lastNumber?.numeracao || 0) + 1;
+      const nextNumber = currentMaxNumber + 1;
+
+      console.log(nextNumber);
+
+      const numeracao = nextNumber;
 
       this.numeracao = numeracao;
 

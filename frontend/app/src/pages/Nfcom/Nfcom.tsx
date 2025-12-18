@@ -19,7 +19,7 @@ export default function Nfcom() {
   // Estados para controlar envio do certificado e senha
   const [showCertPasswordPopUp, setShowCertPasswordPopUp] = useState(false);
   const [certPassword, setCertPassword] = useState<string>("");
-
+  const [lastNfcomId, setLastNfcomId] = useState<string>("");
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -92,6 +92,7 @@ export default function Nfcom() {
           clientesSelecionados,
           reducao: isReducaoActive ? reducao : "0.0",
           ambiente,
+          lastNfcomId,
         },
         {
           headers: {
@@ -365,6 +366,16 @@ export default function Nfcom() {
               !isReducaoActive ? "bg-gray-200 cursor-not-allowed" : ""
             }`}
             disabled={!isReducaoActive} // Desabilita o input se a redução não estiver ativa
+          />
+        </div>
+
+        <div className="flex justify-center items-center gap-5 mb-5">
+          <input
+            type="text"
+            value={lastNfcomId}
+            onChange={(e) => setLastNfcomId(e.target.value)}
+            placeholder="Último Nfcom ID"
+            className="ring-2 ring-gray-500 p-2 rounded"
           />
         </div>
       </div>
