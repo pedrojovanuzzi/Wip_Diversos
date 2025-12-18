@@ -995,7 +995,7 @@ class Nfcom {
   private async cancelarNoBackground(
     nfcom: NFCom,
     pppoe: string,
-    nNF: string,
+    id: string,
     password: string,
     NFComRepository: Repository<NFCom>,
     jobRepository: Repository<Jobs>,
@@ -1003,6 +1003,28 @@ class Nfcom {
   ) {
     job.processados += 1;
     await jobRepository.save(job);
+
+    const nfcomData = await NFComRepository.findOne({
+      where: {
+        id: Number(id),
+      },
+    });
+
+    if (!nfcomData) {
+      job.status = "concluido";
+      job.resultado = {
+        cStat: "0",
+        xMotivo: "NFCom não encontrada",
+      };
+      await jobRepository.save(job);
+      return;
+    }
+
+    const nNF = nfcomData?.numeracao;
+
+    console.log(id);
+
+    console.log(nNF);
 
     const xmlCancelamento = this.criarXMLCancelamento(
       nfcom.chave,
@@ -1080,17 +1102,8 @@ class Nfcom {
         }`
       );
 
-      const nfcom = await NFComRepository.findOne({
-        where: {
-          nNF,
-          pppoe,
-        },
-      });
-      if (!nfcom) {
-        return;
-      }
-      nfcom.status = "cancelada";
-      await NFComRepository.save(nfcom);
+      nfcomData.status = "cancelada";
+      await NFComRepository.save(nfcomData);
       job.status = "processando";
       job.resultado = {
         cStat,
@@ -1113,16 +1126,16 @@ class Nfcom {
 
   public cancelarNFcom = async (req: Request, res: Response) => {
     try {
-      let { nNF, password } = req.body;
+      let { id, password } = req.body;
 
       const NFComRepository = DataSource.getRepository(NFCom);
       const jobRepository = DataSource.getRepository(Jobs);
 
-      const numerosParaBuscar = Array.isArray(nNF) ? nNF : [nNF];
+      const numerosParaBuscar = Array.isArray(id) ? id : [id];
 
       const listaNfcom = await NFComRepository.find({
         where: {
-          nNF: In(numerosParaBuscar),
+          id: In(numerosParaBuscar),
         },
       });
 
@@ -1176,14 +1189,14 @@ class Nfcom {
                 "https://nfcom.svrs.rs.gov.br/WS/NFComRecepcao/NFComRecepcao.asmx";
             }
 
-            console.log("Processando NF:", nf.nNF);
+            console.log("Processando NF:", nf.id);
 
             // Esse await NÃO segura o usuário (ele já recebeu a resposta lá em cima).
             // Ele serve apenas para o servidor processar Nota 1, depois Nota 2, etc.
             await this.cancelarNoBackground(
               nf,
               client.login,
-              nf.nNF,
+              String(nf.id),
               password,
               NFComRepository,
               jobRepository,
