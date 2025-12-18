@@ -53,6 +53,7 @@ export default function Nfcom() {
   let [valueSome, setValueSome] = useState<number>(0);
   const { user } = useAuth();
   const token = user?.token;
+  const permissions = user?.permission;
   const navigate = useNavigate();
   const { addJob, showError, showSuccess } = useNotification();
 
@@ -369,15 +370,17 @@ export default function Nfcom() {
           />
         </div>
 
-        <div className="flex justify-center items-center gap-5 mb-5">
-          <input
-            type="text"
-            value={lastNfcomId}
-            onChange={(e) => setLastNfcomId(e.target.value)}
-            placeholder="Último Nfcom ID"
-            className="ring-2 ring-gray-500 p-2 rounded"
-          />
-        </div>
+        {permissions! >= 5 && (
+          <div className="flex justify-center items-center gap-5 mb-5">
+            <input
+              type="text"
+              value={lastNfcomId}
+              onChange={(e) => setLastNfcomId(e.target.value)}
+              placeholder="Último Nfcom ID"
+              className="ring-2 ring-gray-500 p-2 rounded"
+            />
+          </div>
+        )}
       </div>
 
       {arquivo && (
