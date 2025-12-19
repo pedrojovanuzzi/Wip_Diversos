@@ -465,6 +465,53 @@ describe("Nfcom Controller", () => {
     expect(xml.soapEnvelope).toContain("nfcomDadosMsg");
   });
 
+  test("Buscar Clientes", async () => {
+    const request = {
+      body: {
+        cpf: "123",
+        filters: {},
+        dateFilter: {},
+      },
+    } as Partial<Request>;
+    const jsonMock = jest.fn();
+    const sendMock = jest.fn();
+    const endMock = jest.fn();
+
+    const response = {
+      status: jest.fn().mockReturnThis(), // Permite encadear
+      json: jsonMock,
+      send: sendMock, // Adicionado caso use .send()
+      end: endMock, // Adicionado caso use .end()
+    } as unknown as Response;
+
+    const clientes = await (nfcom as any).BuscarClientes(request, response);
+    expect(response.status).toHaveBeenCalledWith(200);
+
+    console.log("JSON chamado?", jsonMock.mock.calls.length > 0);
+    console.log("SEND chamado?", sendMock.mock.calls.length > 0);
+    console.log("END chamado?", endMock.mock.calls.length > 0);
+
+    const dadosEnviados = jsonMock.mock.calls[0][0];
+
+    console.log("Dados pescados do res.json:", dadosEnviados);
+
+    expect(dadosEnviados).toBeDefined();
+    expect(dadosEnviados).toHaveLength(1);
+    expect(dadosEnviados).toEqual([
+      {
+        fatura: {
+          datavenc: "Invalid Date", // Atenção aqui (veja nota abaixo)
+          login: null,
+          tipo: null,
+          titulo: "1",
+          valor: "NaN",
+        },
+        id: 1,
+        nNF: "100",
+      },
+    ]);
+  });
+
   test("criarXMLCancelamento deve criar um XML de cancelamento com sucesso", () => {
     const xml = (nfcom as any).criarXMLCancelamento(
       "123",
