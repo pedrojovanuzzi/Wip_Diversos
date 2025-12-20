@@ -162,26 +162,9 @@ describe("NFSE Controller", () => {
   let statusMock: jest.Mock;
 
   beforeEach(() => {
-    // Resetar mocks
     jest.clearAllMocks();
     jest.restoreAllMocks();
 
-    // Re-instanciar controller
-    // Importante: Como o arquivo original exporta "default new NFSEController()", ou classe sem export,
-    // precisamos ajustar conforme vemos no arquivo:
-    // O arquivo `NFSE.ts` não tem `export default` na visualização (linhas 1-800), mas é comum em controllers.
-    // Vi linhas 23: class NFSEController.
-    // Vou assumir que posso instanciar se exportada, ou precisarei ajustar caso seja export default new...
-    // Se o arquivo não exporta a classe, teremos problemas.
-    // Olhando o arquivo Nfcom.test.ts, ele importa `import Nfcom from "../Nfcom";`.
-    // Suponho que NFSE.ts tenha algo similar no final do arquivo.
-    // Vamos assumir que a classe é exportada ou o default é uma instância.
-    // PERA! No view_file do NFSE.ts ainda não vi o final.
-    // Mas a linha 23 define a classe.
-    // Vou tentar importar a classe. Se falhar, ajusto.
-    // Para garantir, vou instanciar via require se necessário ou mockar.
-
-    // Acessando via require para garantir "freshness"
     const { NFSEController } = require("../NFSE");
     nfseController = new NFSEController();
 
