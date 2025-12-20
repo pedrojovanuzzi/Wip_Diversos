@@ -10,7 +10,7 @@ jest.mock("../../database/MkauthSource", () => ({
       id: 1,
       login: "cliente_teste",
       nome: "Fulano",
-      cpf_cnpj: "12345678900",
+      cpf_cnpj: "123",
       desconto: 0,
       valor: "100.00",
     }),
@@ -484,7 +484,7 @@ describe("Nfcom Controller", () => {
       end: endMock, // Adicionado caso use .end()
     } as unknown as Response;
 
-    const clientes = await (nfcom as any).BuscarClientes(request, response);
+    await (nfcom as any).BuscarClientes(request, response);
     expect(response.status).toHaveBeenCalledWith(200);
 
     console.log("JSON chamado?", jsonMock.mock.calls.length > 0);
@@ -500,7 +500,7 @@ describe("Nfcom Controller", () => {
     expect(dadosEnviados).toEqual([
       {
         fatura: {
-          datavenc: "Invalid Date", // Atenção aqui (veja nota abaixo)
+          datavenc: "Invalid Date",
           login: null,
           tipo: null,
           titulo: "1",
