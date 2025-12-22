@@ -855,6 +855,8 @@ class Pix {
         });
       }
 
+      console.log(structuredData);
+
       // 🔹 Soma o total de todas as mensalidades (já com juros/descontos)
       const total = structuredData
         .reduce((acc, c) => acc + Number(c.valor), 0)
