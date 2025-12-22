@@ -16,6 +16,8 @@ const pixController = new Pix();
 // });
 
 describe("Pix Controller", () => {
+  const dataHora = new Date();
+
   it("Deve gerar e aplicar desconto na mensalidade", async () => {
     const pixController = new Pix();
 
@@ -56,7 +58,7 @@ describe("Pix Controller", () => {
     expect(response).toBe(33);
   });
 
-  it("Gerar Pix All, Valor", async () => {
+  it("Deve gerar até 3 mensalidades para o cliente", async () => {
     const pixController = new Pix();
 
     const controllerPixAny = pixController as any;
@@ -66,13 +68,13 @@ describe("Pix Controller", () => {
       .mockResolvedValue([
         {
           id: 12345,
-          datavenc: new Date("2025-12-22T00:00:00Z"),
+          datavenc: dataHora,
           login: "PEDRO",
           valor: 50.0,
         },
         {
           id: 54321,
-          datavenc: new Date("2025-12-22T00:00:00Z"),
+          datavenc: dataHora,
           login: "PEDRO",
           valor: 10.0,
         },
@@ -105,18 +107,76 @@ describe("Pix Controller", () => {
         link: expect.stringContaining("https://pix.sejaefi.com.br/"),
         mensalidades: [
           {
-            dataVenc: new Date("2025-12-22T00:00:00.000Z"),
+            dataVenc: dataHora,
             id: 12345,
-            valor: 51,
+            valor: 50,
           },
           {
-            dataVenc: new Date("2025-12-22T00:00:00.000Z"),
+            dataVenc: dataHora,
             id: 54321,
-            valor: 10.2,
+            valor: 10,
           },
         ],
         pppoe: "pedro",
-        valor: "61.20",
+        valor: "60.00",
+      })
+    );
+  });
+
+  it("Deve gerar uma mensalidade para cada cadastro", async () => {
+    const pixController = new Pix();
+
+    const controllerPixAny = pixController as any;
+
+    vi.spyOn(controllerPixAny.recordRepo, "find").mockResolvedValue([
+      {
+        id: 12345,
+        datavenc: dataHora,
+        login: "PEDRO",
+        valor: 50.0,
+      },
+      {
+        id: 54321,
+        datavenc: dataHora,
+        login: "JOSE",
+        valor: 80.0,
+      },
+    ]);
+
+    const req = {
+      body: {
+        nome_completo: "pedro",
+        cpf: process.env.OLHO_NO_IMPOSTO_CNPJ,
+        titulos: ["1", "2", "3"],
+      },
+    } as any;
+
+    const res = {
+      json: vi.fn(),
+      status: vi.fn().mockReturnThis(),
+      send: vi.fn(),
+    } as any;
+
+    const response = await pixController.gerarPixVariasContas(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        link: expect.stringContaining("https://pix.sejaefi.com.br"),
+        nome_completo: "PEDRO",
+        titulos: [
+          {
+            dataVenc: dataHora,
+            id: 12345,
+            valor: 50,
+          },
+          {
+            dataVenc: dataHora,
+            id: 54321,
+            valor: 80.0,
+          },
+        ],
+        valor: "130.00",
       })
     );
   });

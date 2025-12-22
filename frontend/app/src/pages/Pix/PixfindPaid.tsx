@@ -55,6 +55,7 @@ export const PixfindPaid: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const token = user?.token;
+  const permission = user?.permission;
 
   // 🔹 Função para consultar PIX
   const handleSubmit = async (e: FormEvent) => {
@@ -194,16 +195,18 @@ export const PixfindPaid: React.FC = () => {
               </div>
 
               {/* 🔁 Novo botão: Reenviar notificações */}
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={handleReenviarNotificacoes}
-                  disabled={loading}
-                  className="w-full sm:w-auto bg-yellow-400 text-black font-semibold py-2 px-4 rounded-lg hover:bg-yellow-300 transition disabled:opacity-50"
-                >
-                  🔁 Reenviar Webhooks
-                </button>
-              </div>
+              {permission! >= 5 && (
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={handleReenviarNotificacoes}
+                    disabled={loading}
+                    className="w-full sm:w-auto bg-yellow-400 text-black font-semibold py-2 px-4 rounded-lg hover:bg-yellow-300 transition disabled:opacity-50"
+                  >
+                    🔁 Reenviar Webhooks
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -224,7 +227,7 @@ export const PixfindPaid: React.FC = () => {
         {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
 
         {/* 🔹 Renderização dos resultados abaixo (sem alteração) */}
-                {status && !Array.isArray(status) && (
+        {status && !Array.isArray(status) && (
           <div className="mt-6 bg-gray-50 border border-gray-200 p-5 rounded-lg">
             <h3 className="text-lg font-bold text-gray-800 mb-3">
               🔹 Detalhes da Cobrança
@@ -329,7 +332,6 @@ export const PixfindPaid: React.FC = () => {
                 key={index}
                 className="bg-gray-50 border border-gray-200 p-5 rounded-lg"
               >
-                
                 <h3 className="text-lg font-bold text-gray-800 mb-3">
                   💳 Cobrança #{index + 1}
                 </h3>

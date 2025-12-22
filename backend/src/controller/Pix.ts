@@ -855,8 +855,6 @@ class Pix {
         });
       }
 
-      console.log(structuredData);
-
       // 🔹 Soma o total de todas as mensalidades (já com juros/descontos)
       const total = structuredData
         .reduce((acc, c) => acc + Number(c.valor), 0)
@@ -944,6 +942,8 @@ class Pix {
       const clientes = await this.recordRepo.find({
         where: { id: In(titulos.map((t) => Number(t))) },
       });
+
+      console.log(clientes);
 
       // 🔹 Se nenhuma fatura foi encontrada, retorna erro
       if (!clientes || clientes.length === 0) {
