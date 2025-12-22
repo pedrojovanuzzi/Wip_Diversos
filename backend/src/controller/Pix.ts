@@ -943,6 +943,8 @@ class Pix {
         where: { id: In(titulos.map((t) => Number(t))) },
       });
 
+      console.log(clientes);
+
       // 🔹 Se nenhuma fatura foi encontrada, retorna erro
       if (!clientes || clientes.length === 0) {
         res.status(404).json("Nenhum título válido encontrado");

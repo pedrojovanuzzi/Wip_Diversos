@@ -1648,6 +1648,10 @@ class Nfcom {
     </soap12:Body>
 </soap12:Envelope>`;
 
+    console.log(xmlInternoAssinado);
+
+    console.log(soapEnvelope);
+
     return { soapEnvelope, xmlAssinado: xmlInternoAssinado };
   }
 

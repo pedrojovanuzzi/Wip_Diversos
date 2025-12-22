@@ -20,7 +20,7 @@ import { FiorilliProvider } from "../services/nfse/FiorilliProvider";
 
 dotenv.config();
 
-class NFSEController {
+export class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
   private TEMP_DIR = path.resolve(__dirname, "../files");
   private homologacao: boolean = false;
