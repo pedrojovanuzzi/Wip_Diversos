@@ -873,21 +873,23 @@ export class NFSEController {
       console.log(e);
     } finally {
       // --- DEBUG: Log para rastrear o problema ---
-      console.log("=== FINALIZANDO JOB DE CANCELAMENTO ===");
-      console.log("Job ID:", job.id);
-      console.log("Total de respostas:", responses.length);
-      console.log("Respostas:", JSON.stringify(responses, null, 2));
+      // console.log("=== FINALIZANDO JOB DE CANCELAMENTO ===");
+      // console.log("Job ID:", job.id);
+      // console.log("Total de respostas:", responses.length);
+      // console.log("Respostas:", JSON.stringify(responses, null, 2));
 
       // Verifica se algum item do array tem success: false
       const teveErro = responses.some((item) => item.success === false);
 
-      console.log("Teve erro?", teveErro);
-      console.log("Status final:", teveErro ? "erro" : "concluido");
+      // console.log("Teve erro?", teveErro);
+      // console.log("Status final:", teveErro ? "erro" : "concluido");
 
       await AppDataSource.getRepository(Jobs).update(job.id, {
         status: teveErro ? "erro" : "concluido",
         resultado: responses || [],
       });
+
+      return responses;
 
       console.log("=== JOB DE CANCELAMENTO ATUALIZADO ===");
     }
