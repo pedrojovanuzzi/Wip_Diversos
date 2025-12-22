@@ -1,81 +1,36 @@
-import { ClientesEntities } from "../../entities/ClientesEntities";
-import { Faturas } from "../../entities/Faturas";
+import { Mock } from "vitest";
+import Pix from "../Pix";
 
-const mockFaturasRepository = {
-  findOne: jest.fn(),
-  find: jest.fn(),
-  update: jest.fn(),
-};
+const pixController = new Pix();
 
-const mockClientesRepository = {
-  findOne: jest.fn(),
-  find: jest.fn(),
-  update: jest.fn(),
-};
+// vi.mock("../../entities/ClientesEntities.ts", async () => {
+//   const originals = await vi.importActual("../../entities/ClientesEntities.ts");
 
-jest.mock("../../database/MkauthSource", () => {
-  return {
-    getRepository: jest.fn((entity) => {
-      const name =
-        entity.name ||
-        (entity.constructor && entity.constructor.name) ||
-        String(entity);
-      console.log("MkauthSource.getRepository called for:", name);
-
-      if (entity === Faturas || name === "Faturas")
-        return mockFaturasRepository;
-      if (entity === ClientesEntities || name === "ClientesEntities")
-        return mockClientesRepository;
-
-      throw new Error(
-        `[MkauthSource] Unmocked entity requested: "${name}" (Type: ${typeof entity})`
-      );
-    }),
-  };
-});
+//   return {
+//     ...originals,
+//     findOne: vi.fn(() => {
+//       desconto: 2.0;
+//     }),
+//   };
+// });
 
 describe("Pix Controller", () => {
-  let jsonMock: jest.Mock;
-  let statusMock: jest.Mock;
-  let req: Partial<Request>;
-  let res: Partial<Response>;
-  let pixController: any;
+  it("Deve gerar e aplicar desconto na mensalidade", async () => {
+    const pixController = new Pix();
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    jest.restoreAllMocks();
+    const controllerAny = pixController as any;
 
-    const { Pix } = require("../Pix");
-    pixController = new Pix();
-
-    jsonMock = jest.fn();
-    statusMock = jest.fn().mockReturnValue({ json: jsonMock });
-    res = {
-      status: statusMock,
-      json: jsonMock,
-    } as unknown as Response;
-  });
-
-  describe("gerarPix", () => {
-    it("Tem que gerar o pix com os respectivos dados", async () => {
-      const req = {
-        body: {
-          pppoe: "123456",
-          cpf: 100,
-          perdoarjuros: true,
-        },
-      } as unknown as Request;
-
-      const res = {
-        status: jest.fn().mockReturnValue({ json: jest.fn() }),
-        json: jest.fn(),
-      } as unknown as Response;
-
-      await pixController.gerarPix(req as Request, res as Response);
-
-      expect(res.json).toHaveBeenCalledWith({
-        message: "Pix gerado com sucesso",
-      });
+    vi.spyOn(controllerAny.clienteRepo, "findOne").mockResolvedValue({
+      login: "pedro",
+      desconto: 2.0,
     });
+
+    const response = await pixController.aplicarJuros_Desconto(
+      50,
+      "pedro",
+      "2025-12-22"
+    );
+
+    expect(response).toBe(48.96);
   });
 });
