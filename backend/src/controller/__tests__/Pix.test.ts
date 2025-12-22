@@ -180,4 +180,80 @@ describe("Pix Controller", () => {
       })
     );
   });
+
+  it("Deve gerar a ultima mensalidade do cliente vencida", async () => {
+    const pixController = new Pix();
+
+    const controllerPixAny = pixController as any;
+
+    vi.spyOn(controllerPixAny.recordRepo, "findOne").mockResolvedValue({
+      id: 12345,
+      datavenc: dataHora,
+      login: "PEDRO",
+      valor: 50.0,
+    });
+
+    const req = {
+      body: {
+        pppoe: "pedro",
+        cpf: process.env.OLHO_NO_IMPOSTO_CNPJ,
+        perdoarjuros: false,
+      },
+    } as any;
+
+    const res = {
+      json: vi.fn(),
+      status: vi.fn().mockReturnThis(),
+      send: vi.fn(),
+    } as any;
+
+    const response = await pixController.gerarPix(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        formattedDate: "22/12",
+        link: expect.stringContaining("https://pix.sejaefi.com.br"),
+        pppoe: "pedro",
+        valor: "50.00",
+      })
+    );
+  });
+
+  it("Deve gerar a ultima mensalidade do cliente em aberto", async () => {
+    const pixController = new Pix();
+
+    const controllerPixAny = pixController as any;
+
+    vi.spyOn(controllerPixAny.recordRepo, "findOne").mockResolvedValue({
+      id: 12345,
+      datavenc: dataHora,
+      login: "PEDRO",
+      valor: 50.0,
+    });
+
+    const req = {
+      body: {
+        pppoe: "pedro",
+        cpf: process.env.OLHO_NO_IMPOSTO_CNPJ,
+        perdoarjuros: false,
+      },
+    } as any;
+
+    const res = {
+      json: vi.fn(),
+      status: vi.fn().mockReturnThis(),
+      send: vi.fn(),
+    } as any;
+
+    const response = await pixController.gerarPixAberto(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dataVenc: dataHora,
+        link: expect.stringContaining("https://pix.sejaefi.com.br"),
+      })
+    );
+  });
 });
