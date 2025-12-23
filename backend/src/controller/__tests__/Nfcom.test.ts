@@ -243,4 +243,102 @@ describe("NFCOM Controller", async () => {
       })
     );
   });
+
+  it("Deve Gerar NFCOM", async () => {
+    const nfcom = new Nfcom();
+
+    const req = {
+      body: {
+        clientesSelecionados: [1],
+        password: process.env.TEST_PASS,
+        reducao: "50",
+        ambiente: "homologacao",
+      },
+    } as any;
+
+    const res = {
+      json: vi.fn(),
+      status: vi.fn().mockReturnThis(),
+    } as any;
+
+    vi.spyOn(AppDataSource, "getRepository").mockImplementation(
+      (entity: any) => {
+        if (entity === ClientesEntities) {
+          return {
+            findOne: vi.fn().mockResolvedValue({
+              id: 1,
+              nome: "Cliente Teste",
+              cpf_cnpj: "12345678901",
+              login: "teste_login",
+              endereco: "Rua Teste",
+              numero: "123",
+              bairro: "Bairro Teste",
+              cidade: "Cidade Teste",
+              estado: "SP",
+              cep: "12345678",
+              desconto: 0,
+            }),
+          } as any;
+        } else if (entity.name === "Faturas") {
+          // Using name check as it's often more reliable if class ref varies
+          return {
+            findOne: vi.fn().mockResolvedValue({
+              id: 1,
+              login: "teste_login",
+              valor: 100.0,
+              datavenc: new Date(),
+            }),
+          } as any;
+        }
+        return {
+          findOne: vi.fn(),
+        } as any;
+      }
+    );
+
+    // Specifically handle Faturas if imported differently or if previous mock didn't cover it
+    // The code uses: MkauthSource.getRepository(Faturas)
+    // We already mocked AppDataSource (which is MkauthSource in imports usually? Let's check imports)
+    // Import says: import AppDataSource from "../../database/MkauthSource";
+    // So mocking AppDataSource covers MkauthSource.getRepository handles.
+
+    // However, the test file imports Faturas from entities? No, it's not imported in the test file shown in previous turn.
+    // Wait, lines 1-6 show imports.
+    // 2: import AppDataSource from "../../database/MkauthSource";
+    // The mock above handles AppDataSource.
+    // But we need to make sure the 'entity' match works.
+    // Let's add imports for Faturas if missing or rely on string/object checks if possible.
+    // Better to add the import or use a more generic check if we can't add imports easily without shifting lines.
+    // I will use a generic check for now or try to match exactly how the controller calls it.
+
+    vi.spyOn(DataSource, "getRepository").mockImplementation((entity: any) => {
+      if (entity === Jobs) {
+        return {
+          create: vi.fn().mockReturnValue({ id: 1 }),
+          save: vi.fn(),
+          update: vi.fn(),
+        } as any;
+      }
+      if (entity === NFCom) {
+        return {
+          findOne: vi.fn().mockResolvedValue({ numeracao: 100 }),
+        } as any;
+      }
+      return {} as any;
+    });
+
+    const spyProcessar = vi
+      .spyOn(nfcom as any, "processarFilaBackground")
+      .mockResolvedValue(undefined);
+
+    await nfcom.gerarNfcom(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Notas Sendo Geradas em Segundo Plano!",
+        job: 1,
+      })
+    );
+  });
 });
