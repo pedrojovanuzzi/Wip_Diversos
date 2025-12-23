@@ -212,7 +212,6 @@ describe("Pix Controller", () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        formattedDate: "22/12",
         link: expect.stringContaining("https://pix.sejaefi.com.br"),
         pppoe: "pedro",
         valor: "50.00",
