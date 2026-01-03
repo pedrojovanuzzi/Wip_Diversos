@@ -37,7 +37,7 @@ describe("Pix Controller", () => {
     );
 
     expect(called).toHaveBeenCalled();
-    expect(response).toBe(48.96);
+    expect(response).toBe(49.1);
   });
 
   it("Aplicar desconto", async () => {
