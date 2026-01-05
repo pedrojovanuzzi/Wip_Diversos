@@ -130,7 +130,7 @@ export default function SearchInterface() {
     try {
       setLoading(true);
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/NFCom/downloadZipXMLs`,
+        `${process.env.REACT_APP_URL_SEMTIMEOUT}/NFCom/downloadZipXMLs`,
         {
           id: selectedIds,
         },
