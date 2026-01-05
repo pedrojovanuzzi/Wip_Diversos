@@ -1852,6 +1852,8 @@ class Nfcom {
           doc.text(`Validade: ${dadosCert.dataInicio} a ${dadosCert.dataFim}`);
           doc.text(`Emissor: ${dadosCert.emissor}`);
         }
+        doc.moveDown();
+        doc.text(`Série: ${nfcom[0].serie}`);
 
         doc.end();
       } catch (error) {
