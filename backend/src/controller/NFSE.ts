@@ -234,7 +234,7 @@ export class NFSEController {
         nfseBase!.exigibilidadeIss = 1;
       } else {
         nfseBase!.tipoRps = 1;
-        nfseBase!.itemListaServico = "14.02";
+        nfseBase!.itemListaServico = "140201";
         nfseBase!.issRetido = 2;
         nfseBase!.responsavelRetencao = 1;
         nfseBase!.exigibilidadeIss = 1;
