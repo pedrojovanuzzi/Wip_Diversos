@@ -1010,6 +1010,7 @@ export default function SearchInterface() {
                         R$ {value.toFixed(2)}
                       </span>
                     </h1>
+                    <h1>Total de Clientes: {nfcomList.length}</h1>
                     <Pagination
                       count={pagination.totalPages}
                       page={pagination.page}
@@ -1017,12 +1018,15 @@ export default function SearchInterface() {
                     />
                   </>
                 )) || (
-                  <h1>
-                    Valor total das faturas:{" "}
-                    <span className="font-bold text-green-600">
-                      R$ {value.toFixed(2)}
-                    </span>
-                  </h1>
+                  <>
+                    <h1>
+                      Valor total das faturas:{" "}
+                      <span className="font-bold text-green-600">
+                        R$ {value.toFixed(2)}
+                      </span>
+                    </h1>
+                    <h1>Total de Clientes: {nfcomList.length}</h1>
+                  </>
                 )}
               </div>
             </div>
