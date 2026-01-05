@@ -1823,6 +1823,7 @@ class Nfcom {
             nfcom[nfcom.length - 1].numeracao
           }`
         );
+        doc.text(`Série: ${nfcom[0].serie}`);
         doc.text(`Total de Documentos: ${nfcom.length}`);
         doc.moveDown();
         doc.text("Somatorio de Valores");
@@ -1852,12 +1853,11 @@ class Nfcom {
           doc.text(`Validade: ${dadosCert.dataInicio} a ${dadosCert.dataFim}`);
           doc.text(`Emissor: ${dadosCert.emissor}`);
         }
-        doc.moveDown();
-        doc.text(`Série: ${nfcom[0].serie}`);
 
         doc.end();
       } catch (error) {
         reject(error);
+        console.log(error);
       }
     });
   }
