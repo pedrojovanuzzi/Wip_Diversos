@@ -214,18 +214,21 @@ export class NFSEController {
       // Mirror logic for NFSe number counting
       let currentNfseNumber = nextNfseNumber;
 
-      if (!lastRpsForSeries) {
-        lastRpsForSeries = NsfeData.create();
-        lastRpsForSeries.tipoRps = 1;
-        lastRpsForSeries.itemListaServico = "17.01";
+      let nfseBase: any;
 
-        lastRpsForSeries.issRetido = 2;
-        lastRpsForSeries.responsavelRetencao = 1;
-        lastRpsForSeries.exigibilidadeIss = 1;
+      if (!lastRpsForSeries) {
+        nfseBase = {};
+        nfseBase.tipoRps = 1;
+        nfseBase.itemListaServico = "17.01";
+        nfseBase.issRetido = 2;
+        nfseBase.responsavelRetencao = 1;
+        nfseBase.exigibilidadeIss = 1;
+        nfseBase.optanteSimplesNacional = 1;
+        nfseBase.incentivoFiscal = 2;
+      } else {
+        // Force clone to plain object to avoid TypeORM reference issues
+        nfseBase = { ...lastRpsForSeries };
       }
-      // Use the last record (of any series? or target?) as base for other fields like 'issRetido'
-      // Ideally use the last record of target series to keep consistency, or fallback to any last record if new series.
-      let nfseBase = lastRpsForSeries;
 
       if (ambiente == "homologacao") {
         nfseBase.tipoRps = 1;
@@ -244,7 +247,8 @@ export class NFSEController {
       }
 
       console.log(
-        ">>>>> DEBUG ITEM LISTA SEVICO: " + nfseBase.itemListaServico
+        ">>>>> DEBUG ITEM LISTA SEVICO (MODIFICADO): " +
+          nfseBase.itemListaServico
       );
 
       // Pass targetSeries explicitly to prepareRpsData so it doesn't need to re-guess
