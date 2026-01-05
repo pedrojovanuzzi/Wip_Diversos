@@ -101,4 +101,11 @@ export class NFSE {
 
   @Column({ name: "numeroNfe", type: "int" })
   numeroNfe!: number;
+
+  @Column({
+    name: "timestamp",
+    type: "timestamp",
+    default: "CURRENT_TIMESTAMP",
+  })
+  timestamp!: Date;
 }
