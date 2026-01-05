@@ -26,7 +26,7 @@ const options = {
     : process.env.CLIENT_SECRET!,
   certificate: isSandbox
     ? path.resolve("src", "files", process.env.CERTIFICATE_SANDBOX!)
-    : path.resolve("src", "files", process.env.CERTIFICATE_PROD!),
+    : path.resolve("dist", "files", process.env.CERTIFICATE_PROD!),
   validateMtls: false,
 };
 
