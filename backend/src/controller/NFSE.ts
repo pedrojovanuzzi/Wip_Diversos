@@ -1049,7 +1049,7 @@ export class NFSEController {
       const nfseResponse = await nfseData.find({
         where: {
           login: In(clientesResponse.map((c) => c.login)),
-          competencia: Between(startDate, endDate),
+          timestamp: Between(startDate, endDate),
           ambiente: ambiente,
           status: status,
         },

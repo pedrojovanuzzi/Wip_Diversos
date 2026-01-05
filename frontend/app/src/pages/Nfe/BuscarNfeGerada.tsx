@@ -558,7 +558,13 @@ export const BuscarNfeGerada = () => {
                           scope="col"
                           className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
                         >
-                          Vencimento
+                          Competência
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                        >
+                          Gerado
                         </th>
                         <th
                           scope="col"
@@ -611,6 +617,9 @@ export const BuscarNfeGerada = () => {
                             </td>
                             <td className="px-6 py-4 text-left text-sm text-gray-500">
                               {cliente.nfse.competencia}
+                            </td>
+                            <td className="px-6 py-4 text-left text-sm text-gray-500">
+                              {cliente.nfse.timestamp}
                             </td>
                             <td className="px-6 py-4 text-left text-sm text-gray-500">
                               {cliente.nfse.aliquota}
