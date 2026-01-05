@@ -247,7 +247,7 @@ export class NFSEController {
       }
 
       console.log(
-        ">>>>> DEBUG ITEM LISTA SEVICO (MODIFICADO): dddddddddd" +
+        ">>>>> DEBUG ITEM LISTA SEVICO (MODIFICADO): " +
           nfseBase.itemListaServico
       );
 
