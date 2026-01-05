@@ -1037,11 +1037,11 @@ export class NFSEController {
         select: { login: true, cpf_cnpj: true, cli_ativado: true },
       });
       const startDate = dateFilter
-        ? moment(dateFilter.start).format("YYYY-MM-DD HH:mm:ss")
+        ? moment(dateFilter.start).startOf("day").format("YYYY-MM-DD HH:mm:ss")
         : moment().startOf("month").format("YYYY-MM-DD HH:mm:ss");
 
       const endDate = dateFilter
-        ? moment(dateFilter.end).format("YYYY-MM-DD HH:mm:ss")
+        ? moment(dateFilter.end).endOf("day").format("YYYY-MM-DD HH:mm:ss")
         : moment().endOf("month").format("YYYY-MM-DD HH:mm:ss");
 
       console.log(startDate, endDate);
