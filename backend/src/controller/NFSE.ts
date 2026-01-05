@@ -1036,7 +1036,6 @@ export class NFSEController {
         where: w,
         select: { login: true, cpf_cnpj: true, cli_ativado: true },
       });
-      const now = new Date();
       const startDate = dateFilter
         ? moment(dateFilter.start).format("YYYY-MM-DD HH:mm:ss")
         : moment().startOf("month").format("YYYY-MM-DD HH:mm:ss");
