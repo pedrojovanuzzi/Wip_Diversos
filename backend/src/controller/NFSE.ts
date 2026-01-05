@@ -106,7 +106,7 @@ export class NFSEController {
       this.configureProvider(ambiente);
       console.log(this.WSDL_URL);
 
-      aliquota = aliquota?.trim() ? aliquota : "5.0000";
+      aliquota = aliquota?.trim() ? aliquota : "4.4269";
       if (this.homologacao) {
         aliquota = "2.5000";
       }
@@ -242,6 +242,10 @@ export class NFSEController {
         nfseBase!.responsavelRetencao = 1;
         nfseBase!.exigibilidadeIss = 1;
       }
+
+      console.log(
+        ">>>>> DEBUG ITEM LISTA SEVICO: " + nfseBase?.itemListaServico
+      );
 
       // Pass targetSeries explicitly to prepareRpsData so it doesn't need to re-guess
       const serieToUse = targetSeries;

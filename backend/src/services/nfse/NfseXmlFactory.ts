@@ -61,7 +61,7 @@ export class NfseXmlFactory {
             <IssRetido>${issRetido}</IssRetido>
             <ResponsavelRetencao>${responsavelRetencao}</ResponsavelRetencao>
             <ItemListaServico>${itemListaServico}</ItemListaServico>
-            <Cnae>${this.CNAE}</Cnae>
+            <CodigoCnae>${this.CNAE}</CodigoCnae>
             <Discriminacao>${discriminacao}</Discriminacao>
             <CodigoMunicipio>${codigoMunicipio}</CodigoMunicipio>
             <ExigibilidadeISS>${exigibilidadeIss}</ExigibilidadeISS>
