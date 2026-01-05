@@ -227,6 +227,8 @@ export class NFSEController {
       // Ideally use the last record of target series to keep consistency, or fallback to any last record if new series.
       let nfseBase = lastRpsForSeries;
 
+      console.log(nfseBase);
+
       if (ambiente == "homologacao") {
         nfseBase!.tipoRps = 1;
         nfseBase!.itemListaServico = "17.01";
