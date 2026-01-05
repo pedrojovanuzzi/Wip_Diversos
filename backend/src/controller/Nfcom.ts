@@ -2575,7 +2575,7 @@ class Nfcom {
         doc.end();
       } catch (error) {
         console.error("Erro ao gerar PDF XML:", error);
-        reject(error);
+        // reject(error);
       }
     }); // End Promise
   }; // End Method
