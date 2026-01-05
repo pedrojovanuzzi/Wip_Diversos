@@ -619,7 +619,9 @@ export const BuscarNfeGerada = () => {
                               {cliente.nfse.competencia}
                             </td>
                             <td className="px-6 py-4 text-left text-sm text-gray-500">
-                              {cliente.nfse.timestamp}
+                              {new Date(
+                                cliente.nfse.timestamp
+                              ).toLocaleDateString("pt-BR")}
                             </td>
                             <td className="px-6 py-4 text-left text-sm text-gray-500">
                               {cliente.nfse.aliquota}
