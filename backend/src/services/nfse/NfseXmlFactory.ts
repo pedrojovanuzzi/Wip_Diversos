@@ -1,4 +1,6 @@
 export class NfseXmlFactory {
+  private CNAE = "6209100";
+
   createRpsXml(
     uuidLanc: string,
     nfseNumber: number,
@@ -59,6 +61,7 @@ export class NfseXmlFactory {
             <IssRetido>${issRetido}</IssRetido>
             <ResponsavelRetencao>${responsavelRetencao}</ResponsavelRetencao>
             <ItemListaServico>${itemListaServico}</ItemListaServico>
+            <Cnae>${this.CNAE}</Cnae>
             <Discriminacao>${discriminacao}</Discriminacao>
             <CodigoMunicipio>${codigoMunicipio}</CodigoMunicipio>
             <ExigibilidadeISS>${exigibilidadeIss}</ExigibilidadeISS>

@@ -218,6 +218,7 @@ export class NFSEController {
         lastRpsForSeries = NsfeData.create();
         lastRpsForSeries.tipoRps = 1;
         lastRpsForSeries.itemListaServico = "17.01";
+
         lastRpsForSeries.issRetido = 2;
         lastRpsForSeries.responsavelRetencao = 1;
         lastRpsForSeries.exigibilidadeIss = 1;
@@ -229,12 +230,14 @@ export class NFSEController {
       if (ambiente == "homologacao") {
         nfseBase!.tipoRps = 1;
         nfseBase!.itemListaServico = "17.01";
+
         nfseBase!.issRetido = 2;
         nfseBase!.responsavelRetencao = 1;
         nfseBase!.exigibilidadeIss = 1;
       } else {
         nfseBase!.tipoRps = 1;
         nfseBase!.itemListaServico = "140201";
+
         nfseBase!.issRetido = 2;
         nfseBase!.responsavelRetencao = 1;
         nfseBase!.exigibilidadeIss = 1;
