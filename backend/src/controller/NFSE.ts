@@ -1043,6 +1043,9 @@ export class NFSEController {
       const endDate = dateFilter
         ? moment(dateFilter.end).format("YYYY-MM-DD HH:mm:ss")
         : moment().endOf("month").format("YYYY-MM-DD HH:mm:ss");
+
+      console.log(startDate, endDate);
+
       const nfseData = AppDataSource.getRepository(NFSE);
       const nfseResponse = await nfseData.find({
         where: {
