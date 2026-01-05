@@ -1037,19 +1037,18 @@ export class NFSEController {
         select: { login: true, cpf_cnpj: true, cli_ativado: true },
       });
       const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       const startDate = dateFilter
-        ? new Date(dateFilter.start)
-        : firstDayOfMonth;
-      const endDate = dateFilter ? new Date(dateFilter.end) : lastDayOfMonth;
-      startDate.setHours(startDate.getHours() + 3);
-      endDate.setHours(endDate.getHours() + 3);
+        ? moment(dateFilter.start).format("YYYY-MM-DD HH:mm:ss")
+        : moment().startOf("month").format("YYYY-MM-DD HH:mm:ss");
+
+      const endDate = dateFilter
+        ? moment(dateFilter.end).format("YYYY-MM-DD HH:mm:ss")
+        : moment().endOf("month").format("YYYY-MM-DD HH:mm:ss");
       const nfseData = AppDataSource.getRepository(NFSE);
       const nfseResponse = await nfseData.find({
         where: {
           login: In(clientesResponse.map((c) => c.login)),
-          timestamp: Between(startDate, endDate),
+          timestamp: Between(startDate, endDate) as any,
           ambiente: ambiente,
           status: status,
         },
