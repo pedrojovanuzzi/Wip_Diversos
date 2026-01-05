@@ -214,22 +214,18 @@ export class NFSEController {
       // Mirror logic for NFSe number counting
       let currentNfseNumber = nextNfseNumber;
 
-      // Create a mutable base object for this batch configuration
-      let nfseBase: NFSE;
-
       if (!lastRpsForSeries) {
-        nfseBase = NsfeData.create();
-        nfseBase.tipoRps = 1;
-        nfseBase.itemListaServico = "17.01";
-        nfseBase.issRetido = 2;
-        nfseBase.responsavelRetencao = 1;
-        nfseBase.exigibilidadeIss = 1;
-      } else {
-        // Clone the entity to avoid mutating the cached result or dealing with readonly references
-        nfseBase = NsfeData.create(lastRpsForSeries);
-      }
+        lastRpsForSeries = NsfeData.create();
+        lastRpsForSeries.tipoRps = 1;
+        lastRpsForSeries.itemListaServico = "17.01";
 
-      console.log("NFSe Base (Pre-Edit):", JSON.stringify(nfseBase, null, 2));
+        lastRpsForSeries.issRetido = 2;
+        lastRpsForSeries.responsavelRetencao = 1;
+        lastRpsForSeries.exigibilidadeIss = 1;
+      }
+      // Use the last record (of any series? or target?) as base for other fields like 'issRetido'
+      // Ideally use the last record of target series to keep consistency, or fallback to any last record if new series.
+      let nfseBase = lastRpsForSeries;
 
       if (ambiente == "homologacao") {
         nfseBase.tipoRps = 1;
@@ -247,7 +243,9 @@ export class NFSEController {
         nfseBase.exigibilidadeIss = 1;
       }
 
-      console.log("NFSe Base (Post-Edit):", JSON.stringify(nfseBase, null, 2));
+      console.log(
+        ">>>>> DEBUG ITEM LISTA SEVICO: " + nfseBase.itemListaServico
+      );
 
       // Pass targetSeries explicitly to prepareRpsData so it doesn't need to re-guess
       const serieToUse = targetSeries;
