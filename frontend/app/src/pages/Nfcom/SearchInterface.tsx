@@ -140,6 +140,7 @@ export default function SearchInterface() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+          timeout: 360000,
         }
       );
 
