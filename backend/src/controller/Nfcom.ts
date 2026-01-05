@@ -533,6 +533,9 @@ class Nfcom {
         "Content-Disposition",
         "attachment; filename=notas_fiscais.zip"
       );
+
+      console.log(zipContent);
+
       res.send(zipContent);
     } catch (error) {
       console.error(error);

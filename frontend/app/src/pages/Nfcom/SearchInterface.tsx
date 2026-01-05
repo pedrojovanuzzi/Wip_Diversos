@@ -141,6 +141,7 @@ export default function SearchInterface() {
             "Content-Type": "application/json",
           },
           timeout: 360000,
+          timeoutErrorMessage: "Timeout de 6 minutos atingido.",
         }
       );
 
