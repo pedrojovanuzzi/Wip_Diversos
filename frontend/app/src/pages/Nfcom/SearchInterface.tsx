@@ -69,6 +69,7 @@ export default function SearchInterface() {
   });
   const [cpf_cnpj, setCpfCnpj] = useState<string>("");
   const [clientType, setClientType] = useState<"SVA" | "SCM" | "" | string>("");
+  const [totalClients, setTotalClients] = useState<number>(0);
   let [value, setValue] = useState<number>(0);
 
   const { user } = useAuth();
@@ -338,6 +339,47 @@ export default function SearchInterface() {
     setShowPopUp(true);
   };
 
+  const fetchTotalClients = async () => {
+    try {
+      const searchParams: any = {};
+      if (pppoe.trim()) searchParams.pppoe = pppoe.trim();
+      if (titulo.trim()) searchParams.titulo = titulo.trim();
+      if (dataInicio.trim()) searchParams.dataInicio = dataInicio.trim();
+      if (dataFim.trim()) searchParams.dataFim = dataFim.trim();
+      if (tpAmb) searchParams.tpAmb = tpAmb;
+      if (serie.trim()) searchParams.serie = serie.trim();
+      if (status.trim()) searchParams.status = status.trim();
+      if (cpf_cnpj.trim()) searchParams.cpf_cnpj = cpf_cnpj.trim();
+      if (clientType.trim()) searchParams.clientType = clientType.trim();
+
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Nfcom/buscarNFComAll`,
+        {
+          searchParams: searchParams,
+          // pagination: { page: 1, take: 999999 }, // No need for pagination here or different usage?
+          // Looking at line 455, it uses pagination and uses excludedIds.
+          // But to get total count matching filters, we likely want all.
+          // Based on user request "passe por todas as paginas, some todos ...", getting the full list is correct.
+          // I will emulate `exec` in useEffect (line 441) but without selectMode specific logic.
+          pagination: { page: 1, take: 1000000 }, // Large take to get all? Or is it ignored?
+          // The backend `buscarNFComAll` probably returns array.
+          excludedIds: [],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (Array.isArray(response.data)) {
+        setTotalClients(response.data.length);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar total de clientes:", error);
+    }
+  };
+
   const handleSearch = async (pageOverride?: number | any) => {
     try {
       setLoading(true);
@@ -373,6 +415,7 @@ export default function SearchInterface() {
       setNfcomList(resposta.data);
       setSelectedIds([]);
       handlePages();
+      fetchTotalClients(); // Calculate total on search
       console.log(resposta.data);
     } catch (erro) {
       console.error("Erro ao buscar NFCom:", erro);
@@ -1010,7 +1053,7 @@ export default function SearchInterface() {
                         R$ {value.toFixed(2)}
                       </span>
                     </h1>
-                    <h1>Total de Clientes: {nfcomList.length}</h1>
+                    <h1>Total de Clientes: {totalClients}</h1>
                     <Pagination
                       count={pagination.totalPages}
                       page={pagination.page}
@@ -1025,7 +1068,7 @@ export default function SearchInterface() {
                         R$ {value.toFixed(2)}
                       </span>
                     </h1>
-                    <h1>Total de Clientes: {nfcomList.length}</h1>
+                    <h1>Total de Clientes: {totalClients}</h1>
                   </>
                 )}
               </div>
