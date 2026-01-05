@@ -188,7 +188,7 @@ class Nfcom {
   private qrCodeUrl = "";
   private numeracao: number = 1;
   private serie: string =
-    process.env.SERVIDOR_HOMOLOGACAO === "true" ? "99" : "3";
+    process.env.SERVIDOR_HOMOLOGACAO === "true" ? "99" : "4";
 
   private cleanString = (str: string) => {
     console.log(str);
