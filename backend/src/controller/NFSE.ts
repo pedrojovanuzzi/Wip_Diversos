@@ -1154,6 +1154,8 @@ export class NFSEController {
               status: nfseValidas.map((nf) => nf.status).join(", ") || null,
               numeroNfse:
                 nfseValidas.map((nf) => nf.numeroNfe).join(", ") || null,
+              timestamp:
+                nfseValidas.map((nf) => nf.timestamp).join(", ") || null,
             },
           };
         })
