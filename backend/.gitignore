@@ -4,3 +4,4 @@ cancelamento-assinado.xml
 uploads/*
 dist/*
 test_nfcom.ts
+msg.json
