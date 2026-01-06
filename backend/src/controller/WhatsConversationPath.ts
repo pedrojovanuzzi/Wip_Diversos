@@ -30,8 +30,8 @@ const options = {
   // PRODUÇÃO = false
   // HOMOLOGAÇÃO = true
   sandbox: false,
-  client_id: process.env.CLIENT_ID,
-  client_secret: process.env.CLIENT_SECRET,
+  client_id: process.env.CLIENT_ID as string,
+  client_secret: process.env.CLIENT_SECRET as string,
   certificate: "src/controllers/cert.p12",
 };
 
@@ -92,7 +92,7 @@ async function findOrCreate(
 
 // CTRL + K + CTRL + 0 MINIMIZA TODAS AS FUNÇÕES
 
-const chave_pix = process.env.CHAVE_PIX;
+const chave_pix = process.env.CHAVE_PIX || "";
 
 class WhatsPixController {
   constructor() {
@@ -2819,22 +2819,26 @@ class WhatsPixController {
 
     const desconto = sis_cliente.desconto;
 
-    let valor = Number(cliente.valor);
+    let valor: number | string = Number(cliente.valor);
     const dataVenc = cliente.datavenc;
     let id = cliente.id;
 
     let corpo = {
-      tipoCob: "cob",
+      tipoCob: "cob" as "cob",
     };
 
     const efipayLoc = new EfiPay(options);
 
-    const loc = await efipayLoc
+    const loc: any = await efipayLoc
       .pixCreateLocation([], corpo)
-      .then()
-      .catch((error) => {
+      .catch((error: any) => {
         console.log(error);
       });
+
+    if (!loc) {
+      console.log("Erro ao criar Location");
+      return;
+    }
 
     const locID = loc.id;
 
@@ -2842,12 +2846,16 @@ class WhatsPixController {
 
     const efipayLocLink = new EfiPay(options);
 
-    const qrlink = await efipayLocLink
-      .pixGenerateQRCode({ id: String(locID) })
-      .then()
-      .catch((error) => {
+    const qrlink: any = await efipayLocLink
+      .pixGenerateQRCode({ id: Number(locID) })
+      .catch((error: any) => {
         console.log(error);
       });
+
+    if (!qrlink) {
+      console.log("Erro ao gerar QR Link");
+      return;
+    }
 
     const link = qrlink.linkVisualizacao;
 
@@ -3030,14 +3038,18 @@ class WhatsPixController {
       txid: crypto.randomBytes(16).toString("hex"),
     };
 
-    let pix = await efipay
+    let pix: any = await efipay
       .pixCreateCharge(params, body)
-      .then()
-      .catch((error) => {
+      .catch((error: any) => {
         console.log(error);
       });
 
     console.log(pix);
+
+    if (!pix) {
+      console.log("Erro ao criar PIX");
+      return;
+    }
 
     let pix_code = pix.pixCopiaECola;
 
@@ -3403,7 +3415,7 @@ class WhatsPixController {
       );
 
       console.log(response.data); // Log da resposta da API
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         "Erro ao enviar mensagem com botão de link:",
         error.response?.data || error.message
@@ -3427,13 +3439,15 @@ class WhatsPixController {
             },
             action: {
               button: "Ver opções",
-              sections: campos.sections.map((section) => ({
-                title: section.title, // Título da seção
-                rows: section.rows.map((row) => ({
-                  id: row.id, // ID da linha
-                  title: row.title, // Título da linha
-                })),
-              })),
+              sections: campos.sections.map(
+                (section: { title: any; rows: any[] }) => ({
+                  title: section.title, // Título da seção
+                  rows: section.rows.map((row: { id: any; title: any }) => ({
+                    id: row.id, // ID da linha
+                    title: row.title, // Título da linha
+                  })),
+                })
+              ),
             },
           },
         },
@@ -3455,7 +3469,7 @@ class WhatsPixController {
       );
 
       console.log(response.data); // Log da resposta da API
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         "Erro ao enviar mensagem de lista:",
         error.response?.data || error.message
@@ -3645,7 +3659,7 @@ class WhatsPixController {
           timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
         }
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         "Error sending button message:",
         error.response?.data || error.message
@@ -3676,7 +3690,7 @@ class WhatsPixController {
       const mediaId = response.data.id;
       console.log("MEDIA ID: " + mediaId);
       this.MensagensDeMidia(receivenumber, "document", mediaId, "Boleto");
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         "Erro ao enviar a mídia:",
         error.response?.data || error.message
@@ -3720,7 +3734,7 @@ class WhatsPixController {
           timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
         }
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         "Error sending media message:",
         error.response?.data || error.message
