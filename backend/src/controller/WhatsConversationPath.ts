@@ -363,6 +363,8 @@ class WhatsPixController {
     } else {
       this.resetInactivityTimer.call(this, celular, session);
 
+      console.log(`[HANDLE_MESSAGE] Stage: ${session.stage}, Texto: ${texto}`);
+
       try {
         const [insertPeople] = await findOrCreate(
           ApiMkDataSource.getRepository(PeopleConversation),
@@ -464,10 +466,10 @@ class WhatsPixController {
           break;
         case "options_start":
           if (this.verificaType(type)) {
-            if (texto == "1" || texto == "2" || texto == "Boleto/Pix") {
+            if (texto == "1" || texto == "Boleto/Pix") {
               await this.PodeMePassarOCpf(celular);
               session.stage = "awaiting_cpf";
-            } else if (texto == "Serviços/Contratação") {
+            } else if (texto == "2" || texto == "Serviços/Contratação") {
               const campos = {
                 sections: [
                   {
