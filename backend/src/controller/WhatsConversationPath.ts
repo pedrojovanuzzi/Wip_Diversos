@@ -2316,7 +2316,7 @@ class WhatsPixController {
       { campo: "cpf", pergunta: "➡️ Digite seu *CPF/CNPJ*:" },
       {
         campo: "dataNascimento",
-        pergunta: "➡️ Digite sua *data de nascimento*:",
+        pergunta: "➡️ Digite sua *data de nascimento*: dd/mm/yyyy",
       },
       {
         campo: "celular",
@@ -2334,7 +2334,7 @@ class WhatsPixController {
       },
       { campo: "bairro", pergunta: "➡️ Digite seu *Bairro*:" },
       { campo: "cidade", pergunta: "➡️ Digite sua *Cidade*:" },
-      { campo: "estado", pergunta: "➡️ Digite seu *Estado*:" },
+      { campo: "estado", pergunta: "➡️ Digite seu *Estado* (2 Letras):" },
       { campo: "cep", pergunta: "➡️ Digite seu *CEP*:" },
     ];
 
