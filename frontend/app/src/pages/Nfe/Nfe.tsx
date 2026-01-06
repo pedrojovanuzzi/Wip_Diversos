@@ -367,7 +367,7 @@ export const Nfe = () => {
           onChange={(e) => {
             setAliquota(e.target.value);
           }}
-          placeholder="Exemplo 4,4249%"
+          placeholder="Exemplo 5,0000%"
           className="ring-2 ring-gray-500 p-2 rounded m-5"
         />
       </div>

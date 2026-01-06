@@ -106,7 +106,7 @@ export class NFSEController {
       this.configureProvider(ambiente);
       console.log(this.WSDL_URL);
 
-      aliquota = aliquota?.trim() ? aliquota : "4.4269";
+      aliquota = aliquota?.trim() ? aliquota : "5.0000";
       if (this.homologacao) {
         aliquota = "2.5000";
       }
