@@ -1011,15 +1011,16 @@ class WhatsPixController {
 
                 console.log(session.msgDadosFinais);
 
-                // const addClient = await ClientesRepository.save({
-                //   nome: session.msgDadosFinais,
-                //   cpf: session.dadosCompleto.cpf,
-                //   telefone: session.dadosCompleto.telefone,
-                //   email: session.dadosCompleto.email,
-                //   plano: session.planoEscolhido,
-                //   vencimento: session.vencimentoEscolhido,
-                //   celular: celular,
-                // })
+                const addClient = await ClientesRepository.save({
+                  nome: session.dadosCompleto.nome,
+                  cpf: session.dadosCompleto.cpf,
+                  email: session.dadosCompleto.email,
+                  plano: session.planoEscolhido,
+                  vencimento: session.vencimentoEscolhido,
+                  celular: session.dadosCompleto.celular,
+                });
+
+                console.log(addClient);
 
                 await this.MensagemBotao(
                   celular,
