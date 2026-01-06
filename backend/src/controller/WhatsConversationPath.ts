@@ -17,6 +17,7 @@ import Conversations from "../entities/APIMK/Conversations";
 import ConversationsUsers from "../entities/APIMK/Conversation_Users";
 import PeopleConversation from "../entities/APIMK/People_Conversations";
 import Mensagens from "../entities/APIMK/Mensagens";
+import Sessions from "../entities/APIMK/Sessions";
 
 dotenv.config();
 
@@ -133,6 +134,29 @@ class WhatsPixController {
     this.iniciarMudancaComodo = this.iniciarMudancaComodo.bind(this);
     this.Finalizar = this.Finalizar.bind(this);
     this.verify = this.verify.bind(this);
+    this.saveSession = this.saveSession.bind(this);
+    this.deleteSession = this.deleteSession.bind(this);
+  }
+
+  async saveSession(celular: string) {
+    if (sessions[celular]) {
+      const { stage, inactivityTimer, ...dados } = sessions[celular];
+      // Não salvamos o timer no banco, pois ele é específico da memória em execução
+      await ApiMkDataSource.getRepository(Sessions).save({
+        celular,
+        stage: stage || "",
+        dados: dados || {},
+      });
+      // console.log(`Sessão salva no banco para ${celular}`);
+    }
+  }
+
+  async deleteSession(celular: string) {
+    if (sessions[celular]) {
+      delete sessions[celular];
+    }
+    await ApiMkDataSource.getRepository(Sessions).delete({ celular });
+    console.log(`Sessão removida do banco para ${celular}`);
   }
 
   async verify(req: Request, res: Response) {
@@ -218,9 +242,31 @@ class WhatsPixController {
 
                   console.log(type + " TIPO DA MENSAGEM");
 
-                  // Inicializa a sessão se não existir
+                  // Inicializa a sessão se não existir cache
                   if (!sessions[celular]) {
-                    sessions[celular] = { stage: "" };
+                    // Tenta buscar do banco
+                    const sessionDB = await ApiMkDataSource.getRepository(
+                      Sessions
+                    ).findOne({ where: { celular } });
+
+                    if (sessionDB) {
+                      sessions[celular] = {
+                        stage: sessionDB.stage,
+                        ...sessionDB.dados,
+                      };
+                      console.log(
+                        `Sessão recuperada do banco para ${celular}:`,
+                        sessions[celular]
+                      );
+                    } else {
+                      sessions[celular] = { stage: "" };
+                      // Salva nova sessão no banco
+                      await ApiMkDataSource.getRepository(Sessions).save({
+                        celular: celular,
+                        stage: "",
+                        dados: {},
+                      });
+                    }
                   }
 
                   const session = sessions[celular];
@@ -309,7 +355,9 @@ class WhatsPixController {
                       celular,
                       type,
                       manutencao
-                    );
+                    ).then(() => {
+                      this.saveSession(celular);
+                    });
                   }
                 }
               }
@@ -340,7 +388,7 @@ class WhatsPixController {
         celular,
         "🤷🏻 Seu atendimento foi *finalizado* devido à inatividade!!\nEntre em contato novamente 👍"
       );
-      delete sessions[celular];
+      this.deleteSession(celular);
     }, 900000); // 15 minutos de inatividade
   }
 
@@ -620,8 +668,10 @@ class WhatsPixController {
                 celular,
                 "🥹 *Infelizmente* não poderei mais dar \ncontinuidade ao seu atendimento, *respeitando* a sua vontade.\n🫡Estaremos sempre aqui a sua *disposição*!"
               );
-              clearTimeout(sessions[celular].inactivityTimer);
-              delete sessions[celular];
+              if (sessions[celular] && sessions[celular].inactivityTimer) {
+                clearTimeout(sessions[celular].inactivityTimer);
+              }
+              this.deleteSession(celular);
             } else {
               await this.MensagensComuns(
                 celular,
@@ -3822,8 +3872,10 @@ class WhatsPixController {
   async Finalizar(msg: any, celular: any, sessions: any) {
     try {
       await this.MensagensComuns(process.env.TEST_PHONE, msg);
-      clearTimeout(sessions[celular].inactivityTimer);
-      delete sessions[celular];
+      if (sessions[celular] && sessions[celular].inactivityTimer) {
+        clearTimeout(sessions[celular].inactivityTimer);
+      }
+      this.deleteSession(celular);
 
       const insertMessage = await ApiMkDataSource.getRepository(Mensagens).save(
         {
