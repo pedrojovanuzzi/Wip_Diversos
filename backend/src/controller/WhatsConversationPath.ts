@@ -1053,7 +1053,7 @@ class WhatsPixController {
                     endereco: session.dadosCompleto.rua,
                     cep: session.dadosCompleto.cep,
                     plano: session.planoEscolhido,
-                    vencimento: (session.vencimentoEscolhido || "")
+                    venc: (session.vencimentoEscolhido || "")
                       .trim()
                       .replace(/\D/g, ""),
                     celular: session.dadosCompleto.celular,
