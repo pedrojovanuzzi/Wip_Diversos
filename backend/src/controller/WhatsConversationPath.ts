@@ -102,9 +102,13 @@ async function findOrCreate(
 const chave_pix = process.env.CHAVE_PIX || "";
 
 class WhatsPixController {
+  processedMessages: Set<string>;
   constructor() {
     this.index = this.index.bind(this);
     this.enviarMensagemVencimento = this.enviarMensagemVencimento.bind(this);
+
+    this.processedMessages = new Set<string>();
+
     this.boasVindas = this.boasVindas.bind(this);
     this.PodeMePassarOCpf = this.PodeMePassarOCpf.bind(this);
     this.validarCPF = this.validarCPF.bind(this);
@@ -183,106 +187,138 @@ class WhatsPixController {
         return;
       }
 
-      if (body.entry && body.entry[0].changes) {
-        const changes = body.entry[0].changes;
+      if (body.entry) {
+        for (const entry of body.entry) {
+          if (entry.changes) {
+            for (const change of entry.changes) {
+              const value = change.value;
 
-        // console.log(changes);
+              if (value && value.messages) {
+                for (const message of value.messages) {
+                  const messageId = message.id;
 
-        if (changes && Array.isArray(changes) && changes.length > 0) {
-          const messages = changes[0].value.messages;
-
-          // console.log(changes[0].value.statuses);
-
-          // const celular = process.env.TEST_PHONE; // Para testes, mantenha fixo
-          const celular = messages ? messages[0].from : undefined;
-          const type = messages ? messages[0].type : undefined;
-
-          if (!celular || !type) {
-            res.status(200); // Responder ao webhook mesmo que não haja um número de celular
-            return;
-          }
-
-          console.log(type + " TIPO DA MENSAGEM");
-
-          // Inicializa a sessão se não existir
-          if (!sessions[celular]) {
-            sessions[celular] = { stage: "" };
-          }
-
-          const session = sessions[celular];
-          // console.log(`Sessão atual para ${celular}:`, session);
-          let mensagemCorpo;
-
-          if (type === "interactive") {
-            const interactive = messages[0].interactive;
-
-            // Verifica se o tipo é 'button_reply' e exibe o objeto completo de 'button_reply'
-            if (interactive.type === "button_reply") {
-              const buttonReply = interactive.button_reply;
-              console.log("button_reply object:", buttonReply); // Exibe o objeto completo de 'button_reply'
-              mensagemCorpo = buttonReply.title;
-            }
-
-            if (interactive.type === "list_reply") {
-              const listReply = interactive.list_reply;
-              console.log("list_reply object:", listReply);
-              mensagemCorpo = listReply.title;
-            }
-          } else {
-            mensagemCorpo = messages?.[0]?.text?.body;
-          }
-
-          if (mensagemCorpo || type) {
-            const texto = mensagemCorpo;
-            console.log(`Texto recebido: ${texto}, Celular: ${celular}`);
-
-            if (type === "undefined" || type === undefined) {
-              console.log(`Type undefined ignorado`);
-              res.status(200); // Resposta para o webhook
-              return;
-            }
-
-            fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-              let logs = [];
-              if (err && err.code === "ENOENT") {
-                console.log("Arquivo de log não encontrado, criando um novo.");
-              } else if (err) {
-                console.error("Erro ao ler o arquivo de log:", err);
-                return;
-              } else {
-                try {
-                  logs = JSON.parse(data);
-                  if (!Array.isArray(logs)) {
-                    logs = [];
+                  // Deduplicação
+                  if (this.processedMessages.has(messageId)) {
+                    console.log(`Mensagem duplicada ignorada: ${messageId}`);
+                    continue; // Pula para a próxima mensagem
                   }
-                } catch (parseErr) {
-                  console.error("Erro ao analisar o arquivo de log:", parseErr);
-                  logs = [];
+
+                  this.processedMessages.add(messageId);
+                  // Remove o ID do conjunto após 2 minutos para liberar memória
+                  setTimeout(() => {
+                    this.processedMessages.delete(messageId);
+                  }, 2 * 60 * 1000);
+
+                  const celular = message.from;
+                  const type = message.type;
+
+                  if (!celular || !type) {
+                    continue;
+                  }
+
+                  console.log(type + " TIPO DA MENSAGEM");
+
+                  // Inicializa a sessão se não existir
+                  if (!sessions[celular]) {
+                    sessions[celular] = { stage: "" };
+                  }
+
+                  const session = sessions[celular];
+                  let mensagemCorpo;
+
+                  if (type === "interactive") {
+                    const interactive = message.interactive;
+
+                    if (interactive.type === "button_reply") {
+                      const buttonReply = interactive.button_reply;
+                      console.log("button_reply object:", buttonReply);
+                      mensagemCorpo = buttonReply.title;
+                    }
+
+                    if (interactive.type === "list_reply") {
+                      const listReply = interactive.list_reply;
+                      console.log("list_reply object:", listReply);
+                      mensagemCorpo = listReply.title;
+                    }
+                  } else {
+                    mensagemCorpo = message?.text?.body;
+                  }
+
+                  if (mensagemCorpo || type) {
+                    const texto = mensagemCorpo;
+                    console.log(
+                      `Texto recebido: ${texto}, Celular: ${celular}`
+                    );
+
+                    if (type === "undefined" || type === undefined) {
+                      console.log(`Type undefined ignorado`);
+                      continue;
+                    }
+
+                    fs.readFile(logMsgFilePath, "utf8", (err, data) => {
+                      let logs = [];
+                      if (err && err.code === "ENOENT") {
+                        console.log(
+                          "Arquivo de log não encontrado, criando um novo."
+                        );
+                      } else if (err) {
+                        console.error("Erro ao ler o arquivo de log:", err);
+                        return;
+                      } else {
+                        try {
+                          logs = JSON.parse(data);
+                          if (!Array.isArray(logs)) {
+                            logs = [];
+                          }
+                        } catch (parseErr) {
+                          console.error(
+                            "Erro ao analisar o arquivo de log:",
+                            parseErr
+                          );
+                          logs = [];
+                        }
+                      }
+
+                      const log = {
+                        messages: [message],
+                        timestamp: new Date().toISOString(),
+                      };
+
+                      logs.push(log);
+
+                      const jsonString = JSON.stringify(logs, null, 2);
+
+                      fs.writeFile(
+                        logMsgFilePath,
+                        jsonString,
+                        "utf8",
+                        (err) => {
+                          if (err) {
+                            console.error(
+                              "Erro ao escrever no arquivo de log:",
+                              err
+                            );
+                          }
+                        }
+                      );
+                    });
+
+                    this.handleMessage(
+                      session,
+                      texto,
+                      celular,
+                      type,
+                      manutencao
+                    );
+                  }
                 }
               }
-
-              const log = {
-                messages: messages,
-                timestamp: new Date().toISOString(),
-              };
-
-              logs.push(log);
-
-              const jsonString = JSON.stringify(logs, null, 2);
-
-              fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                if (err) {
-                  console.error("Erro ao escrever no arquivo de log:", err);
-                  return;
-                }
-                console.log("Log atualizado com sucesso!");
-              });
-            });
-
-            this.handleMessage(session, texto, celular, type, manutencao);
+            }
           }
-          res.status(200); // Resposta para o webhook
         }
+        res.status(200).send("EVENT_RECEIVED");
+      } else {
+        res.sendStatus(404);
       }
     } catch (error) {
       console.error("Erro ao processar o webhook:", error);
