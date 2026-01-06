@@ -128,6 +128,26 @@ class WhatsPixController {
     this.LGPD = this.LGPD.bind(this);
     this.iniciarMudancaComodo = this.iniciarMudancaComodo.bind(this);
     this.Finalizar = this.Finalizar.bind(this);
+    this.verify = this.verify.bind(this);
+  }
+
+  async verify(req: Request, res: Response) {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+
+    const myToken = process.env.WEBHOOK_VERIFY_TOKEN || "meu_token_secreto";
+
+    if (mode && token) {
+      if (mode === "subscribe" && token === myToken) {
+        console.log("WEBHOOK_VERIFIED");
+        res.status(200).send(challenge);
+      } else {
+        res.sendStatus(403);
+      }
+    } else {
+      res.sendStatus(400);
+    }
   }
 
   async index(req: Request, res: Response) {
