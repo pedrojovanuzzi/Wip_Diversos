@@ -133,13 +133,13 @@ class WhatsPixController {
 
   async verify(req: Request, res: Response) {
     const mode = req.query["hub.mode"];
-    const token = req.query["hub.verify_token"];
+    const verify_token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
 
-    const myToken = process.env.WEBHOOK_VERIFY_TOKEN || "meu_token_secreto";
+    const myToken = token;
 
-    if (mode && token) {
-      if (mode === "subscribe" && token === myToken) {
+    if (mode && verify_token) {
+      if (mode === "subscribe" && verify_token === myToken) {
         console.log("WEBHOOK_VERIFIED");
         res.status(200).send(challenge);
       } else {
