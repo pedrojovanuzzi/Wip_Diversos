@@ -128,15 +128,21 @@ class WhatsPixController {
     // console.log(req.body);
 
     try {
-      const insertPeople = await PeopleConversation.findOrCreate({
-        where: { telefone: process.env.SENDER_NUMBER },
-        defaults: { nome: "Você", telefone: process.env.SENDER_NUMBER },
-      });
+      const [insertPeople] = await findOrCreate(
+        ApiMkDataSource.getRepository(PeopleConversation),
+        {
+          where: { telefone: process.env.SENDER_NUMBER },
+          defaults: { nome: "Você", telefone: process.env.SENDER_NUMBER },
+        }
+      );
 
-      const insertConversation = await Conversations.findOrCreate({
-        where: { id: conversation.receiver_id },
-        defaults: { nome: "Você" },
-      });
+      const [insertConversation] = await findOrCreate(
+        ApiMkDataSource.getRepository(Conversations),
+        {
+          where: { id: conversation.receiver_id },
+          defaults: { nome: "Você" },
+        }
+      );
 
       const body = req.body;
 
@@ -1823,7 +1829,7 @@ class WhatsPixController {
                 "Falar com Atendente"
               );
               session.stage = "options_start";
-            } else if (this.validarCPF(texto)) {
+            } else if (await this.validarCPF(texto)) {
               const cpf = texto.replace(/[^\d]+/g, "");
               console.log("Consultar cadastro");
               session.cpf = cpf;
@@ -1984,7 +1990,7 @@ class WhatsPixController {
               session.stage = "awaiting_selection";
               let messageText =
                 "🔍 Mais de um *Cadastro encontrado!* Digite o *Número* para qual deseja 👇🏻\n\n";
-              session.structuredData.forEach((client) => {
+              session.structuredData.forEach((client: any) => {
                 messageText += `*${client.index}* Nome: ${client.nome}, Endereço: ${client.endereco} N: ${client.numero}\n\n`;
               });
               messageText +=
