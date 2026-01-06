@@ -1037,11 +1037,25 @@ class WhatsPixController {
                 try {
                   const addClient = await ClientesRepository.save({
                     nome: session.dadosCompleto.nome,
+                    login: session.dadosCompleto.login.trim().toUpperCase(),
+                    rg: session.dadosCompleto.rg,
                     cpf: session.dadosCompleto.cpf,
                     email: session.dadosCompleto.email,
+                    cidade: session.dadosCompleto.cidade,
+                    bairro: session.dadosCompleto.bairro,
+                    estado: session.dadosCompleto.estado
+                      .toUpperCase()
+                      .slice(0, 2),
+                    nascimento: session.dadosCompleto.dataNascimento,
+                    numero: session.dadosCompleto.numero,
+                    endereco: session.dadosCompleto.rua,
+                    cep: session.dadosCompleto.cep,
                     plano: session.planoEscolhido,
-                    vencimento: session.vencimentoEscolhido,
+                    vencimento: session.vencimentoEscolhido
+                      .trim()
+                      .replace(/\D/g, ""),
                     celular: session.dadosCompleto.celular,
+                    opcelular: session.dadosCompleto.celularSecundario,
                   });
                   console.log("Cliente salvo com sucesso:", addClient);
                 } catch (dbError) {
