@@ -151,6 +151,11 @@ class WhatsPixController {
 
       console.log(JSON.stringify(body, null, 2));
 
+      if (!body.entry) {
+        res.sendStatus(200);
+        return;
+      }
+
       if (body.entry && body.entry[0].changes) {
         const changes = body.entry[0].changes;
 
