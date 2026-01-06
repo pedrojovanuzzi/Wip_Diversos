@@ -1037,13 +1037,15 @@ class WhatsPixController {
                 try {
                   const addClient = await ClientesRepository.save({
                     nome: session.dadosCompleto.nome,
-                    login: session.dadosCompleto.login.trim().toUpperCase(),
+                    login: (session.dadosCompleto.nome || "")
+                      .trim()
+                      .toUpperCase(),
                     rg: session.dadosCompleto.rg,
                     cpf: session.dadosCompleto.cpf,
                     email: session.dadosCompleto.email,
                     cidade: session.dadosCompleto.cidade,
                     bairro: session.dadosCompleto.bairro,
-                    estado: session.dadosCompleto.estado
+                    estado: (session.dadosCompleto.estado || "")
                       .toUpperCase()
                       .slice(0, 2),
                     nascimento: session.dadosCompleto.dataNascimento,
@@ -1051,7 +1053,7 @@ class WhatsPixController {
                     endereco: session.dadosCompleto.rua,
                     cep: session.dadosCompleto.cep,
                     plano: session.planoEscolhido,
-                    vencimento: session.vencimentoEscolhido
+                    vencimento: (session.vencimentoEscolhido || "")
                       .trim()
                       .replace(/\D/g, ""),
                     celular: session.dadosCompleto.celular,
