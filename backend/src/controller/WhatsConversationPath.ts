@@ -1018,8 +1018,10 @@ class WhatsPixController {
                   "🥹 *Infelizmente* não poderei mais dar \ncontinuidade ao seu atendimento, *respeitando* a sua vontade.\n🫡Estaremos sempre aqui a sua *disposição*!"
                 );
                 setTimeout(() => {
-                  clearTimeout(sessions[celular].inactivityTimer);
-                  delete sessions[celular];
+                  if (sessions[celular] && sessions[celular].inactivityTimer) {
+                    clearTimeout(sessions[celular].inactivityTimer);
+                  }
+                  this.deleteSession(celular);
                 }, 5000); // Espera 5 segundos antes de limpar
               } else {
                 await this.MensagensComuns(
@@ -2164,8 +2166,10 @@ class WhatsPixController {
               celular,
               "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉"
             );
-            clearTimeout(sessions[celular].inactivityTimer);
-            delete sessions[celular];
+            if (sessions[celular] && sessions[celular].inactivityTimer) {
+              clearTimeout(sessions[celular].inactivityTimer);
+            }
+            this.deleteSession(celular);
             console.log(
               "Clientes Utilizando o Bot no momento: " +
                 this.getActiveSessionsCount()
