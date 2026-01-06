@@ -124,7 +124,7 @@ class WhatsPixController {
   }
 
   async index(req: Request, res: Response) {
-    // console.log('Webhook recebido');
+    // console.log("Webhook recebido");
     // console.log(req.body);
 
     try {
@@ -144,15 +144,22 @@ class WhatsPixController {
         }
       );
 
-      const body = req.body;
+      let body = req.body;
+      if (body.reqbody) {
+        body = body.reqbody;
+      }
+
+      console.log(JSON.stringify(body, null, 2));
 
       if (body.entry && body.entry[0].changes) {
         const changes = body.entry[0].changes;
 
+        console.log(changes);
+
         if (changes && Array.isArray(changes) && changes.length > 0) {
           const messages = changes[0].value.messages;
 
-          // console.log(changes[0].value.statuses);
+          console.log(changes[0].value.statuses);
 
           // const celular = process.env.TEST_PHONE; // Para testes, mantenha fixo
           const celular = messages ? messages[0].from : undefined;
