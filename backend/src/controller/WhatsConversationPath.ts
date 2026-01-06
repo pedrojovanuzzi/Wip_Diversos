@@ -1023,9 +1023,7 @@ class WhatsPixController {
                 mailOptions(session.msgDadosFinais);
 
                 const ClientesRepository =
-                  AppDataSource.getRepository(ClientesEntities);
-
-                console.log(session.msgDadosFinais);
+                  MkauthDataSource.getRepository(ClientesEntities);
 
                 try {
                   const addClient = await ClientesRepository.save({
