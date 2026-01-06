@@ -429,6 +429,15 @@ class WhatsPixController {
     } else {
       this.resetInactivityTimer.call(this, celular, session);
 
+      if (texto && texto.toLowerCase() === "resetar") {
+        await this.MensagensComuns(
+          celular,
+          "Sessão resetada com sucesso! Você pode iniciar uma nova conversa agora."
+        );
+        await this.deleteSession(celular);
+        return;
+      }
+
       console.log(`[HANDLE_MESSAGE] Stage: ${session.stage}, Texto: ${texto}`);
 
       try {
@@ -1039,11 +1048,23 @@ class WhatsPixController {
                   console.error("Erro ao salvar cliente no banco:", dbError);
                 }
 
-                await this.MensagemBotao(
-                  celular,
-                  "Concluir Solicitação",
-                  "Finalizar"
+                console.log(
+                  "Tentando enviar botão de finalização para:",
+                  celular
                 );
+                try {
+                  await this.MensagemBotao(
+                    celular,
+                    "Concluir Solicitação",
+                    "Finalizar"
+                  );
+                  console.log("Botão de finalização enviado com sucesso.");
+                } catch (btnError) {
+                  console.error(
+                    "Erro ao enviar botão de finalização:",
+                    btnError
+                  );
+                }
                 session.stage = "finalizar";
               } else if (
                 texto.toLowerCase() === "não" ||
