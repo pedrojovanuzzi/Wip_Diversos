@@ -73,8 +73,6 @@ const sessions: { [key: string]: any } = {};
 
 const manutencao = false;
 
-let msgDadosFinais = "";
-
 let conversation: {
   conv_id: number | null;
   sender_id: number | null;
@@ -702,7 +700,7 @@ class WhatsPixController {
                   let dadosCliente = session.dadosCompleto
                     ? JSON.stringify(session.dadosCompleto, null, 2)
                     : "Dados não encontrados";
-                  msgDadosFinais = `*🏠 Mudança de Endereço* \n\n*💰 Forma: Paga com ${pagamento}*\nDados do Cliente: ${dadosCliente}`;
+                  session.msgDadosFinais = `*🏠 Mudança de Endereço* \n\n*💰 Forma: Paga com ${pagamento}*\nDados do Cliente: ${dadosCliente}`;
 
                   fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                     let logs = [];
@@ -729,7 +727,7 @@ class WhatsPixController {
                     }
 
                     const log = {
-                      messages: msgDadosFinais,
+                      messages: session.msgDadosFinais,
                       timestamp: new Date().toISOString(),
                     };
 
@@ -749,7 +747,7 @@ class WhatsPixController {
                     });
                   });
 
-                  mailOptions(msgDadosFinais);
+                  mailOptions(session.msgDadosFinais);
                   await this.MensagemBotao(
                     celular,
                     "Concluir Solicitação",
@@ -766,7 +764,7 @@ class WhatsPixController {
                   let dadosCliente = session.dadosCompleto
                     ? JSON.stringify(session.dadosCompleto, null, 2)
                     : "Dados não encontrados";
-                  msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*💰 Forma: Paga com ${pagamento}*\nDados do Cliente: ${dadosCliente}`;
+                  session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*💰 Forma: Paga com ${pagamento}*\nDados do Cliente: ${dadosCliente}`;
 
                   fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                     let logs = [];
@@ -793,7 +791,7 @@ class WhatsPixController {
                     }
 
                     const log = {
-                      messages: msgDadosFinais,
+                      messages: session.msgDadosFinais,
                       timestamp: new Date().toISOString(),
                     };
 
@@ -812,7 +810,7 @@ class WhatsPixController {
                       console.log("Log atualizado com sucesso!");
                     });
                   });
-                  mailOptions(msgDadosFinais);
+                  mailOptions(session.msgDadosFinais);
                   await this.MensagemBotao(
                     celular,
                     "Concluir Solicitação",
@@ -958,7 +956,7 @@ class WhatsPixController {
                 let dadosCliente = session.dadosCompleto
                   ? JSON.stringify(session.dadosCompleto, null, 2)
                   : "Dados não encontrados";
-                msgDadosFinais = `*🧑 Instalação Nova* \nPlano Escolhido: ${session.planoEscolhido}\nVencimento: ${session.vencimentoEscolhido}\nDados do Cliente: ${dadosCliente}`;
+                session.msgDadosFinais = `*🧑 Instalação Nova* \nPlano Escolhido: ${session.planoEscolhido}\nVencimento: ${session.vencimentoEscolhido}\nDados do Cliente: ${dadosCliente}`;
 
                 fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                   let logs = [];
@@ -985,7 +983,7 @@ class WhatsPixController {
                   }
 
                   const log = {
-                    messages: msgDadosFinais,
+                    messages: session.msgDadosFinais,
                     timestamp: new Date().toISOString(),
                   };
 
@@ -1002,7 +1000,7 @@ class WhatsPixController {
                   });
                 });
 
-                mailOptions(msgDadosFinais);
+                mailOptions(session.msgDadosFinais);
                 await this.MensagemBotao(
                   celular,
                   "Concluir Solicitação",
@@ -1068,7 +1066,7 @@ class WhatsPixController {
                   let dadosCliente = session.dadosCompleto
                     ? JSON.stringify(session.dadosCompleto, null, 2)
                     : "Dados não encontrados";
-                  msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*🆓 Forma: Gratis*\nDados do Cliente: ${dadosCliente}`;
+                  session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*🆓 Forma: Gratis*\nDados do Cliente: ${dadosCliente}`;
 
                   fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                     let logs = [];
@@ -1095,7 +1093,7 @@ class WhatsPixController {
                     }
 
                     const log = {
-                      messages: msgDadosFinais,
+                      messages: session.msgDadosFinais,
                       timestamp: new Date().toISOString(),
                     };
 
@@ -1114,7 +1112,7 @@ class WhatsPixController {
                       console.log("Log atualizado com sucesso!");
                     });
                   });
-                  mailOptions(msgDadosFinais);
+                  mailOptions(session.msgDadosFinais);
                   await this.MensagemBotao(
                     celular,
                     "Concluir Solicitação",
@@ -1312,7 +1310,7 @@ class WhatsPixController {
               let dadosCliente = session.dadosCompleto
                 ? JSON.stringify(session.dadosCompleto, null, 2)
                 : "Dados não encontrados";
-              msgDadosFinais = `*🎭 Troca de Titularidade*\n\nDados do Cliente: ${dadosCliente}`;
+              session.msgDadosFinais = `*🎭 Troca de Titularidade*\n\nDados do Cliente: ${dadosCliente}`;
 
               fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                 let logs = [];
@@ -1339,7 +1337,7 @@ class WhatsPixController {
                 }
 
                 const log = {
-                  messages: msgDadosFinais,
+                  messages: session.msgDadosFinais,
                   timestamp: new Date().toISOString(),
                 };
 
@@ -1356,7 +1354,7 @@ class WhatsPixController {
                 });
               });
 
-              mailOptions(msgDadosFinais);
+              mailOptions(session.msgDadosFinais);
               await this.MensagemBotao(
                 celular,
                 "Concluir Solicitação",
@@ -1384,7 +1382,7 @@ class WhatsPixController {
             let dadosCliente = session.dadosCompleto
               ? JSON.stringify(session.dadosCompleto, null, 2)
               : "Dados não encontrados";
-            msgDadosFinais = `*🔌 Wifi Estendido 100 Megas* \nDados do Cliente: ${dadosCliente}`;
+            session.msgDadosFinais = `*🔌 Wifi Estendido 100 Megas* \nDados do Cliente: ${dadosCliente}`;
 
             fs.readFile(logMsgFilePath, "utf8", (err, data) => {
               let logs = [];
@@ -1406,7 +1404,7 @@ class WhatsPixController {
               }
 
               const log = {
-                messages: msgDadosFinais,
+                messages: session.msgDadosFinais,
                 timestamp: new Date().toISOString(),
               };
 
@@ -1423,7 +1421,7 @@ class WhatsPixController {
               });
             });
 
-            mailOptions(msgDadosFinais);
+            mailOptions(session.msgDadosFinais);
             await this.MensagemBotao(
               celular,
               "Concluir Solicitação",
@@ -1445,7 +1443,7 @@ class WhatsPixController {
             let dadosCliente = session.dadosCompleto
               ? JSON.stringify(session.dadosCompleto, null, 2)
               : "Dados não encontrados";
-            msgDadosFinais = `*🔌 Wifi Estendido 100 Megas* \nDados do Cliente: ${dadosCliente}`;
+            session.msgDadosFinais = `*🔌 Wifi Estendido 100 Megas* \nDados do Cliente: ${dadosCliente}`;
 
             fs.readFile(logMsgFilePath, "utf8", (err, data) => {
               let logs = [];
@@ -1467,7 +1465,7 @@ class WhatsPixController {
               }
 
               const log = {
-                messages: msgDadosFinais,
+                messages: session.msgDadosFinais,
                 timestamp: new Date().toISOString(),
               };
 
@@ -1484,7 +1482,7 @@ class WhatsPixController {
               });
             });
 
-            mailOptions(msgDadosFinais);
+            mailOptions(session.msgDadosFinais);
             await this.MensagemBotao(
               celular,
               "Concluir Solicitação",
@@ -1690,7 +1688,7 @@ class WhatsPixController {
             let dadosCliente = session.dadosCompleto
               ? JSON.stringify(session.dadosCompleto, null, 2)
               : "Dados não encontrados";
-            msgDadosFinais = `*🔌 Alteração de Plano* \nPlano Escolhido: ${session.planoEscolhido}\nDados do Cliente: ${dadosCliente}`;
+            session.msgDadosFinais = `*🔌 Alteração de Plano* \nPlano Escolhido: ${session.planoEscolhido}\nDados do Cliente: ${dadosCliente}`;
 
             fs.readFile(logMsgFilePath, "utf8", (err, data) => {
               let logs = [];
@@ -1712,7 +1710,7 @@ class WhatsPixController {
               }
 
               const log = {
-                messages: msgDadosFinais,
+                messages: session.msgDadosFinais,
                 timestamp: new Date().toISOString(),
               };
 
@@ -1729,7 +1727,7 @@ class WhatsPixController {
               });
             });
 
-            mailOptions(msgDadosFinais);
+            mailOptions(session.msgDadosFinais);
             await this.MensagemBotao(
               celular,
               "Concluir Solicitação",
@@ -1776,7 +1774,7 @@ class WhatsPixController {
                 let dadosCliente = session.dadosCompleto
                   ? JSON.stringify(session.dadosCompleto, null, 2)
                   : "Dados não encontrados";
-                msgDadosFinais = `*🏠 Mudança de Endereço* \n\n*🆓 Forma: Gratis*\nDados do Cliente: ${dadosCliente}`;
+                session.msgDadosFinais = `*🏠 Mudança de Endereço* \n\n*🆓 Forma: Gratis*\nDados do Cliente: ${dadosCliente}`;
 
                 fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                   let logs = [];
@@ -1803,7 +1801,7 @@ class WhatsPixController {
                   }
 
                   const log = {
-                    messages: msgDadosFinais,
+                    messages: session.msgDadosFinais,
                     timestamp: new Date().toISOString(),
                   };
 
@@ -1820,7 +1818,7 @@ class WhatsPixController {
                   });
                 });
 
-                mailOptions(msgDadosFinais);
+                mailOptions(session.msgDadosFinais);
                 await this.MensagemBotao(
                   celular,
                   "Concluir Solicitação",
@@ -1861,7 +1859,7 @@ class WhatsPixController {
                 let dadosCliente = session.dadosCompleto
                   ? JSON.stringify(session.dadosCompleto, null, 2)
                   : "Dados não encontrados";
-                msgDadosFinais = `*🆕 Renovação Contratual* \nDados do Cliente: ${dadosCliente}`;
+                session.msgDadosFinais = `*🆕 Renovação Contratual* \nDados do Cliente: ${dadosCliente}`;
 
                 fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                   let logs = [];
@@ -1888,7 +1886,7 @@ class WhatsPixController {
                   }
 
                   const log = {
-                    messages: msgDadosFinais,
+                    messages: session.msgDadosFinais,
                     timestamp: new Date().toISOString(),
                   };
 
@@ -1905,7 +1903,7 @@ class WhatsPixController {
                   });
                 });
 
-                mailOptions(msgDadosFinais);
+                mailOptions(session.msgDadosFinais);
                 await this.MensagemBotao(
                   celular,
                   "Concluir Solicitação",
@@ -2187,7 +2185,7 @@ class WhatsPixController {
           try {
             if (this.verificaType(type)) {
               if (texto.toLowerCase() === "finalizar") {
-                await this.Finalizar(msgDadosFinais, celular, sessions);
+                await this.Finalizar(session.msgDadosFinais, celular, sessions);
               } else {
                 await this.MensagensComuns(
                   celular,
