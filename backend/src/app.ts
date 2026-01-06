@@ -21,6 +21,7 @@ import BackupRoutes from "./routes/Backup.routes";
 import PixRoutes from "./routes/Pix.routes";
 import Pix from "./controller/Pix";
 import NFCom from "./routes/NFCom.routes";
+import WhatsappWebHook from "./routes/WhatsappWebHook.routes";
 const backup = new Backup();
 const pix = new Pix();
 
@@ -50,6 +51,7 @@ export class App {
     this.server.use("/api/Nfe", NFSE);
     this.server.use("/api/NFCom", NFCom);
     this.server.use("/api/whatsapp", Whatsapp);
+    this.server.use("/api/whatsappWebHook", WhatsappWebHook);
     this.server.use("/api/Prefeitura", Prefeitura);
     this.server.use("/api/ClientAnalytics", ClientAnalytics);
     this.server.use("/api/DosProtect", DosProtect);
