@@ -1051,7 +1051,7 @@ class WhatsPixController {
                   }
 
                   const addClient = await ClientesRepository.save({
-                    nome: session.dadosCompleto.nome,
+                    nome: session.dadosCompleto.nome.toUpperCase(),
                     login: (session.dadosCompleto.nome || "")
                       .trim()
                       .replace(/\s/g, "")
