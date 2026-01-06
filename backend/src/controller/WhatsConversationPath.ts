@@ -26,13 +26,20 @@ const logMsgFilePath = path.join(__dirname, "msg.json");
 const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
 const urlMedia = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
 
+const isSandbox = process.env.SERVIDOR_HOMOLOGACAO === "true";
+
 const options = {
-  // PRODUÇÃO = false
-  // HOMOLOGAÇÃO = true
-  sandbox: false,
-  client_id: process.env.CLIENT_ID as string,
-  client_secret: process.env.CLIENT_SECRET as string,
-  certificate: "src/controllers/cert.p12",
+  sandbox: isSandbox,
+  client_id: isSandbox
+    ? process.env.CLIENT_ID_HOMOLOGACAO!
+    : process.env.CLIENT_ID!,
+  client_secret: isSandbox
+    ? process.env.CLIENT_SECRET_HOMOLOGACAO!
+    : process.env.CLIENT_SECRET!,
+  certificate: isSandbox
+    ? path.resolve("src", "files", process.env.CERTIFICATE_SANDBOX!)
+    : path.resolve("dist", "files", process.env.CERTIFICATE_PROD!),
+  validateMtls: false,
 };
 
 const transporter = nodemailer.createTransport({
