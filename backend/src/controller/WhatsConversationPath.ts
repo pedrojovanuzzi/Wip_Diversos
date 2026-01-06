@@ -252,6 +252,14 @@ class WhatsPixController {
                     ).findOne({ where: { celular } });
 
                     if (sessionDB) {
+                      // Verifica se a mensagem já foi processada (persistência no banco)
+                      if (sessionDB.last_message_id === messageId) {
+                        console.log(
+                          `Mensagem duplicada (persistida) ignorada: ${messageId}`
+                        );
+                        continue;
+                      }
+
                       sessions[celular] = {
                         stage: sessionDB.stage,
                         ...sessionDB.dados,
@@ -267,8 +275,12 @@ class WhatsPixController {
                         celular: celular,
                         stage: "",
                         dados: {},
+                        last_message_id: messageId, // Inicializa com o ID da mensagem atual
                       });
                     }
+                  } else {
+                    // Se a sessão já está em memória, verifica se o DB tem um ID mais recente (proteção extra) ou se é falha de reinicio rápido
+                    // Mas o principal é atualizar o last_message_id no final do processamento
                   }
 
                   const session = sessions[celular];
@@ -358,6 +370,10 @@ class WhatsPixController {
                       type,
                       manutencao
                     ).then(() => {
+                      // Atualiza last_message_id na sessão em memória antes de salvar
+                      if (sessions[celular]) {
+                        (sessions[celular] as any).last_message_id = messageId;
+                      }
                       this.saveSession(celular);
                     });
                   }
@@ -1011,16 +1027,19 @@ class WhatsPixController {
 
                 console.log(session.msgDadosFinais);
 
-                const addClient = await ClientesRepository.save({
-                  nome: session.dadosCompleto.nome,
-                  cpf: session.dadosCompleto.cpf,
-                  email: session.dadosCompleto.email,
-                  plano: session.planoEscolhido,
-                  vencimento: session.vencimentoEscolhido,
-                  celular: session.dadosCompleto.celular,
-                });
-
-                console.log(addClient);
+                try {
+                  const addClient = await ClientesRepository.save({
+                    nome: session.dadosCompleto.nome,
+                    cpf: session.dadosCompleto.cpf,
+                    email: session.dadosCompleto.email,
+                    plano: session.planoEscolhido,
+                    vencimento: session.vencimentoEscolhido,
+                    celular: session.dadosCompleto.celular,
+                  });
+                  console.log("Cliente salvo com sucesso:", addClient);
+                } catch (dbError) {
+                  console.error("Erro ao salvar cliente no banco:", dbError);
+                }
 
                 await this.MensagemBotao(
                   celular,
