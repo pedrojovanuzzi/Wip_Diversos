@@ -11,6 +11,9 @@ export default class Sessions {
   @Column({ type: "json", nullable: true })
   dados!: any; // Guarda session.dadosCadastro, service, etc.
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  last_message_id!: string;
+
   @UpdateDateColumn()
   updated_at!: Date;
 }
