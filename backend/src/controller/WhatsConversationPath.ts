@@ -151,8 +151,8 @@ class WhatsPixController {
   }
 
   async index(req: Request, res: Response) {
-    console.log("Webhook recebido");
-    console.log(req.body);
+    // console.log("Webhook recebido");
+    // console.log(req.body);
 
     try {
       const [insertPeople] = await findOrCreate(
@@ -176,7 +176,7 @@ class WhatsPixController {
         body = body.reqbody;
       }
 
-      console.log(JSON.stringify(body, null, 2));
+      // console.log(JSON.stringify(body, null, 2));
 
       if (!body.entry) {
         res.status(200);
