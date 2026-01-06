@@ -1,7 +1,10 @@
 import { Request, Response } from "express";
 import { Faturas as Record } from "../entities/Faturas";
-import { ClientesEntities as Sis_Cliente } from "../entities/ClientesEntities";
-import { In, IsNull } from "typeorm";
+import {
+  ClientesEntities,
+  ClientesEntities as Sis_Cliente,
+} from "../entities/ClientesEntities";
+import { getRepository, In, IsNull } from "typeorm";
 import ApiMkDataSource from "../database/API_MK";
 import MkauthDataSource from "../database/MkauthSource";
 import EfiPay from "sdk-node-apis-efi";
@@ -18,6 +21,7 @@ import ConversationsUsers from "../entities/APIMK/Conversation_Users";
 import PeopleConversation from "../entities/APIMK/People_Conversations";
 import Mensagens from "../entities/APIMK/Mensagens";
 import Sessions from "../entities/APIMK/Sessions";
+import AppDataSource from "../database/DataSource";
 
 dotenv.config();
 
@@ -1001,6 +1005,22 @@ class WhatsPixController {
                 });
 
                 mailOptions(session.msgDadosFinais);
+
+                const ClientesRepository =
+                  AppDataSource.getRepository(ClientesEntities);
+
+                console.log(session.msgDadosFinais);
+
+                // const addClient = await ClientesRepository.save({
+                //   nome: session.msgDadosFinais,
+                //   cpf: session.dadosCompleto.cpf,
+                //   telefone: session.dadosCompleto.telefone,
+                //   email: session.dadosCompleto.email,
+                //   plano: session.planoEscolhido,
+                //   vencimento: session.vencimentoEscolhido,
+                //   celular: celular,
+                // })
+
                 await this.MensagemBotao(
                   celular,
                   "Concluir Solicitação",
