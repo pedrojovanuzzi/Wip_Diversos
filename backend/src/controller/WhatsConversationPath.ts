@@ -1,3 +1,4 @@
+import { Request, Response } from "express";
 import { Faturas as Record } from "../entities/Faturas";
 import { ClientesEntities as Sis_Cliente } from "../entities/ClientesEntities";
 import { In, IsNull } from "typeorm";
@@ -122,7 +123,7 @@ class WhatsPixController {
     this.Finalizar = this.Finalizar.bind(this);
   }
 
-  async index(req, res) {
+  async index(req: Request, res: Response) {
     // console.log('Webhook recebido');
     // console.log(req.body);
 
@@ -503,13 +504,13 @@ class WhatsPixController {
             if (texto.toLowerCase() === "sim aceito") {
               if (session.service === "instalacao") {
                 session.stage = "register";
-                await this.iniciarCadastro(celular, texto, session);
+                await this.iniciarCadastro(celular, texto, session, type);
               } else if (session.service === "mudanca_endereco") {
                 session.stage = "mudanca_endereco";
-                await this.iniciarMudanca(celular, texto, session);
+                await this.iniciarMudanca(celular, texto, session, type);
               } else if (session.service === "mudanca_comodo") {
                 session.stage = "mudanca_comodo";
-                await this.iniciarMudancaComodo(celular, texto, session);
+                await this.iniciarMudancaComodo(celular, texto, session, type);
               } else if (session.service === "troca_titularidade") {
                 session.stage = "troca_titularidade";
                 await this.MensagemBotao(
@@ -520,7 +521,7 @@ class WhatsPixController {
                 );
               } else if (session.service === "troca_plano") {
                 session.stage = "troca_plano";
-                await this.iniciarTrocaPlano(celular, texto, session);
+                await this.iniciarTrocaPlano(celular, texto, session, type);
               } else if (session.service === "renovação_contratual") {
                 session.stage = "renovacao";
                 await this.iniciarRenovacao(celular, texto, session, type);
@@ -705,7 +706,7 @@ class WhatsPixController {
 
         //Cadastro
         case "register":
-          await this.iniciarCadastro(celular, texto, session);
+          await this.iniciarCadastro(celular, texto, session, type);
           break;
         case "plan":
           if (this.verificaType(type)) {
@@ -906,7 +907,7 @@ class WhatsPixController {
 
         //Mudança de Cômodo
         case "mudanca_comodo":
-          await this.iniciarMudancaComodo(celular, texto, session);
+          await this.iniciarMudancaComodo(celular, texto, session, type);
           break;
         case "choose_type_comodo":
           try {
@@ -1057,7 +1058,12 @@ class WhatsPixController {
         case "handle_titularidade":
           if (this.verificaType(type)) {
             if (texto.toLowerCase() === "concordo") {
-              await this.iniciarMudancaTitularidade(celular, texto, session);
+              await this.iniciarMudancaTitularidade(
+                celular,
+                texto,
+                session,
+                type
+              );
               session.stage = "handle_titularidade_2";
             } else if (
               texto.toLowerCase() === "não concordo" ||
@@ -1123,7 +1129,7 @@ class WhatsPixController {
           }
           break;
         case "handle_titularidade_2":
-          await this.iniciarMudancaTitularidade(celular, texto, session);
+          await this.iniciarMudancaTitularidade(celular, texto, session, type);
           break;
 
         case "choose_wifi_est":
@@ -1357,7 +1363,7 @@ class WhatsPixController {
           break;
         //Troca de Plano
         case "troca_plano":
-          await this.iniciarTrocaPlano(celular, texto, session);
+          await this.iniciarTrocaPlano(celular, texto, session, type);
           break;
         case "choose_type_troca_plano":
           if (this.verificaType(type)) {
@@ -1604,7 +1610,7 @@ class WhatsPixController {
         //Mudança de Endereço
         case "mudanca_endereco":
           if (this.verificaType(type)) {
-            await this.iniciarMudanca(celular, texto, session);
+            await this.iniciarMudanca(celular, texto, session, type);
           } else {
             await this.MensagensComuns(
               celular,
