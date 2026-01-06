@@ -1035,10 +1035,26 @@ class WhatsPixController {
                   MkauthDataSource.getRepository(ClientesEntities);
 
                 try {
+                  const findLogin = await ClientesRepository.findOne({
+                    where: {
+                      login: (session.dadosCompleto.nome || "")
+                        .trim()
+                        .replace(/\s/g, "")
+                        .toUpperCase(),
+                    },
+                  });
+
+                  if (findLogin) {
+                    console.log("Login já existe:", findLogin);
+                    session.dadosCompleto.nome =
+                      session.dadosCompleto.nome + " " + findLogin.id;
+                  }
+
                   const addClient = await ClientesRepository.save({
                     nome: session.dadosCompleto.nome,
                     login: (session.dadosCompleto.nome || "")
                       .trim()
+                      .replace(/\s/g, "")
                       .toUpperCase(),
                     rg: session.dadosCompleto.rg,
                     cpf: session.dadosCompleto.cpf,
@@ -1047,6 +1063,7 @@ class WhatsPixController {
                     bairro: session.dadosCompleto.bairro,
                     estado: (session.dadosCompleto.estado || "")
                       .toUpperCase()
+                      .replace(/\s/g, "")
                       .slice(0, 2),
                     nascimento: session.dadosCompleto.dataNascimento,
                     numero: session.dadosCompleto.numero,
@@ -1055,6 +1072,7 @@ class WhatsPixController {
                     plano: session.planoEscolhido,
                     venc: (session.vencimentoEscolhido || "")
                       .trim()
+                      .replace(/\s/g, "")
                       .replace(/\D/g, ""),
                     celular: session.dadosCompleto.celular,
                     opcelular: session.dadosCompleto.celularSecundario,
