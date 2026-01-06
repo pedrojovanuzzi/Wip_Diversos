@@ -159,7 +159,7 @@ class WhatsPixController {
       console.log(JSON.stringify(body, null, 2));
 
       if (!body.entry) {
-        res.sendStatus(200);
+        res.status(200);
         return;
       }
 
@@ -178,7 +178,7 @@ class WhatsPixController {
           const type = messages ? messages[0].type : undefined;
 
           if (!celular || !type) {
-            res.sendStatus(200); // Responder ao webhook mesmo que não haja um número de celular
+            res.status(200); // Responder ao webhook mesmo que não haja um número de celular
             return;
           }
 
@@ -218,7 +218,7 @@ class WhatsPixController {
 
             if (type === "undefined" || type === undefined) {
               console.log(`Type undefined ignorado`);
-              res.sendStatus(200); // Resposta para o webhook
+              res.status(200); // Resposta para o webhook
               return;
             }
 
@@ -261,7 +261,7 @@ class WhatsPixController {
 
             this.handleMessage(session, texto, celular, type, manutencao);
           }
-          res.sendStatus(200); // Resposta para o webhook
+          res.status(200); // Resposta para o webhook
         }
       }
     } catch (error) {
