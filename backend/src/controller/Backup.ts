@@ -9,6 +9,7 @@ import { ClientSecretCredential } from "@azure/identity";
 import {
   AuthenticationProvider,
   Client,
+  LargeFileUploadTask,
 } from "@microsoft/microsoft-graph-client";
 
 dotenv.config();
@@ -66,6 +67,35 @@ class AzureAuthProvider implements AuthenticationProvider {
   public async getAccessToken(): Promise<string> {
     const token = await this.credential.getToken(this.scopes);
     return token?.token || "";
+  }
+}
+
+class FileUploadWrapper {
+  public content: any;
+  public name: string;
+  public size: number;
+  public path: string;
+
+  constructor(filePath: string, fileName: string, fileSize: number) {
+    this.path = filePath;
+    this.name = fileName;
+    this.size = fileSize;
+    this.content = null;
+  }
+
+  public sliceFile(range: { minValue: number; maxValue: number }): Buffer {
+    const min = range.minValue;
+    const max = range.maxValue;
+    const length = max - min + 1;
+
+    const buffer = Buffer.alloc(length);
+    const fd = fs.openSync(this.path, "r");
+    try {
+      fs.readSync(fd, buffer, 0, length, min);
+    } finally {
+      fs.closeSync(fd);
+    }
+    return buffer;
   }
 }
 
@@ -173,13 +203,39 @@ class Backup {
       // 4. Upload para o OneDrive
       try {
         console.log(`☁️ Enviando ${fileName} para o OneDrive...`);
-        const fileContent = fs.readFileSync(filePath); // Lê o arquivo gerado
 
-        await this.graphClient
-          .api(
-            `/users/${targetUser}/drive/items/${oneDriveFolderId}:/${fileName}:/content`
-          )
-          .put(fileContent);
+        const stats = fs.statSync(filePath);
+        const fileSize = stats.size;
+
+        // Wrapper para simular o objeto File do browser no Node.js
+        const fileObject = new FileUploadWrapper(filePath, fileName, fileSize);
+
+        // Payload para criar a sessão de upload
+        const uploadSessionPayload = {
+          item: {
+            "@microsoft.graph.conflictBehavior": "rename",
+            name: fileName,
+          },
+        };
+
+        // Cria a sessão de upload
+        const uploadSession = await LargeFileUploadTask.createUploadSession(
+          this.graphClient,
+          `/users/${targetUser}/drive/items/${oneDriveFolderId}:/${fileName}:/createUploadSession`,
+          uploadSessionPayload
+        );
+
+        // Configura a tarefa de upload
+        // O tamanho do chunk deve ser múltiplo de 320 KB (327680 bytes)
+        // Vamos usar 5 * 327680 = 1638400 bytes (~1.6 MB) por chunk como padrão
+        const fileUploadTask = new LargeFileUploadTask(
+          this.graphClient,
+          fileObject,
+          uploadSession
+        );
+
+        // Executa o upload
+        const uploadResult = await fileUploadTask.upload();
 
         console.log(`🚀 Upload concluído: ${fileName}`);
         attachments.push({ filename: fileName, path: filePath });
