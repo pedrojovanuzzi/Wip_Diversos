@@ -23,6 +23,7 @@ import PeopleConversation from "../entities/APIMK/People_Conversations";
 import Mensagens from "../entities/APIMK/Mensagens";
 import Sessions from "../entities/APIMK/Sessions";
 import AppDataSource from "../database/DataSource";
+import moment from "moment-timezone";
 
 dotenv.config();
 
@@ -1078,10 +1079,7 @@ class WhatsPixController {
                     numero: session.dadosCompleto.numero
                       .trim()
                       .replace(/\s/g, ""),
-                    endereco: session.dadosCompleto.rua
-                      .toUpperCase()
-                      .trim()
-                      .replace(/\s/g, ""),
+                    endereco: session.dadosCompleto.rua.toUpperCase().trim(),
                     cep: `${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
@@ -1123,11 +1121,13 @@ class WhatsPixController {
                       .replace(/\s/g, ""),
                     endereco_res: session.dadosCompleto.rua
                       .toUpperCase()
-                      .trim()
-                      .replace(/\s/g, ""),
+                      .trim(),
                     pessoa:
-                      session.dadosCompleto.cpf <= 11 ? "fisica" : "juridica",
+                      session.dadosCompleto.cpf.replace(/\D/g, "").length <= 11
+                        ? "fisica"
+                        : "juridica",
                     dias_corte: 80,
+                    cadastro: moment().format("DD-MM-YYYY"),
                   });
                   console.log("Cliente salvo com sucesso:", addClient);
                 } catch (dbError) {
