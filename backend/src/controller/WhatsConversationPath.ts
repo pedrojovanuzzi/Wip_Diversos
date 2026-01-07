@@ -1058,8 +1058,10 @@ class WhatsPixController {
                       .replace(/\s/g, "")
                       .toUpperCase(),
                     rg: session.dadosCompleto.rg.trim().replace(/\s/g, ""),
-                    cpf: session.dadosCompleto.cpf.trim().replace(/\s/g, ""),
-                    uuid_cliente: uuidv4().slice(0, 36),
+                    cpf_cnpj: session.dadosCompleto.cpf
+                      .trim()
+                      .replace(/\s/g, ""),
+                    uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
                     email: session.dadosCompleto.email
                       .trim()
                       .replace(/\s/g, ""),
@@ -1079,8 +1081,15 @@ class WhatsPixController {
                     endereco: session.dadosCompleto.rua
                       .trim()
                       .replace(/\s/g, ""),
-                    cep: session.dadosCompleto.cep.trim().replace(/\s/g, ""),
+                    cep: `${session.dadosCompleto.cep
+                      .trim()
+                      .replace(/\s/g, "")
+                      .slice(0, 4)}${session.dadosCompleto.cep
+                      .trim()
+                      .replace(/\s/g, "")
+                      .slice(4)}`,
                     plano: session.planoEscolhido,
+                    telefone: "(14)3296-1608",
                     venc: (session.vencimentoEscolhido || "")
                       .trim()
                       .replace(/\s/g, "")
@@ -1103,15 +1112,22 @@ class WhatsPixController {
                     cidade_res: session.dadosCompleto.cidade
                       .trim()
                       .replace(/\s/g, ""),
-                    cep_res: session.dadosCompleto.cep
+                    cep_res: `${session.dadosCompleto.cep
                       .trim()
-                      .replace(/\s/g, ""),
+                      .replace(/\s/g, "")
+                      .slice(0, 4)}${session.dadosCompleto.cep
+                      .trim()
+                      .replace(/\s/g, "")
+                      .slice(4)}`,
                     numero_res: session.dadosCompleto.numero
                       .trim()
                       .replace(/\s/g, ""),
                     endereco_res: session.dadosCompleto.rua
                       .trim()
                       .replace(/\s/g, ""),
+                    pessoa:
+                      session.dadosCompleto.cpf <= 11 ? "fisica" : "juridica",
+                    dias_corte: 80,
                   });
                   console.log("Cliente salvo com sucesso:", addClient);
                 } catch (dbError) {
