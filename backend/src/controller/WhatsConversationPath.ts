@@ -1056,26 +1056,41 @@ class WhatsPixController {
                       .trim()
                       .replace(/\s/g, "")
                       .toUpperCase(),
-                    rg: session.dadosCompleto.rg,
-                    cpf: session.dadosCompleto.cpf,
-                    email: session.dadosCompleto.email,
+                    rg: session.dadosCompleto.rg.trim().replace(/\s/g, ""),
+                    cpf: session.dadosCompleto.cpf.trim().replace(/\s/g, ""),
+                    email: session.dadosCompleto.email
+                      .trim()
+                      .replace(/\s/g, ""),
                     cidade: session.dadosCompleto.cidade,
                     bairro: session.dadosCompleto.bairro,
                     estado: (session.dadosCompleto.estado || "")
                       .toUpperCase()
                       .replace(/\s/g, "")
                       .slice(0, 2),
-                    nascimento: session.dadosCompleto.dataNascimento,
-                    numero: session.dadosCompleto.numero,
-                    endereco: session.dadosCompleto.rua,
-                    cep: session.dadosCompleto.cep,
+                    nascimento: session.dadosCompleto.dataNascimento.replace(
+                      "/",
+                      "-"
+                    ),
+                    numero: session.dadosCompleto.numero
+                      .trim()
+                      .replace(/\s/g, ""),
+                    endereco: session.dadosCompleto.rua
+                      .trim()
+                      .replace(/\s/g, ""),
+                    cep: session.dadosCompleto.cep.trim().replace(/\s/g, ""),
                     plano: session.planoEscolhido,
                     venc: (session.vencimentoEscolhido || "")
                       .trim()
                       .replace(/\s/g, "")
                       .replace(/\D/g, ""),
-                    celular: session.dadosCompleto.celular,
-                    opcelular: session.dadosCompleto.celularSecundario,
+                    celular: `(${session.dadosCompleto.celular.slice(
+                      0,
+                      2
+                    )})${session.dadosCompleto.celular.slice(2)}`,
+                    opcelular: `(${session.dadosCompleto.celularSecundario.slice(
+                      0,
+                      2
+                    )})${session.dadosCompleto.celularSecundario.slice(2)}`,
                   });
                   console.log("Cliente salvo com sucesso:", addClient);
                 } catch (dbError) {
