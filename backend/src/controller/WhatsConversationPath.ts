@@ -1085,12 +1085,12 @@ class WhatsPixController {
                     cep: `${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
-                      .slice(0, 4)}${session.dadosCompleto.cep
+                      .slice(0, 4)}-${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
                       .slice(4)}`,
                     plano: session.planoEscolhido,
-                    telefone: "(14)3296-1608",
+                    fone: "(14)3296-1608",
                     venc: (session.vencimentoEscolhido || "")
                       .trim()
                       .replace(/\s/g, "")
@@ -1099,7 +1099,7 @@ class WhatsPixController {
                       0,
                       2
                     )})${session.dadosCompleto.celular.slice(2)}`,
-                    opcelular: `(${session.dadosCompleto.celularSecundario.slice(
+                    celular2: `(${session.dadosCompleto.celularSecundario.slice(
                       0,
                       2
                     )})${session.dadosCompleto.celularSecundario.slice(2)}`,
@@ -1114,7 +1114,7 @@ class WhatsPixController {
                     cep_res: `${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
-                      .slice(0, 4)}${session.dadosCompleto.cep
+                      .slice(0, 4)}-${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
                       .slice(4)}`,
