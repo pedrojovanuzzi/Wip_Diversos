@@ -431,30 +431,6 @@ class WhatsPixController {
     } else {
       this.resetInactivityTimer.call(this, celular, session);
 
-      if (texto && texto.toLowerCase() === "resetar") {
-        await this.MensagensComuns(
-          celular,
-          "Sessão resetada com sucesso! Você pode iniciar uma nova conversa agora."
-        );
-        await this.deleteSession(celular);
-        return;
-      }
-
-      //Easter Egg
-      if (texto === "G.O.A.T") {
-        await this.MensagensComuns(celular, "QuinhoRox");
-        return;
-      }
-
-      //Easter Egg
-      if (texto === "Mamaezinha") {
-        await this.MensagensComuns(
-          celular,
-          "Coquinha Geladinha para limpar os dentinhos"
-        );
-        return;
-      }
-
       console.log(`[HANDLE_MESSAGE] Stage: ${session.stage}, Texto: ${texto}`);
 
       try {
@@ -537,6 +513,30 @@ class WhatsPixController {
           sender_id: insertPeople.id,
           receiver_id: 1,
         };
+
+        if (texto && texto.toLowerCase() === "resetar") {
+          await this.MensagensComuns(
+            celular,
+            "Sessão resetada com sucesso! Você pode iniciar uma nova conversa agora."
+          );
+          await this.deleteSession(celular);
+          return;
+        }
+
+        //Easter Egg
+        if (texto === "G.O.A.T") {
+          await this.MensagensComuns(celular, "QuinhoRox");
+          return;
+        }
+
+        //Easter Egg
+        if (texto === "Mamaezinha") {
+          await this.MensagensComuns(
+            celular,
+            "Coquinha Geladinha para limpar os dentinhos"
+          );
+          return;
+        }
       } catch (error) {
         console.error("Erro ao inserir ou encontrar a pessoa:", error);
       }
