@@ -530,6 +530,12 @@ class WhatsPixController {
         }
 
         //Easter Egg
+        if (texto === "T.O.D.D.Y") {
+          await this.MensagensComuns(celular, "Tem coisa que desanima");
+          return;
+        }
+
+        //Easter Egg
         if (texto === "Mamaezinha") {
           await this.MensagensComuns(
             celular,
