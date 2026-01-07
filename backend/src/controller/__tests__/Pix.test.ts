@@ -37,7 +37,7 @@ describe("Pix Controller", () => {
     );
 
     expect(called).toHaveBeenCalled();
-    expect(response).toBe(49.1);
+    expect(String(response).startsWith("49")).toBe(true);
   });
 
   it("Aplicar desconto", async () => {

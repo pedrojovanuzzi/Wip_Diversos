@@ -1165,6 +1165,7 @@ class WhatsPixController {
                       .format("DD-MM-YYYY")
                       .split("-")
                       .join("/"),
+                    data_ip: moment().format("YYYY-MM-DD HH:mm:ss"),
                   });
                   console.log("Cliente salvo com sucesso:", addClient);
                 } catch (dbError) {
