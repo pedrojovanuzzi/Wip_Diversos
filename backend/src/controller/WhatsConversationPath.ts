@@ -1070,8 +1070,8 @@ class WhatsPixController {
                       .replace(/\s/g, "")
                       .slice(0, 2),
                     nascimento: session.dadosCompleto.dataNascimento.replace(
-                      "/",
-                      "-"
+                      /(\d{2})\/(\d{2})\/(\d{4})/,
+                      "$3-$2-$1"
                     ),
                     numero: session.dadosCompleto.numero
                       .trim()
