@@ -1093,6 +1093,25 @@ class WhatsPixController {
                       0,
                       2
                     )})${session.dadosCompleto.celularSecundario.slice(2)}`,
+                    estado_res: (session.dadosCompleto.estado || "")
+                      .toUpperCase()
+                      .replace(/\s/g, "")
+                      .slice(0, 2),
+                    bairro_res: session.dadosCompleto.bairro
+                      .trim()
+                      .replace(/\s/g, ""),
+                    cidade_res: session.dadosCompleto.cidade
+                      .trim()
+                      .replace(/\s/g, ""),
+                    cep_res: session.dadosCompleto.cep
+                      .trim()
+                      .replace(/\s/g, ""),
+                    numero_res: session.dadosCompleto.numero
+                      .trim()
+                      .replace(/\s/g, ""),
+                    endereco_res: session.dadosCompleto.rua
+                      .trim()
+                      .replace(/\s/g, ""),
                   });
                   console.log("Cliente salvo com sucesso:", addClient);
                 } catch (dbError) {
