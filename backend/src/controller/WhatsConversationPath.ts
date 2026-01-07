@@ -1132,6 +1132,9 @@ class WhatsPixController {
                     endereco_res: session.dadosCompleto.rua
                       .toUpperCase()
                       .trim(),
+                    tipo_cob: "titulo",
+                    mesref: "now",
+                    prilanc: "tot",
                     pessoa:
                       session.dadosCompleto.cpf.replace(/\D/g, "").length <= 11
                         ? "fisica"
