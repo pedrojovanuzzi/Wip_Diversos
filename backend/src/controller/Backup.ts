@@ -45,6 +45,12 @@ const databases: DatabaseConfig[] = [
     user: process.env.DATABASE_USERNAME_TVWIP!,
     pass: process.env.DATABASE_PASSWORD_TVWIP!,
   },
+  {
+    name: process.env.DATABASE_API!,
+    host: process.env.DATABASE_HOST_API!,
+    user: process.env.DATABASE_USERNAME_API!,
+    pass: process.env.DATABASE_PASSWORD_API!,
+  },
 ];
 
 class AzureAuthProvider implements AuthenticationProvider {
