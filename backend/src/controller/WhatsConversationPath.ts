@@ -1065,8 +1065,8 @@ class WhatsPixController {
                     email: session.dadosCompleto.email
                       .trim()
                       .replace(/\s/g, ""),
-                    cidade: session.dadosCompleto.cidade,
-                    bairro: session.dadosCompleto.bairro,
+                    cidade: session.dadosCompleto.cidade.trim(),
+                    bairro: session.dadosCompleto.bairro.toUpperCase().trim(),
                     estado: (session.dadosCompleto.estado || "")
                       .toUpperCase()
                       .replace(/\s/g, "")
@@ -1079,6 +1079,7 @@ class WhatsPixController {
                       .trim()
                       .replace(/\s/g, ""),
                     endereco: session.dadosCompleto.rua
+                      .toUpperCase()
                       .trim()
                       .replace(/\s/g, ""),
                     cep: `${session.dadosCompleto.cep
@@ -1107,11 +1108,9 @@ class WhatsPixController {
                       .replace(/\s/g, "")
                       .slice(0, 2),
                     bairro_res: session.dadosCompleto.bairro
-                      .trim()
-                      .replace(/\s/g, ""),
-                    cidade_res: session.dadosCompleto.cidade
-                      .trim()
-                      .replace(/\s/g, ""),
+                      .toUpperCase()
+                      .trim(),
+                    cidade_res: session.dadosCompleto.cidade.trim(),
                     cep_res: `${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
@@ -1123,6 +1122,7 @@ class WhatsPixController {
                       .trim()
                       .replace(/\s/g, ""),
                     endereco_res: session.dadosCompleto.rua
+                      .toUpperCase()
                       .trim()
                       .replace(/\s/g, ""),
                     pessoa:
