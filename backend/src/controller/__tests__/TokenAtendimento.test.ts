@@ -110,7 +110,7 @@ describe("TokenAtendimento", () => {
     );
   });
 
-  it("Deve escolher qual dos cadastros vai pegar o boleto", async () => {
+  it("Deve escolher qual dos cadastros vai pegar o boleto com base no login", async () => {
     const tokenAtendimento = new TokenAtendimento();
 
     const req = {
@@ -126,6 +126,8 @@ describe("TokenAtendimento", () => {
     } as any;
 
     const response = await tokenAtendimento.chooseHome(req, res);
+    const dadosEnviados = res.json.mock.calls[0][0];
+    console.log("Conteúdo do res.json:", dadosEnviados);
 
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
