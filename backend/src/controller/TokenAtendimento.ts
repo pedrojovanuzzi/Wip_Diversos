@@ -51,6 +51,20 @@ class TokenAtendimento {
     }
   }
 
+  async chooseHome(req: Request, res: Response) {
+    try {
+      const cadastros = await this.clienteRepo.findOne({
+        where: { login: req.body.login },
+      });
+      res.status(200).json(cadastros);
+      return;
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Erro ao buscar cliente" });
+      return;
+    }
+  }
+
   aplicarJuros_Desconto = async (
     valor: string | number,
     pppoe: string,

@@ -5,7 +5,7 @@ describe("TokenAtendimento", () => {
   it("Deve gerar um pix de pagamento sem juros", async () => {
     const cliente = {
       id: 1,
-      login: "Teste",
+      login: "PEDROGAMERBRTEST",
       cpf: "01450042872", // CPF DE TEST
       telefone: "12345678901",
       email: "test@example.com",
@@ -46,7 +46,7 @@ describe("TokenAtendimento", () => {
   it("Deve gerar um pix de pagamento com juros", async () => {
     const cliente = {
       id: 1,
-      login: "Teste",
+      login: "PEDROGAMERBRTEST",
       cpf: "01450042872", // CPF DE TEST
       telefone: "12345678901",
       email: "test@example.com",
@@ -101,8 +101,6 @@ describe("TokenAtendimento", () => {
 
     const response = await tokenAtendimento.login(req, res);
 
-    console.log(res.json);
-
     expect(res.json).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
@@ -112,5 +110,27 @@ describe("TokenAtendimento", () => {
     );
   });
 
-  it("Deve escolher qual dos cadastros vai pegar o boleto", async () => {});
+  it("Deve escolher qual dos cadastros vai pegar o boleto", async () => {
+    const tokenAtendimento = new TokenAtendimento();
+
+    const req = {
+      body: {
+        login: "PEDROGAMERBRTEST",
+      },
+    } as any;
+
+    const res = {
+      json: vi.fn(),
+      status: vi.fn().mockReturnThis(),
+      send: vi.fn(),
+    } as any;
+
+    const response = await tokenAtendimento.chooseHome(req, res);
+
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        login: expect.stringContaining("PEDROGAMERBRTEST"),
+      })
+    );
+  });
 });
