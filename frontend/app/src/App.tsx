@@ -34,6 +34,7 @@ import { PixAdmin } from "./pages/Pix/PixAdmin";
 import { PixfindPaid } from "./pages/Pix/PixfindPaid";
 import Nfcom from "./pages/Nfcom/Nfcom";
 import SearchInterface from "./pages/Nfcom/SearchInterface";
+import { TokenAutoAtendimento } from "./pages/TokenAutoAtendimento/TokenAutoAtendimento";
 
 function App() {
   const { user, loading, logout } = useAuth();
@@ -328,6 +329,10 @@ function App() {
                 <Navigate to="/auth/login" />
               )
             }
+          />
+          <Route
+            path="/TokenAutoAtendimento"
+            element={<TokenAutoAtendimento />}
           />
         </Routes>
       </div>
