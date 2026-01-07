@@ -1083,10 +1083,10 @@ class WhatsPixController {
                     cep: `${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
-                      .slice(0, 4)}-${session.dadosCompleto.cep
+                      .slice(0, 5)}-${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
-                      .slice(4)}`,
+                      .slice(5)}`,
                     plano: session.planoEscolhido,
                     fone: "(14)3296-1608",
                     venc: (session.vencimentoEscolhido || "")
@@ -1112,10 +1112,10 @@ class WhatsPixController {
                     cep_res: `${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
-                      .slice(0, 4)}-${session.dadosCompleto.cep
+                      .slice(0, 5)}-${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
-                      .slice(4)}`,
+                      .slice(5)}`,
                     numero_res: session.dadosCompleto.numero
                       .trim()
                       .replace(/\s/g, ""),
@@ -1127,7 +1127,10 @@ class WhatsPixController {
                         ? "fisica"
                         : "juridica",
                     dias_corte: 80,
-                    cadastro: moment().format("DD-MM-YYYY"),
+                    cadastro: moment()
+                      .format("DD-MM-YYYY")
+                      .split("-")
+                      .join("/"),
                   });
                   console.log("Cliente salvo com sucesso:", addClient);
                 } catch (dbError) {
