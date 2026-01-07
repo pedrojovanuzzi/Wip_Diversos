@@ -440,6 +440,21 @@ class WhatsPixController {
         return;
       }
 
+      //Easter Egg
+      if (texto === "G.O.A.T") {
+        await this.MensagensComuns(celular, "QuinhoRox");
+        return;
+      }
+
+      //Easter Egg
+      if (texto === "Mamaezinha") {
+        await this.MensagensComuns(
+          celular,
+          "Coquinha Geladinha para limpar os dentinhos"
+        );
+        return;
+      }
+
       console.log(`[HANDLE_MESSAGE] Stage: ${session.stage}, Texto: ${texto}`);
 
       try {
