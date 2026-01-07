@@ -16,6 +16,7 @@ import nodemailer from "nodemailer";
 import axios from "axios";
 import SftpClient from "ssh2-sftp-client";
 import FormData from "form-data";
+import { v4 as uuidv4 } from "uuid";
 import Conversations from "../entities/APIMK/Conversations";
 import ConversationsUsers from "../entities/APIMK/Conversation_Users";
 import PeopleConversation from "../entities/APIMK/People_Conversations";
@@ -1058,6 +1059,7 @@ class WhatsPixController {
                       .toUpperCase(),
                     rg: session.dadosCompleto.rg.trim().replace(/\s/g, ""),
                     cpf: session.dadosCompleto.cpf.trim().replace(/\s/g, ""),
+                    uuid_cliente: uuidv4().slice(0, 36),
                     email: session.dadosCompleto.email
                       .trim()
                       .replace(/\s/g, ""),
