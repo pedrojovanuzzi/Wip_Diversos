@@ -208,6 +208,32 @@ class TokenAtendimento {
     }
   };
 
+  faturaWentPaid = async (req: Request, res: Response) => {
+    try {
+      let { faturaId } = req.body;
+
+      const fatura = await this.recordRepo.findOne({
+        where: { id: faturaId },
+      });
+
+      if (!fatura) {
+        res.status(404).json({ error: "Fatura nao encontrada" });
+        return;
+      }
+
+      if (fatura.status != "pago") {
+        res.status(400).json({ error: "Fatura ainda nao foi paga" });
+        return;
+      }
+
+      res.status(200).json({ message: "Fatura paga com sucesso" });
+      return;
+    } catch (error) {
+      res.status(500).json({ error: "Erro Desconhecido" });
+      return;
+    }
+  };
+
   gerarPixToken = async (req: Request, res: Response) => {
     try {
       let { cpf, login, perdoarJuros } = req.body;
@@ -298,7 +324,9 @@ class TokenAtendimento {
           valor: valorPerdoado,
           pppoe,
           link: qrlink.linkVisualizacao,
+          imagem: qrlink.imagemQrcode,
           formattedDate,
+          faturaId: cliente.id,
         });
       } else {
         const body =
@@ -344,7 +372,9 @@ class TokenAtendimento {
           valor: valorFinal,
           pppoe,
           link: qrlink.linkVisualizacao,
+          imagem: qrlink.imagemQrcode,
           formattedDate,
+          faturaId: cliente.id,
         });
       }
     } catch (error) {

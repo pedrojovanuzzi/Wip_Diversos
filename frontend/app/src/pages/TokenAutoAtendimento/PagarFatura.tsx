@@ -5,17 +5,20 @@ import {
   HiUser,
   HiHome,
   HiCheck,
-  HiClipboardCopy,
+  HiCreditCard,
+  HiCurrencyDollar,
 } from "react-icons/hi";
 import { Link, useNavigate } from "react-router-dom";
 import { Keyboard } from "./components/Keyboard";
 import axios from "axios";
-import { FaSpinner } from "react-icons/fa";
+import { FaSpinner, FaBarcode } from "react-icons/fa";
+import { QRCodeCanvas } from "qrcode.react";
 
 interface Client {
   id: number;
   nome: string;
   cpf: string;
+  login: string;
   endereco?: {
     rua: string;
     numero: string;
@@ -28,12 +31,17 @@ interface Client {
 
 export const PagarFatura = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState<"search" | "selection">("search");
+  const [qrCode, setQrCode] = useState("");
+  const [valorPagamento, setValorPagamento] = useState("");
+  const [step, setStep] = useState<
+    "search" | "selection" | "method" | "payment-pix" | "payment-card"
+  >("search");
   const [cpf, setCpf] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [faturaId, setFaturaId] = useState<number | null>(null);
 
   // Input ref to keep focus if needed, though we primarily use virtual keyboard
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,9 +60,6 @@ export const PagarFatura = () => {
       if (cpf.length < 11) {
         setCpf((prev) => prev + key);
       }
-    } else if (key.length === 1 && !/[a-zA-Z]/.test(key)) {
-      // Allow other chars if needed, but primarily blocking letters if strict
-      // For now, let's strictly allow only numbers as it's a CPF field
     }
   };
 
@@ -73,9 +78,6 @@ export const PagarFatura = () => {
         { cpf } // Sending raw CPF digits
       );
 
-      // Assuming backend returns { data: Client[] } or just Client[]
-      // Adjust based on actual response structure.
-      // If response is just the array:
       const data = Array.isArray(response.data)
         ? response.data
         : response.data.clients || [response.data];
@@ -97,24 +99,56 @@ export const PagarFatura = () => {
   const handleSelectClient = async (client: Client) => {
     setLoading(true);
     try {
-      // Using ChooseHome as requested to select the context
-      const response = await axios.post(
+      // 1. Select Context
+      await axios.post(
         `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ChooseHome`,
-        { ...client } // Sending full client object or ID as required
+        { ...client }
       );
 
-      // Navigate to the next step - likely the actual payment or invoice list
-      // For now, we'll placeholder this navigation
-      // navigate("/TokenAutoAtendimento/faturas");
-      // alert(`Cadastro de ${client.nome} selecionado! Redirecionando...`);
-      // Since I don't know the exact next route, I'll leave it as an alert for now
-      console.log(response.data);
-      setSelectedClient(response.data);
-      //selectedClient.login
-      // or navigate back to home if that's the flow
+      setSelectedClient(client);
+      setStep("method"); // Move to payment method selection
     } catch (err: any) {
       console.error(err);
       setError("Erro ao selecionar cadastro.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMethodSelect = async (method: "pix" | "card") => {
+    if (!selectedClient) return;
+
+    if (method === "card") {
+      setStep("payment-card");
+      return;
+    }
+
+    // Method is PIX
+    setLoading(true);
+    setError("");
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/TokenAutoAtendimento/GerarPixToken`,
+        {
+          cpf: cpf,
+          login: selectedClient.login,
+          perdoarJuros: false,
+        }
+      );
+
+      console.log(response.data);
+
+      const valor = response.data.valor;
+      const qrCode = response.data.imagem;
+      setQrCode(qrCode);
+      setValorPagamento(valor);
+      setFaturaId(response.data.faturaId);
+      // API request sent successfully.
+      // User requested NOT to show QR Code, so we assume the backend handles the display/process or it's displayed on a terminal.
+      setStep("payment-pix");
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.error || "Erro ao iniciar pagamento Pix.");
     } finally {
       setLoading(false);
     }
@@ -127,6 +161,65 @@ export const PagarFatura = () => {
       .replace(/(\d{3})(\d)/, "$1.$2")
       .replace(/(\d{3})(\d{1,2})/, "$1-$2")
       .replace(/(-\d{2})\d+?$/, "$1");
+  };
+
+  const formatCurrency = (value: string | number) => {
+    if (!value) return "R$ 0,00";
+    const num = typeof value === "string" ? parseFloat(value) : value;
+    if (isNaN(num)) return typeof value === "string" ? value : "R$ 0,00";
+    return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  };
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timer;
+
+    if (step === "payment-pix" && faturaId) {
+      const checkPayment = async () => {
+        try {
+          const response = await axios.post(
+            `${process.env.REACT_APP_URL}/TokenAutoAtendimento/FaturaWentPaid`,
+            { faturaId }
+          );
+
+          if (response.data) {
+            // Payment confirmed
+            // Stopping the interval is handled by the cleanup or dependency change (step change)
+            alert("Pagamento confirmado com sucesso!");
+            navigate("/TokenAutoAtendimento");
+          }
+        } catch (error) {
+          // Silent error or log, as polling might fail intermittently or just return false
+          console.log("Aguardando pagamento...", error);
+        }
+      };
+
+      // Initial check
+      checkPayment();
+
+      // Poll every 3 seconds
+      intervalId = setInterval(checkPayment, 3000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [step, faturaId, navigate]);
+
+  const getStepTitle = () => {
+    switch (step) {
+      case "search":
+        return "Identificação";
+      case "selection":
+        return "Seleção de Cadastro";
+      case "method":
+        return "Forma de Pagamento";
+      case "payment-pix":
+        return "Pagamento via Pix";
+      case "payment-card":
+        return "Pagamento via Cartão";
+      default:
+        return "";
+    }
   };
 
   return (
@@ -157,7 +250,7 @@ export const PagarFatura = () => {
                 PAGAR FATURA
               </span>
               <span className="text-[10px] tracking-[0.2em] text-cyan-300 uppercase">
-                {step === "search" ? "Identificação" : "Seleção de Cadastro"}
+                {getStepTitle()}
               </span>
             </div>
           </div>
@@ -283,6 +376,119 @@ export const PagarFatura = () => {
                   Buscar outro CPF
                 </button>
               </div>
+            </div>
+          )}
+
+          {step === "method" && (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6">
+              <h2 className="text-2xl font-bold text-white mb-4">
+                Como deseja pagar?
+              </h2>
+
+              <div className="grid grid-cols-1 gap-6 w-full max-w-sm">
+                <button
+                  onClick={() => handleMethodSelect("pix")}
+                  className="group relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-500 rounded-2xl p-6 transition-all transform hover:scale-105 hover:shadow-2xl hover:shadow-emerald-500/30"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-white font-bold text-xl uppercase tracking-wider">
+                      Pix
+                    </span>
+                    <div className="bg-white/20 p-3 rounded-full">
+                      <FaBarcode className="text-white text-2xl" />
+                    </div>
+                  </div>
+                  <p className="text-emerald-100 text-sm mt-2 text-left">
+                    Pagamento instantâneo
+                  </p>
+                </button>
+
+                <button
+                  onClick={() => handleMethodSelect("card")}
+                  className="group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 transition-all transform hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/30"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-white font-bold text-xl uppercase tracking-wider">
+                      Cartão
+                    </span>
+                    <div className="bg-white/20 p-3 rounded-full">
+                      <HiCreditCard className="text-white text-2xl" />
+                    </div>
+                  </div>
+                  <p className="text-blue-100 text-sm mt-2 text-left">
+                    Débito ou Crédito
+                  </p>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {(step === "payment-pix" || step === "payment-card") && (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
+              <div className="w-24 h-24 bg-cyan-500/10 rounded-full flex items-center justify-center animate-pulse">
+                <HiCurrencyDollar className="text-5xl text-cyan-400" />
+              </div>
+
+              <div className="text-center">
+                <h2 className="text-3xl font-bold text-white mb-2">
+                  {step === "payment-pix"
+                    ? "Pagamento Pix"
+                    : "Pagamento Cartão"}
+                </h2>
+              </div>
+
+              {step === "payment-pix" ? (
+                <div className="flex flex-col items-center space-y-6 w-full max-w-md">
+                  <div className="bg-slate-800/80 border border-cyan-500/30 rounded-2xl p-6 w-full text-center shadow-lg shadow-cyan-500/10">
+                    <span className="text-slate-400 text-sm uppercase tracking-widest block mb-1">
+                      Valor a Pagar
+                    </span>
+                    <span className="text-4xl font-bold text-white">
+                      {formatCurrency(valorPagamento)}
+                    </span>
+                  </div>
+
+                  {qrCode && (
+                    <div className="bg-white p-4 rounded-xl shadow-2xl">
+                      {qrCode.length > 1000 || qrCode.startsWith("data:") ? (
+                        <img
+                          src={
+                            qrCode.startsWith("data:image")
+                              ? qrCode
+                              : `data:image/png;base64,${qrCode}`
+                          }
+                          alt="QR Code Pix"
+                          className="w-64 h-64 object-contain"
+                        />
+                      ) : (
+                        <QRCodeCanvas value={qrCode} size={256} />
+                      )}
+                    </div>
+                  )}
+                  <p className="text-slate-400 text-sm max-w-xs mx-auto text-center">
+                    Escaneie o QR Code acima para pagar
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <p className="text-slate-400 text-lg max-w-xs mx-auto text-center">
+                    Insira o cartão na maquininha e siga as instruções.
+                  </p>
+                  <div className="p-4 bg-slate-800 border border-white/5 rounded-xl max-w-sm w-full mt-8">
+                    <div className="flex items-center justify-center space-x-3 text-slate-300">
+                      <FaSpinner className="animate-spin text-cyan-400" />
+                      <span>Aguardando operação...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => navigate("/TokenAutoAtendimento")}
+                className="mt-8 px-8 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-white/10 transition-colors"
+              >
+                Cancelar / Voltar
+              </button>
             </div>
           )}
         </div>
