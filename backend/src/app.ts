@@ -22,6 +22,7 @@ import PixRoutes from "./routes/Pix.routes";
 import Pix from "./controller/Pix";
 import NFCom from "./routes/NFCom.routes";
 import WhatsappWebHook from "./routes/WhatsappWebHook.routes";
+import TokenAtendimentoRoutes from "./routes/TokenAtendimento.routes";
 const backup = new Backup();
 const pix = new Pix();
 
@@ -60,6 +61,7 @@ export class App {
     this.server.use("/api/Onu", Onu);
     this.server.use("/api/Backup", BackupRoutes);
     this.server.use("/api/Pix", PixRoutes);
+    this.server.use("/api/TokenAutoAtendimento", TokenAtendimentoRoutes);
   }
 
   private agendarBackup() {

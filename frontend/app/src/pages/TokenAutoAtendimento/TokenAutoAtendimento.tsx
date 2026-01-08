@@ -2,6 +2,8 @@ import React from "react";
 import { FaCreditCard, FaComments, FaUser } from "react-icons/fa";
 import { QRCodeCanvas } from "qrcode.react";
 import { HiChip } from "react-icons/hi";
+import { Link } from "react-router-dom";
+import { Keyboard } from "./components/Keyboard";
 
 export const TokenAutoAtendimento = () => {
   return (
@@ -39,59 +41,42 @@ export const TokenAutoAtendimento = () => {
         <div className="flex-1 flex flex-col items-center justify-center space-y-5 px-8">
           <button className="group w-full relative overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none">
             <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full opacity-80 blur group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-16 flex items-center justify-between px-6 border border-white/10 group-hover:bg-opacity-30 transition-all">
-              <span className="text-white font-bold text-lg tracking-wide uppercase drop-shadow">
-                Pagar Fatura
-              </span>
-              <FaCreditCard className="text-cyan-200 text-2xl" />
-            </div>
+            <Link to="/TokenAutoAtendimento/pagar-fatura">
+              <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-16 flex items-center justify-between px-6 border border-white/10 group-hover:bg-opacity-30 transition-all">
+                <span className="text-white font-bold text-lg tracking-wide uppercase drop-shadow">
+                  Pagar Fatura
+                </span>
+                <FaCreditCard className="text-cyan-200 text-2xl" />
+              </div>
+            </Link>
           </button>
 
-          <button className="group w-full relative overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none">
+          {/* <button className="group w-full relative overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none">
             <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-amber-500 rounded-full opacity-80 blur group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-16 flex items-center justify-between px-6 border border-white/10 group-hover:bg-opacity-30 transition-all">
-              <span className="text-white font-bold text-lg tracking-wide uppercase drop-shadow">
-                Criar Chamado
-              </span>
-              <FaComments className="text-amber-100 text-2xl" />
-            </div>
-          </button>
+            <Link to="/TokenAutoAtendimento/criar-chamado">
+              <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-16 flex items-center justify-between px-6 border border-white/10 group-hover:bg-opacity-30 transition-all">
+                <span className="text-white font-bold text-lg tracking-wide uppercase drop-shadow">
+                  Criar Chamado
+                </span>
+                <FaComments className="text-amber-100 text-2xl" />
+              </div>
+            </Link>
+          </button> */}
 
           <button className="group w-full relative overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full opacity-80 blur group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-16 flex items-center justify-between px-6 border border-white/10 group-hover:bg-opacity-30 transition-all">
-              <span className="text-white font-bold text-lg tracking-wide uppercase drop-shadow">
-                Fazer Cadastro
-              </span>
-              <FaUser className="text-purple-100 text-2xl" />
-            </div>
+            <Link to="/TokenAutoAtendimento/fazer-cadastro">
+              <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-16 flex items-center justify-between px-6 border border-white/10 group-hover:bg-opacity-30 transition-all">
+                <span className="text-white font-bold text-lg tracking-wide uppercase drop-shadow">
+                  Fazer Cadastro
+                </span>
+                <FaUser className="text-purple-100 text-2xl" />
+              </div>
+            </Link>
           </button>
         </div>
 
-        {/* Keypad & QR Section */}
-        <div className="mt-auto px-8 pb-10 flex items-end justify-center w-full">
-          {/* Numeric Keypad */}
-          <div className="grid grid-cols-3 gap-2 w-max">
-            {[1, 2, 3, 4, 5, 6].map((num) => (
-              <button
-                key={num}
-                className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/80 font-mono text-lg hover:bg-white/10 hover:border-white/30 transition-all shadow-sm"
-              >
-                {num}
-              </button>
-            ))}
-            {/* Simplified bottom row for visual balance as per the reference image style often implying more keys or just a grid */}
-            <button className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/80 font-mono text-lg hover:bg-white/10 hover:border-white/30 transition-all">
-              0
-            </button>
-            <button className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/80 font-mono text-lg hover:bg-white/10 hover:border-white/30 transition-all">
-              $
-            </button>
-            <button className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/80 font-mono text-lg hover:bg-white/10 hover:border-white/30 transition-all">
-              #
-            </button>
-          </div>
-        </div>
+        <Keyboard onKeyPress={(key) => console.log(key)} />
 
         {/* Card Slot Visual */}
         <div className="absolute bottom-8 right-[50%] translate-x-[50%] w-32 h-1 bg-black/50 rounded-full shadow-[inset_0_-1px_1px_rgba(255,255,255,0.2)]"></div>

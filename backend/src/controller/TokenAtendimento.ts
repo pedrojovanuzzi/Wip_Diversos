@@ -65,6 +65,34 @@ class TokenAtendimento {
     }
   }
 
+  criarCadastro = async (req: Request, res: Response) => {
+    try {
+      console.log(req.body);
+
+      for (const key in req.body) {
+        const valor = req.body[key];
+        console.log(valor);
+
+        if (valor === "" || valor === null || valor === undefined) {
+          res
+            .status(500)
+            .json({ error: "Erro ao criar cadastro, campos inválidos" });
+          return;
+        }
+      }
+
+      const cadastro = this.clienteRepo.create(req.body);
+
+      await this.clienteRepo.save(cadastro);
+      res.status(200).json({ message: "Cadastro criado com sucesso" });
+      return;
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Erro ao criar cadastro" });
+      return;
+    }
+  };
+
   aplicarJuros_Desconto = async (
     valor: string | number,
     pppoe: string,

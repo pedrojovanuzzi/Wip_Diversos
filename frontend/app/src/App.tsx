@@ -35,6 +35,9 @@ import { PixfindPaid } from "./pages/Pix/PixfindPaid";
 import Nfcom from "./pages/Nfcom/Nfcom";
 import SearchInterface from "./pages/Nfcom/SearchInterface";
 import { TokenAutoAtendimento } from "./pages/TokenAutoAtendimento/TokenAutoAtendimento";
+import { PagarFatura } from "./pages/TokenAutoAtendimento/PagarFatura";
+import { CriarChamado } from "./pages/TokenAutoAtendimento/CriarChamado";
+import { FazerCadastro } from "./pages/TokenAutoAtendimento/FazerCadastro";
 
 function App() {
   const { user, loading, logout } = useAuth();
@@ -333,6 +336,18 @@ function App() {
           <Route
             path="/TokenAutoAtendimento"
             element={<TokenAutoAtendimento />}
+          />
+          <Route
+            path="/TokenAutoAtendimento/pagar-fatura"
+            element={<PagarFatura />}
+          />
+          <Route
+            path="/TokenAutoAtendimento/criar-chamado"
+            element={<CriarChamado />}
+          />
+          <Route
+            path="/TokenAutoAtendimento/fazer-cadastro"
+            element={<FazerCadastro />}
           />
         </Routes>
       </div>
