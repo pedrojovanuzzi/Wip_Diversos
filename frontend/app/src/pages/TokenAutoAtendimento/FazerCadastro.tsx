@@ -30,7 +30,51 @@ export const FazerCadastro = () => {
     null
   );
 
+  const validateForm = () => {
+    const requiredFields = [
+      "nome",
+      "cpf",
+      "rg",
+      "nascimento",
+      "email",
+      "cep",
+      "rua",
+      "numero",
+      "bairro",
+      "cidade",
+      "estado",
+      "celular",
+      "plano",
+      "vencimento",
+    ];
+
+    for (const field of requiredFields) {
+      if (!formData[field as keyof typeof formData].trim()) {
+        setError(`O campo ${field.toUpperCase()} é obrigatório.`);
+        return false;
+      }
+    }
+
+    // Basic Email Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError("Por favor, insira um e-mail válido.");
+      return false;
+    }
+
+    // Basic CPF Length Validation (simplistic)
+    if (formData.cpf.length < 11) {
+      setError("CPF inválido. Verifique os números digitados.");
+      return false;
+    }
+
+    return true;
+  };
+
   const axiosCadastro = async () => {
+    setError(""); // Clear previous errors
+    if (!validateForm()) return;
+
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/TokenAutoAtendimento/CreateCadastro`,

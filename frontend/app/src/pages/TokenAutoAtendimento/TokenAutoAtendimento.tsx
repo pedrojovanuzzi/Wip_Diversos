@@ -44,7 +44,7 @@ export const TokenAutoAtendimento = () => {
             <Link to="/TokenAutoAtendimento/pagar-fatura">
               <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-16 flex items-center justify-between px-6 border border-white/10 group-hover:bg-opacity-30 transition-all">
                 <span className="text-white font-bold text-lg tracking-wide uppercase drop-shadow">
-                  Pagar Fatura
+                  Pagar Ultima Fatura
                 </span>
                 <FaCreditCard className="text-cyan-200 text-2xl" />
               </div>

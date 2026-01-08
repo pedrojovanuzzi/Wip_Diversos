@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import AppDataSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
-import { IsNull } from "typeorm";
+import { In, IsNull, Or } from "typeorm";
 import EfiPay from "sdk-node-apis-efi";
 import path from "path";
 import dotenv from "dotenv";
@@ -37,7 +37,7 @@ class TokenAtendimento {
   private recordRepo = AppDataSource.getRepository(Faturas);
   private clienteRepo = AppDataSource.getRepository(ClientesEntities);
 
-  async login(req: Request, res: Response) {
+  login = async (req: Request, res: Response) => {
     try {
       const cadastros = await this.clienteRepo.find({
         where: { cpf_cnpj: req.body.cpf },
@@ -49,9 +49,9 @@ class TokenAtendimento {
       res.status(500).json({ error: "Erro ao buscar cliente" });
       return;
     }
-  }
+  };
 
-  async chooseHome(req: Request, res: Response) {
+  chooseHome = async (req: Request, res: Response) => {
     try {
       const cadastros = await this.clienteRepo.findOne({
         where: { login: req.body.login },
@@ -63,7 +63,7 @@ class TokenAtendimento {
       res.status(500).json({ error: "Erro ao buscar cliente" });
       return;
     }
-  }
+  };
 
   criarCadastro = async (req: Request, res: Response) => {
     try {
@@ -208,7 +208,7 @@ class TokenAtendimento {
     }
   };
 
-  async gerarPixToken(req: Request, res: Response) {
+  gerarPixToken = async (req: Request, res: Response) => {
     try {
       let { cpf, login, perdoarJuros } = req.body;
 
@@ -217,7 +217,11 @@ class TokenAtendimento {
       let pppoe = login;
 
       const cliente = await this.recordRepo.findOne({
-        where: { login: pppoe, status: "vencido", datadel: IsNull() },
+        where: {
+          login: pppoe,
+          status: In(["vencido", "aberto"]),
+          datadel: IsNull(),
+        },
         order: { datavenc: "ASC" as const },
       });
 
@@ -347,7 +351,7 @@ class TokenAtendimento {
       console.log(error);
       res.status(500).json({ error: "Erro ao gerar Pix" });
     }
-  }
+  };
 }
 
 export default TokenAtendimento;

@@ -9,5 +9,6 @@ const tokenAtendimento = new TokenAtendimento();
 router.post("/Login", tokenAtendimento.login);
 router.post("/ChooseHome", tokenAtendimento.chooseHome);
 router.post("/CreateCadastro", tokenAtendimento.criarCadastro);
+router.post("/GerarPixToken", tokenAtendimento.gerarPixToken);
 
 export default router;
