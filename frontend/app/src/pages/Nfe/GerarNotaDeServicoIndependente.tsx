@@ -8,7 +8,6 @@ import { NavBar } from "../../components/navbar/NavBar";
 export const GerarNotaDeServicoIndependente = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [nfeNumber, setNfeNumber] = useState("");
   const [message, setMessage] = useState<{
     msg: string;
     type: "error" | "success";
@@ -21,6 +20,7 @@ export const GerarNotaDeServicoIndependente = () => {
     descricao: "Serviço Avulso",
     password: "",
     nfeNumber: "",
+    ambiente: "1",
   });
 
   const handleChange = (
@@ -44,7 +44,9 @@ export const GerarNotaDeServicoIndependente = () => {
       !formData.login ||
       !formData.valor ||
       !formData.servico ||
-      !formData.password
+      !formData.password ||
+      !formData.nfeNumber ||
+      !formData.ambiente
     ) {
       setMessage({
         msg: "Preencha todos os campos obrigatórios.",
@@ -114,6 +116,24 @@ export const GerarNotaDeServicoIndependente = () => {
               />
             </div>
 
+            {/* Ambiente */}
+            <div className="flex flex-col">
+              <label htmlFor="ambiente" className="font-semibold text-gray-700">
+                Ambiente
+              </label>
+              <select
+                name="ambiente"
+                id="ambiente"
+                className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={formData.ambiente}
+                onChange={handleChange}
+                required
+              >
+                <option value="producao">Produção</option>
+                <option value="homologacao">Homologação</option>
+              </select>
+            </div>
+
             {/* Valor */}
             <div className="flex flex-col">
               <label htmlFor="valor" className="font-semibold text-gray-700">
@@ -146,8 +166,8 @@ export const GerarNotaDeServicoIndependente = () => {
                 id="nfeNumber"
                 className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Número da Nota"
-                value={nfeNumber}
-                onChange={(e) => setNfeNumber(e.target.value)}
+                value={formData.nfeNumber}
+                onChange={handleChange}
                 required
               />
             </div>

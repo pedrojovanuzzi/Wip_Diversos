@@ -1481,8 +1481,18 @@ export class NFSEController {
 
   public async GerarNfseAvulsa(req: Request, res: Response) {
     try {
-      const { login, valor, servico, descricao, password, nfeNumber } =
-        req.body;
+      const {
+        login,
+        valor,
+        servico,
+        descricao,
+        password,
+        nfeNumber,
+        ambiente,
+      } = req.body;
+
+      console.log("GerarNfseAvulsa Payload:", JSON.stringify(req.body));
+      console.log("nfeNumber recebido:", nfeNumber, "Tipo:", typeof nfeNumber);
 
       if (!login || !valor || !servico || !password) {
         res.status(400).json({ error: "Dados incompletos" });
@@ -1490,7 +1500,6 @@ export class NFSEController {
       }
 
       this.PASSWORD = password;
-      const ambiente = "producao";
       this.configureProvider(ambiente);
 
       const ClientRepository = MkauthSource.getRepository(ClientesEntities);
@@ -1574,17 +1583,17 @@ export class NFSEController {
         2,
         1,
         servico,
-        descricao || "Serviço Avulso",
+        this.removerAcentos(descricao || "Servico Avulso"),
         "3503406",
         1,
         cnpjPrestador || "",
         inscricaoPrestador || "",
         ClientData?.cpf_cnpj || "",
-        ClientData?.nome || "",
-        this.removerAcentos(ClientData?.endereco),
+        this.removerAcentos(ClientData?.nome || ""),
+        this.removerAcentos(ClientData?.endereco || ""),
         ClientData?.numero || "",
-        ClientData?.complemento || "",
-        ClientData?.bairro || "",
+        this.removerAcentos(ClientData?.complemento || ""),
+        this.removerAcentos(ClientData?.bairro || ""),
         String(ibgeId),
         "SP",
         ClientData?.cep.replace(/[^0-9]/g, "") || "",
@@ -1619,11 +1628,24 @@ export class NFSEController {
       const logPath = "./log/xml_log_avulsa.txt";
       fs.appendFileSync(logPath, soapXml + "\n", "utf8");
 
-      const responseXml = await this.fiorilliProvider.sendSoapRequest(
-        soapXml,
-        "EnviarLoteRpsSincronoEnvio",
-        password
-      );
+      let responseXml;
+      try {
+        responseXml = await this.fiorilliProvider.sendSoapRequest(
+          soapXml,
+          "EnviarLoteRpsSincronoEnvio",
+          password
+        );
+      } catch (error: any) {
+        if (error.response && error.response.data) {
+          console.error("SOAP FAULT:", error.response.data);
+          res.status(500).json({
+            error: "Erro no Servidor SOAP",
+            detalhes: error.response.data,
+          });
+          return;
+        }
+        throw error;
+      }
 
       const parsed = await parseStringPromise(responseXml, {
         explicitArray: false,
