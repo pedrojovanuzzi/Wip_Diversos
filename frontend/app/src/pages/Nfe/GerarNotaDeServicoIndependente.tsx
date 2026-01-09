@@ -22,6 +22,7 @@ export const GerarNotaDeServicoIndependente = () => {
     nfeNumber: "",
     ambiente: "homologacao",
     aliquota: "5.0000",
+    rpsNumber: "",
   });
 
   const handleChange = (
@@ -134,6 +135,25 @@ export const GerarNotaDeServicoIndependente = () => {
                 <option value="producao">Produção</option>
                 <option value="homologacao">Homologação</option>
               </select>
+            </div>
+
+            {/* RPS Number */}
+            <div className="flex flex-col">
+              <label
+                htmlFor="rpsNumber"
+                className="font-semibold text-gray-700"
+              >
+                Número do RPS (Opcional)
+              </label>
+              <input
+                type="text"
+                name="rpsNumber"
+                id="rpsNumber"
+                className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ex: 123456"
+                value={formData.rpsNumber}
+                onChange={handleChange}
+              />
             </div>
 
             {/* Aliquota */}

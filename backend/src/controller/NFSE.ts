@@ -1352,26 +1352,46 @@ export class NFSEController {
       }
 
       const lista = Array.isArray(compNfse) ? compNfse : [compNfse];
+      console.log("getLastNfseNumber items:", JSON.stringify(lista));
+
+      let foundNextNfse = null;
+      let foundNextRps = null;
+
       for (const item of lista) {
         const nfseNum = item?.["ns2:Nfse"]?.["ns2:InfNfse"]?.["ns2:Numero"];
-        const rpsNum =
+        const rpsObj =
           item?.["ns2:Nfse"]?.["ns2:InfNfse"]?.[
             "ns2:DeclaracaoPrestacaoServico"
           ]?.["ns2:InfDeclaracaoPrestacaoServico"]?.["ns2:Rps"]?.[
             "ns2:IdentificacaoRps"
-          ]?.["ns2:Numero"];
+          ];
+
+        const rpsNum = rpsObj?.["ns2:Numero"];
+        const rpsSerie = rpsObj?.["ns2:Serie"];
+
+        console.log(
+          `Checking item: NFSe=${nfseNum}, RPS=${rpsNum}, Serie=${rpsSerie}`
+        );
 
         if (nfseNum && Number(nfseNum) === lastNfe) {
           console.log(
-            `NFSe ${lastNfe} encontrada. RPS vinculado: ${rpsNum}. Próximos: ${
-              lastNfe + 1
-            }, RPS ${Number(rpsNum) + 1}`
+            `NFSe ${lastNfe} encontrada. RPS vinculado: ${rpsNum} (Serie: ${rpsSerie}).`
           );
-          return {
-            nextNfseNumber: lastNfe + 1,
-            nextRpsNumber: Number(rpsNum) + 1,
-          };
+          // Preferentially update if we find a match, but keep looking (or break if unique)
+          // Assuming we want the one matching our current series logic?
+          foundNextNfse = lastNfe + 1;
+          foundNextRps = Number(rpsNum) + 1;
         }
+      }
+
+      if (foundNextNfse && foundNextRps) {
+        console.log(
+          `Retornando: NextNFe=${foundNextNfse}, NextRPS=${foundNextRps}`
+        );
+        return {
+          nextNfseNumber: foundNextNfse,
+          nextRpsNumber: foundNextRps,
+        };
       }
 
       console.log(
@@ -1490,6 +1510,7 @@ export class NFSEController {
         nfeNumber,
         ambiente,
         aliquota,
+        rpsNumber,
       } = req.body;
 
       console.log("GerarNfseAvulsa Payload:", JSON.stringify(req.body));
@@ -1517,29 +1538,48 @@ export class NFSEController {
       let nextRpsNumber = 0;
 
       const NsfeData = AppDataSource.getRepository(NFSE); // Moved up for use in if (nfeNumber) block
+      let currentRpsNumber = 0;
+      let targetSeries = "1";
 
-      const result = await this.getLastNfseNumber(nfeNumber, ambiente);
-      nextNfseNumber = result.nextNfseNumber;
-      nextRpsNumber = result.nextRpsNumber;
+      if (!rpsNumber) {
+        const result = await this.getLastNfseNumber(
+          Number(nfeNumber),
+          ambiente
+        );
+        nextNfseNumber = result.nextNfseNumber;
+        nextRpsNumber = result.nextRpsNumber;
 
-      const lastProd = await NsfeData.findOne({
-        where: { serieRps: Not("wip99") },
-        order: { id: "DESC" },
-      });
-      const targetSeries = lastProd?.serieRps || "1";
+        console.log("nextNfseNumber:", nextNfseNumber);
+        console.log("nextRpsNumber:", nextRpsNumber);
 
-      const lastRpsForSeries = await NsfeData.findOne({
-        where: { serieRps: targetSeries },
-        order: { numeroRps: "DESC" },
-      });
+        const lastProd = await NsfeData.findOne({
+          where: { serieRps: Not("wip99") },
+          order: { id: "DESC" },
+        });
+        targetSeries = lastProd?.serieRps || "1";
 
-      let currentRpsNumber = nextRpsNumber;
-      if (lastRpsForSeries && lastRpsForSeries.numeroRps) {
-        const localNextRps = lastRpsForSeries.numeroRps + 1;
-        // If using manual nfeNumber, we might want to trust local RPS logic primarily unless nextRpsNumber from soap was higher
-        if (localNextRps > nextRpsNumber) {
-          currentRpsNumber = localNextRps;
-        }
+        const lastRpsForSeries = await NsfeData.findOne({
+          where: { serieRps: targetSeries },
+          order: { numeroRps: "DESC" },
+        });
+
+        currentRpsNumber = nextRpsNumber;
+      } else {
+        currentRpsNumber = Number(rpsNumber);
+        const result = await this.getLastNfseNumber(
+          Number(nfeNumber),
+          ambiente
+        );
+        nextNfseNumber = result.nextNfseNumber;
+
+        console.log("nextNfseNumber:", nextNfseNumber);
+        console.log("nextRpsNumber:", nextRpsNumber);
+
+        const lastProd = await NsfeData.findOne({
+          where: { serieRps: Not("wip99") },
+          order: { id: "DESC" },
+        });
+        targetSeries = lastProd?.serieRps || "1";
       }
 
       let ibgeId = "3503406";
@@ -1568,7 +1608,7 @@ export class NFSEController {
 
       const xml = this.xmlFactory.createRpsXml(
         uuidLanc,
-        nextNfseNumber,
+        currentRpsNumber,
         targetSeries,
         "1",
         new Date(),
