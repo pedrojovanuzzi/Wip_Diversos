@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import AppDataSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
-import { IsNull } from "typeorm";
+import { In, IsNull, Or } from "typeorm";
 import EfiPay from "sdk-node-apis-efi";
 import path from "path";
 import dotenv from "dotenv";
@@ -37,7 +37,7 @@ class TokenAtendimento {
   private recordRepo = AppDataSource.getRepository(Faturas);
   private clienteRepo = AppDataSource.getRepository(ClientesEntities);
 
-  async login(req: Request, res: Response) {
+  login = async (req: Request, res: Response) => {
     try {
       const cadastros = await this.clienteRepo.find({
         where: { cpf_cnpj: req.body.cpf },
@@ -49,7 +49,49 @@ class TokenAtendimento {
       res.status(500).json({ error: "Erro ao buscar cliente" });
       return;
     }
-  }
+  };
+
+  chooseHome = async (req: Request, res: Response) => {
+    try {
+      const cadastros = await this.clienteRepo.findOne({
+        where: { login: req.body.login },
+      });
+      res.status(200).json(cadastros);
+      return;
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Erro ao buscar cliente" });
+      return;
+    }
+  };
+
+  criarCadastro = async (req: Request, res: Response) => {
+    try {
+      console.log(req.body);
+
+      for (const key in req.body) {
+        const valor = req.body[key];
+        console.log(valor);
+
+        if (valor === "" || valor === null || valor === undefined) {
+          res
+            .status(500)
+            .json({ error: "Erro ao criar cadastro, campos inválidos" });
+          return;
+        }
+      }
+
+      const cadastro = this.clienteRepo.create(req.body);
+
+      await this.clienteRepo.save(cadastro);
+      res.status(200).json({ message: "Cadastro criado com sucesso" });
+      return;
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Erro ao criar cadastro" });
+      return;
+    }
+  };
 
   aplicarJuros_Desconto = async (
     valor: string | number,
@@ -166,7 +208,33 @@ class TokenAtendimento {
     }
   };
 
-  async gerarPixToken(req: Request, res: Response) {
+  faturaWentPaid = async (req: Request, res: Response) => {
+    try {
+      let { faturaId } = req.body;
+
+      const fatura = await this.recordRepo.findOne({
+        where: { id: faturaId },
+      });
+
+      if (!fatura) {
+        res.status(404).json({ error: "Fatura nao encontrada" });
+        return;
+      }
+
+      if (fatura.status != "pago") {
+        res.status(400).json({ error: "Fatura ainda nao foi paga" });
+        return;
+      }
+
+      res.status(200).json({ message: "Fatura paga com sucesso" });
+      return;
+    } catch (error) {
+      res.status(500).json({ error: "Erro Desconhecido" });
+      return;
+    }
+  };
+
+  gerarPixToken = async (req: Request, res: Response) => {
     try {
       let { cpf, login, perdoarJuros } = req.body;
 
@@ -175,7 +243,11 @@ class TokenAtendimento {
       let pppoe = login;
 
       const cliente = await this.recordRepo.findOne({
-        where: { login: pppoe, status: "vencido", datadel: IsNull() },
+        where: {
+          login: pppoe,
+          status: In(["vencido", "aberto"]),
+          datadel: IsNull(),
+        },
         order: { datavenc: "ASC" as const },
       });
 
@@ -252,7 +324,9 @@ class TokenAtendimento {
           valor: valorPerdoado,
           pppoe,
           link: qrlink.linkVisualizacao,
+          imagem: qrlink.imagemQrcode,
           formattedDate,
+          faturaId: cliente.id,
         });
       } else {
         const body =
@@ -298,14 +372,16 @@ class TokenAtendimento {
           valor: valorFinal,
           pppoe,
           link: qrlink.linkVisualizacao,
+          imagem: qrlink.imagemQrcode,
           formattedDate,
+          faturaId: cliente.id,
         });
       }
     } catch (error) {
       console.log(error);
       res.status(500).json({ error: "Erro ao gerar Pix" });
     }
-  }
+  };
 }
 
 export default TokenAtendimento;
