@@ -1489,6 +1489,7 @@ export class NFSEController {
         password,
         nfeNumber,
         ambiente,
+        aliquota,
       } = req.body;
 
       console.log("GerarNfseAvulsa Payload:", JSON.stringify(req.body));
@@ -1568,8 +1569,14 @@ export class NFSEController {
           ? ClientData.email.trim()
           : "sememail@wiptelecom.com.br";
 
-      const cnpjPrestador = process.env.MUNICIPIO_LOGIN;
-      const inscricaoPrestador = process.env.MUNICIPIO_INCRICAO;
+      const cnpjPrestador =
+        ambiente === "producao"
+          ? process.env.MUNICIPIO_LOGIN
+          : process.env.MUNICIPIO_CNPJ_TEST;
+      const inscricaoPrestador =
+        ambiente === "producao"
+          ? process.env.MUNICIPIO_INCRICAO
+          : process.env.MUNICIPIO_INCRICAO_TEST;
 
       const xml = this.xmlFactory.createRpsXml(
         uuidLanc,
@@ -1579,16 +1586,16 @@ export class NFSEController {
         new Date(),
         "1",
         Number(valor),
-        "0.0500",
+        aliquota,
         2,
         1,
         servico,
         this.removerAcentos(descricao || "Servico Avulso"),
         "3503406",
         1,
-        cnpjPrestador || "",
-        inscricaoPrestador || "",
-        ClientData?.cpf_cnpj || "",
+        cnpjPrestador,
+        inscricaoPrestador,
+        ClientData?.cpf_cnpj,
         this.removerAcentos(ClientData?.nome || ""),
         this.removerAcentos(ClientData?.endereco || ""),
         ClientData?.numero || "",
@@ -1618,10 +1625,20 @@ export class NFSEController {
         1,
         signedRps
       );
+
+      const loginMunicipio =
+        ambiente === "producao"
+          ? process.env.MUNICIPIO_LOGIN
+          : process.env.MUNICIPIO_LOGIN_TEST;
+      const senhaMunicipio =
+        ambiente === "producao"
+          ? process.env.MUNICIPIO_SENHA
+          : process.env.MUNICIPIO_SENHA_TEST;
+
       const soapXml = this.xmlFactory.createEnviarLoteSoap(
         loteXml,
-        process.env.MUNICIPIO_LOGIN || "",
-        process.env.MUNICIPIO_SENHA || ""
+        loginMunicipio!,
+        senhaMunicipio!
       );
 
       if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
@@ -1670,7 +1687,7 @@ export class NFSEController {
           dataEmissao: new Date(),
           competencia: new Date(),
           valorServico: Number(valor),
-          aliquota: 0.05,
+          aliquota: aliquota,
           issRetido: 2,
           responsavelRetencao: 1,
           itemListaServico: servico,

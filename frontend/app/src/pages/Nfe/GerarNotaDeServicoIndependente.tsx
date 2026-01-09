@@ -20,7 +20,8 @@ export const GerarNotaDeServicoIndependente = () => {
     descricao: "Serviço Avulso",
     password: "",
     nfeNumber: "",
-    ambiente: "1",
+    ambiente: "homologacao",
+    aliquota: "5.0000",
   });
 
   const handleChange = (
@@ -46,7 +47,8 @@ export const GerarNotaDeServicoIndependente = () => {
       !formData.servico ||
       !formData.password ||
       !formData.nfeNumber ||
-      !formData.ambiente
+      !formData.ambiente ||
+      !formData.aliquota
     ) {
       setMessage({
         msg: "Preencha todos os campos obrigatórios.",
@@ -132,6 +134,24 @@ export const GerarNotaDeServicoIndependente = () => {
                 <option value="producao">Produção</option>
                 <option value="homologacao">Homologação</option>
               </select>
+            </div>
+
+            {/* Aliquota */}
+            <div className="flex flex-col">
+              <label htmlFor="aliquota" className="font-semibold text-gray-700">
+                Aliquota
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                name="aliquota"
+                id="aliquota"
+                className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="0.00"
+                value={formData.aliquota}
+                onChange={handleChange}
+                required
+              />
             </div>
 
             {/* Valor */}
