@@ -38,6 +38,7 @@ import { TokenAutoAtendimento } from "./pages/TokenAutoAtendimento/TokenAutoAten
 import { PagarFatura } from "./pages/TokenAutoAtendimento/PagarFatura";
 import { CriarChamado } from "./pages/TokenAutoAtendimento/CriarChamado";
 import { FazerCadastro } from "./pages/TokenAutoAtendimento/FazerCadastro";
+import { PdfViewer } from "./pages/PdfViewer/PdfViewer";
 
 function App() {
   const { user, loading, logout } = useAuth();
@@ -349,6 +350,7 @@ function App() {
             path="/TokenAutoAtendimento/fazer-cadastro"
             element={<FazerCadastro />}
           />
+          <Route path="/doc/:fileName" element={<PdfViewer />} />
         </Routes>
       </div>
     </BrowserRouter>
