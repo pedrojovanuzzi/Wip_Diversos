@@ -1481,7 +1481,8 @@ export class NFSEController {
 
   public async GerarNfseAvulsa(req: Request, res: Response) {
     try {
-      const { login, valor, servico, descricao, password } = req.body;
+      const { login, valor, servico, descricao, password, nfeNumber } =
+        req.body;
 
       if (!login || !valor || !servico || !password) {
         res.status(400).json({ error: "Dados incompletos" });
@@ -1502,12 +1503,26 @@ export class NFSEController {
 
       const uuidLanc = uuidv4();
 
-      const { nextNfseNumber, nextRpsNumber } = await this.getLastNfseNumber(
-        0,
-        ambiente
-      );
+      let nextNfseNumber = 0;
+      let nextRpsNumber = 0;
 
-      const NsfeData = AppDataSource.getRepository(NFSE);
+      const NsfeData = AppDataSource.getRepository(NFSE); // Moved up for use in if (nfeNumber) block
+
+      if (nfeNumber) {
+        nextNfseNumber = Number(nfeNumber);
+        // If user provides NFSE number, we guess RPS based on local db or just fallback
+        // The original logic uses RPS number to generate Lote ID and local DB storage.
+        // We need a valid RPS number.
+        const lastRps = await NsfeData.findOne({
+          where: { serieRps: "1" }, // Assume series 1 if manual
+          order: { numeroRps: "DESC" },
+        });
+        nextRpsNumber = (lastRps?.numeroRps || 0) + 1;
+      } else {
+        const result = await this.getLastNfseNumber(0, ambiente);
+        nextNfseNumber = result.nextNfseNumber;
+        nextRpsNumber = result.nextRpsNumber;
+      }
 
       const lastProd = await NsfeData.findOne({
         where: { serieRps: Not("wip99") },
@@ -1523,6 +1538,7 @@ export class NFSEController {
       let currentRpsNumber = nextRpsNumber;
       if (lastRpsForSeries && lastRpsForSeries.numeroRps) {
         const localNextRps = lastRpsForSeries.numeroRps + 1;
+        // If using manual nfeNumber, we might want to trust local RPS logic primarily unless nextRpsNumber from soap was higher
         if (localNextRps > nextRpsNumber) {
           currentRpsNumber = localNextRps;
         }
