@@ -11,6 +11,16 @@ export const PdfViewer = () => {
 
   return (
     <div className="w-full h-screen flex flex-col">
+      <div className="flex justify-center p-2 bg-gray-800">
+        <a
+          href={pdfPath}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Abrir/Baixar PDF
+        </a>
+      </div>
       <div className="flex-1 w-full h-full">
         <iframe
           src={pdfPath}
