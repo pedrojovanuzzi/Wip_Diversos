@@ -382,6 +382,23 @@ class TokenAtendimento {
       res.status(500).json({ error: "Erro ao gerar Pix" });
     }
   };
+
+  receberPagamentoMercadoPagoWebhook = async (req: Request, res: Response) => {
+    try {
+      const { body } = req;
+
+      if (body.password != process.env.MERCADOPAGO_PASS_WEBHOOK) {
+        res.status(401).json({ error: "Senha incorreta" });
+        return;
+      }
+
+      console.log(body);
+      res.status(200).json({ message: "Pagamento recebido com sucesso" });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Erro ao receber pagamento" });
+    }
+  };
 }
 
 export default TokenAtendimento;
