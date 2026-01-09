@@ -39,6 +39,7 @@ import { PagarFatura } from "./pages/TokenAutoAtendimento/PagarFatura";
 import { CriarChamado } from "./pages/TokenAutoAtendimento/CriarChamado";
 import { FazerCadastro } from "./pages/TokenAutoAtendimento/FazerCadastro";
 import { PdfViewer } from "./pages/PdfViewer/PdfViewer";
+import { GerarNotaDeServicoIndependente } from "./pages/Nfe/GerarNotaDeServicoIndependente";
 
 function App() {
   const { user, loading, logout } = useAuth();
@@ -351,6 +352,10 @@ function App() {
             element={<FazerCadastro />}
           />
           <Route path="/doc/:fileName" element={<PdfViewer />} />
+          <Route
+            path="/GerarNotaDeServicoIndependente"
+            element={<GerarNotaDeServicoIndependente />}
+          />
         </Routes>
       </div>
     </BrowserRouter>
