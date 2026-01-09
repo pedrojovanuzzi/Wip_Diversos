@@ -1,7 +1,4 @@
-import {
-  Disclosure,
-
-} from "@headlessui/react";
+import { Disclosure } from "@headlessui/react";
 import { FunnelIcon } from "@heroicons/react/20/solid";
 import { useState } from "react";
 import Calendar from "./Calendar";
@@ -197,6 +194,13 @@ export default function Filter({
               >
                 <IoArrowUpCircleOutline className="text-2xl" />
                 Senha Certificado
+              </button>
+              <button
+                className="bg-green-500 ring-1 ring-black ring-opacity-5 text-white indent-2 py-3 px-8 rounded hover:bg-green-400 transition-all flex items-center justify-center"
+                onClick={() => navigate("/GerarNotaDeServicoIndependente")}
+              >
+                <CiCirclePlus className="text-2xl" />
+                Nota de Serviço Independente
               </button>
               {showPasswordPopUp && (
                 <SetPassword
