@@ -1518,21 +1518,9 @@ export class NFSEController {
 
       const NsfeData = AppDataSource.getRepository(NFSE); // Moved up for use in if (nfeNumber) block
 
-      if (nfeNumber) {
-        nextNfseNumber = Number(nfeNumber);
-        // If user provides NFSE number, we guess RPS based on local db or just fallback
-        // The original logic uses RPS number to generate Lote ID and local DB storage.
-        // We need a valid RPS number.
-        const lastRps = await NsfeData.findOne({
-          where: { serieRps: "1" }, // Assume series 1 if manual
-          order: { numeroRps: "DESC" },
-        });
-        nextRpsNumber = (lastRps?.numeroRps || 0) + 1;
-      } else {
-        const result = await this.getLastNfseNumber(0, ambiente);
-        nextNfseNumber = result.nextNfseNumber;
-        nextRpsNumber = result.nextRpsNumber;
-      }
+      const result = await this.getLastNfseNumber(nfeNumber, ambiente);
+      nextNfseNumber = result.nextNfseNumber;
+      nextRpsNumber = result.nextRpsNumber;
 
       const lastProd = await NsfeData.findOne({
         where: { serieRps: Not("wip99") },
@@ -1593,8 +1581,8 @@ export class NFSEController {
         this.removerAcentos(descricao || "Servico Avulso"),
         "3503406",
         1,
-        cnpjPrestador,
-        inscricaoPrestador,
+        cnpjPrestador!,
+        inscricaoPrestador!,
         ClientData?.cpf_cnpj,
         this.removerAcentos(ClientData?.nome || ""),
         this.removerAcentos(ClientData?.endereco || ""),
@@ -1640,10 +1628,6 @@ export class NFSEController {
         loginMunicipio!,
         senhaMunicipio!
       );
-
-      if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
-      const logPath = "./log/xml_log_avulsa.txt";
-      fs.appendFileSync(logPath, soapXml + "\n", "utf8");
 
       let responseXml;
       try {
