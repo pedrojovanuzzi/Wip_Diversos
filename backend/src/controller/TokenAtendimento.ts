@@ -382,6 +382,50 @@ class TokenAtendimento {
       res.status(500).json({ error: "Erro ao gerar Pix" });
     }
   };
+
+  receberPagamentoMercadoPagoWebhook = async (req: Request, res: Response) => {
+    try {
+      const { body } = req;
+
+      console.log(req);
+
+      console.log(body);
+
+      const valor = body.data.total_paid_amount;
+      const faturaId = body.data.id;
+
+      const status = body.data.transactions.payments[0].status;
+
+      if (status == "processed") {
+        const fatura = await this.recordRepo.findOne({
+          where: {
+            id: Number(faturaId),
+          },
+        });
+
+        if (!fatura) {
+          res.status(404).json({ error: "Fatura nao encontrada" });
+          return;
+        }
+
+        const faturaUpdate = await this.recordRepo.update(fatura.id, {
+          status: "pago",
+          datapag: new Date(),
+          formapag: "mercadoPagoPoint",
+          coletor: "mercadoPagoPoint",
+          valorpag: valor,
+        });
+
+        console.log(faturaUpdate);
+
+        res.status(200).json({ message: "Pagamento recebido com sucesso" });
+        return;
+      }
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Erro ao receber pagamento" });
+    }
+  };
 }
 
 export default TokenAtendimento;
