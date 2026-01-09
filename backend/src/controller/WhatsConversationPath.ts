@@ -974,7 +974,7 @@ class WhatsPixController {
               "🙂 Estamos quase terminando!",
               "🗂️ Peço que *leia atenciosamente* as *informações* e o *Contrato* hospedado disponíveis abaixo, não restando nenhuma *dúvida* na sua *contratação*!",
               "Ler Informações",
-              "https://apimk.wiptelecomunicacoes.com.br/menu/TermosContratacao"
+              "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contratação"
             );
             await this.MensagemTermos(
               celular,
@@ -1339,7 +1339,7 @@ class WhatsPixController {
                 "Termos Troca de Titularidade",
                 "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a opção que deseja.",
                 "Ler Termos",
-                "https://apimk.wiptelecomunicacoes.com.br/menu/TrocaTitularidade"
+                "https://wipdiversos.wiptelecomunicacoes.com.br/doc/troca_de_titularidade"
               );
               await this.MensagemBotao(
                 celular,
@@ -2609,7 +2609,7 @@ class WhatsPixController {
         "Termos Mudança de Endereço",
         "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
         "Ler Termos",
-        "https://apimk.wiptelecomunicacoes.com.br/menu/MudancaEndereco"
+        "https://wiptelecomunicacoes.com.br/doc/mudanca_endereco"
       );
       await this.MensagemBotao(celular, "Escolha a Forma", "Grátis", "Paga");
       session.stage = "choose_type_endereco";
@@ -2796,7 +2796,7 @@ class WhatsPixController {
         "Termos Mudança de Cômodo",
         "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
         "Ler Termos",
-        "https://apimk.wiptelecomunicacoes.com.br/menu/MudancaComodo"
+        "https://wiptelecomunicacoes.com.br/doc/mudanca_comodo"
       );
       await this.MensagemBotao(celular, "Escolha a Forma", "Grátis", "Paga");
       session.stage = "choose_type_comodo";
@@ -2975,7 +2975,7 @@ class WhatsPixController {
         "Termos Alteração de Plano",
         "📄 Para dar *continuidade*, é preciso que *leia* o *Termo abaixo* e escolha a opção que deseja",
         "Ler Termos",
-        "https://apimk.wiptelecomunicacoes.com.br/menu/AlteracaoPlano"
+        "https://wiptelecomunicacoes.com.br/doc/altera_plano"
       );
       await this.MensagemBotao(
         celular,
@@ -3067,7 +3067,7 @@ class WhatsPixController {
         "Termos Renovação Contratual",
         "📄 Para dar *continuidade*, é preciso que *leia* o *Termo abaixo* e escolha a opção que deseja",
         "Ler Termos",
-        "https://apimk.wiptelecomunicacoes.com.br/menu/Renovacao"
+        "https://wiptelecomunicacoes.com.br/doc/renovacao"
       );
       await this.MensagemBotao(
         celular,
@@ -3094,7 +3094,7 @@ class WhatsPixController {
       "Termos LGPD",
       "📄 Para dar *continuidade*, é preciso que leia e *aceite* os *Termos abaixo* para a segurança dos seus dados pessoais, de acordo com a *LGPD*.",
       "Ler Termos",
-      "https://apimk.wiptelecomunicacoes.com.br/menu/PoliticaPrivacidade"
+      "https://wiptelecomunicacoes.com.br/doc/privacidade"
     );
     await this.MensagemBotao(
       celular,
