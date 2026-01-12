@@ -134,6 +134,7 @@ export const PagarFatura = () => {
 
         if (response.status === 200) {
           setCardMessage("Termine o processo na maquininha.");
+          setFaturaId(response.data.faturaId);
         }
 
         console.log(response.data);
