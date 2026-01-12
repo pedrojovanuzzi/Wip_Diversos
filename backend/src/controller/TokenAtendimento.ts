@@ -314,13 +314,16 @@ class TokenAtendimento {
 
         await efipay.pixCreateCharge(params, body);
 
-        const options2 = {
-          month: "2-digit",
-          day: "2-digit",
-        } as Intl.DateTimeFormatOptions;
-        const formattedDate = new Intl.DateTimeFormat("pt-BR", options2).format(
-          cliente.datavenc as Date
-        );
+        // const options2 = {
+        //   month: "2-digit",
+        //   day: "2-digit",
+        // } as Intl.DateTimeFormatOptions;
+        // const formattedDate = new Intl.DateTimeFormat("pt-BR", options2).format(
+        //   cliente.datavenc as Date
+        // );
+
+        const formattedDate = cliente.datavenc;
+
         console.log("Juros Perdoado");
         res.status(200).json({
           valor: valorPerdoado,
@@ -362,13 +365,7 @@ class TokenAtendimento {
 
         await efipay.pixCreateCharge(params, body);
 
-        const options2 = {
-          month: "2-digit",
-          day: "2-digit",
-        } as Intl.DateTimeFormatOptions;
-        const formattedDate = new Intl.DateTimeFormat("pt-BR", options2).format(
-          cliente.datavenc as Date
-        );
+        const formattedDate = cliente.datavenc;
 
         res.status(200).json({
           valor: valorFinal,
@@ -501,9 +498,12 @@ class TokenAtendimento {
       console.log(response2);
 
       console.log(terminais2);
-      res
-        .status(200)
-        .json({ id: fatura.id, valor: fatura.valor, order: terminais2 });
+      res.status(200).json({
+        id: fatura.id,
+        valor: fatura.valor,
+        order: terminais2,
+        dataPagamento: fatura.datavenc,
+      });
     } catch (error: any) {
       console.log("********** ERRO MERCADO PAGO **********");
       console.log(JSON.stringify(error.response?.data, null, 2));

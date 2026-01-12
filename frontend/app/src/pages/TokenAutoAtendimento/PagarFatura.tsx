@@ -14,6 +14,9 @@ import { Keyboard } from "./components/Keyboard";
 import axios from "axios";
 import { FaSpinner, FaBarcode } from "react-icons/fa";
 import { QRCodeCanvas } from "qrcode.react";
+import { format } from "date-fns";
+import { useReactToPrint } from "react-to-print";
+import { Receipt } from "./components/Receipt";
 
 interface Client {
   id: number;
@@ -23,6 +26,7 @@ interface Client {
   endereco: string;
   numero: string;
   bairro: string;
+  plano: string;
   cidade: string;
 }
 
@@ -30,6 +34,7 @@ export const PagarFatura = () => {
   const navigate = useNavigate();
   const [qrCode, setQrCode] = useState("");
   const [valorPagamento, setValorPagamento] = useState("");
+  const [dataPagamento, setDataPagamento] = useState("");
   const [step, setStep] = useState<
     | "search"
     | "selection"
@@ -58,6 +63,11 @@ export const PagarFatura = () => {
 
   // Input ref to keep focus if needed, though we primarily use virtual keyboard
   const inputRef = useRef<HTMLInputElement>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = useReactToPrint({
+    contentRef: receiptRef, // Modern API uses contentRef property
+  });
 
   const handleKeyPress = (key: string) => {
     if (step !== "search") return;
@@ -193,6 +203,7 @@ export const PagarFatura = () => {
           setCardMessage("Termine o processo na maquininha.");
           setFaturaId(response.data.id);
           setValorPagamento(response.data.valor);
+          setDataPagamento(response.data.dataPagamento);
           setOrder(response.data.order);
         }
       } catch (error) {
@@ -221,6 +232,7 @@ export const PagarFatura = () => {
       const qrCode = response.data.imagem;
       setQrCode(qrCode);
       setValorPagamento(valor);
+      setDataPagamento(response.data.formattedDate);
       setFaturaId(response.data.faturaId);
       // API request sent successfully.
       // User requested NOT to show QR Code, so we assume the backend handles the display/process or it's displayed on a terminal.
@@ -281,7 +293,14 @@ export const PagarFatura = () => {
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (step === "payment-success" || step === "payment-error") {
+    if (step === "payment-success") {
+      // Trigger print automatically on success
+      handlePrint?.();
+
+      timer = setTimeout(() => {
+        navigate("/TokenAutoAtendimento");
+      }, 10000);
+    } else if (step === "payment-error") {
       timer = setTimeout(() => {
         navigate("/TokenAutoAtendimento");
       }, 10000);
@@ -289,7 +308,7 @@ export const PagarFatura = () => {
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [step, navigate]);
+  }, [step, navigate, handlePrint]);
 
   const getStepTitle = () => {
     switch (step) {
@@ -541,7 +560,11 @@ export const PagarFatura = () => {
                       Valor a Pagar
                     </span>
                     <span className="text-4xl font-bold text-white">
-                      {formatCurrency(valorPagamento)}
+                      {formatCurrency(valorPagamento)}{" "}
+                      <span className="text-green-400 text-sm uppercase tracking-widest block my-2">
+                        {dataPagamento &&
+                          format(new Date(dataPagamento), "dd/MM/yyyy")}
+                      </span>
                     </span>
                   </div>
 
@@ -575,6 +598,10 @@ export const PagarFatura = () => {
                     <span className="text-4xl font-bold text-white">
                       {formatCurrency(valorPagamento)}
                     </span>
+                    <span className="text-green-400 text-sm uppercase tracking-widest block my-2">
+                      {dataPagamento &&
+                        format(new Date(dataPagamento), "dd/MM/yyyy")}
+                    </span>
                   </div>
                   <p className="text-slate-400 text-lg max-w-xs mx-auto text-center">
                     {cardMessage}
@@ -598,7 +625,8 @@ export const PagarFatura = () => {
               )}
               {step === "payment-card" && (
                 <span className="mt-4 px-4 py-3 bg-red-800 hover:bg-red-700 text-white rounded-lg border border-white/10 transition-colors">
-                  Para Cancelar, Clique 2 vezes em Voltar na maquininha!
+                  Para Cancelar, Clique na seta esquerda no canto superior da
+                  maquininha!
                 </span>
               )}
             </div>
@@ -665,6 +693,18 @@ export const PagarFatura = () => {
             <Keyboard onKeyPress={handleKeyPress} />
           </div>
         )}
+      </div>
+      {/* Hidden Receipt Component */}
+      <div style={{ display: "none" }}>
+        <Receipt
+          ref={receiptRef}
+          clientName={selectedClient?.nome || ""}
+          cpfCnpj={selectedClient?.cpf_cnpj || ""}
+          faturaId={faturaId}
+          valor={valorPagamento}
+          dataPagamento={dataPagamento}
+          plano={selectedClient?.plano || ""}
+        />
       </div>
     </div>
   );
