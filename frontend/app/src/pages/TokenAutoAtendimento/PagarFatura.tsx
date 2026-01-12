@@ -133,6 +133,7 @@ export const PagarFatura = () => {
         );
 
         if (response.status === 200) {
+          console.log("Dados retorno Cartão:", response.data);
           setCardMessage("Termine o processo na maquininha.");
           setFaturaId(response.data.faturaId);
         }
@@ -196,6 +197,7 @@ export const PagarFatura = () => {
     let intervalId: NodeJS.Timer;
 
     if (faturaId) {
+      console.log("Polling iniciado para faturaId:", faturaId);
       const checkPayment = async () => {
         try {
           const response = await axios.post(
@@ -203,7 +205,9 @@ export const PagarFatura = () => {
             { faturaId }
           );
 
-          if (response.data) {
+          console.log("CheckPayment result:", response.data);
+
+          if (response.data === true) {
             // Payment confirmed
             // Stopping the interval is handled by the cleanup or dependency change (step change)
             alert("Pagamento confirmado com sucesso!");
@@ -211,7 +215,7 @@ export const PagarFatura = () => {
           }
         } catch (error) {
           // Silent error or log, as polling might fail intermittently or just return false
-          console.log("Aguardando pagamento...", error);
+          console.log("Aguardando pagamento error:", error);
         }
       };
 
