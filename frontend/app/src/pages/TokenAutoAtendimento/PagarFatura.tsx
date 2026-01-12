@@ -42,6 +42,9 @@ export const PagarFatura = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [faturaId, setFaturaId] = useState<number | null>(null);
+  const [cardMessage, setCardMessage] = useState(
+    "Insira o cartão na maquininha e siga as instruções."
+  );
 
   // Input ref to keep focus if needed, though we primarily use virtual keyboard
   const inputRef = useRef<HTMLInputElement>(null);
@@ -120,6 +123,7 @@ export const PagarFatura = () => {
 
     if (method === "card") {
       setStep("payment-card");
+      setCardMessage("Aguardando comunicação com a maquininha...");
       try {
         const response = await axios.post(
           `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterListaTerminaisEGerarPagamento`,
@@ -128,11 +132,16 @@ export const PagarFatura = () => {
           }
         );
 
+        if (response.status === 200) {
+          setCardMessage("Termine o processo na maquininha.");
+        }
+
         console.log(response.data);
       } catch (error) {
         console.error(error);
         setError("Erro ao iniciar pagamento Cartão.");
       }
+      return;
     }
 
     // Method is PIX
@@ -484,7 +493,7 @@ export const PagarFatura = () => {
               ) : (
                 <div className="text-center">
                   <p className="text-slate-400 text-lg max-w-xs mx-auto text-center">
-                    Insira o cartão na maquininha e siga as instruções.
+                    {cardMessage}
                   </p>
                   <div className="p-4 bg-slate-800 border border-white/5 rounded-xl max-w-sm w-full mt-8">
                     <div className="flex items-center justify-center space-x-3 text-slate-300">

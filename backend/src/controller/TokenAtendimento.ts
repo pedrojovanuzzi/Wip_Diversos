@@ -476,7 +476,7 @@ class TokenAtendimento {
         {
           type: "point",
           external_reference: String(fatura.id),
-          expiration_time: "PT16M",
+          expiration_time: "PT1M",
           transactions: {
             payments: [
               {
