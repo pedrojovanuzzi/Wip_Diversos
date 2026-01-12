@@ -15,5 +15,9 @@ router.post(
   "/ReceberPagamentoMercadoPagoWebhook",
   tokenAtendimento.receberPagamentoMercadoPagoWebhook
 );
+router.post(
+  "/ObterListaTerminaisEGerarPagamento",
+  tokenAtendimento.obterListaTerminaisEGerarPagamento
+);
 
 export default router;

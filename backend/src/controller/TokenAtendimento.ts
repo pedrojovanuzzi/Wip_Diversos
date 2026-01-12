@@ -7,6 +7,8 @@ import EfiPay from "sdk-node-apis-efi";
 import path from "path";
 import dotenv from "dotenv";
 import crypto from "crypto";
+import axios from "axios";
+import { v4 as uuidv4 } from "uuid";
 
 dotenv.config();
 
@@ -424,6 +426,91 @@ class TokenAtendimento {
     } catch (error) {
       console.log(error);
       res.status(500).json({ error: "Erro ao receber pagamento" });
+    }
+  };
+
+  obterListaTerminaisEGerarPagamento = async (req: Request, res: Response) => {
+    try {
+      const { login } = req.body;
+
+      const cliente = await this.clienteRepo.findOne({
+        where: {
+          login,
+        },
+      });
+
+      if (!cliente) {
+        res.status(404).json({ error: "Cliente nao encontrado" });
+        return;
+      }
+
+      const fatura = await this.recordRepo.findOne({
+        where: {
+          login: cliente.login,
+          status: In(["aberto", "vencido"]),
+          datapag: IsNull(),
+        },
+        order: { datavenc: "ASC" as const },
+      });
+
+      if (!fatura) {
+        res.status(404).json({ error: "Fatura nao encontrada" });
+        return;
+      }
+
+      const response = await axios.get(
+        "https://api.mercadopago.com/terminals/v1/list",
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+          },
+        }
+      );
+
+      const terminais = await response.data.data.terminals;
+
+      console.log(terminais);
+
+      const response2 = await axios.post(
+        "https://api.mercadopago.com/v1/orders",
+        {
+          type: "point",
+          external_reference: String(fatura.id),
+          expiration_time: "PT1M",
+          transactions: {
+            payments: [
+              {
+                amount: fatura.valor,
+              },
+            ],
+          },
+          config: {
+            point: {
+              terminal_id: terminais[0].id,
+              print_on_terminal: "seller_ticket",
+            },
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+            "X-Idempotency-Key": uuidv4(),
+          },
+        }
+      );
+      const terminais2 = await response2.data;
+      console.log(terminais2.data);
+      console.log(response2);
+
+      console.log(terminais2);
+      res.status(200).json(terminais2);
+    } catch (error: any) {
+      console.log("********** ERRO MERCADO PAGO **********");
+      console.log(JSON.stringify(error.response?.data, null, 2));
+      console.log(JSON.stringify(error.response, null, 2));
+      console.log("***************************************");
+      console.log(error);
+      res.status(500).json({ error: "Erro ao obter lista de terminais" });
     }
   };
 }
