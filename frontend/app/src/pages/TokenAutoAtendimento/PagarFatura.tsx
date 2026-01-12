@@ -42,7 +42,12 @@ export const PagarFatura = () => {
   const [error, setError] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [orderId, setOrderId] = useState<{} | null>(null);
+  const [order, setOrder] = useState<{
+    id: string;
+    user_id: string;
+    external_reference: string;
+    status: string;
+  } | null>(null);
   const [faturaId, setFaturaId] = useState<number | null>(null);
   const [cardMessage, setCardMessage] = useState(
     "Insira o cartão na maquininha e siga as instruções."
@@ -121,30 +126,51 @@ export const PagarFatura = () => {
     }
   };
 
-  const obterOrderPorId = async () => {
-    setLoading(true);
+  const obterOrderPorId = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const response = await axios.get(
-        `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterOrderPorId`,
-        {
-          params: {
-            id: faturaId,
-          },
-        }
+        `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterOrderPorId/${order?.id}`
       );
 
       console.log(response.data);
 
-      setQrCode(response.data.imagem);
       setValorPagamento(response.data.valor);
-      setStep("payment-pix");
+
+      if (response.data.status === "expired") {
+        setError("Pagamento expirado.");
+      } else if (
+        response.data.status === "failed" ||
+        response.data.status === "canceled"
+      ) {
+        setError("Pagamento Falhou.");
+      }
+
+      // setStep("payment-pix");
     } catch (err: any) {
       console.error(err);
-      setError(err.response?.data?.error || "Erro ao buscar pedido.");
+      if (!silent)
+        setError(err.response?.data?.error || "Erro ao buscar pedido.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timer;
+    if (order) {
+      // Initial call
+      obterOrderPorId(false);
+
+      // Polling every 5 seconds
+      intervalId = setInterval(() => {
+        obterOrderPorId(true);
+      }, 5000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [order]);
 
   const handleMethodSelect = async (method: "pix" | "card") => {
     if (!selectedClient) return;
@@ -164,6 +190,7 @@ export const PagarFatura = () => {
           setCardMessage("Termine o processo na maquininha.");
           setFaturaId(response.data.id);
           setValorPagamento(response.data.valor);
+          setOrder(response.data.order);
         }
       } catch (error) {
         console.error(error);

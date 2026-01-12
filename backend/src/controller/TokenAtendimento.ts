@@ -516,10 +516,10 @@ class TokenAtendimento {
 
   obterOrderPorId = async (req: Request, res: Response) => {
     try {
-      const { id } = req.params;
+      const { order } = req.params;
 
       const response = await axios.get(
-        `https://api.mercadopago.com/v1/orders/${id}`,
+        `https://api.mercadopago.com/v1/orders/${order}`,
         {
           headers: {
             Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
@@ -527,17 +527,17 @@ class TokenAtendimento {
         }
       );
 
-      const order = await response.data;
-
-      if (!order) {
+      if (!response) {
         res.status(404).json({ error: "Order nao encontrado" });
         return;
       }
 
-      res.status(200).json(order);
+      console.log(response.data);
+
+      res.status(200).json(response.data);
     } catch (error) {
       console.log(error);
-      res.status(500).json({ error: "Erro ao obter order" });
+      res.status(500).json({ error: error });
     }
   };
 }
