@@ -42,6 +42,7 @@ export const PagarFatura = () => {
   const [error, setError] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [orderId, setOrderId] = useState<{} | null>(null);
   const [faturaId, setFaturaId] = useState<number | null>(null);
   const [cardMessage, setCardMessage] = useState(
     "Insira o cartão na maquininha e siga as instruções."
@@ -120,6 +121,31 @@ export const PagarFatura = () => {
     }
   };
 
+  const obterOrderPorId = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterOrderPorId`,
+        {
+          params: {
+            id: faturaId,
+          },
+        }
+      );
+
+      console.log(response.data);
+
+      setQrCode(response.data.imagem);
+      setValorPagamento(response.data.valor);
+      setStep("payment-pix");
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.error || "Erro ao buscar pedido.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleMethodSelect = async (method: "pix" | "card") => {
     if (!selectedClient) return;
 
@@ -136,13 +162,8 @@ export const PagarFatura = () => {
 
         if (response.status === 200) {
           setCardMessage("Termine o processo na maquininha.");
-          // Se response.data for o número direto (como visto nos logs), usamos ele.
-          // Caso contrário, tentamos pegar faturaId se for um objeto.
-          const id =
-            typeof response.data === "object"
-              ? response.data.faturaId
-              : response.data;
-          setFaturaId(id);
+          setFaturaId(response.data.id);
+          setValorPagamento(response.data.valor);
         }
       } catch (error) {
         console.error(error);
@@ -276,12 +297,12 @@ export const PagarFatura = () => {
         {/* Header */}
         <div className="flex items-center justify-between px-8 pt-8 pb-4 bg-slate-900/40 border-b border-white/5">
           <div className="flex items-center space-x-3 text-cyan-400">
-            <Link
+            {/* <Link
               to="/TokenAutoAtendimento"
               className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors"
             >
               <HiArrowLeft className="text-2xl" />
-            </Link>
+            </Link> */}
             <div className="flex flex-col">
               <span className="text-xl font-bold tracking-wider text-white">
                 PAGAR FATURA
@@ -541,12 +562,12 @@ export const PagarFatura = () => {
                 </div>
               )}
 
-              <button
+              {/* <button
                 onClick={() => navigate("/TokenAutoAtendimento")}
                 className="mt-8 px-8 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-white/10 transition-colors"
               >
                 Cancelar / Voltar
-              </button>
+              </button> */}
             </div>
           )}
 

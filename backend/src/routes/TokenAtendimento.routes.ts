@@ -20,4 +20,6 @@ router.post(
   tokenAtendimento.obterListaTerminaisEGerarPagamento
 );
 
+router.get("/ObterOrderPorId/:id", tokenAtendimento.obterOrderPorId);
+
 export default router;
