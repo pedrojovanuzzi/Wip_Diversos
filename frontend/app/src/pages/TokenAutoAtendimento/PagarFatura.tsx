@@ -194,7 +194,7 @@ export const PagarFatura = () => {
   useEffect(() => {
     let intervalId: NodeJS.Timer;
 
-    if (step === "payment-pix" && faturaId) {
+    if ((step === "payment-pix" || step === "payment-card") && faturaId) {
       const checkPayment = async () => {
         try {
           const response = await axios.post(
