@@ -207,11 +207,9 @@ export const PagarFatura = () => {
             { faturaId }
           );
 
-          if (response.data === true) {
-            // Payment confirmed
-            alert("Pagamento confirmado com sucesso!");
-            navigate("/TokenAutoAtendimento");
-          }
+          // Payment confirmed
+          alert("Pagamento confirmado com sucesso!");
+          navigate("/TokenAutoAtendimento");
         } catch (error) {
           console.log("Aguardando pagamento...", error);
         }
