@@ -7,6 +7,7 @@ import {
   HiCheck,
   HiCreditCard,
   HiCurrencyDollar,
+  HiXCircle,
 } from "react-icons/hi";
 import { Link, useNavigate } from "react-router-dom";
 import { Keyboard } from "./components/Keyboard";
@@ -36,7 +37,9 @@ export const PagarFatura = () => {
     | "payment-pix"
     | "payment-card"
     | "payment-success"
+    | "payment-error"
   >("search");
+  const [errorMessage, setErrorMessage] = useState("");
   const [cpf, setCpf] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -135,18 +138,18 @@ export const PagarFatura = () => {
 
       console.log(response.data);
 
-      setValorPagamento(response.data.valor);
-
       if (response.data.status === "expired") {
-        setError("Pagamento expirado.");
+        setErrorMessage("Pagamento expirado.");
+        setStep("payment-error");
+        setOrder(null);
       } else if (
         response.data.status === "failed" ||
         response.data.status === "canceled"
       ) {
-        setError("Pagamento Falhou.");
+        setErrorMessage("Pagamento Falhou.");
+        setStep("payment-error");
+        setOrder(null);
       }
-
-      // setStep("payment-pix");
     } catch (err: any) {
       console.error(err);
       if (!silent)
@@ -278,7 +281,7 @@ export const PagarFatura = () => {
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (step === "payment-success") {
+    if (step === "payment-success" || step === "payment-error") {
       timer = setTimeout(() => {
         navigate("/TokenAutoAtendimento");
       }, 10000);
@@ -302,6 +305,8 @@ export const PagarFatura = () => {
         return "Pagamento via Cartão";
       case "payment-success":
         return "Concluído";
+      case "payment-error":
+        return "Erro no Pagamento";
       default:
         return "";
     }
@@ -324,12 +329,6 @@ export const PagarFatura = () => {
         {/* Header */}
         <div className="flex items-center justify-between px-8 pt-8 pb-4 bg-slate-900/40 border-b border-white/5">
           <div className="flex items-center space-x-3 text-cyan-400">
-            {/* <Link
-              to="/TokenAutoAtendimento"
-              className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors"
-            >
-              <HiArrowLeft className="text-2xl" />
-            </Link> */}
             <div className="flex flex-col">
               <span className="text-xl font-bold tracking-wider text-white">
                 PAGAR FATURA
@@ -536,8 +535,8 @@ export const PagarFatura = () => {
               </div>
 
               {step === "payment-pix" ? (
-                <div className="flex flex-col items-center space-y-6 w-full max-w-md">
-                  <div className="bg-slate-800/80 border border-cyan-500/30 rounded-2xl p-6 w-full text-center shadow-lg shadow-cyan-500/10">
+                <div className="flex flex-col items-center space-y-4 w-full max-w-md">
+                  <div className="bg-slate-800/80 border border-cyan-500/30 rounded-2xl p-4 w-full text-center shadow-lg shadow-cyan-500/10">
                     <span className="text-slate-400 text-sm uppercase tracking-widest block mb-1">
                       Valor a Pagar
                     </span>
@@ -547,7 +546,7 @@ export const PagarFatura = () => {
                   </div>
 
                   {qrCode && (
-                    <div className="bg-white p-4 rounded-xl shadow-2xl">
+                    <div className="bg-white p-2 rounded-xl shadow-2xl">
                       {qrCode.length > 1000 || qrCode.startsWith("data:") ? (
                         <img
                           src={
@@ -569,7 +568,7 @@ export const PagarFatura = () => {
                 </div>
               ) : (
                 <div className="text-center">
-                  <div className="bg-slate-800/80 border border-cyan-500/30 rounded-2xl p-6 w-full text-center shadow-lg shadow-cyan-500/10">
+                  <div className="bg-slate-800/80  border border-cyan-500/30 rounded-2xl p-6 w-full text-center shadow-lg shadow-cyan-500/10">
                     <span className="text-slate-400 text-sm uppercase tracking-widest block mb-1">
                       Valor a Pagar
                     </span>
@@ -580,7 +579,7 @@ export const PagarFatura = () => {
                   <p className="text-slate-400 text-lg max-w-xs mx-auto text-center">
                     {cardMessage}
                   </p>
-                  <div className="p-4 bg-slate-800 border border-white/5 rounded-xl max-w-sm w-full mt-8">
+                  <div className="p-4 bg-slate-800 border border-white/5 rounded-xl max-w-sm w-full mt-4">
                     <div className="flex items-center justify-center space-x-3 text-slate-300">
                       <FaSpinner className="animate-spin text-cyan-400" />
                       <span>Aguardando operação...</span>
@@ -589,12 +588,19 @@ export const PagarFatura = () => {
                 </div>
               )}
 
-              {/* <button
-                onClick={() => navigate("/TokenAutoAtendimento")}
-                className="mt-8 px-8 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-white/10 transition-colors"
-              >
-                Cancelar / Voltar
-              </button> */}
+              {step === "payment-pix" && (
+                <button
+                  onClick={() => navigate("/TokenAutoAtendimento")}
+                  className="mt-4 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-white/10 transition-colors"
+                >
+                  Cancelar / Voltar
+                </button>
+              )}
+              {step === "payment-card" && (
+                <span className="mt-4 px-4 py-3 bg-red-800 hover:bg-red-700 text-white rounded-lg border border-white/10 transition-colors">
+                  Para Cancelar, Clique 2 vezes em Voltar na maquininha!
+                </span>
+              )}
             </div>
           )}
 
@@ -621,6 +627,33 @@ export const PagarFatura = () => {
                 className="mt-8 px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/50 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95"
               >
                 Voltar ao Início Agora
+              </button>
+            </div>
+          )}
+
+          {step === "payment-error" && (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8 animate-fadeIn">
+              <div className="w-32 h-32 bg-red-500/20 rounded-full flex items-center justify-center">
+                <HiXCircle className="text-6xl text-red-500" />
+              </div>
+
+              <div className="text-center space-y-4">
+                <h2 className="text-3xl font-bold text-white">
+                  {errorMessage || "Erro no Pagamento"}
+                </h2>
+                <p className="text-slate-400 text-lg">
+                  Não foi possível concluir a transação.
+                </p>
+                <div className="text-slate-500 text-sm">
+                  Retornando ao início em 10 segundos...
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate("/TokenAutoAtendimento")}
+                className="mt-8 px-10 py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:shadow-red-500/50 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95"
+              >
+                Tentar Novamente
               </button>
             </div>
           )}
