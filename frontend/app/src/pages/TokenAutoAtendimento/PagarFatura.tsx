@@ -133,12 +133,15 @@ export const PagarFatura = () => {
         );
 
         if (response.status === 200) {
-          console.log("Dados retorno Cartão:", response.data);
           setCardMessage("Termine o processo na maquininha.");
-          setFaturaId(response.data.faturaId);
+          // Se response.data for o número direto (como visto nos logs), usamos ele.
+          // Caso contrário, tentamos pegar faturaId se for um objeto.
+          const id =
+            typeof response.data === "object"
+              ? response.data.faturaId
+              : response.data;
+          setFaturaId(id);
         }
-
-        console.log(response.data);
       } catch (error) {
         console.error(error);
         setError("Erro ao iniciar pagamento Cartão.");
@@ -197,15 +200,12 @@ export const PagarFatura = () => {
     let intervalId: NodeJS.Timer;
 
     if (faturaId) {
-      console.log("Polling iniciado para faturaId:", faturaId);
       const checkPayment = async () => {
         try {
           const response = await axios.post(
             `${process.env.REACT_APP_URL}/TokenAutoAtendimento/FaturaWentPaid`,
             { faturaId }
           );
-
-          console.log("CheckPayment result:", response.data);
 
           if (response.data === true) {
             // Payment confirmed
@@ -215,7 +215,7 @@ export const PagarFatura = () => {
           }
         } catch (error) {
           // Silent error or log, as polling might fail intermittently or just return false
-          console.log("Aguardando pagamento error:", error);
+          console.log("Aguardando pagamento...", error);
         }
       };
 
@@ -225,6 +225,8 @@ export const PagarFatura = () => {
       // Poll every 3 seconds
       intervalId = setInterval(checkPayment, 3000);
     }
+
+    console.log("SEM FATURA ID? ", faturaId);
 
     return () => {
       if (intervalId) clearInterval(intervalId);
