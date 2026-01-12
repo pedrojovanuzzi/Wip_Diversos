@@ -120,7 +120,19 @@ export const PagarFatura = () => {
 
     if (method === "card") {
       setStep("payment-card");
-      return;
+      try {
+        const response = await axios.post(
+          `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterListaTerminaisEGerarPagamento`,
+          {
+            login: selectedClient.login,
+          }
+        );
+
+        console.log(response.data);
+      } catch (error) {
+        console.error(error);
+        setError("Erro ao iniciar pagamento Cartão.");
+      }
     }
 
     // Method is PIX
