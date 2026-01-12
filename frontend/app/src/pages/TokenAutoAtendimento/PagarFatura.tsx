@@ -197,8 +197,7 @@ export const PagarFatura = () => {
   };
 
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    let isActive = true;
+    let intervalId: NodeJS.Timer;
 
     if (faturaId) {
       const checkPayment = async () => {
@@ -208,27 +207,25 @@ export const PagarFatura = () => {
             { faturaId }
           );
 
-          if (response.data === true && isActive) {
+          if (response.data === true) {
             // Payment confirmed
             alert("Pagamento confirmado com sucesso!");
             navigate("/TokenAutoAtendimento");
-            return; // Stop polling
           }
         } catch (error) {
-          console.log("Aguardando pagamento (retentando)...", error);
-        }
-
-        if (isActive) {
-          timeoutId = setTimeout(checkPayment, 3000);
+          console.log("Aguardando pagamento...", error);
         }
       };
 
+      // Initial check
       checkPayment();
+
+      // Poll every 3 seconds: setInterval guarantees execution
+      intervalId = setInterval(checkPayment, 3000);
     }
 
     return () => {
-      isActive = false;
-      if (timeoutId) clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
     };
   }, [step, faturaId, navigate]);
 
