@@ -15,6 +15,8 @@ import axios from "axios";
 import { FaSpinner, FaBarcode } from "react-icons/fa";
 import { QRCodeCanvas } from "qrcode.react";
 import { format } from "date-fns";
+import { useReactToPrint } from "react-to-print";
+import { Receipt } from "./components/Receipt";
 
 interface Client {
   id: number;
@@ -60,6 +62,11 @@ export const PagarFatura = () => {
 
   // Input ref to keep focus if needed, though we primarily use virtual keyboard
   const inputRef = useRef<HTMLInputElement>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = useReactToPrint({
+    contentRef: receiptRef, // Modern API uses contentRef property
+  });
 
   const handleKeyPress = (key: string) => {
     if (step !== "search") return;
@@ -285,7 +292,14 @@ export const PagarFatura = () => {
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (step === "payment-success" || step === "payment-error") {
+    if (step === "payment-success") {
+      // Trigger print automatically on success
+      handlePrint?.();
+
+      timer = setTimeout(() => {
+        navigate("/TokenAutoAtendimento");
+      }, 10000);
+    } else if (step === "payment-error") {
       timer = setTimeout(() => {
         navigate("/TokenAutoAtendimento");
       }, 10000);
@@ -293,7 +307,7 @@ export const PagarFatura = () => {
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [step, navigate]);
+  }, [step, navigate, handlePrint]);
 
   const getStepTitle = () => {
     switch (step) {
@@ -678,6 +692,17 @@ export const PagarFatura = () => {
             <Keyboard onKeyPress={handleKeyPress} />
           </div>
         )}
+      </div>
+      {/* Hidden Receipt Component */}
+      <div style={{ display: "none" }}>
+        <Receipt
+          ref={receiptRef}
+          clientName={selectedClient?.nome || ""}
+          cpfCnpj={selectedClient?.cpf_cnpj || ""}
+          faturaId={faturaId}
+          valor={valorPagamento}
+          dataPagamento={dataPagamento}
+        />
       </div>
     </div>
   );
