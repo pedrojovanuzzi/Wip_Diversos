@@ -17,16 +17,12 @@ import { QRCodeCanvas } from "qrcode.react";
 interface Client {
   id: number;
   nome: string;
-  cpf: string;
+  cpf_cnpj: string;
   login: string;
-  endereco?: {
-    rua: string;
-    numero: string;
-    bairro: string;
-    cidade: string;
-  };
-  plano?: string;
-  contratoId?: number;
+  endereco: string;
+  numero: string;
+  bairro: string;
+  cidade: string;
 }
 
 export const PagarFatura = () => {
@@ -34,7 +30,12 @@ export const PagarFatura = () => {
   const [qrCode, setQrCode] = useState("");
   const [valorPagamento, setValorPagamento] = useState("");
   const [step, setStep] = useState<
-    "search" | "selection" | "method" | "payment-pix" | "payment-card"
+    | "search"
+    | "selection"
+    | "method"
+    | "payment-pix"
+    | "payment-card"
+    | "payment-success"
   >("search");
   const [cpf, setCpf] = useState("");
   const [loading, setLoading] = useState(false);
@@ -89,6 +90,7 @@ export const PagarFatura = () => {
         setError("Nenhum cadastro encontrado para este CPF.");
       } else {
         setClients(data);
+        console.log(data);
         setStep("selection");
       }
     } catch (err: any) {
@@ -208,8 +210,7 @@ export const PagarFatura = () => {
           );
 
           // Payment confirmed
-          alert("Pagamento confirmado com sucesso!");
-          navigate("/TokenAutoAtendimento");
+          setStep("payment-success");
         } catch (error) {
           console.log("Aguardando pagamento...", error);
         }
@@ -227,6 +228,18 @@ export const PagarFatura = () => {
     };
   }, [step, faturaId, navigate]);
 
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (step === "payment-success") {
+      timer = setTimeout(() => {
+        navigate("/TokenAutoAtendimento");
+      }, 10000);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [step, navigate]);
+
   const getStepTitle = () => {
     switch (step) {
       case "search":
@@ -239,6 +252,8 @@ export const PagarFatura = () => {
         return "Pagamento via Pix";
       case "payment-card":
         return "Pagamento via Cartão";
+      case "payment-success":
+        return "Concluído";
       default:
         return "";
     }
@@ -360,19 +375,18 @@ export const PagarFatura = () => {
                         </div>
                         <div>
                           <h4 className="text-xl font-bold text-white mb-1 group-hover:text-cyan-300 transition-colors">
-                            {client.nome}
+                            {client.login}
                           </h4>
                           <p className="text-slate-400 text-sm mb-2">
-                            {client.cpf}
+                            {client.cpf_cnpj}
                           </p>
                           {client.endereco && (
                             <p className="text-slate-500 text-xs flex flex-col">
                               <span>
-                                {client.endereco.rua}, {client.endereco.numero}
+                                {client.endereco}, {client.numero}
                               </span>
                               <span>
-                                {client.endereco.bairro} -{" "}
-                                {client.endereco.cidade}
+                                {client.bairro} - {client.cidade}
                               </span>
                             </p>
                           )}
