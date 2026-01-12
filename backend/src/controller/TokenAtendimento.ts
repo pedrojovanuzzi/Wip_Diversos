@@ -389,8 +389,6 @@ class TokenAtendimento {
     try {
       const { body } = req;
 
-      console.log(req);
-
       console.log(body);
 
       const valor = body.data.total_paid_amount;
