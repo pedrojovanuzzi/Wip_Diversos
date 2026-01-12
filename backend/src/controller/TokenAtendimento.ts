@@ -501,7 +501,9 @@ class TokenAtendimento {
       console.log(response2);
 
       console.log(terminais2);
-      res.status(200).json(fatura.id);
+      res
+        .status(200)
+        .json({ id: fatura.id, valor: fatura.valor, order: terminais2 });
     } catch (error: any) {
       console.log("********** ERRO MERCADO PAGO **********");
       console.log(JSON.stringify(error.response?.data, null, 2));
@@ -509,6 +511,33 @@ class TokenAtendimento {
       console.log("***************************************");
       console.log(error);
       res.status(500).json({ error: "Erro ao obter lista de terminais" });
+    }
+  };
+
+  obterOrderPorId = async (req: Request, res: Response) => {
+    try {
+      const { order } = req.params;
+
+      const response = await axios.get(
+        `https://api.mercadopago.com/v1/orders/${order}`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+          },
+        }
+      );
+
+      if (!response) {
+        res.status(404).json({ error: "Order nao encontrado" });
+        return;
+      }
+
+      console.log(response.data);
+
+      res.status(200).json(response.data);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: error });
     }
   };
 }
