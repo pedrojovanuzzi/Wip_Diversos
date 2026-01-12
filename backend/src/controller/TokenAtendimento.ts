@@ -392,9 +392,9 @@ class TokenAtendimento {
       console.log(body);
 
       const valor = body.data.total_paid_amount;
-      const faturaId = body.data.id;
+      const faturaId = body.data.external_reference;
 
-      const status = body.data.transactions.payments[0].status;
+      const status = body.data.status;
 
       if (status == "processed") {
         const fatura = await this.recordRepo.findOne({
