@@ -418,24 +418,38 @@ export const PagarFatura = () => {
           {step === "method" && (
             <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6">
               <h2 className="text-2xl font-bold text-white mb-4">
-                Como deseja pagar?
+                Como deseja pagar?{" "}
               </h2>
-
               <div className="grid grid-cols-1 gap-6 w-full max-w-sm">
                 <button
                   onClick={() => handleMethodSelect("pix")}
-                  className="group relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-500 rounded-2xl p-6 transition-all transform hover:scale-105 hover:shadow-2xl hover:shadow-emerald-500/30"
+                  disabled={loading}
+                  className={`
+                    group relative overflow-hidden rounded-2xl p-6 transition-all transform 
+                    ${
+                      loading
+                        ? "bg-emerald-800 cursor-not-allowed"
+                        : "bg-gradient-to-r from-emerald-600 to-teal-500 hover:scale-105 hover:shadow-2xl hover:shadow-emerald-500/30"
+                    }
+                  `}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-white font-bold text-xl uppercase tracking-wider">
-                      Pix
+                    <span className="text-white font-bold text-xl uppercase tracking-wider flex items-center gap-2">
+                      {loading ? (
+                        <>
+                          <FaSpinner className="animate-spin" />
+                          <span>Processando...</span>
+                        </>
+                      ) : (
+                        "Pix"
+                      )}
                     </span>
                     <div className="bg-white/20 p-3 rounded-full">
                       <FaBarcode className="text-white text-2xl" />
                     </div>
                   </div>
                   <p className="text-emerald-100 text-sm mt-2 text-left">
-                    Pagamento instantâneo
+                    {loading ? "Aguarde um momento" : "Pagamento instantâneo"}
                   </p>
                 </button>
 
@@ -460,7 +474,7 @@ export const PagarFatura = () => {
           )}
 
           {(step === "payment-pix" || step === "payment-card") && (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
+            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8 overflow-auto">
               <div className="w-24 h-24 bg-cyan-500/10 rounded-full flex items-center justify-center animate-pulse">
                 <HiCurrencyDollar className="text-5xl text-cyan-400" />
               </div>
@@ -507,6 +521,14 @@ export const PagarFatura = () => {
                 </div>
               ) : (
                 <div className="text-center">
+                  <div className="bg-slate-800/80 border border-cyan-500/30 rounded-2xl p-6 w-full text-center shadow-lg shadow-cyan-500/10">
+                    <span className="text-slate-400 text-sm uppercase tracking-widest block mb-1">
+                      Valor a Pagar
+                    </span>
+                    <span className="text-4xl font-bold text-white">
+                      {formatCurrency(valorPagamento)}
+                    </span>
+                  </div>
                   <p className="text-slate-400 text-lg max-w-xs mx-auto text-center">
                     {cardMessage}
                   </p>
