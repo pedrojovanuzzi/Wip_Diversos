@@ -501,7 +501,7 @@ class TokenAtendimento {
       console.log(response2);
 
       console.log(terminais2);
-      res.status(200).json(terminais2);
+      res.status(200).json(fatura.id);
     } catch (error: any) {
       console.log("********** ERRO MERCADO PAGO **********");
       console.log(JSON.stringify(error.response?.data, null, 2));
