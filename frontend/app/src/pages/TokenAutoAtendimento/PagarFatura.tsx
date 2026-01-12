@@ -14,6 +14,7 @@ import { Keyboard } from "./components/Keyboard";
 import axios from "axios";
 import { FaSpinner, FaBarcode } from "react-icons/fa";
 import { QRCodeCanvas } from "qrcode.react";
+import { format } from "date-fns";
 
 interface Client {
   id: number;
@@ -30,6 +31,7 @@ export const PagarFatura = () => {
   const navigate = useNavigate();
   const [qrCode, setQrCode] = useState("");
   const [valorPagamento, setValorPagamento] = useState("");
+  const [dataPagamento, setDataPagamento] = useState("");
   const [step, setStep] = useState<
     | "search"
     | "selection"
@@ -193,6 +195,7 @@ export const PagarFatura = () => {
           setCardMessage("Termine o processo na maquininha.");
           setFaturaId(response.data.id);
           setValorPagamento(response.data.valor);
+          setDataPagamento(response.data.dataPagamento);
           setOrder(response.data.order);
         }
       } catch (error) {
@@ -221,6 +224,7 @@ export const PagarFatura = () => {
       const qrCode = response.data.imagem;
       setQrCode(qrCode);
       setValorPagamento(valor);
+      setDataPagamento(response.data.formattedDate);
       setFaturaId(response.data.faturaId);
       // API request sent successfully.
       // User requested NOT to show QR Code, so we assume the backend handles the display/process or it's displayed on a terminal.
@@ -541,7 +545,11 @@ export const PagarFatura = () => {
                       Valor a Pagar
                     </span>
                     <span className="text-4xl font-bold text-white">
-                      {formatCurrency(valorPagamento)}
+                      {formatCurrency(valorPagamento)}{" "}
+                      <span className="text-green-400 text-sm uppercase tracking-widest block my-2">
+                        {dataPagamento &&
+                          format(new Date(dataPagamento), "dd/MM/yyyy")}
+                      </span>
                     </span>
                   </div>
 
@@ -575,6 +583,10 @@ export const PagarFatura = () => {
                     <span className="text-4xl font-bold text-white">
                       {formatCurrency(valorPagamento)}
                     </span>
+                    <span className="text-green-400 text-sm uppercase tracking-widest block my-2">
+                      {dataPagamento &&
+                        format(new Date(dataPagamento), "dd/MM/yyyy")}
+                    </span>
                   </div>
                   <p className="text-slate-400 text-lg max-w-xs mx-auto text-center">
                     {cardMessage}
@@ -598,7 +610,8 @@ export const PagarFatura = () => {
               )}
               {step === "payment-card" && (
                 <span className="mt-4 px-4 py-3 bg-red-800 hover:bg-red-700 text-white rounded-lg border border-white/10 transition-colors">
-                  Para Cancelar, Clique 2 vezes em Voltar na maquininha!
+                  Para Cancelar, Clique na seta esquerda no canto superior da
+                  maquininha!
                 </span>
               )}
             </div>
