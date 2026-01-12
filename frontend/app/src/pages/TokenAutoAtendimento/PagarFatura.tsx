@@ -522,13 +522,15 @@ export const PagarFatura = () => {
               <button
                 onClick={() => navigate("/TokenAutoAtendimento")}
                 className="mt-8 px-8 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-white/10 transition-colors"
-              ></button>
+              >
+                Cancelar / Voltar
+              </button>
             </div>
           )}
 
           {step === "payment-success" && (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8 animate-fadeIn">
-              <div className="w-32 h-32 bg-green-500/20 rounded-full flex items-center justify-center animate-bounce">
+            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
+              <div className="w-32 h-32 bg-green-500/20 rounded-full flex items-center justify-center">
                 <HiCheck className="text-6xl text-green-400" />
               </div>
 
