@@ -522,8 +522,33 @@ export const PagarFatura = () => {
               <button
                 onClick={() => navigate("/TokenAutoAtendimento")}
                 className="mt-8 px-8 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-white/10 transition-colors"
+              ></button>
+            </div>
+          )}
+
+          {step === "payment-success" && (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8 animate-fadeIn">
+              <div className="w-32 h-32 bg-green-500/20 rounded-full flex items-center justify-center animate-bounce">
+                <HiCheck className="text-6xl text-green-400" />
+              </div>
+
+              <div className="text-center space-y-4">
+                <h2 className="text-3xl font-bold text-white">
+                  Pagamento Confirmado!
+                </h2>
+                <p className="text-slate-400 text-lg">
+                  Obrigado por utilizar nosso autoatendimento.
+                </p>
+                <div className="text-slate-500 text-sm">
+                  Retornando ao início em 10 segundos...
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate("/TokenAutoAtendimento")}
+                className="mt-8 px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/50 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95"
               >
-                Cancelar / Voltar
+                Voltar ao Início Agora
               </button>
             </div>
           )}
