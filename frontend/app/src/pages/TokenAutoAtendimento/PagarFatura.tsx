@@ -8,6 +8,7 @@ import {
   HiCreditCard,
   HiCurrencyDollar,
   HiXCircle,
+  HiPrinter,
 } from "react-icons/hi";
 import { Link, useNavigate } from "react-router-dom";
 import { Keyboard } from "./components/Keyboard";
@@ -66,7 +67,9 @@ export const PagarFatura = () => {
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = useReactToPrint({
-    contentRef: receiptRef, // Modern API uses contentRef property
+    contentRef: receiptRef,
+    onAfterPrint: () => console.log("Impressão concluída"),
+    onPrintError: (error) => console.error("Erro impressão:", error),
   });
 
   const handleKeyPress = (key: string) => {
@@ -233,7 +236,7 @@ export const PagarFatura = () => {
       setQrCode(qrCode);
       setValorPagamento(valor);
       setDataPagamento(response.data.formattedDate);
-      setFaturaId(response.data.faturaId);
+      setFaturaId(response.data.id);
       // API request sent successfully.
       // User requested NOT to show QR Code, so we assume the backend handles the display/process or it's displayed on a terminal.
       setStep("payment-pix");
@@ -294,8 +297,16 @@ export const PagarFatura = () => {
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (step === "payment-success") {
-      // Trigger print automatically on success
-      handlePrint?.();
+      // Trigger print automatically on success with a small delay to ensure rendering
+      const printTimer = setTimeout(() => {
+        console.log("Tentando impressão automática...");
+        if (receiptRef.current) {
+          console.log("Ref encontrado, chamando handlePrint...");
+          handlePrint?.();
+        } else {
+          console.warn("receiptRef.current está nulo/indefinido!");
+        }
+      }, 500);
 
       timer = setTimeout(() => {
         navigate("/TokenAutoAtendimento");
@@ -650,12 +661,22 @@ export const PagarFatura = () => {
                 </div>
               </div>
 
-              <button
-                onClick={() => navigate("/TokenAutoAtendimento")}
-                className="mt-8 px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/50 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95"
-              >
-                Voltar ao Início Agora
-              </button>
+              <div className="flex flex-col space-y-4 w-full max-w-sm">
+                <button
+                  onClick={() => handlePrint && handlePrint()}
+                  className="w-full px-10 py-4 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95 flex items-center justify-center space-x-2"
+                >
+                  <HiPrinter className="text-xl" />
+                  <span>Imprimir Comprovante</span>
+                </button>
+
+                <button
+                  onClick={() => navigate("/TokenAutoAtendimento")}
+                  className="w-full px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/50 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95"
+                >
+                  Voltar ao Início Agora
+                </button>
+              </div>
             </div>
           )}
 
@@ -694,8 +715,8 @@ export const PagarFatura = () => {
           </div>
         )}
       </div>
-      {/* Hidden Receipt Component */}
-      <div style={{ display: "none" }}>
+      {/* Hidden Receipt Component - using overflow hidden instead of display none ensures render for print */}
+      <div style={{ position: "absolute", top: "-9999px", left: "-9999px" }}>
         <Receipt
           ref={receiptRef}
           clientName={selectedClient?.nome || ""}
