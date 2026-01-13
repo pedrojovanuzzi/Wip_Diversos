@@ -51,7 +51,7 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(
             WIP TELECOM
           </h1>
           <div className="text-[10px] grid gap-0.5 leading-tight">
-            <p className="font-bold">WIP TELECOM MULTIMIDIA EIRELI ME</p>
+            <p className="font-bold">WIP TELECOM MULTIMIDIA EIRELI</p>
             <p>CNPJ: 20.843.290/0001-42</p>
             <p>RUA EMILIO CARRARO - AREALVA</p>
           </div>
