@@ -233,7 +233,7 @@ export const PagarFatura = () => {
       setQrCode(qrCode);
       setValorPagamento(valor);
       setDataPagamento(response.data.formattedDate);
-      setFaturaId(response.data.faturaId);
+      setFaturaId(response.data.id);
       // API request sent successfully.
       // User requested NOT to show QR Code, so we assume the backend handles the display/process or it's displayed on a terminal.
       setStep("payment-pix");
@@ -294,8 +294,10 @@ export const PagarFatura = () => {
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (step === "payment-success") {
-      // Trigger print automatically on success
-      handlePrint?.();
+      // Trigger print automatically on success with a small delay to ensure rendering
+      const printTimer = setTimeout(() => {
+        handlePrint?.();
+      }, 500);
 
       timer = setTimeout(() => {
         navigate("/TokenAutoAtendimento");
@@ -695,7 +697,8 @@ export const PagarFatura = () => {
         )}
       </div>
       {/* Hidden Receipt Component */}
-      <div style={{ display: "none" }}>
+      {/* Hidden Receipt Component - using off-screen positioning instead of display:none to ensure it renders */}
+      <div style={{ position: "absolute", left: "-9999px", top: "-9999px" }}>
         <Receipt
           ref={receiptRef}
           clientName={selectedClient?.nome || ""}
