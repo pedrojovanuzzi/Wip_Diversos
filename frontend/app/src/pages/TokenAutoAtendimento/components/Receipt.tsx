@@ -127,7 +127,7 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(
           </p>
           <div className="text-[10px] space-y-0.5">
             <p>Emissão: {format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
-            <p className="font-bold">www.wiptelecom.com.br</p>
+            <p className="font-bold">www.wiptelecom.net.br</p>
           </div>
           <div className="pb-4 border-b border-black w-1/2 mx-auto"></div>
         </div>
