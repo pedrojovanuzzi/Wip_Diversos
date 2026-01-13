@@ -26,6 +26,7 @@ interface Client {
   endereco: string;
   numero: string;
   bairro: string;
+  plano: string;
   cidade: string;
 }
 
@@ -702,6 +703,7 @@ export const PagarFatura = () => {
           faturaId={faturaId}
           valor={valorPagamento}
           dataPagamento={dataPagamento}
+          plano={selectedClient?.plano || ""}
         />
       </div>
     </div>

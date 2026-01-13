@@ -7,27 +7,34 @@ interface ReceiptProps {
   faturaId: number | null;
   valor: string;
   dataPagamento: string;
+  plano: string;
 }
 
 export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(
-  ({ clientName, cpfCnpj, faturaId, valor, dataPagamento }, ref) => {
+  ({ clientName, cpfCnpj, faturaId, valor, dataPagamento, plano }, ref) => {
     return (
       <div
         ref={ref}
         className="p-8 font-mono text-black bg-white w-[80mm] mx-auto"
       >
         <div className="text-center mb-6">
-          <h1 className="text-xl font-bold uppercase">Recibo de Pagamento</h1>
-          <p className="text-sm text-gray-600">Comprovante de Transação</p>
+          <h1 className="text-xl font-bold uppercase">
+            Recibo {dataPagamento}
+          </h1>
         </div>
-
-        <div className="border-b-2 border-dashed border-gray-300 my-4"></div>
 
         <div className="space-y-4 text-sm">
           <div>
-            <p className="font-bold text-gray-500 text-xs uppercase">Cliente</p>
-            <p className="font-bold">{clientName}</p>
-            <p>{cpfCnpj}</p>
+            Emitente: <strong>WIP TELECOM MULTIMIDIA EIRELI ME</strong>{" "}
+            CPF/CNPJ: 20.843.290/0001-42
+            <p className="font-bold text-gray-500 text-xs uppercase">
+              RUA EMILIO CARRARO - AREALVA Recebi(emos) de {clientName}
+            </p>
+            <p>
+              CPF/CNPJ: {cpfCnpj} a importância de {valor}
+            </p>
+            <p>ref. ao pag. titulo de numero {faturaId}</p>
+            <p>na data de {dataPagamento}</p>
           </div>
 
           <div>
