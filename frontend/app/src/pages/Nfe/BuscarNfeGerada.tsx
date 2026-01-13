@@ -67,6 +67,7 @@ export const BuscarNfeGerada = () => {
 
   const { user } = useAuth();
   const token = user?.token;
+  const permission = user?.permission;
   const { addJob, showError, showSuccess } = useNotification();
 
   // Update dateFilter object when individual inputs change
@@ -507,14 +508,16 @@ export const BuscarNfeGerada = () => {
                       <BsFiletypeDoc />
                       Imprimir ({clientesSelecionados.length})
                     </button>
-                    <button
-                      className="bg-red-600 text-white py-2 px-4 rounded hover:bg-red-500 transition-all flex items-center gap-2 text-sm"
-                      onClick={() => setShowCancelPopUp(true)}
-                      disabled={clientesSelecionados.length === 0}
-                    >
-                      <CiNoWaitingSign />
-                      Cancelar ({clientesSelecionados.length})
-                    </button>
+                    {permission! >= 5 && (
+                      <button
+                        className="bg-red-600 text-white py-2 px-4 rounded hover:bg-red-500 transition-all flex items-center gap-2 text-sm"
+                        onClick={() => setShowCancelPopUp(true)}
+                        disabled={clientesSelecionados.length === 0}
+                      >
+                        <CiNoWaitingSign />
+                        Cancelar ({clientesSelecionados.length})
+                      </button>
+                    )}
                   </div>
                 </div>
 

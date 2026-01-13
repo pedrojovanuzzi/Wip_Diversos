@@ -74,6 +74,7 @@ export default function SearchInterface() {
 
   const { user } = useAuth();
   const token = user?.token;
+  const permission = user?.permission;
   const { addJob, showError, showSuccess } = useNotification();
 
   const createXmlDownloadUrl = (xmlContent: string): string => {
@@ -830,15 +831,17 @@ export default function SearchInterface() {
               {selectedIds.length - (isSelectAllMode ? excludedIds.length : 0) >
                 0 && (
                 <div className="mt-4 flex gap-5 justify-end">
-                  <button
-                    onClick={handleBulkCancel}
-                    className="px-5 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-all font-medium flex items-center gap-2"
-                  >
-                    Cancelar Selecionadas (
-                    {selectedIds.length -
-                      (isSelectAllMode ? excludedIds.length : 0)}
-                    )
-                  </button>
+                  {permission! >= 5 && (
+                    <button
+                      onClick={handleBulkCancel}
+                      className="px-5 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-all font-medium flex items-center gap-2"
+                    >
+                      Cancelar Selecionadas (
+                      {selectedIds.length -
+                        (isSelectAllMode ? excludedIds.length : 0)}
+                      )
+                    </button>
+                  )}
                   <button
                     onClick={downloadZipXMLs}
                     disabled={loading}
@@ -1025,12 +1028,14 @@ export default function SearchInterface() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-left whitespace-nowrap">
-                          <button
-                            onClick={() => handleCancelar(nfcom)}
-                            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-all"
-                          >
-                            Cancelar
-                          </button>
+                          {permission! >= 5 && (
+                            <button
+                              onClick={() => handleCancelar(nfcom)}
+                              className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-all"
+                            >
+                              Cancelar
+                            </button>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-left whitespace-nowrap">
                           <button

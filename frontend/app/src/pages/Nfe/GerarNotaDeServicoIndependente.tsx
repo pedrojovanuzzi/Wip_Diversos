@@ -16,7 +16,7 @@ export const GerarNotaDeServicoIndependente = () => {
   const [formData, setFormData] = useState({
     login: "",
     valor: "",
-    servico: "14.02",
+    servico: "140201",
     descricao: "Serviço Avulso",
     password: "",
     nfeNumber: "",
