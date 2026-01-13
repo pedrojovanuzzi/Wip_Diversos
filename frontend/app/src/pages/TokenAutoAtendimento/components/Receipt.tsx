@@ -15,82 +15,73 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(
     return (
       <div
         ref={ref}
-        className="bg-white text-black p-2 mx-auto printing-container"
+        className="bg-white text-black mx-auto printing-container"
         style={{
-          width: "80mm",
+          width: "72mm", // Reduced from 80mm to allow margins
+          padding: "0",
           fontFamily: '"Courier Prime", "Courier New", monospace',
           fontSize: "12px",
           lineHeight: "1.2",
         }}
       >
-        {/* Header */}
-        <div className="text-center mb-2 pb-2 border-b border-dashed border-black">
-          <h1 className="text-base font-bold uppercase tracking-wide">
-            WIP TELECOM
-          </h1>
-          <p className="text-[10px]">WIP TELECOM MULTIMIDIA EIRELI ME</p>
-          <p className="text-[10px]">CNPJ: 20.843.290/0001-42</p>
-          <p className="text-[10px]">RUA EMILIO CARRARO - AREALVA</p>
-        </div>
+        <style type="text/css" media="print">
+          {`
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+            @media print {
+              html, body {
+                width: 80mm;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+              .printing-container {
+                width: 72mm !important;
+                margin: 0 auto !important; /* Centers the 72mm content on 80mm page */
+                padding: 2mm 0 !important;
+              }
+            }
+          `}
+        </style>
 
-        {/* Title */}
-        <div className="text-center my-3">
-          <h2 className="text-sm font-bold uppercase border border-black inline-block px-4 py-1 rounded-sm">
-            Recibo de Pagamento
-          </h2>
-        </div>
-
-        {/* Client Info */}
-        <div className="mb-3">
-          <p className="font-bold text-xs uppercase mb-1 border-b border-black inline-block">
-            Pagador
-          </p>
-          <p className="uppercase truncate font-bold">{clientName}</p>
-          <p>CPF/CNPJ: {cpfCnpj}</p>
-        </div>
-
-        {/* Payment Details */}
-        <div className="mb-3">
-          <p className="font-bold text-xs uppercase mb-1 border-b border-black inline-block">
-            Detalhes
-          </p>
-          <div className="flex justify-between">
-            <span>Fatura:</span>
-            <span className="font-bold">#{faturaId}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Vencimento:</span>
-            <span>
-              {dataPagamento
-                ? format(new Date(dataPagamento), "dd/MM/yyyy")
-                : "-"}
+        {/* Content matching the user's image */}
+        <div className="text-left font-bold text-xs uppercase leading-relaxed font-mono">
+          <div className="mb-4">
+            <span className="text-sm">
+              Recibo: {format(new Date(), "dd/MM/yy")}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span>Plano:</span>
-            <span className="truncate max-w-[120px] text-right">{plano}</span>
-          </div>
-        </div>
 
-        {/* Totals */}
-        <div className="my-4 border-t border-b border-dashed border-black py-2">
-          <div className="flex justify-between items-center text-base font-bold">
-            <span>TOTAL PAGO</span>
-            <span>
+          <div className="mb-2">
+            <span className="block">
+              EMITENTE: WIP TELECOM MULTIMIDIA EIRELI ME
+            </span>
+            <span className="block">CPF/CNPJ: 20.843.290/0001-42</span>
+            <span className="block">RUA EMILIO CARRARO - AREALVA</span>
+          </div>
+
+          <div className="mt-4 text-justify">
+            Recebi(emos) de{" "}
+            <span className="underline decoration-dotted">{clientName}</span>
+            <br />
+            CPF/CNPJ: {cpfCnpj} a importância de{" "}
+            <span className="text-sm">
               {parseFloat(valor || "0").toLocaleString("pt-BR", {
                 style: "currency",
                 currency: "BRL",
               })}
             </span>
+            <br />
+            ref. ao pag. titulo de numero: {faturaId} vencido em{" "}
+            {dataPagamento ? format(new Date(dataPagamento), "dd/MM/yy") : "-"}{" "}
+            /Plano: {plano}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="text-center text-[10px] space-y-1 mt-4">
-          <p>Emissão: {format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
-          <p className="mt-2 text-xs font-bold uppercase">
-            *** Obrigado pela preferência! ***
-          </p>
+        <div className="text-center text-[10px] space-y-1 mt-8 pt-4 border-t border-dashed border-black">
+          <p className="font-bold">*** Obrigado pela preferência! ***</p>
           <p>www.wiptelecom.com.br</p>
         </div>
       </div>
