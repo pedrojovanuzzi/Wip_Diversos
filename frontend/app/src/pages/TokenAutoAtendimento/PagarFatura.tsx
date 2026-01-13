@@ -67,9 +67,7 @@ export const PagarFatura = () => {
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = useReactToPrint({
-    contentRef: receiptRef,
-    onAfterPrint: () => console.log("Impressão concluída"),
-    onPrintError: (error) => console.error("Erro impressão:", error),
+    contentRef: receiptRef, // Modern API uses contentRef property
   });
 
   const handleKeyPress = (key: string) => {
@@ -299,13 +297,7 @@ export const PagarFatura = () => {
     if (step === "payment-success") {
       // Trigger print automatically on success with a small delay to ensure rendering
       const printTimer = setTimeout(() => {
-        console.log("Tentando impressão automática...");
-        if (receiptRef.current) {
-          console.log("Ref encontrado, chamando handlePrint...");
-          handlePrint?.();
-        } else {
-          console.warn("receiptRef.current está nulo/indefinido!");
-        }
+        handlePrint?.();
       }, 500);
 
       timer = setTimeout(() => {
