@@ -697,8 +697,7 @@ export const PagarFatura = () => {
         )}
       </div>
       {/* Hidden Receipt Component */}
-      {/* Hidden Receipt Component - using off-screen positioning instead of display:none to ensure it renders */}
-      <div style={{ position: "absolute", left: "-9999px", top: "-9999px" }}>
+      <div style={{ display: "none" }}>
         <Receipt
           ref={receiptRef}
           clientName={selectedClient?.nome || ""}
