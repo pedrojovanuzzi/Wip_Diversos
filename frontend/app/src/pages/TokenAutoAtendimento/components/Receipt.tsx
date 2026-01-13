@@ -15,70 +15,121 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(
     return (
       <div
         ref={ref}
-        className="p-8 font-mono text-black bg-white w-[80mm] mx-auto"
+        className="bg-white text-black mx-auto printing-container font-mono"
+        style={{
+          width: "72mm", // Reduced from 80mm to allow margins
+          padding: "0",
+          fontFamily: '"Courier Prime", "Courier New", monospace',
+          fontSize: "12px",
+          lineHeight: "1.3",
+        }}
       >
-        <div className="text-center mb-6">
-          <h1 className="text-xl font-bold uppercase">
-            Recibo {dataPagamento}
+        <style type="text/css" media="print">
+          {`
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+            @media print {
+              html, body {
+                width: 80mm;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+              .printing-container {
+                width: 72mm !important;
+                margin: 0 auto !important; /* Centers the 72mm content on 80mm page */
+                padding: 2mm 0 !important;
+              }
+            }
+          `}
+        </style>
+
+        {/* Header */}
+        <div className="text-center mb-4 pb-2 border-b-2 border-black">
+          <h1 className="text-xl font-black uppercase tracking-wider mb-1">
+            WIP TELECOM
           </h1>
+          <div className="text-[10px] grid gap-0.5 leading-tight">
+            <p className="font-bold">WIP TELECOM MULTIMIDIA EIRELI ME</p>
+            <p>CNPJ: 20.843.290/0001-42</p>
+            <p>RUA EMILIO CARRARO - AREALVA</p>
+          </div>
         </div>
 
-        <div className="space-y-4 text-sm">
+        {/* Receipt Title Box */}
+        <div className="text-center mb-6">
+          <div className="inline-block bg-black text-white px-6 py-1 rounded-sm">
+            <h2 className="text-sm font-bold uppercase tracking-widest">
+              RECIBO DE PAGAMENTO
+            </h2>
+          </div>
+          <p className="text-xs mt-1 font-bold">
+            {format(new Date(), "dd/MM/yyyy")}
+          </p>
+        </div>
+
+        {/* Body Content */}
+        <div className="text-justify text-xs uppercase leading-relaxed space-y-4">
+          {/* Payer Section */}
           <div>
-            Emitente: <strong>WIP TELECOM MULTIMIDIA EIRELI ME</strong>{" "}
-            CPF/CNPJ: 20.843.290/0001-42
-            <p className="font-bold text-gray-500 text-xs uppercase">
-              RUA EMILIO CARRARO - AREALVA Recebi(emos) de {clientName}
+            <p className="text-[10px] font-bold border-b border-black inline-block mb-1">
+              PAGADOR
+            </p>
+            <p className="font-bold text-sm block">{clientName}</p>
+            <p>CPF/CNPJ: {cpfCnpj}</p>
+          </div>
+
+          <div className="border-t border-dashed border-black/50 my-2"></div>
+
+          {/* Details Section */}
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold border-b border-black inline-block mb-1">
+              DETALHES
             </p>
             <p>
-              CPF/CNPJ: {cpfCnpj} a importância de {valor}
-            </p>
-            <p>ref. ao pag. titulo de numero {faturaId}</p>
-            <p>na data de {dataPagamento}</p>
-          </div>
-
-          <div>
-            <p className="font-bold text-gray-500 text-xs uppercase">
-              Detalhes da Fatura
-            </p>
-            <div className="flex justify-between">
-              <span>Fatura ID:</span>
-              <span>#{faturaId}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Data de Vencimento:</span>
-              {/* Assuming dataPagamento is the due date or payment date string */}
-              <span>
-                {dataPagamento
-                  ? format(new Date(dataPagamento), "dd/MM/yyyy")
-                  : "-"}
-              </span>
-            </div>
-          </div>
-
-          <div className="border-b-2 border-dashed border-gray-300 my-4"></div>
-
-          <div>
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total Pago:</span>
-              <span>
+              Recebemos a importância de:
+              <br />
+              <span className="text-lg font-black block mt-1 border border-black p-1 text-center bg-gray-100">
                 {parseFloat(valor || "0").toLocaleString("pt-BR", {
                   style: "currency",
                   currency: "BRL",
                 })}
               </span>
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-dotted border-black">
+              <div>
+                <span className="text-[10px] block font-bold">REFERÊNCIA</span>
+                <span>Fatura #{faturaId}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] block font-bold">VENCIMENTO</span>
+                <span>
+                  {dataPagamento
+                    ? format(new Date(dataPagamento), "dd/MM/yy")
+                    : "-"}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-1">
+              <span className="text-[10px]">PLANO:</span>{" "}
+              <span className="font-bold">{plano}</span>
             </div>
           </div>
         </div>
 
-        <div className="border-b-2 border-dashed border-gray-300 my-6"></div>
-
-        <div className="text-center text-xs space-y-2">
-          <p>Data/Hora da Emissão:</p>
-          <p>{format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
-          <br />
-          <p className="font-bold">Obrigado pela preferência!</p>
-          <p>Volte sempre.</p>
+        {/* Footer */}
+        <div className="text-center space-y-2 mt-8 pt-4 border-t-2 border-black">
+          <p className="text-xs font-black uppercase">
+            *** Obrigado pela preferência! ***
+          </p>
+          <div className="text-[10px] space-y-0.5">
+            <p>Emissão: {format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
+            <p className="font-bold">www.wiptelecom.com.br</p>
+          </div>
+          <div className="pb-4 border-b border-black w-1/2 mx-auto"></div>
         </div>
       </div>
     );

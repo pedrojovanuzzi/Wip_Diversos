@@ -299,22 +299,26 @@ export const PagarFatura = () => {
     if (step === "payment-success") {
       // Trigger print automatically on success with a small delay to ensure rendering
       const printTimer = setTimeout(() => {
-        console.log("Tentando impressão automática...");
+        console.log("PRINT DEBUG: Attempting automatic print...");
         if (receiptRef.current) {
-          console.log("Ref encontrado, chamando handlePrint...");
+          console.log(
+            "PRINT DEBUG: Receipt ref found, calling handlePrint now."
+          );
           handlePrint?.();
         } else {
-          console.warn("receiptRef.current está nulo/indefinido!");
+          console.error(
+            "PRINT DEBUG: receiptRef.current is null/undefined! Cannot print."
+          );
         }
-      }, 500);
+      }, 1000); // Increased delay to 1000ms to ensure render
 
       timer = setTimeout(() => {
         navigate("/TokenAutoAtendimento");
-      }, 10000);
+      }, 20000);
     } else if (step === "payment-error") {
       timer = setTimeout(() => {
         navigate("/TokenAutoAtendimento");
-      }, 10000);
+      }, 20000);
     }
     return () => {
       if (timer) clearTimeout(timer);
@@ -657,7 +661,7 @@ export const PagarFatura = () => {
                   Obrigado por utilizar nosso autoatendimento.
                 </p>
                 <div className="text-slate-500 text-sm">
-                  Retornando ao início em 10 segundos...
+                  Retornando ao início em 20 segundos...
                 </div>
               </div>
 
