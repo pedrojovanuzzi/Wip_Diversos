@@ -314,11 +314,11 @@ export const PagarFatura = () => {
 
       timer = setTimeout(() => {
         navigate("/TokenAutoAtendimento");
-      }, 10000);
+      }, 20000);
     } else if (step === "payment-error") {
       timer = setTimeout(() => {
         navigate("/TokenAutoAtendimento");
-      }, 10000);
+      }, 20000);
     }
     return () => {
       if (timer) clearTimeout(timer);
@@ -661,7 +661,7 @@ export const PagarFatura = () => {
                   Obrigado por utilizar nosso autoatendimento.
                 </p>
                 <div className="text-slate-500 text-sm">
-                  Retornando ao início em 10 segundos...
+                  Retornando ao início em 20 segundos...
                 </div>
               </div>
 
