@@ -910,8 +910,8 @@ class WhatsPixController {
               planoEscolhido = "🟠 500 MEGA R$ 199,90";
             } else if (texto === "🟩 20 MEGA R$ 89,90") {
               planoEscolhido = "🟩 20 MEGA R$ 89,90";
-            } else if (texto === "🟦 8 MEGA R$ 119,90") {
-              planoEscolhido = "🟦 8 MEGA R$ 119,90";
+            } else if (texto === "🟦 30 MEGA R$ 119,90") {
+              planoEscolhido = "🟦 30 MEGA R$ 119,90";
             } else {
               await this.MensagensComuns(
                 celular,
@@ -1750,7 +1750,7 @@ class WhatsPixController {
                     title: "Escolha seu Plano",
                     rows: [
                       { id: "option_8", title: "🟩 20 MEGA R$ 89,90" },
-                      { id: "option_9", title: "🟦 8 MEGA R$ 119,90" },
+                      { id: "option_9", title: "🟦 30 MEGA R$ 119,90" },
                     ],
                   },
                 ],
@@ -1843,8 +1843,8 @@ class WhatsPixController {
                 "Clique em *Concluir* para Terminar a *Alteração de Plano*",
                 "Concluir"
               );
-            } else if (texto === "🟦 8 MEGA R$ 119,90") {
-              let planoEscolhido = "🟦 8 MEGA R$ 119,90";
+            } else if (texto === "🟦 30 MEGA R$ 119,90") {
+              let planoEscolhido = "🟦 30 MEGA R$ 119,90";
               session.planoEscolhido = planoEscolhido;
               session.stage = "finish_troca_plan";
               await this.MensagemBotao(
@@ -2510,7 +2510,7 @@ class WhatsPixController {
             title: "Rádio (Consultar)",
             rows: [
               { id: "option_9", title: "🟩 20 MEGA R$ 89,90" },
-              { id: "option_10", title: "🟦 8 MEGA R$ 119,90" },
+              { id: "option_10", title: "🟦 30 MEGA R$ 119,90" },
             ],
           },
         ],
