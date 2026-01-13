@@ -15,70 +15,83 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(
     return (
       <div
         ref={ref}
-        className="p-8 font-mono text-black bg-white w-[80mm] mx-auto"
+        className="bg-white text-black p-2 mx-auto printing-container"
+        style={{
+          width: "80mm",
+          fontFamily: '"Courier Prime", "Courier New", monospace',
+          fontSize: "12px",
+          lineHeight: "1.2",
+        }}
       >
-        <div className="text-center mb-6">
-          <h1 className="text-xl font-bold uppercase">
-            Recibo {dataPagamento}
+        {/* Header */}
+        <div className="text-center mb-2 pb-2 border-b border-dashed border-black">
+          <h1 className="text-base font-bold uppercase tracking-wide">
+            WIP TELECOM
           </h1>
+          <p className="text-[10px]">WIP TELECOM MULTIMIDIA EIRELI ME</p>
+          <p className="text-[10px]">CNPJ: 20.843.290/0001-42</p>
+          <p className="text-[10px]">RUA EMILIO CARRARO - AREALVA</p>
         </div>
 
-        <div className="space-y-4 text-sm">
-          <div>
-            Emitente: <strong>WIP TELECOM MULTIMIDIA EIRELI ME</strong>{" "}
-            CPF/CNPJ: 20.843.290/0001-42
-            <p className="font-bold text-gray-500 text-xs uppercase">
-              RUA EMILIO CARRARO - AREALVA Recebi(emos) de {clientName}
-            </p>
-            <p>
-              CPF/CNPJ: {cpfCnpj} a importância de {valor}
-            </p>
-            <p>ref. ao pag. titulo de numero {faturaId}</p>
-            <p>na data de {dataPagamento}</p>
+        {/* Title */}
+        <div className="text-center my-3">
+          <h2 className="text-sm font-bold uppercase border border-black inline-block px-4 py-1 rounded-sm">
+            Recibo de Pagamento
+          </h2>
+        </div>
+
+        {/* Client Info */}
+        <div className="mb-3">
+          <p className="font-bold text-xs uppercase mb-1 border-b border-black inline-block">
+            Pagador
+          </p>
+          <p className="uppercase truncate font-bold">{clientName}</p>
+          <p>CPF/CNPJ: {cpfCnpj}</p>
+        </div>
+
+        {/* Payment Details */}
+        <div className="mb-3">
+          <p className="font-bold text-xs uppercase mb-1 border-b border-black inline-block">
+            Detalhes
+          </p>
+          <div className="flex justify-between">
+            <span>Fatura:</span>
+            <span className="font-bold">#{faturaId}</span>
           </div>
-
-          <div>
-            <p className="font-bold text-gray-500 text-xs uppercase">
-              Detalhes da Fatura
-            </p>
-            <div className="flex justify-between">
-              <span>Fatura ID:</span>
-              <span>#{faturaId}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Data de Vencimento:</span>
-              {/* Assuming dataPagamento is the due date or payment date string */}
-              <span>
-                {dataPagamento
-                  ? format(new Date(dataPagamento), "dd/MM/yyyy")
-                  : "-"}
-              </span>
-            </div>
+          <div className="flex justify-between">
+            <span>Vencimento:</span>
+            <span>
+              {dataPagamento
+                ? format(new Date(dataPagamento), "dd/MM/yyyy")
+                : "-"}
+            </span>
           </div>
-
-          <div className="border-b-2 border-dashed border-gray-300 my-4"></div>
-
-          <div>
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total Pago:</span>
-              <span>
-                {parseFloat(valor || "0").toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              </span>
-            </div>
+          <div className="flex justify-between">
+            <span>Plano:</span>
+            <span className="truncate max-w-[120px] text-right">{plano}</span>
           </div>
         </div>
 
-        <div className="border-b-2 border-dashed border-gray-300 my-6"></div>
+        {/* Totals */}
+        <div className="my-4 border-t border-b border-dashed border-black py-2">
+          <div className="flex justify-between items-center text-base font-bold">
+            <span>TOTAL PAGO</span>
+            <span>
+              {parseFloat(valor || "0").toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              })}
+            </span>
+          </div>
+        </div>
 
-        <div className="text-center text-xs space-y-2">
-          <p>Data/Hora da Emissão:</p>
-          <p>{format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
-          <br />
-          <p className="font-bold">Obrigado pela preferência!</p>
-          <p>Volte sempre.</p>
+        {/* Footer */}
+        <div className="text-center text-[10px] space-y-1 mt-4">
+          <p>Emissão: {format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
+          <p className="mt-2 text-xs font-bold uppercase">
+            *** Obrigado pela preferência! ***
+          </p>
+          <p>www.wiptelecom.com.br</p>
         </div>
       </div>
     );
