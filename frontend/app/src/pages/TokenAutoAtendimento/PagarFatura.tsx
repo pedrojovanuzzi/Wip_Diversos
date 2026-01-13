@@ -8,7 +8,6 @@ import {
   HiCreditCard,
   HiCurrencyDollar,
   HiXCircle,
-  HiPrinter,
 } from "react-icons/hi";
 import { Link, useNavigate } from "react-router-dom";
 import { Keyboard } from "./components/Keyboard";
@@ -653,22 +652,12 @@ export const PagarFatura = () => {
                 </div>
               </div>
 
-              <div className="flex flex-col space-y-4 w-full max-w-sm">
-                <button
-                  onClick={() => handlePrint && handlePrint()}
-                  className="w-full px-10 py-4 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95 flex items-center justify-center space-x-2"
-                >
-                  <HiPrinter className="text-xl" />
-                  <span>Imprimir Comprovante</span>
-                </button>
-
-                <button
-                  onClick={() => navigate("/TokenAutoAtendimento")}
-                  className="w-full px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/50 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95"
-                >
-                  Voltar ao Início Agora
-                </button>
-              </div>
+              <button
+                onClick={() => navigate("/TokenAutoAtendimento")}
+                className="mt-8 px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/50 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95"
+              >
+                Voltar ao Início Agora
+              </button>
             </div>
           )}
 
@@ -707,8 +696,8 @@ export const PagarFatura = () => {
           </div>
         )}
       </div>
-      {/* Hidden Receipt Component - using overflow hidden instead of display none ensures render for print */}
-      <div style={{ position: "absolute", top: "-9999px", left: "-9999px" }}>
+      {/* Hidden Receipt Component */}
+      <div style={{ display: "none" }}>
         <Receipt
           ref={receiptRef}
           clientName={selectedClient?.nome || ""}
