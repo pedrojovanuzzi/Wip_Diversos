@@ -30,6 +30,7 @@ import {
 import { isNotEmpty } from "class-validator";
 import { Jobs } from "../entities/Jobs";
 import AppDataSource from "../database/MkauthSource";
+import Email from "./Email";
 dotenv.config();
 
 interface CertificadoDados {
@@ -623,7 +624,7 @@ class Nfcom {
           const xmlFinalDistrib = `<?xml version="1.0" encoding="UTF-8"?><nfcomProc xmlns="http://www.portalfiscal.inf.br/nfcom" versao="1.00">${xmlAssinado}${protocoloXml}</nfcomProc>`;
 
           // 4. Passa o XML FINAL (String pura) para o banco
-          await this.inserirDadosBanco(
+          const savedNfcom = await this.inserirDadosBanco(
             xmlFinalDistrib,
             item.nfComData,
             item.clientLogin,
@@ -631,6 +632,62 @@ class Nfcom {
             item.clientType,
             item.cpf_cnpj
           );
+
+          // --- ENVIO DE EMAIL COM PDF ---
+          try {
+            let emailDestino = item.nfComData.dest.email;
+
+            // Se for homologação, troca o email
+            if (this.homologacao) {
+              emailDestino = "suporte_wiptelecom@outlook.com";
+            }
+
+            if (emailDestino) {
+              // 1. Pega dados para montar o PDF (obs/Chave)
+              const obsData: any = await this.getNfcomByChaveDeOlhoNoImposto();
+              const obsString = obsData?.Chave || "";
+
+              // 2. Gera o PDF em memória (Buffer)
+              const pdfBuffer = await this.generateXmlPdf(
+                savedNfcom,
+                obsString
+              );
+
+              // 3. Envia Email
+              const emailService = new Email();
+              const nomeArquivo = `NFCom_${savedNfcom.numeracao}.pdf`;
+
+              // O método sendEmail espera optional attachments: any[]
+              await emailService.sendEmail(
+                emailDestino,
+                `Nota Fiscal de Comunicação (NFCom) - Nº ${savedNfcom.numeracao}`,
+                `Olá,\n\nSegue em anexo a Nota Fiscal de Comunicação (NFCom) modelo 62, referente à sua fatura.\nNúmero: ${savedNfcom.numeracao}\nSérie: ${savedNfcom.serie}\n\nAtenciosamente,\nWIP Telecom`,
+                [
+                  {
+                    filename: nomeArquivo,
+                    content: pdfBuffer,
+                  },
+                  {
+                    filename: `NFCom_${savedNfcom.numeracao}.xml`,
+                    content: Buffer.from(savedNfcom.xml, "utf-8"),
+                  },
+                ]
+              );
+              console.log(
+                `📧 Email com PDF enviado para: ${emailDestino} (Nota ${savedNfcom.numeracao})`
+              );
+            } else {
+              console.warn(
+                `Clientes sem email cadastrado na nota ${savedNfcom.numeracao}. Email não enviado.`
+              );
+            }
+          } catch (emailErr) {
+            console.error(
+              `Erro ao gerar/enviar email da nota ${savedNfcom.numeracao}:`,
+              emailErr
+            );
+          }
+          // ------------------------------
 
           responses.push({
             success: true,
@@ -683,7 +740,7 @@ class Nfcom {
     faturaId: number,
     clientType: string,
     cpf_cnpj: string
-  ): Promise<void> {
+  ): Promise<NFCom> {
     try {
       const NFComRepository = DataSource.getRepository(NFCom);
 
@@ -726,6 +783,7 @@ class Nfcom {
 
       await NFComRepository.save(novaNFCom);
       console.log(`✅ NFCom ${novaNFCom.nNF} salva no banco com sucesso.`);
+      return novaNFCom;
     } catch (error) {
       console.error("Erro no TypeORM ao salvar NFCom:", error);
       throw new Error("Falha ao salvar a NFCom no banco de dados.");
