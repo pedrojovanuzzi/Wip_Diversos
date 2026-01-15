@@ -506,7 +506,7 @@ class TokenAtendimento {
       console.log(terminais2);
       res.status(200).json({
         id: fatura.id,
-        valor: fatura.valor,
+        valor: valor,
         order: terminais2,
         dataPagamento: fatura.datavenc,
       });
