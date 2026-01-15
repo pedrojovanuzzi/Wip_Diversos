@@ -443,7 +443,7 @@ class TokenAtendimento {
         where: {
           login: cliente.login,
           status: In(["aberto", "vencido"]),
-          datapag: IsNull(),
+          datadel: IsNull(),
         },
         order: { datavenc: "ASC" as const },
       });
