@@ -453,6 +453,12 @@ class TokenAtendimento {
         return;
       }
 
+      const valor = await this.aplicarJuros_Desconto(
+        fatura.valor,
+        cliente.login,
+        fatura.datavenc
+      );
+
       const response = await axios.get(
         "https://api.mercadopago.com/terminals/v1/list",
         {
@@ -475,7 +481,7 @@ class TokenAtendimento {
           transactions: {
             payments: [
               {
-                amount: fatura.valor,
+                amount: String(valor),
               },
             ],
           },
