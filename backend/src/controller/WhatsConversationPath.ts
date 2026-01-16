@@ -1168,6 +1168,10 @@ class WhatsPixController {
                     data_ip: moment().format("YYYY-MM-DD HH:mm:ss"),
                     data_ins: moment().format("YYYY-MM-DD HH:mm:ss"),
                   });
+                  await ClientesRepository.update(addClient.id, {
+                    termo: `${addClient.id}C/${moment().format("YYYY")}`,
+                  });
+
                   console.log("Cliente salvo com sucesso:", addClient);
                 } catch (dbError) {
                   console.error("Erro ao salvar cliente no banco:", dbError);

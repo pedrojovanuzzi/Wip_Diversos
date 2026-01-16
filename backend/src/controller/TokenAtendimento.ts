@@ -91,7 +91,13 @@ class TokenAtendimento {
 
       const cadastro = this.clienteRepo.create(body);
 
-      await this.clienteRepo.save(cadastro);
+      const cadastroSaved = (await this.clienteRepo.save(
+        cadastro
+      )) as unknown as ClientesEntities;
+
+      await this.clienteRepo.update(cadastroSaved.id, {
+        termo: `${cadastroSaved.id}C/${moment().format("YYYY")}`,
+      });
       res.status(200).json({ message: "Cadastro criado com sucesso" });
       return;
     } catch (error) {
