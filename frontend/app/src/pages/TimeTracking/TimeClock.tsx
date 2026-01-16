@@ -62,9 +62,7 @@ export const TimeClock = () => {
 
     try {
       await axios.post(
-        `${
-          process.env.REACT_APP_API_URL || "http://localhost:3000"
-        }/api/time-tracking/clock-in`,
+        `${process.env.REACT_APP_API_URL}/api/time-tracking/clock-in`,
         {
           employeeId,
           lat: location.lat,

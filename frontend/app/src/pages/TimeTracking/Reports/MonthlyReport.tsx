@@ -26,9 +26,7 @@ export const MonthlyReport = () => {
   const fetchEmployees = async () => {
     try {
       const res = await axios.get(
-        `${
-          process.env.REACT_APP_API_URL || "http://localhost:3000"
-        }/api/time-tracking/employee`
+        `${process.env.REACT_APP_API_URL}/api/time-tracking/employee`
       );
       setEmployees(res.data);
     } catch (error) {
@@ -40,9 +38,7 @@ export const MonthlyReport = () => {
     if (!selectedEmployee) return;
     try {
       const res = await axios.get(
-        `${
-          process.env.REACT_APP_API_URL || "http://localhost:3000"
-        }/api/time-tracking/records/${selectedEmployee}`
+        `${process.env.REACT_APP_API_URL}/api/time-tracking/records/${selectedEmployee}`
       );
       setRecords(res.data);
     } catch (error) {
@@ -232,8 +228,7 @@ export const MonthlyReport = () => {
                           <img
                             key={idx}
                             src={`${
-                              process.env.REACT_APP_API_URL ||
-                              "http://localhost:3000"
+                              process.env.REACT_APP_API_URL
                             }/${r.photo_url.replace(/\\/g, "/")}`}
                             alt="ref"
                             className="w-8 h-8 object-cover rounded-full border border-gray-200"
