@@ -32,7 +32,7 @@ export const MonthlyReport = () => {
           overflow: hidden;
         }
         .print-container {
-           transform: scale(0.9);
+           transform: scale(0.75);
            transform-origin: top center;
            width: 100%;
         }
@@ -202,7 +202,7 @@ export const MonthlyReport = () => {
           </div>
 
           {employeeData && (
-            <div className="mb-2 grid grid-cols-4 gap-2 text-xs">
+            <div className="mb-1 grid grid-cols-4 gap-1 text-[10px]">
               <div>
                 <strong>Nome:</strong> {employeeData.name}
               </div>
@@ -218,14 +218,14 @@ export const MonthlyReport = () => {
             </div>
           )}
 
-          <table className="w-full border-collapse border border-gray-300 text-xs">
+          <table className="w-full border-collapse border border-gray-300 text-[10px]">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border border-gray-300 p-2">Data</th>
-                <th className="border border-gray-300 p-2">
+                <th className="border border-gray-300 p-1">Data</th>
+                <th className="border border-gray-300 p-1">
                   Registros (Horário - Tipo)
                 </th>
-                <th className="border border-gray-300 p-2">Foto</th>
+                <th className="border border-gray-300 p-1">Foto</th>
               </tr>
             </thead>
             <tbody>
@@ -239,16 +239,16 @@ export const MonthlyReport = () => {
 
                 return (
                   <tr key={date}>
-                    <td className="border border-gray-300 p-2 text-center font-medium">
+                    <td className="border border-gray-300 p-1 text-center font-medium">
                       {date}
                     </td>
-                    <td className="border border-gray-300 p-2">
-                      <div className="flex flex-wrap gap-2">
+                    <td className="border border-gray-300 p-1">
+                      <div className="flex flex-wrap gap-1">
                         {dayRecords.length > 0 ? (
                           dayRecords.map((r, idx) => (
                             <span
                               key={idx}
-                              className="bg-gray-100 px-2 py-1 rounded text-xs border"
+                              className="bg-gray-100 px-1 py-0.5 rounded text-[9px] border"
                             >
                               {moment(r.timestamp).format("HH:mm")} - {r.type}
                             </span>
@@ -258,7 +258,7 @@ export const MonthlyReport = () => {
                         )}
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-2 text-center">
+                    <td className="border border-gray-300 p-1 text-center">
                       <div className="flex gap-1 justify-center">
                         {dayRecords.map((r, idx) =>
                           r.photo_url ? (
@@ -282,9 +282,9 @@ export const MonthlyReport = () => {
             </tbody>
           </table>
 
-          <div className="mt-4 flex justify-between items-end text-xs">
+          <div className="mt-2 flex justify-between items-end text-[10px]">
             <div className="text-center w-64">
-              <div className="border-t border-black pt-2">
+              <div className="border-t border-black pt-1">
                 Assinatura do Empregador
               </div>
             </div>
@@ -297,14 +297,14 @@ export const MonthlyReport = () => {
                 <img
                   src={signature}
                   alt="Assinatura"
-                  className="h-16 mx-auto mb-2"
+                  className="h-10 mx-auto mb-1"
                 />
               ) : (
-                <div className="h-16 flex items-center justify-center text-gray-400 text-sm italic bg-gray-50 mb-2 border border-dashed hover:bg-gray-100">
+                <div className="h-10 flex items-center justify-center text-gray-400 text-[9px] italic bg-gray-50 mb-1 border border-dashed hover:bg-gray-100">
                   <AiOutlineEdit className="mr-1" /> Clique para Assinar
                 </div>
               )}
-              <div className="border-t border-black pt-2 select-none">
+              <div className="border-t border-black pt-1 select-none">
                 Assinatura do Funcionário
               </div>
             </div>

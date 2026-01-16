@@ -19,12 +19,14 @@ export const EmployeeManager = () => {
 
   const fetchEmployees = async () => {
     try {
-      const res = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/time-tracking/employee`
-      );
+      const url = `${
+        process.env.REACT_APP_API_URL || "http://localhost:3000"
+      }/api/time-tracking/employee`;
+      console.log("Manager: Fetching from", url);
+      const res = await axios.get(url);
       setEmployees(res.data);
     } catch (error) {
-      console.error(error);
+      console.error("Manager: Error fetching", error);
     }
   };
 
@@ -42,6 +44,7 @@ export const EmployeeManager = () => {
         }/api/time-tracking/employee`,
         form
       );
+      console.log("Manager: Created employee");
       setMessage("Funcionário cadastrado com sucesso!");
       setForm({ name: "", role: "", cpf: "" });
       fetchEmployees();
@@ -61,6 +64,7 @@ export const EmployeeManager = () => {
           process.env.REACT_APP_API_URL || "http://localhost:3000"
         }/api/time-tracking/employee/${id}`
       );
+      console.log("Manager: Deleted employee", id);
       fetchEmployees();
     } catch (error) {
       console.error(error);
