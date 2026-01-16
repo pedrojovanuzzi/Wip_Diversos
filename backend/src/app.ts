@@ -46,7 +46,7 @@ export class App {
     this.server.use(cors({ origin: process.env.URL }));
     this.server.use(
       "/uploads",
-      express.static(path.resolve(__dirname, "..", "..", "uploads"))
+      express.static(path.resolve(__dirname, "..", "uploads"))
     );
   }
 

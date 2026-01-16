@@ -34,7 +34,6 @@ class TimeRecordController {
             __dirname,
             "..",
             "..",
-            "..",
             "uploads",
             "time_records"
           );
