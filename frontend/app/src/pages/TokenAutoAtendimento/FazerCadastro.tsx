@@ -7,12 +7,12 @@ import axios from "axios";
 export const FazerCadastro = () => {
   const [formData, setFormData] = useState({
     nome: "",
-    cpf: "",
+    cpf_cnpj: "",
     rg: "",
     nascimento: "",
     email: "",
     cep: "",
-    rua: "",
+    endereco: "",
     numero: "",
     bairro: "",
     cidade: "",
@@ -33,12 +33,12 @@ export const FazerCadastro = () => {
   const validateForm = () => {
     const requiredFields = [
       "nome",
-      "cpf",
+      "cpf_cnpj",
       "rg",
       "nascimento",
       "email",
       "cep",
-      "rua",
+      "endereco",
       "numero",
       "bairro",
       "cidade",
@@ -63,7 +63,7 @@ export const FazerCadastro = () => {
     }
 
     // Basic CPF Length Validation (simplistic)
-    if (formData.cpf.length < 11) {
+    if (formData.cpf_cnpj.length < 11) {
       setError("CPF inválido. Verifique os números digitados.");
       return false;
     }
@@ -156,6 +156,14 @@ export const FazerCadastro = () => {
     </div>
   );
 
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>): void {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  }
+
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden font-sans">
       {/* Background Ambience */}
@@ -220,14 +228,16 @@ export const FazerCadastro = () => {
               </h3>
               <InputField label="Nome Completo" name="nome" />
               <div className="grid grid-cols-2 gap-4">
-                <InputField label="CPF" name="cpf" />
+                <InputField label="CPF" name="cpf_cnpj" />
                 <InputField label="RG" name="rg" />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <InputField
-                  label="Data Nascimento"
+                <input
+                  className="bg-slate-600 border rounded-lg px-4 py-3 text-white outline-none transition-all"
+                  type="date"
                   name="nascimento"
-                  placeholder="DD/MM/AAAA"
+                  value={formData.nascimento}
+                  onChange={(e) => handleInputChange(e)}
                 />
                 <InputField label="Email" name="email" />
               </div>
@@ -248,7 +258,7 @@ export const FazerCadastro = () => {
               </div>
               <div className="grid grid-cols-4 gap-4">
                 <div className="col-span-3">
-                  <InputField label="Rua" name="rua" />
+                  <InputField label="Endereço" name="endereco" />
                 </div>
                 <div className="col-span-1">
                   <InputField label="Nº" name="numero" />
@@ -283,12 +293,12 @@ export const FazerCadastro = () => {
                     className="bg-slate-800/50 border border-white/10 rounded-lg px-4 py-3 text-white outline-none focus:border-cyan-400"
                   >
                     <option value="">Selecione...</option>
-                    <option value="plano_a">400 Mbps</option>
-                    <option value="plano_b">500 Mbps</option>
-                    <option value="plano_c">600 Mbps</option>
-                    <option value="plano_d">700 Mbps</option>
-                    <option value="plano_e">800 Mbps</option>
-                    <option value="plano_f">Plano Rural / Verificar</option>
+                    <option value="plano_400">400 Mbps</option>
+                    <option value="plano_500">500 Mbps</option>
+                    <option value="plano_600">600 Mbps</option>
+                    <option value="plano_700">700 Mbps</option>
+                    <option value="plano_800">800 Mbps</option>
+                    <option value="plano_rural">Plano Rural / Verificar</option>
                   </select>
                 </div>
                 <div className="flex flex-col space-y-1">

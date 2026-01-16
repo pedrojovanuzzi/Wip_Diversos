@@ -84,19 +84,74 @@ class TokenAtendimento {
         }
       }
 
-      const body = {
-        ...req.body,
+      const addClient = await this.clienteRepo.save({
+        nome: (req.body.nome || "").toUpperCase(),
+        login: (req.body.nome || "").trim().replace(/\s/g, "").toUpperCase(),
+        rg: req.body.rg.trim().replace(/\s/g, ""),
+        cpf_cnpj: req.body.cpf_cnpj.trim().replace(/\s/g, ""),
+        uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
+        email: req.body.email.trim().replace(/\s/g, ""),
+        cidade: `${req.body.cidade
+          .trim()
+          .slice(0, 1)
+          .toUpperCase()}${req.body.cidade.trim().slice(1)}`,
+        bairro: req.body.bairro.toUpperCase().trim(),
+        estado: (req.body.estado || "")
+          .toUpperCase()
+          .replace(/\s/g, "")
+          .slice(0, 2),
+        nascimento: req.body.nascimento.replace(
+          /(\d{2})\/(\d{2})\/(\d{4})/,
+          "$3-$2-$1"
+        ),
+        numero: req.body.numero.trim().replace(/\s/g, ""),
+        endereco: req.body.endereco.toUpperCase().trim(),
+        cep: `${req.body.cep
+          .trim()
+          .replace(/\s/g, "")
+          .slice(0, 5)}-${req.body.cep.trim().replace(/\s/g, "").slice(5)}`,
+        plano: req.body.plano,
+        fone: "(14)3296-1608",
+        venc: (req.body.vencimento || "")
+          .trim()
+          .replace(/\s/g, "")
+          .replace(/\D/g, ""),
+        celular: `(${req.body.celular.slice(0, 2)})${req.body.celular.slice(
+          2
+        )}`,
+        celular2: `(${req.body.celularSecundario.slice(
+          0,
+          2
+        )})${req.body.celularSecundario.slice(2)}`,
+        estado_res: (req.body.estado || "")
+          .toUpperCase()
+          .replace(/\s/g, "")
+          .slice(0, 2),
+        bairro_res: req.body.bairro.toUpperCase().trim(),
+        cidade_res: `${req.body.cidade
+          .trim()
+          .slice(0, 1)
+          .toUpperCase()}${req.body.cidade.trim().slice(1)}`,
+        cep_res: `${req.body.cep
+          .trim()
+          .replace(/\s/g, "")
+          .slice(0, 5)}-${req.body.cep.trim().replace(/\s/g, "").slice(5)}`,
+        numero_res: req.body.numero.trim().replace(/\s/g, ""),
+        endereco_res: req.body.endereco.toUpperCase().trim(),
+        tipo_cob: "titulo",
+        mesref: "now",
+        prilanc: "tot",
+        pessoa:
+          req.body.cpf_cnpj.replace(/\D/g, "").length <= 11
+            ? "fisica"
+            : "juridica",
+        dias_corte: 80,
+        cadastro: moment().format("DD-MM-YYYY").split("-").join("/"),
+        data_ip: moment().format("YYYY-MM-DD HH:mm:ss"),
         data_ins: moment().format("YYYY-MM-DD HH:mm:ss"),
-      };
-
-      const cadastro = this.clienteRepo.create(body);
-
-      const cadastroSaved = (await this.clienteRepo.save(
-        cadastro
-      )) as unknown as ClientesEntities;
-
-      await this.clienteRepo.update(cadastroSaved.id, {
-        termo: `${cadastroSaved.id}C/${moment().format("YYYY")}`,
+      });
+      await this.clienteRepo.update(addClient.id, {
+        termo: `${addClient.id}C/${moment().format("YYYY")}`,
       });
       res.status(200).json({ message: "Cadastro criado com sucesso" });
       return;
