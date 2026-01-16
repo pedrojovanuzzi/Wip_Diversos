@@ -9,6 +9,7 @@ import dotenv from "dotenv";
 import crypto from "crypto";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
+import moment from "moment";
 
 dotenv.config();
 
@@ -83,7 +84,12 @@ class TokenAtendimento {
         }
       }
 
-      const cadastro = this.clienteRepo.create(req.body);
+      const body = {
+        ...req.body,
+        data_ins: moment().format("YYYY-MM-DD HH:mm:ss"),
+      };
+
+      const cadastro = this.clienteRepo.create(body);
 
       await this.clienteRepo.save(cadastro);
       res.status(200).json({ message: "Cadastro criado com sucesso" });

@@ -17,7 +17,7 @@ export const TokenAutoAtendimento = () => {
       </div>
 
       {/* Kiosk Frame */}
-      <div className="relative z-10 w-full max-w-md bg-white/5 backdrop-blur-xl border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[85vh] md:h-[900px] border-t-white/20 border-l-white/20">
+      <div className="relative z-10 w-full max-w-md bg-white/5 backdrop-blur-xl border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[800px] sm:h-[700px]  border-t-white/20 border-l-white/20">
         {/* Glow Effects on Frame */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-50"></div>
         <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-purple-400 to-transparent opacity-50"></div>

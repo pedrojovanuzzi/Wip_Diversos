@@ -45,7 +45,7 @@ export const Keyboard: React.FC<KeyboardProps> = ({ onKeyPress }) => {
   ];
 
   return (
-    <div className="flex flex-col gap-2 p-4 bg-slate-900/80 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl w-full max-w-4xl mx-auto select-none">
+    <div className="flex flex-col gap-2 p-4 bg-slate-900/80 backdrop-blur-md rounded-2xl border-white/10  w-full max-w-4xl mx-auto select-none">
       {rows.map((row, rowIndex) => (
         <div key={rowIndex} className="flex justify-center gap-1.5 w-full">
           {row.map((key, keyIndex) => {
