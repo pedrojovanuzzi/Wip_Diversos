@@ -20,9 +20,7 @@ export const EmployeeManager = () => {
   const fetchEmployees = async () => {
     try {
       const res = await axios.get(
-        `${
-          process.env.REACT_APP_API_URL || "http://localhost:3000"
-        }/api/time-tracking/employee`
+        `${process.env.REACT_APP_API_URL}/api/time-tracking/employee`
       );
       setEmployees(res.data);
     } catch (error) {
@@ -39,7 +37,9 @@ export const EmployeeManager = () => {
     setLoading(true);
     try {
       await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/time-tracking/employee`,
+        `${
+          process.env.REACT_APP_API_URL || "http://localhost:3000"
+        }/api/time-tracking/employee`,
         form
       );
       setMessage("Funcionário cadastrado com sucesso!");
@@ -57,7 +57,9 @@ export const EmployeeManager = () => {
     if (!window.confirm("Tem certeza que deseja excluir?")) return;
     try {
       await axios.delete(
-        `${process.env.REACT_APP_API_URL}/api/time-tracking/employee/${id}`
+        `${
+          process.env.REACT_APP_API_URL || "http://localhost:3000"
+        }/api/time-tracking/employee/${id}`
       );
       fetchEmployees();
     } catch (error) {

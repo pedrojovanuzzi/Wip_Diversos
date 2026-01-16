@@ -13,7 +13,6 @@ class TimeRecordController {
   clockIn = async (req: Request, res: Response) => {
     try {
       const { employeeId, lat, lng, photo, type } = req.body;
-
       const employee = await this.employeeRepo.findOneBy({
         id: Number(employeeId),
       });

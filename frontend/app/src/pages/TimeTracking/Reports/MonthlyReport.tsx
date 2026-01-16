@@ -18,6 +18,26 @@ export const MonthlyReport = () => {
   const componentRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
     contentRef: componentRef,
+    documentTitle: `Ponto_${selectedEmployee}_${month}_${year}`,
+    pageStyle: `
+      @page {
+        size: A4;
+        margin: 5mm;
+      }
+      @media print {
+        html, body {
+          height: 100vh;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden;
+        }
+        .print-container {
+           transform: scale(0.9);
+           transform-origin: top center;
+           width: 100%;
+        }
+      }
+    `,
   });
 
   useEffect(() => {
@@ -26,24 +46,38 @@ export const MonthlyReport = () => {
 
   const fetchEmployees = async () => {
     try {
-      const res = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/time-tracking/employee`
-      );
+      const url = `${
+        process.env.REACT_APP_API_URL || "http://localhost:3000"
+      }/api/time-tracking/employee`;
+      console.log("Fetching employees from:", url);
+      const res = await axios.get(url);
+      console.log("Employees fetched:", res.data);
       setEmployees(res.data);
     } catch (error) {
-      console.error(error);
+      console.error("Error fetching employees:", error);
     }
   };
 
   const fetchRecords = async () => {
-    if (!selectedEmployee) return;
+    if (!selectedEmployee) {
+      alert("Selecione um funcionário!");
+      return;
+    }
     try {
-      const res = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/time-tracking/records/${selectedEmployee}`
-      );
+      const url = `${
+        process.env.REACT_APP_API_URL || "http://localhost:3000"
+      }/api/time-tracking/records/${selectedEmployee}`;
+      console.log("Fetching records from:", url);
+
+      const res = await axios.get(url);
+      console.log("Records fetched:", res.data);
       setRecords(res.data);
+      if (res.data.length === 0) {
+        alert("Nenhum registro encontrado para este funcionário.");
+      }
     } catch (error) {
-      console.error(error);
+      console.error("Error fetching records:", error);
+      alert("Erro ao buscar registros check o console.");
     }
   };
 
@@ -157,18 +191,18 @@ export const MonthlyReport = () => {
 
         {/* Report Area */}
         <div
-          className="bg-white p-10 shadow-lg mx-auto max-w-4xl"
+          className="bg-white p-4 shadow-lg mx-auto max-w-4xl print-container"
           ref={componentRef}
         >
-          <div className="text-center mb-8 border-b-2 pb-4">
-            <h2 className="text-2xl font-bold uppercase">Folha de Ponto</h2>
+          <div className="text-center mb-2 border-b pb-2">
+            <h2 className="text-xl font-bold uppercase">Folha de Ponto</h2>
             <p className="text-gray-600">
               Período: {month}/{year}
             </p>
           </div>
 
           {employeeData && (
-            <div className="mb-6 grid grid-cols-2 gap-4">
+            <div className="mb-2 grid grid-cols-4 gap-2 text-xs">
               <div>
                 <strong>Nome:</strong> {employeeData.name}
               </div>
@@ -184,7 +218,7 @@ export const MonthlyReport = () => {
             </div>
           )}
 
-          <table className="w-full border-collapse border border-gray-300 text-sm">
+          <table className="w-full border-collapse border border-gray-300 text-xs">
             <thead>
               <tr className="bg-gray-100">
                 <th className="border border-gray-300 p-2">Data</th>
@@ -231,7 +265,8 @@ export const MonthlyReport = () => {
                             <img
                               key={idx}
                               src={`${
-                                process.env.REACT_APP_API_URL
+                                process.env.REACT_APP_API_URL ||
+                                "http://localhost:3000"
                               }/${r.photo_url.replace(/\\/g, "/")}`}
                               alt="ref"
                               className="w-8 h-8 object-cover rounded-full border border-gray-200"
@@ -247,7 +282,7 @@ export const MonthlyReport = () => {
             </tbody>
           </table>
 
-          <div className="mt-12 flex justify-between items-end">
+          <div className="mt-4 flex justify-between items-end text-xs">
             <div className="text-center w-64">
               <div className="border-t border-black pt-2">
                 Assinatura do Empregador
@@ -275,7 +310,7 @@ export const MonthlyReport = () => {
             </div>
           </div>
 
-          <div className="text-xs text-center text-gray-400 mt-10">
+          <div className="text-[10px] text-center text-gray-400 mt-2">
             Gerado automaticamente por Sistema de Ponto WIP.
           </div>
         </div>
