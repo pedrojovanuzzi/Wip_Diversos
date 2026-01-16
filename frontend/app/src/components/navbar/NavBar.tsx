@@ -12,9 +12,13 @@ import {
   FaWhatsapp,
   FaFileInvoice,
   FaSearch,
+  FaRegFolder,
+  FaClock,
+  FaUsers,
+  FaClipboardList,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
-import { FaRegFolder } from "react-icons/fa";
+
 import { FaPlugCirclePlus } from "react-icons/fa6";
 import { ImExit } from "react-icons/im";
 import { FaPix } from "react-icons/fa6";
@@ -32,7 +36,7 @@ export const NavBar = ({ color = "black" }: Color) => {
 
   const { user } = useAuth();
   const token = user?.token;
-  const permission = user?.permission;
+  const permission = user?.permission || 0;
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -93,7 +97,7 @@ export const NavBar = ({ color = "black" }: Color) => {
             <span className="break-all whitespace-normal">{user?.login}</span>
           </h2>
           <ul className="grid grid-cols-2 gap-5 p-4">
-            {permission! >= 2 && (
+            {permission >= 2 && (
               <>
                 <li className="p-2 grid place-items-center col-span-2">
                   <Link to="/">
@@ -112,15 +116,30 @@ export const NavBar = ({ color = "black" }: Color) => {
                 <VscGraph className='text-white size-8 transition-all hover:text-green-400' />
               </Link>
             </li> */}
-            {permission! >= 5 && (
+            {permission >= 5 && (
               <li className="p-2 grid place-items-center col-span-2">
                 <Link to="/Create">
                   <FaUserPlus className="text-white size-8 transition-all hover:text-green-400" />
                 </Link>
               </li>
             )}
-            {permission! >= 2 && (
+            {permission >= 2 && (
               <>
+                <li className="p-2 grid place-items-center col-span-2">
+                  <Link to="/TimeTracking/ClockIn">
+                    <FaClock className="text-white size-8 transition-all hover:text-green-400" />
+                  </Link>
+                </li>
+                <li className="p-2 grid place-items-center col-span-2">
+                  <Link to="/TimeTracking/Admin">
+                    <FaUsers className="text-white size-8 transition-all hover:text-green-400" />
+                  </Link>
+                </li>
+                <li className="p-2 grid place-items-center col-span-2">
+                  <Link to="/TimeTracking/Report">
+                    <FaClipboardList className="text-white size-8 transition-all hover:text-green-400" />
+                  </Link>
+                </li>
                 <li className="p-2 grid place-items-center col-span-2">
                   <Link to="/feedbackCreate">
                     <MdOutlineFeedback className="text-white size-8 transition-all hover:text-green-400" />
@@ -148,7 +167,7 @@ export const NavBar = ({ color = "black" }: Color) => {
                 </li>
               </>
             )}
-            {permission! === 1 && (
+            {permission === 1 && (
               <>
                 <li className="p-2 grid place-items-center col-span-2">
                   <Link to="/Nfcom/Buscar">
@@ -167,7 +186,7 @@ export const NavBar = ({ color = "black" }: Color) => {
                 <PiComputerTowerBold className='text-white size-8 transition-all hover:text-green-400' />
               </Link>
             </li> */}
-            {permission! >= 2 && (
+            {permission >= 2 && (
               <>
                 <li className="p-2 grid place-items-center col-span-2">
                   <Link to="/ServerLogs">

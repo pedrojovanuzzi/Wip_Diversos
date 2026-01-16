@@ -23,6 +23,8 @@ import Pix from "./controller/Pix";
 import NFCom from "./routes/NFCom.routes";
 import WhatsappWebHook from "./routes/WhatsappWebHook.routes";
 import TokenAtendimentoRoutes from "./routes/TokenAtendimento.routes";
+import TimeTrackingRoutes from "./routes/TimeTracking.routes";
+import path from "path";
 const backup = new Backup();
 const pix = new Pix();
 
@@ -42,6 +44,10 @@ export class App {
     this.server.use(express.json());
     this.server.use(express.urlencoded({ extended: true }));
     this.server.use(cors({ origin: process.env.URL }));
+    this.server.use(
+      "/uploads",
+      express.static(path.resolve(__dirname, "..", "..", "uploads"))
+    );
   }
 
   private router() {
@@ -62,6 +68,7 @@ export class App {
     this.server.use("/api/Backup", BackupRoutes);
     this.server.use("/api/Pix", PixRoutes);
     this.server.use("/api/TokenAutoAtendimento", TokenAtendimentoRoutes);
+    this.server.use("/api/time-tracking", TimeTrackingRoutes);
   }
 
   private agendarBackup() {
