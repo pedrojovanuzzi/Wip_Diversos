@@ -44,7 +44,7 @@ class Auth {
 
       let errorsArray = validationResult(req).array();
 
-      const { login, password, permission } = req.body;
+      const { id, login, password, permission } = req.body;
 
       const userRepository = DataSource.getRepository(User);
       const user = await userRepository.findOne({ where: { login: login } });
@@ -79,6 +79,7 @@ class Auth {
       const passwordHash = await bcrypt.hash(password, salt);
 
       const newUser = userRepository.create({
+        id,
         login,
         password: passwordHash,
         permission: permission,
@@ -106,6 +107,8 @@ class Auth {
         token: generateToken(String(newUser.id)),
       });
     } catch (error) {
+      console.log(error);
+
       res.status(401).json({ errors: [{ msg: "Ocorreu um Erro" }] });
     }
   }

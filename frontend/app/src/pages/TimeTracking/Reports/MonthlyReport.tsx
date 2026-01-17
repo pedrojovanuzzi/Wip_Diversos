@@ -260,7 +260,8 @@ export const MonthlyReport = () => {
                             <img
                               key={idx}
                               src={`${
-                                process.env.REACT_APP_BASE_URL
+                                process.env.REACT_APP_API_URL ||
+                                "http://localhost:3000"
                               }/${r.photo_url.replace(/\\/g, "/")}`}
                               alt="ref"
                               className="w-8 h-8 object-cover rounded-full border border-gray-200"

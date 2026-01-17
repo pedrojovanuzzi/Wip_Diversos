@@ -13,6 +13,7 @@ import {
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 
 export const Create = () => {
+  const [id, setId] = useState("");
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [permission, setPermission] = useState("");
@@ -32,7 +33,7 @@ export const Create = () => {
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/auth/create`,
-        { login, password, permission },
+        { id, login, password, permission },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setSucesso(true);
@@ -76,6 +77,25 @@ export const Create = () => {
 
           <form onSubmit={createUser} className="p-8 space-y-6">
             <div className="space-y-4">
+              <div className="relative">
+                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                  ID
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FaUser className="text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    className="pl-10 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm p-2.5 border"
+                    placeholder="Ex: admin"
+                    value={id}
+                    onChange={(e) => setId(e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div className="relative">
                 <label className="text-sm font-medium text-gray-700 mb-1 block">
                   Login
