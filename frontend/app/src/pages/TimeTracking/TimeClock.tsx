@@ -30,16 +30,27 @@ export const TimeClock = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          console.log("Accuracy:", position.coords.accuracy);
           setLocation({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           });
+          // Optional: Create a warning if accuracy is low (> 100m)
+          if (position.coords.accuracy > 100) {
+            setMessage(
+              `Atenção: A precisão do GPS está baixa (${Math.round(
+                position.coords.accuracy
+              )}m). Tente usar o celular.`
+            );
+          } else {
+            setMessage(""); // Clear "waiting" or error messages
+          }
         },
         (error) => {
           console.error("Error getting location: ", error);
           setMessage("Erro ao obter localização. Permita o acesso.");
         },
-        { enableHighAccuracy: true }
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
       );
     } else {
       setMessage("Geolocalização não suportada neste navegador.");
