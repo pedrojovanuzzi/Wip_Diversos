@@ -99,6 +99,20 @@ export const TimeClock = () => {
     }
   };
 
+  const parseTimeInput = (input: string) => {
+    if (!input) return 0;
+    if (input.includes(":")) {
+      const [h, m] = input.split(":").map(Number);
+      return (h || 0) + (m || 0) / 100;
+    }
+    // Fallback if users enter minutes as number (e.g. 90 -> 1.30)
+    const val = parseFloat(input);
+    if (!isNaN(val)) {
+      return Math.floor(val / 60) + (val % 60) / 100;
+    }
+    return 0;
+  };
+
   const handleOvertime = async () => {
     if (!employeeId) {
       setMessage("Por favor, selecione o Nome do funcionário.");
@@ -113,15 +127,15 @@ export const TimeClock = () => {
     setMessage("");
 
     try {
-      // Convert minutes to hours
-      const h50 = (parseFloat(overtime50) || 0) / 60;
-      const h100 = (parseFloat(overtime100) || 0) / 60;
+      // Convert HH:MM input to H.MM format
+      const h50 = parseTimeInput(overtime50);
+      const h100 = parseTimeInput(overtime100);
 
       await axios.post(`${process.env.REACT_APP_URL}/time-tracking/overtime`, {
         employeeId,
         date: overtimeDate,
-        hours50: h50,
-        hours100: h100,
+        hours50: h50.toFixed(2),
+        hours100: h100.toFixed(2),
       });
       setMessage("Horas extras registradas com sucesso!");
       setOvertime50("");
@@ -242,26 +256,26 @@ export const TimeClock = () => {
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700">
-                    50% (Minutos)
+                    50% (HH:MM)
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     value={overtime50}
                     onChange={(e) => setOvertime50(e.target.value)}
                     className="w-full p-2 border border-gray-300 rounded"
-                    placeholder="Ex: 75 Minutos"
+                    placeholder="Ex: 01:30"
                   />
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700">
-                    100% (Minutos)
+                    100% (HH:MM)
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     value={overtime100}
                     onChange={(e) => setOvertime100(e.target.value)}
                     className="w-full p-2 border border-gray-300 rounded"
-                    placeholder="Ex: 125 Minutos"
+                    placeholder="Ex: 00:45"
                   />
                 </div>
               </div>

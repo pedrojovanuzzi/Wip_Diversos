@@ -175,13 +175,25 @@ export const MonthlyReport = () => {
   const employeeData = employees.find((e) => e.id === Number(selectedEmployee));
 
   // Calculate Totals
-  const total50 = Object.values(overtimeData).reduce(
-    (acc, curr) => acc + (Number(curr.hours50) || 0),
-    0
+  // Calculate Totals encoded as H.MM
+  const sumTime = (values: number[]) => {
+    let totalMinutes = 0;
+    values.forEach((val) => {
+      const h = Math.floor(val);
+      // Avoid floating point errors (e.g. 0.3 * 100 = 29.9999)
+      const m = Math.round((val - h) * 100);
+      totalMinutes += h * 60 + m;
+    });
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return hours + minutes / 100;
+  };
+
+  const total50 = sumTime(
+    Object.values(overtimeData).map((curr) => Number(curr.hours50) || 0)
   );
-  const total100 = Object.values(overtimeData).reduce(
-    (acc, curr) => acc + (Number(curr.hours100) || 0),
-    0
+  const total100 = sumTime(
+    Object.values(overtimeData).map((curr) => Number(curr.hours100) || 0)
   );
 
   return (
@@ -375,20 +387,23 @@ export const MonthlyReport = () => {
                     </td>
                     <td className="border border-gray-300 p-1 text-center">
                       <div className="flex gap-1 justify-center">
-                        {dayRecords.map((r, idx) =>
-                          r.photo_url ? (
+                        {dayRecords.map((r, idx) => {
+                          const baseUrl =
+                            process.env.REACT_APP_URL?.replace(/\/api$/, "") ||
+                            "";
+                          return r.photo_url ? (
                             <img
                               key={idx}
-                              src={`${
-                                process.env.REACT_APP_URL ||
-                                "http://localhost:3000"
-                              }/${r.photo_url.replace(/\\/g, "/")}`}
+                              src={`${baseUrl}/${r.photo_url.replace(
+                                /\\/g,
+                                "/"
+                              )}`}
                               alt="ref"
                               className="w-8 h-8 object-cover rounded-full border border-gray-200"
                               title={r.type}
                             />
-                          ) : null
-                        )}
+                          ) : null;
+                        })}
                       </div>
                     </td>
                   </tr>
