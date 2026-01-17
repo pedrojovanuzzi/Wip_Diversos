@@ -32,7 +32,6 @@ export const MonthlyReport = () => {
           overflow: hidden;
         }
         .print-container {
-           transform: scale(0.75);
            transform-origin: top center;
            width: 100%;
         }
@@ -46,9 +45,7 @@ export const MonthlyReport = () => {
 
   const fetchEmployees = async () => {
     try {
-      const url = `${
-        process.env.REACT_APP_API_URL || "http://localhost:3000"
-      }/api/time-tracking/employee`;
+      const url = `${process.env.REACT_APP_URL}/time-tracking/employee`;
       console.log("Fetching employees from:", url);
       const res = await axios.get(url);
       console.log("Employees fetched:", res.data);
@@ -64,9 +61,7 @@ export const MonthlyReport = () => {
       return;
     }
     try {
-      const url = `${
-        process.env.REACT_APP_API_URL || "http://localhost:3000"
-      }/api/time-tracking/records/${selectedEmployee}`;
+      const url = `${process.env.REACT_APP_URL}/time-tracking/records/${selectedEmployee}`;
       console.log("Fetching records from:", url);
 
       const res = await axios.get(url);
@@ -265,8 +260,7 @@ export const MonthlyReport = () => {
                             <img
                               key={idx}
                               src={`${
-                                process.env.REACT_APP_API_URL ||
-                                "http://localhost:3000"
+                                process.env.REACT_APP_BASE_URL
                               }/${r.photo_url.replace(/\\/g, "/")}`}
                               alt="ref"
                               className="w-8 h-8 object-cover rounded-full border border-gray-200"

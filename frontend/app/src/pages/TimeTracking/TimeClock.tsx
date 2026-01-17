@@ -41,9 +41,7 @@ export const TimeClock = () => {
   const fetchEmployees = async () => {
     try {
       const res = await axios.get(
-        `${
-          process.env.REACT_APP_API_URL || "http://localhost:3000"
-        }/api/time-tracking/employee`
+        `${process.env.REACT_APP_URL}/time-tracking/employee`
       );
       setEmployees(res.data);
     } catch (error) {
@@ -77,18 +75,13 @@ export const TimeClock = () => {
     setMessage("");
 
     try {
-      await axios.post(
-        `${
-          process.env.REACT_APP_API_URL || "http://localhost:3000"
-        }/api/time-tracking/clock-in`,
-        {
-          employeeId,
-          lat: location.lat,
-          lng: location.lng,
-          photo,
-          type,
-        }
-      );
+      await axios.post(`${process.env.REACT_APP_URL}/time-tracking/clock-in`, {
+        employeeId,
+        lat: location.lat,
+        lng: location.lng,
+        photo,
+        type,
+      });
       setMessage(`Ponto registrado com sucesso: ${type}!`);
       setEmployeeId(""); // Clear input
     } catch (error) {

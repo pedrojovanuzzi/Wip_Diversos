@@ -19,9 +19,7 @@ export const EmployeeManager = () => {
 
   const fetchEmployees = async () => {
     try {
-      const url = `${
-        process.env.REACT_APP_API_URL || "http://localhost:3000"
-      }/api/time-tracking/employee`;
+      const url = `${process.env.REACT_APP_URL}/time-tracking/employee`;
       console.log("Manager: Fetching from", url);
       const res = await axios.get(url);
       setEmployees(res.data);
@@ -39,9 +37,7 @@ export const EmployeeManager = () => {
     setLoading(true);
     try {
       await axios.post(
-        `${
-          process.env.REACT_APP_API_URL || "http://localhost:3000"
-        }/api/time-tracking/employee`,
+        `${process.env.REACT_APP_URL}/time-tracking/employee`,
         form
       );
       console.log("Manager: Created employee");
@@ -60,9 +56,7 @@ export const EmployeeManager = () => {
     if (!window.confirm("Tem certeza que deseja excluir?")) return;
     try {
       await axios.delete(
-        `${
-          process.env.REACT_APP_API_URL || "http://localhost:3000"
-        }/api/time-tracking/employee/${id}`
+        `${process.env.REACT_APP_URL}/time-tracking/employee/${id}`
       );
       console.log("Manager: Deleted employee", id);
       fetchEmployees();

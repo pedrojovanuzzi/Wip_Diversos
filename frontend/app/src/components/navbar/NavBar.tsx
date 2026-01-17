@@ -117,22 +117,24 @@ export const NavBar = ({ color = "black" }: Color) => {
               </Link>
             </li> */}
             {permission >= 5 && (
-              <li className="p-2 grid place-items-center col-span-2">
-                <Link to="/Create">
-                  <FaUserPlus className="text-white size-8 transition-all hover:text-green-400" />
-                </Link>
-              </li>
+              <>
+                <li className="p-2 grid place-items-center col-span-2">
+                  <Link to="/Create">
+                    <FaUserPlus className="text-white size-8 transition-all hover:text-green-400" />
+                  </Link>
+                </li>
+                <li className="p-2 grid place-items-center col-span-2">
+                  <Link to="/TimeTracking/Admin">
+                    <FaUsers className="text-white size-8 transition-all hover:text-green-400" />
+                  </Link>
+                </li>
+              </>
             )}
             {permission >= 2 && (
               <>
                 <li className="p-2 grid place-items-center col-span-2">
                   <Link to="/TimeTracking/ClockIn">
                     <FaClock className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/TimeTracking/Admin">
-                    <FaUsers className="text-white size-8 transition-all hover:text-green-400" />
                   </Link>
                 </li>
                 <li className="p-2 grid place-items-center col-span-2">
