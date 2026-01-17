@@ -1,6 +1,7 @@
 import { Router } from "express";
 import EmployeeController from "../controller/EmployeeController";
 import TimeRecordController from "../controller/TimeRecordController";
+import DailyOvertimeController from "../controller/DailyOvertimeController";
 
 const TimeTrackingRoutes = Router();
 
@@ -15,6 +16,13 @@ TimeTrackingRoutes.post("/clock-in", TimeRecordController.clockIn);
 TimeTrackingRoutes.get(
   "/records/:employeeId",
   TimeRecordController.listByEmployee
+);
+
+// Overtime Routes
+TimeTrackingRoutes.post("/overtime", DailyOvertimeController.save);
+TimeTrackingRoutes.get(
+  "/overtime/:employeeId/:month/:year",
+  DailyOvertimeController.getByMonth
 );
 
 export default TimeTrackingRoutes;

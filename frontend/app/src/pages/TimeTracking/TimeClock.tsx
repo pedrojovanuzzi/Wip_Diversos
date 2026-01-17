@@ -14,6 +14,13 @@ export const TimeClock = () => {
     null
   );
 
+  const [mode, setMode] = useState<"clock" | "overtime">("clock");
+  const [overtimeDate, setOvertimeDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [overtime50, setOvertime50] = useState("");
+  const [overtime100, setOvertime100] = useState("");
+
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
     return imageSrc;
@@ -92,6 +99,41 @@ export const TimeClock = () => {
     }
   };
 
+  const handleOvertime = async () => {
+    if (!employeeId) {
+      setMessage("Por favor, selecione o Nome do funcionário.");
+      return;
+    }
+    if (!overtimeDate) {
+      setMessage("Selecione a data.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      // Convert minutes to hours
+      const h50 = (parseFloat(overtime50) || 0) / 60;
+      const h100 = (parseFloat(overtime100) || 0) / 60;
+
+      await axios.post(`${process.env.REACT_APP_URL}/time-tracking/overtime`, {
+        employeeId,
+        date: overtimeDate,
+        hours50: h50,
+        hours100: h100,
+      });
+      setMessage("Horas extras registradas com sucesso!");
+      setOvertime50("");
+      setOvertime100("");
+    } catch (error) {
+      console.error(error);
+      setMessage("Erro ao registrar horas extras.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <NavBar></NavBar>
@@ -130,36 +172,108 @@ export const TimeClock = () => {
             ))}
           </select>
 
-          <div className="grid grid-cols-2 gap-3 w-full">
+          <div className="flex space-x-2 mb-4 w-full">
             <button
-              onClick={() => handleClockIn("Entrada")}
-              disabled={loading}
-              className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+              onClick={() => setMode("clock")}
+              className={`flex-1 py-2 rounded ${
+                mode === "clock"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 text-gray-700"
+              }`}
             >
-              Entrada
+              Ponto
             </button>
             <button
-              onClick={() => handleClockIn("Saída Almoço")}
-              disabled={loading}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded transition duration-200"
+              onClick={() => setMode("overtime")}
+              className={`flex-1 py-2 rounded ${
+                mode === "overtime"
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-200 text-gray-700"
+              }`}
             >
-              Saída Almoço
-            </button>
-            <button
-              onClick={() => handleClockIn("Volta Almoço")}
-              disabled={loading}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded transition duration-200"
-            >
-              Volta Almoço
-            </button>
-            <button
-              onClick={() => handleClockIn("Saída")}
-              disabled={loading}
-              className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200"
-            >
-              Saída
+              Hora Extra
             </button>
           </div>
+
+          {mode === "clock" ? (
+            <div className="grid grid-cols-2 gap-3 w-full">
+              <button
+                onClick={() => handleClockIn("Entrada")}
+                disabled={loading}
+                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+              >
+                Entrada
+              </button>
+              <button
+                onClick={() => handleClockIn("Saída Almoço")}
+                disabled={loading}
+                className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded transition duration-200"
+              >
+                Saída Almoço
+              </button>
+              <button
+                onClick={() => handleClockIn("Volta Almoço")}
+                disabled={loading}
+                className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+              >
+                Volta Almoço
+              </button>
+              <button
+                onClick={() => handleClockIn("Saída")}
+                disabled={loading}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+              >
+                Saída
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col w-full gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Data
+                </label>
+                <input
+                  type="date"
+                  value={overtimeDate}
+                  onChange={(e) => setOvertimeDate(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded"
+                />
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    50% (Minutos)
+                  </label>
+                  <input
+                    type="number"
+                    value={overtime50}
+                    onChange={(e) => setOvertime50(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded"
+                    placeholder="Ex: 75 Minutos"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    100% (Minutos)
+                  </label>
+                  <input
+                    type="number"
+                    value={overtime100}
+                    onChange={(e) => setOvertime100(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded"
+                    placeholder="Ex: 125 Minutos"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleOvertime}
+                disabled={loading}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded transition duration-200 w-full"
+              >
+                Registrar Hora Extra
+              </button>
+            </div>
+          )}
 
           {loading && (
             <div className="mt-4 flex items-center text-blue-600">

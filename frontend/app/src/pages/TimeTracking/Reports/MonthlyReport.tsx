@@ -14,6 +14,9 @@ export const MonthlyReport = () => {
   const [records, setRecords] = useState<any[]>([]);
   const [signature, setSignature] = useState<string | null>(null);
   const [showSigModal, setShowSigModal] = useState(false);
+  const [overtimeData, setOvertimeData] = useState<{
+    [key: string]: { hours50: any; hours100: any };
+  }>({});
 
   const componentRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
@@ -35,6 +38,11 @@ export const MonthlyReport = () => {
            transform-origin: top center;
            width: 100%;
         }
+        input {
+          border: none;
+          background: transparent;
+          text-align: center;
+        }
       }
     `,
   });
@@ -55,6 +63,26 @@ export const MonthlyReport = () => {
     }
   };
 
+  const fetchOvertime = async () => {
+    try {
+      if (!selectedEmployee) return;
+      const res = await axios.get(
+        `${process.env.REACT_APP_URL}/time-tracking/overtime/${selectedEmployee}/${month}/${year}`
+      );
+      const data: any = {};
+      res.data.forEach((r: any) => {
+        const d = moment(r.date.toString().split("T")[0]).format("DD/MM/YYYY");
+        data[d] = {
+          hours50: Number(r.hours50),
+          hours100: Number(r.hours100),
+        };
+      });
+      setOvertimeData(data);
+    } catch (error) {
+      console.error("Error fetching overtime:", error);
+    }
+  };
+
   const fetchRecords = async () => {
     if (!selectedEmployee) {
       alert("Selecione um funcionário!");
@@ -70,9 +98,48 @@ export const MonthlyReport = () => {
       if (res.data.length === 0) {
         alert("Nenhum registro encontrado para este funcionário.");
       }
+      // Also fetch overtime data
+      fetchOvertime();
     } catch (error) {
       console.error("Error fetching records:", error);
       alert("Erro ao buscar registros check o console.");
+    }
+  };
+
+  const handleOvertimeChange = (
+    date: string,
+    field: "hours50" | "hours100",
+    value: string
+  ) => {
+    setOvertimeData((prev) => ({
+      ...prev,
+      [date]: {
+        ...(prev[date] || { hours50: 0, hours100: 0 }),
+        [field]: value,
+      },
+    }));
+  };
+
+  const saveOvertime = async (
+    date: string,
+    hours50: string,
+    hours100: string
+  ) => {
+    try {
+      // Convert date DD/MM/YYYY to YYYY-MM-DD
+      const [d, m, y] = date.split("/");
+      const formattedDate = `${y}-${m}-${d}`;
+
+      await axios.post(`${process.env.REACT_APP_URL}/time-tracking/overtime`, {
+        employeeId: selectedEmployee,
+        date: formattedDate,
+        hours50: hours50,
+        hours100: hours100,
+      });
+      console.log("Saved overtime for", date);
+    } catch (err) {
+      console.error("Error saving overtime", err);
+      alert("Erro ao salvar hora extra");
     }
   };
 
@@ -106,6 +173,16 @@ export const MonthlyReport = () => {
 
   const grouped = getGroupedRecords();
   const employeeData = employees.find((e) => e.id === Number(selectedEmployee));
+
+  // Calculate Totals
+  const total50 = Object.values(overtimeData).reduce(
+    (acc, curr) => acc + (Number(curr.hours50) || 0),
+    0
+  );
+  const total100 = Object.values(overtimeData).reduce(
+    (acc, curr) => acc + (Number(curr.hours100) || 0),
+    0
+  );
 
   return (
     <>
@@ -220,6 +297,8 @@ export const MonthlyReport = () => {
                 <th className="border border-gray-300 p-1">
                   Registros (Horário - Tipo)
                 </th>
+                <th className="border border-gray-300 p-1 w-16">H.E. 50%</th>
+                <th className="border border-gray-300 p-1 w-16">H.E. 100%</th>
                 <th className="border border-gray-300 p-1">Foto</th>
               </tr>
             </thead>
@@ -231,6 +310,11 @@ export const MonthlyReport = () => {
                     new Date(a.timestamp).getTime() -
                     new Date(b.timestamp).getTime()
                 );
+
+                const currentOvertime = overtimeData[date] || {
+                  hours50: "",
+                  hours100: "",
+                };
 
                 return (
                   <tr key={date}>
@@ -254,13 +338,49 @@ export const MonthlyReport = () => {
                       </div>
                     </td>
                     <td className="border border-gray-300 p-1 text-center">
+                      <input
+                        type="number"
+                        className="w-full text-center bg-transparent focus:outline-none"
+                        value={currentOvertime.hours50}
+                        onChange={(e) =>
+                          handleOvertimeChange(date, "hours50", e.target.value)
+                        }
+                        onBlur={(e) =>
+                          saveOvertime(
+                            date,
+                            e.target.value,
+                            String(currentOvertime.hours100)
+                          )
+                        }
+                        placeholder="-"
+                      />
+                    </td>
+                    <td className="border border-gray-300 p-1 text-center">
+                      <input
+                        type="number"
+                        className="w-full text-center bg-transparent focus:outline-none"
+                        value={currentOvertime.hours100}
+                        onChange={(e) =>
+                          handleOvertimeChange(date, "hours100", e.target.value)
+                        }
+                        onBlur={(e) =>
+                          saveOvertime(
+                            date,
+                            String(currentOvertime.hours50),
+                            e.target.value
+                          )
+                        }
+                        placeholder="-"
+                      />
+                    </td>
+                    <td className="border border-gray-300 p-1 text-center">
                       <div className="flex gap-1 justify-center">
                         {dayRecords.map((r, idx) =>
                           r.photo_url ? (
                             <img
                               key={idx}
                               src={`${
-                                process.env.REACT_APP_API_URL ||
+                                process.env.REACT_APP_URL ||
                                 "http://localhost:3000"
                               }/${r.photo_url.replace(/\\/g, "/")}`}
                               alt="ref"
@@ -274,6 +394,22 @@ export const MonthlyReport = () => {
                   </tr>
                 );
               })}
+              {/* Totals Row */}
+              <tr className="bg-gray-100 font-bold">
+                <td
+                  className="border border-gray-300 p-1 text-right"
+                  colSpan={2}
+                >
+                  TOTAIS
+                </td>
+                <td className="border border-gray-300 p-1 text-center">
+                  {total50 > 0 ? total50.toFixed(2) : "-"}
+                </td>
+                <td className="border border-gray-300 p-1 text-center">
+                  {total100 > 0 ? total100.toFixed(2) : "-"}
+                </td>
+                <td className="border border-gray-300 p-1"></td>
+              </tr>
             </tbody>
           </table>
 
