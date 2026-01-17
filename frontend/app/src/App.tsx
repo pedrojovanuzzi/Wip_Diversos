@@ -40,6 +40,10 @@ import { CriarChamado } from "./pages/TokenAutoAtendimento/CriarChamado";
 import { FazerCadastro } from "./pages/TokenAutoAtendimento/FazerCadastro";
 import { PdfViewer } from "./pages/PdfViewer/PdfViewer";
 import { GerarNotaDeServicoIndependente } from "./pages/Nfe/GerarNotaDeServicoIndependente";
+import { TimeClock } from "./pages/TimeTracking/TimeClock";
+import { EmployeeManager } from "./pages/TimeTracking/Admin/EmployeeManager";
+import { TimeTrackingMap } from "./pages/TimeTracking/TimeTrackingMap";
+import { MonthlyReport } from "./pages/TimeTracking/Reports/MonthlyReport";
 
 function App() {
   const { user, loading, logout } = useAuth();
@@ -355,6 +359,37 @@ function App() {
           <Route
             path="/GerarNotaDeServicoIndependente"
             element={<GerarNotaDeServicoIndependente />}
+          />
+          <Route path="/TimeTracking/ClockIn" element={<TimeClock />} />
+          <Route
+            path="/TimeTracking/Admin"
+            element={
+              user?.token && user.permission >= 5 ? (
+                <EmployeeManager />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/TimeTracking/Map"
+            element={
+              user?.token && user.permission >= 5 ? (
+                <TimeTrackingMap />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/TimeTracking/Report"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <MonthlyReport />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
           />
         </Routes>
       </div>
