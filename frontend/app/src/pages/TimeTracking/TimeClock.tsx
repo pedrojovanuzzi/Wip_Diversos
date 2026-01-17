@@ -3,6 +3,7 @@ import Webcam from "react-webcam";
 import axios from "axios";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { NavBar } from "../../components/navbar/NavBar";
+import moment from "moment";
 
 export const TimeClock = () => {
   const webcamRef = useRef<Webcam>(null);
@@ -12,6 +13,10 @@ export const TimeClock = () => {
   const [employees, setEmployees] = useState<any[]>([]);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
     null
+  );
+
+  const [selectedTime, setSelectedTime] = useState(
+    moment().format("YYYY-MM-DDTHH:mm:ss")
   );
 
   const [mode, setMode] = useState<"clock" | "overtime">("clock");
@@ -100,6 +105,7 @@ export const TimeClock = () => {
         lng: location.lng,
         photo,
         type,
+        timestamp: selectedTime,
       });
       setMessage(`Ponto registrado com sucesso: ${type}!`);
       setEmployeeId(""); // Clear input
@@ -223,6 +229,18 @@ export const TimeClock = () => {
 
           {mode === "clock" ? (
             <div className="grid grid-cols-2 gap-3 w-full">
+              <div className="col-span-2 mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Data e Hora
+                </label>
+                <input
+                  type="datetime-local"
+                  step="1"
+                  value={selectedTime}
+                  onChange={(e) => setSelectedTime(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded"
+                />
+              </div>
               <button
                 onClick={() => handleClockIn("Entrada")}
                 disabled={loading}

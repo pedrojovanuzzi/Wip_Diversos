@@ -12,7 +12,7 @@ class TimeRecordController {
 
   clockIn = async (req: Request, res: Response) => {
     try {
-      const { employeeId, lat, lng, photo, type } = req.body;
+      const { employeeId, lat, lng, photo, type, timestamp } = req.body;
       const employee = await this.employeeRepo.findOneBy({
         id: Number(employeeId),
       });
@@ -49,7 +49,7 @@ class TimeRecordController {
 
       const record = this.timeRepo.create({
         employee,
-        timestamp: new Date(),
+        timestamp: timestamp ? new Date(timestamp) : new Date(),
         location: `${lat},${lng}`,
         photo_url: photoPath,
         type: type || "entry", // Default or provided
