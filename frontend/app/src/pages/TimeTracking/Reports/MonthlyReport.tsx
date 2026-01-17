@@ -351,37 +351,19 @@ export const MonthlyReport = () => {
                     </td>
                     <td className="border border-gray-300 p-1 text-center">
                       <input
+                        readOnly
                         type="number"
                         className="w-full text-center bg-transparent focus:outline-none"
                         value={currentOvertime.hours50}
-                        onChange={(e) =>
-                          handleOvertimeChange(date, "hours50", e.target.value)
-                        }
-                        onBlur={(e) =>
-                          saveOvertime(
-                            date,
-                            e.target.value,
-                            String(currentOvertime.hours100)
-                          )
-                        }
                         placeholder="-"
                       />
                     </td>
                     <td className="border border-gray-300 p-1 text-center">
                       <input
+                        readOnly
                         type="number"
                         className="w-full text-center bg-transparent focus:outline-none"
                         value={currentOvertime.hours100}
-                        onChange={(e) =>
-                          handleOvertimeChange(date, "hours100", e.target.value)
-                        }
-                        onBlur={(e) =>
-                          saveOvertime(
-                            date,
-                            String(currentOvertime.hours50),
-                            e.target.value
-                          )
-                        }
                         placeholder="-"
                       />
                     </td>

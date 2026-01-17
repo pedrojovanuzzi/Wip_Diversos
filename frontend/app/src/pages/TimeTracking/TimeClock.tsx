@@ -38,7 +38,8 @@ export const TimeClock = () => {
         (error) => {
           console.error("Error getting location: ", error);
           setMessage("Erro ao obter localização. Permita o acesso.");
-        }
+        },
+        { enableHighAccuracy: true }
       );
     } else {
       setMessage("Geolocalização não suportada neste navegador.");

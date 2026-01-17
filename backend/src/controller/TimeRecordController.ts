@@ -76,6 +76,21 @@ class TimeRecordController {
       res.status(500).json({ error: "Error fetching records" });
     }
   };
+
+  listAll = async (req: Request, res: Response) => {
+    try {
+      // Optional: limit to last 30 days or similar if needed
+      const records = await this.timeRepo.find({
+        relations: ["employee"],
+        order: { timestamp: "DESC" },
+        take: 500, // Limit to prevent overload
+      });
+      res.json(records);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Error fetching all records" });
+    }
+  };
 }
 
 export default new TimeRecordController();

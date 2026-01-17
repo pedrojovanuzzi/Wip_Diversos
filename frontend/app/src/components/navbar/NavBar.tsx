@@ -16,6 +16,7 @@ import {
   FaClock,
   FaUsers,
   FaClipboardList,
+  FaMapMarkedAlt,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -29,9 +30,10 @@ import Cookies from "js-cookie";
 
 type Color = {
   color?: string;
+  className?: string;
 };
 
-export const NavBar = ({ color = "black" }: Color) => {
+export const NavBar = ({ color = "black", className = "" }: Color) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const { user } = useAuth();
@@ -57,9 +59,9 @@ export const NavBar = ({ color = "black" }: Color) => {
 
   return (
     <div
-      className={`z-10 sm:h-screen  ${
+      className={`z-10 relative sm:h-screen  ${
         isOpen ? "sm:w-32" : "sm:w-0"
-      } bg-stone-800 sm:fixed sm:top-0 sm:left-0 grid sm:grid-rows-[auto,1fr] p-4 sm:p-0 sm:pt-10 transition-all duration-300`}
+      } bg-stone-800 sm:fixed sm:top-0 sm:left-0 grid sm:grid-rows-[auto,1fr] p-4 sm:p-0 sm:pt-10 transition-all duration-300 ${className}`}
     >
       <nav className="sm:w-full sm:p-4 grid place-items-center relative">
         {/* Ícone de menu "HiBars3" para dispositivos móveis */}
@@ -126,6 +128,11 @@ export const NavBar = ({ color = "black" }: Color) => {
                 <li className="p-2 grid place-items-center col-span-2">
                   <Link to="/TimeTracking/Admin">
                     <FaUsers className="text-white size-8 transition-all hover:text-green-400" />
+                  </Link>
+                </li>
+                <li className="p-2 grid place-items-center col-span-2">
+                  <Link to="/TimeTracking/Map">
+                    <FaMapMarkedAlt className="text-white size-8 transition-all hover:text-green-400" />
                   </Link>
                 </li>
               </>
