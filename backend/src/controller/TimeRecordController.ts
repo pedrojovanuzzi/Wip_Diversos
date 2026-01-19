@@ -30,13 +30,7 @@ class TimeRecordController {
           const data = match[2];
           const buffer = Buffer.from(data, "base64");
           const fileName = `${uuidv4()}.png`; // Simple assumption
-          const uploadDir = path.resolve(
-            __dirname,
-            "..",
-            "..",
-            "uploads",
-            "time_records",
-          );
+          const uploadDir = path.join(process.cwd(), "uploads", "time_records");
 
           if (!fs.existsSync(uploadDir)) {
             fs.mkdirSync(uploadDir, { recursive: true });
@@ -45,7 +39,7 @@ class TimeRecordController {
           photoPath = path
             .join("uploads", "time_records", fileName)
             .replace(/\\/g, "/");
-          fs.writeFileSync(path.resolve(uploadDir, fileName), buffer);
+          fs.writeFileSync(path.join(uploadDir, fileName), buffer);
         }
       }
 

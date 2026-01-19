@@ -46,7 +46,7 @@ export class App {
     this.server.use(cors({ origin: process.env.URL }));
     this.server.use(
       "/uploads",
-      express.static(path.resolve(__dirname, "..", "uploads"))
+      express.static(path.join(process.cwd(), "uploads")),
     );
   }
 
@@ -76,7 +76,7 @@ export class App {
     cron.schedule("0 3 * * *", async () => {
       console.log(
         "⏰ Executando backup automático",
-        new Date().toLocaleString()
+        new Date().toLocaleString(),
       );
       try {
         await backup.gerarTodos();
