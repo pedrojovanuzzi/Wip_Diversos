@@ -3,6 +3,7 @@ import Webcam from "react-webcam";
 import axios from "axios";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { NavBar } from "../../components/navbar/NavBar";
+import { SignatureModal } from "../../components/SignatureModal";
 import moment from "moment";
 
 export const TimeClock = () => {
@@ -12,19 +13,26 @@ export const TimeClock = () => {
   const [message, setMessage] = useState("");
   const [employees, setEmployees] = useState<any[]>([]);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
-    null
+    null,
   );
 
   const [selectedTime, setSelectedTime] = useState(
-    moment().format("YYYY-MM-DDTHH:mm:ss")
+    moment().format("YYYY-MM-DDTHH:mm:ss"),
   );
 
-  const [mode, setMode] = useState<"clock" | "overtime">("clock");
   const [overtimeDate, setOvertimeDate] = useState(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [overtime50, setOvertime50] = useState("");
   const [overtime100, setOvertime100] = useState("");
+
+  const [signatureDate, setSignatureDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [showSigModal, setShowSigModal] = useState(false);
+  const [signatureMode, setSignatureMode] = useState<
+    "clock" | "overtime" | "signature"
+  >("clock");
 
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
@@ -44,8 +52,8 @@ export const TimeClock = () => {
           if (position.coords.accuracy > 100) {
             setMessage(
               `Atenção: A precisão do GPS está baixa (${Math.round(
-                position.coords.accuracy
-              )}m). Tente usar o celular.`
+                position.coords.accuracy,
+              )}m). Tente usar o celular.`,
             );
           } else {
             setMessage(""); // Clear "waiting" or error messages
@@ -55,7 +63,7 @@ export const TimeClock = () => {
           console.error("Error getting location: ", error);
           setMessage("Erro ao obter localização. Permita o acesso.");
         },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
       );
     } else {
       setMessage("Geolocalização não suportada neste navegador.");
@@ -65,7 +73,7 @@ export const TimeClock = () => {
   const fetchEmployees = async () => {
     try {
       const res = await axios.get(
-        `${process.env.REACT_APP_URL}/time-tracking/employee`
+        `${process.env.REACT_APP_URL}/time-tracking/employee`,
       );
       setEmployees(res.data);
     } catch (error) {
@@ -77,6 +85,14 @@ export const TimeClock = () => {
     getLocation();
     fetchEmployees();
   }, []);
+
+  // Sync signatureDate with selectedTime
+  React.useEffect(() => {
+    if (selectedTime) {
+      const datePart = selectedTime.split("T")[0];
+      setSignatureDate(datePart);
+    }
+  }, [selectedTime]);
 
   const handleClockIn = async (type: string) => {
     if (!employeeId) {
@@ -166,6 +182,36 @@ export const TimeClock = () => {
     }
   };
 
+  const handleSaveSignature = async (signatureData: string) => {
+    if (!employeeId) {
+      alert("Selecione um funcionário primeiro!");
+      return;
+    }
+    if (!signatureDate) {
+      alert("Selecione uma data!");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const [y, m, d] = signatureDate.split("-");
+      const formattedDate = `${y}-${m}-${d}`;
+
+      await axios.post(`${process.env.REACT_APP_URL}/time-tracking/signature`, {
+        employeeId,
+        date: formattedDate,
+        signature: signatureData,
+      });
+      setMessage("Assinatura salva com sucesso!");
+      setShowSigModal(false);
+    } catch (error) {
+      console.error("Error saving signature:", error);
+      setMessage("Erro ao salvar assinatura.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <NavBar></NavBar>
@@ -206,9 +252,9 @@ export const TimeClock = () => {
 
           <div className="flex space-x-2 mb-4 w-full">
             <button
-              onClick={() => setMode("clock")}
-              className={`flex-1 py-2 rounded ${
-                mode === "clock"
+              onClick={() => setSignatureMode("clock")}
+              className={`flex-1 py-2 rounded text-sm font-medium ${
+                signatureMode === "clock"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-200 text-gray-700"
               }`}
@@ -216,9 +262,9 @@ export const TimeClock = () => {
               Ponto
             </button>
             <button
-              onClick={() => setMode("overtime")}
-              className={`flex-1 py-2 rounded ${
-                mode === "overtime"
+              onClick={() => setSignatureMode("overtime")}
+              className={`flex-1 py-2 rounded text-sm font-medium ${
+                signatureMode === "overtime"
                   ? "bg-purple-600 text-white"
                   : "bg-gray-200 text-gray-700"
               }`}
@@ -227,7 +273,7 @@ export const TimeClock = () => {
             </button>
           </div>
 
-          {mode === "clock" ? (
+          {signatureMode === "clock" && (
             <div className="grid grid-cols-2 gap-3 w-full">
               <div className="col-span-2 mb-2">
                 <label className="block text-sm font-medium text-gray-700">
@@ -269,8 +315,29 @@ export const TimeClock = () => {
               >
                 Saída
               </button>
+
+              {/* Signature Section Moved Here */}
+              <div className="col-span-2 mt-4 pt-4 border-t border-gray-200">
+                <div className="flex justify-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (!employeeId) {
+                        setMessage("Selecione um funcionário primeiro.");
+                        return;
+                      }
+                      setShowSigModal(true);
+                    }}
+                    disabled={loading}
+                    className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded transition duration-200 flex items-center justify-center gap-2"
+                  >
+                    <span>✍️</span> Assinar Dia
+                  </button>
+                </div>
+              </div>
             </div>
-          ) : (
+          )}
+
+          {signatureMode === "overtime" && (
             <div className="flex flex-col w-full gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -337,6 +404,13 @@ export const TimeClock = () => {
           )}
         </div>
       </div>
+
+      {showSigModal && (
+        <SignatureModal
+          onClose={() => setShowSigModal(false)}
+          onSave={handleSaveSignature}
+        />
+      )}
     </>
   );
 };
