@@ -26,7 +26,14 @@ export const SignatureModal: React.FC<Props> = ({ onSave, onClose }) => {
           <SignatureCanvas
             ref={sigCanvas}
             penColor="black"
-            canvasProps={{ className: "w-full h-full" }}
+            velocityFilterWeight={0.7}
+            minWidth={1}
+            maxWidth={2.5}
+            throttle={16}
+            canvasProps={{
+              className: "w-full h-full",
+              style: { width: "100%", height: "100%" },
+            }}
           />
         </div>
         <div className="flex justify-end gap-2">
