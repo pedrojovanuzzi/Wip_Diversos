@@ -34,6 +34,10 @@ export const MonthlyReport = () => {
           padding: 0 !important;
           overflow: hidden;
         }
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
         .print-container {
            transform-origin: top center;
            width: 100%;
