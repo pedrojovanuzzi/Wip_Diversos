@@ -29,7 +29,7 @@ export const MonthlyReport = () => {
     pageStyle: `
       @page {
         size: A4;
-        margin: 5mm;
+        margin: 3mm;
       }
       @media print {
         html, body {
@@ -326,18 +326,20 @@ export const MonthlyReport = () => {
 
         {/* Report Area */}
         <div
-          className="bg-white p-4 shadow-lg mx-auto max-w-4xl print-container"
+          className="bg-white p-1 shadow-lg mx-auto max-w-4xl print-container"
           ref={componentRef}
         >
-          <div className="text-center mb-2 border-b pb-2">
-            <h2 className="text-xs font-bold uppercase">Folha de Ponto</h2>
-            <p className="text-gray-600">
-              Período: {month}/{year}
-            </p>
+          <div className="text-center border-b pb-1">
+            <h2 className="text-xs font-bold uppercase">
+              Folha de Ponto Mensal / Período: {month}/{year}
+            </h2>
+          </div>
+          <div className="text-center text-xs mb-1 text-gray-600">
+            <p>Empresa: WIP TELECOM MULTIMIDIA EIRELI - 20.843.290/0001-01</p>
           </div>
 
           {employeeData && (
-            <div className="mb-1 grid grid-cols-4 gap-1 text-[10px]">
+            <div className="mb-2 grid grid-cols-4 gap-1 text-[11px]">
               <div>
                 <strong>Nome:</strong> {employeeData.name}
               </div>
@@ -430,7 +432,7 @@ export const MonthlyReport = () => {
                         ) : (
                           <button
                             onClick={() => openSigModal(date)}
-                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-0.5 rounded text-[9px] border border-gray-300 no-print"
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-3 print:hidden rounded text-[9px] border border-gray-300 no-print"
                           >
                             Assinar
                           </button>
@@ -459,7 +461,7 @@ export const MonthlyReport = () => {
             </tbody>
           </table>
 
-          <div className="mt-2 flex justify-between items-end text-[10px]">
+          <div className="mt-4 flex justify-between items-end text-[10px]">
             <div className="text-center w-64">
               <div className="border-t border-black pt-1">
                 Assinatura do Empregador
@@ -494,7 +496,7 @@ export const MonthlyReport = () => {
             </div>
           </div>
 
-          <div className="text-[10px] text-center text-gray-400 mt-2">
+          <div className="text-[10px] text-center text-gray-400 mt-4">
             Gerado automaticamente por Sistema de Ponto WIP.
           </div>
         </div>
