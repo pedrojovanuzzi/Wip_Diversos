@@ -35,14 +35,16 @@ class TimeRecordController {
             "..",
             "..",
             "uploads",
-            "time_records"
+            "time_records",
           );
 
           if (!fs.existsSync(uploadDir)) {
             fs.mkdirSync(uploadDir, { recursive: true });
           }
 
-          photoPath = path.join("uploads", "time_records", fileName);
+          photoPath = path
+            .join("uploads", "time_records", fileName)
+            .replace(/\\/g, "/");
           fs.writeFileSync(path.resolve(uploadDir, fileName), buffer);
         }
       }

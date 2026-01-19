@@ -130,7 +130,7 @@ export const TimeTrackingMap = () => {
             <div style="text-align: center; margin-bottom: 5px;">
               <img src="${
                 record.photo_url
-                  ? `${process.env.REACT_APP_URL?.replace(/\/api$/, "")}/${record.photo_url}`
+                  ? `${process.env.REACT_APP_URL?.replace(/\/api$/, "")}/${record.photo_url.replace(/\\/g, "/")}`
                   : "https://via.placeholder.com/100"
               }" style="width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 2px solid #ccc;" />
             </div>
