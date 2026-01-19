@@ -2,8 +2,17 @@ import { Router } from "express";
 import EmployeeController from "../controller/EmployeeController";
 import TimeRecordController from "../controller/TimeRecordController";
 import DailyOvertimeController from "../controller/DailyOvertimeController";
+import ImageController from "../controller/ImageController";
+import AuthGuard from "../middleware/AuthGuard";
 
 const TimeTrackingRoutes = Router();
+
+// Protected Image Route
+TimeTrackingRoutes.get(
+  "/image/:filename",
+  AuthGuard,
+  ImageController.serveImage,
+);
 
 // Employee Routes
 TimeTrackingRoutes.post("/employee", EmployeeController.create);

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import axios from "axios";
+import Cookies from "js-cookie";
 import { NavBar } from "../../components/navbar/NavBar";
 
 // Fix Leaflet default icon issue
@@ -40,6 +41,19 @@ export const TimeTrackingMap = () => {
     new Date().toISOString().split("T")[0],
   );
   const [selectedType, setSelectedType] = useState<string>("");
+
+  const [token, setToken] = useState<string>("");
+
+  useEffect(() => {
+    const savedCookie = Cookies.get("user");
+    if (savedCookie) {
+      try {
+        setToken(JSON.parse(savedCookie));
+      } catch {
+        setToken("");
+      }
+    }
+  }, []);
 
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -122,17 +136,30 @@ export const TimeTrackingMap = () => {
 
         const dateStr = new Date(record.timestamp).toLocaleString();
 
+        const photoUrl = record.photo_url || "";
+        let imgSrc = "https://via.placeholder.com/100";
+
+        if (photoUrl) {
+          // Standardize path separators to slash
+          const normalizedPath = photoUrl.replace(/\\/g, "/");
+          const filename = normalizedPath.split("/").pop();
+
+          if (filename && token) {
+            // Use protected route
+            imgSrc = `${process.env.REACT_APP_URL}/time-tracking/image/${filename}?token=${token}`;
+          } else if (filename) {
+            // Fallback (though likely won't work in prod if protected)
+            imgSrc = `${process.env.REACT_APP_URL?.replace(/\/api$/, "")}/${normalizedPath}`;
+          }
+        }
+
         const popupContent = `
           <div style="font-family: sans-serif; font-size: 14px;">
             <strong style="display:block; font-size: 16px; margin-bottom: 4px;">
               ${record.employee?.name || "Funcionário"}
             </strong>
             <div style="text-align: center; margin-bottom: 5px;">
-              <img src="${
-                record.photo_url
-                  ? `${process.env.REACT_APP_URL?.replace(/\/api$/, "")}/${record.photo_url.replace(/\\/g, "/")}`
-                  : "https://via.placeholder.com/100"
-              }" style="width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 2px solid #ccc;" />
+              <img src="${imgSrc}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 2px solid #ccc;" />
             </div>
              <span style="color: #555;">${dateStr}</span><br/>
              <span style="
