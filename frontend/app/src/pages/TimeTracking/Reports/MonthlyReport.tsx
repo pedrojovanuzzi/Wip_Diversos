@@ -4,6 +4,7 @@ import { useReactToPrint } from "react-to-print";
 import moment from "moment";
 import { AiOutlinePrinter, AiOutlineEdit } from "react-icons/ai";
 import { NavBar } from "../../../components/navbar/NavBar";
+import { SignatureModal } from "../../../components/SignatureModal";
 
 export const MonthlyReport = () => {
   const [employees, setEmployees] = useState<any[]>([]);
@@ -18,6 +19,8 @@ export const MonthlyReport = () => {
   const [overtimeData, setOvertimeData] = useState<{
     [key: string]: { hours50: any; hours100: any };
   }>({});
+  const [monthlySignature, setMonthlySignature] = useState<string | null>(null);
+  const [showSigModal, setShowSigModal] = useState(false);
 
   const componentRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
@@ -26,7 +29,7 @@ export const MonthlyReport = () => {
     pageStyle: `
       @page {
         size: A4;
-        margin: 3mm;
+        margin: 1mm;
       }
       @media print {
         html, body {
@@ -91,6 +94,11 @@ export const MonthlyReport = () => {
     } catch (error) {
       console.error("Error fetching overtime:", error);
     }
+  };
+
+  const handleSaveSignature = (data: string) => {
+    setMonthlySignature(data);
+    setShowSigModal(false);
   };
 
   const fetchRecords = async () => {
@@ -421,8 +429,39 @@ export const MonthlyReport = () => {
             </div>
 
             <div className="text-center w-64">
-              {/* Employee Signature Area - Read Only or Just Line */}
-              <div className="h-10 mb-1"></div>
+              {/* Employee Signature Area */}
+              <div className="mb-1 flex flex-col items-center justify-end min-h-[60px]">
+                {monthlySignature ? (
+                  <div className="relative group">
+                    <img
+                      src={monthlySignature}
+                      alt="Assinatura Funcionário"
+                      className="h-12 scale-[200%] object-contain"
+                    />
+                    <button
+                      onClick={() => {
+                        if (window.confirm("Deseja refazer a assinatura?")) {
+                          setMonthlySignature(null);
+                        }
+                      }}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 text-[8px] opacity-0 group-hover:opacity-100 transition-opacity no-print"
+                      title="Refazer assinatura"
+                    >
+                      X
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center">
+                    <button
+                      onClick={() => setShowSigModal(true)}
+                      className="text-[20px] bg-gray-300 border border-gray-400 text-white px-6 py-2 rounded hover:bg-gray-700 no-print"
+                    >
+                      Assinar
+                    </button>
+                    <div className="h-10 w-full hidden print-block border-b border-gray-300"></div>
+                  </div>
+                )}
+              </div>
               <div className="border-t border-black pt-1 select-none">
                 Assinatura do Funcionário
               </div>
@@ -430,6 +469,12 @@ export const MonthlyReport = () => {
           </div>
         </div>
       </div>
+      {showSigModal && (
+        <SignatureModal
+          onClose={() => setShowSigModal(false)}
+          onSave={handleSaveSignature}
+        />
+      )}
     </>
   );
 };

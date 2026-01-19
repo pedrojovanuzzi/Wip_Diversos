@@ -3,6 +3,7 @@ import EmployeeController from "../controller/EmployeeController";
 import TimeRecordController from "../controller/TimeRecordController";
 import DailyOvertimeController from "../controller/DailyOvertimeController";
 import ImageController from "../controller/ImageController";
+import MonthlyReportSignatureController from "../controller/MonthlyReportSignatureController";
 import AuthGuard from "../middleware/AuthGuard";
 
 const TimeTrackingRoutes = Router();
@@ -35,6 +36,16 @@ TimeTrackingRoutes.post("/signature", DailyOvertimeController.saveSignature);
 TimeTrackingRoutes.get(
   "/overtime/:employeeId/:month/:year",
   DailyOvertimeController.getByMonth,
+);
+
+// Monthly Signature Routes
+TimeTrackingRoutes.post(
+  "/monthly-signature",
+  MonthlyReportSignatureController.save,
+);
+TimeTrackingRoutes.get(
+  "/monthly-signature/:employeeId/:month/:year",
+  MonthlyReportSignatureController.get,
 );
 
 export default TimeTrackingRoutes;
