@@ -333,8 +333,10 @@ export const MonthlyReport = () => {
                   hours100: "",
                 };
 
+                const isSunday = moment(date, "DD/MM/YYYY").day() === 0;
+
                 return (
-                  <tr key={date}>
+                  <tr key={date} className={isSunday ? "bg-gray-300" : ""}>
                     <td className="border border-gray-300 p-1 text-center font-medium">
                       {date}
                     </td>
@@ -381,9 +383,7 @@ export const MonthlyReport = () => {
                             className="scale-[200%] h-4 w-20 object-contain"
                           />
                         ) : (
-                          <span className="text-[8px] text-gray-400 italic">
-                            Pend.
-                          </span>
+                          <span className="text-[8px] text-gray-400 italic"></span>
                         )}
                       </div>
                     </td>
