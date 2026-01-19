@@ -15,7 +15,6 @@ const servidores = [
   { host: process.env.MIKROTIK_PPPOE2, nome: "PPPOE2" },
   { host: process.env.MIKROTIK_PPPOE3, nome: "PPPOE3" },
   { host: process.env.MIKROTIK_PPPOE4, nome: "PPPOE4" },
-  { host: process.env.MIKROTIK_PPPOE5, nome: "PPPOE5" },
 ];
 
 class ClientAnalytics {
@@ -108,74 +107,72 @@ class ClientAnalytics {
     }
   };
 
-pppoesLogs = async (req: Request, res: Response) => {
-  try {
-    const resultados: any[] = [];
+  pppoesLogs = async (req: Request, res: Response) => {
+    try {
+      const resultados: any[] = [];
 
-    for (const servidor of servidores) {
-      try {
-        const comando = `log print without-paging detail`;
-        const resposta = await this.executarSSH(servidor.host!, comando);
+      for (const servidor of servidores) {
+        try {
+          const comando = `log print without-paging detail`;
+          const resposta = await this.executarSSH(servidor.host!, comando);
 
-        // Regex para os servidores "normais" (data + extra-info)
-        const regexNormal =
-          /time=(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+topics=([^ ]+)\s+message="([^"]+)"\s+extra-info="([^"]*)"/g;
+          // Regex para os servidores "normais" (data + extra-info)
+          const regexNormal =
+            /time=(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+topics=([^ ]+)\s+message="([^"]+)"\s+extra-info="([^"]*)"/g;
 
-        // Regex específico para o PPPOE1 (só hora, sem extra-info)
-        const regexPPPOE1 =
-          /time=(\d{2}:\d{2}:\d{2})\s+topics=([^ ]+)\s+message="([^"]+)"/g;
+          // Regex específico para o PPPOE1 (só hora, sem extra-info)
+          const regexPPPOE1 =
+            /time=(\d{2}:\d{2}:\d{2})\s+topics=([^ ]+)\s+message="([^"]+)"/g;
 
-        // Escolhe qual regex usar
-        const regex = servidor.nome === "PPPOE1" ? regexPPPOE1 : regexNormal;
+          // Escolhe qual regex usar
+          const regex = servidor.nome === "PPPOE1" ? regexPPPOE1 : regexNormal;
 
-        const matches = [...resposta.matchAll(regex)];
+          const matches = [...resposta.matchAll(regex)];
 
-        for (const match of matches) {
-          // Se for PPPOE1, não existe "extra"
-          if (servidor.nome === "PPPOE1") {
-            const [, time, topics, message] = match;
+          for (const match of matches) {
+            // Se for PPPOE1, não existe "extra"
+            if (servidor.nome === "PPPOE1") {
+              const [, time, topics, message] = match;
 
-            if (message.startsWith("user api_diversos logged")) continue;
+              if (message.startsWith("user api_diversos logged")) continue;
 
-            const hoje = new Date().toISOString().split("T")[0]; // ex: "2025-10-03"
-            const dataCompleta = `${hoje} ${time}`;
+              const hoje = new Date().toISOString().split("T")[0]; // ex: "2025-10-03"
+              const dataCompleta = `${hoje} ${time}`;
 
-            resultados.push({
-              servidor: servidor.nome,
-              time: dataCompleta,
-              topics,
-              message,
-              extra: null, // mantém consistência no JSON
-            });
-          } else {
-            const [, time, topics, message, extra] = match;
+              resultados.push({
+                servidor: servidor.nome,
+                time: dataCompleta,
+                topics,
+                message,
+                extra: null, // mantém consistência no JSON
+              });
+            } else {
+              const [, time, topics, message, extra] = match;
 
-            if (message.startsWith("user api_diversos logged")) continue;
+              if (message.startsWith("user api_diversos logged")) continue;
 
-            resultados.push({
-              servidor: servidor.nome,
-              time,
-              topics,
-              message,
-              extra,
-            });
+              resultados.push({
+                servidor: servidor.nome,
+                time,
+                topics,
+                message,
+                extra,
+              });
+            }
           }
+        } catch (err: any) {
+          resultados.push({
+            servidor: servidor.nome,
+            erro: err.message || "Erro desconhecido",
+          });
         }
-      } catch (err: any) {
-        resultados.push({
-          servidor: servidor.nome,
-          erro: err.message || "Erro desconhecido",
-        });
       }
+
+      res.status(200).json(resultados);
+    } catch (error) {
+      res.status(500).json(error);
     }
-
-    res.status(200).json(resultados);
-  } catch (error) {
-    res.status(500).json(error);
-  }
-};
-
-
+  };
 
   desconections = async (req: Request, res: Response) => {
     try {
@@ -277,7 +274,7 @@ pppoesLogs = async (req: Request, res: Response) => {
       // limpa as mensagens "Press any key..." e espaços extras
       const cleaned = lines
         .map(
-          (l) => l.replace(/--Press any key.*?stop--/g, "").trim() // remove a mensagem
+          (l) => l.replace(/--Press any key.*?stop--/g, "").trim(), // remove a mensagem
         )
         .filter((l) => /^\d+/.test(l)); // mantém só linhas que começam com número (as ONUs)
 
@@ -308,7 +305,7 @@ pppoesLogs = async (req: Request, res: Response) => {
 
       const optic = await conn.exec(
         `show optic_module slot ${slot} pon ${pon} onu ${onuId}`,
-        { execTimeout: 30000 }
+        { execTimeout: 30000 },
       );
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -403,7 +400,7 @@ pppoesLogs = async (req: Request, res: Response) => {
         onuId = await this.buscarOnuIdPorMac(
           conn,
           `show online slot ${slot} pon ${pon}`,
-          snCliente
+          snCliente,
         );
       }
 
@@ -423,7 +420,7 @@ pppoesLogs = async (req: Request, res: Response) => {
 
       turnOff = await conn.exec(
         `reboot slot ${slot} pon ${pon} onulist ${onuId}`,
-        { timeout: 1000 }
+        { timeout: 1000 },
       );
 
       console.log("Turn off " + turnOff);
@@ -458,7 +455,7 @@ pppoesLogs = async (req: Request, res: Response) => {
               if (err) {
                 console.error(
                   `[ERRO] Erro ao executar comando no ${host}:`,
-                  err
+                  err,
                 );
                 conn.end();
                 return reject(err);
@@ -507,7 +504,7 @@ pppoesLogs = async (req: Request, res: Response) => {
   async buscarOnuIdPorMac(
     conn: Telnet,
     comando: string,
-    snClienteRaw: string
+    snClienteRaw: string,
   ): Promise<string> {
     try {
       const snCliente = this.normalizeMac(snClienteRaw);
@@ -604,7 +601,7 @@ pppoesLogs = async (req: Request, res: Response) => {
 
           // Verifica se há linha com "pppoe" e "address=" (ou IP no formato comum)
           const ativo = /pppoe\s+\S+\s+([0-9]{1,3}\.){3}[0-9]{1,3}/.test(
-            resposta
+            resposta,
           );
 
           resultados.push({
@@ -657,7 +654,7 @@ pppoesLogs = async (req: Request, res: Response) => {
 
         const respostaversaoMikrotik = await this.executarSSH(
           this.serverIp,
-          versaoMikrotik
+          versaoMikrotik,
         );
 
         let versao = "";
@@ -679,7 +676,7 @@ pppoesLogs = async (req: Request, res: Response) => {
 
         const conectadoResposta = await this.executarSSH(
           ipDoServidor,
-          conectadoComand
+          conectadoComand,
         );
 
         if (this.versao >= 7) {
@@ -717,7 +714,7 @@ pppoesLogs = async (req: Request, res: Response) => {
 
         const respostaFragment = await this.executarSSH(
           ipDoServidor,
-          comandoFragment
+          comandoFragment,
         );
 
         //console.log(respostaFragment);
@@ -754,7 +751,7 @@ pppoesLogs = async (req: Request, res: Response) => {
         //console.log("BUFFER");
         const respostaBuffer = await this.executarSSH(
           ipDoServidor,
-          comandoBuffer
+          comandoBuffer,
         );
 
         // //console.log(respostaBuffer);
@@ -763,7 +760,7 @@ pppoesLogs = async (req: Request, res: Response) => {
 
         const respostaVelocidade = await this.executarSSH(
           ipDoServidor,
-          comandoVelocidade
+          comandoVelocidade,
         );
 
         const linhasVelocidade = respostaVelocidade.split("\n");
@@ -811,7 +808,7 @@ pppoesLogs = async (req: Request, res: Response) => {
 
         const respostaVelocidade = await this.executarSSH(
           this.serverIp,
-          comandoVelocidade
+          comandoVelocidade,
         );
 
         const linhasVelocidade = respostaVelocidade.split("\n");
