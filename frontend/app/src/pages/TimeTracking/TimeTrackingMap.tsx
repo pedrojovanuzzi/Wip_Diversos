@@ -24,6 +24,7 @@ interface Record {
     id: number;
     name: string;
   };
+  photo_url?: string;
 }
 
 interface Employee {
@@ -35,6 +36,10 @@ export const TimeTrackingMap = () => {
   const [records, setRecords] = useState<Record[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>(
+    new Date().toISOString().split("T")[0],
+  );
+  const [selectedType, setSelectedType] = useState<string>("");
 
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -70,7 +75,7 @@ export const TimeTrackingMap = () => {
     if (mapContainerRef.current && !mapRef.current) {
       const map = L.map(mapContainerRef.current).setView(
         [-23.55052, -46.633308], // Default SP
-        10
+        10,
       );
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -90,9 +95,25 @@ export const TimeTrackingMap = () => {
       const bounds = L.latLngBounds([]);
 
       // Filter logic
-      const filteredRecords = selectedEmployee
-        ? records.filter((r) => r.employee?.id === Number(selectedEmployee))
-        : records;
+      const filteredRecords = records.filter((r) => {
+        // Employee Filter
+        if (selectedEmployee && r.employee?.id !== Number(selectedEmployee)) {
+          return false;
+        }
+
+        // Date Filter
+        if (selectedDate) {
+          const recordDate = new Date(r.timestamp).toISOString().split("T")[0];
+          if (recordDate !== selectedDate) return false;
+        }
+
+        // Type Filter
+        if (selectedType && r.type !== selectedType) {
+          return false;
+        }
+
+        return true;
+      });
 
       filteredRecords.forEach((record) => {
         if (!record.location) return;
@@ -106,6 +127,13 @@ export const TimeTrackingMap = () => {
             <strong style="display:block; font-size: 16px; margin-bottom: 4px;">
               ${record.employee?.name || "Funcionário"}
             </strong>
+            <div style="text-align: center; margin-bottom: 5px;">
+              <img src="${
+                record.photo_url
+                  ? `${process.env.REACT_APP_URL?.replace(/\/api$/, "")}/${record.photo_url}`
+                  : "https://via.placeholder.com/100"
+              }" style="width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 2px solid #ccc;" />
+            </div>
              <span style="color: #555;">${dateStr}</span><br/>
              <span style="
                 display: inline-block; 
@@ -115,7 +143,9 @@ export const TimeTrackingMap = () => {
                 color: white; 
                 font-size: 12px;
                 background-color: ${
-                  record.type === "entry" ? "#22c55e" : "#ef4444"
+                  record.type === "Entrada" || record.type === "Volta Almoço"
+                    ? "#22c55e"
+                    : "#ef4444"
                 };
              ">
                ${record.type}
@@ -133,7 +163,7 @@ export const TimeTrackingMap = () => {
         mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
       }
     }
-  }, [records, selectedEmployee]);
+  }, [records, selectedEmployee, selectedDate, selectedType]);
 
   return (
     <>
@@ -161,6 +191,35 @@ export const TimeTrackingMap = () => {
                 {emp.name}
               </option>
             ))}
+          </select>
+        </div>
+
+        <div className="mt-3">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Filtrar por Data
+          </label>
+          <input
+            type="date"
+            className="w-full p-2 border border-gray-300 rounded"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
+        </div>
+
+        <div className="mt-3">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Filtrar por Tipo
+          </label>
+          <select
+            className="w-full p-2 border border-gray-300 rounded"
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.target.value)}
+          >
+            <option value="">Todos</option>
+            <option value="Entrada">Entrada</option>
+            <option value="Saída Almoço">Saída Almoço</option>
+            <option value="Volta Almoço">Volta Almoço</option>
+            <option value="Saída">Saída</option>
           </select>
         </div>
       </div>
