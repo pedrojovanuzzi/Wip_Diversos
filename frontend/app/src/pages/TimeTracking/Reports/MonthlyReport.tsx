@@ -29,7 +29,7 @@ export const MonthlyReport = () => {
     pageStyle: `
       @page {
         size: A4;
-        margin: 1mm;
+        margin: 2mm;
       }
       @media print {
         html, body {
@@ -306,12 +306,12 @@ export const MonthlyReport = () => {
           </div>
 
           {employeeData && (
-            <div className="mb-2 grid grid-cols-3 gap-1 text-[11px]">
+            <div className="flex justify-evenly text-[11px]">
               <div>
                 <strong>Nome:</strong> {employeeData.name}
               </div>
               <div>
-                <strong>Cargo:</strong> {employeeData.role}
+                <strong>CBO:</strong> {employeeData.role}
               </div>
               <div>
                 <strong>CPF:</strong> {employeeData.cpf}
@@ -454,11 +454,11 @@ export const MonthlyReport = () => {
                   <div className="flex flex-col items-center">
                     <button
                       onClick={() => setShowSigModal(true)}
-                      className="text-[20px] bg-gray-300 border border-gray-400 text-white px-6 py-2 rounded hover:bg-gray-700 no-print"
+                      className="text-[15px] bg-gray-300 border border-gray-400 text-white px-20 py-2 rounded hover:bg-gray-700 no-print"
                     >
                       Assinar
                     </button>
-                    <div className="h-10 w-full hidden print-block border-b border-gray-300"></div>
+                    <div className="h-8 w-full hidden print-block border-b border-gray-300"></div>
                   </div>
                 )}
               </div>
