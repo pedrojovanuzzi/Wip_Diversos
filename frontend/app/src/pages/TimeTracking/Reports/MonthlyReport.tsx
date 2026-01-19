@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useReactToPrint } from "react-to-print";
-import { SignatureModal } from "../../../components/SignatureModal";
 import moment from "moment";
 import { AiOutlinePrinter, AiOutlineEdit } from "react-icons/ai";
 import { NavBar } from "../../../components/navbar/NavBar";
@@ -13,8 +12,6 @@ export const MonthlyReport = () => {
   const [year, setYear] = useState(moment().format("YYYY"));
   const [records, setRecords] = useState<any[]>([]);
   const [signature, setSignature] = useState<string | null>(null);
-  const [showSigModal, setShowSigModal] = useState(false);
-  const [signingDate, setSigningDate] = useState<string | null>(null);
   const [dailySignatures, setDailySignatures] = useState<{
     [key: string]: string;
   }>({});
@@ -150,47 +147,6 @@ export const MonthlyReport = () => {
       console.error("Error saving overtime", err);
       alert("Erro ao salvar hora extra");
     }
-  };
-
-  const handleSaveSignature = async (signatureData: string) => {
-    if (signingDate) {
-      // Daily Signature
-      try {
-        const [d, m, y] = signingDate.split("/");
-        const formattedDate = `${y}-${m}-${d}`;
-
-        await axios.post(
-          `${process.env.REACT_APP_URL}/time-tracking/signature`,
-          {
-            employeeId: selectedEmployee,
-            date: formattedDate,
-            signature: signatureData,
-          },
-        );
-
-        setDailySignatures((prev) => ({
-          ...prev,
-          [signingDate]: signatureData,
-        }));
-      } catch (error) {
-        console.error("Error saving signature:", error);
-        alert("Erro ao salvar assinatura.");
-      }
-      setSigningDate(null);
-    } else {
-      // General Report Signature (Bottom)
-      setSignature(signatureData);
-    }
-    setShowSigModal(false);
-  };
-
-  const openSigModal = (date: string) => {
-    if (!selectedEmployee) {
-      alert("Selecione um funcionário primeiro!");
-      return;
-    }
-    setSigningDate(date);
-    setShowSigModal(true);
   };
 
   // Group records by day for the selected month/year
@@ -422,16 +378,12 @@ export const MonthlyReport = () => {
                           <img
                             src={dailySignatures[date]}
                             alt="Assinatura"
-                            className="scale-[200%] h-4 w-20 object-contain cursor-pointer"
-                            onClick={() => openSigModal(date)}
+                            className="scale-[200%] h-4 w-20 object-contain"
                           />
                         ) : (
-                          <button
-                            onClick={() => openSigModal(date)}
-                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-3 print:hidden rounded text-[9px] border border-gray-300 no-print"
-                          >
-                            Assinar
-                          </button>
+                          <span className="text-[8px] text-gray-400 italic">
+                            Pend.
+                          </span>
                         )}
                       </div>
                     </td>
@@ -464,44 +416,15 @@ export const MonthlyReport = () => {
               </div>
             </div>
 
-            <div
-              className={`text-center w-64 ${
-                !selectedEmployee
-                  ? "cursor-not-allowed opacity-50"
-                  : "cursor-pointer"
-              }`}
-              onClick={() => {
-                if (selectedEmployee) setShowSigModal(true);
-                else alert("Selecione um funcionário primeiro!");
-              }}
-            >
-              {signature ? (
-                <img
-                  src={signature}
-                  alt="Assinatura"
-                  className="h-10 scale-[200%] mx-auto mb-1"
-                />
-              ) : (
-                <div className="h-10 flex items-center justify-center text-gray-400 text-[9px] italic bg-gray-50 mb-1 border border-dashed hover:bg-gray-100">
-                  <AiOutlineEdit className="mr-1" /> Clique para Assinar
-                </div>
-              )}
+            <div className="text-center w-64">
+              {/* Employee Signature Area - Read Only or Just Line */}
+              <div className="h-10 mb-1"></div>
               <div className="border-t border-black pt-1 select-none">
                 Assinatura do Funcionário
               </div>
             </div>
           </div>
         </div>
-
-        {showSigModal && (
-          <SignatureModal
-            onSave={handleSaveSignature}
-            onClose={() => {
-              setShowSigModal(false);
-              setSigningDate(null);
-            }}
-          />
-        )}
       </div>
     </>
   );
