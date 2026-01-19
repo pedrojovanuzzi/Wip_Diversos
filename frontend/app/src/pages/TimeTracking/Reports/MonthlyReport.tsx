@@ -33,7 +33,6 @@ export const MonthlyReport = () => {
       }
       @media print {
         html, body {
-          height: 100vh;
           margin: 0 !important;
           padding: 0 !important;
           overflow: hidden;
@@ -335,11 +334,11 @@ export const MonthlyReport = () => {
             </h2>
           </div>
           <div className="text-center text-xs mb-1 text-gray-600">
-            <p>Empresa: WIP TELECOM MULTIMIDIA EIRELI - 20.843.290/0001-01</p>
+            <p>Empresa: WIP TELECOM MULTIMIDIA EIRELI - 20.843.290/0001-42</p>
           </div>
 
           {employeeData && (
-            <div className="mb-2 grid grid-cols-4 gap-1 text-[11px]">
+            <div className="mb-2 grid grid-cols-3 gap-1 text-[11px]">
               <div>
                 <strong>Nome:</strong> {employeeData.name}
               </div>
@@ -349,13 +348,10 @@ export const MonthlyReport = () => {
               <div>
                 <strong>CPF:</strong> {employeeData.cpf}
               </div>
-              <div>
-                <strong>ID:</strong> {employeeData.id}
-              </div>
             </div>
           )}
 
-          <table className="w-full border-collapse border border-gray-300 text-[10px]">
+          <table className="w-[90%] mx-auto border-collapse border border-gray-300 text-[10px]">
             <thead>
               <tr className="bg-gray-100">
                 <th className="border border-gray-300 p-1">Data</th>
@@ -386,13 +382,13 @@ export const MonthlyReport = () => {
                     <td className="border border-gray-300 p-1 text-center font-medium">
                       {date}
                     </td>
-                    <td className="border border-gray-300 p-1">
+                    <td className="border border-gray-300">
                       <div className="flex flex-wrap gap-1">
                         {dayRecords.length > 0 ? (
                           dayRecords.map((r, idx) => (
                             <span
                               key={idx}
-                              className="bg-gray-100 px-1 py-0.5 rounded text-[9px] border"
+                              className="bg-gray-100  rounded text-[9px] border"
                             >
                               {moment(r.timestamp).format("HH:mm")} - {r.type}
                             </span>
@@ -402,7 +398,7 @@ export const MonthlyReport = () => {
                         )}
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-1 text-center">
+                    <td className="border border-gray-300 p-1.5 text-center">
                       <input
                         readOnly
                         type="number"
@@ -411,7 +407,7 @@ export const MonthlyReport = () => {
                         placeholder="-"
                       />
                     </td>
-                    <td className="border border-gray-300 p-1 text-center">
+                    <td className="border border-gray-300 p-1.5 text-center">
                       <input
                         readOnly
                         type="number"
@@ -420,13 +416,13 @@ export const MonthlyReport = () => {
                         placeholder="-"
                       />
                     </td>
-                    <td className="border border-gray-300 p-1 text-center">
+                    <td className="border border-gray-300 p-1.5 text-center">
                       <div className="flex gap-1 justify-center items-center h-full">
                         {dailySignatures[date] ? (
                           <img
                             src={dailySignatures[date]}
                             alt="Assinatura"
-                            className="h-8 max-w-[100px] object-contain cursor-pointer"
+                            className="scale-[200%] h-4 w-20 object-contain cursor-pointer"
                             onClick={() => openSigModal(date)}
                           />
                         ) : (
@@ -445,23 +441,23 @@ export const MonthlyReport = () => {
               {/* Totals Row */}
               <tr className="bg-gray-100 font-bold">
                 <td
-                  className="border border-gray-300 p-1 text-right"
+                  className="border border-gray-300 p-1.5 text-right"
                   colSpan={2}
                 >
                   TOTAIS
                 </td>
-                <td className="border border-gray-300 p-1 text-center">
-                  {total50 > 0 ? total50.toFixed(2) : "-"}
+                <td className="border border-gray-300 p-1.5 text-center">
+                  {total50 > 0 ? total50.toFixed(2).replace(".", ":") : "-"}
                 </td>
-                <td className="border border-gray-300 p-1 text-center">
-                  {total100 > 0 ? total100.toFixed(2) : "-"}
+                <td className="border border-gray-300 p-1.5 text-center">
+                  {total100 > 0 ? total100.toFixed(2).replace(".", ":") : "-"}
                 </td>
-                <td className="border border-gray-300 p-1"></td>
+                <td className="border border-gray-300 p-1.5"> </td>
               </tr>
             </tbody>
           </table>
 
-          <div className="mt-4 flex justify-between items-end text-[10px]">
+          <div className="mt-4 flex justify-evenly items-end text-[10px]">
             <div className="text-center w-64">
               <div className="border-t border-black pt-1">
                 Assinatura do Empregador
@@ -483,7 +479,7 @@ export const MonthlyReport = () => {
                 <img
                   src={signature}
                   alt="Assinatura"
-                  className="h-10 mx-auto mb-1"
+                  className="h-10 scale-[200%] mx-auto mb-1"
                 />
               ) : (
                 <div className="h-10 flex items-center justify-center text-gray-400 text-[9px] italic bg-gray-50 mb-1 border border-dashed hover:bg-gray-100">
@@ -494,10 +490,6 @@ export const MonthlyReport = () => {
                 Assinatura do Funcionário
               </div>
             </div>
-          </div>
-
-          <div className="text-[10px] text-center text-gray-400 mt-4">
-            Gerado automaticamente por Sistema de Ponto WIP.
           </div>
         </div>
 
