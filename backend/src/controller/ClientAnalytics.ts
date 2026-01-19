@@ -92,13 +92,16 @@ class ClientAnalytics {
               upTime = `${upTime}d`;
             }
 
-            // Sanitização básica para evitar quebras de protocolo/JSON
+            // Sanitização estrita: remove caracteres não-ASCII
+            const sanitize = (str: string) =>
+              str ? str.replace(/[^\x20-\x7E]/g, "").trim() : "";
+
             resultados.push({
               servidor: servidor.nome,
-              pppoe: pppoe ? pppoe.trim() : "",
-              callerId: callerId ? callerId.trim() : "",
-              ip: ip ? ip.trim() : "",
-              upTime: upTime ? upTime.trim() : "",
+              pppoe: sanitize(pppoe),
+              callerId: sanitize(callerId),
+              ip: sanitize(ip),
+              upTime: sanitize(upTime),
             });
           }
         } catch (err: any) {
