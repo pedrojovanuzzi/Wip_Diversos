@@ -35,6 +35,41 @@ class DailyOvertimeController {
     }
   };
 
+  saveSignature = async (req: Request, res: Response) => {
+    try {
+      const { employeeId, date, signature } = req.body;
+      const empId = Number(employeeId);
+
+      if (isNaN(empId)) {
+        res.status(400).json({ error: "Invalid Employee ID" });
+        return;
+      }
+
+      const repo = DataSource.getRepository(DailyOvertime);
+
+      let record = await repo.findOne({
+        where: { employeeId: empId, date },
+      });
+
+      if (record) {
+        record.signature = signature;
+        await repo.save(record);
+      } else {
+        record = repo.create({
+          employeeId: empId,
+          date,
+          signature,
+        });
+        await repo.save(record);
+      }
+
+      res.status(200).json(record);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Internal Error" });
+    }
+  };
+
   getByMonth = async (req: Request, res: Response) => {
     try {
       const { employeeId, month, year } = req.params;

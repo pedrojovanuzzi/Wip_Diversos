@@ -30,6 +30,9 @@ export class DailyOvertime {
   @Column({ type: "decimal", precision: 5, scale: 2, default: 0 })
   hours100!: number;
 
+  @Column({ type: "longtext", nullable: true })
+  signature!: string;
+
   @CreateDateColumn()
   created_at!: Date;
 

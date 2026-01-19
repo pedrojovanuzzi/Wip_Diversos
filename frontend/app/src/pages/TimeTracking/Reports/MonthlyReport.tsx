@@ -14,6 +14,10 @@ export const MonthlyReport = () => {
   const [records, setRecords] = useState<any[]>([]);
   const [signature, setSignature] = useState<string | null>(null);
   const [showSigModal, setShowSigModal] = useState(false);
+  const [signingDate, setSigningDate] = useState<string | null>(null);
+  const [dailySignatures, setDailySignatures] = useState<{
+    [key: string]: string;
+  }>({});
   const [overtimeData, setOvertimeData] = useState<{
     [key: string]: { hours50: any; hours100: any };
   }>({});
@@ -67,17 +71,23 @@ export const MonthlyReport = () => {
     try {
       if (!selectedEmployee) return;
       const res = await axios.get(
-        `${process.env.REACT_APP_URL}/time-tracking/overtime/${selectedEmployee}/${month}/${year}`
+        `${process.env.REACT_APP_URL}/time-tracking/overtime/${selectedEmployee}/${month}/${year}`,
       );
-      const data: any = {};
+      const overtime: any = {};
+      const signatures: any = {};
+
       res.data.forEach((r: any) => {
         const d = moment(r.date.toString().split("T")[0]).format("DD/MM/YYYY");
-        data[d] = {
+        overtime[d] = {
           hours50: Number(r.hours50),
           hours100: Number(r.hours100),
         };
+        if (r.signature) {
+          signatures[d] = r.signature;
+        }
       });
-      setOvertimeData(data);
+      setOvertimeData(overtime);
+      setDailySignatures(signatures);
     } catch (error) {
       console.error("Error fetching overtime:", error);
     }
@@ -109,7 +119,7 @@ export const MonthlyReport = () => {
   const handleOvertimeChange = (
     date: string,
     field: "hours50" | "hours100",
-    value: string
+    value: string,
   ) => {
     setOvertimeData((prev) => ({
       ...prev,
@@ -123,7 +133,7 @@ export const MonthlyReport = () => {
   const saveOvertime = async (
     date: string,
     hours50: string,
-    hours100: string
+    hours100: string,
   ) => {
     try {
       // Convert date DD/MM/YYYY to YYYY-MM-DD
@@ -143,6 +153,47 @@ export const MonthlyReport = () => {
     }
   };
 
+  const handleSaveSignature = async (signatureData: string) => {
+    if (signingDate) {
+      // Daily Signature
+      try {
+        const [d, m, y] = signingDate.split("/");
+        const formattedDate = `${y}-${m}-${d}`;
+
+        await axios.post(
+          `${process.env.REACT_APP_URL}/time-tracking/signature`,
+          {
+            employeeId: selectedEmployee,
+            date: formattedDate,
+            signature: signatureData,
+          },
+        );
+
+        setDailySignatures((prev) => ({
+          ...prev,
+          [signingDate]: signatureData,
+        }));
+      } catch (error) {
+        console.error("Error saving signature:", error);
+        alert("Erro ao salvar assinatura.");
+      }
+      setSigningDate(null);
+    } else {
+      // General Report Signature (Bottom)
+      setSignature(signatureData);
+    }
+    setShowSigModal(false);
+  };
+
+  const openSigModal = (date: string) => {
+    if (!selectedEmployee) {
+      alert("Selecione um funcionário primeiro!");
+      return;
+    }
+    setSigningDate(date);
+    setShowSigModal(true);
+  };
+
   // Group records by day for the selected month/year
   const getGroupedRecords = () => {
     const filtered = records.filter((r) => {
@@ -156,7 +207,7 @@ export const MonthlyReport = () => {
     for (let i = 1; i <= daysInMonth; i++) {
       const day = moment(
         `${year}-${month}-${i < 10 ? `0${i}` : i}`,
-        "YYYY-MM-DD"
+        "YYYY-MM-DD",
       ).format("DD/MM/YYYY");
       grouped[day] = [];
     }
@@ -190,10 +241,10 @@ export const MonthlyReport = () => {
   };
 
   const total50 = sumTime(
-    Object.values(overtimeData).map((curr) => Number(curr.hours50) || 0)
+    Object.values(overtimeData).map((curr) => Number(curr.hours50) || 0),
   );
   const total100 = sumTime(
-    Object.values(overtimeData).map((curr) => Number(curr.hours100) || 0)
+    Object.values(overtimeData).map((curr) => Number(curr.hours100) || 0),
   );
 
   return (
@@ -279,7 +330,7 @@ export const MonthlyReport = () => {
           ref={componentRef}
         >
           <div className="text-center mb-2 border-b pb-2">
-            <h2 className="text-xl font-bold uppercase">Folha de Ponto</h2>
+            <h2 className="text-xs font-bold uppercase">Folha de Ponto</h2>
             <p className="text-gray-600">
               Período: {month}/{year}
             </p>
@@ -311,7 +362,7 @@ export const MonthlyReport = () => {
                 </th>
                 <th className="border border-gray-300 p-1 w-16">H.E. 50%</th>
                 <th className="border border-gray-300 p-1 w-16">H.E. 100%</th>
-                <th className="border border-gray-300 p-1">Foto</th>
+                <th className="border border-gray-300 p-1">Assinatura</th>
               </tr>
             </thead>
             <tbody>
@@ -320,7 +371,7 @@ export const MonthlyReport = () => {
                 dayRecords.sort(
                   (a, b) =>
                     new Date(a.timestamp).getTime() -
-                    new Date(b.timestamp).getTime()
+                    new Date(b.timestamp).getTime(),
                 );
 
                 const currentOvertime = overtimeData[date] || {
@@ -368,24 +419,22 @@ export const MonthlyReport = () => {
                       />
                     </td>
                     <td className="border border-gray-300 p-1 text-center">
-                      <div className="flex gap-1 justify-center">
-                        {dayRecords.map((r, idx) => {
-                          const baseUrl =
-                            process.env.REACT_APP_URL?.replace(/\/api$/, "") ||
-                            "";
-                          return r.photo_url ? (
-                            <img
-                              key={idx}
-                              src={`${baseUrl}/${r.photo_url.replace(
-                                /\\/g,
-                                "/"
-                              )}`}
-                              alt="ref"
-                              className="w-8 h-8 object-cover rounded-full border border-gray-200"
-                              title={r.type}
-                            />
-                          ) : null;
-                        })}
+                      <div className="flex gap-1 justify-center items-center h-full">
+                        {dailySignatures[date] ? (
+                          <img
+                            src={dailySignatures[date]}
+                            alt="Assinatura"
+                            className="h-8 max-w-[100px] object-contain cursor-pointer"
+                            onClick={() => openSigModal(date)}
+                          />
+                        ) : (
+                          <button
+                            onClick={() => openSigModal(date)}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-0.5 rounded text-[9px] border border-gray-300 no-print"
+                          >
+                            Assinar
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -418,8 +467,15 @@ export const MonthlyReport = () => {
             </div>
 
             <div
-              className="text-center w-64 cursor-pointer"
-              onClick={() => setShowSigModal(true)}
+              className={`text-center w-64 ${
+                !selectedEmployee
+                  ? "cursor-not-allowed opacity-50"
+                  : "cursor-pointer"
+              }`}
+              onClick={() => {
+                if (selectedEmployee) setShowSigModal(true);
+                else alert("Selecione um funcionário primeiro!");
+              }}
             >
               {signature ? (
                 <img
@@ -445,8 +501,11 @@ export const MonthlyReport = () => {
 
         {showSigModal && (
           <SignatureModal
-            onSave={setSignature}
-            onClose={() => setShowSigModal(false)}
+            onSave={handleSaveSignature}
+            onClose={() => {
+              setShowSigModal(false);
+              setSigningDate(null);
+            }}
           />
         )}
       </div>

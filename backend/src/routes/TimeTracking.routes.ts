@@ -15,15 +15,17 @@ TimeTrackingRoutes.delete("/employee/:id", EmployeeController.delete);
 TimeTrackingRoutes.post("/clock-in", TimeRecordController.clockIn);
 TimeTrackingRoutes.get(
   "/records/:employeeId",
-  TimeRecordController.listByEmployee
+  TimeRecordController.listByEmployee,
 );
 TimeTrackingRoutes.get("/map-records", TimeRecordController.listAll);
 
 // Overtime Routes
 TimeTrackingRoutes.post("/overtime", DailyOvertimeController.save);
+TimeTrackingRoutes.post("/signature", DailyOvertimeController.saveSignature);
+
 TimeTrackingRoutes.get(
   "/overtime/:employeeId/:month/:year",
-  DailyOvertimeController.getByMonth
+  DailyOvertimeController.getByMonth,
 );
 
 export default TimeTrackingRoutes;
