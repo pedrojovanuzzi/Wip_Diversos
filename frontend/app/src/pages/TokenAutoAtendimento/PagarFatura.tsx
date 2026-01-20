@@ -59,7 +59,7 @@ export const PagarFatura = () => {
   } | null>(null);
   const [faturaId, setFaturaId] = useState<number | null>(null);
   const [cardMessage, setCardMessage] = useState(
-    "Insira o cartão na maquininha e siga as instruções."
+    "Insira o cartão na maquininha e siga as instruções.",
   );
 
   // Input ref to keep focus if needed, though we primarily use virtual keyboard
@@ -101,7 +101,7 @@ export const PagarFatura = () => {
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/TokenAutoAtendimento/Login`,
-        { cpf } // Sending raw CPF digits
+        { cpf }, // Sending raw CPF digits
       );
 
       const data = Array.isArray(response.data)
@@ -129,7 +129,7 @@ export const PagarFatura = () => {
       // 1. Select Context
       await axios.post(
         `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ChooseHome`,
-        { ...client }
+        { ...client },
       );
 
       setSelectedClient(client);
@@ -146,7 +146,7 @@ export const PagarFatura = () => {
     if (!silent) setLoading(true);
     try {
       const response = await axios.get(
-        `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterOrderPorId/${order?.id}`
+        `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterOrderPorId/${order?.id}`,
       );
 
       console.log(response.data);
@@ -199,7 +199,7 @@ export const PagarFatura = () => {
           `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterListaTerminaisEGerarPagamento`,
           {
             login: selectedClient.login,
-          }
+          },
         );
 
         if (response.status === 200) {
@@ -226,7 +226,7 @@ export const PagarFatura = () => {
           cpf: cpf,
           login: selectedClient.login,
           perdoarJuros: false,
-        }
+        },
       );
 
       console.log(response.data);
@@ -272,7 +272,7 @@ export const PagarFatura = () => {
         try {
           const response = await axios.post(
             `${process.env.REACT_APP_URL}/TokenAutoAtendimento/FaturaWentPaid`,
-            { faturaId }
+            { faturaId },
           );
 
           // Payment confirmed
@@ -295,6 +295,22 @@ export const PagarFatura = () => {
   }, [step, faturaId, navigate]);
 
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    if (step === "payment-pix" || step === "payment-card") {
+      timeoutId = setTimeout(() => {
+        setErrorMessage("Tempo para pagamento expirado.");
+        setStep("payment-error");
+        setOrder(null);
+      }, 120000); // 2 minutes
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [step]);
+
+  useEffect(() => {
     let timer: NodeJS.Timeout;
     if (step === "payment-success") {
       // Trigger print automatically on success with a small delay to ensure rendering
@@ -302,12 +318,12 @@ export const PagarFatura = () => {
         console.log("PRINT DEBUG: Attempting automatic print...");
         if (receiptRef.current) {
           console.log(
-            "PRINT DEBUG: Receipt ref found, calling handlePrint now."
+            "PRINT DEBUG: Receipt ref found, calling handlePrint now.",
           );
           handlePrint?.();
         } else {
           console.error(
-            "PRINT DEBUG: receiptRef.current is null/undefined! Cannot print."
+            "PRINT DEBUG: receiptRef.current is null/undefined! Cannot print.",
           );
         }
       }, 1000); // Increased delay to 1000ms to ensure render
