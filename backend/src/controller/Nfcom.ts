@@ -291,8 +291,8 @@ class Nfcom {
       const currentMaxNumber = lastNfcomId
         ? Number(lastNfcomId)
         : lastRecord
-        ? Number(lastRecord.numeracao)
-        : 0;
+          ? Number(lastRecord.numeracao)
+          : 0;
 
       const nextNumber = currentMaxNumber + 1;
 
@@ -421,7 +421,7 @@ class Nfcom {
             FaturasData.linhadig ||
               FaturasData.chave_gnet2 ||
               FaturasData.nossonum ||
-              ""
+              "",
           ),
         },
         infNFComSupl: {
@@ -446,14 +446,14 @@ class Nfcom {
     // 4. Filtra resultados nulos e faz o type assertion
     const dadosFinaisNFCom = resultados.filter(
       (
-        data
+        data,
       ): data is {
         nfComData: INFComData;
         clientLogin: string;
         faturaId: number;
         clientType: string;
         cpf_cnpj: string;
-      } => data !== null
+      } => data !== null,
     );
 
     console.log(`Gerando ${dadosFinaisNFCom.length} notas...`);
@@ -519,10 +519,10 @@ class Nfcom {
             console.error(`Erro ao gerar PDF da nota ${nomeArquivo}:`, err);
             folderPdf?.file(
               `ERRO_${nomeArquivo}.txt`,
-              `Falha ao gerar PDF: ${err}`
+              `Falha ao gerar PDF: ${err}`,
             );
           }
-        })
+        }),
       );
 
       // Gera o binário do ZIP
@@ -532,7 +532,7 @@ class Nfcom {
       res.setHeader("Content-Type", "application/zip");
       res.setHeader(
         "Content-Disposition",
-        "attachment; filename=notas_fiscais.zip"
+        "attachment; filename=notas_fiscais.zip",
       );
 
       console.log(zipContent);
@@ -546,7 +546,7 @@ class Nfcom {
 
   public async getNfcomByChaveDeOlhoNoImposto(req?: Request, res?: Response) {
     const response = await axios.get(
-      `https://apidoni.ibpt.org.br/api/v1/servicos?token=${process.env.OLHO_NO_IMPOSTO_TOKEN}&cnpj=${process.env.OLHO_NO_IMPOSTO_CNPJ}&codigo=${process.env.OLHO_NO_IMPOSTO_CODIGO}&uf=${process.env.OLHO_NO_IMPOSTO_UF}&descricao=${process.env.OLHO_NO_IMPOSTO_DESCRICAO}&unidadeMedida=${process.env.OLHO_NO_IMPOSTO_UNIDADEMEDIDA}&valor=${process.env.OLHO_NO_IMPOSTO_VALOR}`
+      `https://apidoni.ibpt.org.br/api/v1/servicos?token=${process.env.OLHO_NO_IMPOSTO_TOKEN}&cnpj=${process.env.OLHO_NO_IMPOSTO_CNPJ}&codigo=${process.env.OLHO_NO_IMPOSTO_CODIGO}&uf=${process.env.OLHO_NO_IMPOSTO_UF}&descricao=${process.env.OLHO_NO_IMPOSTO_DESCRICAO}&unidadeMedida=${process.env.OLHO_NO_IMPOSTO_UNIDADEMEDIDA}&valor=${process.env.OLHO_NO_IMPOSTO_VALOR}`,
     );
 
     if (req || res) {
@@ -560,7 +560,7 @@ class Nfcom {
     dadosFinaisNFCom: any[],
     job: any,
     password: string,
-    responses: any[]
+    responses: any[],
   ) {
     let contadorProcessados = job.processados || 0;
 
@@ -580,7 +580,7 @@ class Nfcom {
         // 1. Recebe o objeto desestruturado
         const { soapEnvelope, xmlAssinado } = await this.gerarXml(
           item.nfComData,
-          password
+          password,
         );
 
         this.numeracao++;
@@ -602,18 +602,18 @@ class Nfcom {
 
         if (cStat === "100") {
           console.log(
-            `Nota ${item.nfComData.ide.nNF} autorizada! Montando XML Final...`
+            `Nota ${item.nfComData.ide.nNF} autorizada! Montando XML Final...`,
           );
 
           // 2. Extrai APENAS o bloco do Protocolo da resposta
           // Regex busca <protNFCom ...> até </protNFCom>
           const protMatch = responseStr.match(
-            /<protNFCom[^>]*>[\s\S]*?<\/protNFCom>/
+            /<protNFCom[^>]*>[\s\S]*?<\/protNFCom>/,
           );
 
           if (!protMatch) {
             throw new Error(
-              "Nota autorizada, mas protocolo não encontrado na resposta."
+              "Nota autorizada, mas protocolo não encontrado na resposta.",
             );
           }
 
@@ -630,7 +630,7 @@ class Nfcom {
             item.clientLogin,
             item.faturaId,
             item.clientType,
-            item.cpf_cnpj
+            item.cpf_cnpj,
           );
 
           // --- ENVIO DE EMAIL COM PDF ---
@@ -650,7 +650,7 @@ class Nfcom {
               // 2. Gera o PDF em memória (Buffer)
               const pdfBuffer = await this.generateXmlPdf(
                 savedNfcom,
-                obsString
+                obsString,
               );
 
               // 3. Envia Email
@@ -671,20 +671,20 @@ class Nfcom {
                     filename: `NFCom_${savedNfcom.numeracao}.xml`,
                     content: Buffer.from(savedNfcom.xml, "utf-8"),
                   },
-                ]
+                ],
               );
               console.log(
-                `📧 Email com PDF enviado para: ${emailDestino} (Nota ${savedNfcom.numeracao})`
+                `📧 Email com PDF enviado para: ${emailDestino} (Nota ${savedNfcom.numeracao})`,
               );
             } else {
               console.warn(
-                `Clientes sem email cadastrado na nota ${savedNfcom.numeracao}. Email não enviado.`
+                `Clientes sem email cadastrado na nota ${savedNfcom.numeracao}. Email não enviado.`,
               );
             }
           } catch (emailErr) {
             console.error(
               `Erro ao gerar/enviar email da nota ${savedNfcom.numeracao}:`,
-              emailErr
+              emailErr,
             );
           }
           // ------------------------------
@@ -697,7 +697,7 @@ class Nfcom {
         } else {
           // Erro na autorização da NFCom
           console.error(
-            `Erro ao autorizar nota ${item.nfComData.ide.nNF}: ${cStat} - ${xMotivo}`
+            `Erro ao autorizar nota ${item.nfComData.ide.nNF}: ${cStat} - ${xMotivo}`,
           );
           responses.push({
             success: false,
@@ -739,7 +739,7 @@ class Nfcom {
     clientLogin: string,
     faturaId: number,
     clientType: string,
-    cpf_cnpj: string
+    cpf_cnpj: string,
   ): Promise<NFCom> {
     try {
       const NFComRepository = DataSource.getRepository(NFCom);
@@ -798,10 +798,10 @@ class Nfcom {
       nfComData.ide.cUF
     }${anoMes}${nfComData.emit.CNPJ.padStart(
       14,
-      "0"
+      "0",
     )}62${nfComData.ide.serie.padStart(3, "0")}${nfComData.ide.nNF.padStart(
       9,
-      "0"
+      "0",
     )}${nfComData.ide.tpEmis}${
       nfComData.ide.nSiteAutoriz || "0"
     }${nfComData.ide.cNF.padStart(7, "0")}`;
@@ -863,7 +863,7 @@ class Nfcom {
         // WHERE data_emissao >= dataInicio AND data_emissao < dataFimLimite
         whereConditions.data_emissao = Between(
           dataInicio, // Type Date (correto!)
-          dataFimLimite // Type Date (correto!)
+          dataFimLimite, // Type Date (correto!)
         );
       }
 
@@ -944,7 +944,7 @@ class Nfcom {
         // WHERE data_emissao >= dataInicio AND data_emissao < dataFimLimite
         whereConditions.data_emissao = Between(
           dataInicio, // Type Date (correto!)
-          dataFimLimite // Type Date (correto!)
+          dataFimLimite, // Type Date (correto!)
         );
       }
 
@@ -1012,7 +1012,7 @@ class Nfcom {
     protocoloAutorizacao: string,
     cnpjEmitente: string,
     justificativa: string,
-    tpAmb: number
+    tpAmb: number,
   ) {
     // 1. Definições
     const tpEvento = "110111";
@@ -1070,7 +1070,7 @@ class Nfcom {
     password: string,
     NFComRepository: Repository<NFCom>,
     jobRepository: Repository<Jobs>,
-    job: Jobs
+    job: Jobs,
   ) {
     job.processados += 1;
     await jobRepository.save(job);
@@ -1102,13 +1102,13 @@ class Nfcom {
       nfcom.protocolo,
       process.env.CPF_CNPJ as string,
       "Cancelamento por erro de cadastro",
-      nfcom.tpAmb
+      nfcom.tpAmb,
     );
 
     const assinado = this.assinarXmlCancelamento(
       xmlCancelamento,
       `evCancNFCom${nNF}`,
-      password
+      password,
     );
 
     const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
@@ -1170,7 +1170,7 @@ class Nfcom {
       console.log(
         `Nota ${nNF} cancelada! ${
           cStat === "631" ? "(Duplicidade de evento)" : ""
-        }`
+        }`,
       );
 
       nfcomData.status = "cancelada";
@@ -1242,7 +1242,7 @@ class Nfcom {
         for (const nf of listaNfcom) {
           try {
             const client = await AppDataSource.getRepository(
-              ClientesEntities
+              ClientesEntities,
             ).findOne({
               where: { login: nf.pppoe },
             });
@@ -1271,7 +1271,7 @@ class Nfcom {
               password,
               NFComRepository,
               jobRepository,
-              job
+              job,
             );
           } catch (error) {
             console.error("Erro no loop de background:", error);
@@ -1362,7 +1362,7 @@ class Nfcom {
               valor:
                 fat
                   .map((f) =>
-                    (Number(f.valor) - (cliente.desconto || 0)).toFixed(2)
+                    (Number(f.valor) - (cliente.desconto || 0)).toFixed(2),
                   )
                   .join(", ") || null,
             },
@@ -1370,7 +1370,7 @@ class Nfcom {
         })
         .filter((i): i is NonNullable<typeof i> => i !== null)
         .sort((a, b) =>
-          (b?.fatura?.titulo || "").localeCompare(a?.fatura?.titulo || "")
+          (b?.fatura?.titulo || "").localeCompare(a?.fatura?.titulo || ""),
         );
       res.status(200).json(arr);
     } catch {
@@ -1381,10 +1381,10 @@ class Nfcom {
   private calcularDV(data: INFComData): string {
     const chaveSemDV = `${data.ide.cUF}${data.ide.dhEmi.substring(
       2,
-      4
+      4,
     )}${data.ide.dhEmi.substring(5, 7)}${data.emit.CNPJ.padStart(
       14,
-      "0"
+      "0",
     )}62${data.ide.serie.padStart(3, "0")}${data.ide.nNF.padStart(9, "0")}${
       data.ide.tpEmis
     }${data.ide.nSiteAutoriz || "0"}${data.ide.cNF.padStart(7, "0")}`;
@@ -1430,13 +1430,13 @@ class Nfcom {
 
     console.log(
       "Magic Bytes (GZIP Check - deve começar com 1f8b):",
-      compressedBuffer.toString("hex").substring(0, 4)
+      compressedBuffer.toString("hex").substring(0, 4),
     );
 
     return compressedBuffer.toString("base64");
   }
 
-  public async enviarNfcom(xml: string, password: string): Promise<any> {
+  public async enviarNfcom(xml: string, password: string = "0"): Promise<any> {
     try {
       const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
 
@@ -1448,7 +1448,7 @@ class Nfcom {
       const processedCertPath = processarCertificado(
         certPath,
         password,
-        tempDir
+        tempDir,
       );
 
       const pfxBuffer = fs.readFileSync(processedCertPath);
@@ -1481,7 +1481,7 @@ class Nfcom {
 
   public async gerarXml(
     data: INFComData,
-    password: string
+    password: string,
   ): Promise<{ soapEnvelope: string; xmlAssinado: string }> {
     // 1. Gera Chave de Acesso
     const anoMes =
@@ -1489,7 +1489,7 @@ class Nfcom {
 
     let chaveSemDV = `${data.ide.cUF}${anoMes}${data.emit.CNPJ.padStart(
       14,
-      "0"
+      "0",
     )}62${data.ide.serie.padStart(3, "0")}${data.ide.nNF.padStart(9, "0")}${
       data.ide.tpEmis
     }${data.ide.nSiteAutoriz || "0"}${data.ide.cNF.padStart(7, "0")}`;
@@ -1498,7 +1498,7 @@ class Nfcom {
 
     if (chaveAcessoCompleta.length !== 44) {
       throw new Error(
-        `Chave de acesso gerada tem tamanho inválido: ${chaveAcessoCompleta.length} (esperado 44). Verifique cNF e nSiteAutoriz.`
+        `Chave de acesso gerada tem tamanho inválido: ${chaveAcessoCompleta.length} (esperado 44). Verifique cNF e nSiteAutoriz.`,
       );
     }
 
@@ -1661,7 +1661,7 @@ class Nfcom {
       .ele("codBarras")
       .txt(
         data.gFat.codBarras ||
-          "000000000000000000000000000000000000000000000000"
+          "000000000000000000000000000000000000000000000000",
       );
 
     const infNFComSupl = nfCom.ele("infNFComSupl");
@@ -1681,7 +1681,7 @@ class Nfcom {
       xmlInternoAssinado = this.assinarXml(
         xmlInternoSemAssinatura,
         id,
-        password
+        password,
       );
     } catch (error) {
       console.error("Erro ao assinar XML:", error);
@@ -1695,7 +1695,7 @@ class Nfcom {
 
     console.log(
       "Base64 gerado (inicio):",
-      xmlComprimidoBase64.substring(0, 50)
+      xmlComprimidoBase64.substring(0, 50),
     );
 
     // 6. Montagem MANUAL do Envelope SOAP (A alteração solicitada)
@@ -1725,7 +1725,7 @@ class Nfcom {
 
     const pfxBuffer = fs.readFileSync(certPath);
     const pfxAsn1 = forge.asn1.fromDer(
-      forge.util.createBuffer(pfxBuffer.toString("binary"))
+      forge.util.createBuffer(pfxBuffer.toString("binary")),
     );
     const pfx = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, false, password);
 
@@ -1738,7 +1738,7 @@ class Nfcom {
 
     if (!certBags || !keyBags) {
       throw new Error(
-        "Não foi possível extrair certificado ou chave privada do PFX."
+        "Não foi possível extrair certificado ou chave privada do PFX.",
       );
     }
 
@@ -1776,7 +1776,7 @@ class Nfcom {
   private assinarXmlCancelamento(
     xml: string,
     idTag: string,
-    password: string
+    password: string,
   ): string {
     const certPath = path.join(__dirname, "..", "files", "certificado.pfx");
 
@@ -1786,7 +1786,7 @@ class Nfcom {
 
     const pfxBuffer = fs.readFileSync(certPath);
     const pfxAsn1 = forge.asn1.fromDer(
-      forge.util.createBuffer(pfxBuffer.toString("binary"))
+      forge.util.createBuffer(pfxBuffer.toString("binary")),
     );
     const pfx = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, false, password);
 
@@ -1799,7 +1799,7 @@ class Nfcom {
 
     if (!certBags || !keyBags) {
       throw new Error(
-        "Não foi possível extrair certificado ou chave privada do PFX."
+        "Não foi possível extrair certificado ou chave privada do PFX.",
       );
     }
 
@@ -1839,7 +1839,7 @@ class Nfcom {
     dataInicio: string,
     dataFim: string,
     password: string,
-    p12FileBase64: string
+    p12FileBase64: string,
   ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       try {
@@ -1857,7 +1857,7 @@ class Nfcom {
         doc.moveDown();
         doc.fontSize(12);
         doc.text(
-          `Identificação Contribuinte: WIP TELECOM MULTIMIDIA EIRELI ME`
+          `Identificação Contribuinte: WIP TELECOM MULTIMIDIA EIRELI ME`,
         );
         doc.text(`CNPJ Contribuinte: 20.843.290/0001-42`);
         doc.text(`IE Contribuinte: 183013286115`);
@@ -1871,7 +1871,7 @@ class Nfcom {
             .padStart(2, "0")}:${new Date()
             .getSeconds()
             .toString()
-            .padStart(2, "0")}`
+            .padStart(2, "0")}`,
         );
         doc.moveDown();
         doc.text(`Documentos Fiscais Apresentados`);
@@ -1882,7 +1882,7 @@ class Nfcom {
         doc.text(
           `Faixa de Numeração de ${nfcom[0].numeracao} até ${
             nfcom[nfcom.length - 1].numeracao
-          }`
+          }`,
         );
         doc.text(`Série: ${nfcom[0].serie}`);
         doc.text(`Total de Documentos: ${nfcom.length}`);
@@ -1925,7 +1925,7 @@ class Nfcom {
 
   private extractCertData = (
     p12Base64: string,
-    password: string
+    password: string,
   ): CertificadoDados | null => {
     try {
       // --- CORREÇÃO AQUI ---
@@ -1992,7 +1992,7 @@ class Nfcom {
       // Dica: Logar o tamanho da string ajuda a debugar se ela veio vazia
       console.error(
         `Erro ao ler certificado (Tamanho base64: ${p12Base64?.length})`,
-        error
+        error,
       );
       return null;
     }
@@ -2048,7 +2048,7 @@ class Nfcom {
 
   private generateXmlPdf = async (
     nfcom: NFCom,
-    obs: string
+    obs: string,
   ): Promise<Buffer> => {
     return new Promise<Buffer>(async (resolve, reject) => {
       try {
@@ -2134,7 +2134,7 @@ class Nfcom {
           .text(
             "DOCUMENTO AUXILIAR DA NOTA FISCAL FATURA DE SERVIÇOS DE COMUNICAÇÃO ELETRÔNICA",
             margin + 10,
-            y + 10
+            y + 10,
           );
 
         // Dados do Emitente
@@ -2147,13 +2147,13 @@ class Nfcom {
         doc.text(
           `${ender.xLgr}, ${ender.nro} - ${ender.xBairro} - ${ender.xMun}/${ender.UF}`,
           margin + 10,
-          y + 42
+          y + 42,
         );
         doc.text(`CEP: ${ender.CEP}`, margin + 10, y + 52);
         doc.text(
           `CNPJ: ${data.emit.CNPJ} - IE: ${data.emit.IE}`,
           margin + 10,
-          y + 62
+          y + 62,
         );
 
         y += 95;
@@ -2175,19 +2175,19 @@ class Nfcom {
             destEnd.xBairro || ""
           }`,
           margin,
-          y + 12
+          y + 12,
         );
         doc.text(
           `CEP: ${destEnd.CEP || ""} - ${destEnd.xMun || ""} - ${
             destEnd.UF || ""
           }`,
           margin,
-          y + 22
+          y + 22,
         );
         doc.text(
           `CPF/CNPJ: ${data.dest.CNPJ || data.dest.CPF}`,
           margin,
-          y + 32
+          y + 32,
         );
         doc.text(`IE: ${data.dest.IE || "ISENTO"}`, margin, y + 42);
         doc.text(`CÓDIGO DO CLIENTE: ${data.dest.id || ""}`, margin, y + 52);
@@ -2222,7 +2222,7 @@ class Nfcom {
         doc.text(
           `DATA DE EMISSÃO: ${formatDate(data.ide.dhEmi)}`,
           infoX,
-          y + 24
+          y + 24,
         );
 
         doc.fontSize(7).font("Helvetica");
@@ -2242,10 +2242,10 @@ class Nfcom {
         if (data.prot) {
           doc.text(
             `Protocolo de Autorização: ${data.prot.nProt} - ${formatDate(
-              data.prot.dhRecbto
+              data.prot.dhRecbto,
             )}`,
             infoX,
-            y + 76
+            y + 76,
           );
         }
 
@@ -2282,12 +2282,12 @@ class Nfcom {
         drawLeftBox(
           "VENCIMENTO:",
           data.gFat && data.gFat.dVencFat ? formatDate(data.gFat.dVencFat) : "",
-          y + boxH + gap
+          y + boxH + gap,
         );
         drawLeftBox(
           "TOTAL A PAGAR:",
           `R$ ${formatCurrency(data.total.vNF)}`,
-          y + (boxH + gap) * 2
+          y + (boxH + gap) * 2,
         );
 
         // Caixa Direita (Area Contribuinte)
@@ -2473,11 +2473,11 @@ class Nfcom {
         doc.text("FUST/FUNTTEL", margin + 5, tribY + 20);
         doc.text(
           formatCurrency(
-            Number(data.total.vFUST || 0) + Number(data.total.vFUNTTEL || 0)
+            Number(data.total.vFUST || 0) + Number(data.total.vFUNTTEL || 0),
           ),
           margin + 5,
           tribY + 20,
-          { width: halfW - 10, align: "right" }
+          { width: halfW - 10, align: "right" },
         );
 
         // Direita: Reservado ao Fisco
@@ -2515,7 +2515,7 @@ class Nfcom {
           .text(
             "NFCOM EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL",
             margin + 5,
-            y + 20
+            y + 20,
           );
 
         y += 20;
@@ -2545,7 +2545,7 @@ class Nfcom {
             {
               width: contentWidth - 10,
               align: "left",
-            }
+            },
           );
 
         y += 60;
@@ -2555,7 +2555,7 @@ class Nfcom {
           try {
             const linhaDigitavel = String(data.gFat.codBarras).replace(
               /\D/g,
-              ""
+              "",
             );
 
             // 1. Converte para o formato de barras (44 dígitos) para gerar a IMAGEM
@@ -2594,22 +2594,22 @@ class Nfcom {
             if (linhaDigitavel.length === 47) {
               textoLegivel = `${linhaDigitavel.substring(
                 0,
-                5
+                5,
               )}.${linhaDigitavel.substring(5, 10)}  ${linhaDigitavel.substring(
                 10,
-                15
+                15,
               )}.${linhaDigitavel.substring(
                 15,
-                21
+                21,
               )}  ${linhaDigitavel.substring(
                 21,
-                26
+                26,
               )}.${linhaDigitavel.substring(
                 26,
-                32
+                32,
               )}  ${linhaDigitavel.substring(
                 32,
-                33
+                33,
               )}  ${linhaDigitavel.substring(33)}`;
             }
 
@@ -2656,7 +2656,7 @@ class Nfcom {
       res.set("Content-Type", "application/pdf");
       res.set(
         "Content-Disposition",
-        "attachment; filename=" + nfcom.nNF + ".pdf"
+        "attachment; filename=" + nfcom.nNF + ".pdf",
       );
       res.send(pdf);
     } catch (error) {
@@ -2683,7 +2683,7 @@ class Nfcom {
 
       const caminhoArquivo = path.resolve(
         __dirname,
-        "../files/certificado.pfx"
+        "../files/certificado.pfx",
       );
 
       const fileBuffer = fs.readFileSync(caminhoArquivo);
@@ -2695,12 +2695,12 @@ class Nfcom {
         dataInicio,
         dataFim,
         password,
-        pfxFileBase64
+        pfxFileBase64,
       );
       res.set("Content-Type", "application/pdf");
       res.set(
         "Content-Disposition",
-        "attachment; filename=" + nfcom[0].nNF + ".pdf"
+        "attachment; filename=" + nfcom[0].nNF + ".pdf",
       );
       res.send(pdf);
     } catch (error) {

@@ -108,4 +108,9 @@
   "include": [
     "src/**/*"               /* <--- OBRIGATÓRIO: Diz para compilar apenas o que está dentro de src */
   ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/test_nfcom.ts"
+  ]
 }
