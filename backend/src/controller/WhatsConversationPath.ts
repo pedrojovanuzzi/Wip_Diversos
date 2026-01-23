@@ -91,7 +91,7 @@ let conversation: {
 
 async function findOrCreate(
   repository: any,
-  { where, defaults }: { where: any; defaults: any }
+  { where, defaults }: { where: any; defaults: any },
 ) {
   let entity = await repository.findOne({ where });
   if (entity) {
@@ -192,7 +192,7 @@ class WhatsPixController {
         {
           where: { telefone: process.env.SENDER_NUMBER },
           defaults: { nome: "Você", telefone: process.env.SENDER_NUMBER },
-        }
+        },
       );
 
       const [insertConversation] = await findOrCreate(
@@ -200,7 +200,7 @@ class WhatsPixController {
         {
           where: { id: conversation.receiver_id },
           defaults: { nome: "Você" },
-        }
+        },
       );
 
       let body = req.body;
@@ -233,9 +233,12 @@ class WhatsPixController {
 
                   this.processedMessages.add(messageId);
                   // Remove o ID do conjunto após 2 minutos para liberar memória
-                  setTimeout(() => {
-                    this.processedMessages.delete(messageId);
-                  }, 2 * 60 * 1000);
+                  setTimeout(
+                    () => {
+                      this.processedMessages.delete(messageId);
+                    },
+                    2 * 60 * 1000,
+                  );
 
                   const celular = message.from;
                   const type = message.type;
@@ -250,14 +253,14 @@ class WhatsPixController {
                   if (!sessions[celular]) {
                     // Tenta buscar do banco
                     const sessionDB = await ApiMkDataSource.getRepository(
-                      Sessions
+                      Sessions,
                     ).findOne({ where: { celular } });
 
                     if (sessionDB) {
                       // Verifica se a mensagem já foi processada (persistência no banco)
                       if (sessionDB.last_message_id === messageId) {
                         console.log(
-                          `Mensagem duplicada (persistida) ignorada: ${messageId}`
+                          `Mensagem duplicada (persistida) ignorada: ${messageId}`,
                         );
                         continue;
                       }
@@ -268,7 +271,7 @@ class WhatsPixController {
                       };
                       console.log(
                         `Sessão recuperada do banco para ${celular}:`,
-                        sessions[celular]
+                        sessions[celular],
                       );
                     } else {
                       sessions[celular] = { stage: "" };
@@ -309,7 +312,7 @@ class WhatsPixController {
                   if (mensagemCorpo || type) {
                     const texto = mensagemCorpo;
                     console.log(
-                      `Texto recebido: ${texto}, Celular: ${celular}`
+                      `Texto recebido: ${texto}, Celular: ${celular}`,
                     );
 
                     if (type === "undefined" || type === undefined) {
@@ -321,7 +324,7 @@ class WhatsPixController {
                       let logs = [];
                       if (err && err.code === "ENOENT") {
                         console.log(
-                          "Arquivo de log não encontrado, criando um novo."
+                          "Arquivo de log não encontrado, criando um novo.",
                         );
                       } else if (err) {
                         console.error("Erro ao ler o arquivo de log:", err);
@@ -335,7 +338,7 @@ class WhatsPixController {
                         } catch (parseErr) {
                           console.error(
                             "Erro ao analisar o arquivo de log:",
-                            parseErr
+                            parseErr,
                           );
                           logs = [];
                         }
@@ -358,10 +361,10 @@ class WhatsPixController {
                           if (err) {
                             console.error(
                               "Erro ao escrever no arquivo de log:",
-                              err
+                              err,
                             );
                           }
-                        }
+                        },
                       );
                     });
 
@@ -370,7 +373,7 @@ class WhatsPixController {
                       texto,
                       celular,
                       type,
-                      manutencao
+                      manutencao,
                     ).then(() => {
                       // Atualiza last_message_id na sessão em memória antes de salvar
                       if (sessions[celular]) {
@@ -406,7 +409,7 @@ class WhatsPixController {
     session.inactivityTimer = setTimeout(() => {
       this.MensagensComuns(
         celular,
-        "🤷🏻 Seu atendimento foi *finalizado* devido à inatividade!!\nEntre em contato novamente 👍"
+        "🤷🏻 Seu atendimento foi *finalizado* devido à inatividade!!\nEntre em contato novamente 👍",
       );
       this.deleteSession(celular);
     }, 900000); // 15 minutos de inatividade
@@ -417,7 +420,7 @@ class WhatsPixController {
     texto: any,
     celular: any,
     type: any,
-    manutencao: any
+    manutencao: any,
   ) {
     if (
       manutencao == true &&
@@ -426,7 +429,7 @@ class WhatsPixController {
     ) {
       this.MensagensComuns(
         celular,
-        "Olá, no momento nosso Bot está em Manutenção ⚙, tente novamente mais tarde!"
+        "Olá, no momento nosso Bot está em Manutenção ⚙, tente novamente mais tarde!",
       );
     } else {
       this.resetInactivityTimer.call(this, celular, session);
@@ -439,12 +442,12 @@ class WhatsPixController {
           {
             where: { telefone: celular },
             defaults: { nome: celular, telefone: celular },
-          }
+          },
         );
 
         // Verifica se já existe uma conversa associada a esse cliente
         const existingConvUser = await ApiMkDataSource.getRepository(
-          ConversationsUsers
+          ConversationsUsers,
         ).findOne({
           where: { user_id: insertPeople.id },
         });
@@ -452,13 +455,13 @@ class WhatsPixController {
         let insertConversation;
         if (existingConvUser) {
           insertConversation = await ApiMkDataSource.getRepository(
-            Conversations
+            Conversations,
           ).findOneBy({
             id: existingConvUser.conv_id,
           });
         } else {
           insertConversation = await ApiMkDataSource.getRepository(
-            Conversations
+            Conversations,
           ).save({ nome: celular });
 
           // Vincula cliente à nova conversa
@@ -471,7 +474,7 @@ class WhatsPixController {
         // Verificação de segurança
         if (!insertConversation || !insertConversation.id) {
           throw new Error(
-            "Conversa não pôde ser criada ou recuperada corretamente."
+            "Conversa não pôde ser criada ou recuperada corretamente.",
           );
         }
 
@@ -517,7 +520,7 @@ class WhatsPixController {
         if (texto && texto.toLowerCase() === "resetar") {
           await this.MensagensComuns(
             celular,
-            "Sessão resetada com sucesso! Você pode iniciar uma nova conversa agora."
+            "Sessão resetada com sucesso! Você pode iniciar uma nova conversa agora.",
           );
           await this.deleteSession(celular);
           return;
@@ -539,7 +542,7 @@ class WhatsPixController {
         if (texto === "Mamaezinha") {
           await this.MensagensComuns(
             celular,
-            "Coquinha Geladinha para limpar os dentinhos"
+            "Coquinha Geladinha para limpar os dentinhos",
           );
           return;
         }
@@ -557,7 +560,7 @@ class WhatsPixController {
             "Escolha a Opção",
             "Boleto/Pix",
             "Serviços/Contratação",
-            "Falar com Atendente"
+            "Falar com Atendente",
           );
 
           session.stage = "options_start";
@@ -587,29 +590,29 @@ class WhatsPixController {
               await this.MensagemLista(celular, "Escolha um Serviço", campos);
               await this.MensagensComuns(
                 celular,
-                "Caso deseje voltar a aba inicial, digite *inicio*"
+                "Caso deseje voltar a aba inicial, digite *inicio*",
               );
               session.stage = "awaiting_service";
             } else if (texto == "3" || texto == "Falar com Atendente") {
               await this.MensagensComuns(
                 celular,
-                "Caso queira falar com um *Atendente*, acesse esse Link das 8 às 20h 👍🏻 https://wa.me/message/C3QNNVFXJWK5A1"
+                "Caso queira falar com um *Atendente*, acesse esse Link das 8 às 20h 👍🏻 https://wa.me/message/C3QNNVFXJWK5A1",
               );
               await this.MensagensComuns(
                 celular,
-                "👉🏻 Digite *continuar* para terminar o atendimento"
+                "👉🏻 Digite *continuar* para terminar o atendimento",
               );
               session.stage = "end";
             } else {
               await this.MensagensComuns(
                 celular,
-                "⚠️ Seleção *Inválida*, Verifique se Digitou o Número Corretamente!!!"
+                "⚠️ Seleção *Inválida*, Verifique se Digitou o Número Corretamente!!!",
               );
             }
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, *selecione* uma opção válida!!"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, *selecione* uma opção válida!!",
             );
           }
 
@@ -660,7 +663,7 @@ class WhatsPixController {
                 "Escolha a Opção",
                 "Boleto/Pix",
                 "Serviços/Contratação",
-                "Falar com Atendente"
+                "Falar com Atendente",
               );
               session.stage = "options_start";
             } else if (texto.toLowerCase() === "renovação contratual") {
@@ -670,13 +673,13 @@ class WhatsPixController {
             } else {
               await this.MensagensComuns(
                 celular,
-                "Opção Invalída, Selecione a Opção da Lista"
+                "Opção Invalída, Selecione a Opção da Lista",
               );
             }
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
             );
           }
           break;
@@ -698,7 +701,7 @@ class WhatsPixController {
                   celular,
                   "Você é o Titular do Cadastro?",
                   "Sim",
-                  "Não"
+                  "Não",
                 );
               } else if (session.service === "troca_plano") {
                 session.stage = "troca_plano";
@@ -716,7 +719,7 @@ class WhatsPixController {
             ) {
               await this.MensagensComuns(
                 celular,
-                "🥹 *Infelizmente* não poderei mais dar \ncontinuidade ao seu atendimento, *respeitando* a sua vontade.\n🫡Estaremos sempre aqui a sua *disposição*!"
+                "🥹 *Infelizmente* não poderei mais dar \ncontinuidade ao seu atendimento, *respeitando* a sua vontade.\n🫡Estaremos sempre aqui a sua *disposição*!",
               );
               if (sessions[celular] && sessions[celular].inactivityTimer) {
                 clearTimeout(sessions[celular].inactivityTimer);
@@ -725,13 +728,13 @@ class WhatsPixController {
             } else {
               await this.MensagensComuns(
                 celular,
-                "Aperte nos Botoes de Sim ou Não"
+                "Aperte nos Botoes de Sim ou Não",
               );
             }
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes",
             );
           }
           break;
@@ -747,7 +750,7 @@ class WhatsPixController {
                   const pagamento = texto;
                   await this.MensagensComuns(
                     celular,
-                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de endereço*\n\n*Clique no botão abaixo para finalizar*"
+                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de endereço*\n\n*Clique no botão abaixo para finalizar*",
                   );
                   let dadosCliente = session.dadosCompleto
                     ? JSON.stringify(session.dadosCompleto, null, 2)
@@ -758,7 +761,7 @@ class WhatsPixController {
                     let logs = [];
                     if (err && err.code === "ENOENT") {
                       console.log(
-                        "Arquivo de log não encontrado, criando um novo."
+                        "Arquivo de log não encontrado, criando um novo.",
                       );
                     } else if (err) {
                       console.error("Erro ao ler o arquivo de log:", err);
@@ -772,7 +775,7 @@ class WhatsPixController {
                       } catch (parseErr) {
                         console.error(
                           "Erro ao analisar o arquivo de log:",
-                          parseErr
+                          parseErr,
                         );
                         logs = [];
                       }
@@ -791,7 +794,7 @@ class WhatsPixController {
                       if (err) {
                         console.error(
                           "Erro ao escrever no arquivo de log:",
-                          err
+                          err,
                         );
                         return;
                       }
@@ -803,7 +806,7 @@ class WhatsPixController {
                   await this.MensagemBotao(
                     celular,
                     "Concluir Solicitação",
-                    "Finalizar"
+                    "Finalizar",
                   );
 
                   session.stage = "finalizar";
@@ -811,7 +814,7 @@ class WhatsPixController {
                   const pagamento = texto;
                   await this.MensagensComuns(
                     celular,
-                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de cômodo*\n\n*Clique no Botão abaixo para finalizar*"
+                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de cômodo*\n\n*Clique no Botão abaixo para finalizar*",
                   );
                   let dadosCliente = session.dadosCompleto
                     ? JSON.stringify(session.dadosCompleto, null, 2)
@@ -822,7 +825,7 @@ class WhatsPixController {
                     let logs = [];
                     if (err && err.code === "ENOENT") {
                       console.log(
-                        "Arquivo de log não encontrado, criando um novo."
+                        "Arquivo de log não encontrado, criando um novo.",
                       );
                     } else if (err) {
                       console.error("Erro ao ler o arquivo de log:", err);
@@ -836,7 +839,7 @@ class WhatsPixController {
                       } catch (parseErr) {
                         console.error(
                           "Erro ao analisar o arquivo de log:",
-                          parseErr
+                          parseErr,
                         );
                         logs = [];
                       }
@@ -855,7 +858,7 @@ class WhatsPixController {
                       if (err) {
                         console.error(
                           "Erro ao escrever no arquivo de log:",
-                          err
+                          err,
                         );
                         return;
                       }
@@ -866,20 +869,20 @@ class WhatsPixController {
                   await this.MensagemBotao(
                     celular,
                     "Concluir Solicitação",
-                    "Finalizar"
+                    "Finalizar",
                   );
                   session.stage = "finalizar";
                 }
               } else {
                 await this.MensagensComuns(
                   celular,
-                  "Invalido, aperte em um Botão da lista"
+                  "Invalido, aperte em um Botão da lista",
                 );
               }
             } else {
               await this.MensagensComuns(
                 celular,
-                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista"
+                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
               );
             }
           } catch (error) {
@@ -915,7 +918,7 @@ class WhatsPixController {
             } else {
               await this.MensagensComuns(
                 celular,
-                "*Opção Invalida* 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista"
+                "*Opção Invalida* 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
               );
               session.stage = "plan";
               return;
@@ -925,7 +928,7 @@ class WhatsPixController {
 
             await this.MensagensComuns(
               celular,
-              "🗓️ Vamos escolher a *Data* mensal de *Vencimento* da sua fatura!"
+              "🗓️ Vamos escolher a *Data* mensal de *Vencimento* da sua fatura!",
             );
             await this.MensagemLista(celular, "Escolha seu Vencimento", {
               sections: [
@@ -945,7 +948,7 @@ class WhatsPixController {
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
             );
           }
           break;
@@ -963,7 +966,7 @@ class WhatsPixController {
             } else {
               await this.MensagensComuns(
                 celular,
-                "*Opção Invalida* 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista"
+                "*Opção Invalida* 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
               );
               session.stage = "venc_date";
               return;
@@ -974,26 +977,26 @@ class WhatsPixController {
               "🙂 Estamos quase terminando!",
               "🗂️ Peço que *leia atenciosamente* as *informações* e o *Contrato* hospedado disponíveis abaixo, não restando nenhuma *dúvida* na sua *contratação*!",
               "Ler Informações",
-              "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contratação"
+              "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contratação",
             );
             await this.MensagemTermos(
               celular,
               "Contrato Hospedado",
               "Este é o Nosso Contrato Oficial Completo",
               "Ler o contrato",
-              "https://wiptelecomunicacoes.com.br/contrato"
+              "https://wiptelecomunicacoes.com.br/contrato",
             );
             await this.MensagemBotao(
               celular,
               "🆗 *Li* e estou *de acordo* com as *informações* dadas e todos os termos do *Contrato*.",
               "Sim, li e aceito",
-              "Não"
+              "Não",
             );
             session.stage = "final_register";
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
             );
           }
           break;
@@ -1003,7 +1006,7 @@ class WhatsPixController {
               if (texto.toLowerCase() === "sim, li e aceito") {
                 await this.MensagensComuns(
                   celular,
-                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Vamos realizar a *Consulta do seu CPF*. \nUm de nossos *atendentes* entrará em contato para finalizar a sua *contratação* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n*Clique no Botão abaixo para finalizar*"
+                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Vamos realizar a *Consulta do seu CPF*. \nUm de nossos *atendentes* entrará em contato para finalizar a sua *contratação* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n*Clique no Botão abaixo para finalizar*",
                 );
                 let dadosCliente = session.dadosCompleto
                   ? JSON.stringify(session.dadosCompleto, null, 2)
@@ -1014,7 +1017,7 @@ class WhatsPixController {
                   let logs = [];
                   if (err && err.code === "ENOENT") {
                     console.log(
-                      "Arquivo de log não encontrado, criando um novo."
+                      "Arquivo de log não encontrado, criando um novo.",
                     );
                   } else if (err) {
                     console.error("Erro ao ler o arquivo de log:", err);
@@ -1028,7 +1031,7 @@ class WhatsPixController {
                     } catch (parseErr) {
                       console.error(
                         "Erro ao analisar o arquivo de log:",
-                        parseErr
+                        parseErr,
                       );
                       logs = [];
                     }
@@ -1100,7 +1103,7 @@ class WhatsPixController {
                       .slice(0, 2),
                     nascimento: session.dadosCompleto.dataNascimento.replace(
                       /(\d{2})\/(\d{2})\/(\d{4})/,
-                      "$3-$2-$1"
+                      "$3-$2-$1",
                     ),
                     numero: session.dadosCompleto.numero
                       .trim()
@@ -1121,11 +1124,11 @@ class WhatsPixController {
                       .replace(/\D/g, ""),
                     celular: `(${session.dadosCompleto.celular.slice(
                       0,
-                      2
+                      2,
                     )})${session.dadosCompleto.celular.slice(2)}`,
                     celular2: `(${session.dadosCompleto.celularSecundario.slice(
                       0,
-                      2
+                      2,
                     )})${session.dadosCompleto.celularSecundario.slice(2)}`,
                     estado_res: (session.dadosCompleto.estado || "")
                       .toUpperCase()
@@ -1134,6 +1137,7 @@ class WhatsPixController {
                     bairro_res: session.dadosCompleto.bairro
                       .toUpperCase()
                       .trim(),
+                    tipo: "pppoe",
                     cidade_res: `${session.dadosCompleto.cidade
                       .trim()
                       .slice(0, 1)
@@ -1179,19 +1183,19 @@ class WhatsPixController {
 
                 console.log(
                   "Tentando enviar botão de finalização para:",
-                  celular
+                  celular,
                 );
                 try {
                   await this.MensagemBotao(
                     celular,
                     "Concluir Solicitação",
-                    "Finalizar"
+                    "Finalizar",
                   );
                   console.log("Botão de finalização enviado com sucesso.");
                 } catch (btnError) {
                   console.error(
                     "Erro ao enviar botão de finalização:",
-                    btnError
+                    btnError,
                   );
                 }
                 session.stage = "finalizar";
@@ -1201,7 +1205,7 @@ class WhatsPixController {
               ) {
                 await this.MensagensComuns(
                   celular,
-                  "🥹 *Infelizmente* não poderei mais dar \ncontinuidade ao seu atendimento, *respeitando* a sua vontade.\n🫡Estaremos sempre aqui a sua *disposição*!"
+                  "🥹 *Infelizmente* não poderei mais dar \ncontinuidade ao seu atendimento, *respeitando* a sua vontade.\n🫡Estaremos sempre aqui a sua *disposição*!",
                 );
                 setTimeout(() => {
                   if (sessions[celular] && sessions[celular].inactivityTimer) {
@@ -1212,13 +1216,13 @@ class WhatsPixController {
               } else {
                 await this.MensagensComuns(
                   celular,
-                  "Opção invalida 😞\n🙏🏻Por gentileza, Selecione um Botão"
+                  "Opção invalida 😞\n🙏🏻Por gentileza, Selecione um Botão",
                 );
               }
             } else {
               await this.MensagensComuns(
                 celular,
-                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione um Botão"
+                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione um Botão",
               );
             }
           } catch (error) {
@@ -1240,7 +1244,7 @@ class WhatsPixController {
                     "Escolha Forma de Pagamento",
                     "Pix",
                     "Cartão",
-                    "Dinheiro"
+                    "Dinheiro",
                   );
                   session.stage = "choose_type_payment";
                 } else if (
@@ -1249,7 +1253,7 @@ class WhatsPixController {
                 ) {
                   await this.MensagensComuns(
                     celular,
-                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de cômodo* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n*Clique no botão abaixo para finalizar*"
+                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de cômodo* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n*Clique no botão abaixo para finalizar*",
                   );
                   let dadosCliente = session.dadosCompleto
                     ? JSON.stringify(session.dadosCompleto, null, 2)
@@ -1260,7 +1264,7 @@ class WhatsPixController {
                     let logs = [];
                     if (err && err.code === "ENOENT") {
                       console.log(
-                        "Arquivo de log não encontrado, criando um novo."
+                        "Arquivo de log não encontrado, criando um novo.",
                       );
                     } else if (err) {
                       console.error("Erro ao ler o arquivo de log:", err);
@@ -1274,7 +1278,7 @@ class WhatsPixController {
                       } catch (parseErr) {
                         console.error(
                           "Erro ao analisar o arquivo de log:",
-                          parseErr
+                          parseErr,
                         );
                         logs = [];
                       }
@@ -1293,7 +1297,7 @@ class WhatsPixController {
                       if (err) {
                         console.error(
                           "Erro ao escrever no arquivo de log:",
-                          err
+                          err,
                         );
                         return;
                       }
@@ -1304,14 +1308,14 @@ class WhatsPixController {
                   await this.MensagemBotao(
                     celular,
                     "Concluir Solicitação",
-                    "Finalizar"
+                    "Finalizar",
                   );
 
                   session.stage = "finalizar";
                 } else {
                   await this.MensagensComuns(
                     celular,
-                    "Opção Invalída, Selecione a Opção da Lista"
+                    "Opção Invalída, Selecione a Opção da Lista",
                   );
                 }
               } catch (err) {
@@ -1320,7 +1324,7 @@ class WhatsPixController {
             } else {
               await this.MensagensComuns(
                 celular,
-                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista"
+                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
               );
             }
           } catch (error) {
@@ -1337,20 +1341,20 @@ class WhatsPixController {
                 "Contrato Hospedado",
                 "Este é o Nosso Contrato Oficial Completo",
                 "Ler o contrato",
-                "https://wiptelecomunicacoes.com.br/contrato"
+                "https://wiptelecomunicacoes.com.br/contrato",
               );
               await this.MensagemTermos(
                 celular,
                 "Termos Troca de Titularidade",
                 "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a opção que deseja.",
                 "Ler Termos",
-                "https://wipdiversos.wiptelecomunicacoes.com.br/doc/troca_de_titularidade"
+                "https://wipdiversos.wiptelecomunicacoes.com.br/doc/troca_de_titularidade",
               );
               await this.MensagemBotao(
                 celular,
                 "Escolha a Opção",
                 "Concordo",
-                "Não Concordo"
+                "Não Concordo",
               );
               session.stage = "handle_titularidade";
             } else if (
@@ -1359,20 +1363,20 @@ class WhatsPixController {
             ) {
               await this.MensagensComuns(
                 celular,
-                "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não ser o *Titular do Cadastro!!!*"
+                "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não ser o *Titular do Cadastro!!!*",
               );
               clearTimeout(sessions[celular].inactivityTimer);
               delete sessions[celular];
             } else {
               await this.MensagensComuns(
                 celular,
-                "Aperte nos Botoes de Sim ou Não"
+                "Aperte nos Botoes de Sim ou Não",
               );
             }
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes",
             );
           }
           break;
@@ -1383,7 +1387,7 @@ class WhatsPixController {
                 celular,
                 texto,
                 session,
-                type
+                type,
               );
               session.stage = "handle_titularidade_2";
             } else if (
@@ -1392,20 +1396,20 @@ class WhatsPixController {
             ) {
               await this.MensagensComuns(
                 celular,
-                "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*"
+                "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
               );
               clearTimeout(sessions[celular].inactivityTimer);
               delete sessions[celular];
             } else {
               await this.MensagensComuns(
                 celular,
-                "Aperte nos Botoes de Sim ou Não"
+                "Aperte nos Botoes de Sim ou Não",
               );
             }
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes",
             );
           }
           break;
@@ -1417,13 +1421,13 @@ class WhatsPixController {
             if (texto.toLowerCase() === "sim concordo") {
               await this.MensagensComuns(
                 celular,
-                "👍🏻 *Confirmação* para Instalação de *Wi-Fi Estendido*"
+                "👍🏻 *Confirmação* para Instalação de *Wi-Fi Estendido*",
               );
               await this.MensagemBotao(
                 celular,
                 "Escolha a opção desejada:",
                 "Wifi 100 Mbps",
-                "Wifi 1000 Mbps"
+                "Wifi 1000 Mbps",
               );
               session.stage = "choose_wifi_est";
             } else if (
@@ -1432,20 +1436,20 @@ class WhatsPixController {
             ) {
               await this.MensagensComuns(
                 celular,
-                "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*"
+                "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
               );
               clearTimeout(sessions[celular].inactivityTimer);
               delete sessions[celular];
             } else {
               await this.MensagensComuns(
                 celular,
-                "Aperte nos Botoes de Sim ou Não"
+                "Aperte nos Botoes de Sim ou Não",
               );
             }
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes",
             );
           }
           break;
@@ -1458,23 +1462,23 @@ class WhatsPixController {
             if (texto.toLowerCase() === "wifi 100 mbps") {
               await this.MensagensComuns(
                 celular,
-                "⚠️ *Atenção* \nCada plano possui *valor distinto*, previamente informado por telefone ao cliente, e devidamente descrito no *Termo de Adesão*, que deverá ser assinado digitalmente antes da realização da instalação."
+                "⚠️ *Atenção* \nCada plano possui *valor distinto*, previamente informado por telefone ao cliente, e devidamente descrito no *Termo de Adesão*, que deverá ser assinado digitalmente antes da realização da instalação.",
               );
               await this.MensagemBotao(
                 celular,
                 "Concluir Solicitação",
-                "Concluir"
+                "Concluir",
               );
               session.stage = "choose_wifi_est_100";
             } else if (texto.toLowerCase() === "wifi 1000 mbps") {
               await this.MensagensComuns(
                 celular,
-                "⚠️ *Atenção* \nCada plano possui *valor distinto*, previamente informado por telefone ao cliente, e devidamente descrito no *Termo de Adesão*, que deverá ser assinado digitalmente antes da realização da instalação."
+                "⚠️ *Atenção* \nCada plano possui *valor distinto*, previamente informado por telefone ao cliente, e devidamente descrito no *Termo de Adesão*, que deverá ser assinado digitalmente antes da realização da instalação.",
               );
               await this.MensagemBotao(
                 celular,
                 "Concluir Solicitação",
-                "Concluir"
+                "Concluir",
               );
               session.stage = "choose_wifi_est_1gbps";
             } else {
@@ -1483,7 +1487,7 @@ class WhatsPixController {
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes",
             );
           }
           break;
@@ -1492,7 +1496,7 @@ class WhatsPixController {
             if (this.verificaType(type)) {
               await this.MensagensComuns(
                 celular,
-                "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *Alteração de Titularidade* enviando o *link* para o cliente atual com o *Termo de Alteração de Titularidade* \n\ne ao Novo Cliente o *link* com os *Termos de Adesão, Alteração de Titularidade e Contrato de Permanência* a serem *assinados*.\n\n*Clique no Botão abaixo para finalizar*"
+                "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *Alteração de Titularidade* enviando o *link* para o cliente atual com o *Termo de Alteração de Titularidade* \n\ne ao Novo Cliente o *link* com os *Termos de Adesão, Alteração de Titularidade e Contrato de Permanência* a serem *assinados*.\n\n*Clique no Botão abaixo para finalizar*",
               );
 
               let dadosCliente = session.dadosCompleto
@@ -1504,7 +1508,7 @@ class WhatsPixController {
                 let logs = [];
                 if (err && err.code === "ENOENT") {
                   console.log(
-                    "Arquivo de log não encontrado, criando um novo."
+                    "Arquivo de log não encontrado, criando um novo.",
                   );
                 } else if (err) {
                   console.error("Erro ao ler o arquivo de log:", err);
@@ -1518,7 +1522,7 @@ class WhatsPixController {
                   } catch (parseErr) {
                     console.error(
                       "Erro ao analisar o arquivo de log:",
-                      parseErr
+                      parseErr,
                     );
                     logs = [];
                   }
@@ -1546,14 +1550,14 @@ class WhatsPixController {
               await this.MensagemBotao(
                 celular,
                 "Concluir Solicitação",
-                "Finalizar"
+                "Finalizar",
               );
 
               session.stage = "finalizar";
             } else {
               await this.MensagensComuns(
                 celular,
-                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes"
+                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes",
               );
             }
           } catch (error) {
@@ -1565,7 +1569,7 @@ class WhatsPixController {
             await this.MensagensComuns(celular, "🫱🏻‍🫲🏼 Tudo certo!");
             await this.MensagensComuns(
               celular,
-              "✅️ Receberá em breve o *Termo de Adesão* e *Contrato de Permanência*  para assinatura online. Após a *confirmação*, daremos continuidade com a instalação do *Wi-Fi Estendido*."
+              "✅️ Receberá em breve o *Termo de Adesão* e *Contrato de Permanência*  para assinatura online. Após a *confirmação*, daremos continuidade com a instalação do *Wi-Fi Estendido*.",
             );
             let dadosCliente = session.dadosCompleto
               ? JSON.stringify(session.dadosCompleto, null, 2)
@@ -1613,7 +1617,7 @@ class WhatsPixController {
             await this.MensagemBotao(
               celular,
               "Concluir Solicitação",
-              "Finalizar"
+              "Finalizar",
             );
 
             session.stage = "finalizar";
@@ -1626,7 +1630,7 @@ class WhatsPixController {
             await this.MensagensComuns(celular, "🫱🏻‍🫲🏼 Tudo certo!");
             await this.MensagensComuns(
               celular,
-              "✅️ Receberá em breve o *Termo de Adesão* e *Contrato de Permanência*  para assinatura online. Após a *confirmação*, daremos continuidade com a instalação do *Wi-Fi Estendido*."
+              "✅️ Receberá em breve o *Termo de Adesão* e *Contrato de Permanência*  para assinatura online. Após a *confirmação*, daremos continuidade com a instalação do *Wi-Fi Estendido*.",
             );
             let dadosCliente = session.dadosCompleto
               ? JSON.stringify(session.dadosCompleto, null, 2)
@@ -1674,7 +1678,7 @@ class WhatsPixController {
             await this.MensagemBotao(
               celular,
               "Concluir Solicitação",
-              "Finalizar"
+              "Finalizar",
             );
 
             session.stage = "finalizar";
@@ -1693,7 +1697,7 @@ class WhatsPixController {
                 celular,
                 "Escolha qual seu *Tipo* de *Tecnologia*: \n(Caso tenha dúvida, pergunte para nossos atendentes)",
                 "Fibra",
-                "Rádio"
+                "Rádio",
               );
               session.stage = "select_plan_troca";
             } else if (
@@ -1702,20 +1706,20 @@ class WhatsPixController {
             ) {
               await this.MensagensComuns(
                 celular,
-                "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*"
+                "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
               );
               clearTimeout(sessions[celular].inactivityTimer);
               delete sessions[celular];
             } else {
               await this.MensagensComuns(
                 celular,
-                "Aperte nos Botoes de Sim ou Não"
+                "Aperte nos Botoes de Sim ou Não",
               );
             }
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes",
             );
           }
           break;
@@ -1764,13 +1768,13 @@ class WhatsPixController {
             } else {
               await this.MensagensComuns(
                 celular,
-                "Aperte nos Botoes de Fibra ou Rádio"
+                "Aperte nos Botoes de Fibra ou Rádio",
               );
             }
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes",
             );
           }
           break;
@@ -1783,7 +1787,7 @@ class WhatsPixController {
               await this.MensagemBotao(
                 celular,
                 "Clique em *Concluir* para Terminar a *Alteração de Plano*",
-                "Concluir"
+                "Concluir",
               );
             } else if (texto === "🟩 500 MEGA R$ 99,90") {
               let planoEscolhido = "🟩 500 MEGA R$ 99,90";
@@ -1792,7 +1796,7 @@ class WhatsPixController {
               await this.MensagemBotao(
                 celular,
                 "Clique em *Concluir* para Terminar a *Alteração de Plano*",
-                "Concluir"
+                "Concluir",
               );
             } else if (texto === "🔴 600 MEGA R$ 109,90") {
               let planoEscolhido = "🔴 600 MEGA R$ 109,90";
@@ -1801,7 +1805,7 @@ class WhatsPixController {
               await this.MensagemBotao(
                 celular,
                 "Clique em *Concluir* para Terminar a *Alteração de Plano*",
-                "Concluir"
+                "Concluir",
               );
             } else if (texto === "🟡 700 MEGA R$ 129,90") {
               let planoEscolhido = "🟡 700 MEGA R$ 129,90";
@@ -1810,7 +1814,7 @@ class WhatsPixController {
               await this.MensagemBotao(
                 celular,
                 "Clique em *Concluir* para Terminar a *Alteração de Plano*",
-                "Concluir"
+                "Concluir",
               );
             } else if (texto === "🟦 800 MEGA R$ 159,90") {
               let planoEscolhido = "🟦 800 MEGA R$ 159,90";
@@ -1819,7 +1823,7 @@ class WhatsPixController {
               await this.MensagemBotao(
                 celular,
                 "Clique em *Concluir* para Terminar a *Alteração de Plano*",
-                "Concluir"
+                "Concluir",
               );
             } else if (texto === "🟤 340 MEGA R$ 159,90") {
               let planoEscolhido = "🟤 340 MEGA R$ 159,90";
@@ -1828,7 +1832,7 @@ class WhatsPixController {
               await this.MensagemBotao(
                 celular,
                 "Clique em *Concluir* para Terminar a *Alteração de Plano*",
-                "Concluir"
+                "Concluir",
               );
             } else if (texto === "🟠 500 MEGA R$ 199,90") {
               let planoEscolhido = "🟠 500 MEGA R$ 199,90";
@@ -1837,7 +1841,7 @@ class WhatsPixController {
               await this.MensagemBotao(
                 celular,
                 "Clique em *Concluir* para Terminar a *Alteração de Plano*",
-                "Concluir"
+                "Concluir",
               );
             } else if (texto === "🟩 20 MEGA R$ 89,90") {
               let planoEscolhido = "🟩 20 MEGA R$ 89,90";
@@ -1846,7 +1850,7 @@ class WhatsPixController {
               await this.MensagemBotao(
                 celular,
                 "Clique em *Concluir* para Terminar a *Alteração de Plano*",
-                "Concluir"
+                "Concluir",
               );
             } else if (texto === "🟦 30 MEGA R$ 119,90") {
               let planoEscolhido = "🟦 30 MEGA R$ 119,90";
@@ -1855,7 +1859,7 @@ class WhatsPixController {
               await this.MensagemBotao(
                 celular,
                 "Clique em *Concluir* para Terminar a *Alteração de Plano*",
-                "Concluir"
+                "Concluir",
               );
             } else {
               await this.MensagensComuns(celular, "Aperte nos Botoes da Lista");
@@ -1863,7 +1867,7 @@ class WhatsPixController {
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes",
             );
           }
           break;
@@ -1871,7 +1875,7 @@ class WhatsPixController {
           try {
             await this.MensagensComuns(
               celular,
-              "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Um de nossos *atendentes* entrará em contato para concluir a sua *Alteração de plano* enviando o *link* com os *Termos de Alteração de Plano, Termo de Adesão e Contrato de Permanência* a serem *assinados*\n\nClique no botão abaixo para finalizar"
+              "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Um de nossos *atendentes* entrará em contato para concluir a sua *Alteração de plano* enviando o *link* com os *Termos de Alteração de Plano, Termo de Adesão e Contrato de Permanência* a serem *assinados*\n\nClique no botão abaixo para finalizar",
             );
             let dadosCliente = session.dadosCompleto
               ? JSON.stringify(session.dadosCompleto, null, 2)
@@ -1919,7 +1923,7 @@ class WhatsPixController {
             await this.MensagemBotao(
               celular,
               "Concluir Solicitação",
-              "Finalizar"
+              "Finalizar",
             );
 
             session.stage = "finalizar";
@@ -1935,7 +1939,7 @@ class WhatsPixController {
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
             );
           }
           break;
@@ -1948,7 +1952,7 @@ class WhatsPixController {
                   "Escolha Forma de Pagamento",
                   "Pix",
                   "Cartão",
-                  "Dinheiro"
+                  "Dinheiro",
                 );
                 session.stage = "choose_type_payment";
               } else if (
@@ -1957,7 +1961,7 @@ class WhatsPixController {
               ) {
                 await this.MensagensComuns(
                   celular,
-                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de endereço* enviando o *link* com os *Termos de Alteração de Endereço, Termo de Adesão e Contrato de Permanência* a serem *assinados*\n\nClique no Botão abaixo para finalizar"
+                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de endereço* enviando o *link* com os *Termos de Alteração de Endereço, Termo de Adesão e Contrato de Permanência* a serem *assinados*\n\nClique no Botão abaixo para finalizar",
                 );
                 let dadosCliente = session.dadosCompleto
                   ? JSON.stringify(session.dadosCompleto, null, 2)
@@ -1968,7 +1972,7 @@ class WhatsPixController {
                   let logs = [];
                   if (err && err.code === "ENOENT") {
                     console.log(
-                      "Arquivo de log não encontrado, criando um novo."
+                      "Arquivo de log não encontrado, criando um novo.",
                     );
                   } else if (err) {
                     console.error("Erro ao ler o arquivo de log:", err);
@@ -1982,7 +1986,7 @@ class WhatsPixController {
                     } catch (parseErr) {
                       console.error(
                         "Erro ao analisar o arquivo de log:",
-                        parseErr
+                        parseErr,
                       );
                       logs = [];
                     }
@@ -2010,20 +2014,20 @@ class WhatsPixController {
                 await this.MensagemBotao(
                   celular,
                   "Concluir Solicitação",
-                  "Finalizar"
+                  "Finalizar",
                 );
 
                 session.stage = "finalizar";
               } else {
                 await this.MensagensComuns(
                   celular,
-                  "Opção Invalída, Selecione a Opção da Lista"
+                  "Opção Invalída, Selecione a Opção da Lista",
                 );
               }
             } else {
               await this.MensagensComuns(
                 celular,
-                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista"
+                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
               );
             }
           } catch (error) {
@@ -2041,7 +2045,7 @@ class WhatsPixController {
               if (texto.toLowerCase() === "sim concordo") {
                 await this.MensagensComuns(
                   celular,
-                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Um de nossos *atendentes* entrará em contato para concluir a sua *Renovação* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n Clique em finalizar abaixo para terminar a conversa"
+                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Um de nossos *atendentes* entrará em contato para concluir a sua *Renovação* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n Clique em finalizar abaixo para terminar a conversa",
                 );
 
                 let dadosCliente = session.dadosCompleto
@@ -2053,7 +2057,7 @@ class WhatsPixController {
                   let logs = [];
                   if (err && err.code === "ENOENT") {
                     console.log(
-                      "Arquivo de log não encontrado, criando um novo."
+                      "Arquivo de log não encontrado, criando um novo.",
                     );
                   } else if (err) {
                     console.error("Erro ao ler o arquivo de log:", err);
@@ -2067,7 +2071,7 @@ class WhatsPixController {
                     } catch (parseErr) {
                       console.error(
                         "Erro ao analisar o arquivo de log:",
-                        parseErr
+                        parseErr,
                       );
                       logs = [];
                     }
@@ -2095,7 +2099,7 @@ class WhatsPixController {
                 await this.MensagemBotao(
                   celular,
                   "Concluir Solicitação",
-                  "Finalizar"
+                  "Finalizar",
                 );
 
                 session.stage = "finalizar";
@@ -2105,7 +2109,7 @@ class WhatsPixController {
               ) {
                 await this.MensagensComuns(
                   celular,
-                  "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*"
+                  "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
                 );
                 setTimeout(() => {
                   clearTimeout(sessions[celular].inactivityTimer);
@@ -2114,13 +2118,13 @@ class WhatsPixController {
               } else {
                 await this.MensagensComuns(
                   celular,
-                  "Aperte nos Botoes de Sim ou Não"
+                  "Aperte nos Botoes de Sim ou Não",
                 );
               }
             } else {
               await this.MensagensComuns(
                 celular,
-                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes"
+                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes",
               );
             }
           } catch (error) {
@@ -2141,7 +2145,7 @@ class WhatsPixController {
                 "Escolha um Botão",
                 "Boleto/Pix",
                 "Serviços/Contratação",
-                "Falar com Atendente"
+                "Falar com Atendente",
               );
               session.stage = "options_start";
             } else if (await this.validarCPF(texto)) {
@@ -2150,7 +2154,7 @@ class WhatsPixController {
               session.cpf = cpf;
 
               const sis_cliente = await MkauthDataSource.getRepository(
-                Sis_Cliente
+                Sis_Cliente,
               ).find({
                 select: {
                   id: true,
@@ -2183,7 +2187,7 @@ class WhatsPixController {
                 // Convertendo structuredData para uma string legível
                 await this.MensagensComuns(
                   celular,
-                  "🔍 Cadastros encontrados! "
+                  "🔍 Cadastros encontrados! ",
                 );
                 let messageText =
                   "🔍 Mais de um *Cadastro encontrado!* Digite o *Número* para qual deseja 👇🏻\n\n";
@@ -2199,28 +2203,28 @@ class WhatsPixController {
                 session.stage = "end";
                 await this.MensagensComuns(
                   celular,
-                  `🔍 Cadastro encontrado! ${sis_cliente[0].login.toUpperCase()}`
+                  `🔍 Cadastro encontrado! ${sis_cliente[0].login.toUpperCase()}`,
                 );
                 await this.enviarBoleto(
                   sis_cliente[0].login,
                   celular,
                   sis_cliente[0].endereco,
-                  cpf
+                  cpf,
                 );
                 await this.MensagensComuns(
                   celular,
-                  "👉🏻 Digite *continuar* para terminar o atendimento"
+                  "👉🏻 Digite *continuar* para terminar o atendimento",
                 );
               } else {
                 await this.MensagensComuns(
                   celular,
-                  "🙁 Seu cadastro *não* foi *encontrado*, verifique se digitou corretamente o seu *CPF/CNPJ*"
+                  "🙁 Seu cadastro *não* foi *encontrado*, verifique se digitou corretamente o seu *CPF/CNPJ*",
                 );
                 session.stage = "awaiting_cpf";
               }
             } else {
               console.log(
-                "CPF/CNPJ inválido. Por favor, verifique e tente novamente."
+                "CPF/CNPJ inválido. Por favor, verifique e tente novamente.",
               );
               session.stage = "awaiting_cpf";
             }
@@ -2228,7 +2232,7 @@ class WhatsPixController {
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, *Digite* seu *CPF/CNPJ*!!"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, *Digite* seu *CPF/CNPJ*!!",
             );
           }
           break;
@@ -2244,7 +2248,7 @@ class WhatsPixController {
                 "Escolha um Botão",
                 "Boleto/Pix",
                 "Serviços/Contratação",
-                "Falar com Atendente"
+                "Falar com Atendente",
               );
               session.stage = "options_start";
             } else {
@@ -2255,38 +2259,38 @@ class WhatsPixController {
                   const selectedClient = session.structuredData[selectedIndex];
                   console.log(selectedClient);
                   console.log(
-                    `Usuário selecionou o cliente com ID: ${selectedClient.id}`
+                    `Usuário selecionou o cliente com ID: ${selectedClient.id}`,
                   );
                   await this.enviarBoleto(
                     selectedClient.login,
                     celular,
                     selectedClient.endereco,
-                    selectedClient.cpf
+                    selectedClient.cpf,
                   );
 
                   await this.MensagensComuns(
                     celular,
-                    "👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻\n\n🙂Deseja voltar e retirar boleto referente a outro endereço?\n⬆️ Digite *voltar* ou *continuar*"
+                    "👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻\n\n🙂Deseja voltar e retirar boleto referente a outro endereço?\n⬆️ Digite *voltar* ou *continuar*",
                   );
 
                   session.stage = "end";
                 } else {
                   console.log(
-                    "⚠️ Seleção *inválida*, por favor, tente novamente."
+                    "⚠️ Seleção *inválida*, por favor, tente novamente.",
                   );
                   await this.MensagensComuns(
                     celular,
-                    "⚠️ Seleção *inválida*, por favor, tente novamente."
+                    "⚠️ Seleção *inválida*, por favor, tente novamente.",
                   );
                   session.stage = "awaiting_selection";
                 }
               } else {
                 console.log(
-                  "⚠️ Seleção *inválida*, por favor, tente novamente."
+                  "⚠️ Seleção *inválida*, por favor, tente novamente.",
                 );
                 await this.MensagensComuns(
                   celular,
-                  "⚠️ Seleção *inválida*, por favor, tente novamente."
+                  "⚠️ Seleção *inválida*, por favor, tente novamente.",
                 );
                 session.stage = "awaiting_selection";
               }
@@ -2295,7 +2299,7 @@ class WhatsPixController {
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n\n🙏🏻Por gentileza, *selecione* uma opção válida!!"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n\n🙏🏻Por gentileza, *selecione* uma opção válida!!",
             );
           }
           break;
@@ -2325,7 +2329,7 @@ class WhatsPixController {
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, *selecione* uma opção válida!!"
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, *selecione* uma opção válida!!",
             );
           }
           break;
@@ -2338,7 +2342,7 @@ class WhatsPixController {
               "Escolha um Botão",
               "Boleto/Pix",
               "Serviços/Contratação",
-              "Falar com Atendente"
+              "Falar com Atendente",
             );
 
             session.stage = "options_start";
@@ -2350,7 +2354,7 @@ class WhatsPixController {
           ) {
             await this.MensagensComuns(
               celular,
-              "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉"
+              "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
             );
             if (sessions[celular] && sessions[celular].inactivityTimer) {
               clearTimeout(sessions[celular].inactivityTimer);
@@ -2358,12 +2362,12 @@ class WhatsPixController {
             this.deleteSession(celular);
             console.log(
               "Clientes Utilizando o Bot no momento: " +
-                this.getActiveSessionsCount()
+                this.getActiveSessionsCount(),
             );
           } else {
             await this.MensagensComuns(
               celular,
-              "⚠️ Seleção *Inválida*, Verifique se Digitou o Número Corretamente!!!"
+              "⚠️ Seleção *Inválida*, Verifique se Digitou o Número Corretamente!!!",
             );
           }
           break;
@@ -2377,13 +2381,13 @@ class WhatsPixController {
               } else {
                 await this.MensagensComuns(
                   celular,
-                  "Opção Invalída, Clique no Botão"
+                  "Opção Invalída, Clique no Botão",
                 );
               }
             } else {
               await this.MensagensComuns(
                 celular,
-                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Clique no Botão"
+                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Clique no Botão",
               );
             }
           } catch (error) {
@@ -2400,7 +2404,7 @@ class WhatsPixController {
     if (type !== "text" && type !== "interactive" && type !== undefined) {
       await this.MensagensComuns(
         celular,
-        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite"
+        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite",
       );
       return;
     }
@@ -2438,7 +2442,7 @@ class WhatsPixController {
       console.log("Iniciando cadastro...");
       await this.MensagensComuns(
         celular,
-        "🔤 Pronto, agora vamos coletar todos os seus *Dados* para elaborar o Cadastro e realizar os *Termos de Adesão*."
+        "🔤 Pronto, agora vamos coletar todos os seus *Dados* para elaborar o Cadastro e realizar os *Termos de Adesão*.",
       );
       session.dadosCadastro = {}; // Inicializa os dados do cadastro
       session.ultimaPergunta = perguntas[0].campo; // Começa com a primeira pergunta
@@ -2455,7 +2459,7 @@ class WhatsPixController {
         if (!cpfValido) {
           await this.MensagensComuns(
             celular,
-            "❌ *CPF* inválido. Por favor, insira um *CPF* válido."
+            "❌ *CPF* inválido. Por favor, insira um *CPF* válido.",
           );
           return; // Não avança para a próxima pergunta
         }
@@ -2466,7 +2470,7 @@ class WhatsPixController {
         if (!RgValido) {
           await this.MensagensComuns(
             celular,
-            "❌ *RG* inválido. Por favor, insira um *RG* válido."
+            "❌ *RG* inválido. Por favor, insira um *RG* válido.",
           );
           return; // Não avança para a próxima pergunta
         }
@@ -2490,7 +2494,7 @@ class WhatsPixController {
       // Cadastro completo
       await this.MensagensComuns(
         celular,
-        "🛜 Vamos escolher o seu *Plano de Internet*"
+        "🛜 Vamos escolher o seu *Plano de Internet*",
       );
       await this.MensagemLista(celular, "Escolha seu Plano:", {
         sections: [
@@ -2540,7 +2544,7 @@ class WhatsPixController {
     if (type !== "text" && type !== "interactive" && type !== undefined) {
       await this.MensagensComuns(
         celular,
-        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite"
+        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite",
       );
       return;
     }
@@ -2562,7 +2566,7 @@ class WhatsPixController {
       console.log("Iniciando mudança...");
       await this.MensagensComuns(
         celular,
-        "🔤 Pronto, agora vamos coletar todos os *Dados* para realizar a mudança de endereço"
+        "🔤 Pronto, agora vamos coletar todos os *Dados* para realizar a mudança de endereço",
       );
       session.dadosCadastro = {}; // Inicializa os dados do cadastro
       session.ultimaPergunta = perguntas[0].campo; // Começa com a primeira pergunta
@@ -2579,7 +2583,7 @@ class WhatsPixController {
         if (!cpfValido) {
           await this.MensagensComuns(
             celular,
-            "❌ *CPF* inválido. Por favor, insira um *CPF* válido."
+            "❌ *CPF* inválido. Por favor, insira um *CPF* válido.",
           );
           return; // Não avança para a próxima pergunta
         }
@@ -2607,14 +2611,14 @@ class WhatsPixController {
         "Contrato Hospedado",
         "Este é o Nosso Contrato Oficial Completo",
         "Ler o contrato",
-        "https://wiptelecomunicacoes.com.br/contrato"
+        "https://wiptelecomunicacoes.com.br/contrato",
       );
       await this.MensagemTermos(
         celular,
         "Termos Mudança de Endereço",
         "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
         "Ler Termos",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_endereco"
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_endereco",
       );
       await this.MensagemBotao(celular, "Escolha a Forma", "Grátis", "Paga");
       session.stage = "choose_type_endereco";
@@ -2634,14 +2638,14 @@ class WhatsPixController {
     celular: any,
     texto: any,
     session: any,
-    type: any
+    type: any,
   ) {
     console.log("Mudança Type: " + type);
 
     if (type !== "text" && type !== "interactive" && type !== undefined) {
       await this.MensagensComuns(
         celular,
-        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite"
+        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite",
       );
       return;
     }
@@ -2657,7 +2661,7 @@ class WhatsPixController {
       console.log("Iniciando Wifi Estendido...");
       await this.MensagensComuns(
         celular,
-        "🔤 Pronto, agora vamos coletar todos os *Dados* para realizar o Wifi Estendido"
+        "🔤 Pronto, agora vamos coletar todos os *Dados* para realizar o Wifi Estendido",
       );
       session.dadosCadastro = {}; // Inicializa os dados do cadastro
       session.ultimaPergunta = perguntas[0].campo; // Começa com a primeira pergunta
@@ -2674,7 +2678,7 @@ class WhatsPixController {
         if (!cpfValido) {
           await this.MensagensComuns(
             celular,
-            "❌ *CPF* inválido. Por favor, insira um *CPF* válido."
+            "❌ *CPF* inválido. Por favor, insira um *CPF* válido.",
           );
           return; // Não avança para a próxima pergunta
         }
@@ -2702,14 +2706,14 @@ class WhatsPixController {
         "Contrato Hospedado",
         "Este é o Nosso Contrato Oficial Completo",
         "Ler o contrato",
-        "https://wiptelecomunicacoes.com.br/contrato"
+        "https://wiptelecomunicacoes.com.br/contrato",
       );
 
       await this.MensagemBotao(
         celular,
         "Escolha a Opção",
         "Sim Concordo",
-        "Não"
+        "Não",
       );
 
       session.stage = "choose_est";
@@ -2729,12 +2733,12 @@ class WhatsPixController {
     celular: any,
     texto: any,
     session: any,
-    type: any
+    type: any,
   ) {
     if (type !== "text" && type !== "interactive" && type !== undefined) {
       await this.MensagensComuns(
         celular,
-        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite"
+        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite",
       );
       return;
     }
@@ -2750,7 +2754,7 @@ class WhatsPixController {
       console.log("Iniciando mudança...");
       await this.MensagensComuns(
         celular,
-        "🔤 Agora vamos coletar todos os *Dados* para realizar a mudança de cômodo e agendar a visita"
+        "🔤 Agora vamos coletar todos os *Dados* para realizar a mudança de cômodo e agendar a visita",
       );
       session.dadosCadastro = {}; // Inicializa os dados do cadastro
       session.ultimaPergunta = perguntas[0].campo; // Começa com a primeira pergunta
@@ -2767,7 +2771,7 @@ class WhatsPixController {
         if (!cpfValido) {
           await this.MensagensComuns(
             celular,
-            "❌ *CPF* inválido. Por favor, insira um *CPF* válido."
+            "❌ *CPF* inválido. Por favor, insira um *CPF* válido.",
           );
           return; // Não avança para a próxima pergunta
         }
@@ -2794,14 +2798,14 @@ class WhatsPixController {
         "Contrato Hospedado",
         "Este é o Nosso Contrato Oficial Completo",
         "Ler o contrato",
-        "https://wiptelecomunicacoes.com.br/contrato"
+        "https://wiptelecomunicacoes.com.br/contrato",
       );
       await this.MensagemTermos(
         celular,
         "Termos Mudança de Cômodo",
         "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
         "Ler Termos",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_comodo"
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_comodo",
       );
       await this.MensagemBotao(celular, "Escolha a Forma", "Grátis", "Paga");
       session.stage = "choose_type_comodo";
@@ -2821,12 +2825,12 @@ class WhatsPixController {
     celular: any,
     texto: any,
     session: any,
-    type: any
+    type: any,
   ) {
     if (type !== "text" && type !== "interactive" && type !== undefined) {
       await this.MensagensComuns(
         celular,
-        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite"
+        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite",
       );
       return;
     }
@@ -2850,7 +2854,7 @@ class WhatsPixController {
       console.log("Iniciando mudança...");
       await this.MensagensComuns(
         celular,
-        "🔤 Agora vamos coletar todos os *Dados* para realizar a troca de titularidade"
+        "🔤 Agora vamos coletar todos os *Dados* para realizar a troca de titularidade",
       );
       session.dadosCadastro = {}; // Inicializa os dados do cadastro
       session.ultimaPergunta = perguntas[0].campo; // Começa com a primeira pergunta
@@ -2867,7 +2871,7 @@ class WhatsPixController {
         if (!cpfValido) {
           await this.MensagensComuns(
             celular,
-            "❌ *CPF* inválido. Por favor, insira um *CPF* válido."
+            "❌ *CPF* inválido. Por favor, insira um *CPF* válido.",
           );
           return; // Não avança para a próxima pergunta
         }
@@ -2895,7 +2899,7 @@ class WhatsPixController {
       await this.MensagemBotao(
         celular,
         "Aperte Em *Continuar* para Concluir a Troca de *Titularidade*",
-        "Continuar"
+        "Continuar",
       );
 
       // Aqui você armazena todos os dados na sessão
@@ -2913,7 +2917,7 @@ class WhatsPixController {
     if (type !== "text" && type !== "interactive" && type !== undefined) {
       await this.MensagensComuns(
         celular,
-        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite"
+        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite",
       );
       return;
     }
@@ -2929,7 +2933,7 @@ class WhatsPixController {
       console.log("Iniciando mudança...");
       await this.MensagensComuns(
         celular,
-        "🔤 Pronto, agora vamos coletar todos os *Dados* para realizar a Alteração de Plano"
+        "🔤 Pronto, agora vamos coletar todos os *Dados* para realizar a Alteração de Plano",
       );
       session.dadosCadastro = {}; // Inicializa os dados do cadastro
       session.ultimaPergunta = perguntas[0].campo; // Começa com a primeira pergunta
@@ -2946,7 +2950,7 @@ class WhatsPixController {
         if (!cpfValido) {
           await this.MensagensComuns(
             celular,
-            "❌ *CPF* inválido. Por favor, insira um *CPF* válido."
+            "❌ *CPF* inválido. Por favor, insira um *CPF* válido.",
           );
           return; // Não avança para a próxima pergunta
         }
@@ -2973,20 +2977,20 @@ class WhatsPixController {
         "Contrato Hospedado",
         "Este é o Nosso Contrato Oficial Completo",
         "Ler o contrato",
-        "https://wiptelecomunicacoes.com.br/contrato"
+        "https://wiptelecomunicacoes.com.br/contrato",
       );
       await this.MensagemTermos(
         celular,
         "Termos Alteração de Plano",
         "📄 Para dar *continuidade*, é preciso que *leia* o *Termo abaixo* e escolha a opção que deseja",
         "Ler Termos",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/altera_plano"
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/altera_plano",
       );
       await this.MensagemBotao(
         celular,
         "Escolha a Opção",
         "Sim Concordo",
-        "Não"
+        "Não",
       );
       session.stage = "choose_type_troca_plano";
 
@@ -3005,7 +3009,7 @@ class WhatsPixController {
     if (type !== "text" && type !== "interactive" && type !== undefined) {
       await this.MensagensComuns(
         celular,
-        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite"
+        "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite",
       );
       return;
     }
@@ -3021,7 +3025,7 @@ class WhatsPixController {
       console.log("Iniciando Renovação...");
       await this.MensagensComuns(
         celular,
-        "🔤 Pronto, agora vamos coletar todos os *Dados* para realizar a *Renovação Contratual*"
+        "🔤 Pronto, agora vamos coletar todos os *Dados* para realizar a *Renovação Contratual*",
       );
       session.dadosCadastro = {}; // Inicializa os dados do cadastro
       session.ultimaPergunta = perguntas[0].campo; // Começa com a primeira pergunta
@@ -3038,7 +3042,7 @@ class WhatsPixController {
         if (!cpfValido) {
           await this.MensagensComuns(
             celular,
-            "❌ *CPF* inválido. Por favor, insira um *CPF* válido."
+            "❌ *CPF* inválido. Por favor, insira um *CPF* válido.",
           );
           return; // Não avança para a próxima pergunta
         }
@@ -3065,20 +3069,20 @@ class WhatsPixController {
         "Contrato Hospedado",
         "Este é o Nosso Contrato Oficial Completo",
         "Ler o contrato",
-        "https://wiptelecomunicacoes.com.br/contrato"
+        "https://wiptelecomunicacoes.com.br/contrato",
       );
       await this.MensagemTermos(
         celular,
         "Termos Renovação Contratual",
         "📄 Para dar *continuidade*, é preciso que *leia* o *Termo abaixo* e escolha a opção que deseja",
         "Ler Termos",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/renovacao"
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/renovacao",
       );
       await this.MensagemBotao(
         celular,
         "Escolha a Opção",
         "Sim Concordo",
-        "Não"
+        "Não",
       );
       session.stage = "choose_type_renovacao";
 
@@ -3099,13 +3103,13 @@ class WhatsPixController {
       "Termos LGPD",
       "📄 Para dar *continuidade*, é preciso que leia e *aceite* os *Termos abaixo* para a segurança dos seus dados pessoais, de acordo com a *LGPD*.",
       "Ler Termos",
-      "https://wipdiversos.wiptelecomunicacoes.com.br/doc/privacidade"
+      "https://wipdiversos.wiptelecomunicacoes.com.br/doc/privacidade",
     );
     await this.MensagemBotao(
       celular,
       "Concorda com os Termos?",
       "Sim Aceito",
-      "Não"
+      "Não",
     );
   }
 
@@ -3129,7 +3133,7 @@ class WhatsPixController {
     });
 
     const sis_cliente: any = await MkauthDataSource.getRepository(
-      Sis_Cliente
+      Sis_Cliente,
     ).findOne({
       where: { login: pppoe, cpf_cnpj: cpf, cli_ativado: "s" },
     });
@@ -3376,7 +3380,7 @@ class WhatsPixController {
       year: "numeric",
     } as const;
     const formattedDate = new Intl.DateTimeFormat("pt-BR", options2).format(
-      dataVenc
+      dataVenc,
     );
 
     await this.enviarMensagemVencimento(
@@ -3388,7 +3392,7 @@ class WhatsPixController {
       valor,
       pppoe,
       sis_cliente.numero,
-      cliente.uuid_lanc
+      cliente.uuid_lanc,
     );
   }
 
@@ -3413,7 +3417,7 @@ class WhatsPixController {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       const insertMessage = await ApiMkDataSource.getRepository(Mensagens).save(
@@ -3422,7 +3426,7 @@ class WhatsPixController {
           sender_id: conversation.receiver_id,
           content: msg,
           timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
-        }
+        },
       );
 
       // console.log(response.data);
@@ -3454,7 +3458,7 @@ class WhatsPixController {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       const insertMessage = await ApiMkDataSource.getRepository(Mensagens).save(
@@ -3463,7 +3467,7 @@ class WhatsPixController {
           sender_id: conversation.receiver_id,
           content: "Pode me passar o CPF?",
           timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
-        }
+        },
       );
     } catch (error) {
       console.error("Error sending message:", error);
@@ -3574,7 +3578,7 @@ class WhatsPixController {
     valor: any,
     pppoe: any,
     numero: any,
-    boletoID: any
+    boletoID: any,
   ) {
     try {
       await this.MensagensComuns(receivenumber, "🔎 *Só um Momento* 🕵️");
@@ -3594,7 +3598,7 @@ class WhatsPixController {
           process.env.SFTP_USER,
           process.env.SFTP_PASSWORD,
           `${process.env.PDF_PATH}${boletoID}.pdf`,
-          path.join(__dirname, "..", "..", "temp", `${boletoID}.pdf`)
+          path.join(__dirname, "..", "..", "temp", `${boletoID}.pdf`),
         );
         await this.MensagensComuns(receivenumber, "Linha Digitavel 👇");
         await this.MensagensComuns(receivenumber, linha_dig);
@@ -3630,7 +3634,7 @@ class WhatsPixController {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       const insertMessage = await ApiMkDataSource.getRepository(Mensagens).save(
@@ -3639,7 +3643,7 @@ class WhatsPixController {
           sender_id: conversation.receiver_id,
           content: "Bem-vindo ao nosso serviço de WhatsApp!",
           timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
-        }
+        },
       );
     } catch (error) {
       console.error("Error sending template message:", error);
@@ -3652,7 +3656,7 @@ class WhatsPixController {
     username: any,
     password: any,
     remoteFilePath: any,
-    localFilePath: any
+    localFilePath: any,
   ) {
     const client = new SftpClient();
     try {
@@ -3686,7 +3690,7 @@ class WhatsPixController {
     header: any,
     body: any,
     right_text_url: any,
-    url_site: any
+    url_site: any,
   ) {
     try {
       const response = await axios.post(
@@ -3719,7 +3723,7 @@ class WhatsPixController {
             Authorization: `Bearer ${token}`, // Substitua pelo seu token de acesso
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       const insertMessage = await ApiMkDataSource.getRepository(Mensagens).save(
@@ -3728,14 +3732,14 @@ class WhatsPixController {
           sender_id: conversation.receiver_id,
           content: "Termos Enviados",
           timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
-        }
+        },
       );
 
       console.log(response.data); // Log da resposta da API
     } catch (error: any) {
       console.error(
         "Erro ao enviar mensagem com botão de link:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
     }
   }
@@ -3763,7 +3767,7 @@ class WhatsPixController {
                     id: row.id, // ID da linha
                     title: row.title, // Título da linha
                   })),
-                })
+                }),
               ),
             },
           },
@@ -3773,7 +3777,7 @@ class WhatsPixController {
             Authorization: `Bearer ${token}`, // Substitua pelo seu token de acesso
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       const insertMessage = await ApiMkDataSource.getRepository(Mensagens).save(
@@ -3782,14 +3786,14 @@ class WhatsPixController {
           sender_id: conversation.receiver_id,
           content: "Lista de Opções Enviada",
           timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
-        }
+        },
       );
 
       console.log(response.data); // Log da resposta da API
     } catch (error: any) {
       console.error(
         "Erro ao enviar mensagem de lista:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
     }
   }
@@ -3799,7 +3803,7 @@ class WhatsPixController {
     texto: any,
     title1: any,
     title2: any = 0,
-    title3: any = 0
+    title3: any = 0,
   ) {
     try {
       if (title3 != 0 && title2 != 0) {
@@ -3847,7 +3851,7 @@ class WhatsPixController {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
-          }
+          },
         );
         console.log(response.data);
       } else if (title3 != 0) {
@@ -3888,7 +3892,7 @@ class WhatsPixController {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
-          }
+          },
         );
         console.log(response.data);
       } else if (title3 == 0 && title2 == 0) {
@@ -3922,7 +3926,7 @@ class WhatsPixController {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
-          }
+          },
         );
         console.log(response.data);
       } else {
@@ -3963,7 +3967,7 @@ class WhatsPixController {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
-          }
+          },
         );
         console.log(response.data);
       }
@@ -3974,12 +3978,12 @@ class WhatsPixController {
           sender_id: conversation.receiver_id,
           content: "Mensagem de Botão Enviada",
           timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
-        }
+        },
       );
     } catch (error: any) {
       console.error(
         "Error sending button message:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
     }
   }
@@ -3988,7 +3992,7 @@ class WhatsPixController {
     receivenumber: any,
     filePath: any,
     type: any,
-    messaging_product: any = "whatsapp"
+    messaging_product: any = "whatsapp",
   ) {
     const formData = new FormData();
     formData.append("file", fs.createReadStream(filePath));
@@ -4010,7 +4014,7 @@ class WhatsPixController {
     } catch (error: any) {
       console.error(
         "Erro ao enviar a mídia:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
     }
   }
@@ -4019,7 +4023,7 @@ class WhatsPixController {
     receivenumber: any,
     type: any,
     mediaID: any,
-    filename: any
+    filename: any,
   ) {
     try {
       const response = await axios.post(
@@ -4040,7 +4044,7 @@ class WhatsPixController {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       const insertMessage = await ApiMkDataSource.getRepository(Mensagens).save(
@@ -4049,12 +4053,12 @@ class WhatsPixController {
           sender_id: conversation.receiver_id,
           content: "Arquivo Enviado",
           timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
-        }
+        },
       );
     } catch (error: any) {
       console.error(
         "Error sending media message:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
     }
   }
@@ -4073,7 +4077,7 @@ class WhatsPixController {
           sender_id: conversation.receiver_id,
           content: msg,
           timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
-        }
+        },
       );
     } catch (error) {
       console.log("Error sending message:", error);

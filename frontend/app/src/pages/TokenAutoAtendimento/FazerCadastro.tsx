@@ -9,7 +9,8 @@ import { useNavigate } from "react-router-dom";
 export const FazerCadastro = () => {
   const navigate = useNavigate();
   useIdleTimeout({
-    onIdle: () => navigate("/TokenAutoAtendimento"),
+    onIdle: () =>
+      navigate("/TokenAutoAtendimento", { state: { forceIdle: true } }),
     idleTime: 180, // 3 minutes
   });
   const [formData, setFormData] = useState({
@@ -195,6 +196,7 @@ export const FazerCadastro = () => {
             <p className="text-slate-300 mb-8">{success}</p>
             <Link
               to="/TokenAutoAtendimento"
+              state={{ forceIdle: true }}
               className="block w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-cyan-500/25 transition-all active:scale-95"
             >
               VOLTAR AO INÍCIO
@@ -213,6 +215,7 @@ export const FazerCadastro = () => {
           <div className="flex items-center space-x-3 text-cyan-400">
             <Link
               to="/TokenAutoAtendimento"
+              state={{ forceIdle: false }}
               className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors"
             >
               <HiArrowLeft className="text-2xl" />

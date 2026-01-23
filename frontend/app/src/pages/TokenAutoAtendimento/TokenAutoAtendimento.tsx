@@ -2,14 +2,24 @@ import React from "react";
 import { FaCreditCard, FaComments, FaUser } from "react-icons/fa";
 import { QRCodeCanvas } from "qrcode.react";
 import { HiChip } from "react-icons/hi";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Keyboard } from "./components/Keyboard";
 import { useIdleTimeout } from "../../hooks/useIdleTimeout";
 import { IdleScreen } from "./components/IdleScreen";
 import { useState } from "react";
 
 export const TokenAutoAtendimento = () => {
-  const [isIdle, setIsIdle] = useState(true); // Start as idle
+  const location = useLocation();
+  const [isIdle, setIsIdle] = useState(() => {
+    // If explicitly requested to be idle (e.g. timeout or finish task)
+    if (location.state?.forceIdle === true) return true;
+
+    // If explicitly requested to be active (e.g. back button)
+    if (location.state?.forceIdle === false) return false;
+
+    // Default to idle (Attract Mode) on fresh load
+    return true;
+  });
 
   const { resetTimer } = useIdleTimeout({
     onIdle: () => setIsIdle(true),
@@ -63,13 +73,13 @@ export const TokenAutoAtendimento = () => {
         {/* Main Buttons */}
         <div className="flex-1 flex flex-col items-center justify-center space-y-5 px-8">
           <button className="group w-full relative overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none">
-            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full opacity-80 blur group-hover:opacity-100 transition-opacity"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full opacity-80 blur group-hover:opacity-100 transition-opacity"></div>
             <Link to="/TokenAutoAtendimento/pagar-fatura">
               <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-16 flex items-center justify-between px-6 border border-white/10 group-hover:bg-opacity-30 transition-all">
                 <span className="text-white font-bold text-lg tracking-wide uppercase drop-shadow">
                   Pagar Ultima Fatura
                 </span>
-                <FaCreditCard className="text-cyan-200 text-2xl" />
+                <FaCreditCard className="text-purple-200 text-2xl" />
               </div>
             </Link>
           </button>
@@ -87,7 +97,7 @@ export const TokenAutoAtendimento = () => {
           </button> */}
 
           <button className="group w-full relative overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full opacity-80 blur group-hover:opacity-100 transition-opacity"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full opacity-80 blur group-hover:opacity-100 transition-opacity"></div>
             <Link to="/TokenAutoAtendimento/fazer-cadastro">
               <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-16 flex items-center justify-between px-6 border border-white/10 group-hover:bg-opacity-30 transition-all">
                 <span className="text-white font-bold text-lg tracking-wide uppercase drop-shadow">

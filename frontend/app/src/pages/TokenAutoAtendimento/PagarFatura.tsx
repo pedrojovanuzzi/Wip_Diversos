@@ -65,7 +65,8 @@ export const PagarFatura = () => {
   );
 
   useIdleTimeout({
-    onIdle: () => navigate("/TokenAutoAtendimento"),
+    onIdle: () =>
+      navigate("/TokenAutoAtendimento", { state: { forceIdle: true } }),
     idleTime: 180, // 3 minutes
   });
 
@@ -336,11 +337,11 @@ export const PagarFatura = () => {
       }, 1000); // Increased delay to 1000ms to ensure render
 
       timer = setTimeout(() => {
-        navigate("/TokenAutoAtendimento");
+        navigate("/TokenAutoAtendimento", { state: { forceIdle: true } });
       }, 20000);
     } else if (step === "payment-error") {
       timer = setTimeout(() => {
-        navigate("/TokenAutoAtendimento");
+        navigate("/TokenAutoAtendimento", { state: { forceIdle: true } });
       }, 20000);
     }
     return () => {
@@ -375,7 +376,7 @@ export const PagarFatura = () => {
       setClients([]);
       setError("");
     } else {
-      navigate("/TokenAutoAtendimento");
+      navigate("/TokenAutoAtendimento", { state: { forceIdle: false } });
     }
   }
 
@@ -726,7 +727,11 @@ export const PagarFatura = () => {
                 </button>
 
                 <button
-                  onClick={() => navigate("/TokenAutoAtendimento")}
+                  onClick={() =>
+                    navigate("/TokenAutoAtendimento", {
+                      state: { forceIdle: true },
+                    })
+                  }
                   className="w-full px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/50 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95"
                 >
                   Voltar ao Início Agora
@@ -754,7 +759,11 @@ export const PagarFatura = () => {
               </div>
 
               <button
-                onClick={() => navigate("/TokenAutoAtendimento")}
+                onClick={() =>
+                  navigate("/TokenAutoAtendimento", {
+                    state: { forceIdle: true },
+                  })
+                }
                 className="mt-8 px-10 py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:shadow-red-500/50 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95"
               >
                 Tentar Novamente

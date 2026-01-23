@@ -5,7 +5,8 @@ import { useNavigate } from "react-router-dom";
 export const CriarChamado = () => {
   const navigate = useNavigate();
   useIdleTimeout({
-    onIdle: () => navigate("/TokenAutoAtendimento"),
+    onIdle: () =>
+      navigate("/TokenAutoAtendimento", { state: { forceIdle: true } }),
     idleTime: 180, // 3 minutes
   });
   return (
