@@ -19,16 +19,16 @@ export const IdleScreen: React.FC<IdleScreenProps> = ({ onStart }) => {
       </div>
 
       {/* Header */}
-      <div className="w-full bg-slate-900/50 backdrop-blur-md border-b border-white/5 py-6 px-6 flex flex-col items-center justify-center relative z-10">
+      <div className="w-full bg-slate-900/50 backdrop-blur-md border-b border-white/5 py-4 lg:py-6 px-4 lg:px-6 flex flex-col items-center justify-center relative z-10">
         <img
           src="/imgs/icon.png"
           alt="Logo"
-          className="h-48 mb-4 object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]"
+          className="h-24 lg:h-48 mb-2 lg:mb-4 object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]"
         />
-        <div className="text-slate-400 font-light text-2xl uppercase tracking-[0.2em]">
+        <div className="text-slate-400 font-light text-base lg:text-2xl uppercase tracking-[0.2em]">
           Terminal <span className="lowercase text-slate-500">de</span>
         </div>
-        <div className="text-white font-bold text-4xl sm:text-5xl uppercase tracking-wider mt-1 drop-shadow-lg">
+        <div className="text-white font-bold text-3xl sm:text-4xl lg:text-5xl uppercase tracking-wider mt-1 drop-shadow-lg text-center">
           Autoatendimento
         </div>
         {/* Glow line under header */}
@@ -38,18 +38,18 @@ export const IdleScreen: React.FC<IdleScreenProps> = ({ onStart }) => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center relative p-8 z-10">
         {/* Central Card/Icon */}
-        <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-full p-16 shadow-[0_0_60px_rgba(34,211,238,0.15)] mb-16 animate-pulse relative group">
+        <div className="bg-white/5 border border-white/10 backdrop-blur-sm rounded-full p-8 lg:p-16 shadow-[0_0_60px_rgba(34,211,238,0.15)] mb-8 lg:mb-16 animate-pulse relative group">
           <div className="absolute inset-0 rounded-full bg-cyan-500/20 blur-xl opacity-50 group-hover:opacity-100 transition-opacity duration-1000"></div>
-          <FaHandPointUp className="text-cyan-400 text-8xl sm:text-9xl relative z-10 drop-shadow-[0_0_15px_rgba(34,211,238,0.8)]" />
+          <FaHandPointUp className="text-cyan-400 text-6xl sm:text-8xl lg:text-9xl relative z-10 drop-shadow-[0_0_15px_rgba(34,211,238,0.8)]" />
         </div>
 
         {/* Action Button */}
-        <button className="group relative px-12 py-6 rounded-full shadow-2xl transform transition-all hover:scale-105 active:scale-95 cursor-pointer overflow-hidden">
+        <button className="group relative px-8 py-4 lg:px-12 lg:py-6 rounded-full shadow-2xl transform transition-all hover:scale-105 active:scale-95 cursor-pointer overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-700 opacity-90 group-hover:opacity-100 transition-opacity"></div>
 
           {/* Button content */}
-          <div className="relative flex items-center space-x-4">
-            <span className="text-3xl text-white font-bold tracking-widest uppercase drop-shadow-md">
+          <div className="relative flex items-center space-x-2 lg:space-x-4">
+            <span className="text-xl lg:text-3xl text-white font-bold tracking-widest uppercase drop-shadow-md">
               Toque Aqui
             </span>
           </div>

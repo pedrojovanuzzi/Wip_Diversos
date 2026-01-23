@@ -46,24 +46,24 @@ export const TokenAutoAtendimento = () => {
       </div>
 
       {/* Kiosk Frame */}
-      <div className="relative z-10 w-full max-w-[900px] bg-white/5 backdrop-blur-xl border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[85vh] border-t-white/20 border-l-white/20">
+      <div className="relative z-10 w-full max-w-md lg:max-w-[900px] bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2rem] lg:rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[85vh] border-t-white/20 border-l-white/20">
         {/* Glow Effects on Frame */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-50"></div>
         <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-purple-400 to-transparent opacity-50"></div>
 
         {/* Header */}
-        <div className="flex flex-col items-center pt-16 pb-10">
-          <div className="flex flex-col items-center text-left space-x-6 text-cyan-400 mb-4">
+        <div className="flex flex-col items-center pt-8 lg:pt-16 pb-6 lg:pb-10">
+          <div className="flex flex-col items-center text-left space-x-0 lg:space-x-6 text-cyan-400 mb-2 lg:mb-4">
             <img
               src="/imgs/icon.png"
               alt="Logo"
-              className="h-48 drop-shadow-[0_0_12px_rgba(34,211,238,0.8)]"
+              className="h-24 lg:h-48 drop-shadow-[0_0_12px_rgba(34,211,238,0.8)]"
             />
-            <div className="flex flex-col">
-              <span className="text-5xl font-bold tracking-wider text-white drop-shadow-md">
+            <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
+              <span className="text-3xl lg:text-5xl font-bold tracking-wider text-white drop-shadow-md">
                 TOTEM
               </span>
-              <span className="text-xl tracking-[0.3em] text-cyan-300">
+              <span className="text-xs lg:text-xl tracking-[0.3em] text-cyan-300">
                 WIP TELECOM
               </span>
             </div>
@@ -72,14 +72,14 @@ export const TokenAutoAtendimento = () => {
 
         {/* Main Buttons */}
         <div className="flex-1 flex flex-col items-center justify-center space-y-5 px-8">
-          <button className="group w-full relative overflow-hidden rounded-full p-[3px] transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none">
+          <button className="group w-full relative overflow-hidden rounded-full p-[2px] lg:p-[3px] transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full opacity-80 blur group-hover:opacity-100 transition-opacity"></div>
             <Link to="/TokenAutoAtendimento/pagar-fatura">
-              <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-32 flex items-center justify-between px-10 border border-white/10 group-hover:bg-opacity-30 transition-all">
-                <span className="text-white font-bold text-3xl tracking-wide uppercase drop-shadow">
+              <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-20 lg:h-32 flex items-center justify-between px-6 lg:px-10 border border-white/10 group-hover:bg-opacity-30 transition-all">
+                <span className="text-white font-bold text-lg lg:text-3xl tracking-wide uppercase drop-shadow">
                   Pagar Ultima Fatura
                 </span>
-                <FaCreditCard className="text-purple-200 text-5xl" />
+                <FaCreditCard className="text-purple-200 text-3xl lg:text-5xl" />
               </div>
             </Link>
           </button>
@@ -96,14 +96,14 @@ export const TokenAutoAtendimento = () => {
             </Link>
           </button> */}
 
-          <button className="group w-full relative overflow-hidden rounded-full p-[3px] transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none">
+          <button className="group w-full relative overflow-hidden rounded-full p-[2px] lg:p-[3px] transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full opacity-80 blur group-hover:opacity-100 transition-opacity"></div>
             <Link to="/TokenAutoAtendimento/fazer-cadastro">
-              <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-32 flex items-center justify-between px-10 border border-white/10 group-hover:bg-opacity-30 transition-all">
-                <span className="text-white font-bold text-3xl tracking-wide uppercase drop-shadow">
+              <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-20 lg:h-32 flex items-center justify-between px-6 lg:px-10 border border-white/10 group-hover:bg-opacity-30 transition-all">
+                <span className="text-white font-bold text-lg lg:text-3xl tracking-wide uppercase drop-shadow">
                   Fazer Cadastro
                 </span>
-                <FaUser className="text-purple-100 text-5xl" />
+                <FaUser className="text-purple-100 text-3xl lg:text-5xl" />
               </div>
             </Link>
           </button>

@@ -142,8 +142,8 @@ export const FazerCadastro = () => {
     name: keyof typeof formData;
     placeholder?: string;
   }) => (
-    <div className="flex flex-col space-y-2">
-      <label className="text-cyan-400 text-sm font-bold tracking-wider uppercase ml-1">
+    <div className="flex flex-col space-y-1 lg:space-y-2">
+      <label className="text-cyan-400 text-xs lg:text-sm font-bold tracking-wider uppercase ml-1">
         {label}
       </label>
       <input
@@ -153,7 +153,7 @@ export const FazerCadastro = () => {
         readOnly // Prevent native keyboard on mobile/touch, force use of Virtual Keyboard
         placeholder={placeholder}
         className={`
-          bg-slate-800/50 border rounded-xl px-6 py-5 text-white outline-none transition-all text-xl
+          bg-slate-800/50 border rounded-lg lg:rounded-xl px-4 lg:px-6 py-3 lg:py-5 text-white outline-none transition-all text-base lg:text-xl
           ${
             activeField === name
               ? "border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)] bg-slate-800"
@@ -206,25 +206,25 @@ export const FazerCadastro = () => {
       )}
 
       {/* Kiosk Frame */}
-      <div className="relative z-10 w-full max-w-[900px] bg-white/5 backdrop-blur-xl border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[85vh] border-t-white/20 border-l-white/20">
+      <div className="relative z-10 w-full max-w-md lg:max-w-[900px] bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2rem] lg:rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-full lg:h-[85vh] border-t-white/20 border-l-white/20">
         {/* Glow Effects */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-50"></div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-10 pt-16 pb-6 bg-slate-900/40 border-b border-white/5">
-          <div className="flex items-center space-x-6 text-cyan-400">
+        <div className="flex items-center justify-between px-6 lg:px-10 pt-8 lg:pt-16 pb-4 lg:pb-6 bg-slate-900/40 border-b border-white/5">
+          <div className="flex items-center space-x-3 lg:space-x-6 text-cyan-400">
             <Link
               to="/TokenAutoAtendimento"
               state={{ forceIdle: false }}
-              className="p-4 -ml-4 rounded-full hover:bg-white/5 transition-colors"
+              className="p-2 lg:p-4 -ml-2 lg:-ml-4 rounded-full hover:bg-white/5 transition-colors"
             >
-              <HiArrowLeft className="text-4xl" />
+              <HiArrowLeft className="text-2xl lg:text-4xl" />
             </Link>
             <div className="flex flex-col">
-              <span className="text-4xl font-bold tracking-wider text-white">
+              <span className="text-xl lg:text-4xl font-bold tracking-wider text-white">
                 NOVO CADASTRO
               </span>
-              <span className="text-sm tracking-[0.2em] text-cyan-300 uppercase">
+              <span className="text-[10px] lg:text-sm tracking-[0.2em] text-cyan-300 uppercase">
                 Preencha seus dados
               </span>
             </div>
@@ -232,7 +232,7 @@ export const FazerCadastro = () => {
           <img
             src="/imgs/icon.png"
             alt="Logo"
-            className="h-28 w-auto drop-shadow-[0_0_12px_rgba(34,211,238,0.8)]"
+            className="h-16 lg:h-28 w-auto drop-shadow-[0_0_12px_rgba(34,211,238,0.8)]"
           />
         </div>
 
@@ -251,7 +251,7 @@ export const FazerCadastro = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <input
-                  className="bg-slate-600 border rounded-xl px-6 py-5 text-white outline-none transition-all text-xl"
+                  className="bg-slate-600 border rounded-lg lg:rounded-xl px-4 lg:px-6 py-3 lg:py-5 text-white outline-none transition-all text-base lg:text-xl"
                   type="date"
                   name="nascimento"
                   value={formData.nascimento}
@@ -299,7 +299,7 @@ export const FazerCadastro = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col space-y-1">
-                  <label className="text-cyan-400 text-sm font-bold tracking-wider uppercase ml-1">
+                  <label className="text-cyan-400 text-xs lg:text-sm font-bold tracking-wider uppercase ml-1">
                     Plano Escolhido
                   </label>
                   <select
@@ -308,7 +308,7 @@ export const FazerCadastro = () => {
                       setFormData({ ...formData, plano: e.target.value })
                     }
                     onFocus={() => setActiveField("plano")}
-                    className="bg-slate-800/50 border border-white/10 rounded-xl px-6 py-5 text-white outline-none focus:border-cyan-400 text-xl"
+                    className="bg-slate-800/50 border border-white/10 rounded-lg lg:rounded-xl px-4 lg:px-6 py-3 lg:py-5 text-white outline-none focus:border-cyan-400 text-base lg:text-xl"
                   >
                     <option value="">Selecione...</option>
                     <option value="plano_400">400 Mbps</option>
@@ -320,7 +320,7 @@ export const FazerCadastro = () => {
                   </select>
                 </div>
                 <div className="flex flex-col space-y-1">
-                  <label className="text-cyan-400 text-sm font-bold tracking-wider uppercase ml-1">
+                  <label className="text-cyan-400 text-xs lg:text-sm font-bold tracking-wider uppercase ml-1">
                     Vencimento
                   </label>
                   <select
@@ -329,7 +329,7 @@ export const FazerCadastro = () => {
                       setFormData({ ...formData, vencimento: e.target.value })
                     }
                     onFocus={() => setActiveField("vencimento")}
-                    className="bg-slate-800/50 border border-white/10 rounded-xl px-6 py-5 text-white outline-none focus:border-cyan-400 text-xl"
+                    className="bg-slate-800/50 border border-white/10 rounded-lg lg:rounded-xl px-4 lg:px-6 py-3 lg:py-5 text-white outline-none focus:border-cyan-400 text-base lg:text-xl"
                   >
                     <option value="">Selecione...</option>
                     <option value="05">Dia 05</option>
@@ -342,7 +342,7 @@ export const FazerCadastro = () => {
               </div>
               <button
                 onClick={axiosCadastro}
-                className="w-full bg-cyan-400 text-white py-6 rounded-xl hover:bg-cyan-500 transition-colors font-bold text-2xl uppercase tracking-widest mt-4"
+                className="w-full bg-cyan-400 text-white py-4 lg:py-6 rounded-lg lg:rounded-xl hover:bg-cyan-500 transition-colors font-bold text-xl lg:text-2xl uppercase tracking-widest mt-4"
               >
                 Cadastrar
               </button>
