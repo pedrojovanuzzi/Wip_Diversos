@@ -142,8 +142,8 @@ export const FazerCadastro = () => {
     name: keyof typeof formData;
     placeholder?: string;
   }) => (
-    <div className="flex flex-col space-y-1">
-      <label className="text-cyan-400 text-xs font-bold tracking-wider uppercase ml-1">
+    <div className="flex flex-col space-y-2">
+      <label className="text-cyan-400 text-sm font-bold tracking-wider uppercase ml-1">
         {label}
       </label>
       <input
@@ -153,7 +153,7 @@ export const FazerCadastro = () => {
         readOnly // Prevent native keyboard on mobile/touch, force use of Virtual Keyboard
         placeholder={placeholder}
         className={`
-          bg-slate-800/50 border rounded-lg px-4 py-3 text-white outline-none transition-all
+          bg-slate-800/50 border rounded-xl px-6 py-5 text-white outline-none transition-all text-xl
           ${
             activeField === name
               ? "border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)] bg-slate-800"
@@ -206,25 +206,25 @@ export const FazerCadastro = () => {
       )}
 
       {/* Kiosk Frame */}
-      <div className="relative z-10 w-[90vw] max-w-2xl bg-white/5 backdrop-blur-xl border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[90vh] md:h-[950px] border-t-white/20 border-l-white/20">
+      <div className="relative z-10 w-full max-w-[900px] bg-white/5 backdrop-blur-xl border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[85vh] border-t-white/20 border-l-white/20">
         {/* Glow Effects */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-50"></div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-8 pt-8 pb-4 bg-slate-900/40 border-b border-white/5">
-          <div className="flex items-center space-x-3 text-cyan-400">
+        <div className="flex items-center justify-between px-10 pt-16 pb-6 bg-slate-900/40 border-b border-white/5">
+          <div className="flex items-center space-x-6 text-cyan-400">
             <Link
               to="/TokenAutoAtendimento"
               state={{ forceIdle: false }}
-              className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors"
+              className="p-4 -ml-4 rounded-full hover:bg-white/5 transition-colors"
             >
-              <HiArrowLeft className="text-2xl" />
+              <HiArrowLeft className="text-4xl" />
             </Link>
             <div className="flex flex-col">
-              <span className="text-xl font-bold tracking-wider text-white">
+              <span className="text-4xl font-bold tracking-wider text-white">
                 NOVO CADASTRO
               </span>
-              <span className="text-[10px] tracking-[0.2em] text-cyan-300 uppercase">
+              <span className="text-sm tracking-[0.2em] text-cyan-300 uppercase">
                 Preencha seus dados
               </span>
             </div>
@@ -232,16 +232,16 @@ export const FazerCadastro = () => {
           <img
             src="/imgs/icon.png"
             alt="Logo"
-            className="h-20 w-auto drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"
+            className="h-28 w-auto drop-shadow-[0_0_12px_rgba(34,211,238,0.8)]"
           />
         </div>
 
         {/* Scrollable Form Content */}
         <div className="flex-1 overflow-y-auto px-8 py-6 custom-scrollbar scroll-smooth">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
             {/* Dados Pessoais */}
-            <div className="md:col-span-2 space-y-4">
-              <h3 className="text-white/50 text-sm font-bold border-b border-white/10 pb-1 mb-2">
+            <div className="md:col-span-2 space-y-6">
+              <h3 className="text-white/50 text-base font-bold border-b border-white/10 pb-2 mb-4">
                 DADOS PESSOAIS
               </h3>
               <InputField label="Nome Completo" name="nome" />
@@ -251,7 +251,7 @@ export const FazerCadastro = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <input
-                  className="bg-slate-600 border rounded-lg px-4 py-3 text-white outline-none transition-all"
+                  className="bg-slate-600 border rounded-xl px-6 py-5 text-white outline-none transition-all text-xl"
                   type="date"
                   name="nascimento"
                   value={formData.nascimento}
@@ -299,7 +299,7 @@ export const FazerCadastro = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col space-y-1">
-                  <label className="text-cyan-400 text-xs font-bold tracking-wider uppercase ml-1">
+                  <label className="text-cyan-400 text-sm font-bold tracking-wider uppercase ml-1">
                     Plano Escolhido
                   </label>
                   <select
@@ -308,7 +308,7 @@ export const FazerCadastro = () => {
                       setFormData({ ...formData, plano: e.target.value })
                     }
                     onFocus={() => setActiveField("plano")}
-                    className="bg-slate-800/50 border border-white/10 rounded-lg px-4 py-3 text-white outline-none focus:border-cyan-400"
+                    className="bg-slate-800/50 border border-white/10 rounded-xl px-6 py-5 text-white outline-none focus:border-cyan-400 text-xl"
                   >
                     <option value="">Selecione...</option>
                     <option value="plano_400">400 Mbps</option>
@@ -320,7 +320,7 @@ export const FazerCadastro = () => {
                   </select>
                 </div>
                 <div className="flex flex-col space-y-1">
-                  <label className="text-cyan-400 text-xs font-bold tracking-wider uppercase ml-1">
+                  <label className="text-cyan-400 text-sm font-bold tracking-wider uppercase ml-1">
                     Vencimento
                   </label>
                   <select
@@ -329,7 +329,7 @@ export const FazerCadastro = () => {
                       setFormData({ ...formData, vencimento: e.target.value })
                     }
                     onFocus={() => setActiveField("vencimento")}
-                    className="bg-slate-800/50 border border-white/10 rounded-lg px-4 py-3 text-white outline-none focus:border-cyan-400"
+                    className="bg-slate-800/50 border border-white/10 rounded-xl px-6 py-5 text-white outline-none focus:border-cyan-400 text-xl"
                   >
                     <option value="">Selecione...</option>
                     <option value="05">Dia 05</option>
@@ -342,7 +342,7 @@ export const FazerCadastro = () => {
               </div>
               <button
                 onClick={axiosCadastro}
-                className="w-full bg-cyan-400 text-white py-3 rounded-lg hover:bg-cyan-500 transition-colors"
+                className="w-full bg-cyan-400 text-white py-6 rounded-xl hover:bg-cyan-500 transition-colors font-bold text-2xl uppercase tracking-widest mt-4"
               >
                 Cadastrar
               </button>

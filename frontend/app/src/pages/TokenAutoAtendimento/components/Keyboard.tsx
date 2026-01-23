@@ -49,22 +49,22 @@ export const Keyboard: React.FC<KeyboardProps> = ({ onKeyPress }) => {
       {rows.map((row, rowIndex) => (
         <div key={rowIndex} className="flex justify-center gap-1.5 w-full">
           {row.map((key, keyIndex) => {
-            let widthClass = "w-12 sm:w-14"; // Default key width
+            let widthClass = "w-16 md:w-20"; // Default key width increased
             let bgClass = "bg-slate-700 hover:bg-slate-600 active:bg-cyan-600";
-            let textClass = "text-white text-xl font-medium";
+            let textClass = "text-white text-3xl font-medium"; // Increased font size
 
             // Special key styling
             if (key === "SPACE") {
-              widthClass = "flex-grow max-w-md";
+              widthClass = "flex-grow max-w-lg";
             } else if (
               key === "BACKSPACE" ||
               key === "ENTER" ||
               key === "SHIFT" ||
               key === "CAPS"
             ) {
-              widthClass = "w-20 sm:w-24 px-2";
+              widthClass = "w-24 md:w-32 px-4";
               bgClass = "bg-slate-800 hover:bg-slate-700 active:bg-purple-600";
-              textClass = "text-slate-300 text-sm font-bold tracking-wide";
+              textClass = "text-slate-300 text-lg font-bold tracking-wide";
             }
 
             // Activated state for toggle keys
@@ -82,7 +82,7 @@ export const Keyboard: React.FC<KeyboardProps> = ({ onKeyPress }) => {
                   handleKeyPress(key);
                 }}
                 className={`
-                  ${widthClass} h-14 rounded-lg 
+                  ${widthClass} h-20 rounded-xl 
                   flex items-center justify-center 
                   transition-all duration-150 transform active:scale-95
                   border-b-4 border-black/30 active:border-b-0 active:translate-y-1

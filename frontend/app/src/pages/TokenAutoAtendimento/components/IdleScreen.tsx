@@ -23,7 +23,7 @@ export const IdleScreen: React.FC<IdleScreenProps> = ({ onStart }) => {
         <img
           src="/imgs/icon.png"
           alt="Logo"
-          className="h-24 mb-4 object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]"
+          className="h-48 mb-4 object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]"
         />
         <div className="text-slate-400 font-light text-2xl uppercase tracking-[0.2em]">
           Terminal <span className="lowercase text-slate-500">de</span>

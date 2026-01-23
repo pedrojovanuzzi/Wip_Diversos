@@ -390,27 +390,27 @@ export const PagarFatura = () => {
       </div>
 
       {/* Kiosk Frame */}
-      <div className="relative z-10 w-[90vw] max-w-2xl bg-white/5 backdrop-blur-xl border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[90vh] md:h-[800px] border-t-white/20 border-l-white/20">
+      <div className="relative z-10 w-full max-w-[900px] bg-white/5 backdrop-blur-xl border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[85vh] border-t-white/20 border-l-white/20">
         {/* Glow Effects */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-50"></div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-8 pt-8 pb-4 bg-slate-900/40 border-b border-white/5">
-          <div className="flex items-center space-x-3 text-cyan-400">
+        <div className="flex items-center justify-between px-10 pt-16 pb-6 bg-slate-900/40 border-b border-white/5">
+          <div className="flex items-center space-x-6 text-cyan-400">
             {/* Conditional Back Button in Header - Positioned to the left of title */}
             {(step === "search" || step === "selection") && (
               <button
                 onClick={handleBack}
-                className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors mr-3"
+                className="p-4 -ml-4 rounded-full hover:bg-white/5 transition-colors mr-4"
               >
-                <HiArrowLeft className="text-2xl" />
+                <HiArrowLeft className="text-4xl" />
               </button>
             )}
             <div className="flex flex-col">
-              <span className="text-xl font-bold tracking-wider text-white">
+              <span className="text-4xl font-bold tracking-wider text-white">
                 PAGAR FATURA
               </span>
-              <span className="text-[10px] tracking-[0.2em] text-cyan-300 uppercase">
+              <span className="text-sm tracking-[0.2em] text-cyan-300 uppercase">
                 {getStepTitle()}
               </span>
             </div>
@@ -418,7 +418,7 @@ export const PagarFatura = () => {
           <img
             src="/imgs/icon.png"
             alt="Logo"
-            className="h-20 w-auto drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"
+            className="h-28 w-auto drop-shadow-[0_0_12px_rgba(34,211,238,0.8)]"
           />
         </div>
 
@@ -435,17 +435,17 @@ export const PagarFatura = () => {
                 </p>
               </div>
 
-              <div className="w-full max-w-sm relative group">
+              <div className="w-full max-w-xl relative group">
                 <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
-                <div className="relative bg-slate-900 border border-white/10 rounded-xl p-4 flex items-center shadow-xl">
-                  <HiUser className="text-2xl text-cyan-400 mr-3" />
+                <div className="relative bg-slate-900 border border-white/10 rounded-2xl p-6 flex items-center shadow-xl">
+                  <HiUser className="text-4xl text-cyan-400 mr-4" />
                   <input
                     ref={inputRef}
                     type="text"
                     value={formatCPF(cpf)}
                     readOnly
                     placeholder="000.000.000-00"
-                    className="bg-transparent border-none outline-none text-3xl font-mono text-white placeholder-slate-600 w-full text-center tracking-wider"
+                    className="bg-transparent border-none outline-none text-5xl font-mono text-white placeholder-slate-600 w-full text-center tracking-wider"
                   />
                 </div>
               </div>
@@ -456,8 +456,8 @@ export const PagarFatura = () => {
                 onClick={handleSearch}
                 disabled={loading || cpf.length !== 11}
                 className={`
-                  w-full max-w-sm py-4 rounded-xl font-bold text-lg tracking-wide uppercase transition-all transform shadow-lg
-                  flex items-center justify-center space-x-2
+                  w-full max-w-xl py-8 rounded-2xl font-bold text-3xl tracking-wide uppercase transition-all transform shadow-lg
+                  flex items-center justify-center space-x-4
                   ${
                     loading || cpf.length !== 11
                       ? "bg-slate-700 text-slate-500 cursor-not-allowed"
@@ -467,13 +467,13 @@ export const PagarFatura = () => {
               >
                 {loading ? (
                   <>
-                    <FaSpinner className="animate-spin text-xl" />
+                    <FaSpinner className="animate-spin text-3xl" />
                     <span>Buscando...</span>
                   </>
                 ) : (
                   <>
                     <span>Continuar</span>
-                    <HiArrowRight className="text-xl" />
+                    <HiArrowRight className="text-3xl" />
                   </>
                 )}
               </button>
@@ -498,23 +498,23 @@ export const PagarFatura = () => {
                     onClick={() => handleSelectClient(client)}
                     className="
                       group relative overflow-hidden bg-slate-800/50 hover:bg-slate-800 border border-white/10 hover:border-cyan-500/50 
-                      rounded-2xl p-5 text-left transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl hover:shadow-cyan-900/20
+                      rounded-2xl p-8 text-left transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl hover:shadow-cyan-900/20
                     "
                   >
                     <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-4">
-                        <div className="w-12 h-12 rounded-full bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
-                          <HiHome className="text-2xl text-cyan-400" />
+                      <div className="flex items-start space-x-6">
+                        <div className="w-16 h-16 rounded-full bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
+                          <HiHome className="text-4xl text-cyan-400" />
                         </div>
                         <div>
-                          <h4 className="text-xl font-bold text-white mb-1 group-hover:text-cyan-300 transition-colors">
+                          <h4 className="text-3xl font-bold text-white mb-2 group-hover:text-cyan-300 transition-colors">
                             {client.login}
                           </h4>
-                          <p className="text-slate-400 text-sm mb-2">
+                          <p className="text-slate-400 text-xl mb-3">
                             {client.cpf_cnpj}
                           </p>
                           {client.endereco && (
-                            <p className="text-slate-500 text-xs flex flex-col">
+                            <p className="text-slate-500 text-base flex flex-col space-y-1">
                               <span>
                                 {client.endereco}, {client.numero}
                               </span>
@@ -525,8 +525,8 @@ export const PagarFatura = () => {
                           )}
                         </div>
                       </div>
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-cyan-500 rounded-full p-2">
-                        <HiCheck className="text-white text-xl" />
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-cyan-500 rounded-full p-3">
+                        <HiCheck className="text-white text-2xl" />
                       </div>
                     </div>
                   </button>
@@ -549,16 +549,16 @@ export const PagarFatura = () => {
           )}
 
           {step === "method" && (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6">
-              <h2 className="text-2xl font-bold text-white mb-4">
+            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-10">
+              <h2 className="text-4xl font-bold text-white mb-6">
                 Como deseja pagar?{" "}
               </h2>
-              <div className="grid grid-cols-1 gap-6 w-full max-w-sm">
+              <div className="grid grid-cols-1 gap-8 w-full max-w-xl">
                 <button
                   onClick={() => handleMethodSelect("pix")}
                   disabled={loading}
                   className={`
-                    group relative overflow-hidden rounded-2xl p-6 transition-all transform 
+                    group relative overflow-hidden rounded-3xl p-10 transition-all transform 
                     ${
                       loading
                         ? "bg-emerald-800 cursor-not-allowed"
@@ -567,7 +567,7 @@ export const PagarFatura = () => {
                   `}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-white font-bold text-xl uppercase tracking-wider flex items-center gap-2">
+                    <span className="text-white font-bold text-3xl uppercase tracking-wider flex items-center gap-4">
                       {loading ? (
                         <>
                           <FaSpinner className="animate-spin" />
@@ -577,28 +577,28 @@ export const PagarFatura = () => {
                         "Pix"
                       )}
                     </span>
-                    <div className="bg-white/20 p-3 rounded-full">
-                      <FaBarcode className="text-white text-2xl" />
+                    <div className="bg-white/20 p-5 rounded-full">
+                      <FaBarcode className="text-white text-4xl" />
                     </div>
                   </div>
-                  <p className="text-emerald-100 text-sm mt-2 text-left">
+                  <p className="text-emerald-100 text-lg mt-4 text-left">
                     {loading ? "Aguarde um momento" : "Pagamento instantâneo"}
                   </p>
                 </button>
 
                 <button
                   onClick={() => handleMethodSelect("card")}
-                  className="group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 transition-all transform hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/30"
+                  className="group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 rounded-3xl p-10 transition-all transform hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/30"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-white font-bold text-xl uppercase tracking-wider">
+                    <span className="text-white font-bold text-3xl uppercase tracking-wider">
                       Cartão
                     </span>
-                    <div className="bg-white/20 p-3 rounded-full">
-                      <HiCreditCard className="text-white text-2xl" />
+                    <div className="bg-white/20 p-5 rounded-full">
+                      <HiCreditCard className="text-white text-4xl" />
                     </div>
                   </div>
-                  <p className="text-blue-100 text-sm mt-2 text-left">
+                  <p className="text-blue-100 text-lg mt-4 text-left">
                     Débito ou Crédito
                   </p>
                 </button>
@@ -607,13 +607,13 @@ export const PagarFatura = () => {
           )}
 
           {(step === "payment-pix" || step === "payment-card") && (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8 overflow-auto">
-              <div className="w-24 h-24 bg-cyan-500/10 rounded-full flex items-center justify-center animate-pulse">
-                <HiCurrencyDollar className="text-5xl text-cyan-400" />
+            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-10 overflow-auto">
+              <div className="w-32 h-32 bg-cyan-500/10 rounded-full flex items-center justify-center animate-pulse">
+                <HiCurrencyDollar className="text-7xl text-cyan-400" />
               </div>
 
               <div className="text-center">
-                <h2 className="text-3xl font-bold text-white mb-2">
+                <h2 className="text-4xl font-bold text-white mb-2">
                   {step === "payment-pix"
                     ? "Pagamento Pix"
                     : "Pagamento Cartão"}
@@ -621,14 +621,14 @@ export const PagarFatura = () => {
               </div>
 
               {step === "payment-pix" ? (
-                <div className="flex flex-col items-center space-y-4 w-full max-w-md">
-                  <div className="bg-slate-800/80 border border-cyan-500/30 rounded-2xl p-4 w-full text-center shadow-lg shadow-cyan-500/10">
-                    <span className="text-slate-400 text-sm uppercase tracking-widest block mb-1">
+                <div className="flex flex-col items-center space-y-8 w-full max-w-xl">
+                  <div className="bg-slate-800/80 border border-cyan-500/30 rounded-3xl p-8 w-full text-center shadow-lg shadow-cyan-500/10">
+                    <span className="text-slate-400 text-lg uppercase tracking-widest block mb-2">
                       Valor a Pagar
                     </span>
-                    <span className="text-4xl font-bold text-white">
+                    <span className="text-6xl font-bold text-white">
                       {formatCurrency(valorPagamento)}{" "}
-                      <span className="text-green-400 text-sm uppercase tracking-widest block my-2">
+                      <span className="text-green-400 text-xl uppercase tracking-widest block my-4">
                         {dataPagamento &&
                           format(new Date(dataPagamento), "dd/MM/yyyy")}
                       </span>
@@ -636,7 +636,7 @@ export const PagarFatura = () => {
                   </div>
 
                   {qrCode && (
-                    <div className="bg-white p-2 rounded-xl shadow-2xl">
+                    <div className="bg-white p-4 rounded-2xl shadow-2xl">
                       {qrCode.length > 1000 || qrCode.startsWith("data:") ? (
                         <img
                           src={
@@ -645,38 +645,38 @@ export const PagarFatura = () => {
                               : `data:image/png;base64,${qrCode}`
                           }
                           alt="QR Code Pix"
-                          className="w-64 h-64 object-contain"
+                          className="w-96 h-96 object-contain"
                         />
                       ) : (
-                        <QRCodeCanvas value={qrCode} size={256} />
+                        <QRCodeCanvas value={qrCode} size={384} />
                       )}
                     </div>
                   )}
-                  <p className="text-slate-400 text-sm max-w-xs mx-auto text-center">
+                  <p className="text-slate-400 text-xl max-w-md mx-auto text-center">
                     Escaneie o QR Code acima para pagar
                   </p>
                 </div>
               ) : (
-                <div className="text-center">
-                  <div className="bg-slate-800/80  border border-cyan-500/30 rounded-2xl p-6 w-full text-center shadow-lg shadow-cyan-500/10">
-                    <span className="text-slate-400 text-sm uppercase tracking-widest block mb-1">
+                <div className="text-center w-full max-w-xl">
+                  <div className="bg-slate-800/80  border border-cyan-500/30 rounded-3xl p-8 w-full text-center shadow-lg shadow-cyan-500/10 mb-8">
+                    <span className="text-slate-400 text-lg uppercase tracking-widest block mb-2">
                       Valor a Pagar
                     </span>
-                    <span className="text-4xl font-bold text-white">
+                    <span className="text-6xl font-bold text-white">
                       {formatCurrency(valorPagamento)}
                     </span>
-                    <span className="text-green-400 text-sm uppercase tracking-widest block my-2">
+                    <span className="text-green-400 text-xl uppercase tracking-widest block my-4">
                       {dataPagamento &&
                         format(new Date(dataPagamento), "dd/MM/yyyy")}
                     </span>
                   </div>
-                  <p className="text-slate-400 text-lg max-w-xs mx-auto text-center">
+                  <p className="text-slate-400 text-2xl max-w-lg mx-auto text-center mb-6">
                     {cardMessage}
                   </p>
-                  <div className="p-4 bg-slate-800 border border-white/5 rounded-xl max-w-sm w-full mt-4">
-                    <div className="flex items-center justify-center space-x-3 text-slate-300">
-                      <FaSpinner className="animate-spin text-cyan-400" />
-                      <span>Aguardando operação...</span>
+                  <div className="p-6 bg-slate-800 border border-white/5 rounded-2xl max-w-md w-full mx-auto mt-6">
+                    <div className="flex items-center justify-center space-x-4 text-slate-300">
+                      <FaSpinner className="animate-spin text-cyan-400 text-3xl" />
+                      <span className="text-xl">Aguardando operação...</span>
                     </div>
                   </div>
                 </div>
@@ -685,13 +685,13 @@ export const PagarFatura = () => {
               {step === "payment-pix" && (
                 <button
                   onClick={() => navigate("/TokenAutoAtendimento")}
-                  className="mt-4 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-white/10 transition-colors"
+                  className="mt-8 px-8 py-5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl border border-white/10 transition-colors text-2xl"
                 >
                   Cancelar / Voltar
                 </button>
               )}
               {step === "payment-card" && (
-                <span className="mt-4 px-4 py-3 bg-red-800 hover:bg-red-700 text-white rounded-lg border border-white/10 transition-colors">
+                <span className="mt-8 px-8 py-5 bg-red-800 hover:bg-red-700 text-white rounded-2xl border border-white/10 transition-colors text-xl block max-w-xl text-center">
                   Para Cancelar, Clique na seta esquerda no canto superior da
                   maquininha!
                 </span>
