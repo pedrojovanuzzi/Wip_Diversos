@@ -244,9 +244,19 @@ export const PagarFatura = () => {
       setQrCode(qrCode);
       setValorPagamento(valor);
       setDataPagamento(response.data.formattedDate);
-      setFaturaId(response.data.id);
+      setFaturaId(response.data.faturaId);
+
+      if (!response.data.faturaId) {
+        console.error(
+          "ERRO CRITICO: API não retornou ID da fatura para Pix. O polling não funcionará.",
+        );
+        setError("Erro interno: ID da fatura não gerado. Contate o suporte.");
+        return;
+      }
+
+      console.log("Pagamento Pix iniciado. Fatura ID:", response.data.faturaId);
+
       // API request sent successfully.
-      // User requested NOT to show QR Code, so we assume the backend handles the display/process or it's displayed on a terminal.
       setStep("payment-pix");
     } catch (err: any) {
       console.error(err);
@@ -278,15 +288,34 @@ export const PagarFatura = () => {
     if (faturaId) {
       const checkPayment = async () => {
         try {
+          console.log(
+            "Verificando status do pagamento Pix para Fatura ID:",
+            faturaId,
+          );
           const response = await axios.post(
             `${process.env.REACT_APP_URL}/TokenAutoAtendimento/FaturaWentPaid`,
             { faturaId },
           );
 
-          // Payment confirmed
-          setStep("payment-success");
+          console.log("Resposta Verificação Pix:", response.data);
+
+          // Check for boolean true or object with paid/status property
+          // Adjust logic based on actual backend response.
+          // Assuming if it returns 200 and data is truthy or specifically true/confirmed.
+          // If the API returns 200 with "false" (not paid), we should NOT confirm.
+
+          const isPaid = response.data.pago === true;
+          if (isPaid) {
+            console.log("Pagamento Confirmado!");
+            setStep("payment-success");
+          } else {
+            console.log("Pagamento ainda pendente...");
+          }
         } catch (error) {
-          console.log("Aguardando pagamento...", error);
+          console.log(
+            "Aguardando pagamento (ou erro na verificação)...",
+            error,
+          );
         }
       };
 

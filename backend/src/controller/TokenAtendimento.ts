@@ -102,7 +102,7 @@ class TokenAtendimento {
           .slice(0, 2),
         nascimento: req.body.nascimento.replace(
           /(\d{2})\/(\d{2})\/(\d{4})/,
-          "$3-$2-$1"
+          "$3-$2-$1",
         ),
         numero: req.body.numero.trim().replace(/\s/g, ""),
         endereco: req.body.endereco.toUpperCase().trim(),
@@ -117,11 +117,11 @@ class TokenAtendimento {
           .replace(/\s/g, "")
           .replace(/\D/g, ""),
         celular: `(${req.body.celular.slice(0, 2)})${req.body.celular.slice(
-          2
+          2,
         )}`,
         celular2: `(${req.body.celularSecundario.slice(
           0,
-          2
+          2,
         )})${req.body.celularSecundario.slice(2)}`,
         estado_res: (req.body.estado || "")
           .toUpperCase()
@@ -165,7 +165,7 @@ class TokenAtendimento {
   aplicarJuros_Desconto = async (
     valor: string | number,
     pppoe: string,
-    dataVenc: Date | string
+    dataVenc: Date | string,
   ): Promise<number> => {
     try {
       // 🔹 Busca o cliente no banco de dados pelo login (pppoe)
@@ -195,7 +195,7 @@ class TokenAtendimento {
       console.log("📅 Data de hoje:", dataHoje.toLocaleDateString());
       console.log(
         "📆 Data de vencimento:",
-        dataVencimento.toLocaleDateString()
+        dataVencimento.toLocaleDateString(),
       );
 
       // 🔹 Se ainda não venceu
@@ -252,7 +252,7 @@ class TokenAtendimento {
 
   aplicar_Desconto = async (
     valor: string | number,
-    pppoe: string
+    pppoe: string,
   ): Promise<number> => {
     try {
       // 🔹 Busca o cliente no banco de dados pelo login (pppoe)
@@ -295,7 +295,7 @@ class TokenAtendimento {
         return;
       }
 
-      res.status(200).json({ message: "Fatura paga com sucesso" });
+      res.status(200).json({ pago: true });
       return;
     } catch (error) {
       res.status(500).json({ error: "Erro Desconhecido" });
@@ -338,7 +338,7 @@ class TokenAtendimento {
       let valorDesconto = await this.aplicarJuros_Desconto(
         valor,
         pppoe,
-        dataVenc
+        dataVenc,
       );
 
       const valorFinal = Number(valorDesconto).toFixed(2);
@@ -346,7 +346,7 @@ class TokenAtendimento {
       if (perdoarJuros) {
         let valorPerdoado: string | number = await this.aplicar_Desconto(
           cliente.valor,
-          pppoe
+          pppoe,
         );
         valorPerdoado = valorPerdoado.toFixed(2);
 
@@ -523,7 +523,7 @@ class TokenAtendimento {
       const valor = await this.aplicarJuros_Desconto(
         fatura.valor,
         cliente.login,
-        fatura.datavenc
+        fatura.datavenc,
       );
 
       const response = await axios.get(
@@ -532,7 +532,7 @@ class TokenAtendimento {
           headers: {
             Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
           },
-        }
+        },
       );
 
       const terminais = await response.data.data.terminals;
@@ -564,7 +564,7 @@ class TokenAtendimento {
             Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
             "X-Idempotency-Key": uuidv4(),
           },
-        }
+        },
       );
       const terminais2 = await response2.data;
       console.log(terminais2.data);
@@ -597,7 +597,7 @@ class TokenAtendimento {
           headers: {
             Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
           },
-        }
+        },
       );
 
       if (!response) {
