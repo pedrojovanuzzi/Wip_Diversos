@@ -370,7 +370,13 @@ export const PagarFatura = () => {
   };
 
   function handleBack(): void {
-    navigate("/TokenAutoAtendimento");
+    if (step === "selection") {
+      setStep("search");
+      setClients([]);
+      setError("");
+    } else {
+      navigate("/TokenAutoAtendimento");
+    }
   }
 
   return (
@@ -390,6 +396,15 @@ export const PagarFatura = () => {
         {/* Header */}
         <div className="flex items-center justify-between px-8 pt-8 pb-4 bg-slate-900/40 border-b border-white/5">
           <div className="flex items-center space-x-3 text-cyan-400">
+            {/* Conditional Back Button in Header - Positioned to the left of title */}
+            {(step === "search" || step === "selection") && (
+              <button
+                onClick={handleBack}
+                className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors mr-3"
+              >
+                <HiArrowLeft className="text-2xl" />
+              </button>
+            )}
             <div className="flex flex-col">
               <span className="text-xl font-bold tracking-wider text-white">
                 PAGAR FATURA
@@ -434,13 +449,7 @@ export const PagarFatura = () => {
                 </div>
               </div>
 
-              <button
-                onClick={handleBack}
-                className="w-full max-w-sm py-4 bg-slate-700 text-slate-500 hover:bg-slate-600 hover:text-slate-400 rounded-xl font-bold text-lg tracking-wide uppercase transition-all transform shadow-lg flex items-center justify-center space-x-2"
-              >
-                <HiArrowLeft className="text-xl" />
-                <span>Voltar</span>
-              </button>
+              {/* Removed Back button from here as requested */}
 
               <button
                 onClick={handleSearch}
