@@ -3,8 +3,15 @@ import { HiChip, HiArrowLeft } from "react-icons/hi";
 import { Link } from "react-router-dom";
 import { Keyboard } from "./components/Keyboard";
 import axios from "axios";
+import { useIdleTimeout } from "../../hooks/useIdleTimeout";
+import { useNavigate } from "react-router-dom";
 
 export const FazerCadastro = () => {
+  const navigate = useNavigate();
+  useIdleTimeout({
+    onIdle: () => navigate("/TokenAutoAtendimento"),
+    idleTime: 180, // 3 minutes
+  });
   const [formData, setFormData] = useState({
     nome: "",
     cpf_cnpj: "",
@@ -27,7 +34,7 @@ export const FazerCadastro = () => {
   const [success, setSuccess] = useState("");
 
   const [activeField, setActiveField] = useState<keyof typeof formData | null>(
-    null
+    null,
   );
 
   const validateForm = () => {
@@ -78,7 +85,7 @@ export const FazerCadastro = () => {
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/TokenAutoAtendimento/CreateCadastro`,
-        formData
+        formData,
       );
       console.log(response.data);
       setSuccess("Cadastro realizado com sucesso!");
@@ -178,7 +185,11 @@ export const FazerCadastro = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-cyan-500/30 rounded-[2rem] p-8 max-w-sm w-full shadow-[0_0_40px_rgba(34,211,238,0.2)] text-center transform transition-all scale-100 animate-fade-in-up">
             <div className="w-20 h-20 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <HiChip className="text-5xl text-cyan-400" />
+              <img
+                src="/imgs/icon.png"
+                alt="Logo"
+                className="h-20 w-auto drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"
+              />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Sucesso!</h2>
             <p className="text-slate-300 mb-8">{success}</p>
@@ -215,7 +226,11 @@ export const FazerCadastro = () => {
               </span>
             </div>
           </div>
-          <HiChip className="text-4xl text-cyan-400/50" />
+          <img
+            src="/imgs/icon.png"
+            alt="Logo"
+            className="h-20 w-auto drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"
+          />
         </div>
 
         {/* Scrollable Form Content */}

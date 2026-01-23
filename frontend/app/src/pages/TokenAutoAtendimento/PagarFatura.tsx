@@ -9,6 +9,7 @@ import {
   HiCurrencyDollar,
   HiXCircle,
   HiPrinter,
+  HiArrowRight,
 } from "react-icons/hi";
 import { Link, useNavigate } from "react-router-dom";
 import { Keyboard } from "./components/Keyboard";
@@ -18,6 +19,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import { format } from "date-fns";
 import { useReactToPrint } from "react-to-print";
 import { Receipt } from "./components/Receipt";
+import { useIdleTimeout } from "../../hooks/useIdleTimeout";
 
 interface Client {
   id: number;
@@ -61,6 +63,11 @@ export const PagarFatura = () => {
   const [cardMessage, setCardMessage] = useState(
     "Insira o cartão na maquininha e siga as instruções.",
   );
+
+  useIdleTimeout({
+    onIdle: () => navigate("/TokenAutoAtendimento"),
+    idleTime: 180, // 3 minutes
+  });
 
   // Input ref to keep focus if needed, though we primarily use virtual keyboard
   const inputRef = useRef<HTMLInputElement>(null);
@@ -362,6 +369,10 @@ export const PagarFatura = () => {
     }
   };
 
+  function handleBack(): void {
+    navigate("/TokenAutoAtendimento");
+  }
+
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden font-sans">
       {/* Background Ambience */}
@@ -388,7 +399,11 @@ export const PagarFatura = () => {
               </span>
             </div>
           </div>
-          <HiChip className="text-4xl text-cyan-400/50" />
+          <img
+            src="/imgs/icon.png"
+            alt="Logo"
+            className="h-20 w-auto drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"
+          />
         </div>
 
         {/* Content Area */}
@@ -420,6 +435,14 @@ export const PagarFatura = () => {
               </div>
 
               <button
+                onClick={handleBack}
+                className="w-full max-w-sm py-4 bg-slate-700 text-slate-500 hover:bg-slate-600 hover:text-slate-400 rounded-xl font-bold text-lg tracking-wide uppercase transition-all transform shadow-lg flex items-center justify-center space-x-2"
+              >
+                <HiArrowLeft className="text-xl" />
+                <span>Voltar</span>
+              </button>
+
+              <button
                 onClick={handleSearch}
                 disabled={loading || cpf.length !== 11}
                 className={`
@@ -438,7 +461,10 @@ export const PagarFatura = () => {
                     <span>Buscando...</span>
                   </>
                 ) : (
-                  <span>Continuar</span>
+                  <>
+                    <span>Continuar</span>
+                    <HiArrowRight className="text-xl" />
+                  </>
                 )}
               </button>
 

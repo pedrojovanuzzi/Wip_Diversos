@@ -1,6 +1,13 @@
 import React from "react";
+import { useIdleTimeout } from "../../hooks/useIdleTimeout";
+import { useNavigate } from "react-router-dom";
 
 export const CriarChamado = () => {
+  const navigate = useNavigate();
+  useIdleTimeout({
+    onIdle: () => navigate("/TokenAutoAtendimento"),
+    idleTime: 180, // 3 minutes
+  });
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden font-sans">
       {/* Background Ambience */}

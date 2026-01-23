@@ -4,8 +4,27 @@ import { QRCodeCanvas } from "qrcode.react";
 import { HiChip } from "react-icons/hi";
 import { Link } from "react-router-dom";
 import { Keyboard } from "./components/Keyboard";
+import { useIdleTimeout } from "../../hooks/useIdleTimeout";
+import { IdleScreen } from "./components/IdleScreen";
+import { useState } from "react";
 
 export const TokenAutoAtendimento = () => {
+  const [isIdle, setIsIdle] = useState(true); // Start as idle
+
+  const { resetTimer } = useIdleTimeout({
+    onIdle: () => setIsIdle(true),
+    idleTime: 180, // 3 minutes
+  });
+
+  const handleStart = () => {
+    setIsIdle(false);
+    resetTimer();
+  };
+
+  if (isIdle) {
+    return <IdleScreen onStart={handleStart} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden font-sans">
       {/* Background Ambience */}
@@ -25,13 +44,17 @@ export const TokenAutoAtendimento = () => {
         {/* Header */}
         <div className="flex flex-col items-center pt-10 pb-6">
           <div className="flex items-center space-x-3 text-cyan-400 mb-2">
-            <HiChip className="text-5xl drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+            <img
+              src="/imgs/icon.png"
+              alt="Logo"
+              className="h-20 w-auto drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"
+            />
             <div className="flex flex-col">
               <span className="text-3xl font-bold tracking-wider text-white drop-shadow-md">
-                TOKEN
+                TOTEM
               </span>
               <span className="text-xs tracking-[0.2em] text-cyan-300">
-                SELF-SERVICE
+                WIP TELECOM
               </span>
             </div>
           </div>
