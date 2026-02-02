@@ -37,7 +37,6 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const { user } = useAuth();
-  const token = user?.token;
   const permission = user?.permission || 0;
 
   const toggleMenu = () => {
