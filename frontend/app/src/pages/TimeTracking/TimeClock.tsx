@@ -91,7 +91,10 @@ export const TimeClock = () => {
       const res = await axios.get(
         `${process.env.REACT_APP_URL}/time-tracking/employee`,
       );
-      setEmployees(res.data);
+      const sorted = res.data.sort((a: any, b: any) =>
+        a.name.localeCompare(b.name),
+      );
+      setEmployees(sorted);
     } catch (error) {
       console.error(error);
     }
