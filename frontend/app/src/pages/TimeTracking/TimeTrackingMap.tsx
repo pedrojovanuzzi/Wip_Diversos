@@ -190,7 +190,7 @@ export const TimeTrackingMap = () => {
         mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
       }
     }
-  }, [records, selectedEmployee, selectedDate, selectedType]);
+  }, [records, selectedEmployee, selectedDate, selectedType, token]);
 
   return (
     <>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import Webcam from "react-webcam";
 import axios from "axios";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
@@ -97,7 +97,7 @@ export const TimeClock = () => {
     }
   };
 
-  const fetchDailyRecords = async () => {
+  const fetchDailyRecords = useCallback(async () => {
     if (!employeeId || !selectedTime) return;
 
     try {
@@ -109,21 +109,21 @@ export const TimeClock = () => {
     } catch (error) {
       console.error("Error fetching daily records:", error);
     }
-  };
+  }, [employeeId, selectedTime]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     getLocation();
     fetchEmployees();
   }, []);
 
   // Sync signatureDate with selectedTime
-  React.useEffect(() => {
+  useEffect(() => {
     if (selectedTime) {
       const datePart = selectedTime.split("T")[0];
       setSignatureDate(datePart);
     }
     fetchDailyRecords();
-  }, [selectedTime, employeeId]);
+  }, [selectedTime, employeeId, fetchDailyRecords]);
 
   // Check if a specific type is already registered today
   const isTypeRegistered = (type: string) => {
