@@ -12,12 +12,25 @@ class TimeRecordController {
 
   clockIn = async (req: Request, res: Response) => {
     try {
-      const { employeeId, lat, lng, photo, type, timestamp } = req.body;
+      const { employeeId, lat, lng, photo, type, timestamp, cpf } = req.body;
       const employee = await this.employeeRepo.findOneBy({
         id: Number(employeeId),
       });
+
       if (!employee) {
         res.status(404).json({ error: "Employee not found" });
+        return;
+      }
+
+      // CPF Verification
+      // Strip non-numeric characters for comparison
+      const cleanCpfInput = cpf ? cpf.replace(/\D/g, "") : "";
+      const cleanCpfStored = employee.cpf
+        ? employee.cpf.replace(/\D/g, "")
+        : "";
+
+      if (!cleanCpfInput || cleanCpfInput !== cleanCpfStored) {
+        res.status(401).json({ error: "CPF incorreto. Tente novamente." });
         return;
       }
 

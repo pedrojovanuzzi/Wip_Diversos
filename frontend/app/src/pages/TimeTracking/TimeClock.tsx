@@ -4,6 +4,8 @@ import axios from "axios";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { NavBar } from "../../components/navbar/NavBar";
 import { SignatureModal } from "../../components/SignatureModal";
+import { CpfVerificationModal } from "../../components/CpfVerificationModal";
+import { ErrorModal } from "../../components/ErrorModal";
 import moment from "moment";
 
 export const TimeClock = () => {
@@ -11,6 +13,16 @@ export const TimeClock = () => {
   const [employeeId, setEmployeeId] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+
+  // Modal States
+  const [showCpfModal, setShowCpfModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [pendingAction, setPendingAction] = useState<{
+    type: string;
+    payload?: any;
+  } | null>(null);
+
   const [employees, setEmployees] = useState<any[]>([]);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
     null,
@@ -61,7 +73,9 @@ export const TimeClock = () => {
         },
         (error) => {
           console.error("Error getting location: ", error);
-          setMessage("Erro ao obter localização. Permita o acesso.");
+          const msg = "Erro ao obter localização. Permita o acesso.";
+          setMessage(msg);
+          // Also show popup for critical initial errors if desired, but user focused on "clock errors"
         },
         { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
       );
@@ -94,40 +108,109 @@ export const TimeClock = () => {
     }
   }, [selectedTime]);
 
-  const handleClockIn = async (type: string) => {
+  // Step 1: User clicks button -> Validate basic requirements -> Open CPF Modal
+  const initiateClockIn = (type: string) => {
     if (!employeeId) {
-      setMessage("Por favor, selecione o Nome do funcionário.");
+      setErrorMessage("Por favor, selecione o Nome do funcionário.");
+      setShowErrorModal(true);
       return;
     }
     if (!location) {
-      setMessage("Aguardando localização...");
+      setErrorMessage(
+        "Aguardando localização... Tente novamente em instantes.",
+      );
+      setShowErrorModal(true);
       getLocation(); // Retry
       return;
     }
 
-    const photo = capture();
-    if (!photo) {
-      setMessage("Erro ao capturar foto. Verifique a câmera.");
-      return;
+    // Set pending action and open modal
+    setPendingAction({ type });
+    setShowCpfModal(true);
+  };
+
+  // Step 2: User enters CPF -> Send request
+  const handleConfirmCpf = async (cpf: string) => {
+    if (!pendingAction) return;
+
+    const { type } = pendingAction;
+
+    // Check location for clock-in actions, but maybe not strictly for others if not needed?
+    // Requirement says "clock" needs location. Overtime/Signature might not NEED location strictly,
+    // but the code uses location for clock-in. Let's keep location check for clock-in types.
+    // "overtime" and "signature" are not "clock-in" types.
+    if (!["overtime", "signature"].includes(type)) {
+      if (!location) {
+        setErrorMessage("Localização perdida. Tente novamente.");
+        setShowErrorModal(true);
+        setShowCpfModal(false);
+        return;
+      }
     }
 
     setLoading(true);
     setMessage("");
 
     try {
-      await axios.post(`${process.env.REACT_APP_URL}/time-tracking/clock-in`, {
-        employeeId,
-        lat: location.lat,
-        lng: location.lng,
-        photo,
-        type,
-        timestamp: selectedTime,
-      });
-      setMessage(`Ponto registrado com sucesso: ${type}!`);
-      setEmployeeId(""); // Clear input
-    } catch (error) {
+      if (type === "overtime") {
+        const { date, hours50, hours100 } = pendingAction.payload;
+        await axios.post(
+          `${process.env.REACT_APP_URL}/time-tracking/overtime`,
+          {
+            employeeId,
+            date,
+            hours50,
+            hours100,
+            cpf,
+          },
+        );
+        setMessage("Horas extras registradas com sucesso!");
+        setOvertime50("");
+        setOvertime100("");
+      } else if (type === "signature") {
+        const { date, signature } = pendingAction.payload;
+        await axios.post(
+          `${process.env.REACT_APP_URL}/time-tracking/signature`,
+          {
+            employeeId,
+            date,
+            signature,
+            cpf,
+          },
+        );
+        setMessage("Assinatura salva com sucesso!");
+        setShowSigModal(false);
+      } else {
+        // Clock In
+        const photo = capture();
+        if (!photo) {
+          throw new Error("Erro ao capturar foto.");
+        }
+        await axios.post(
+          `${process.env.REACT_APP_URL}/time-tracking/clock-in`,
+          {
+            employeeId,
+            lat: location?.lat,
+            lng: location?.lng,
+            photo,
+            type,
+            timestamp: selectedTime,
+            cpf,
+          },
+        );
+        setMessage(`Ponto registrado com sucesso: ${type}!`);
+        setEmployeeId("");
+      }
+
+      setShowCpfModal(false);
+    } catch (error: any) {
       console.error(error);
-      setMessage("Erro ao registrar ponto. Verifique o ID.");
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Erro ao realizar operação.";
+      setErrorMessage(errorMsg);
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
     }
@@ -139,7 +222,6 @@ export const TimeClock = () => {
       const [h, m] = input.split(":").map(Number);
       return (h || 0) + (m || 0) / 100;
     }
-    // Fallback if users enter minutes as number (e.g. 90 -> 1.30)
     const val = parseFloat(input);
     if (!isNaN(val)) {
       return Math.floor(val / 60) + (val % 60) / 100;
@@ -149,67 +231,54 @@ export const TimeClock = () => {
 
   const handleOvertime = async () => {
     if (!employeeId) {
-      setMessage("Por favor, selecione o Nome do funcionário.");
+      setErrorMessage("Por favor, selecione o Nome do funcionário.");
+      setShowErrorModal(true);
       return;
     }
     if (!overtimeDate) {
-      setMessage("Selecione a data.");
+      setErrorMessage("Selecione a data.");
+      setShowErrorModal(true);
       return;
     }
 
-    setLoading(true);
-    setMessage("");
+    // Prepare payload
+    const h50 = parseTimeInput(overtime50);
+    const h100 = parseTimeInput(overtime100);
 
-    try {
-      // Convert HH:MM input to H.MM format
-      const h50 = parseTimeInput(overtime50);
-      const h100 = parseTimeInput(overtime100);
-
-      await axios.post(`${process.env.REACT_APP_URL}/time-tracking/overtime`, {
-        employeeId,
+    setPendingAction({
+      type: "overtime",
+      payload: {
         date: overtimeDate,
         hours50: h50.toFixed(2),
         hours100: h100.toFixed(2),
-      });
-      setMessage("Horas extras registradas com sucesso!");
-      setOvertime50("");
-      setOvertime100("");
-    } catch (error) {
-      console.error(error);
-      setMessage("Erro ao registrar horas extras.");
-    } finally {
-      setLoading(false);
-    }
+      },
+    });
+    setShowCpfModal(true);
   };
 
   const handleSaveSignature = async (signatureData: string) => {
     if (!employeeId) {
-      alert("Selecione um funcionário primeiro!");
+      setErrorMessage("Selecione um funcionário primeiro!");
+      setShowErrorModal(true);
       return;
     }
     if (!signatureDate) {
-      alert("Selecione uma data!");
+      setErrorMessage("Selecione uma data!");
+      setShowErrorModal(true);
       return;
     }
 
-    try {
-      setLoading(true);
-      const [y, m, d] = signatureDate.split("-");
-      const formattedDate = `${y}-${m}-${d}`;
+    const [y, m, d] = signatureDate.split("-");
+    const formattedDate = `${y}-${m}-${d}`;
 
-      await axios.post(`${process.env.REACT_APP_URL}/time-tracking/signature`, {
-        employeeId,
+    setPendingAction({
+      type: "signature",
+      payload: {
         date: formattedDate,
         signature: signatureData,
-      });
-      setMessage("Assinatura salva com sucesso!");
-      setShowSigModal(false);
-    } catch (error) {
-      console.error("Error saving signature:", error);
-      setMessage("Erro ao salvar assinatura.");
-    } finally {
-      setLoading(false);
-    }
+      },
+    });
+    setShowCpfModal(true);
   };
 
   return (
@@ -288,28 +357,28 @@ export const TimeClock = () => {
                 />
               </div>
               <button
-                onClick={() => handleClockIn("Entrada")}
+                onClick={() => initiateClockIn("Entrada")}
                 disabled={loading}
                 className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-200"
               >
                 Entrada
               </button>
               <button
-                onClick={() => handleClockIn("Saída Almoço")}
+                onClick={() => initiateClockIn("Saída Almoço")}
                 disabled={loading}
                 className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded transition duration-200"
               >
                 Saída Almoço
               </button>
               <button
-                onClick={() => handleClockIn("Volta Almoço")}
+                onClick={() => initiateClockIn("Volta Almoço")}
                 disabled={loading}
                 className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded transition duration-200"
               >
                 Volta Almoço
               </button>
               <button
-                onClick={() => handleClockIn("Saída")}
+                onClick={() => initiateClockIn("Saída")}
                 disabled={loading}
                 className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200"
               >
@@ -322,7 +391,8 @@ export const TimeClock = () => {
                   <button
                     onClick={() => {
                       if (!employeeId) {
-                        setMessage("Selecione um funcionário primeiro.");
+                        setErrorMessage("Selecione um funcionário primeiro.");
+                        setShowErrorModal(true);
                         return;
                       }
                       setShowSigModal(true);
@@ -411,6 +481,19 @@ export const TimeClock = () => {
           onSave={handleSaveSignature}
         />
       )}
+
+      <CpfVerificationModal
+        isOpen={showCpfModal}
+        onClose={() => setShowCpfModal(false)}
+        onConfirm={handleConfirmCpf}
+        loading={loading}
+      />
+
+      <ErrorModal
+        isOpen={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        message={errorMessage}
+      />
     </>
   );
 };
