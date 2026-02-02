@@ -5,6 +5,7 @@ import { Employee } from "../entities/Employee";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
+import { Between } from "typeorm";
 
 class TimeRecordController {
   private timeRepo = AppDataSource.getRepository(TimeRecord);
@@ -98,6 +99,34 @@ class TimeRecordController {
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Error fetching all records" });
+    }
+  };
+  getByDate = async (req: Request, res: Response) => {
+    try {
+      const { employeeId } = req.params;
+      const { date } = req.query;
+
+      if (!date) {
+        res.status(400).json({ error: "Date parameter is required" });
+        return;
+      }
+
+      const dateStr = String(date); // YYYY-MM-DD
+      const startOfDay = new Date(`${dateStr}T00:00:00`);
+      const endOfDay = new Date(`${dateStr}T23:59:59`);
+
+      const records = await this.timeRepo.find({
+        where: {
+          employeeId: Number(employeeId),
+          timestamp: Between(startOfDay, endOfDay),
+        },
+        order: { timestamp: "ASC" },
+      });
+
+      res.json(records);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Error fetching daily records" });
     }
   };
 }

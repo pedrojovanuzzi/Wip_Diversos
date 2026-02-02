@@ -135,6 +135,11 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                     <FaMapMarkedAlt className="text-white size-8 transition-all hover:text-green-400" />
                   </Link>
                 </li>
+                <li className="p-2 grid place-items-center col-span-2">
+                  <Link to="/TimeTracking/Report">
+                    <FaClipboardList className="text-white size-8 transition-all hover:text-green-400" />
+                  </Link>
+                </li>
               </>
             )}
             {permission >= 2 && (
@@ -190,11 +195,7 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                 <FaClock className="text-white size-8 transition-all hover:text-green-400" />
               </Link>
             </li>
-            <li className="p-2 grid place-items-center col-span-2">
-              <Link to="/TimeTracking/Report">
-                <FaClipboardList className="text-white size-8 transition-all hover:text-green-400" />
-              </Link>
-            </li>
+
             {permission >= 2 && (
               <>
                 <li className="p-2 grid place-items-center col-span-2">

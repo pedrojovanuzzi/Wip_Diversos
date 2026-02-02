@@ -46,6 +46,8 @@ export const TimeClock = () => {
     "clock" | "overtime" | "signature"
   >("clock");
 
+  const [dailyRecords, setDailyRecords] = useState<any[]>([]);
+
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
     return imageSrc;
@@ -95,6 +97,20 @@ export const TimeClock = () => {
     }
   };
 
+  const fetchDailyRecords = async () => {
+    if (!employeeId || !selectedTime) return;
+
+    try {
+      const datePart = selectedTime.split("T")[0];
+      const res = await axios.get(
+        `${process.env.REACT_APP_URL}/time-tracking/records/date/${employeeId}?date=${datePart}`,
+      );
+      setDailyRecords(res.data);
+    } catch (error) {
+      console.error("Error fetching daily records:", error);
+    }
+  };
+
   React.useEffect(() => {
     getLocation();
     fetchEmployees();
@@ -106,7 +122,13 @@ export const TimeClock = () => {
       const datePart = selectedTime.split("T")[0];
       setSignatureDate(datePart);
     }
-  }, [selectedTime]);
+    fetchDailyRecords();
+  }, [selectedTime, employeeId]);
+
+  // Check if a specific type is already registered today
+  const isTypeRegistered = (type: string) => {
+    return dailyRecords.some((record) => record.type === type);
+  };
 
   // Step 1: User clicks button -> Validate basic requirements -> Open CPF Modal
   const initiateClockIn = (type: string) => {
@@ -115,6 +137,14 @@ export const TimeClock = () => {
       setShowErrorModal(true);
       return;
     }
+
+    // Check if already registered (double check, though button should be disabled)
+    if (isTypeRegistered(type)) {
+      setErrorMessage(`O registro de "${type}" já foi realizado hoje.`);
+      setShowErrorModal(true);
+      return;
+    }
+
     if (!location) {
       setErrorMessage(
         "Aguardando localização... Tente novamente em instantes.",
@@ -200,6 +230,7 @@ export const TimeClock = () => {
         );
         setMessage(`Ponto registrado com sucesso: ${type}!`);
         setEmployeeId("");
+        fetchDailyRecords(); // Refresh to disable button
       }
 
       setShowCpfModal(false);
@@ -358,29 +389,29 @@ export const TimeClock = () => {
               </div>
               <button
                 onClick={() => initiateClockIn("Entrada")}
-                disabled={loading}
-                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+                disabled={loading || isTypeRegistered("Entrada")}
+                className={`${isTypeRegistered("Entrada") ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"} text-white font-bold py-2 px-4 rounded transition duration-200`}
               >
                 Entrada
               </button>
               <button
                 onClick={() => initiateClockIn("Saída Almoço")}
-                disabled={loading}
-                className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded transition duration-200"
+                disabled={loading || isTypeRegistered("Saída Almoço")}
+                className={`${isTypeRegistered("Saída Almoço") ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-500 hover:bg-yellow-600"} text-white font-bold py-2 px-4 rounded transition duration-200`}
               >
                 Saída Almoço
               </button>
               <button
                 onClick={() => initiateClockIn("Volta Almoço")}
-                disabled={loading}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+                disabled={loading || isTypeRegistered("Volta Almoço")}
+                className={`${isTypeRegistered("Volta Almoço") ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-600 hover:bg-yellow-700"} text-white font-bold py-2 px-4 rounded transition duration-200`}
               >
                 Volta Almoço
               </button>
               <button
                 onClick={() => initiateClockIn("Saída")}
-                disabled={loading}
-                className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+                disabled={loading || isTypeRegistered("Saída")}
+                className={`${isTypeRegistered("Saída") ? "bg-gray-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"} text-white font-bold py-2 px-4 rounded transition duration-200`}
               >
                 Saída
               </button>

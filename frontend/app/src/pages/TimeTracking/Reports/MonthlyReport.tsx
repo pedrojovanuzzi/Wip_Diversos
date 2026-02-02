@@ -452,12 +452,12 @@ export const MonthlyReport = () => {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center">
-                    <button
+                    {/* <button
                       onClick={() => setShowSigModal(true)}
                       className="text-[15px] bg-gray-300 border border-gray-400 text-white px-20 py-2 rounded hover:bg-gray-700 no-print"
                     >
                       Assinar
-                    </button>
+                    </button> */}
                     <div className="h-8 w-full hidden print-block border-b border-gray-300"></div>
                   </div>
                 )}

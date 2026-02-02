@@ -381,7 +381,16 @@ function App() {
               )
             }
           />
-          <Route path="/TimeTracking/Report" element={<MonthlyReport />} />
+          <Route
+            path="/TimeTracking/Report"
+            element={
+              user?.token && user.permission >= 5 ? (
+                <MonthlyReport />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
         </Routes>
       </div>
     </BrowserRouter>

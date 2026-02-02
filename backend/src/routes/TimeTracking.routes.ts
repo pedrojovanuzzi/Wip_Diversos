@@ -28,6 +28,10 @@ TimeTrackingRoutes.get(
   TimeRecordController.listByEmployee,
 );
 TimeTrackingRoutes.get("/map-records", TimeRecordController.listAll);
+TimeTrackingRoutes.get(
+  "/records/date/:employeeId",
+  TimeRecordController.getByDate,
+);
 
 // Overtime Routes
 TimeTrackingRoutes.post("/overtime", DailyOvertimeController.save);
