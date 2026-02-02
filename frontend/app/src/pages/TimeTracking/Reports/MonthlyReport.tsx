@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useReactToPrint } from "react-to-print";
 import moment from "moment";
-import { AiOutlinePrinter, AiOutlineEdit } from "react-icons/ai";
+import { AiOutlinePrinter } from "react-icons/ai";
 import { NavBar } from "../../../components/navbar/NavBar";
 import { SignatureModal } from "../../../components/SignatureModal";
 
@@ -12,7 +12,6 @@ export const MonthlyReport = () => {
   const [month, setMonth] = useState(moment().format("MM"));
   const [year, setYear] = useState(moment().format("YYYY"));
   const [records, setRecords] = useState<any[]>([]);
-  const [signature, setSignature] = useState<string | null>(null);
   const [dailySignatures, setDailySignatures] = useState<{
     [key: string]: string;
   }>({});
@@ -121,43 +120,6 @@ export const MonthlyReport = () => {
     } catch (error) {
       console.error("Error fetching records:", error);
       alert("Erro ao buscar registros check o console.");
-    }
-  };
-
-  const handleOvertimeChange = (
-    date: string,
-    field: "hours50" | "hours100",
-    value: string,
-  ) => {
-    setOvertimeData((prev) => ({
-      ...prev,
-      [date]: {
-        ...(prev[date] || { hours50: 0, hours100: 0 }),
-        [field]: value,
-      },
-    }));
-  };
-
-  const saveOvertime = async (
-    date: string,
-    hours50: string,
-    hours100: string,
-  ) => {
-    try {
-      // Convert date DD/MM/YYYY to YYYY-MM-DD
-      const [d, m, y] = date.split("/");
-      const formattedDate = `${y}-${m}-${d}`;
-
-      await axios.post(`${process.env.REACT_APP_URL}/time-tracking/overtime`, {
-        employeeId: selectedEmployee,
-        date: formattedDate,
-        hours50: hours50,
-        hours100: hours100,
-      });
-      console.log("Saved overtime for", date);
-    } catch (err) {
-      console.error("Error saving overtime", err);
-      alert("Erro ao salvar hora extra");
     }
   };
 
@@ -452,12 +414,12 @@ export const MonthlyReport = () => {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center">
-                    <button
+                    {/* <button
                       onClick={() => setShowSigModal(true)}
                       className="text-[15px] bg-gray-300 border border-gray-400 text-white px-20 py-2 rounded hover:bg-gray-700 no-print"
                     >
                       Assinar
-                    </button>
+                    </button> */}
                     <div className="h-8 w-full hidden print-block border-b border-gray-300"></div>
                   </div>
                 )}

@@ -46,7 +46,7 @@ import { TimeTrackingMap } from "./pages/TimeTracking/TimeTrackingMap";
 import { MonthlyReport } from "./pages/TimeTracking/Reports/MonthlyReport";
 
 function App() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading } = useAuth();
 
   console.log(user?.login);
 
@@ -185,6 +185,7 @@ function App() {
             path="/DDDOS"
             element={
               user?.token && user.permission >= 2 ? (
+                // eslint-disable-next-line react/jsx-pascal-case
                 <DDDOS_Home />
               ) : (
                 <Navigate to="/auth/login" />
@@ -381,7 +382,16 @@ function App() {
               )
             }
           />
-          <Route path="/TimeTracking/Report" element={<MonthlyReport />} />
+          <Route
+            path="/TimeTracking/Report"
+            element={
+              user?.token && user.permission >= 5 ? (
+                <MonthlyReport />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
         </Routes>
       </div>
     </BrowserRouter>

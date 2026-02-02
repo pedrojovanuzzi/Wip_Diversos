@@ -5,6 +5,7 @@ import { Employee } from "../entities/Employee";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
+import { Between } from "typeorm";
 
 class TimeRecordController {
   private timeRepo = AppDataSource.getRepository(TimeRecord);
@@ -12,12 +13,25 @@ class TimeRecordController {
 
   clockIn = async (req: Request, res: Response) => {
     try {
-      const { employeeId, lat, lng, photo, type, timestamp } = req.body;
+      const { employeeId, lat, lng, photo, type, timestamp, cpf } = req.body;
       const employee = await this.employeeRepo.findOneBy({
         id: Number(employeeId),
       });
+
       if (!employee) {
         res.status(404).json({ error: "Employee not found" });
+        return;
+      }
+
+      // CPF Verification
+      // Strip non-numeric characters for comparison
+      const cleanCpfInput = cpf ? cpf.replace(/\D/g, "") : "";
+      const cleanCpfStored = employee.cpf
+        ? employee.cpf.replace(/\D/g, "")
+        : "";
+
+      if (!cleanCpfInput || cleanCpfInput !== cleanCpfStored) {
+        res.status(401).json({ error: "CPF incorreto. Tente novamente." });
         return;
       }
 
@@ -85,6 +99,34 @@ class TimeRecordController {
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Error fetching all records" });
+    }
+  };
+  getByDate = async (req: Request, res: Response) => {
+    try {
+      const { employeeId } = req.params;
+      const { date } = req.query;
+
+      if (!date) {
+        res.status(400).json({ error: "Date parameter is required" });
+        return;
+      }
+
+      const dateStr = String(date); // YYYY-MM-DD
+      const startOfDay = new Date(`${dateStr}T00:00:00`);
+      const endOfDay = new Date(`${dateStr}T23:59:59`);
+
+      const records = await this.timeRepo.find({
+        where: {
+          employeeId: Number(employeeId),
+          timestamp: Between(startOfDay, endOfDay),
+        },
+        order: { timestamp: "ASC" },
+      });
+
+      res.json(records);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Error fetching daily records" });
     }
   };
 }
