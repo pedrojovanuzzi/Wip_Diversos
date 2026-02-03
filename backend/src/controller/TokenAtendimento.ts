@@ -558,7 +558,6 @@ class TokenAtendimento {
               print_on_terminal: "seller_ticket",
             },
             payment_method: {
-              default_installments: 1,
               installments_cost: "buyer",
             },
           },
