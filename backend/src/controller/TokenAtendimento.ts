@@ -491,7 +491,10 @@ class TokenAtendimento {
     }
   };
 
-  obterListaTerminaisEGerarPagamento = async (req: Request, res: Response) => {
+  obterListaTerminaisEGerarPagamentoCredito = async (
+    req: Request,
+    res: Response,
+  ) => {
     try {
       const { login } = req.body;
 
@@ -556,6 +559,113 @@ class TokenAtendimento {
             point: {
               terminal_id: terminais[0].id,
               print_on_terminal: "seller_ticket",
+            },
+            payment_method: {
+              default_type: "credit_card",
+              installments_cost: "buyer",
+              default_installments: 1,
+            },
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+            "X-Idempotency-Key": uuidv4(),
+          },
+        },
+      );
+      const terminais2 = await response2.data;
+      console.log(terminais2.data);
+      console.log(response2);
+
+      console.log(terminais2);
+      res.status(200).json({
+        id: fatura.id,
+        valor: valor,
+        order: terminais2,
+        dataPagamento: fatura.datavenc,
+      });
+    } catch (error: any) {
+      console.log("********** ERRO MERCADO PAGO **********");
+      console.log(JSON.stringify(error.response?.data, null, 2));
+      console.log(JSON.stringify(error.response, null, 2));
+      console.log("***************************************");
+      console.log(error);
+      res.status(500).json({ error: "Erro ao obter lista de terminais" });
+    }
+  };
+
+  obterListaTerminaisEGerarPagamentoDebito = async (
+    req: Request,
+    res: Response,
+  ) => {
+    try {
+      const { login } = req.body;
+
+      const cliente = await this.clienteRepo.findOne({
+        where: {
+          login,
+        },
+      });
+
+      if (!cliente) {
+        res.status(404).json({ error: "Cliente nao encontrado" });
+        return;
+      }
+
+      const fatura = await this.recordRepo.findOne({
+        where: {
+          login: cliente.login,
+          status: In(["aberto", "vencido"]),
+          datadel: IsNull(),
+        },
+        order: { datavenc: "ASC" as const },
+      });
+
+      if (!fatura) {
+        res.status(404).json({ error: "Fatura nao encontrada" });
+        return;
+      }
+
+      const valor = await this.aplicarJuros_Desconto(
+        fatura.valor,
+        cliente.login,
+        fatura.datavenc,
+      );
+
+      const response = await axios.get(
+        "https://api.mercadopago.com/terminals/v1/list",
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+          },
+        },
+      );
+
+      const terminais = await response.data.data.terminals;
+
+      console.log(terminais);
+
+      const response2 = await axios.post(
+        "https://api.mercadopago.com/v1/orders",
+        {
+          type: "point",
+          external_reference: String(fatura.id),
+          expiration_time: "PT1M",
+          transactions: {
+            payments: [
+              {
+                amount: String(valor),
+              },
+            ],
+          },
+          config: {
+            point: {
+              terminal_id: terminais[0].id,
+              print_on_terminal: "seller_ticket",
+            },
+            payment_method: {
+              default_type: "debit_card",
             },
           },
         },

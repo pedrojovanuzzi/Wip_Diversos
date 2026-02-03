@@ -13,11 +13,15 @@ router.post("/GerarPixToken", tokenAtendimento.gerarPixToken);
 router.post("/FaturaWentPaid", tokenAtendimento.faturaWentPaid);
 router.post(
   "/ReceberPagamentoMercadoPagoWebhook",
-  tokenAtendimento.receberPagamentoMercadoPagoWebhook
+  tokenAtendimento.receberPagamentoMercadoPagoWebhook,
 );
 router.post(
-  "/ObterListaTerminaisEGerarPagamento",
-  tokenAtendimento.obterListaTerminaisEGerarPagamento
+  "/ObterListaTerminaisEGerarPagamentoCredito",
+  tokenAtendimento.obterListaTerminaisEGerarPagamentoCredito,
+);
+router.post(
+  "/ObterListaTerminaisEGerarPagamentoDebito",
+  tokenAtendimento.obterListaTerminaisEGerarPagamentoDebito,
 );
 
 router.get("/ObterOrderPorId/:order", tokenAtendimento.obterOrderPorId);

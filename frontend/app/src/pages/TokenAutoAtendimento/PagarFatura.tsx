@@ -196,19 +196,21 @@ export const PagarFatura = () => {
     };
   }, [order]);
 
-  const handleMethodSelect = async (method: "pix" | "card") => {
+  const handleMethodSelect = async (method: "pix" | "credit" | "debit") => {
     if (!selectedClient) return;
 
-    if (method === "card") {
+    if (method === "credit" || method === "debit") {
       setStep("payment-card");
       setCardMessage("Aguardando comunicação com a maquininha...");
       try {
-        const response = await axios.post(
-          `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterListaTerminaisEGerarPagamento`,
-          {
-            login: selectedClient.login,
-          },
-        );
+        const endpoint =
+          method === "credit"
+            ? `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterListaTerminaisEGerarPagamentoCredito`
+            : `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterListaTerminaisEGerarPagamentoDebito`;
+
+        const response = await axios.post(endpoint, {
+          login: selectedClient.login,
+        });
 
         if (response.status === 200) {
           setCardMessage("Termine o processo na maquininha.");
@@ -219,7 +221,10 @@ export const PagarFatura = () => {
         }
       } catch (error) {
         console.error(error);
-        setError("Erro ao iniciar pagamento Cartão.");
+        setError(
+          `Erro ao iniciar pagamento ${method === "credit" ? "Crédito" : "Débito"}.`,
+        );
+        setStep("method"); // Go back to method selection on error so they can try again
       }
       return;
     }
@@ -582,16 +587,17 @@ export const PagarFatura = () => {
               <h2 className="text-2xl lg:text-4xl font-bold text-white mb-4 lg:mb-6">
                 Como deseja pagar?{" "}
               </h2>
-              <div className="grid grid-cols-1 gap-6 lg:gap-8 w-full max-w-sm lg:max-w-xl">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 w-full max-w-sm lg:max-w-4xl">
+                {/* Pix - Full Width on lg if preferred, or just first item */}
                 <button
                   onClick={() => handleMethodSelect("pix")}
                   disabled={loading}
                   className={`
-                    group relative overflow-hidden rounded-2xl lg:rounded-3xl p-6 lg:p-10 transition-all transform 
+                    lg:col-span-2 group relative overflow-hidden rounded-2xl lg:rounded-3xl p-6 lg:p-8 transition-all transform 
                     ${
                       loading
                         ? "bg-emerald-800 cursor-not-allowed"
-                        : "bg-gradient-to-r from-emerald-600 to-teal-500 hover:scale-105 hover:shadow-2xl hover:shadow-emerald-500/30"
+                        : "bg-gradient-to-r from-emerald-600 to-teal-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-500/30"
                     }
                   `}
                 >
@@ -606,29 +612,48 @@ export const PagarFatura = () => {
                         "Pix"
                       )}
                     </span>
-                    <div className="bg-white/20 p-3 lg:p-5 rounded-full">
+                    <div className="bg-white/20 p-3 lg:p-4 rounded-full">
                       <FaBarcode className="text-white text-2xl lg:text-4xl" />
                     </div>
                   </div>
-                  <p className="text-emerald-100 text-sm lg:text-lg mt-2 lg:mt-4 text-left">
+                  <p className="text-emerald-100 text-sm lg:text-lg mt-2 lg:mt-3 text-left">
                     {loading ? "Aguarde um momento" : "Pagamento instantâneo"}
                   </p>
                 </button>
 
+                {/* Credit Card */}
                 <button
-                  onClick={() => handleMethodSelect("card")}
-                  className="group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl lg:rounded-3xl p-6 lg:p-10 transition-all transform hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/30"
+                  onClick={() => handleMethodSelect("credit")}
+                  className="group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl lg:rounded-3xl p-6 lg:p-8 transition-all transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/30"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-white font-bold text-xl lg:text-3xl uppercase tracking-wider">
-                      Cartão
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-white font-bold text-xl lg:text-2xl uppercase tracking-wider">
+                      Crédito
                     </span>
-                    <div className="bg-white/20 p-3 lg:p-5 rounded-full">
-                      <HiCreditCard className="text-white text-2xl lg:text-4xl" />
+                    <div className="bg-white/20 p-3 lg:p-4 rounded-full">
+                      <HiCreditCard className="text-white text-2xl lg:text-3xl" />
                     </div>
                   </div>
-                  <p className="text-blue-100 text-sm lg:text-lg mt-2 lg:mt-4 text-left">
-                    Débito ou Crédito
+                  <p className="text-blue-100 text-sm lg:text-base text-left">
+                    Cartão de Crédito
+                  </p>
+                </button>
+
+                {/* Debit Card */}
+                <button
+                  onClick={() => handleMethodSelect("debit")}
+                  className="group relative overflow-hidden bg-gradient-to-r from-cyan-600 to-blue-500 rounded-2xl lg:rounded-3xl p-6 lg:p-8 transition-all transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-cyan-500/30"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-white font-bold text-xl lg:text-2xl uppercase tracking-wider">
+                      Débito
+                    </span>
+                    <div className="bg-white/20 p-3 lg:p-4 rounded-full">
+                      <HiCreditCard className="text-white text-2xl lg:text-3xl" />
+                    </div>
+                  </div>
+                  <p className="text-cyan-100 text-sm lg:text-base text-left">
+                    Cartão de Débito
                   </p>
                 </button>
               </div>
