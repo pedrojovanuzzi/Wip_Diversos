@@ -557,6 +557,10 @@ class TokenAtendimento {
               terminal_id: terminais[0].id,
               print_on_terminal: "seller_ticket",
             },
+            payment_methods: {
+              default_installments: 1,
+              installments_cost: "buyer",
+            },
           },
         },
         {
