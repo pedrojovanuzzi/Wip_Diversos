@@ -557,9 +557,6 @@ class TokenAtendimento {
               terminal_id: terminais[0].id,
               print_on_terminal: "seller_ticket",
             },
-            payment_method: {
-              installments_cost: "buyer",
-            },
           },
         },
         {
@@ -571,7 +568,7 @@ class TokenAtendimento {
       );
       const terminais2 = await response2.data;
       console.log(terminais2.data);
-      console.log(response2.status); // Log status instead of full response
+      console.log(response2);
 
       console.log(terminais2);
       res.status(200).json({
@@ -582,12 +579,8 @@ class TokenAtendimento {
       });
     } catch (error: any) {
       console.log("********** ERRO MERCADO PAGO **********");
-      if (error.response) {
-        console.log("Status:", error.response.status);
-        console.log("Data:", JSON.stringify(error.response.data, null, 2));
-      } else {
-        console.log("Error Message:", error.message);
-      }
+      console.log(JSON.stringify(error.response?.data, null, 2));
+      console.log(JSON.stringify(error.response, null, 2));
       console.log("***************************************");
       console.log(error);
       res.status(500).json({ error: "Erro ao obter lista de terminais" });
