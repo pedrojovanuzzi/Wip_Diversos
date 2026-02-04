@@ -8,6 +8,7 @@ import FeedbackLinkGenerator from "./pages/feedback/FeedBackLinkGenerator";
 import FeedbackPage from "./pages/feedback/FeedbackPage";
 import { Opnion } from "./pages/feedback/Opnion";
 import { Nfe } from "./pages/Nfe/Nfe";
+import { Comodato } from "./pages/Nfe/Comodato";
 import { BuscarNfeGerada } from "./pages/Nfe/BuscarNfeGerada";
 import PrefeituraLogin from "./pages/prefeitura_login/PrefeituraLogin";
 import CodeOtp from "./pages/prefeitura_login/CodeOtp";
@@ -124,6 +125,26 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <Nfe />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/nfe/comodato"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <Comodato />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/NfeComodato"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <Comodato />
               ) : (
                 <Navigate to="/auth/login" />
               )

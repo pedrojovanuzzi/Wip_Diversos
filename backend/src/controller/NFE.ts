@@ -11,6 +11,7 @@ import MkauthSource from "../database/MkauthSource";
 import { NFE } from "../entities/NFE";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { processarCertificado } from "../utils/certUtils";
+import { Faturas } from "../entities/Faturas";
 
 class NFEController {
   private homologacao: boolean = false;
@@ -570,6 +571,73 @@ class NFEController {
     sig.computeSignature(xml);
     return sig.getSignedXml();
   }
+
+  public BuscarClientes = async (req: Request, res: Response) => {
+    try {
+      const clientRepository = MkauthSource.getRepository(ClientesEntities);
+
+      const clients = await clientRepository
+        .createQueryBuilder("cliente")
+        .leftJoinAndMapOne(
+          "cliente.fatura",
+          Faturas,
+          "fatura",
+          "fatura.login = cliente.login",
+        )
+        .where("cliente.cli_ativado = :ativado", { ativado: "s" })
+        .andWhere("fatura.status = :status", { status: "aberto" })
+        .select([
+          "cliente.id",
+          "cliente.nome",
+          "cliente.login",
+          "cliente.cli_ativado",
+          "cliente.cpf_cnpj",
+          "fatura.id",
+          "fatura.titulo",
+          "fatura.datavenc",
+          "fatura.valor",
+          "fatura.tipo",
+          "fatura.status",
+        ])
+        .getMany();
+
+      res.status(200).json(clients);
+    } catch (error) {
+      console.error(error);
+      res
+        .status(500)
+        .json({ message: "Erro ao buscar clientes", error: error });
+    }
+  };
+
+  public BuscarAtivos = async (req: Request, res: Response) => {
+    try {
+      const clientRepository = MkauthSource.getRepository(ClientesEntities);
+
+      const clients = await clientRepository.find({
+        where: { cli_ativado: "s" },
+        select: [
+          "id",
+          "nome",
+          "login",
+          "cli_ativado",
+          "cpf_cnpj",
+          "endereco",
+          "bairro",
+          "cidade",
+          "cep",
+          "numero",
+        ],
+      });
+
+      res.status(200).json(clients);
+    } catch (error) {
+      console.error(error);
+      res
+        .status(500)
+        .json({ message: "Erro ao buscar clientes ativos", error: error });
+    }
+  };
 }
 
 export default NFEController;

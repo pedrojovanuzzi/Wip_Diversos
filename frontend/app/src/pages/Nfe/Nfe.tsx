@@ -28,7 +28,7 @@ export const Nfe = () => {
   const [ambiente, setAmbiente] = useState("homologacao");
   const [reducao, setReducao] = useState("");
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
-    []
+    [],
   );
   const [dateFilter, setDateFilter] = useState<{
     start: string;
@@ -69,10 +69,8 @@ export const Nfe = () => {
     if (clientesSelecionados.length === clientes.length) {
       setClientesSelecionados([]);
     } else {
-      const titulosValidos = clientes
-        .filter((cliente) => cliente.fatura && cliente.fatura.titulo)
-        .map((cliente) => cliente.fatura.titulo);
-      setClientesSelecionados(titulosValidos);
+      const idsValidos = clientes.map((cliente) => cliente.id);
+      setClientesSelecionados(idsValidos);
     }
   };
 
@@ -101,7 +99,7 @@ export const Nfe = () => {
             "Content-Type": "application/json",
           },
           timeout: 480000,
-        }
+        },
       );
       setDadosNFe(resposta.data);
       // setSuccess("NF-e emitida com sucesso.");
@@ -110,7 +108,7 @@ export const Nfe = () => {
       if (resposta.data.job) {
         addJob(resposta.data.job, "emissao");
         showSuccess(
-          "Solicitação de emissão enviada! Processando em segundo plano."
+          "Solicitação de emissão enviada! Processando em segundo plano.",
         );
       } else {
         showSuccess("NF-e emitida com sucesso.");
@@ -163,7 +161,7 @@ export const Nfe = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
       console.log("Certificado enviado:", resposta.data);
       showSuccess("Certificado enviado com sucesso!");
@@ -180,7 +178,7 @@ export const Nfe = () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
     try {
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
+        `${process.env.REACT_APP_URL}/Nfe/BuscarAtivos`,
         {
           cpf: searchCpfRegex,
           filters: activeFilters,
@@ -191,7 +189,7 @@ export const Nfe = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
       console.log("Clientes encontrados:", resposta.data);
       setClientes(resposta.data);
@@ -203,7 +201,7 @@ export const Nfe = () => {
         erro.response.status === 500
       ) {
         showError(
-          "Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde."
+          "Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde.",
         );
       } else if (axios.isAxiosError(erro) && erro.response) {
         showError(`Erro: ${erro.response.data.error || "Algo deu errado."}`);
@@ -224,7 +222,11 @@ export const Nfe = () => {
   return (
     <div>
       <NavBar />
-      <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
+      <Stacked
+        setSearchCpf={setSearchCpf}
+        onSearch={handleSearch}
+        title="Gerar Nota Fiscal Eletrônica"
+      />
       <Link
         className="flex justify-center sm:justify-start"
         to="/BuscarNfeGerada"
@@ -275,19 +277,16 @@ export const Nfe = () => {
                   </th>
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900" />
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Titulo
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
                     Login
                   </th>
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Vencimento
+                    CPF/CNPJ
                   </th>
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Tipo
+                    Endereco
                   </th>
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Valor
+                    Cidade
                   </th>
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900">
                     Status
@@ -301,25 +300,22 @@ export const Nfe = () => {
                       <input
                         className="cursor-pointer"
                         type="checkbox"
-                        checked={clientesSelecionados.includes(
-                          cliente.fatura.titulo
-                        )}
-                        onChange={() =>
-                          handleCheckboxChange(cliente.fatura.titulo)
-                        }
+                        checked={clientesSelecionados.includes(cliente.id)}
+                        onChange={() => handleCheckboxChange(cliente.id)}
                       />
                     </td>
                     <td className="px-6 py-4" />
-                    <td className="px-6 py-4">{cliente.fatura.titulo}</td>
                     <td className="px-6 py-4">{cliente.login}</td>
-                    <td className="px-6 py-4">{cliente.fatura.datavenc}</td>
-                    <td className="px-6 py-4">{cliente.fatura.tipo}</td>
-                    <td className="px-6 py-4">{cliente.fatura.valor}</td>
+                    <td className="px-6 py-4">{cliente.cpf_cnpj}</td>
+                    <td className="px-6 py-4">
+                      {cliente.endereco}, {cliente.numero}, {cliente.bairro}
+                    </td>
+                    <td className="px-6 py-4">{cliente.cidade}</td>
                     <td className="px-6 py-4">
                       {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
                     </td>
                     <td className="px-6 py-4 hidden">
-                      {(valueSome += Number(cliente.fatura.valor))}
+                      {/* Value sum removed */}
                     </td>
                   </tr>
                 ))}
@@ -354,6 +350,11 @@ export const Nfe = () => {
           >
             Emitir NF-e
           </button>
+          <Link to="/nfe/comodato">
+            <button className="bg-blue-600 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-blue-500 transition-all">
+              Emitir Comodato
+            </button>
+          </Link>
         </div>
         <select
           onChange={(e) => setAmbiente(e.target.value)}
@@ -380,7 +381,7 @@ export const Nfe = () => {
               e.target.value
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-zA-Z0-9 ]/g, "")
+                .replace(/[^a-zA-Z0-9 ]/g, ""),
             );
           }}
           placeholder="Servico de Manutencao"
@@ -393,7 +394,7 @@ export const Nfe = () => {
               e.target.value
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-zA-Z0-9 ]/g, "")
+                .replace(/[^a-zA-Z0-9 ]/g, ""),
             );
           }}
           placeholder="Redução Ex: 60%"
@@ -404,7 +405,7 @@ export const Nfe = () => {
           required
           onChange={(e) => {
             setLastNfe(
-              e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, "")
+              e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, ""),
             );
           }}
           placeholder="Ultimo Numero NF-e"

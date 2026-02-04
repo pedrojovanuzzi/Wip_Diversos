@@ -9,7 +9,8 @@ const router: Router = Router();
 
 // router.post("/emitirNFE", AuthGuard, nfe.emitirNFE);
 // router.post("/buscarNFE", AuthGuard, nfe.buscarNFE);
-// router.post("/buscarClientes", AuthGuard, nfe.BuscarClientes);
+router.post("/buscarClientes", AuthGuard, nfe.BuscarClientes);
+router.post("/buscarAtivos", AuthGuard, nfe.BuscarAtivos);
 // router.post("/cancelarNFE", AuthGuard, nfe.cancelarNFE);
 // router.post("/statusJob", AuthGuard, nfe.getStatusJob);
 

@@ -3,9 +3,10 @@ import { CiSearch } from "react-icons/ci";
 interface SearchCPF {
   setSearchCpf: (cpf: string) => void;
   onSearch: () => Promise<void>;
+  title?: string;
 }
 
-export default function Stacked({ setSearchCpf, onSearch }: SearchCPF) {
+export default function Stacked({ setSearchCpf, onSearch, title }: SearchCPF) {
   return (
     <>
       <div className="min-h-full">
@@ -13,7 +14,7 @@ export default function Stacked({ setSearchCpf, onSearch }: SearchCPF) {
           <header className="py-10">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <h1 className="text-3xl font-bold tracking-tight text-white">
-                Gerar Nota Fiscal Prefeitura
+                {title || "Gerar Nota Fiscal Prefeitura"}
               </h1>
             </div>
           </header>
