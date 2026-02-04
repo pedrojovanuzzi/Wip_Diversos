@@ -438,6 +438,7 @@ class Nfcom {
         faturaId: FaturasData.id,
         clientType: ClientData.vendedor || "",
         cpf_cnpj: ClientData.cpf_cnpj || "",
+        clientEmail: ClientData.email || "",
       };
     });
 
@@ -453,6 +454,7 @@ class Nfcom {
         faturaId: number;
         clientType: string;
         cpf_cnpj: string;
+        clientEmail: string;
       } => data !== null,
     );
 
@@ -635,7 +637,7 @@ class Nfcom {
 
           // --- ENVIO DE EMAIL COM PDF ---
           try {
-            let emailDestino = item.nfComData.dest.email;
+            let emailDestino = item.clientEmail;
 
             // Se for homologação, troca o email
             if (this.homologacao) {
