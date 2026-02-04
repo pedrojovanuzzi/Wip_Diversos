@@ -32,19 +32,16 @@ export const TimeClock = () => {
     moment().format("YYYY-MM-DDTHH:mm:ss"),
   );
 
-  const [overtimeDate, setOvertimeDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
-  const [overtime50, setOvertime50] = useState("");
-  const [overtime100, setOvertime100] = useState("");
-
   const [signatureDate, setSignatureDate] = useState(
     new Date().toISOString().split("T")[0],
   );
   const [showSigModal, setShowSigModal] = useState(false);
-  const [signatureMode, setSignatureMode] = useState<
-    "clock" | "overtime" | "signature"
-  >("clock");
+  // Removed signatureMode entirely as tabs are gone, but we might need a way to trigger signature?
+  // Re-reading: "no lugar do botão de hora extra e ponto" -> Replaced tabs with Scale toggle.
+  // "Assinar Dia" button was inside "Ponto" tab content.
+  // I should probably keep `signatureDate` and `showSigModal` for the modal usage.
+
+  const [scale, setScale] = useState<"8h" | "12h">("8h");
 
   const [dailyRecords, setDailyRecords] = useState<any[]>([]);
 
@@ -52,6 +49,8 @@ export const TimeClock = () => {
     const imageSrc = webcamRef.current?.getScreenshot();
     return imageSrc;
   }, [webcamRef]);
+
+  // ... (getLocation, fetchEmployees, fetchDailyRecords, useEffects remain similar)
 
   const getLocation = () => {
     if (navigator.geolocation) {
@@ -62,7 +61,6 @@ export const TimeClock = () => {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           });
-          // Optional: Create a warning if accuracy is low (> 100m)
           if (position.coords.accuracy > 100) {
             setMessage(
               `Atenção: A precisão do GPS está baixa (${Math.round(
@@ -70,14 +68,13 @@ export const TimeClock = () => {
               )}m). Tente usar o celular.`,
             );
           } else {
-            setMessage(""); // Clear "waiting" or error messages
+            setMessage("");
           }
         },
         (error) => {
           console.error("Error getting location: ", error);
           const msg = "Erro ao obter localização. Permita o acesso.";
           setMessage(msg);
-          // Also show popup for critical initial errors if desired, but user focused on "clock errors"
         },
         { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
       );
@@ -123,7 +120,6 @@ export const TimeClock = () => {
     fetchEmployees();
   }, []);
 
-  // Sync signatureDate with selectedTime
   useEffect(() => {
     if (selectedTime) {
       const datePart = selectedTime.split("T")[0];
@@ -132,12 +128,10 @@ export const TimeClock = () => {
     fetchDailyRecords();
   }, [selectedTime, employeeId, fetchDailyRecords]);
 
-  // Check if a specific type is already registered today
   const isTypeRegistered = (type: string) => {
     return dailyRecords.some((record) => record.type === type);
   };
 
-  // Step 1: User clicks button -> Validate basic requirements -> Open CPF Modal
   const initiateClockIn = (type: string) => {
     if (!employeeId) {
       setErrorMessage("Por favor, selecione o Nome do funcionário.");
@@ -145,7 +139,6 @@ export const TimeClock = () => {
       return;
     }
 
-    // Check if already registered (double check, though button should be disabled)
     if (isTypeRegistered(type)) {
       setErrorMessage(`O registro de "${type}" já foi realizado hoje.`);
       setShowErrorModal(true);
@@ -157,26 +150,20 @@ export const TimeClock = () => {
         "Aguardando localização... Tente novamente em instantes.",
       );
       setShowErrorModal(true);
-      getLocation(); // Retry
+      getLocation();
       return;
     }
 
-    // Set pending action and open modal
     setPendingAction({ type });
     setShowCpfModal(true);
   };
 
-  // Step 2: User enters CPF -> Send request
   const handleConfirmCpf = async (cpf: string) => {
     if (!pendingAction) return;
 
     const { type } = pendingAction;
 
-    // Check location for clock-in actions, but maybe not strictly for others if not needed?
-    // Requirement says "clock" needs location. Overtime/Signature might not NEED location strictly,
-    // but the code uses location for clock-in. Let's keep location check for clock-in types.
-    // "overtime" and "signature" are not "clock-in" types.
-    if (!["overtime", "signature"].includes(type)) {
+    if (type !== "signature") {
       if (!location) {
         setErrorMessage("Localização perdida. Tente novamente.");
         setShowErrorModal(true);
@@ -189,22 +176,7 @@ export const TimeClock = () => {
     setMessage("");
 
     try {
-      if (type === "overtime") {
-        const { date, hours50, hours100 } = pendingAction.payload;
-        await axios.post(
-          `${process.env.REACT_APP_URL}/time-tracking/overtime`,
-          {
-            employeeId,
-            date,
-            hours50,
-            hours100,
-            cpf,
-          },
-        );
-        setMessage("Horas extras registradas com sucesso!");
-        setOvertime50("");
-        setOvertime100("");
-      } else if (type === "signature") {
+      if (type === "signature") {
         const { date, signature } = pendingAction.payload;
         await axios.post(
           `${process.env.REACT_APP_URL}/time-tracking/signature`,
@@ -233,11 +205,12 @@ export const TimeClock = () => {
             type,
             timestamp: selectedTime,
             cpf,
+            scale, // Pass the selected scale
           },
         );
         setMessage(`Ponto registrado com sucesso: ${type}!`);
         setEmployeeId("");
-        fetchDailyRecords(); // Refresh to disable button
+        fetchDailyRecords();
       }
 
       setShowCpfModal(false);
@@ -252,46 +225,6 @@ export const TimeClock = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const parseTimeInput = (input: string) => {
-    if (!input) return 0;
-    if (input.includes(":")) {
-      const [h, m] = input.split(":").map(Number);
-      return (h || 0) + (m || 0) / 100;
-    }
-    const val = parseFloat(input);
-    if (!isNaN(val)) {
-      return Math.floor(val / 60) + (val % 60) / 100;
-    }
-    return 0;
-  };
-
-  const handleOvertime = async () => {
-    if (!employeeId) {
-      setErrorMessage("Por favor, selecione o Nome do funcionário.");
-      setShowErrorModal(true);
-      return;
-    }
-    if (!overtimeDate) {
-      setErrorMessage("Selecione a data.");
-      setShowErrorModal(true);
-      return;
-    }
-
-    // Prepare payload
-    const h50 = parseTimeInput(overtime50);
-    const h100 = parseTimeInput(overtime100);
-
-    setPendingAction({
-      type: "overtime",
-      payload: {
-        date: overtimeDate,
-        hours50: h50.toFixed(2),
-        hours100: h100.toFixed(2),
-      },
-    });
-    setShowCpfModal(true);
   };
 
   const handleSaveSignature = async (signatureData: string) => {
@@ -357,142 +290,92 @@ export const TimeClock = () => {
             ))}
           </select>
 
-          <div className="flex space-x-2 mb-4 w-full">
+          {/* Scale Selector */}
+          <div className="flex space-x-2 mb-4 w-full bg-gray-200 p-1 rounded">
             <button
-              onClick={() => setSignatureMode("clock")}
-              className={`flex-1 py-2 rounded text-sm font-medium ${
-                signatureMode === "clock"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-700"
+              onClick={() => setScale("8h")}
+              className={`flex-1 py-2 rounded text-sm font-bold transition-all ${
+                scale === "8h"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              Ponto
+              Escala 8h
             </button>
             <button
-              onClick={() => setSignatureMode("overtime")}
-              className={`flex-1 py-2 rounded text-sm font-medium ${
-                signatureMode === "overtime"
-                  ? "bg-purple-600 text-white"
-                  : "bg-gray-200 text-gray-700"
+              onClick={() => setScale("12h")}
+              className={`flex-1 py-2 rounded text-sm font-bold transition-all ${
+                scale === "12h"
+                  ? "bg-white text-purple-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              Hora Extra
+              Escala 12h
             </button>
           </div>
 
-          {signatureMode === "clock" && (
-            <div className="grid grid-cols-2 gap-3 w-full">
-              <div className="col-span-2 mb-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Data e Hora
-                </label>
-                <input
-                  type="datetime-local"
-                  step="1"
-                  value={selectedTime}
-                  onChange={(e) => setSelectedTime(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded"
-                />
-              </div>
-              <button
-                onClick={() => initiateClockIn("Entrada")}
-                disabled={loading || isTypeRegistered("Entrada")}
-                className={`${isTypeRegistered("Entrada") ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"} text-white font-bold py-2 px-4 rounded transition duration-200`}
-              >
-                Entrada
-              </button>
-              <button
-                onClick={() => initiateClockIn("Saída Almoço")}
-                disabled={loading || isTypeRegistered("Saída Almoço")}
-                className={`${isTypeRegistered("Saída Almoço") ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-500 hover:bg-yellow-600"} text-white font-bold py-2 px-4 rounded transition duration-200`}
-              >
-                Saída Almoço
-              </button>
-              <button
-                onClick={() => initiateClockIn("Volta Almoço")}
-                disabled={loading || isTypeRegistered("Volta Almoço")}
-                className={`${isTypeRegistered("Volta Almoço") ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-600 hover:bg-yellow-700"} text-white font-bold py-2 px-4 rounded transition duration-200`}
-              >
-                Volta Almoço
-              </button>
-              <button
-                onClick={() => initiateClockIn("Saída")}
-                disabled={loading || isTypeRegistered("Saída")}
-                className={`${isTypeRegistered("Saída") ? "bg-gray-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"} text-white font-bold py-2 px-4 rounded transition duration-200`}
-              >
-                Saída
-              </button>
+          <div className="grid grid-cols-2 gap-3 w-full">
+            <div className="col-span-2 mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Data e Hora
+              </label>
+              <input
+                type="datetime-local"
+                step="1"
+                value={selectedTime}
+                onChange={(e) => setSelectedTime(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded"
+              />
+            </div>
+            <button
+              onClick={() => initiateClockIn("Entrada")}
+              disabled={loading || isTypeRegistered("Entrada")}
+              className={`${isTypeRegistered("Entrada") ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"} text-white font-bold py-2 px-4 rounded transition duration-200`}
+            >
+              Entrada
+            </button>
+            <button
+              onClick={() => initiateClockIn("Saída Almoço")}
+              disabled={loading || isTypeRegistered("Saída Almoço")}
+              className={`${isTypeRegistered("Saída Almoço") ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-500 hover:bg-yellow-600"} text-white font-bold py-2 px-4 rounded transition duration-200`}
+            >
+              Saída Almoço
+            </button>
+            <button
+              onClick={() => initiateClockIn("Volta Almoço")}
+              disabled={loading || isTypeRegistered("Volta Almoço")}
+              className={`${isTypeRegistered("Volta Almoço") ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-600 hover:bg-yellow-700"} text-white font-bold py-2 px-4 rounded transition duration-200`}
+            >
+              Volta Almoço
+            </button>
+            <button
+              onClick={() => initiateClockIn("Saída")}
+              disabled={loading || isTypeRegistered("Saída")}
+              className={`${isTypeRegistered("Saída") ? "bg-gray-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"} text-white font-bold py-2 px-4 rounded transition duration-200`}
+            >
+              Saída
+            </button>
 
-              {/* Signature Section Moved Here */}
-              <div className="col-span-2 mt-4 pt-4 border-t border-gray-200">
-                <div className="flex justify-center gap-2">
-                  <button
-                    onClick={() => {
-                      if (!employeeId) {
-                        setErrorMessage("Selecione um funcionário primeiro.");
-                        setShowErrorModal(true);
-                        return;
-                      }
-                      setShowSigModal(true);
-                    }}
-                    disabled={loading}
-                    className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded transition duration-200 flex items-center justify-center gap-2"
-                  >
-                    <span>✍️</span> Assinar Dia
-                  </button>
-                </div>
+            {/* Signature Section */}
+            <div className="col-span-2 mt-4 pt-4 border-t border-gray-200">
+              <div className="flex justify-center gap-2">
+                <button
+                  onClick={() => {
+                    if (!employeeId) {
+                      setErrorMessage("Selecione um funcionário primeiro.");
+                      setShowErrorModal(true);
+                      return;
+                    }
+                    setShowSigModal(true);
+                  }}
+                  disabled={loading}
+                  className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded transition duration-200 flex items-center justify-center gap-2"
+                >
+                  <span>✍️</span> Assinar Dia
+                </button>
               </div>
             </div>
-          )}
-
-          {signatureMode === "overtime" && (
-            <div className="flex flex-col w-full gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Data
-                </label>
-                <input
-                  type="date"
-                  value={overtimeDate}
-                  onChange={(e) => setOvertimeDate(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded"
-                />
-              </div>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700">
-                    50% (HH:MM)
-                  </label>
-                  <input
-                    type="text"
-                    value={overtime50}
-                    onChange={(e) => setOvertime50(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded"
-                    placeholder="Ex: 01:30"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700">
-                    100% (HH:MM)
-                  </label>
-                  <input
-                    type="text"
-                    value={overtime100}
-                    onChange={(e) => setOvertime100(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded"
-                    placeholder="Ex: 00:45"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={handleOvertime}
-                disabled={loading}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded transition duration-200 w-full"
-              >
-                Registrar Hora Extra
-              </button>
-            </div>
-          )}
+          </div>
 
           {loading && (
             <div className="mt-4 flex items-center text-blue-600">
