@@ -90,16 +90,16 @@ export const PagarFatura = () => {
     } else if (key === "SPACE") {
       // CPF usually doesn't have spaces, but we can allow it or ignore
     } else if (key.length === 1 && /[0-9]/.test(key)) {
-      // Only allow numbers for CPF
-      if (cpf.length < 11) {
+      // Allow numbers for CPF (11) or CNPJ (14), but let them type more to correct mistakes
+      if (cpf.length < 14) {
         setCpf((prev) => prev + key);
       }
     }
   };
 
   const handleSearch = async () => {
-    if (cpf.length !== 11) {
-      setError("CPF deve ter 11 dígitos.");
+    if (cpf.length !== 11 && cpf.length !== 14) {
+      setError("Documento deve ter 11 (CPF) ou 14 (CNPJ) dígitos.");
       return;
     }
 
@@ -117,7 +117,7 @@ export const PagarFatura = () => {
         : response.data.clients || [response.data];
 
       if (!data || data.length === 0) {
-        setError("Nenhum cadastro encontrado para este CPF.");
+        setError("Nenhum cadastro encontrado para este CPF/CNPJ.");
       } else {
         setClients(data);
         console.log(data);
@@ -271,13 +271,22 @@ export const PagarFatura = () => {
     }
   };
 
-  const formatCPF = (value: string) => {
-    return value
-      .replace(/\D/g, "")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d{1,2})/, "$1-$2")
-      .replace(/(-\d{2})\d+?$/, "$1");
+  const formatCpfCnpj = (value: string) => {
+    const cleanValue = value.replace(/\D/g, "");
+
+    if (cleanValue.length <= 11) {
+      return cleanValue
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d{1,2})/, "$1-$2")
+        .replace(/(-\d{2})\d+?$/, "$1");
+    } else {
+      return cleanValue
+        .replace(/^(\d{2})(\d)/, "$1.$2")
+        .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+        .replace(/\.(\d{3})(\d)/, ".$1/$2")
+        .replace(/(\d{4})(\d)/, "$1-$2");
+    }
   };
 
   const formatCurrency = (value: string | number) => {
@@ -462,7 +471,7 @@ export const PagarFatura = () => {
             <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
               <div className="text-center space-y-2">
                 <h2 className="text-2xl font-bold text-white">
-                  Digite seu CPF
+                  Digite seu CPF ou CNPJ
                 </h2>
                 <p className="text-slate-400 text-sm">
                   Use o teclado abaixo para digitar os números
@@ -476,9 +485,9 @@ export const PagarFatura = () => {
                   <input
                     ref={inputRef}
                     type="text"
-                    value={formatCPF(cpf)}
+                    value={formatCpfCnpj(cpf)}
                     readOnly
-                    placeholder="000.000.000-00"
+                    placeholder="CPF/CNPJ"
                     className="bg-transparent border-none outline-none text-3xl lg:text-5xl font-mono text-white placeholder-slate-600 w-full text-center tracking-wider"
                   />
                 </div>
@@ -488,12 +497,12 @@ export const PagarFatura = () => {
 
               <button
                 onClick={handleSearch}
-                disabled={loading || cpf.length !== 11}
+                disabled={loading || (cpf.length !== 11 && cpf.length !== 14)}
                 className={`
                   w-full max-w-sm lg:max-w-xl py-4 lg:py-8 rounded-xl lg:rounded-2xl font-bold text-xl lg:text-3xl tracking-wide uppercase transition-all transform shadow-lg
                   flex items-center justify-center space-x-2 lg:space-x-4
                   ${
-                    loading || cpf.length !== 11
+                    loading || (cpf.length !== 11 && cpf.length !== 14)
                       ? "bg-slate-700 text-slate-500 cursor-not-allowed"
                       : "bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-cyan-500/50 active:scale-95"
                   }

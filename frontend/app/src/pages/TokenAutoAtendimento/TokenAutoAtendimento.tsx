@@ -1,12 +1,10 @@
 import React from "react";
-import { FaCreditCard, FaComments, FaUser } from "react-icons/fa";
-import { QRCodeCanvas } from "qrcode.react";
-import { HiChip } from "react-icons/hi";
+import { FaCreditCard, FaUser } from "react-icons/fa";
 import { Link, useLocation } from "react-router-dom";
-import { Keyboard } from "./components/Keyboard";
 import { useIdleTimeout } from "../../hooks/useIdleTimeout";
 import { IdleScreen } from "./components/IdleScreen";
 import { useState } from "react";
+import { Keyboard } from "./components/Keyboard";
 
 export const TokenAutoAtendimento = () => {
   const location = useLocation();
