@@ -155,10 +155,13 @@ class TimeRecordController {
       }
 
       const thresholdMinutes = scale === "12h" ? 720 : 480; // 12*60 or 8*60
+      const TOLERANCE = 10;
 
-      if (workedMinutes > thresholdMinutes + 10) {
-        // +10 min tolerance
-        const extraMinutes = workedMinutes - thresholdMinutes;
+      // Se passar da tolerância (ex: 8h10m), paga TUDO (os 10m + excedente).
+      // Se não passar (ex: 8h10m cravados), paga ZERO.
+      if (workedMinutes > thresholdMinutes + TOLERANCE) {
+        // +10 min tolerance checked
+        const extraMinutes = workedMinutes - thresholdMinutes; // Count from threshold (e.g. 0)
 
         // User wants HH.MM format (e.g. 1h 15m -> 1.15, NOT 1.25)
         const hours = Math.floor(extraMinutes / 60);
