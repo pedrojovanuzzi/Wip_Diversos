@@ -6,45 +6,26 @@ import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { Between } from "typeorm";
+import Holidays from "date-holidays";
 
 class TimeRecordController {
   private timeRepo = AppDataSource.getRepository(TimeRecord);
   private employeeRepo = AppDataSource.getRepository(Employee);
 
   isHoliday(date: Date): boolean {
-    const d = date.getDate();
-    const m = date.getMonth() + 1; // 0-indexed
-    const y = date.getFullYear();
-
-    // Check fixed holidays (Day/Month)
-    // 1-1: Confraternização Universal
-    // 21-4: Tiradentes
-    // 1-5: Dia do Trabalho
-    // 7-9: Independência
-    // 12-10: Nossa Senhora Aparecida
-    // 2-11: Finados
-    // 15-11: Proclamação da República
-    // 25-12: Natal
-    const fixedHolidays = [
-      "1-1",
-      "21-4",
-      "1-5",
-      "7-9",
-      "12-10",
-      "2-11",
-      "15-11",
-      "25-12",
-    ];
-
-    if (fixedHolidays.includes(`${d}-${m}`)) return true;
-
-    // Mobile holidays (Easter, Carnival, Corpus Christi) require complex calculation.
-    // implementing a simple Gaussian algorithm for Easter would be robust, but for brevity
-    // and common business use, sometimes fixed dates or a library is used.
-    // For now, let's stick to Fixed + Sundays. If user needs full Easter support we can add.
-
     // Check Sunday (0)
     if (date.getDay() === 0) return true;
+
+    // Use date-holidays for BR/SP/Arealva
+    const hd = new Holidays("BR", "SP", "Arealva");
+    const holiday = hd.isHoliday(date);
+
+    if (holiday) {
+      console.log(
+        `Feriado detectado: ${holiday[0].name} em ${date.toISOString()}`,
+      );
+      return true;
+    }
 
     return false;
   }

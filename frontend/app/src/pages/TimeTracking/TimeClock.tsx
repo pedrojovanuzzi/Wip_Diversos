@@ -7,8 +7,10 @@ import { SignatureModal } from "../../components/SignatureModal";
 import { CpfVerificationModal } from "../../components/CpfVerificationModal";
 import { ErrorModal } from "../../components/ErrorModal";
 import moment from "moment";
+import { useAuth } from "../../context/AuthContext";
 
 export const TimeClock = () => {
+  const { user } = useAuth();
   const webcamRef = useRef<Webcam>(null);
   const [employeeId, setEmployeeId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,21 +38,18 @@ export const TimeClock = () => {
     new Date().toISOString().split("T")[0],
   );
   const [showSigModal, setShowSigModal] = useState(false);
-  // Removed signatureMode entirely as tabs are gone, but we might need a way to trigger signature?
-  // Re-reading: "no lugar do botão de hora extra e ponto" -> Replaced tabs with Scale toggle.
-  // "Assinar Dia" button was inside "Ponto" tab content.
-  // I should probably keep `signatureDate` and `showSigModal` for the modal usage.
 
   const [scale, setScale] = useState<"8h" | "12h">("8h");
 
   const [dailyRecords, setDailyRecords] = useState<any[]>([]);
 
+  // Check permission
+  const canEditDate = (user?.permission || 0) >= 5;
+
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
     return imageSrc;
   }, [webcamRef]);
-
-  // ... (getLocation, fetchEmployees, fetchDailyRecords, useEffects remain similar)
 
   const getLocation = () => {
     if (navigator.geolocation) {
@@ -324,7 +323,8 @@ export const TimeClock = () => {
                 step="1"
                 value={selectedTime}
                 onChange={(e) => setSelectedTime(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded"
+                className={`w-full p-2 border border-gray-300 rounded ${!canEditDate ? "bg-gray-200 cursor-not-allowed" : ""}`}
+                disabled={!canEditDate}
               />
             </div>
             <button
