@@ -31,6 +31,11 @@ class NFEController {
 
       this.homologacao = ambiente === "homologacao";
 
+      if (!login) {
+        res.status(400).json({ message: "Login não fornecido" });
+        return;
+      }
+
       const clientRepository = MkauthSource.getRepository(ClientesEntities);
       const nfeRepository = AppDataSource.getRepository(NFE);
 
@@ -38,6 +43,8 @@ class NFEController {
       const client = await clientRepository.findOne({
         where: { login: login },
       });
+
+      console.log(login);
 
       if (!client) {
         res.status(404).json({ message: "Cliente não encontrado" });
@@ -835,9 +842,20 @@ class NFEController {
       const cStat = cStatMatch ? cStatMatch[1] : ""; // Note: extracts first cStat, check strictness if needed
 
       // Update DB if success (135)
+      // Update DB if success (135 - Evento registrado vinculada a NF-e)
       if (responseBody.includes("<cStat>135</cStat>")) {
         const nfeRepository = AppDataSource.getRepository(NFE);
-        await nfeRepository.update({ chave: chave }, { status: "cancelado" });
+        // We could also store the cancellation XML or protocol if we had columns for it.
+        // For now, updating status is the critical part requested.
+        await nfeRepository.update(
+          { chave: chave },
+          {
+            status: "cancelado",
+            // If we want to store the cancellation protocol, we might overwrite the emission protocol
+            // or we need a new column 'protocolo_cancelamento'.
+            // Given the current entity, let's just update 'status'.
+          },
+        );
       }
 
       res.status(200).json({
