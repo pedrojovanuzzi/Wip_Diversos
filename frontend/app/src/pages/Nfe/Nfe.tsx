@@ -83,7 +83,7 @@ export const Nfe = () => {
       setLoading(true);
 
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/`,
+        `${process.env.REACT_APP_URL}/NFEletronica/`,
         {
           password,
           clientesSelecionados,
@@ -154,7 +154,7 @@ export const Nfe = () => {
       formData.append("password", certPassword);
 
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/upload`,
+        `${process.env.REACT_APP_URL}/NFEletronica/upload`,
         formData,
         {
           headers: {
@@ -178,7 +178,7 @@ export const Nfe = () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
     try {
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/BuscarAtivos`,
+        `${process.env.REACT_APP_URL}/NFEletronica/buscarAtivos`,
         {
           cpf: searchCpfRegex,
           filters: activeFilters,

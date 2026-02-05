@@ -52,7 +52,7 @@ export const Comodato = () => {
     try {
       setLoading(true);
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
+        `${process.env.REACT_APP_URL}/NFEletronica/buscarAtivos`,
         {
           cpf: searchCpfRegex,
           filters: activeFilters,

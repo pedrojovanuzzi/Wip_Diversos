@@ -24,6 +24,7 @@ import NFCom from "./routes/NFCom.routes";
 import WhatsappWebHook from "./routes/WhatsappWebHook.routes";
 import TokenAtendimentoRoutes from "./routes/TokenAtendimento.routes";
 import TimeTrackingRoutes from "./routes/TimeTracking.routes";
+import NFE from "./routes/NFE.Routes";
 import path from "path";
 const backup = new Backup();
 const pix = new Pix();
@@ -56,6 +57,7 @@ export class App {
     this.server.use("/api/auth", Auth);
     this.server.use("/api/feedback", Feed);
     this.server.use("/api/Nfe", NFSE);
+    this.server.use("/api/NFEletronica", NFE);
     this.server.use("/api/NFCom", NFCom);
     this.server.use("/api/whatsapp", Whatsapp);
     this.server.use("/api/whatsappWebHook", WhatsappWebHook);
