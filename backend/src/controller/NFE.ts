@@ -854,17 +854,19 @@ class NFEController {
   };
 
   private getCredentialsFromPfx(password: string) {
-    const certPath = path.resolve(__dirname, "../files/certificado.pfx"); // Check relative path!
-    // In original code it was: path.join(__dirname, "..", "files", "certificado.pfx");
-    // Let's use the property this.certPath if available or re-resolve.
-
-    // Safety check if property exists or just resolve again
-    // The class property is: private certPath = path.resolve(__dirname, "../files/certificado.pfx");
     if (!fs.existsSync(this.certPath)) {
       throw new Error(`Certificado não encontrado em: ${this.certPath}`);
     }
 
-    const pfxBuffer = fs.readFileSync(this.certPath);
+    // Use certUtils to process/re-export certificate
+    const processedCertPath = processarCertificado(
+      this.certPath,
+      password,
+      this.TEMP_DIR,
+    );
+
+    // Read from processed path
+    const pfxBuffer = fs.readFileSync(processedCertPath);
     const pfxAsn1 = forge.asn1.fromDer(
       forge.util.createBuffer(pfxBuffer.toString("binary")),
     );
