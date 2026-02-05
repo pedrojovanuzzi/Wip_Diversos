@@ -3,7 +3,6 @@ import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
-import { HiPlus, HiTrash } from "react-icons/hi2";
 import Stacked from "./Components/Stacked";
 import Filter from "./Components/Filter";
 
@@ -30,14 +29,7 @@ export const Comodato = () => {
   const [arquivo, setArquivo] = useState<File | null>(null); // For Filter component compatibility
 
   // --- Shared States ---
-  const [equipamentos, setEquipamentos] = useState<
-    { codigo: string; descricao: string; valor: string }[]
-  >([]);
-  const [novoEquipamento, setNovoEquipamento] = useState({
-    codigo: "",
-    descricao: "",
-    valor: "",
-  });
+
   const [tipoOperacao, setTipoOperacao] = useState<"saida" | "entrada">(
     "saida",
   );
@@ -93,27 +85,10 @@ export const Comodato = () => {
   };
 
   // --- Shared Methods ---
-  const adicionarEquipamento = () => {
-    if (!novoEquipamento.descricao || !novoEquipamento.valor) {
-      showError("Preencha descrição e valor.");
-      return;
-    }
-    setEquipamentos([...equipamentos, novoEquipamento]);
-    setNovoEquipamento({ codigo: "", descricao: "", valor: "" });
-  };
-
-  const removerEquipamento = (index: number) => {
-    const novos = [...equipamentos];
-    novos.splice(index, 1);
-    setEquipamentos(novos);
-  };
 
   const emitirNFe = async () => {
     // Validation
-    if (equipamentos.length === 0) {
-      showError("Adicione pelo menos um equipamento.");
-      return;
-    }
+
     if (!password) {
       showError("Digite a senha do certificado.");
       return;
@@ -128,8 +103,8 @@ export const Comodato = () => {
       setLoading(true);
       const endpoint =
         tipoOperacao === "saida"
-          ? "/nfe/comodato/saida"
-          : "/nfe/comodato/entrada";
+          ? "/NFEletronica/comodato/saida"
+          : "/NFEletronica/comodato/entrada";
 
       const targets = clientesSelecionados;
       setProgress({ current: 0, total: targets.length });
@@ -144,7 +119,6 @@ export const Comodato = () => {
           // Clean payload for each client
           const payload = {
             clienteId: targetCliente.id,
-            equipamentos,
             password,
             ambiente,
           };
@@ -171,7 +145,6 @@ export const Comodato = () => {
       }
 
       // Cleanup
-      setEquipamentos([]);
       setPassword("");
       setClientesSelecionados([]);
     } catch (error: any) {
@@ -253,9 +226,7 @@ export const Comodato = () => {
                               onChange={() => handleCheckboxChange(c)}
                             />
                           </td>
-                          <td className="p-3">
-                            {c.nome || c.razao_social || c.fatura?.titulo}
-                          </td>
+                          <td className="p-3">{c.nome || c.razao_social}</td>
                           <td className="p-3">{c.login}</td>
                           <td className="p-3">
                             {c.cli_ativado === "s" ? "Ativo" : "Inativo"}
@@ -310,90 +281,6 @@ export const Comodato = () => {
                 <option value="producao">Produção</option>
               </select>
             </div>
-          </div>
-          {/* Equipments */}
-          <div className="mb-6 bg-gray-50 p-4 rounded border">
-            <h2 className="font-semibold text-lg mb-2">
-              Equipamentos (Aplicado para todos)
-            </h2>
-            <div className="flex flex-col md:flex-row gap-2 mb-2">
-              <input
-                type="text"
-                placeholder="Código"
-                className="border p-2 rounded w-24"
-                value={novoEquipamento.codigo}
-                onChange={(e) =>
-                  setNovoEquipamento({
-                    ...novoEquipamento,
-                    codigo: e.target.value,
-                  })
-                }
-              />
-              <input
-                type="text"
-                placeholder="Descrição"
-                className="border p-2 rounded flex-1"
-                value={novoEquipamento.descricao}
-                onChange={(e) =>
-                  setNovoEquipamento({
-                    ...novoEquipamento,
-                    descricao: e.target.value,
-                  })
-                }
-              />
-              <input
-                type="number"
-                placeholder="Valor (R$)"
-                className="border p-2 rounded w-32"
-                value={novoEquipamento.valor}
-                onChange={(e) =>
-                  setNovoEquipamento({
-                    ...novoEquipamento,
-                    valor: e.target.value,
-                  })
-                }
-              />
-              <button
-                onClick={adicionarEquipamento}
-                className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 flex items-center justify-center"
-              >
-                <HiPlus className="w-5 h-5" />
-              </button>
-            </div>
-
-            {equipamentos.length > 0 ? (
-              <table className="w-full bg-white shadow rounded overflow-hidden">
-                <thead className="bg-gray-200">
-                  <tr>
-                    <th className="p-2 text-left">Código</th>
-                    <th className="p-2 text-left">Descrição</th>
-                    <th className="p-2 text-left">Valor</th>
-                    <th className="p-2 text-center">Ação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {equipamentos.map((eq, idx) => (
-                    <tr key={idx} className="border-b">
-                      <td className="p-2">{eq.codigo}</td>
-                      <td className="p-2">{eq.descricao}</td>
-                      <td className="p-2">R$ {eq.valor}</td>
-                      <td className="p-2 text-center">
-                        <button
-                          onClick={() => removerEquipamento(idx)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <HiTrash />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className="text-gray-500 italic">
-                Nenhum equipamento adicionado.
-              </p>
-            )}
           </div>
 
           {/* Password and Emission */}

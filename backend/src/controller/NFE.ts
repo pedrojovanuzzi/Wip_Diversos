@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { In, Between, IsNull } from "typeorm";
 import { create } from "xmlbuilder2";
 import * as fs from "fs";
 import * as path from "path";
@@ -12,6 +13,11 @@ import { NFE } from "../entities/NFE";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { processarCertificado } from "../utils/certUtils";
 import { Faturas } from "../entities/Faturas";
+import moment from "moment-timezone";
+import dotenv from "dotenv";
+import { Sis_prodCliente } from "../entities/Sis_prodCliente";
+
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 class NFEController {
   private homologacao: boolean = false;
@@ -20,30 +26,52 @@ class NFEController {
 
   public emitirSaidaComodato = async (req: Request, res: Response) => {
     try {
-      const { clienteId, equipamentos, password, ambiente } = req.body;
+      // Changed to receive login instead of clienteId
+      const { login, password, ambiente } = req.body;
 
       this.homologacao = ambiente === "homologacao";
 
       const clientRepository = MkauthSource.getRepository(ClientesEntities);
       const nfeRepository = AppDataSource.getRepository(NFE);
 
+      // Find client by login
       const client = await clientRepository.findOne({
-        where: { id: clienteId },
+        where: { login: login },
       });
+
       if (!client) {
         res.status(404).json({ message: "Cliente não encontrado" });
         return;
       }
 
+      const prodClienteRepository = MkauthSource.getRepository(Sis_prodCliente);
+
+      const prodCliente = await prodClienteRepository.findOne({
+        where: { cliente: client.login },
+      });
+
+      if (!prodCliente) {
+        res.status(404).json({ message: "Produto não encontrado" });
+        return;
+      }
+
+      const equipamentos = await prodClienteRepository.find({
+        where: { cliente: client.login },
+      });
+
       // 1. Determine next NFE number
       const lastNfe = await nfeRepository.findOne({
-        where: { serie: this.homologacao ? "99" : "1" }, // Adjust serie logic as needed
+        where: { serie: this.homologacao ? "99" : "1" },
         order: { id: "DESC" },
       });
 
       const nNF = lastNfe ? parseInt(lastNfe.nNF) + 1 : 1;
       const serie = this.homologacao ? "99" : "1";
-      const dhEmi = new Date().toISOString();
+      // Use moment-timezone for correct formatting
+      const dhEmi = moment()
+        .tz("America/Sao_Paulo")
+        .format("YYYY-MM-DDTHH:mm:ssZ");
+
       const cNF = Math.floor(Math.random() * 99999999)
         .toString()
         .padStart(8, "0");
@@ -103,12 +131,15 @@ class NFEController {
               client.cpf_cnpj.length <= 11
                 ? client.cpf_cnpj.replace(/\D/g, "")
                 : undefined,
-            xNome: client.nome,
+            xNome: this.homologacao
+              ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
+              : client.nome,
+
             enderDest: {
               xLgr: client.endereco,
               nro: client.numero || "S/N",
               xBairro: client.bairro,
-              cMun: client.cidade_ibge || "3503406", // Needs fallback or correct mapping
+              cMun: client.cidade_ibge || "3503406",
               xMun: client.cidade,
               UF: client.estado || "SP",
               CEP: client.cep.replace(/\D/g, ""),
@@ -123,7 +154,7 @@ class NFEController {
               cProd: eq.codigo || "CF0001",
               cEAN: "SEM GTIN",
               xProd: eq.descricao,
-              NCM: "85176259", // Default for router/equipment, verify!
+              NCM: "85176259",
               CFOP: "5908", // Comodato Saída
               uCom: "UN",
               qCom: "1.0000",
@@ -137,8 +168,7 @@ class NFEController {
             },
             imposto: {
               ICMS: {
-                ICMSSN400: {
-                  // Simples Nacional - Não tributado
+                ICMSSN102: {
                   orig: "0",
                   CSOSN: "400",
                 },
@@ -211,28 +241,77 @@ class NFEController {
       nfeData.infNFe["@Id"] = `NFe${chave}`;
       nfeData.infNFe.ide.cDV = chave.slice(-1);
 
-      // 4. Generate XML string
-      let xml = create(
+      // 4. Generate inner XML (Attempting to compact)
+      let innerXml = create(
         { encoding: "UTF-8" },
         { NFe: { "@xmlns": "http://www.portalfiscal.inf.br/nfe", ...nfeData } },
-      ).end({ prettyPrint: true });
+      ).end({ prettyPrint: false });
 
       // 5. Sign XML
       const signedXml = await this.assinarXml(
-        xml,
+        innerXml,
         password,
         nfeData.infNFe["@Id"],
       );
 
-      // 6. Send to SEFAZ (simplified for now, assumes synchronous response or handled by background job logic in future)
-      // For now, let's just save the signed XML
+      // 6. Wrap in enviNFe (Batch)
+      const loteXml = `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>1</idLote><indSinc>1</indSinc>${signedXml.replace(/<\?xml.*?\?>/, "")}</enviNFe>`;
+
+      // 7. SOAP Envelope
+      const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body><nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">${loteXml}</nfeDadosMsg></soap12:Body></soap12:Envelope>`;
+
+      // 8. Credentials and Send
+      const { cert, key } = this.getCredentialsFromPfx(password);
+      const httpsAgent = new https.Agent({
+        cert,
+        key,
+        rejectUnauthorized: false,
+      });
+
+      const url = this.homologacao
+        ? "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx?WSDL"
+        : "https://nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx?WSDL";
+
+      console.log(`Enviando NFe para ${url}`);
+
+      const response = await axios.post(url, soapEnvelope, {
+        headers: {
+          "Content-Type":
+            'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4/nfeAutorizacaoLote"',
+        },
+        httpsAgent,
+      });
+
+      console.log("Response SEFAZ Status:", response.status);
+      const responseBody = response.data;
+
+      // Check for success (100 or 103)
+      // We should extract nProt if available
+      let nProt = "";
+      const nProtMatch = responseBody.match(/<nProt>(.*?)<\/nProt>/);
+      nProt = nProtMatch ? nProtMatch[1] : "";
+
+      // Also extract cStat
+      let cStat = "";
+      const cStatMatch = responseBody.match(/<cStat>(.*?)<\/cStat>/); // Note: might match multiple, usually the last one (inside protNFe) is what matters for the NFe status itself.
+      // But retEnviNFe also has cStat (104 for batch processed).
+      // We should look for the cStat inside protNFe if possible, or just parse loosely.
+      // If we used a robust parser it would be better, but regex is what was used in test.
+
+      // Simple logic: If we have nProt, it was likely authorized or denied with a protocol.
+      // Ideally we want to know if it was authorized (100).
+
+      const status = responseBody.includes("<cStat>100</cStat>")
+        ? "autorizado"
+        : "enviado";
 
       const nfeRecord = nfeRepository.create({
         nNF: nfeData.infNFe.ide.nNF,
         serie: nfeData.infNFe.ide.serie,
         chave: chave,
         xml: signedXml,
-        status: "assinado", // Pending transmission
+        status: status,
+        protocolo: nProt, // Fixed column name
         data_emissao: new Date(),
         cliente_id: client.id,
         destinatario_nome: client.nome,
@@ -245,19 +324,24 @@ class NFEController {
       await nfeRepository.save(nfeRecord);
 
       res.status(200).json({
-        message: "NFE Gerada e Assinada",
+        message: "NFE Processada",
         id: nfeRecord.id,
         chave: chave,
+        nProt: nProt,
+        status_sefaz: status,
+        raw_response: responseBody.substring(0, 500), // partial return for debug
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      res.status(500).json({ message: "Erro ao emitir NFE", error: error });
+      res
+        .status(500)
+        .json({ message: "Erro ao emitir NFE", error: error.message });
     }
   };
 
   public emitirEntradaComodato = async (req: Request, res: Response) => {
     try {
-      const { clienteId, equipamentos, password, ambiente } = req.body;
+      const { login, password, ambiente } = req.body;
 
       this.homologacao = ambiente === "homologacao";
 
@@ -265,12 +349,27 @@ class NFEController {
       const nfeRepository = AppDataSource.getRepository(NFE);
 
       const client = await clientRepository.findOne({
-        where: { id: clienteId },
+        where: { login: login },
       });
       if (!client) {
         res.status(404).json({ message: "Cliente não encontrado" });
         return;
       }
+
+      const prodClienteRepository = MkauthSource.getRepository(Sis_prodCliente);
+
+      const prodCliente = await prodClienteRepository.findOne({
+        where: { cliente: client.login },
+      });
+
+      if (!prodCliente) {
+        res.status(404).json({ message: "Produto não encontrado" });
+        return;
+      }
+
+      const equipamentos = await prodClienteRepository.find({
+        where: { cliente: client.login },
+      });
 
       // 1. Determine next NFE number
       const lastNfe = await nfeRepository.findOne({
@@ -573,69 +672,282 @@ class NFEController {
   }
 
   public BuscarClientes = async (req: Request, res: Response) => {
+    const { cpf, filters, dateFilter } = req.body;
+    const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+    const w: any = {};
+    let servicosFilter: string[] = ["mensalidade"];
+    if (cpf) w.cpf_cnpj = cpf;
+    if (filters) {
+      let { plano, vencimento, cli_ativado, SCM, servicos } = filters;
+      if (plano?.length) w.plano = In(plano);
+      if (vencimento?.length) w.venc = In(vencimento);
+      if (cli_ativado?.length) w.cli_ativado = In(["s"]);
+      if (SCM?.length) {
+        w.vendedor = In(SCM);
+      } else {
+        w.vendedor = In(["SVA"]);
+      }
+      if (servicos?.length) servicosFilter = servicos;
+    }
     try {
-      const clientRepository = MkauthSource.getRepository(ClientesEntities);
-
-      const clients = await clientRepository
-        .createQueryBuilder("cliente")
-        .leftJoinAndMapOne(
-          "cliente.fatura",
-          Faturas,
-          "fatura",
-          "fatura.login = cliente.login",
-        )
-        .where("cliente.cli_ativado = :ativado", { ativado: "s" })
-        .andWhere("fatura.status = :status", { status: "aberto" })
-        .select([
-          "cliente.id",
-          "cliente.nome",
-          "cliente.login",
-          "cliente.cli_ativado",
-          "cliente.cpf_cnpj",
-          "fatura.id",
-          "fatura.titulo",
-          "fatura.datavenc",
-          "fatura.valor",
-          "fatura.tipo",
-          "fatura.status",
-        ])
-        .getMany();
-
-      res.status(200).json(clients);
-    } catch (error) {
-      console.error(error);
-      res
-        .status(500)
-        .json({ message: "Erro ao buscar clientes", error: error });
+      const clientesResponse = await ClientRepository.find({
+        where: w,
+        select: {
+          id: true,
+          login: true,
+          cpf_cnpj: true,
+          cli_ativado: true,
+          desconto: true,
+        },
+        order: { id: "DESC" },
+      });
+      const faturasData = MkauthSource.getRepository(Faturas);
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const startDate = dateFilter
+        ? new Date(dateFilter.start)
+        : firstDayOfMonth;
+      const endDate = dateFilter ? new Date(dateFilter.end) : lastDayOfMonth;
+      startDate.setHours(startDate.getHours() + 3);
+      endDate.setHours(endDate.getHours() + 3);
+      const faturasResponse = await faturasData.find({
+        where: {
+          login: In(clientesResponse.map((c) => c.login)),
+          datavenc: Between(startDate, endDate),
+          datadel: IsNull(),
+          tipo: In(servicosFilter),
+        },
+        select: {
+          id: true,
+          login: true,
+          datavenc: true,
+          tipo: true,
+          valor: true,
+        },
+        order: { id: "DESC" },
+      });
+      const arr = clientesResponse
+        .map((cliente) => {
+          const fat = faturasResponse.filter((f) => f.login === cliente.login);
+          if (!fat.length) return null;
+          return {
+            ...cliente,
+            fatura: {
+              titulo: fat.map((f) => f.id).join(", ") || null,
+              login: fat.map((f) => f.login).join(", ") || null,
+              datavenc:
+                fat
+                  .map((f) => new Date(f.datavenc).toLocaleDateString("pt-BR"))
+                  .join(", ") || null,
+              tipo: fat.map((f) => f.tipo).join(", ") || null,
+              valor:
+                fat
+                  .map((f) =>
+                    (Number(f.valor) - (cliente.desconto || 0)).toFixed(2),
+                  )
+                  .join(", ") || null,
+            },
+          };
+        })
+        .filter((i): i is NonNullable<typeof i> => i !== null)
+        .sort((a, b) =>
+          (b?.fatura?.titulo || "").localeCompare(a?.fatura?.titulo || ""),
+        );
+      res.status(200).json(arr);
+    } catch {
+      res.status(500).json({ message: "Erro ao buscar clientes" });
     }
   };
 
-  public BuscarAtivos = async (req: Request, res: Response) => {
+  public cancelarNota = async (req: Request, res: Response) => {
     try {
-      const clientRepository = MkauthSource.getRepository(ClientesEntities);
+      const {
+        chave,
+        protocolo,
+        justificativa = "Cancelamento de Nota",
+        login,
+        ambiente,
+        password,
+      } = req.body;
 
-      const clients = await clientRepository.find({
-        where: { cli_ativado: "s" },
-        select: [
-          "id",
-          "nome",
-          "login",
-          "cli_ativado",
-          "cpf_cnpj",
-          "endereco",
-          "bairro",
-          "cidade",
-          "cep",
-          "numero",
-        ],
+      // Basic verification
+      if (!chave || !protocolo || !login) {
+        res
+          .status(400)
+          .json({ message: "Dados incompletos para cancelamento" });
+        return;
+      }
+
+      const isHomologacao = ambiente === "homologacao";
+
+      // 1. Build Event XML
+      const tpEvento = "110111"; // Cancelamento
+      const nSeqEvento = "1";
+      // Use moment-timezone
+      const dhEvento = moment()
+        .tz("America/Sao_Paulo")
+        .format("YYYY-MM-DDTHH:mm:ssZ");
+      const idTag = `ID${tpEvento}${chave}${nSeqEvento.padStart(2, "0")}`;
+      const cnpj = process.env.CPF_CNPJ;
+
+      // Raw XML construction
+      // Ensure "versao" is lowercase as fixed in tests
+      const infEventoXml = `<infEvento Id="${idTag}" xmlns="http://www.portalfiscal.inf.br/nfe"><cOrgao>35</cOrgao><tpAmb>${isHomologacao ? "2" : "1"}</tpAmb><CNPJ>${cnpj}</CNPJ><chNFe>${chave}</chNFe><dhEvento>${dhEvento}</dhEvento><tpEvento>${tpEvento}</tpEvento><nSeqEvento>${nSeqEvento}</nSeqEvento><verEvento>1.00</verEvento><detEvento versao="1.00"><descEvento>Cancelamento</descEvento><nProt>${protocolo}</nProt><xJust>${justificativa}</xJust></detEvento></infEvento>`;
+
+      // 2. Sign
+      const signedEvento = await this.assinarEvento(
+        infEventoXml,
+        password,
+        idTag,
+      );
+
+      // 3. Wrap in Batch (envEvento)
+      const envEventoXml = `<envEvento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00"><idLote>1</idLote>${signedEvento}</envEvento>`;
+
+      // 4. Wrap in SOAP
+      const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body><nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4">${envEventoXml}</nfeDadosMsg></soap12:Body></soap12:Envelope>`;
+
+      // 5. Send Request
+      const { cert, key } = this.getCredentialsFromPfx(password);
+      const httpsAgent = new https.Agent({
+        cert,
+        key,
+        rejectUnauthorized: false,
       });
 
-      res.status(200).json(clients);
-    } catch (error) {
+      const url = isHomologacao
+        ? "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeRecepcaoEvento4.asmx?WSDL"
+        : "https://nfe.fazenda.sp.gov.br/ws/nfeRecepcaoEvento4.asmx?WSDL";
+
+      console.log(`Enviando Cancelamento para ${url}`);
+
+      const response = await axios.post(url, soapEnvelope, {
+        headers: {
+          "Content-Type":
+            'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4/nfeRecepcaoEvento"',
+        },
+        httpsAgent,
+      });
+
+      const responseBody = response.data;
+      const cStatMatch = responseBody.match(/<cStat>(.*?)<\/cStat>/);
+      const cStat = cStatMatch ? cStatMatch[1] : ""; // Note: extracts first cStat, check strictness if needed
+
+      // Update DB if success (135)
+      if (responseBody.includes("<cStat>135</cStat>")) {
+        const nfeRepository = AppDataSource.getRepository(NFE);
+        await nfeRepository.update({ chave: chave }, { status: "cancelado" });
+      }
+
+      res.status(200).json({
+        message: "Solicitação de cancelamento processada",
+        cStat: cStat,
+        response: responseBody.substring(0, 1000),
+      });
+    } catch (error: any) {
       console.error(error);
       res
         .status(500)
-        .json({ message: "Erro ao buscar clientes ativos", error: error });
+        .json({ message: "Erro ao cancelar NFE", error: error.message });
+    }
+  };
+
+  private getCredentialsFromPfx(password: string) {
+    const certPath = path.resolve(__dirname, "../files/certificado.pfx"); // Check relative path!
+    // In original code it was: path.join(__dirname, "..", "files", "certificado.pfx");
+    // Let's use the property this.certPath if available or re-resolve.
+
+    // Safety check if property exists or just resolve again
+    // The class property is: private certPath = path.resolve(__dirname, "../files/certificado.pfx");
+    if (!fs.existsSync(this.certPath)) {
+      throw new Error(`Certificado não encontrado em: ${this.certPath}`);
+    }
+
+    const pfxBuffer = fs.readFileSync(this.certPath);
+    const pfxAsn1 = forge.asn1.fromDer(
+      forge.util.createBuffer(pfxBuffer.toString("binary")),
+    );
+    const pfx = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, false, password);
+
+    const certBags = pfx.getBags({ bagType: forge.pki.oids.certBag })[
+      forge.pki.oids.certBag
+    ];
+    const keyBags = pfx.getBags({
+      bagType: forge.pki.oids.pkcs8ShroudedKeyBag,
+    })[forge.pki.oids.pkcs8ShroudedKeyBag];
+
+    if (!certBags || !keyBags) {
+      throw new Error("Falha ao extrair chaves do PFX via Forge");
+    }
+
+    const certPem = forge.pki.certificateToPem(certBags[0]!.cert!);
+    const keyPem = forge.pki.privateKeyToPem(keyBags[0]!.key!);
+
+    return { cert: certPem, key: keyPem };
+  }
+
+  private async assinarEvento(
+    infEventoXml: string,
+    password: string,
+    idTag: string,
+  ): Promise<string> {
+    const fullXmlToSign = `<evento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00">${infEventoXml}</evento>`;
+
+    const { cert, key } = this.getCredentialsFromPfx(password);
+
+    const sig = new SignedXml();
+    sig.privateKey = key;
+    sig.publicCert = cert;
+    sig.canonicalizationAlgorithm =
+      "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
+    sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+
+    sig.addReference({
+      xpath: "//*[local-name(.)='infEvento']",
+      transforms: [
+        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      ],
+      digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
+      uri: "#" + idTag,
+    });
+
+    sig.computeSignature(fullXmlToSign);
+    return sig.getSignedXml();
+  }
+
+  public BuscarAtivos = async (req: Request, res: Response) => {
+    const { cpf, filters, dateFilter } = req.body;
+    const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+    const w: any = {};
+    let servicosFilter: string[] = ["mensalidade"];
+    if (cpf) w.cpf_cnpj = cpf;
+    if (filters) {
+      let { plano, vencimento, cli_ativado, SCM, servicos } = filters;
+      if (plano?.length) w.plano = In(plano);
+      if (vencimento?.length) w.venc = In(vencimento);
+      if (cli_ativado?.length) w.cli_ativado = In(["s"]);
+      w.cli_ativado = In(["s"]);
+      if (servicos?.length) servicosFilter = servicos;
+    }
+    try {
+      const clientesResponse = await ClientRepository.find({
+        where: w,
+        select: {
+          id: true,
+          login: true,
+          cpf_cnpj: true,
+          cli_ativado: true,
+          nome: true,
+          desconto: true,
+        },
+        order: { id: "DESC" },
+      });
+
+      res.status(200).json(clientesResponse);
+    } catch {
+      res.status(500).json({ message: "Erro ao buscar clientes" });
     }
   };
 }

@@ -16,5 +16,6 @@ router.post("/buscarAtivos", AuthGuard, nfe.BuscarAtivos);
 
 router.post("/comodato/saida", AuthGuard, nfe.emitirSaidaComodato);
 router.post("/comodato/entrada", AuthGuard, nfe.emitirEntradaComodato);
+router.post("/cancelar", AuthGuard, nfe.cancelarNota);
 
 export default router;
