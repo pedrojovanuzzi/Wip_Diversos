@@ -9,3 +9,5 @@ backend/response_error.html
 backend/soap_response.xml
 backend/validation_errors.txt
 backend/validate_xsd.py
+backend/soap_cancel_response.xml
+backend/soap_cancel_request.xml
