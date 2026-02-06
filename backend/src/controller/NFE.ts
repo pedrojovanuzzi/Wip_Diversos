@@ -387,7 +387,9 @@ class NFEController {
 
       const nNF = lastNfe ? parseInt(lastNfe.nNF) + 1 : 1;
       const serie = this.homologacao ? "99" : "1";
-      const dhEmi = new Date().toISOString();
+      const dhEmi = moment()
+        .tz("America/Sao_Paulo")
+        .format("YYYY-MM-DDTHH:mm:ssZ");
       const cNF = Math.floor(Math.random() * 99999999)
         .toString()
         .padStart(8, "0");
@@ -447,7 +449,9 @@ class NFEController {
               client.cpf_cnpj.length <= 11
                 ? client.cpf_cnpj.replace(/\D/g, "")
                 : undefined,
-            xNome: client.nome || "CLIENTE SEM NOME",
+            xNome: this.homologacao
+              ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
+              : client.nome || "CLIENTE SEM NOME",
             enderDest: {
               xLgr: client.endereco || "Rua Sem Nome",
               nro: client.numero || "S/N",
@@ -481,7 +485,7 @@ class NFEController {
             },
             imposto: {
               ICMS: {
-                ICMSSN400: {
+                ICMSSN102: {
                   orig: "0",
                   CSOSN: "400",
                 },
@@ -556,7 +560,7 @@ class NFEController {
       let xml = create(
         { encoding: "UTF-8" },
         { NFe: { "@xmlns": "http://www.portalfiscal.inf.br/nfe", ...nfeData } },
-      ).end({ prettyPrint: true });
+      ).end({ prettyPrint: false });
 
       const signedXml = await this.assinarXml(
         xml,
@@ -564,12 +568,59 @@ class NFEController {
         nfeData.infNFe["@Id"],
       );
 
+      // --- TRANSMISSION LOGIC START ---
+      const loteXml = `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>1</idLote><indSinc>1</indSinc>${signedXml.replace(/<\?xml.*?\?>/, "")}</enviNFe>`;
+
+      const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body><nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">${loteXml}</nfeDadosMsg></soap12:Body></soap12:Envelope>`;
+
+      const { cert, key } = this.getCredentialsFromPfx(password);
+      const httpsAgent = new https.Agent({
+        cert,
+        key,
+        rejectUnauthorized: false,
+      });
+
+      const url = this.homologacao
+        ? "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx?WSDL"
+        : "https://nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx?WSDL";
+
+      console.log(`Enviando NFe Entrada para ${url}`);
+
+      let response;
+      try {
+        response = await axios.post(url, soapEnvelope, {
+          headers: {
+            "Content-Type":
+              'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4/nfeAutorizacaoLote"',
+          },
+          httpsAgent,
+        });
+      } catch (reqError: any) {
+        console.error("Erro na requisição SOAP:", reqError.message);
+        throw new Error(`Erro de comunicação com SEFAZ: ${reqError.message}`);
+      }
+
+      console.log("Response SEFAZ Status:", response.status);
+      const responseBody = response.data;
+      console.log(responseBody);
+
+      let nProt = "";
+      const nProtMatch = responseBody.match(/<nProt>(.*?)<\/nProt>/);
+      nProt = nProtMatch ? nProtMatch[1] : "";
+
+      const status = responseBody.includes("<cStat>100</cStat>")
+        ? "autorizado"
+        : "enviado";
+
+      // --- TRANSMISSION LOGIC END ---
+
       const nfeRecord = nfeRepository.create({
         nNF: nfeData.infNFe.ide.nNF,
         serie: nfeData.infNFe.ide.serie,
         chave: chave,
         xml: signedXml,
-        status: "assinado",
+        status: status,
+        protocolo: nProt,
         data_emissao: new Date(),
         cliente_id: client.id,
         destinatario_nome: client.nome,
@@ -582,9 +633,12 @@ class NFEController {
       await nfeRepository.save(nfeRecord);
 
       res.status(200).json({
-        message: "NFE de Entrada Gerada e Assinada",
+        message: "NFE de Entrada Processada",
         id: nfeRecord.id,
         chave: chave,
+        nProt: nProt,
+        status_sefaz: status,
+        raw_response: responseBody.substring(0, 500),
       });
     } catch (error) {
       console.error(error);
