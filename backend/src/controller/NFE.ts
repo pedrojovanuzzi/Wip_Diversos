@@ -1080,6 +1080,29 @@ class NFEController {
         .json({ message: "Erro ao buscar NFEs", error: error.message });
     }
   };
+  public downloadXml = async (req: Request, res: Response) => {
+    try {
+      const { chave } = req.params;
+      const nfeRepository = AppDataSource.getRepository(NFE);
+
+      const nfe = await nfeRepository.findOne({ where: { chave } });
+
+      if (!nfe || !nfe.xml) {
+        res.status(404).json({ message: "XML não encontrado." });
+        return;
+      }
+
+      const xmlContent = nfe.xml;
+      const fileName = `${chave}-nfe.xml`;
+
+      res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+      res.setHeader("Content-Type", "application/xml");
+      res.send(xmlContent);
+    } catch (error) {
+      console.error("Erro ao baixar XML:", error);
+      res.status(500).json({ message: "Erro ao baixar XML." });
+    }
+  };
 }
 
 export default NFEController;

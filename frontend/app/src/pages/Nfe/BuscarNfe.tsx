@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import { CiSearch } from "react-icons/ci";
-import { BiCalendar, BiUser } from "react-icons/bi";
+
 import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
 
@@ -12,8 +12,10 @@ export const BuscarNfe = () => {
   const [loading, setLoading] = useState(false);
   const [ambiente, setAmbiente] = useState<string>("homologacao");
   const [status, setStatus] = useState<string>(""); // autorizado, cancelado, etc.
-  const [dataInicio, setDataInicio] = useState("");
-  const [dataFim, setDataFim] = useState("");
+  const [dateFilter, setDateFilter] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
 
   const { user } = useAuth();
   const token = user?.token;
@@ -26,10 +28,7 @@ export const BuscarNfe = () => {
         `${process.env.REACT_APP_URL}/NFEletronica/buscarGeradas`,
         {
           cpf: searchCpf,
-          dateFilter: {
-            start: dataInicio,
-            end: dataFim,
-          },
+          dateFilter: dateFilter,
           status: status,
           ambiente: ambiente,
         },
@@ -49,18 +48,37 @@ export const BuscarNfe = () => {
     }
   };
 
-  const handleClear = () => {
-    setSearchCpf("");
-    setDataInicio("");
-    setDataFim("");
-    setStatus("");
-    setNfes([]);
-  };
-
   // Carregar ao entrar (opcional, pode ser pesado se não tiver filtro)
   // useEffect(() => {
   //   handleSearch();
   // }, []);
+
+  // Function to download XML
+  const handleDownloadXml = async (chave: string) => {
+    try {
+      const response = await axios.get(
+        `${process.env.REACT_APP_URL}/NFEletronica/xml/${chave}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          responseType: "blob", // Important for file download
+        },
+      );
+
+      // Create blob link to download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `${chave}-nfe.xml`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (erro) {
+      console.error("Erro ao baixar XML:", erro);
+      showError("Erro ao baixar o XML.");
+    }
+  };
 
   return (
     <div>
@@ -70,88 +88,90 @@ export const BuscarNfe = () => {
           <header className="py-10">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <h1 className="text-3xl font-bold tracking-tight text-white">
-                Buscar NF-e Geradas (Produtos)
+                Buscar NF-e
               </h1>
             </div>
           </header>
         </div>
 
         <main className="-mt-32">
-          <div className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
-            <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
-              {/* Filtros */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div className="relative">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+            <div className="rounded-lg bg-white px-5 py-6 shadow sm:px-6">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-4">
+                <div className="col-span-1">
+                  <label
+                    htmlFor="cpf"
+                    className="block text-sm font-medium text-gray-700"
+                  >
                     CPF/CNPJ Destinatário
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <BiUser />
-                    </span>
-                    <input
-                      type="text"
-                      value={searchCpf}
-                      onChange={(e) => setSearchCpf(e.target.value)}
-                      placeholder="Ex: 000.000.000-00"
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    name="cpf"
+                    id="cpf"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    placeholder="000.000.000-00"
+                    value={searchCpf}
+                    onChange={(e) => setSearchCpf(e.target.value)}
+                  />
                 </div>
 
-                <div className="relative">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Data Inicial
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <BiCalendar />
-                    </span>
-                    <input
-                      type="date"
-                      value={dataInicio}
-                      onChange={(e) => setDataInicio(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="relative">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Data Final
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <BiCalendar />
-                    </span>
-                    <input
-                      type="date"
-                      value={dataFim}
-                      onChange={(e) => setDataFim(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="relative">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ambiente
-                  </label>
-                  <select
-                    value={ambiente}
-                    onChange={(e) => setAmbiente(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                <div className="col-span-1">
+                  <label
+                    htmlFor="date-start"
+                    className="block text-sm font-medium text-gray-700"
                   >
-                    <option value="homologacao">Homologação</option>
-                    <option value="producao">Produção</option>
-                  </select>
+                    Data Início
+                  </label>
+                  <input
+                    type="date"
+                    name="date-start"
+                    id="date-start"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    value={dateFilter?.start || ""}
+                    onChange={(e) =>
+                      setDateFilter((prev) => ({
+                        ...prev,
+                        start: e.target.value,
+                        end: prev?.end || "",
+                      }))
+                    }
+                  />
                 </div>
 
-                <div className="relative">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                <div className="col-span-1">
+                  <label
+                    htmlFor="date-end"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Data Fim
+                  </label>
+                  <input
+                    type="date"
+                    name="date-end"
+                    id="date-end"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    value={dateFilter?.end || ""}
+                    onChange={(e) =>
+                      setDateFilter((prev) => ({
+                        ...prev,
+                        start: prev?.start || "",
+                        end: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="col-span-1">
+                  <label
+                    htmlFor="status"
+                    className="block text-sm font-medium text-gray-700"
+                  >
                     Status
                   </label>
                   <select
+                    id="status"
+                    name="status"
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -164,121 +184,167 @@ export const BuscarNfe = () => {
                     <option value="enviado">Enviado (Pendente)</option>
                   </select>
                 </div>
+
+                <div className="col-span-1">
+                  <label
+                    htmlFor="ambiente"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Ambiente
+                  </label>
+                  <select
+                    id="ambiente"
+                    name="ambiente"
+                    value={ambiente}
+                    onChange={(e) => setAmbiente(e.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                  >
+                    <option value="homologacao">Homologação</option>
+                    <option value="producao">Produção</option>
+                  </select>
+                </div>
+
+                <div className="col-span-1 flex items-end">
+                  <button
+                    onClick={handleSearch}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  >
+                    <CiSearch className="mr-2 h-5 w-5" />
+                    Buscar
+                  </button>
+                </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-4">
-                <button
-                  onClick={handleClear}
-                  className="px-5 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-all font-medium"
-                >
-                  Limpar
-                </button>
-                <button
-                  onClick={handleSearch}
-                  disabled={loading}
-                  className="px-5 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-all font-medium flex items-center gap-2 disabled:bg-gray-400"
-                >
-                  <CiSearch className="text-xl" />
-                  {loading ? "Buscando..." : "Buscar"}
-                </button>
-              </div>
-
-              {/* Tabela */}
-              {nfes.length > 0 ? (
-                <div className="mt-8 bg-white shadow-lg rounded-lg border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <h2 className="text-lg font-medium text-gray-900">
-                      Resultados encontrados: {nfes.length}
-                    </h2>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-300">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                            Nº NFe / Série
-                          </th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                            Emissão
-                          </th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                            Destinatário
-                          </th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                            Valor
-                          </th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                            Chave
-                          </th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                            Status
-                          </th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                            Ações
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 bg-white">
-                        {nfes.map((nfe) => (
-                          <tr key={nfe.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 text-sm text-gray-900">
-                              {nfe.nNF} / {nfe.serie}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500">
-                              {new Date(nfe.data_emissao).toLocaleString(
-                                "pt-BR",
-                              )}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">
-                              {nfe.destinatario_nome}
-                              <br />
-                              <span className="text-xs text-gray-500">
-                                {nfe.destinatario_cpf_cnpj}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">
-                              R$ {Number(nfe.valor_total).toFixed(2)}
-                            </td>
-                            <td
-                              className="px-6 py-4 text-sm text-gray-500 truncate max-w-xs"
-                              title={nfe.chave}
+              <div className="mt-8 flex flex-col">
+                <div className="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                  <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
+                    <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                      <table className="min-w-full divide-y divide-gray-300">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th
+                              scope="col"
+                              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
                             >
-                              {nfe.chave}
-                            </td>
-                            <td className="px-6 py-4 text-sm">
-                              <span
-                                className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
-                                  nfe.status === "autorizado"
-                                    ? "bg-green-50 text-green-700 ring-green-600/20"
-                                    : nfe.status === "cancelado" ||
-                                        nfe.status === "erro_autorizacao"
-                                      ? "bg-red-50 text-red-700 ring-red-600/20"
-                                      : nfe.status === "enviado"
-                                        ? "bg-blue-50 text-blue-700 ring-blue-600/20"
-                                        : nfe.status === "assinado"
-                                          ? "bg-cyan-50 text-cyan-700 ring-cyan-600/20"
-                                          : "bg-yellow-50 text-yellow-800 ring-yellow-600/20"
-                                }`}
-                              >
-                                {nfe.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500">
-                              {/* Futuramente link para PDF ou algo assim */}
-                            </td>
+                              Nº / Série
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                            >
+                              Emissão
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                            >
+                              Destinatário
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                            >
+                              Valor
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                            >
+                              Chave
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                            >
+                              Status
+                            </th>
+                            <th
+                              scope="col"
+                              className="relative py-3.5 pl-3 pr-4 sm:pr-6"
+                            >
+                              <span className="sr-only">Ações</span>
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                          {loading ? (
+                            <tr>
+                              <td
+                                colSpan={7}
+                                className="text-center py-4 text-sm text-gray-500"
+                              >
+                                Carregando...
+                              </td>
+                            </tr>
+                          ) : nfes.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={7}
+                                className="text-center py-4 text-sm text-gray-500"
+                              >
+                                Nenhuma NFe encontrada.
+                              </td>
+                            </tr>
+                          ) : (
+                            nfes.map((nfe) => (
+                              <tr key={nfe.id}>
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                  {nfe.nNF} / {nfe.serie}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                  {new Date(
+                                    nfe.data_emissao,
+                                  ).toLocaleDateString()}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                  <div className="font-medium text-gray-900">
+                                    {nfe.destinatario_nome}
+                                  </div>
+                                  <div className="text-gray-500">
+                                    {nfe.destinatario_cpf_cnpj}
+                                  </div>
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                  R$ {Number(nfe.valor_total).toFixed(2)}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                  {nfe.chave}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                  <span
+                                    className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
+                                      nfe.status === "autorizado"
+                                        ? "bg-green-50 text-green-700 ring-green-600/20"
+                                        : nfe.status === "cancelado" ||
+                                            nfe.status === "erro_autorizacao"
+                                          ? "bg-red-50 text-red-700 ring-red-600/20"
+                                          : nfe.status === "enviado"
+                                            ? "bg-blue-50 text-blue-700 ring-blue-600/20"
+                                            : nfe.status === "assinado"
+                                              ? "bg-cyan-50 text-cyan-700 ring-cyan-600/20"
+                                              : "bg-yellow-50 text-yellow-800 ring-yellow-600/20"
+                                    }`}
+                                  >
+                                    {nfe.status}
+                                  </span>
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 text-right">
+                                  <button
+                                    className="text-indigo-600 hover:text-indigo-900 border rounded px-2 py-1 border-indigo-200 hover:bg-indigo-50"
+                                    onClick={() => handleDownloadXml(nfe.chave)}
+                                  >
+                                    XML
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
-              ) : (
-                !loading && (
-                  <div className="text-center mt-10 text-gray-500 py-10">
-                    <p>Nenhuma nota encontrada com os filtros selecionados.</p>
-                  </div>
-                )
-              )}
+              </div>
             </div>
           </div>
         </main>
