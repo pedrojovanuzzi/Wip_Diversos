@@ -84,9 +84,9 @@ class NFEController {
         .padStart(8, "0");
 
       // 2. Build XML
-      const nfeData = {
+      const nfeData: any = {
         infNFe: {
-          "@Id": "", // Will be filled after chNFe calculation
+          "@Id": "",
           "@versao": "4.00",
           ide: {
             cUF: "35", // SP
@@ -100,18 +100,18 @@ class NFEController {
             tpNF: "1", // Saída
             idDest: "1", // Interna
             cMunFG: "3503406", // Arealva
-            tpImp: "1", // Retrato
-            tpEmis: "1", // Normal
-            cDV: "", // Will be calculated
+            tpImp: "1",
+            tpEmis: "1",
+            cDV: "",
             tpAmb: this.homologacao ? "2" : "1",
-            finNFe: "1", // Normal
-            indFinal: "1", // Consumidor final
-            indPres: "1", // Presencial (or others depending on operation)
-            procEmi: "0", // App do contribuinte
+            finNFe: "1",
+            indFinal: "1",
+            indPres: "1",
+            procEmi: "0",
             verProc: "1.0",
           },
           emit: {
-            CNPJ: process.env.CPF_CNPJ?.replace(/\D/g, ""),
+            CNPJ: process.env.CPF_CNPJ?.replace(/\D/g, "") || "",
             xNome: "WIP TELECOM MULTIMIDIA EIRELI ME",
             xFant: "WIP TELECOM",
             enderEmit: {
@@ -127,7 +127,7 @@ class NFEController {
               fone: "1432961608",
             },
             IE: "183013286115",
-            CRT: "1", // Simples Nacional
+            CRT: "1",
           },
           dest: {
             CNPJ:
@@ -140,29 +140,28 @@ class NFEController {
                 : undefined,
             xNome: this.homologacao
               ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
-              : client.nome,
-
+              : client.nome || "CLIENTE SEM NOME",
             enderDest: {
-              xLgr: client.endereco,
+              xLgr: client.endereco || "Rua Sem Nome",
               nro: client.numero || "S/N",
-              xBairro: client.bairro,
+              xBairro: client.bairro || "Bairro Padrão",
               cMun: client.cidade_ibge || "3503406",
-              xMun: client.cidade,
+              xMun: client.cidade || "Arealva",
               UF: client.estado || "SP",
-              CEP: client.cep.replace(/\D/g, ""),
+              CEP: client.cep ? client.cep.replace(/\D/g, "") : "17160000",
               cPais: "1058",
               xPais: "BRASIL",
             },
-            indIEDest: "9", // Não Contribuinte
+            indIEDest: "9",
           },
           det: equipamentos.map((eq: any, index: number) => ({
             "@nItem": index + 1,
             prod: {
               cProd: eq.codigo || "CF0001",
               cEAN: "SEM GTIN",
-              xProd: eq.descricao,
+              xProd: eq.descricao || "EQUIPAMENTO EM COMODATO",
               NCM: "85176259",
-              CFOP: "5908", // Comodato Saída
+              CFOP: "5908",
               uCom: "UN",
               qCom: "1.0000",
               vUnCom: eq.valor || "0.00",
@@ -210,7 +209,7 @@ class NFEController {
               vFCPSTRet: "0.00",
               vProd: equipamentos
                 .reduce(
-                  (acc: number, cur: any) => acc + parseFloat(cur.valor || 0),
+                  (acc: number, cur: any) => acc + parseFloat(cur.valor || "0"),
                   0,
                 )
                 .toFixed(2),
@@ -225,18 +224,18 @@ class NFEController {
               vOutro: "0.00",
               vNF: equipamentos
                 .reduce(
-                  (acc: number, cur: any) => acc + parseFloat(cur.valor || 0),
+                  (acc: number, cur: any) => acc + parseFloat(cur.valor || "0"),
                   0,
                 )
                 .toFixed(2),
             },
           },
           transp: {
-            modFrete: "9", // Sem frete
+            modFrete: "9",
           },
           pag: {
             detPag: {
-              tPag: "90", // Sem pagamento
+              tPag: "90",
               vPag: "0.00",
             },
           },
@@ -291,6 +290,8 @@ class NFEController {
 
       console.log("Response SEFAZ Status:", response.status);
       const responseBody = response.data;
+
+      console.log(response);
 
       // Check for success (100 or 103)
       // We should extract nProt if available
@@ -446,15 +447,15 @@ class NFEController {
               client.cpf_cnpj.length <= 11
                 ? client.cpf_cnpj.replace(/\D/g, "")
                 : undefined,
-            xNome: client.nome,
+            xNome: client.nome || "CLIENTE SEM NOME",
             enderDest: {
-              xLgr: client.endereco,
+              xLgr: client.endereco || "Rua Sem Nome",
               nro: client.numero || "S/N",
-              xBairro: client.bairro,
+              xBairro: client.bairro || "Bairro Padrão",
               cMun: client.cidade_ibge || "3503406",
-              xMun: client.cidade,
+              xMun: client.cidade || "Arealva",
               UF: client.estado || "SP",
-              CEP: client.cep.replace(/\D/g, ""),
+              CEP: client.cep ? client.cep.replace(/\D/g, "") : "17160000",
               cPais: "1058",
               xPais: "BRASIL",
             },
@@ -465,7 +466,7 @@ class NFEController {
             prod: {
               cProd: eq.codigo || "CF0001",
               cEAN: "SEM GTIN",
-              xProd: eq.descricao,
+              xProd: eq.descricao || "DEVOLUCAO DE EQUIPAMENTO",
               NCM: "85176259",
               CFOP: "1909", // Retorno de Comodato
               uCom: "UN",
