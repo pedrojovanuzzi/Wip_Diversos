@@ -53,6 +53,8 @@ export const BuscarNfe = () => {
   //   handleSearch();
   // }, []);
 
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
   // Function to download XML
   const handleDownloadXml = async (chave: string) => {
     try {
@@ -77,6 +79,103 @@ export const BuscarNfe = () => {
     } catch (erro) {
       console.error("Erro ao baixar XML:", erro);
       showError("Erro ao baixar o XML.");
+    }
+  };
+
+  const handleDownloadPdf = async (id: number, nNF: string) => {
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/NFEletronica/generateDanfe`,
+        { id },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        },
+      );
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `nfe_${nNF}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Erro ao baixar PDF:", error);
+      showError("Erro ao baixar PDF.");
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/NFEletronica/generateReportPdf`,
+        {
+          id: selectedIds.length > 0 ? selectedIds : undefined,
+          dataInicio: dateFilter?.start
+            ? new Date(dateFilter.start).toLocaleDateString("pt-BR")
+            : undefined,
+          dataFim: dateFilter?.end
+            ? new Date(dateFilter.end).toLocaleDateString("pt-BR")
+            : undefined,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        },
+      );
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `relatorio_nfe.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Erro ao gerar relatório:", error);
+      showError("Erro ao gerar relatório.");
+    }
+  };
+
+  const handleDownloadZip = async () => {
+    if (selectedIds.length === 0) {
+      showError("Selecione pelo menos uma nota para baixar o ZIP.");
+      return;
+    }
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/NFEletronica/downloadZipXMLs`,
+        { id: selectedIds },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        },
+      );
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `nfes_export.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Erro ao baixar ZIP:", error);
+      showError("Erro ao baixar ZIP.");
+    }
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIds(nfes.map((n) => n.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelect = (id: number) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter((i) => i !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
     }
   };
 
@@ -204,13 +303,25 @@ export const BuscarNfe = () => {
                   </select>
                 </div>
 
-                <div className="col-span-1 flex items-end">
+                <div className="col-span-1 flex items-end space-x-2">
                   <button
                     onClick={handleSearch}
-                    className="w-full inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                   >
                     <CiSearch className="mr-2 h-5 w-5" />
                     Buscar
+                  </button>
+                  <button
+                    onClick={handleGenerateReport}
+                    className="inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  >
+                    Relatório
+                  </button>
+                  <button
+                    onClick={handleDownloadZip}
+                    className="inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  >
+                    ZIP
                   </button>
                 </div>
               </div>
@@ -222,6 +333,20 @@ export const BuscarNfe = () => {
                       <table className="min-w-full divide-y divide-gray-300">
                         <thead className="bg-gray-50">
                           <tr>
+                            <th
+                              scope="col"
+                              className="relative px-7 sm:w-12 sm:px-6"
+                            >
+                              <input
+                                type="checkbox"
+                                className="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                checked={
+                                  nfes.length > 0 &&
+                                  selectedIds.length === nfes.length
+                                }
+                                onChange={handleSelectAll}
+                              />
+                            </th>
                             <th
                               scope="col"
                               className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
@@ -270,7 +395,7 @@ export const BuscarNfe = () => {
                           {loading ? (
                             <tr>
                               <td
-                                colSpan={7}
+                                colSpan={8}
                                 className="text-center py-4 text-sm text-gray-500"
                               >
                                 Carregando...
@@ -279,7 +404,7 @@ export const BuscarNfe = () => {
                           ) : nfes.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={7}
+                                colSpan={8}
                                 className="text-center py-4 text-sm text-gray-500"
                               >
                                 Nenhuma NFe encontrada.
@@ -287,7 +412,23 @@ export const BuscarNfe = () => {
                             </tr>
                           ) : (
                             nfes.map((nfe) => (
-                              <tr key={nfe.id}>
+                              <tr
+                                key={nfe.id}
+                                className={
+                                  selectedIds.includes(nfe.id)
+                                    ? "bg-gray-50"
+                                    : undefined
+                                }
+                              >
+                                <td className="relative px-7 sm:w-12 sm:px-6">
+                                  <input
+                                    type="checkbox"
+                                    className="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                    value={nfe.id}
+                                    checked={selectedIds.includes(nfe.id)}
+                                    onChange={() => handleSelect(nfe.id)}
+                                  />
+                                </td>
                                 <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                   {nfe.nNF} / {nfe.serie}
                                 </td>
@@ -328,12 +469,20 @@ export const BuscarNfe = () => {
                                     {nfe.status}
                                   </span>
                                 </td>
-                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 text-right">
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 text-right space-x-2">
                                   <button
                                     className="text-indigo-600 hover:text-indigo-900 border rounded px-2 py-1 border-indigo-200 hover:bg-indigo-50"
                                     onClick={() => handleDownloadXml(nfe.chave)}
                                   >
                                     XML
+                                  </button>
+                                  <button
+                                    className="text-gray-600 hover:text-gray-900 border rounded px-2 py-1 border-gray-200 hover:bg-gray-50"
+                                    onClick={() =>
+                                      handleDownloadPdf(nfe.id, nfe.nNF)
+                                    }
+                                  >
+                                    PDF
                                   </button>
                                 </td>
                               </tr>

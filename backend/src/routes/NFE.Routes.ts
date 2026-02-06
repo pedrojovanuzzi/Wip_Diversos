@@ -20,4 +20,8 @@ router.post("/comodato/saida", AuthGuard, nfe.emitirSaidaComodato);
 router.post("/comodato/entrada", AuthGuard, nfe.emitirEntradaComodato);
 router.post("/cancelar", AuthGuard, nfe.cancelarNota);
 
+router.post("/generateReportPdf", AuthGuard, nfe.generateReportPdf);
+router.post("/generateDanfe", AuthGuard, nfe.generatePdfFromNfXML);
+router.post("/downloadZipXMLs", AuthGuard, nfe.baixarZipXml);
+
 export default router;

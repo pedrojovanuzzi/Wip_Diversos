@@ -16,6 +16,10 @@ import { Faturas } from "../entities/Faturas";
 import moment from "moment-timezone";
 import dotenv from "dotenv";
 import { Sis_prodCliente } from "../entities/Sis_prodCliente";
+import { XMLParser } from "fast-xml-parser";
+import QRCode from "qrcode";
+import PDFDocument from "pdfkit";
+import JSZip from "jszip";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -1101,6 +1105,630 @@ class NFEController {
     } catch (error) {
       console.error("Erro ao baixar XML:", error);
       res.status(500).json({ message: "Erro ao baixar XML." });
+    }
+  };
+
+  public generateReportPdf = async (req: Request, res: Response) => {
+    try {
+      const { id, dataInicio, dataFim, password } = req.body;
+
+      // Se tiver IDs selecionados, usa eles. Se não, usa os filtros de data.
+      let nfes: NFE[] = [];
+      const nfeRepository = AppDataSource.getRepository(NFE);
+
+      if (id && id.length > 0) {
+        nfes = await nfeRepository.find({
+          where: { id: In(id) },
+          order: { nNF: "ASC" },
+        });
+      } else {
+        // Busca por data se não tiver IDs
+        // Converter strings de data "DD/MM/YYYY" para Date se necessário,
+        // ou assumir que vem no formato ISO/correto se o frontend mandar.
+        // O frontend manda LocaleDateString pt-BR. Vamos converter.
+
+        let start: Date;
+        let end: Date;
+
+        if (dataInicio && dataFim) {
+          const [diaIni, mesIni, anoIni] = dataInicio.split("/");
+          const [diaFim, mesFim, anoFim] = dataFim.split("/");
+          start = new Date(`${anoIni}-${mesIni}-${diaIni}T00:00:00`);
+          end = new Date(`${anoFim}-${mesFim}-${diaFim}T23:59:59`);
+
+          nfes = await nfeRepository.find({
+            where: {
+              data_emissao: Between(start, end),
+            },
+            order: { nNF: "ASC" },
+          });
+        }
+      }
+
+      if (nfes.length === 0) {
+        res
+          .status(404)
+          .json({ message: "Nenhuma nota encontrada para o relatório." });
+        return;
+      }
+
+      const doc = new PDFDocument({ margin: 30, size: "A4" });
+      const chunks: Buffer[] = [];
+
+      doc.on("data", (chunk) => chunks.push(chunk));
+      doc.on("end", () => {
+        const result = Buffer.concat(chunks);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+          "Content-Disposition",
+          "attachment; filename=relatorio_nfe.pdf",
+        );
+        res.send(result);
+      });
+
+      // --- Cabeçalho do Relatório ---
+      // Draw Header Background
+      doc.rect(0, 0, 595.28, 100).fill("#1e293b"); // Slate-900 like color
+      doc.fillColor("white");
+
+      doc.fontSize(20).text("Relatório de Notas Fiscais", 30, 30);
+      doc.fontSize(10).font("Helvetica");
+      doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 30, 60);
+      doc.text(
+        `Período: ${dataInicio || "Início"} a ${dataFim || "Fim"}`,
+        30,
+        75,
+      );
+
+      doc.text(`Total de Notas: ${nfes.length}`, 400, 60, { align: "right" });
+
+      // Reset Colors
+      doc.fillColor("black");
+
+      doc.moveDown();
+      doc.y = 120; // Start content below header
+
+      // --- Tabela ---
+      const startX = 30;
+      let currentY = doc.y;
+
+      // Column Configuration
+      const cols = {
+        numero: { x: 30, w: 60, title: "NÚMERO", align: "left" },
+        serie: { x: 90, w: 40, title: "SÉRIE", align: "left" },
+        emissao: { x: 130, w: 70, title: "EMISSÃO", align: "left" },
+        dest: { x: 210, w: 180, title: "DESTINATÁRIO", align: "left" },
+        valor: { x: 400, w: 80, title: "VALOR", align: "right" },
+        status: { x: 490, w: 80, title: "STATUS", align: "left" },
+      };
+
+      const drawHeader = (y: number) => {
+        doc.rect(startX, y, 535, 20).fill("#e2e8f0"); // Gray-200
+        doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(8);
+
+        doc.text(cols.numero.title, cols.numero.x + 5, y + 6);
+        doc.text(cols.serie.title, cols.serie.x + 5, y + 6);
+        doc.text(cols.emissao.title, cols.emissao.x + 5, y + 6);
+        doc.text(cols.dest.title, cols.dest.x + 5, y + 6);
+        doc.text(cols.valor.title, cols.valor.x, y + 6, {
+          width: cols.valor.w,
+          align: "right",
+        });
+        doc.text(cols.status.title, cols.status.x + 5, y + 6);
+
+        doc.fillColor("black");
+      };
+
+      drawHeader(currentY);
+      currentY += 20;
+
+      doc.font("Helvetica").fontSize(9);
+
+      let totalValor = 0;
+
+      nfes.forEach((nfe, index) => {
+        if (currentY > 750) {
+          doc.addPage();
+          currentY = 30;
+          drawHeader(currentY);
+          currentY += 20;
+          doc.font("Helvetica").fontSize(9);
+        }
+
+        // Zebra Striping
+        if (index % 2 !== 0) {
+          doc.rect(startX, currentY, 535, 20).fill("#f8fafc"); // Very light gray
+          doc.fillColor("black"); // Reset text color
+        }
+
+        const date = new Date(nfe.data_emissao);
+        const dateStr = date.toLocaleDateString("pt-BR");
+        const valor = parseFloat(nfe.valor_total.toString());
+        totalValor += valor;
+
+        // Vertical Alignment
+        const textY = currentY + 6;
+
+        doc.text(nfe.nNF, cols.numero.x + 5, textY);
+        doc.text(nfe.serie, cols.serie.x + 5, textY);
+        doc.text(dateStr, cols.emissao.x + 5, textY);
+        doc.text(
+          nfe.destinatario_nome.substring(0, 35),
+          cols.dest.x + 5,
+          textY,
+          { width: cols.dest.w - 10, ellipsis: true },
+        );
+        doc.text(
+          valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
+          cols.valor.x,
+          textY,
+          { width: cols.valor.w, align: "right" },
+        );
+
+        // Status color logic (text)
+        doc.save();
+        if (nfe.status === "autorizado") doc.fillColor("green");
+        else if (nfe.status === "cancelado" || nfe.status === "erro")
+          doc.fillColor("red");
+        else doc.fillColor("blue");
+
+        doc.text(nfe.status.toUpperCase(), cols.status.x + 5, textY);
+        doc.restore();
+
+        currentY += 20;
+      });
+
+      doc.moveDown();
+      doc.moveDown();
+
+      // Total Box
+      doc.rect(350, currentY, 215, 30).fill("#f1f5f9");
+      doc.fillColor("black").fontSize(10).font("Helvetica-Bold");
+      doc.text("TOTAL DO PERÍODO", 360, currentY + 10);
+      doc.text(
+        `R$ ${totalValor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+        360,
+        currentY + 10,
+        { align: "right", width: 195 },
+      );
+
+      doc.end();
+    } catch (error) {
+      console.error("Erro ao gerar relatório PDF:", error);
+      res.status(500).json({ message: "Erro ao gerar relatório PDF." });
+    }
+  };
+
+  public baixarZipXml = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.body;
+      const nfeRepository = AppDataSource.getRepository(NFE);
+
+      const nfes = await nfeRepository.find({
+        where: { id: In(id) },
+      });
+
+      if (!nfes.length) {
+        res.status(404).json({ message: "Nenhuma nota encontrada." });
+        return;
+      }
+
+      const zip = new JSZip();
+      const folderXml = zip.folder("xmls");
+      const folderPdf = zip.folder("pdfs");
+
+      await Promise.all(
+        nfes.map(async (nfe) => {
+          const nomeArquivo = `NFe_${nfe.nNF}_Serie_${nfe.serie}`;
+
+          if (nfe.xml) {
+            folderXml?.file(`${nomeArquivo}.xml`, nfe.xml);
+          }
+
+          try {
+            const pdfBuffer = await this.generateDanfe(nfe);
+            folderPdf?.file(`${nomeArquivo}.pdf`, pdfBuffer);
+          } catch (err) {
+            console.error(`Erro ao gerar PDF da nota ${nfe.nNF}:`, err);
+            folderPdf?.file(
+              `ERRO_${nomeArquivo}.txt`,
+              `Falha ao gerar PDF: ${err}`,
+            );
+          }
+        }),
+      );
+
+      const zipContent = await zip.generateAsync({ type: "nodebuffer" });
+
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=nfes_export.zip",
+      );
+      res.send(zipContent);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Erro ao gerar ZIP." });
+    }
+  };
+
+  public generateDanfe = async (nfe: NFE): Promise<Buffer> => {
+    return new Promise<Buffer>((resolve, reject) => {
+      try {
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: "",
+          parseTagValue: false,
+        });
+
+        const xmlString = nfe.xml;
+        const parsed = parser.parse(xmlString);
+
+        // Handle NFE structure variations (nfeProc vs NFe)
+        let root = parsed.nfeProc?.NFe || parsed.NFe; // Standard is nfeProc > NFe
+
+        if (!root) throw new Error("XML inválido ou formato desconhecido");
+
+        const inf = root.infNFe;
+        if (!inf) throw new Error("infNFe não encontrado");
+
+        // Mapping fields
+        const ide = inf.ide;
+        const emit = inf.emit;
+        const dest = inf.dest;
+        const det = Array.isArray(inf.det) ? inf.det : [inf.det];
+        const total = inf.total?.ICMSTot;
+
+        const doc = new PDFDocument({ margin: 20, size: "A4" });
+        const chunks: Buffer[] = [];
+        doc.on("data", (chunk) => chunks.push(chunk));
+        doc.on("end", () => resolve(Buffer.concat(chunks)));
+
+        // --- Layout Reuse (NFE) ---
+        const margin = 20;
+        const pageWidth = 595.28;
+        const contentWidth = pageWidth - margin * 2;
+        let y = margin;
+
+        // Helper to draw a box
+        const drawBox = (
+          x: number,
+          y: number,
+          w: number,
+          h: number,
+          title: string,
+        ) => {
+          doc.rect(x, y, w, h).stroke();
+          doc
+            .fontSize(6)
+            .font("Helvetica-Bold")
+            .text(title.toUpperCase(), x + 2, y + 2);
+        };
+
+        // Header Section
+        doc.rect(margin, y, contentWidth, 85).stroke();
+
+        // Left: Emitente Logo/Names
+        // const emitBoxW = contentWidth * 0.45;
+        doc
+          .fontSize(12)
+          .font("Helvetica-Bold")
+          .text(emit.xNome.substring(0, 45), margin + 5, y + 15);
+
+        doc.fontSize(8).font("Helvetica");
+        const enderEmit = emit.enderEmit || {};
+        doc.text(
+          `${enderEmit.xLgr || ""}, ${enderEmit.nro || ""}`,
+          margin + 5,
+          y + 35,
+        );
+        doc.text(
+          `Bairro: ${enderEmit.xBairro || ""} - CEP: ${enderEmit.CEP || ""}`,
+          margin + 5,
+          y + 45,
+        );
+        doc.text(
+          `${enderEmit.xMun || ""} - ${enderEmit.UF || ""}`,
+          margin + 5,
+          y + 55,
+        );
+        doc.text(`CNPJ: ${emit.CNPJ}  IE: ${emit.IE}`, margin + 5, y + 70);
+
+        // Right: DANFE Info
+        const danfeBlockX = margin + 300;
+        doc
+          .fontSize(14)
+          .font("Helvetica-Bold")
+          .text("DANFE", danfeBlockX, y + 10);
+        doc
+          .fontSize(8)
+          .font("Helvetica")
+          .text(
+            "Documento Auxiliar da Nota Fiscal Eletrônica",
+            danfeBlockX,
+            y + 25,
+          );
+
+        doc.rect(danfeBlockX, y + 35, 235, 40).stroke(); // Chave Box within Header
+        doc
+          .fontSize(6)
+          .font("Helvetica-Bold")
+          .text("CHAVE DE ACESSO", danfeBlockX + 2, y + 37);
+        doc
+          .fontSize(8)
+          .font("Helvetica")
+          .text(nfe.chave.replace(/(\d{4})/g, "$1 "), danfeBlockX + 5, y + 55);
+
+        y += 90;
+
+        // Info Row (Natureza, Protocolo side by side or just simple info)
+        drawBox(margin, y, 70, 25, "NÚMERO");
+        doc.fontSize(10).text(ide.nNF, margin + 5, y + 12);
+
+        drawBox(margin + 75, y, 40, 25, "SÉRIE");
+        doc.fontSize(10).text(ide.serie, margin + 80, y + 12);
+
+        drawBox(margin + 120, y, 320, 25, "NATUREZA DA OPERAÇÃO");
+        doc
+          .fontSize(9)
+          .text((ide.natOp || "VENDA").substring(0, 50), margin + 125, y + 12);
+
+        drawBox(margin + 445, y, contentWidth - 445, 25, "DATA DE EMISSÃO");
+        doc
+          .fontSize(10)
+          .text(
+            new Date(ide.dhEmi).toLocaleDateString("pt-BR"),
+            margin + 450,
+            y + 12,
+          );
+
+        y += 35;
+
+        // Destinatario Section
+        doc
+          .fontSize(9)
+          .font("Helvetica-Bold")
+          .text("DESTINATÁRIO / REMETENTE", margin, y);
+        y += 10;
+
+        // Row 1: Nome, CPF/CNPJ, Data Emissão (Again? Usually Data Saida)
+        const destNameW = 350;
+        drawBox(margin, y, destNameW, 25, "NOME / RAZÃO SOCIAL");
+        doc
+          .fontSize(9)
+          .font("Helvetica")
+          .text((dest.xNome || "").substring(0, 55), margin + 5, y + 12); // Truncate to avoid overlap
+
+        drawBox(margin + destNameW, y, 120, 25, "CNPJ / CPF");
+        doc
+          .fontSize(9)
+          .text(dest.CNPJ || dest.CPF || "", margin + destNameW + 5, y + 12);
+
+        // Data Saida place
+        drawBox(
+          margin + destNameW + 120,
+          y,
+          contentWidth - (destNameW + 120),
+          25,
+          "DATA SAÍDA/ENTRADA",
+        );
+        // Assuming same date for simplicity or leave empty if not available
+        doc.text(
+          new Date(ide.dhEmi).toLocaleDateString("pt-BR"),
+          margin + destNameW + 125,
+          y + 12,
+        );
+
+        y += 25;
+
+        // Row 2: Endereco, Bairro, CEP, Municipio, UF
+        const enderDest = dest.enderDest || {};
+        const addrW = 250;
+        drawBox(margin, y, addrW, 25, "ENDEREÇO");
+        doc.text(
+          `${enderDest.xLgr || ""}, ${enderDest.nro || ""}`,
+          margin + 5,
+          y + 12,
+        );
+
+        drawBox(margin + addrW, y, 130, 25, "BAIRRO / DISTRITO");
+        doc.text(
+          (enderDest.xBairro || "").substring(0, 25),
+          margin + addrW + 5,
+          y + 12,
+        );
+
+        drawBox(margin + addrW + 130, y, 80, 25, "CEP");
+        doc.text(enderDest.CEP || "", margin + addrW + 135, y + 12);
+
+        drawBox(
+          margin + addrW + 210,
+          y,
+          contentWidth - (addrW + 210),
+          25,
+          "MUNICÍPIO / UF",
+        );
+        doc.text(
+          `${enderDest.xMun || ""} - ${enderDest.UF || ""}`,
+          margin + addrW + 215,
+          y + 12,
+        );
+
+        y += 35;
+
+        // Products
+        doc
+          .fontSize(9)
+          .font("Helvetica-Bold")
+          .text("DADOS DO PRODUTO / SERVIÇO", margin, y);
+        y += 10;
+
+        // Table Header
+        const prodCols = {
+          cod: { x: margin, w: 60, title: "CÓDIGO", align: "left" as const },
+          desc: {
+            x: margin + 60,
+            w: 220,
+            title: "DESCRIÇÃO",
+            align: "left" as const,
+          },
+          ncm: { x: margin + 280, w: 50, title: "NCM", align: "left" as const },
+          cst: { x: margin + 330, w: 30, title: "CST", align: "left" as const },
+          cfop: {
+            x: margin + 360,
+            w: 30,
+            title: "CFOP",
+            align: "left" as const,
+          },
+          un: { x: margin + 390, w: 30, title: "UN", align: "left" as const },
+          qtd: {
+            x: margin + 420,
+            w: 40,
+            title: "QTD",
+            align: "right" as const,
+          },
+          vunit: {
+            x: margin + 460,
+            w: 50,
+            title: "V.UNIT",
+            align: "right" as const,
+          },
+          vtot: {
+            x: margin + 510,
+            w: contentWidth - 510,
+            title: "V.TOTAL",
+            align: "right" as const,
+          },
+        };
+
+        doc.rect(margin, y, contentWidth, 15).fill("#e5e7eb");
+        doc.fillColor("black").fontSize(7).font("Helvetica-Bold");
+
+        Object.values(prodCols).forEach((col) => {
+          doc.text(col.title, col.x + 2, y + 5, {
+            width: col.w - 4,
+            align: col.align || "left",
+          });
+        });
+
+        y += 15;
+        doc.font("Helvetica");
+
+        det.forEach((item: any, idx: number) => {
+          const p = item.prod;
+          const imp = item.imposto || {};
+
+          // Simple zebra within items
+          if (idx % 2 !== 0) {
+            doc.rect(margin, y, contentWidth, 12).fill("#f9fafb");
+            doc.fillColor("black");
+          }
+
+          const rowY = y + 3;
+          doc.text(p.cProd, prodCols.cod.x + 2, rowY);
+          doc.text(p.xProd.substring(0, 50), prodCols.desc.x + 2, rowY, {
+            ellipsis: true,
+          });
+          doc.text(p.NCM, prodCols.ncm.x + 2, rowY);
+          // Mock CST/CFOP if mostly standard or needs extract from imp
+          doc.text("000", prodCols.cst.x + 2, rowY);
+          doc.text(p.CFOP, prodCols.cfop.x + 2, rowY);
+          doc.text(p.uCom, prodCols.un.x + 2, rowY);
+
+          doc.text(
+            parseFloat(p.qCom).toLocaleString("pt-BR"),
+            prodCols.qtd.x,
+            rowY,
+            { width: prodCols.qtd.w, align: "right" },
+          );
+          doc.text(
+            parseFloat(p.vUnCom).toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+            }),
+            prodCols.vunit.x,
+            rowY,
+            { width: prodCols.vunit.w, align: "right" },
+          );
+          doc.text(
+            parseFloat(p.vProd).toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+            }),
+            prodCols.vtot.x,
+            rowY,
+            { width: prodCols.vtot.w, align: "right" },
+          );
+
+          y += 12;
+        });
+
+        // Footer / Totals
+        y += 10;
+        doc.rect(margin, y, contentWidth, 30).fill("#f3f4f6");
+        doc.fillColor("black");
+
+        const vTotTrib = total.vTotTrib
+          ? `Trib Aprox: R$ ${total.vTotTrib}`
+          : "";
+        doc
+          .fontSize(8)
+          .text(
+            "DADOS ADICIONAIS / INFORMAÇÕES COMPLEMENTARES",
+            margin + 5,
+            y + 5,
+          );
+        doc
+          .fontSize(7)
+          .text(
+            `Inf. Adicionais: ${inf.infAdic?.infCpl || ""} ${vTotTrib}`,
+            margin + 5,
+            y + 15,
+          );
+
+        // Total Box to the right
+        doc.rect(margin + 350, y, contentWidth - 350, 30).stroke();
+        doc
+          .fontSize(7)
+          .font("Helvetica-Bold")
+          .text("VALOR TOTAL DA NOTA", margin + 355, y + 5);
+        doc.fontSize(12).text(
+          "R$ " +
+            parseFloat(total?.vNF || "0").toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+            }),
+          margin + 355,
+          y + 15,
+          { align: "right", width: contentWidth - 360 },
+        );
+
+        doc.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
+  public generatePdfFromNfXML = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.body;
+      const nfeRepository = AppDataSource.getRepository(NFE);
+      const nfe = await nfeRepository.findOne({ where: { id: id } });
+
+      if (!nfe) {
+        res.status(404).json({ message: "NFE não encontrada" });
+        return;
+      }
+
+      const pdfBuffer = await this.generateDanfe(nfe);
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=nfe_${nfe.nNF}.pdf`,
+      );
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Erro ao gerar PDF." });
     }
   };
 }
