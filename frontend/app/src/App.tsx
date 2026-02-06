@@ -10,6 +10,7 @@ import { Opnion } from "./pages/feedback/Opnion";
 import { Nfe } from "./pages/Nfe/Nfe";
 import { Comodato } from "./pages/Nfe/Comodato";
 import { BuscarNfeGerada } from "./pages/Nfe/BuscarNfeGerada";
+import { BuscarNfe } from "./pages/Nfe/BuscarNfe";
 import PrefeituraLogin from "./pages/prefeitura_login/PrefeituraLogin";
 import CodeOtp from "./pages/prefeitura_login/CodeOtp";
 import WhatsappChat from "./pages/whatsapp_chat/WhatsappChat";
@@ -155,6 +156,16 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <BuscarNfeGerada />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/BuscarNfe"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <BuscarNfe />
               ) : (
                 <Navigate to="/auth/login" />
               )

@@ -1025,6 +1025,61 @@ class NFEController {
       res.status(500).json({ message: "Erro ao buscar clientes" });
     }
   };
+
+  public BuscarNFEs = async (req: Request, res: Response) => {
+    try {
+      const { cpf, dateFilter, status, ambiente } = req.body;
+      const nfeRepository = AppDataSource.getRepository(NFE);
+
+      const where: any = {};
+
+      if (cpf) {
+        where.destinatario_cpf_cnpj = cpf.replace(/\D/g, "");
+      }
+
+      if (dateFilter && dateFilter.start && dateFilter.end) {
+        // Force UTC boundaries to ensure we search exactly from 00:00:00 to 23:59:59 of the selected days
+        // irrespective of the server timezone. This assumes the DB stores dates naively or we want strict visual matching.
+        const start = new Date(
+          `${dateFilter.start.substring(0, 10)}T00:00:00.000Z`,
+        );
+        const end = new Date(
+          `${dateFilter.end.substring(0, 10)}T23:59:59.999Z`,
+        );
+
+        console.log("Filter Range (UTC):", start, end);
+
+        where.data_emissao = Between(start, end);
+      }
+
+      if (status) {
+        where.status = status;
+      }
+
+      if (ambiente) {
+        where.tpAmb = ambiente === "homologacao" ? 2 : 1;
+      }
+
+      // Se nenhum filtro for passado, limita a 50 ou exige filtro?
+      // Por padrão typeorm find sem where traz tudo. Vamos limitar ou permitir?
+      // Melhor garantir que pelo menos um range de data ou cpf seja ideal, mas vamos deixar aberto por enquanto
+      // com um take limite se não tiver filtro especifico, ou paginação.
+      // Assumindo que o front envia filtros.
+
+      const nfes = await nfeRepository.find({
+        where: where,
+        order: { id: "DESC" },
+        take: 100, // Limite de segurança
+      });
+
+      res.status(200).json(nfes);
+    } catch (error: any) {
+      console.error("Erro ao buscar NFEs:", error);
+      res
+        .status(500)
+        .json({ message: "Erro ao buscar NFEs", error: error.message });
+    }
+  };
 }
 
 export default NFEController;

@@ -2,18 +2,15 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import Stacked from "./Components/Stacked";
-import Filter from "./Components/Filter";
 
 import { BsFiletypeDoc } from "react-icons/bs";
 import PopUpButton from "./Components/PopUpButton";
 import { useAuth } from "../../context/AuthContext";
-import { BuscarNfeGerada } from "./BuscarNfeGerada";
 import { Link } from "react-router-dom";
 import { useNotification } from "../../context/NotificationContext";
 
 export const Nfe = () => {
-  const [dadosNFe, setDadosNFe] = useState({});
-  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [arquivo] = useState<File | null>(null);
 
   // Estados para controlar envio do certificado e senha
   const [showCertPasswordPopUp, setShowCertPasswordPopUp] = useState(false);
@@ -30,23 +27,6 @@ export const Nfe = () => {
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     [],
   );
-  const [dateFilter, setDateFilter] = useState<{
-    start: string;
-    end: string;
-  } | null>(null);
-  const [activeFilters, setActiveFilters] = useState<{
-    plano: string[];
-    vencimento: string[];
-    cli_ativado: string[];
-    nova_nfe: string[];
-    servicos: string[];
-  }>({
-    plano: [],
-    vencimento: [],
-    cli_ativado: [],
-    nova_nfe: [],
-    servicos: [],
-  });
 
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>(""); // senha para emitir nf
@@ -101,7 +81,7 @@ export const Nfe = () => {
           timeout: 480000,
         },
       );
-      setDadosNFe(resposta.data);
+
       // setSuccess("NF-e emitida com sucesso.");
 
       console.log("Resposta da API:", resposta.data);
@@ -131,15 +111,6 @@ export const Nfe = () => {
       setShowPopUp(false);
       setLoading(false);
     }
-  };
-
-  // Função que abre o popup para senha do certificado
-  const handleEnviarCertificado = () => {
-    if (!arquivo) {
-      alert("Selecione um arquivo para enviar.");
-      return;
-    }
-    setShowCertPasswordPopUp(true);
   };
 
   // Envia o certificado + senha
@@ -181,8 +152,6 @@ export const Nfe = () => {
         `${process.env.REACT_APP_URL}/NFEletronica/buscarAtivos`,
         {
           cpf: searchCpfRegex,
-          filters: activeFilters,
-          dateFilter: dateFilter,
         },
         {
           headers: {
@@ -227,23 +196,7 @@ export const Nfe = () => {
         onSearch={handleSearch}
         title="Gerar Nota Fiscal Eletrônica"
       />
-      <Link
-        className="flex justify-center sm:justify-start"
-        to="/BuscarNfeGerada"
-      >
-        <button
-          className="bg-violet-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
-          onClick={() => setShowPopUp(true)}
-        >
-          NF-es Geradas
-        </button>
-      </Link>
-      <Filter
-        setActiveFilters={setActiveFilters}
-        setDate={setDateFilter}
-        setArquivo={setArquivo}
-        enviarCertificado={handleEnviarCertificado}
-      />
+
       {clientes.length > 0 && (
         <>
           <h1 className="text-center mt-2 self-center text-2xl font-semibold text-gray-900">
@@ -439,7 +392,7 @@ export const Nfe = () => {
             </h2>
             <input
               type="password"
-              value={certPassword}
+              autoComplete="new-password"
               onChange={(e) => setCertPassword(e.target.value)}
               className="block w-full border p-2 my-4 rounded"
               placeholder="Senha do PFX"

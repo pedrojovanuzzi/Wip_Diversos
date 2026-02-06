@@ -4,7 +4,8 @@ import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
 import Stacked from "./Components/Stacked";
-import Filter from "./Components/Filter";
+
+import { Link } from "react-router-dom";
 
 export const Comodato = () => {
   const { user } = useAuth();
@@ -15,18 +16,6 @@ export const Comodato = () => {
   const [searchCpf, setSearchCpf] = useState("");
   const [clientes, setClientes] = useState<any[]>([]);
   const [clientesSelecionados, setClientesSelecionados] = useState<any[]>([]); // Array of full client objects or IDs
-  const [dateFilter, setDateFilter] = useState<{
-    start: string;
-    end: string;
-  } | null>(null);
-  const [activeFilters, setActiveFilters] = useState<any>({
-    plano: [],
-    vencimento: [],
-    cli_ativado: [],
-    nova_nfe: [],
-    servicos: [],
-  });
-  const [arquivo, setArquivo] = useState<File | null>(null); // For Filter component compatibility
 
   // --- Shared States ---
 
@@ -47,8 +36,6 @@ export const Comodato = () => {
         `${process.env.REACT_APP_URL}/NFEletronica/buscarAtivos`,
         {
           cpf: searchCpfRegex,
-          filters: activeFilters,
-          dateFilter: dateFilter,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -174,13 +161,16 @@ export const Comodato = () => {
                 setSearchCpf={setSearchCpf}
                 onSearch={handleSearch}
                 title="Gerar Nota Fiscal Comodato"
+                color="bg-purple-500"
               />
-              <Filter
-                setActiveFilters={setActiveFilters}
-                setDate={setDateFilter}
-                setArquivo={setArquivo} // Not strictly used for comdodato but req by component
-                enviarCertificado={() => {}} // Not needed here
-              />
+              <Link
+                className="flex justify-center sm:justify-start"
+                to="/BuscarNfe"
+              >
+                <button className="bg-violet-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all">
+                  Buscar Notas
+                </button>
+              </Link>
             </div>
 
             {clientes.length > 0 && (
