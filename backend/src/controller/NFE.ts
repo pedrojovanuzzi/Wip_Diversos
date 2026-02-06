@@ -476,7 +476,7 @@ class NFEController {
               cEAN: "SEM GTIN",
               xProd: eq.descricao || "DEVOLUCAO DE EQUIPAMENTO",
               NCM: "85176259",
-              CFOP: "1909", // Retorno de Comodato
+              CFOP: "5909", // Retorno de Comodato
               uCom: "UN",
               qCom: "1.0000",
               vUnCom: eq.valor || "0.00",
@@ -1032,7 +1032,7 @@ class NFEController {
 
   public BuscarNFEs = async (req: Request, res: Response) => {
     try {
-      const { cpf, dateFilter, status, ambiente } = req.body;
+      const { cpf, dateFilter, status, ambiente, tipo_operacao } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
       const where: any = {};
@@ -1064,6 +1064,10 @@ class NFEController {
         where.tpAmb = ambiente === "homologacao" ? 2 : 1;
       }
 
+      if (tipo_operacao) {
+        where.tipo_operacao = tipo_operacao;
+      }
+
       // Se nenhum filtro for passado, limita a 50 ou exige filtro?
       // Por padrão typeorm find sem where traz tudo. Vamos limitar ou permitir?
       // Melhor garantir que pelo menos um range de data ou cpf seja ideal, mas vamos deixar aberto por enquanto
@@ -1076,7 +1080,33 @@ class NFEController {
         take: 100, // Limite de segurança
       });
 
-      res.status(200).json(nfes);
+      // Parse XML to extract product info for frontend display
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: "",
+        parseTagValue: false,
+      });
+
+      const nfesWithProd = nfes.map((nfe) => {
+        let xProd = "Produto não identificado";
+        try {
+          if (nfe.xml) {
+            const parsed = parser.parse(nfe.xml);
+            const root = parsed.nfeProc?.NFe || parsed.NFe;
+            const det = root?.infNFe?.det;
+            if (det) {
+              // If array, take first. If object, take it.
+              const firstItem = Array.isArray(det) ? det[0] : det;
+              xProd = firstItem?.prod?.xProd || xProd;
+            }
+          }
+        } catch (e) {
+          // ignore parsing error
+        }
+        return { ...nfe, produto_predominante: xProd };
+      });
+
+      res.status(200).json(nfesWithProd);
     } catch (error: any) {
       console.error("Erro ao buscar NFEs:", error);
       res
@@ -1110,7 +1140,7 @@ class NFEController {
 
   public generateReportPdf = async (req: Request, res: Response) => {
     try {
-      const { id, dataInicio, dataFim, password } = req.body;
+      const { id, dataInicio, dataFim, password, tipo_operacao } = req.body;
 
       // Se tiver IDs selecionados, usa eles. Se não, usa os filtros de data.
       let nfes: NFE[] = [];
@@ -1136,10 +1166,16 @@ class NFEController {
           start = new Date(`${anoIni}-${mesIni}-${diaIni}T00:00:00`);
           end = new Date(`${anoFim}-${mesFim}-${diaFim}T23:59:59`);
 
+          const where: any = {
+            data_emissao: Between(start, end),
+          };
+
+          if (tipo_operacao) {
+            where.tipo_operacao = tipo_operacao;
+          }
+
           nfes = await nfeRepository.find({
-            where: {
-              data_emissao: Between(start, end),
-            },
+            where: where,
             order: { nNF: "ASC" },
           });
         }
@@ -1175,7 +1211,7 @@ class NFEController {
       doc.fontSize(10).font("Helvetica");
       doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 30, 60);
       doc.text(
-        `Período: ${dataInicio || "Início"} a ${dataFim || "Fim"}`,
+        `Período: ${dataInicio || "Início"} a ${dataFim || "Fim"}${tipo_operacao ? ` - Tipo: ${tipo_operacao}` : ""}`,
         30,
         75,
       );
@@ -1194,22 +1230,26 @@ class NFEController {
 
       // Column Configuration
       const cols = {
-        numero: { x: 30, w: 60, title: "NÚMERO", align: "left" },
-        serie: { x: 90, w: 40, title: "SÉRIE", align: "left" },
-        emissao: { x: 130, w: 70, title: "EMISSÃO", align: "left" },
-        dest: { x: 210, w: 180, title: "DESTINATÁRIO", align: "left" },
-        valor: { x: 400, w: 80, title: "VALOR", align: "right" },
-        status: { x: 490, w: 80, title: "STATUS", align: "left" },
+        numero: { x: 30, w: 50, title: "NÚMERO", align: "left" as const },
+        serie: { x: 80, w: 30, title: "SÉR", align: "left" as const },
+        tipo: { x: 110, w: 60, title: "TIPO", align: "left" as const },
+        produto: { x: 170, w: 100, title: "PRODUTO", align: "left" as const },
+        dest: { x: 270, w: 130, title: "DESTINATÁRIO", align: "left" as const },
+        emissao: { x: 400, w: 60, title: "EMISSÃO", align: "left" as const },
+        valor: { x: 460, w: 70, title: "VALOR", align: "right" as const },
+        status: { x: 530, w: 60, title: "STATUS", align: "left" as const },
       };
 
       const drawHeader = (y: number) => {
         doc.rect(startX, y, 535, 20).fill("#e2e8f0"); // Gray-200
-        doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(8);
+        doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(7);
 
         doc.text(cols.numero.title, cols.numero.x + 5, y + 6);
         doc.text(cols.serie.title, cols.serie.x + 5, y + 6);
-        doc.text(cols.emissao.title, cols.emissao.x + 5, y + 6);
+        doc.text(cols.tipo.title, cols.tipo.x + 5, y + 6);
+        doc.text(cols.produto.title, cols.produto.x + 5, y + 6);
         doc.text(cols.dest.title, cols.dest.x + 5, y + 6);
+        doc.text(cols.emissao.title, cols.emissao.x + 5, y + 6);
         doc.text(cols.valor.title, cols.valor.x, y + 6, {
           width: cols.valor.w,
           align: "right",
@@ -1222,9 +1262,16 @@ class NFEController {
       drawHeader(currentY);
       currentY += 20;
 
-      doc.font("Helvetica").fontSize(9);
+      doc.font("Helvetica").fontSize(8);
 
       let totalValor = 0;
+
+      // Parse Helper
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: "",
+        parseTagValue: false,
+      });
 
       nfes.forEach((nfe, index) => {
         if (currentY > 750) {
@@ -1232,7 +1279,7 @@ class NFEController {
           currentY = 30;
           drawHeader(currentY);
           currentY += 20;
-          doc.font("Helvetica").fontSize(9);
+          doc.font("Helvetica").fontSize(8);
         }
 
         // Zebra Striping
@@ -1240,6 +1287,20 @@ class NFEController {
           doc.rect(startX, currentY, 535, 20).fill("#f8fafc"); // Very light gray
           doc.fillColor("black"); // Reset text color
         }
+
+        // Extract Product
+        let xProd = "-";
+        try {
+          if (nfe.xml) {
+            const parsed = parser.parse(nfe.xml);
+            const root = parsed.nfeProc?.NFe || parsed.NFe;
+            const det = root?.infNFe?.det;
+            if (det) {
+              const firstItem = Array.isArray(det) ? det[0] : det;
+              xProd = firstItem?.prod?.xProd || "-";
+            }
+          }
+        } catch (e) {}
 
         const date = new Date(nfe.data_emissao);
         const dateStr = date.toLocaleDateString("pt-BR");
@@ -1251,13 +1312,27 @@ class NFEController {
 
         doc.text(nfe.nNF, cols.numero.x + 5, textY);
         doc.text(nfe.serie, cols.serie.x + 5, textY);
-        doc.text(dateStr, cols.emissao.x + 5, textY);
+
+        let tipoDisplay =
+          nfe.tipo_operacao === "entrada_comodato"
+            ? "ENTRADA"
+            : nfe.tipo_operacao === "saida_comodato"
+              ? "SAIDA"
+              : "OUTRO";
+        doc.text(tipoDisplay, cols.tipo.x + 5, textY);
+
+        doc.text(xProd.substring(0, 30), cols.produto.x + 5, textY, {
+          width: cols.produto.w - 5,
+          ellipsis: true,
+        });
+
         doc.text(
-          nfe.destinatario_nome.substring(0, 35),
+          (nfe.destinatario_nome || "").substring(0, 35),
           cols.dest.x + 5,
           textY,
-          { width: cols.dest.w - 10, ellipsis: true },
+          { width: cols.dest.w - 5, ellipsis: true },
         );
+        doc.text(dateStr, cols.emissao.x + 5, textY);
         doc.text(
           valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
           cols.valor.x,

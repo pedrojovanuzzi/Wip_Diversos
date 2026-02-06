@@ -12,6 +12,7 @@ export const BuscarNfe = () => {
   const [loading, setLoading] = useState(false);
   const [ambiente, setAmbiente] = useState<string>("homologacao");
   const [status, setStatus] = useState<string>(""); // autorizado, cancelado, etc.
+  const [tipoOperacao, setTipoOperacao] = useState<string>(""); // entrada_comodato, saida_comodato
   const [dateFilter, setDateFilter] = useState<{
     start: string;
     end: string;
@@ -31,6 +32,7 @@ export const BuscarNfe = () => {
           dateFilter: dateFilter,
           status: status,
           ambiente: ambiente,
+          tipo_operacao: tipoOperacao,
         },
         {
           headers: {
@@ -117,6 +119,7 @@ export const BuscarNfe = () => {
           dataFim: dateFilter?.end
             ? new Date(dateFilter.end).toLocaleDateString("pt-BR")
             : undefined,
+          tipo_operacao: tipoOperacao,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -286,6 +289,26 @@ export const BuscarNfe = () => {
 
                 <div className="col-span-1">
                   <label
+                    htmlFor="tipoOperacao"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Tipo Operação
+                  </label>
+                  <select
+                    id="tipoOperacao"
+                    name="tipoOperacao"
+                    value={tipoOperacao}
+                    onChange={(e) => setTipoOperacao(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Todos</option>
+                    <option value="entrada_comodato">Entrada Comodato</option>
+                    <option value="saida_comodato">Saída Comodato</option>
+                  </select>
+                </div>
+
+                <div className="col-span-1">
+                  <label
                     htmlFor="ambiente"
                     className="block text-sm font-medium text-gray-700"
                   >
@@ -303,7 +326,7 @@ export const BuscarNfe = () => {
                   </select>
                 </div>
 
-                <div className="col-span-1 flex items-end space-x-2">
+                <div className="col-span-2 flex items-end space-x-2">
                   <button
                     onClick={handleSearch}
                     className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
@@ -357,6 +380,18 @@ export const BuscarNfe = () => {
                               scope="col"
                               className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
                             >
+                              Tipo
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                            >
+                              Produto
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                            >
                               Emissão
                             </th>
                             <th
@@ -395,7 +430,7 @@ export const BuscarNfe = () => {
                           {loading ? (
                             <tr>
                               <td
-                                colSpan={8}
+                                colSpan={10}
                                 className="text-center py-4 text-sm text-gray-500"
                               >
                                 Carregando...
@@ -404,7 +439,7 @@ export const BuscarNfe = () => {
                           ) : nfes.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={8}
+                                colSpan={10}
                                 className="text-center py-4 text-sm text-gray-500"
                               >
                                 Nenhuma NFe encontrada.
@@ -431,6 +466,19 @@ export const BuscarNfe = () => {
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                   {nfe.nNF} / {nfe.serie}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                  {nfe.tipo_operacao === "entrada_comodato"
+                                    ? "Entrada"
+                                    : nfe.tipo_operacao === "saida_comodato"
+                                      ? "Saída"
+                                      : nfe.tipo_operacao}
+                                </td>
+                                <td
+                                  className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 max-w-xs truncate"
+                                  title={nfe.produto_predominante}
+                                >
+                                  {nfe.produto_predominante}
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                   {new Date(
