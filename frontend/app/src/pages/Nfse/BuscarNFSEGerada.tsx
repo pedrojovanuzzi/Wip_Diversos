@@ -17,7 +17,7 @@ import { useAuth } from "../../context/AuthContext";
 
 import { useNotification } from "../../context/NotificationContext";
 
-export const BuscarNfeGerada = () => {
+export const BuscarNfseGerada = () => {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [ambiente, setAmbiente] = useState<string>("homologacao");

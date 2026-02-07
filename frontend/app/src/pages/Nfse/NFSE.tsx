@@ -7,11 +7,11 @@ import Filter from "./Components/Filter";
 import { BsFiletypeDoc } from "react-icons/bs";
 import PopUpButton from "./Components/PopUpButton";
 import { useAuth } from "../../context/AuthContext";
-import { BuscarNfeGerada } from "./BuscarNfeGerada";
+
 import { Link } from "react-router-dom";
 import { useNotification } from "../../context/NotificationContext";
 
-export const Nfe = () => {
+export const NFSE = () => {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
 
