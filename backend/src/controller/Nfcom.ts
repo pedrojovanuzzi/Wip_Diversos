@@ -26,6 +26,7 @@ import {
   IsNull,
   Not,
   Repository,
+  Like,
 } from "typeorm";
 import { isNotEmpty } from "class-validator";
 import { Jobs } from "../entities/Jobs";
@@ -1307,7 +1308,7 @@ class Nfcom {
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const w: any = {};
     let servicosFilter: string[] = ["mensalidade"];
-    if (cpf) w.cpf_cnpj = cpf;
+    if (cpf) w.cpf_cnpj = Like(`%${cpf}%`);
     if (filters) {
       let { plano, vencimento, cli_ativado, SVA, servicos } = filters;
       if (plano?.length) w.plano = In(plano);

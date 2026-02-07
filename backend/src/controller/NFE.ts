@@ -1135,7 +1135,7 @@ class NFEController {
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const w: any = {};
     let servicosFilter: string[] = ["mensalidade"];
-    if (cpf) w.cpf_cnpj = cpf;
+    if (cpf) w.cpf_cnpj = Like(`%${cpf}%`);
     if (filters) {
       let { plano, vencimento, cli_ativado, SCM, servicos } = filters;
       if (plano?.length) w.plano = In(plano);
