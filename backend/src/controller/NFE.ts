@@ -16,6 +16,7 @@ import { Faturas } from "../entities/Faturas";
 import moment from "moment-timezone";
 import dotenv from "dotenv";
 import { Sis_prodCliente } from "../entities/Sis_prodCliente";
+import { SisProduto } from "../entities/SisProduto";
 import { XMLParser } from "fast-xml-parser";
 import QRCode from "qrcode";
 import PDFDocument from "pdfkit";
@@ -56,6 +57,7 @@ class NFEController {
       }
 
       const prodClienteRepository = MkauthSource.getRepository(Sis_prodCliente);
+      const sisProdutoRepository = MkauthSource.getRepository(SisProduto);
 
       const prodCliente = await prodClienteRepository.findOne({
         where: { cliente: client.login },
@@ -69,6 +71,17 @@ class NFEController {
       const equipamentos = await prodClienteRepository.find({
         where: { cliente: client.login },
       });
+
+      // Fetch product details for all equipment
+      const productIds = equipamentos
+        .map((eq) => eq.idprod)
+        .filter((id) => id !== null && id !== undefined);
+
+      const products = await sisProdutoRepository.findBy({
+        id: In(productIds),
+      });
+
+      const productMap = new Map(products.map((p) => [p.id, p]));
 
       // 1. Determine next NFE number
       const lastNfe = await nfeRepository.findOne({
@@ -158,49 +171,56 @@ class NFEController {
             },
             indIEDest: "9",
           },
-          det: equipamentos.map((eq: any, index: number) => ({
-            "@nItem": index + 1,
-            prod: {
-              cProd: eq.idprod,
-              cEAN: "SEM GTIN",
-              xProd: eq.descricao || "EQUIPAMENTO EM COMODATO",
-              NCM: "85176259",
-              CFOP: "5908",
-              uCom: "UN",
-              qCom: "1.0000",
-              vUnCom: eq.valor || "0.00",
-              vProd: eq.valor || "0.00",
-              cEANTrib: "SEM GTIN",
-              uTrib: "UN",
-              qTrib: "1.0000",
-              vUnTrib: eq.valor || "0.00",
-              indTot: "1",
-            },
-            imposto: {
-              ICMS: {
-                ICMSSN102: {
-                  orig: "0",
-                  CSOSN: "400",
+          det: equipamentos.map((eq: any, index: number) => {
+            const product = eq.idprod ? productMap.get(eq.idprod) : null;
+            const valorProduto = product?.precoatual
+              ? parseFloat(product.precoatual as any).toFixed(2)
+              : "0.00";
+
+            return {
+              "@nItem": index + 1,
+              prod: {
+                cProd: eq.idprod,
+                cEAN: "SEM GTIN",
+                xProd: eq.descricao || "EQUIPAMENTO EM COMODATO",
+                NCM: "85176259",
+                CFOP: "5908",
+                uCom: "UN",
+                qCom: "1.0000",
+                vUnCom: valorProduto,
+                vProd: valorProduto,
+                cEANTrib: "SEM GTIN",
+                uTrib: "UN",
+                qTrib: "1.0000",
+                vUnTrib: valorProduto,
+                indTot: "1",
+              },
+              imposto: {
+                ICMS: {
+                  ICMSSN102: {
+                    orig: "0",
+                    CSOSN: "400",
+                  },
+                },
+                PIS: {
+                  PISOutr: {
+                    CST: "99",
+                    vBC: "0.00",
+                    pPIS: "0.00",
+                    vPIS: "0.00",
+                  },
+                },
+                COFINS: {
+                  COFINSOutr: {
+                    CST: "99",
+                    vBC: "0.00",
+                    pCOFINS: "0.00",
+                    vCOFINS: "0.00",
+                  },
                 },
               },
-              PIS: {
-                PISOutr: {
-                  CST: "99",
-                  vBC: "0.00",
-                  pPIS: "0.00",
-                  vPIS: "0.00",
-                },
-              },
-              COFINS: {
-                COFINSOutr: {
-                  CST: "99",
-                  vBC: "0.00",
-                  pCOFINS: "0.00",
-                  vCOFINS: "0.00",
-                },
-              },
-            },
-          })),
+            };
+          }),
           total: {
             ICMSTot: {
               vBC: "0.00",
@@ -212,10 +232,15 @@ class NFEController {
               vFCPST: "0.00",
               vFCPSTRet: "0.00",
               vProd: equipamentos
-                .reduce(
-                  (acc: number, cur: any) => acc + parseFloat(cur.valor || "0"),
-                  0,
-                )
+                .reduce((acc: number, cur: any) => {
+                  const product = cur.idprod
+                    ? productMap.get(cur.idprod)
+                    : null;
+                  const valor = product?.precoatual
+                    ? parseFloat(product.precoatual as any)
+                    : 0;
+                  return acc + valor;
+                }, 0)
                 .toFixed(2),
               vFrete: "0.00",
               vSeg: "0.00",
@@ -227,13 +252,19 @@ class NFEController {
               vCOFINS: "0.00",
               vOutro: "0.00",
               vNF: equipamentos
-                .reduce(
-                  (acc: number, cur: any) => acc + parseFloat(cur.valor || "0"),
-                  0,
-                )
+                .reduce((acc: number, cur: any) => {
+                  const product = cur.idprod
+                    ? productMap.get(cur.idprod)
+                    : null;
+                  const valor = product?.precoatual
+                    ? parseFloat(product.precoatual as any)
+                    : 0;
+                  return acc + valor;
+                }, 0)
                 .toFixed(2),
             },
           },
+
           transp: {
             modFrete: "9",
           },
@@ -368,9 +399,11 @@ class NFEController {
         return;
       }
 
-      const prodClienteRepository = MkauthSource.getRepository(Sis_prodCliente);
+      const produtClienteRepository =
+        MkauthSource.getRepository(Sis_prodCliente);
+      const sisProdutoRepository = MkauthSource.getRepository(SisProduto);
 
-      const prodCliente = await prodClienteRepository.findOne({
+      const prodCliente = await produtClienteRepository.findOne({
         where: { cliente: client.login },
       });
 
@@ -379,9 +412,20 @@ class NFEController {
         return;
       }
 
-      const equipamentos = await prodClienteRepository.find({
+      const equipamentos = await produtClienteRepository.find({
         where: { cliente: client.login },
       });
+
+      // Fetch product details for all equipment
+      const productIds = equipamentos
+        .map((eq) => eq.idprod)
+        .filter((id) => id !== null && id !== undefined);
+
+      const products = await sisProdutoRepository.findBy({
+        id: In(productIds),
+      });
+
+      const productMap = new Map(products.map((p) => [p.id, p]));
 
       // 1. Determine next NFE number
       const lastNfe = await nfeRepository.findOne({
@@ -469,49 +513,56 @@ class NFEController {
             },
             indIEDest: "9",
           },
-          det: equipamentos.map((eq: any, index: number) => ({
-            "@nItem": index + 1,
-            prod: {
-              cProd: eq.idprod,
-              cEAN: "SEM GTIN",
-              xProd: eq.descricao || "DEVOLUCAO DE EQUIPAMENTO",
-              NCM: "85176259",
-              CFOP: "1909", // Retorno de Comodato
-              uCom: "UN",
-              qCom: "1.0000",
-              vUnCom: eq.valor || "0.00",
-              vProd: eq.valor || "0.00",
-              cEANTrib: "SEM GTIN",
-              uTrib: "UN",
-              qTrib: "1.0000",
-              vUnTrib: eq.valor || "0.00",
-              indTot: "1",
-            },
-            imposto: {
-              ICMS: {
-                ICMSSN102: {
-                  orig: "0",
-                  CSOSN: "400",
+          det: equipamentos.map((eq: any, index: number) => {
+            const product = eq.idprod ? productMap.get(eq.idprod) : null;
+            const valorProduto = product?.precoatual
+              ? parseFloat(product.precoatual as any).toFixed(2)
+              : "0.00";
+
+            return {
+              "@nItem": index + 1,
+              prod: {
+                cProd: eq.idprod,
+                cEAN: "SEM GTIN",
+                xProd: eq.descricao || "DEVOLUCAO DE EQUIPAMENTO",
+                NCM: "85176259",
+                CFOP: "1909", // Retorno de Comodato
+                uCom: "UN",
+                qCom: "1.0000",
+                vUnCom: valorProduto,
+                vProd: valorProduto,
+                cEANTrib: "SEM GTIN",
+                uTrib: "UN",
+                qTrib: "1.0000",
+                vUnTrib: valorProduto,
+                indTot: "1",
+              },
+              imposto: {
+                ICMS: {
+                  ICMSSN102: {
+                    orig: "0",
+                    CSOSN: "400",
+                  },
+                },
+                PIS: {
+                  PISOutr: {
+                    CST: "99",
+                    vBC: "0.00",
+                    pPIS: "0.00",
+                    vPIS: "0.00",
+                  },
+                },
+                COFINS: {
+                  COFINSOutr: {
+                    CST: "99",
+                    vBC: "0.00",
+                    pCOFINS: "0.00",
+                    vCOFINS: "0.00",
+                  },
                 },
               },
-              PIS: {
-                PISOutr: {
-                  CST: "99",
-                  vBC: "0.00",
-                  pPIS: "0.00",
-                  vPIS: "0.00",
-                },
-              },
-              COFINS: {
-                COFINSOutr: {
-                  CST: "99",
-                  vBC: "0.00",
-                  pCOFINS: "0.00",
-                  vCOFINS: "0.00",
-                },
-              },
-            },
-          })),
+            };
+          }),
           total: {
             ICMSTot: {
               vBC: "0.00",
@@ -523,10 +574,15 @@ class NFEController {
               vFCPST: "0.00",
               vFCPSTRet: "0.00",
               vProd: equipamentos
-                .reduce(
-                  (acc: number, cur: any) => acc + parseFloat(cur.valor || 0),
-                  0,
-                )
+                .reduce((acc: number, cur: any) => {
+                  const product = cur.idprod
+                    ? productMap.get(cur.idprod)
+                    : null;
+                  const valor = product?.precoatual
+                    ? parseFloat(product.precoatual as any)
+                    : 0;
+                  return acc + valor;
+                }, 0)
                 .toFixed(2),
               vFrete: "0.00",
               vSeg: "0.00",
@@ -538,10 +594,15 @@ class NFEController {
               vCOFINS: "0.00",
               vOutro: "0.00",
               vNF: equipamentos
-                .reduce(
-                  (acc: number, cur: any) => acc + parseFloat(cur.valor || 0),
-                  0,
-                )
+                .reduce((acc: number, cur: any) => {
+                  const product = cur.idprod
+                    ? productMap.get(cur.idprod)
+                    : null;
+                  const valor = product?.precoatual
+                    ? parseFloat(product.precoatual as any)
+                    : 0;
+                  return acc + valor;
+                }, 0)
                 .toFixed(2),
             },
           },
