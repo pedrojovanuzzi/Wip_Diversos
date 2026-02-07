@@ -5,7 +5,7 @@ import { Request, Response } from "express";
 import { DOMParser } from "xmldom";
 import axios from "axios";
 import moment from "moment-timezone";
-import { In, Between, IsNull, Not } from "typeorm";
+import { In, Between, IsNull, Not, Like } from "typeorm";
 import { parseStringPromise } from "xml2js";
 import { v4 as uuidv4 } from "uuid";
 
@@ -1034,7 +1034,7 @@ export class NFSEController {
     try {
       const { cpf, filters, dateFilter, ambiente, status } = req.body;
       const w: any = {};
-      if (cpf) w.cpf_cnpj = cpf;
+      if (cpf) w.cpf_cnpj = Like(`%${cpf}%`);
       if (filters) {
         const { plano, vencimento, cli_ativado, nova_nfe } = filters;
         if (plano?.length) w.plano = In(plano);
@@ -1425,7 +1425,7 @@ export class NFSEController {
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const w: any = {};
     let servicosFilter: string[] = ["mensalidade"];
-    if (cpf) w.cpf_cnpj = cpf;
+    if (cpf) w.cpf_cnpj = Like(`%${cpf}%`);
     if (filters) {
       let { plano, vencimento, cli_ativado, SCM, servicos } = filters;
       if (plano?.length) w.plano = In(plano);
