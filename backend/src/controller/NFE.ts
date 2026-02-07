@@ -190,7 +190,7 @@ class NFEController {
                 cProd: eq.idprod,
                 cEAN: "SEM GTIN",
                 xProd: product?.nome || "EQUIPAMENTO EM COMODATO",
-                NCM: "85176259",
+                NCM: product?.codigo || "85176259",
                 CFOP: "5908",
                 uCom: "UN",
                 qCom: "1.0000",
@@ -562,7 +562,7 @@ class NFEController {
                 cEAN: "SEM GTIN",
                 xProd:
                   product?.nome || eq.descricao || "DEVOLUCAO DE EQUIPAMENTO",
-                NCM: "85176259",
+                NCM: product?.codigo || "85176259",
                 CFOP: "1909", // Retorno de Comodato
                 uCom: "UN",
                 qCom: "1.0000",
@@ -1134,14 +1134,18 @@ class NFEController {
     const { cpf, filters, dateFilter } = req.body;
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const w: any = {};
+    w.cli_ativado = "s";
     let servicosFilter: string[] = ["mensalidade"];
     if (cpf) w.cpf_cnpj = Like(`%${cpf}%`);
     if (filters) {
-      let { plano, vencimento, cli_ativado, SCM, servicos } = filters;
+      let { plano, vencimento, SCM, servicos } = filters;
       if (plano?.length) w.plano = In(plano);
       if (vencimento?.length) w.venc = In(vencimento);
-      if (cli_ativado?.length) w.cli_ativado = In(["s"]);
-      w.cli_ativado = In(["s"]);
+      if (SCM?.length) {
+        w.vendedor = In(SCM);
+      } else {
+        w.vendedor = In(["SVA"]);
+      }
       if (servicos?.length) servicosFilter = servicos;
     }
     try {
