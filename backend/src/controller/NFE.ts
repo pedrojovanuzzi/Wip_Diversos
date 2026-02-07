@@ -84,13 +84,20 @@ class NFEController {
       const productMap = new Map(products.map((p) => [p.id, p]));
 
       // 1. Determine next NFE number
+      const reqSerie = req.body.serie;
+      const effectiveSerie = reqSerie
+        ? reqSerie
+        : this.homologacao
+          ? "99"
+          : "1";
+
       const lastNfe = await nfeRepository.findOne({
-        where: { serie: this.homologacao ? "99" : "1" },
+        where: { serie: effectiveSerie },
         order: { id: "DESC" },
       });
 
       const nNF = lastNfe ? parseInt(lastNfe.nNF) + 1 : 1;
-      const serie = this.homologacao ? "99" : "1";
+      const serie = effectiveSerie;
       // Use moment-timezone for correct formatting
       const dhEmi = moment()
         .tz("America/Sao_Paulo")
@@ -428,13 +435,20 @@ class NFEController {
       const productMap = new Map(products.map((p) => [p.id, p]));
 
       // 1. Determine next NFE number
+      const reqSerie = req.body.serie;
+      const effectiveSerie = reqSerie
+        ? reqSerie
+        : this.homologacao
+          ? "99"
+          : "1";
+
       const lastNfe = await nfeRepository.findOne({
-        where: { serie: this.homologacao ? "99" : "1" },
+        where: { serie: effectiveSerie },
         order: { id: "DESC" },
       });
 
       const nNF = lastNfe ? parseInt(lastNfe.nNF) + 1 : 1;
-      const serie = this.homologacao ? "99" : "1";
+      const serie = effectiveSerie;
       const dhEmi = moment()
         .tz("America/Sao_Paulo")
         .format("YYYY-MM-DDTHH:mm:ssZ");
