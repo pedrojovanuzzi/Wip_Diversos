@@ -161,7 +161,7 @@ class NFEController {
           det: equipamentos.map((eq: any, index: number) => ({
             "@nItem": index + 1,
             prod: {
-              cProd: eq.codigo || "CF0001",
+              cProd: eq.idprod,
               cEAN: "SEM GTIN",
               xProd: eq.descricao || "EQUIPAMENTO EM COMODATO",
               NCM: "85176259",
@@ -472,11 +472,11 @@ class NFEController {
           det: equipamentos.map((eq: any, index: number) => ({
             "@nItem": index + 1,
             prod: {
-              cProd: eq.codigo || "CF0001",
+              cProd: eq.idprod,
               cEAN: "SEM GTIN",
               xProd: eq.descricao || "DEVOLUCAO DE EQUIPAMENTO",
               NCM: "85176259",
-              CFOP: "5909", // Retorno de Comodato
+              CFOP: "1909", // Retorno de Comodato
               uCom: "UN",
               qCom: "1.0000",
               vUnCom: eq.valor || "0.00",
