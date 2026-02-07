@@ -23,6 +23,7 @@ export const NFSE = () => {
   const [clientes, setClientes] = useState<any[]>([]);
   const [aliquota, setAliquota] = useState("");
   const [lastNfe, setLastNfe] = useState<string>("");
+  const [rpsNumber, setRpsNumber] = useState<string>("");
   const [service, setService] = useState("");
   const [loading, setLoading] = useState(false);
   const [ambiente, setAmbiente] = useState("homologacao");
@@ -94,6 +95,7 @@ export const NFSE = () => {
           reducao,
           ambiente,
           lastNfe,
+          rpsNumber,
         },
         {
           headers: {
@@ -409,6 +411,16 @@ export const NFSE = () => {
           }}
           placeholder="Ultimo Numero NF-e"
           className="ring-2 ring-red-500 p-2 rounded m-5 placeholder:text-red-500"
+        />
+        <input
+          type="text"
+          onChange={(e) => {
+            setRpsNumber(
+              e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, ""),
+            );
+          }}
+          placeholder="Número RPS (Opcional)"
+          className="ring-2 ring-blue-500 p-2 rounded m-5 placeholder:text-blue-500"
         />
       </div>
 

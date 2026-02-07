@@ -38,7 +38,7 @@ export class NFSEController {
     this.fiorilliProvider = new FiorilliProvider(
       this.certPath,
       this.TEMP_DIR,
-      ""
+      "",
     );
 
     this.uploadCertificado = this.uploadCertificado.bind(this);
@@ -72,7 +72,7 @@ export class NFSEController {
     this.fiorilliProvider = new FiorilliProvider(
       this.certPath,
       this.TEMP_DIR,
-      this.WSDL_URL
+      this.WSDL_URL,
     );
   }
 
@@ -96,6 +96,7 @@ export class NFSEController {
         reducao,
         ambiente,
         lastNfe,
+        rpsNumber,
       } = req.body;
       this.PASSWORD = password;
 
@@ -139,7 +140,8 @@ export class NFSEController {
         ambiente,
         service,
         reducao,
-        Number(lastNfe)
+        Number(lastNfe),
+        rpsNumber ? Number(rpsNumber) : undefined,
       );
 
       res.status(200).json({
@@ -160,7 +162,8 @@ export class NFSEController {
     ambiente: string,
     service: string,
     reducao: number,
-    lastNfe: number
+    lastNfe: number,
+    rpsNumber?: number,
   ) {
     const respArr: any[] = [];
     try {
@@ -192,7 +195,7 @@ export class NFSEController {
 
       const { nextNfseNumber, nextRpsNumber } = await this.getLastNfseNumber(
         lastNfe,
-        ambiente
+        ambiente,
       );
 
       console.log("Próximo RPS da API:", nextRpsNumber);
@@ -200,16 +203,22 @@ export class NFSEController {
 
       // CORREÇÃO: Usa o MAIOR número entre banco local e API para evitar duplicação
       let currentRpsNumber = nextRpsNumber;
-      if (lastRpsForSeries && lastRpsForSeries.numeroRps) {
-        const localNextRps = lastRpsForSeries.numeroRps + 1;
-        console.log("Próximo RPS calculado do banco local:", localNextRps);
 
-        // Se o banco local tem um número maior, usa ele
-        if (localNextRps > nextRpsNumber) {
-          console.log(
-            `⚠️ ATENÇÃO: Banco local tem RPS mais recente (${localNextRps}) que a API (${nextRpsNumber}). Usando ${localNextRps}.`
-          );
-          currentRpsNumber = localNextRps;
+      if (rpsNumber) {
+        console.log(`ℹ️ RPS Number fornecido manualmente: ${rpsNumber}`);
+        currentRpsNumber = rpsNumber;
+      } else {
+        if (lastRpsForSeries && lastRpsForSeries.numeroRps) {
+          const localNextRps = lastRpsForSeries.numeroRps + 1;
+          console.log("Próximo RPS calculado do banco local:", localNextRps);
+
+          // Se o banco local tem um número maior, usa ele
+          if (localNextRps > nextRpsNumber) {
+            console.log(
+              `⚠️ ATENÇÃO: Banco local tem RPS mais recente (${localNextRps}) que a API (${nextRpsNumber}). Usando ${localNextRps}.`,
+            );
+            currentRpsNumber = localNextRps;
+          }
         }
       }
 
@@ -250,7 +259,7 @@ export class NFSEController {
 
       console.log(
         ">>>>> DEBUG ITEM LISTA SEVICO (MODIFICADO): " +
-          nfseBase.itemListaServico
+          nfseBase.itemListaServico,
       );
 
       // Pass targetSeries explicitly to prepareRpsData so it doesn't need to re-guess
@@ -300,14 +309,14 @@ export class NFSEController {
             currentRpsNumber,
             nfseBase as NFSE,
             serieToUse,
-            ambiente
+            ambiente,
           );
 
           // Sign RPS
           let signedRps = this.fiorilliProvider.assinarXml(
             xml,
             "InfDeclaracaoPrestacaoServico",
-            password
+            password,
           );
 
           // Append to list
@@ -377,7 +386,7 @@ export class NFSEController {
           cnpj || "",
           inscricao || "",
           batch.length,
-          rpsXmls
+          rpsXmls,
         );
 
         // Wrap in SOAP
@@ -386,7 +395,7 @@ export class NFSEController {
         const soapXml = this.xmlFactory.createEnviarLoteSoap(
           loteXml,
           user,
-          pass
+          pass,
         );
 
         // Log
@@ -396,7 +405,7 @@ export class NFSEController {
         const responseXml = await this.fiorilliProvider.sendSoapRequest(
           soapXml,
           SOAPAction,
-          password
+          password,
         );
 
         // Parse Response
@@ -422,14 +431,14 @@ export class NFSEController {
         console.log("Tem erro: " + JSON.stringify(temErro));
         console.log(
           "Tem sucesso (ListaNfse): " +
-            JSON.stringify(temSucesso ? true : false)
+            JSON.stringify(temSucesso ? true : false),
         );
 
         // Se tem mensagem de erro explícita, marca como erro
         if (temErro) {
           console.log(
             "Erro detectado na resposta SOAP:",
-            JSON.stringify(temErro)
+            JSON.stringify(temErro),
           );
           // If batch failed, mark all items in this batch as failed
           for (const bid of batch) {
@@ -448,7 +457,7 @@ export class NFSEController {
         if (!temSucesso && !temErro) {
           console.log(
             "Resposta inesperada do SOAP (sem ListaNfse e sem erro):",
-            JSON.stringify(resposta)
+            JSON.stringify(resposta),
           );
           for (const bid of batch) {
             respArr.push({
@@ -498,7 +507,7 @@ export class NFSEController {
       // If we need to explicitly clean up specific files used by legacy logic:
       const decryptedPath = path.join(
         this.TEMP_DIR,
-        "decrypted_certificado.tmp"
+        "decrypted_certificado.tmp",
       );
       if (fs.existsSync(decryptedPath)) fs.unlinkSync(decryptedPath);
 
@@ -537,7 +546,7 @@ export class NFSEController {
     nfseNumber: number,
     nfseBase: NFSE,
     serieOverride?: string,
-    ambiente: string = "producao"
+    ambiente: string = "producao",
   ) {
     const RPSQuery = MkauthSource.getRepository(Faturas);
     const rpsData = await RPSQuery.findOne({ where: { id: Number(id) } });
@@ -559,7 +568,7 @@ export class NFSEController {
     let ibgeId = "3503406"; // default fallback or Bauru/Arealva?
     try {
       const resp = await axios.get(
-        `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
+        `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`,
       );
       ibgeId = resp.data.id;
     } catch (e) {
@@ -582,8 +591,8 @@ export class NFSEController {
       ambiente === "homologacao"
         ? "suporte_wiptelecom@outlook.com"
         : ClientData?.email && ClientData.email.trim() !== ""
-        ? ClientData.email.trim()
-        : "sememail@wiptelecom.com.br";
+          ? ClientData.email.trim()
+          : "sememail@wiptelecom.com.br";
 
     const cnpjPrestador =
       ambiente === "homologacao"
@@ -597,8 +606,8 @@ export class NFSEController {
     const serieRps = serieOverride
       ? serieOverride
       : ambiente === "homologacao"
-      ? "wip99"
-      : nfseBase?.serieRps;
+        ? "wip99"
+        : nfseBase?.serieRps;
 
     const xml = this.xmlFactory.createRpsXml(
       rpsData?.uuid_lanc || "",
@@ -630,7 +639,7 @@ export class NFSEController {
       email,
       ambiente === "homologacao" ? "" : "6", // Regime Especial
       ambiente === "homologacao" ? "2" : "1", // Force 1 (Sim) as per Error L124 (Contribuinte É Optante)
-      nfseBase?.incentivoFiscal || 2
+      nfseBase?.incentivoFiscal || 2,
     );
 
     return {
@@ -660,11 +669,11 @@ export class NFSEController {
             nfse.numeroRps,
             nfse.serieRps,
             nfse.tipoRps,
-            ambiente
+            ambiente,
           );
         }
         return { error: `NFSE ${id} não encontrado no banco de dados.` };
-      })
+      }),
     );
     console.log(result);
 
@@ -675,7 +684,7 @@ export class NFSEController {
     rpsNumber: string | number,
     serie: string | number,
     tipo: string | number,
-    ambiente: string
+    ambiente: string,
   ) {
     try {
       const cnpj =
@@ -692,19 +701,19 @@ export class NFSEController {
         String(serie),
         String(tipo),
         cnpj || "",
-        inscricao || ""
+        inscricao || "",
       );
       const soapFinal = this.xmlFactory.createConsultaNfseSoap(
         envioXml,
         process.env.MUNICIPIO_LOGIN || "",
-        process.env.MUNICIPIO_SENHA || ""
+        process.env.MUNICIPIO_SENHA || "",
       );
 
       this.configureProvider(ambiente); // Ensure correct wsdl
       const response = await this.fiorilliProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
-        this.PASSWORD
+        this.PASSWORD,
       );
 
       if (response && response.includes("<ns2:Codigo>E92</ns2:Codigo>"))
@@ -749,7 +758,7 @@ export class NFSEController {
     job: Jobs,
     ids: (string | number)[],
     password: string,
-    ambiente: string
+    ambiente: string,
   ) {
     const responses: any[] = [];
     try {
@@ -791,7 +800,7 @@ export class NFSEController {
             rps,
             nfseEntity?.serieRps || "1",
             nfseEntity?.tipoRps || "1",
-            ambiente
+            ambiente,
           );
           if (!nfseNumber)
             throw new Error("NFSe Number not found for RPS " + rps);
@@ -809,20 +818,20 @@ export class NFSEController {
             nfseNumber,
             cnpj || "",
             inscricao || "",
-            "3503406"
+            "3503406",
           );
           const envioXml = `<CancelarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${pedidoXml}</CancelarNfseEnvio>`;
 
           const envioXmlAssinado = this.fiorilliProvider.assinarXml(
             envioXml,
             "InfPedidoCancelamento",
-            password
+            password,
           );
 
           const soapFinal = this.xmlFactory.createCancelamentoSoap(
             envioXmlAssinado,
             process.env.MUNICIPIO_LOGIN || "",
-            process.env.MUNICIPIO_SENHA || ""
+            process.env.MUNICIPIO_SENHA || "",
           );
 
           let soapToSend = soapFinal;
@@ -830,7 +839,7 @@ export class NFSEController {
           const response = await this.fiorilliProvider.sendSoapRequest(
             soapToSend,
             "ConsultarNfseServicoPrestadoEnvio",
-            password
+            password,
           );
 
           const result = await parseStringPromise(response, {
@@ -918,7 +927,7 @@ export class NFSEController {
     rpsNumber: string | number,
     serie: string | number = "1",
     tipo: string | number = "1",
-    ambiente: string
+    ambiente: string,
   ) {
     try {
       console.log(rpsNumber);
@@ -937,19 +946,19 @@ export class NFSEController {
         String(serie),
         String(tipo),
         cnpj || "",
-        inscricao || ""
+        inscricao || "",
       );
       const soapFinal = this.xmlFactory.createConsultaNfseSoap(
         envioXml,
         process.env.MUNICIPIO_LOGIN || "",
-        process.env.MUNICIPIO_SENHA || ""
+        process.env.MUNICIPIO_SENHA || "",
       );
 
       this.configureProvider(ambiente);
       const response = await this.fiorilliProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
-        this.PASSWORD
+        this.PASSWORD,
       );
 
       console.log(response);
@@ -982,7 +991,7 @@ export class NFSEController {
     rpsNumber: string | number,
     serie: string | number = "1",
     tipo: string | number = "1",
-    ambiente: string
+    ambiente: string,
   ) {
     try {
       const cnpj =
@@ -999,19 +1008,19 @@ export class NFSEController {
         String(serie),
         String(tipo),
         cnpj || "",
-        inscricao || ""
+        inscricao || "",
       );
       const soapFinal = this.xmlFactory.createConsultaNfseSoap(
         envioXml,
         process.env.MUNICIPIO_LOGIN || "",
-        process.env.MUNICIPIO_SENHA || ""
+        process.env.MUNICIPIO_SENHA || "",
       );
 
       this.configureProvider(ambiente);
       const response = await this.fiorilliProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
-        this.PASSWORD
+        this.PASSWORD,
       );
 
       if (response.includes('<ns2:NfseCancelamento versao="2.0">')) return true;
@@ -1061,7 +1070,7 @@ export class NFSEController {
       const arr = await Promise.all(
         clientesResponse.map(async (c) => {
           const nfseDoCliente = nfseResponse.filter(
-            (nf) => nf.login === c.login
+            (nf) => nf.login === c.login,
           );
 
           const nfseValidas: typeof nfseDoCliente = [];
@@ -1098,7 +1107,7 @@ export class NFSEController {
                   .map((nf) =>
                     moment
                       .tz(nf.dataEmissao, "America/Sao_Paulo")
-                      .format("DD/MM/YYYY")
+                      .format("DD/MM/YYYY"),
                   )
                   .join(", ") || null,
               competencia:
@@ -1106,7 +1115,7 @@ export class NFSEController {
                   .map((nf) =>
                     moment
                       .tz(nf.competencia, "America/Sao_Paulo")
-                      .format("DD/MM/YYYY")
+                      .format("DD/MM/YYYY"),
                   )
                   .join(", ") || null,
               valor_servico:
@@ -1161,7 +1170,7 @@ export class NFSEController {
                 nfseValidas.map((nf) => nf.timestamp).join(", ") || null,
             },
           };
-        })
+        }),
       );
       const filtered = arr
         .filter((i): i is NonNullable<typeof i> => i !== null)
@@ -1177,7 +1186,7 @@ export class NFSEController {
     serie: string | number,
     tipo: string | number,
     ambiente: string,
-    retryCount: number = 0
+    retryCount: number = 0,
   ): Promise<any> {
     try {
       const cnpj =
@@ -1198,18 +1207,18 @@ export class NFSEController {
         String(serie),
         String(tipo),
         cnpj || "",
-        inscricao || ""
+        inscricao || "",
       );
       const soapFinal = this.xmlFactory.createConsultaNfseSoap(
         envioXml,
         process.env.MUNICIPIO_LOGIN || "",
-        process.env.MUNICIPIO_SENHA || ""
+        process.env.MUNICIPIO_SENHA || "",
       );
 
       const response = await this.fiorilliProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
-        this.PASSWORD
+        this.PASSWORD,
       );
 
       // Check for E92 - RPS not converted
@@ -1262,7 +1271,7 @@ export class NFSEController {
           const ibgeResponse = await axios
             .get(
               `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${uf}`,
-              { timeout: 1000 }
+              { timeout: 1000 },
             )
             .catch(() => ({ data: { nome: "" } }));
           extractedData.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico.InfDeclaracaoPrestacaoServico.Tomador.Endereco.Cidade =
@@ -1286,7 +1295,7 @@ export class NFSEController {
 
   async getLastNfseNumber(
     lastNfe: number,
-    ambiente: string = "producao"
+    ambiente: string = "producao",
   ): Promise<{ nextNfseNumber: number; nextRpsNumber: number }> {
     try {
       this.configureProvider(ambiente);
@@ -1304,13 +1313,13 @@ export class NFSEController {
         this.xmlFactory.createConsultarNfseServicoPrestadoPorNumeroEnvio(
           cnpj || "",
           inscricao || "",
-          lastNfe
+          lastNfe,
         );
 
       const soapXml = this.xmlFactory.createConsultarNfseServicoPrestadoSoap(
         envioXml,
         process.env.MUNICIPIO_LOGIN || "",
-        process.env.MUNICIPIO_SENHA || ""
+        process.env.MUNICIPIO_SENHA || "",
       );
 
       console.log("SOAP Request getLastNfseNumber:", soapXml);
@@ -1318,7 +1327,7 @@ export class NFSEController {
       const response = await this.fiorilliProvider.sendSoapRequest(
         soapXml,
         "ConsultarNfseServicoPrestadoEnvio", // Action per doc
-        this.PASSWORD
+        this.PASSWORD,
       );
 
       const parsed = await parseStringPromise(response, {
@@ -1335,7 +1344,7 @@ export class NFSEController {
       if (listaMensagem) {
         console.log(
           "Mensagem Retorno getLastNfseNumber:",
-          JSON.stringify(listaMensagem)
+          JSON.stringify(listaMensagem),
         );
       }
 
@@ -1370,12 +1379,12 @@ export class NFSEController {
         const rpsSerie = rpsObj?.["ns2:Serie"];
 
         console.log(
-          `Checking item: NFSe=${nfseNum}, RPS=${rpsNum}, Serie=${rpsSerie}`
+          `Checking item: NFSe=${nfseNum}, RPS=${rpsNum}, Serie=${rpsSerie}`,
         );
 
         if (nfseNum && Number(nfseNum) === lastNfe) {
           console.log(
-            `NFSe ${lastNfe} encontrada. RPS vinculado: ${rpsNum} (Serie: ${rpsSerie}).`
+            `NFSe ${lastNfe} encontrada. RPS vinculado: ${rpsNum} (Serie: ${rpsSerie}).`,
           );
           // Preferentially update if we find a match, but keep looking (or break if unique)
           // Assuming we want the one matching our current series logic?
@@ -1386,7 +1395,7 @@ export class NFSEController {
 
       if (foundNextNfse && foundNextRps) {
         console.log(
-          `Retornando: NextNFe=${foundNextNfse}, NextRPS=${foundNextRps}`
+          `Retornando: NextNFe=${foundNextNfse}, NextRPS=${foundNextRps}`,
         );
         return {
           nextNfseNumber: foundNextNfse,
@@ -1397,7 +1406,7 @@ export class NFSEController {
       console.log(
         `NFSe ${lastNfe} não encontrada explicitamente. Retornando fallback: ${
           lastNfe + 1
-        }`
+        }`,
       );
       return { nextNfseNumber: lastNfe + 1, nextRpsNumber: 1 };
     } catch (error) {
@@ -1483,7 +1492,7 @@ export class NFSEController {
               valor:
                 fat
                   .map((f) =>
-                    (Number(f.valor) - (cliente.desconto || 0)).toFixed(2)
+                    (Number(f.valor) - (cliente.desconto || 0)).toFixed(2),
                   )
                   .join(", ") || null,
             },
@@ -1491,7 +1500,7 @@ export class NFSEController {
         })
         .filter((i): i is NonNullable<typeof i> => i !== null)
         .sort((a, b) =>
-          (b?.fatura?.titulo || "").localeCompare(a?.fatura?.titulo || "")
+          (b?.fatura?.titulo || "").localeCompare(a?.fatura?.titulo || ""),
         );
       res.status(200).json(arr);
     } catch {
@@ -1544,7 +1553,7 @@ export class NFSEController {
       if (!rpsNumber) {
         const result = await this.getLastNfseNumber(
           Number(nfeNumber),
-          ambiente
+          ambiente,
         );
         nextNfseNumber = result.nextNfseNumber;
         nextRpsNumber = result.nextRpsNumber;
@@ -1568,7 +1577,7 @@ export class NFSEController {
         currentRpsNumber = Number(rpsNumber);
         const result = await this.getLastNfseNumber(
           Number(nfeNumber),
-          ambiente
+          ambiente,
         );
         nextNfseNumber = result.nextNfseNumber;
 
@@ -1585,7 +1594,7 @@ export class NFSEController {
       let ibgeId = "3503406";
       try {
         const resp = await axios.get(
-          `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`
+          `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`,
         );
         ibgeId = resp.data.id;
       } catch (e) {
@@ -1636,13 +1645,13 @@ export class NFSEController {
         email,
         "6",
         "1",
-        2
+        2,
       );
 
       const signedRps = this.fiorilliProvider.assinarXml(
         xml,
         "InfDeclaracaoPrestacaoServico",
-        password
+        password,
       );
 
       const loteId = `lote${currentRpsNumber}`;
@@ -1651,7 +1660,7 @@ export class NFSEController {
         cnpjPrestador || "",
         inscricaoPrestador || "",
         1,
-        signedRps
+        signedRps,
       );
 
       const loginMunicipio =
@@ -1666,7 +1675,7 @@ export class NFSEController {
       const soapXml = this.xmlFactory.createEnviarLoteSoap(
         loteXml,
         loginMunicipio!,
-        senhaMunicipio!
+        senhaMunicipio!,
       );
 
       let responseXml;
@@ -1674,7 +1683,7 @@ export class NFSEController {
         responseXml = await this.fiorilliProvider.sendSoapRequest(
           soapXml,
           "EnviarLoteRpsSincronoEnvio",
-          password
+          password,
         );
       } catch (error: any) {
         if (error.response && error.response.data) {
