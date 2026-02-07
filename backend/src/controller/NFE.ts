@@ -335,25 +335,46 @@ class NFEController {
 
       console.log(response);
 
-      // Check for success (100 or 103)
-      // We should extract nProt if available
+      // Extract details from protNFe (Protocolo de Autorização)
+      const protNFeMatch = responseBody.match(/<protNFe.*?>(.*?)<\/protNFe>/);
+      const protNFeContent = protNFeMatch ? protNFeMatch[1] : "";
+
       let nProt = "";
-      const nProtMatch = responseBody.match(/<nProt>(.*?)<\/nProt>/);
+      const nProtMatch = protNFeContent.match(/<nProt>(.*?)<\/nProt>/);
       nProt = nProtMatch ? nProtMatch[1] : "";
 
-      // Also extract cStat
       let cStat = "";
-      const cStatMatch = responseBody.match(/<cStat>(.*?)<\/cStat>/); // Note: might match multiple, usually the last one (inside protNFe) is what matters for the NFe status itself.
-      // But retEnviNFe also has cStat (104 for batch processed).
-      // We should look for the cStat inside protNFe if possible, or just parse loosely.
-      // If we used a robust parser it would be better, but regex is what was used in test.
+      const cStatMatch = protNFeContent.match(/<cStat>(.*?)<\/cStat>/);
+      cStat = cStatMatch ? cStatMatch[1] : "";
 
-      // Simple logic: If we have nProt, it was likely authorized or denied with a protocol.
-      // Ideally we want to know if it was authorized (100).
+      let xMotivo = "";
+      const xMotivoMatch = protNFeContent.match(/<xMotivo>(.*?)<\/xMotivo>/);
+      xMotivo = xMotivoMatch ? xMotivoMatch[1] : "Erro desconhecido na SEFAZ";
 
-      const status = responseBody.includes("<cStat>100</cStat>")
-        ? "autorizado"
-        : "enviado";
+      // Also check if the batch itself was rejected (outside protNFe)
+      if (!cStat) {
+        const cStatBatchMatch = responseBody.match(/<cStat>(.*?)<\/cStat>/);
+        const xMotivoBatchMatch = responseBody.match(
+          /<xMotivo>(.*?)<\/xMotivo>/,
+        );
+        if (cStatBatchMatch && cStatBatchMatch[1] !== "104") {
+          // 104 = Lote Processado
+          cStat = cStatBatchMatch[1];
+          xMotivo = xMotivoBatchMatch ? xMotivoBatchMatch[1] : "Erro no Lote";
+        }
+      }
+
+      if (cStat !== "100") {
+        res.status(400).json({
+          message: "Erro ao autorizar NFE na SEFAZ",
+          cStat: cStat,
+          xMotivo: xMotivo,
+          raw_response: responseBody, // Return raw for debugging
+        });
+        return;
+      }
+
+      const status = "autorizado";
 
       const nfeRecord = nfeRepository.create({
         nNF: nfeData.infNFe.ide.nNF,
@@ -374,12 +395,13 @@ class NFEController {
       await nfeRepository.save(nfeRecord);
 
       res.status(200).json({
-        message: "NFE Processada",
+        message: "NFE Processada e Autorizada",
         id: nfeRecord.id,
         chave: chave,
         nProt: nProt,
         status_sefaz: status,
-        raw_response: responseBody.substring(0, 500), // partial return for debug
+        xMotivo: xMotivo,
+        raw_response: responseBody.substring(0, 500),
       });
     } catch (error: any) {
       console.error(error);
@@ -682,15 +704,49 @@ class NFEController {
 
       console.log("Response SEFAZ Status:", response.status);
       const responseBody = response.data;
-      console.log(responseBody);
+
+      console.log(response);
+
+      // Extract details from protNFe (Protocolo de Autorização)
+      const protNFeMatch = responseBody.match(/<protNFe.*?>(.*?)<\/protNFe>/);
+      const protNFeContent = protNFeMatch ? protNFeMatch[1] : "";
 
       let nProt = "";
-      const nProtMatch = responseBody.match(/<nProt>(.*?)<\/nProt>/);
+      const nProtMatch = protNFeContent.match(/<nProt>(.*?)<\/nProt>/);
       nProt = nProtMatch ? nProtMatch[1] : "";
 
-      const status = responseBody.includes("<cStat>100</cStat>")
-        ? "autorizado"
-        : "enviado";
+      let cStat = "";
+      const cStatMatch = protNFeContent.match(/<cStat>(.*?)<\/cStat>/);
+      cStat = cStatMatch ? cStatMatch[1] : "";
+
+      let xMotivo = "";
+      const xMotivoMatch = protNFeContent.match(/<xMotivo>(.*?)<\/xMotivo>/);
+      xMotivo = xMotivoMatch ? xMotivoMatch[1] : "Erro desconhecido na SEFAZ";
+
+      // Also check if the batch itself was rejected (outside protNFe)
+      if (!cStat) {
+        const cStatBatchMatch = responseBody.match(/<cStat>(.*?)<\/cStat>/);
+        const xMotivoBatchMatch = responseBody.match(
+          /<xMotivo>(.*?)<\/xMotivo>/,
+        );
+        if (cStatBatchMatch && cStatBatchMatch[1] !== "104") {
+          // 104 = Lote Processado
+          cStat = cStatBatchMatch[1];
+          xMotivo = xMotivoBatchMatch ? xMotivoBatchMatch[1] : "Erro no Lote";
+        }
+      }
+
+      if (cStat !== "100") {
+        res.status(400).json({
+          message: "Erro ao autorizar NFE na SEFAZ",
+          cStat: cStat,
+          xMotivo: xMotivo,
+          raw_response: responseBody, // Return raw for debugging
+        });
+        return;
+      }
+
+      const status = "autorizado";
 
       // --- TRANSMISSION LOGIC END ---
 
@@ -713,11 +769,12 @@ class NFEController {
       await nfeRepository.save(nfeRecord);
 
       res.status(200).json({
-        message: "NFE de Entrada Processada",
+        message: "NFE Processada e Autorizada",
         id: nfeRecord.id,
         chave: chave,
         nProt: nProt,
         status_sefaz: status,
+        xMotivo: xMotivo,
         raw_response: responseBody.substring(0, 500),
       });
     } catch (error) {
