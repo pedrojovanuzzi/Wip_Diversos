@@ -190,7 +190,8 @@ class NFEController {
                 cProd: eq.idprod,
                 cEAN: "SEM GTIN",
                 xProd: product?.nome || "EQUIPAMENTO EM COMODATO",
-                NCM: product?.codigo || "85176259",
+                // NCM: product?.codigo || "85176259",
+                NCM: "85176259",
                 CFOP: "5908",
                 uCom: "UN",
                 qCom: "1.0000",
@@ -562,7 +563,8 @@ class NFEController {
                 cEAN: "SEM GTIN",
                 xProd:
                   product?.nome || eq.descricao || "DEVOLUCAO DE EQUIPAMENTO",
-                NCM: product?.codigo || "85176259",
+                // NCM: product?.codigo || "85176259",
+                NCM: "85176259",
                 CFOP: "1909", // Retorno de Comodato
                 uCom: "UN",
                 qCom: "1.0000",
