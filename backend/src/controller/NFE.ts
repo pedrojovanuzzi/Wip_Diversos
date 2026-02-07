@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { In, Between, IsNull } from "typeorm";
+import { In, Between, IsNull, Like } from "typeorm";
 import { create } from "xmlbuilder2";
 import * as fs from "fs";
 import * as path from "path";
@@ -875,7 +875,7 @@ class NFEController {
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const w: any = {};
     let servicosFilter: string[] = ["mensalidade"];
-    if (cpf) w.cpf_cnpj = cpf;
+    if (cpf) w.cpf_cnpj = Like(`%${cpf}%`);
     if (filters) {
       let { plano, vencimento, cli_ativado, SCM, servicos } = filters;
       if (plano?.length) w.plano = In(plano);
@@ -900,6 +900,7 @@ class NFEController {
         },
         order: { id: "DESC" },
       });
+
       const faturasData = MkauthSource.getRepository(Faturas);
       const now = new Date();
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1363,14 +1364,14 @@ class NFEController {
 
       // Column Configuration
       const cols = {
-        numero: { x: 30, w: 50, title: "NÚMERO", align: "left" as const },
-        serie: { x: 80, w: 30, title: "SÉR", align: "left" as const },
-        tipo: { x: 110, w: 60, title: "TIPO", align: "left" as const },
-        produto: { x: 170, w: 100, title: "PRODUTO", align: "left" as const },
-        dest: { x: 270, w: 130, title: "DESTINATÁRIO", align: "left" as const },
-        emissao: { x: 400, w: 60, title: "EMISSÃO", align: "left" as const },
-        valor: { x: 460, w: 70, title: "VALOR", align: "right" as const },
-        status: { x: 530, w: 60, title: "STATUS", align: "left" as const },
+        numero: { x: 30, w: 45, title: "NÚMERO", align: "left" as const },
+        serie: { x: 75, w: 25, title: "SÉR", align: "left" as const },
+        tipo: { x: 100, w: 50, title: "TIPO", align: "left" as const },
+        produto: { x: 150, w: 90, title: "PRODUTO", align: "left" as const },
+        dest: { x: 240, w: 120, title: "DESTINATÁRIO", align: "left" as const },
+        emissao: { x: 360, w: 55, title: "EMISSÃO", align: "left" as const },
+        valor: { x: 415, w: 65, title: "VALOR", align: "right" as const },
+        status: { x: 480, w: 80, title: "STATUS", align: "left" as const },
       };
 
       const drawHeader = (y: number) => {
