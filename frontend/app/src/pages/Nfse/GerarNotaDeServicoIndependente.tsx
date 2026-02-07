@@ -28,7 +28,7 @@ export const GerarNotaDeServicoIndependente = () => {
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    >,
   ) => {
     setFormData({
       ...formData,
@@ -61,14 +61,14 @@ export const GerarNotaDeServicoIndependente = () => {
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/GerarNfseAvulsa`,
+        `${process.env.REACT_APP_URL}/nfse/GerarNfseAvulsa`,
         formData,
         {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${user?.token}`,
           },
-        }
+        },
       );
 
       setMessage({

@@ -35,7 +35,7 @@ export const BuscarNfeGerada = () => {
   };
 
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
-    []
+    [],
   );
   const [dateFilter, setDateFilter] = useState<{
     start: string;
@@ -108,7 +108,7 @@ export const BuscarNfeGerada = () => {
     try {
       setLoading(true);
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/imprimirNFSE`,
+        `${process.env.REACT_APP_URL}/nfse/imprimirNFSE`,
         {
           id: clientesSelecionados,
           ambiente: ambiente || "homologacao",
@@ -118,7 +118,7 @@ export const BuscarNfeGerada = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       console.log("Notas Canceladas:", resposta.data);
@@ -145,7 +145,7 @@ export const BuscarNfeGerada = () => {
   const setSessionPassword = async () => {
     try {
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/setSessionPassword`,
+        `${process.env.REACT_APP_URL}/nfse/setSessionPassword`,
         {
           password: password,
         },
@@ -154,7 +154,7 @@ export const BuscarNfeGerada = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
       setSuccess("Senha atualizada");
       handleSearch();
@@ -169,7 +169,7 @@ export const BuscarNfeGerada = () => {
     try {
       setLoading(true);
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/cancelarNfse`,
+        `${process.env.REACT_APP_URL}/nfse/cancelarNfse`,
         {
           id: clientesSelecionados,
           password: password,
@@ -180,7 +180,7 @@ export const BuscarNfeGerada = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       console.log("Notas Canceladas:", resposta.data);
@@ -188,7 +188,7 @@ export const BuscarNfeGerada = () => {
       if (resposta.data.job) {
         addJob(resposta.data.job, "cancelamento");
         showSuccess(
-          "Solicitação de cancelamento enviada! Processando em segundo plano."
+          "Solicitação de cancelamento enviada! Processando em segundo plano.",
         );
       } else {
         showSuccess("Notas Canceladas com Sucesso!");
@@ -223,14 +223,14 @@ export const BuscarNfeGerada = () => {
       formData.append("password", certPassword);
 
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/upload`,
+        `${process.env.REACT_APP_URL}/nfse/upload`,
         formData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
 
       console.log("Certificado enviado:", resposta.data);
@@ -255,7 +255,7 @@ export const BuscarNfeGerada = () => {
 
     try {
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/BuscarNSFE`,
+        `${process.env.REACT_APP_URL}/nfse/BuscarNSFE`,
         {
           cpf: searchCpfRegex,
           filters: activeFilters,
@@ -268,7 +268,7 @@ export const BuscarNfeGerada = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       console.log("Clientes encontrados:", resposta.data);
@@ -602,7 +602,7 @@ export const BuscarNfeGerada = () => {
                                 type="checkbox"
                                 className="cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                 checked={clientesSelecionados.includes(
-                                  cliente.nfse.id
+                                  cliente.nfse.id,
                                 )}
                                 onChange={() =>
                                   handleCheckboxChange(cliente.nfse.id)
@@ -623,7 +623,7 @@ export const BuscarNfeGerada = () => {
                             </td>
                             <td className="px-6 py-4 text-left text-sm text-gray-500">
                               {new Date(
-                                cliente.nfse.timestamp
+                                cliente.nfse.timestamp,
                               ).toLocaleDateString("pt-BR")}
                             </td>
                             <td className="px-6 py-4 text-left text-sm text-gray-500">
@@ -638,8 +638,8 @@ export const BuscarNfeGerada = () => {
                                   cliente.nfse.status === "Ativa"
                                     ? "bg-green-50 text-green-700 ring-green-600/20"
                                     : cliente.nfse.status === "Cancelada"
-                                    ? "bg-red-50 text-red-700 ring-red-600/20"
-                                    : "bg-yellow-50 text-yellow-800 ring-yellow-600/20"
+                                      ? "bg-red-50 text-red-700 ring-red-600/20"
+                                      : "bg-yellow-50 text-yellow-800 ring-yellow-600/20"
                                 }`}
                               >
                                 {cliente.nfse.status}

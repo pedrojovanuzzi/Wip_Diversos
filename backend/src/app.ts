@@ -56,7 +56,7 @@ export class App {
     this.server.use("/api/", Home);
     this.server.use("/api/auth", Auth);
     this.server.use("/api/feedback", Feed);
-    this.server.use("/api/Nfe", NFSE);
+    this.server.use("/api/nfse", NFSE);
     this.server.use("/api/NFEletronica", NFE);
     this.server.use("/api/NFCom", NFCom);
     this.server.use("/api/whatsapp", Whatsapp);

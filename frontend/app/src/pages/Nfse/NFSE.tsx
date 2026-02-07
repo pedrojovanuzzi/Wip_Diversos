@@ -28,7 +28,7 @@ export const Nfe = () => {
   const [ambiente, setAmbiente] = useState("homologacao");
   const [reducao, setReducao] = useState("");
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
-    []
+    [],
   );
   const [dateFilter, setDateFilter] = useState<{
     start: string;
@@ -85,7 +85,7 @@ export const Nfe = () => {
       setLoading(true);
 
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/`,
+        `${process.env.REACT_APP_URL}/nfse/`,
         {
           password,
           clientesSelecionados,
@@ -101,7 +101,7 @@ export const Nfe = () => {
             "Content-Type": "application/json",
           },
           timeout: 480000,
-        }
+        },
       );
       setDadosNFe(resposta.data);
       // setSuccess("NF-e emitida com sucesso.");
@@ -110,7 +110,7 @@ export const Nfe = () => {
       if (resposta.data.job) {
         addJob(resposta.data.job, "emissao");
         showSuccess(
-          "Solicitação de emissão enviada! Processando em segundo plano."
+          "Solicitação de emissão enviada! Processando em segundo plano.",
         );
       } else {
         showSuccess("NF-e emitida com sucesso.");
@@ -156,14 +156,14 @@ export const Nfe = () => {
       formData.append("password", certPassword);
 
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/upload`,
+        `${process.env.REACT_APP_URL}/nfse/upload`,
         formData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
       console.log("Certificado enviado:", resposta.data);
       showSuccess("Certificado enviado com sucesso!");
@@ -180,7 +180,7 @@ export const Nfe = () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
     try {
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/BuscarClientes`,
+        `${process.env.REACT_APP_URL}/nfse/BuscarClientes`,
         {
           cpf: searchCpfRegex,
           filters: activeFilters,
@@ -191,7 +191,7 @@ export const Nfe = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
       console.log("Clientes encontrados:", resposta.data);
       setClientes(resposta.data);
@@ -203,7 +203,7 @@ export const Nfe = () => {
         erro.response.status === 500
       ) {
         showError(
-          "Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde."
+          "Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde.",
         );
       } else if (axios.isAxiosError(erro) && erro.response) {
         showError(`Erro: ${erro.response.data.error || "Algo deu errado."}`);
@@ -302,7 +302,7 @@ export const Nfe = () => {
                         className="cursor-pointer"
                         type="checkbox"
                         checked={clientesSelecionados.includes(
-                          cliente.fatura.titulo
+                          cliente.fatura.titulo,
                         )}
                         onChange={() =>
                           handleCheckboxChange(cliente.fatura.titulo)
@@ -380,7 +380,7 @@ export const Nfe = () => {
               e.target.value
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-zA-Z0-9 ]/g, "")
+                .replace(/[^a-zA-Z0-9 ]/g, ""),
             );
           }}
           placeholder="Servico de Manutencao"
@@ -393,7 +393,7 @@ export const Nfe = () => {
               e.target.value
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-zA-Z0-9 ]/g, "")
+                .replace(/[^a-zA-Z0-9 ]/g, ""),
             );
           }}
           placeholder="Redução Ex: 60%"
@@ -404,7 +404,7 @@ export const Nfe = () => {
           required
           onChange={(e) => {
             setLastNfe(
-              e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, "")
+              e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, ""),
             );
           }}
           placeholder="Ultimo Numero NF-e"
