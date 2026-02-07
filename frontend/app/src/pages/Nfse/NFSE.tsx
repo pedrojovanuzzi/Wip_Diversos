@@ -229,7 +229,7 @@ export const NFSE = () => {
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
       <Link
         className="flex justify-center sm:justify-start"
-        to="/BuscarNfeGerada"
+        to="/BuscarNfseGerada"
       >
         <button
           className="bg-violet-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
