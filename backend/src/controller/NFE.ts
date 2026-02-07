@@ -1303,8 +1303,9 @@ class NFEController {
         if (dataInicio && dataFim) {
           const [diaIni, mesIni, anoIni] = dataInicio.split("/");
           const [diaFim, mesFim, anoFim] = dataFim.split("/");
-          start = new Date(`${anoIni}-${mesIni}-${diaIni}T00:00:00`);
-          end = new Date(`${anoFim}-${mesFim}-${diaFim}T23:59:59`);
+          // Force explicit offset -03:00 to match Brazil time (BRT)
+          start = new Date(`${anoIni}-${mesIni}-${diaIni}T00:00:00.000-03:00`);
+          end = new Date(`${anoFim}-${mesFim}-${diaFim}T23:59:59.999-03:00`);
 
           const where: any = {
             data_emissao: Between(start, end),
