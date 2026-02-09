@@ -237,7 +237,7 @@ class NFEController {
                 },
                 emit: {
                   CNPJ: process.env.CPF_CNPJ?.replace(/\D/g, "") || "",
-                  xNome: "WIP TELECOM MULTIMIDIA EIRELI ME",
+                  xNome: "WIP TELECOM MULTIMIDIA EIRELI",
                   xFant: "WIP TELECOM",
                   enderEmit: {
                     xLgr: "Rua Emilio Carraro",
@@ -308,7 +308,7 @@ class NFEController {
                         eq.descricao ||
                         xProdDefault
                       ).trim(),
-                      NCM: "85176259",
+                      NCM: product?.codigo || "85176259",
                       CFOP: cfop,
                       uCom: "UN",
                       qCom: "1.0000",
