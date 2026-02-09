@@ -12,6 +12,7 @@ import MkauthSource from "../database/MkauthSource";
 import { NFE } from "../entities/NFE";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { processarCertificado } from "../utils/certUtils";
+
 import { Faturas } from "../entities/Faturas";
 import moment from "moment-timezone";
 import dotenv from "dotenv";
@@ -172,248 +173,265 @@ class NFEController {
 
         const productMap = new Map(products.map((p) => [p.id, p]));
 
-        // 3. Determine Series and NFE Number & RESERVE IT
-        // Use a transaction or lock if possible, but for now strict serialization in this loop
-        // plus immediate save should suffice to prevent simple race conditions in serial processing.
-        const effectiveSerie = isHomologacao ? "99" : "1";
+        // 3. Determine Series and NFE Number & RESERVE IT WITH RETRY
+        let reserved = false;
+        let attempts = 0;
+        let nfeData: any = {};
 
-        const lastNfe = await nfeRepository.findOne({
-          where: { serie: effectiveSerie },
-          order: { id: "DESC" },
-        });
+        while (!reserved && attempts < 5) {
+          try {
+            const effectiveSerie = isHomologacao ? "99" : "1";
 
-        const nNF = lastNfe ? parseInt(lastNfe.nNF) + 1 : 1;
-        const serie = effectiveSerie;
+            const lastNfe = await nfeRepository.findOne({
+              where: { serie: effectiveSerie },
+              order: { id: "DESC" },
+            });
 
-        const dhEmi = moment()
-          .tz("America/Sao_Paulo")
-          .format("YYYY-MM-DDTHH:mm:ssZ");
+            const nNF = lastNfe ? parseInt(lastNfe.nNF) + 1 : 1;
+            const serie = effectiveSerie;
 
-        const cNF = Math.floor(Math.random() * 99999999)
-          .toString()
-          .padStart(8, "0");
+            const dhEmi = moment()
+              .tz("America/Sao_Paulo")
+              .format("YYYY-MM-DDTHH:mm:ssZ");
 
-        // 4. Build XML based on type
-        const natOp =
-          tipo === "saida" ? "REMESSA EM COMODATO" : "RETORNO DE COMODATO";
-        const tpNF = tipo === "saida" ? "1" : "0";
-        const cfop = tipo === "saida" ? "5908" : "1909";
-        const xProdDefault =
-          tipo === "saida"
-            ? "EQUIPAMENTO EM COMODATO"
-            : "DEVOLUCAO DE EQUIPAMENTO";
+            const cNF = Math.floor(Math.random() * 99999999)
+              .toString()
+              .padStart(8, "0");
 
-        const nfeData: any = {
-          infNFe: {
-            "@Id": "",
-            "@versao": "4.00",
-            ide: {
-              cUF: "35",
-              cNF: cNF,
-              natOp: natOp,
-              mod: "55",
-              serie: serie,
-              nNF: nNF.toString(),
-              dhEmi: dhEmi,
-              dhSaiEnt: dhEmi,
-              tpNF: tpNF,
-              idDest: "1",
-              cMunFG: "3503406",
-              tpImp: "1",
-              tpEmis: "1",
-              cDV: "",
-              tpAmb: isHomologacao ? "2" : "1",
-              finNFe: "1",
-              indFinal: "1",
-              indPres: "1",
-              procEmi: "0",
-              verProc: "1.0",
-              // cRegTrib: "1", // If needed
-            },
-            emit: {
-              CNPJ: process.env.CPF_CNPJ?.replace(/\D/g, "") || "",
-              xNome: "WIP TELECOM MULTIMIDIA EIRELI ME",
-              xFant: "WIP TELECOM",
-              enderEmit: {
-                xLgr: "Rua Emilio Carraro",
-                nro: "945",
-                xBairro: "Altos da Cidade",
-                cMun: "3503406",
-                xMun: "Arealva",
-                UF: "SP",
-                CEP: "17160380",
-                cPais: "1058",
-                xPais: "BRASIL",
-                fone: "1432961608",
-              },
-              IE: "183013286115",
-              CRT: "1",
-            },
-            dest: {
-              CNPJ:
-                client.cpf_cnpj.replace(/\D/g, "").length > 11
-                  ? client.cpf_cnpj.replace(/\D/g, "")
-                  : undefined,
-              CPF:
-                client.cpf_cnpj.replace(/\D/g, "").length <= 11
-                  ? client.cpf_cnpj.replace(/\D/g, "")
-                  : undefined,
-              xNome: isHomologacao
-                ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
-                : (client.nome || "CLIENTE SEM NOME").trim(),
-              enderDest: {
-                xLgr: (client.endereco || "Rua Sem Nome").trim(),
-                nro: (client.numero || "S/N").trim(),
-                xBairro: (client.bairro || "Bairro Padrão").trim(),
-                cMun: client.cidade_ibge || "3503406",
-                xMun: (client.cidade || "Arealva").trim(),
-                UF: client.estado || "SP",
-                CEP: client.cep ? client.cep.replace(/\D/g, "") : "17160000",
-                cPais: "1058",
-                xPais: "BRASIL",
-              },
-              indIEDest:
-                client.cpf_cnpj.replace(/\D/g, "").length > 11 &&
-                client.rg &&
-                client.rg.replace(/\D/g, "").length > 0
-                  ? "1"
-                  : "9",
-              IE:
-                client.cpf_cnpj.replace(/\D/g, "").length > 11 &&
-                client.rg &&
-                client.rg.replace(/\D/g, "").length > 0
-                  ? client.rg.replace(/\D/g, "")
-                  : undefined,
-            },
-            det: equipamentos.map((eq: any, index: number) => {
-              const product = eq.idprod ? productMap.get(eq.idprod) : null;
-              const valorProduto = product?.precoatual
-                ? parseFloat(product.precoatual as any).toFixed(2)
-                : "0.00";
+            // 4. Build XML based on type
+            const natOp =
+              tipo === "saida" ? "REMESSA EM COMODATO" : "RETORNO DE COMODATO";
+            const tpNF = tipo === "saida" ? "1" : "0";
+            const cfop = tipo === "saida" ? "5908" : "1909";
+            const xProdDefault =
+              tipo === "saida"
+                ? "EQUIPAMENTO EM COMODATO"
+                : "DEVOLUCAO DE EQUIPAMENTO";
 
-              return {
-                "@nItem": index + 1,
-                prod: {
-                  cProd: eq.idprod,
-                  cEAN: "SEM GTIN",
-                  xProd: (product?.nome || eq.descricao || xProdDefault).trim(),
-                  NCM: "85176259",
-                  CFOP: cfop,
-                  uCom: "UN",
-                  qCom: "1.0000",
-                  vUnCom: valorProduto,
-                  vProd: valorProduto,
-                  cEANTrib: "SEM GTIN",
-                  uTrib: "UN",
-                  qTrib: "1.0000",
-                  vUnTrib: valorProduto,
-                  indTot: "1",
+            nfeData = {
+              infNFe: {
+                "@Id": "",
+                "@versao": "4.00",
+                ide: {
+                  cUF: "35",
+                  cNF: cNF,
+                  natOp: natOp,
+                  mod: "55",
+                  serie: serie,
+                  nNF: nNF.toString(),
+                  dhEmi: dhEmi,
+                  dhSaiEnt: dhEmi,
+                  tpNF: tpNF,
+                  idDest: "1",
+                  cMunFG: "3503406",
+                  tpImp: "1",
+                  tpEmis: "1",
+                  cDV: "",
+                  tpAmb: isHomologacao ? "2" : "1",
+                  finNFe: "1",
+                  indFinal: "1",
+                  indPres: "1",
+                  procEmi: "0",
+                  verProc: "1.0",
+                  // cRegTrib: "1", // If needed
                 },
-                imposto: {
-                  ICMS: {
-                    ICMSSN102: {
-                      orig: "0",
-                      CSOSN: "400",
-                    },
+                emit: {
+                  CNPJ: process.env.CPF_CNPJ?.replace(/\D/g, "") || "",
+                  xNome: "WIP TELECOM MULTIMIDIA EIRELI ME",
+                  xFant: "WIP TELECOM",
+                  enderEmit: {
+                    xLgr: "Rua Emilio Carraro",
+                    nro: "945",
+                    xBairro: "Altos da Cidade",
+                    cMun: "3503406",
+                    xMun: "Arealva",
+                    UF: "SP",
+                    CEP: "17160380",
+                    cPais: "1058",
+                    xPais: "BRASIL",
+                    fone: "1432961608",
                   },
-                  PIS: {
-                    PISOutr: {
-                      CST: "99",
-                      vBC: "0.00",
-                      pPIS: "0.00",
-                      vPIS: "0.00",
-                    },
+                  IE: "183013286115",
+                  CRT: "1",
+                },
+                dest: {
+                  CNPJ:
+                    client.cpf_cnpj.replace(/\D/g, "").length > 11
+                      ? client.cpf_cnpj.replace(/\D/g, "")
+                      : undefined,
+                  CPF:
+                    client.cpf_cnpj.replace(/\D/g, "").length <= 11
+                      ? client.cpf_cnpj.replace(/\D/g, "")
+                      : undefined,
+                  xNome: isHomologacao
+                    ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
+                    : (client.nome || "CLIENTE SEM NOME").trim(),
+                  enderDest: {
+                    xLgr: (client.endereco || "Rua Sem Nome").trim(),
+                    nro: (client.numero || "S/N").trim(),
+                    xBairro: (client.bairro || "Bairro Padrão").trim(),
+                    cMun: client.cidade_ibge || "3503406",
+                    xMun: (client.cidade || "Arealva").trim(),
+                    UF: client.estado || "SP",
+                    CEP: client.cep
+                      ? client.cep.replace(/\D/g, "")
+                      : "17160000",
+                    cPais: "1058",
+                    xPais: "BRASIL",
                   },
-                  COFINS: {
-                    COFINSOutr: {
-                      CST: "99",
-                      vBC: "0.00",
-                      pCOFINS: "0.00",
-                      vCOFINS: "0.00",
+                  indIEDest:
+                    client.cpf_cnpj.replace(/\D/g, "").length > 11 &&
+                    client.rg &&
+                    client.rg.replace(/\D/g, "").length > 0
+                      ? "1"
+                      : "9",
+                  IE:
+                    client.cpf_cnpj.replace(/\D/g, "").length > 11 &&
+                    client.rg &&
+                    client.rg.replace(/\D/g, "").length > 0
+                      ? client.rg.replace(/\D/g, "")
+                      : undefined,
+                },
+                det: equipamentos.map((eq: any, index: number) => {
+                  const product = eq.idprod ? productMap.get(eq.idprod) : null;
+                  const valorProduto = product?.precoatual
+                    ? parseFloat(product.precoatual as any).toFixed(2)
+                    : "0.00";
+
+                  return {
+                    "@nItem": index + 1,
+                    prod: {
+                      cProd: eq.idprod,
+                      cEAN: "SEM GTIN",
+                      xProd: (
+                        product?.nome ||
+                        eq.descricao ||
+                        xProdDefault
+                      ).trim(),
+                      NCM: "85176259",
+                      CFOP: cfop,
+                      uCom: "UN",
+                      qCom: "1.0000",
+                      vUnCom: valorProduto,
+                      vProd: valorProduto,
+                      cEANTrib: "SEM GTIN",
+                      uTrib: "UN",
+                      qTrib: "1.0000",
+                      vUnTrib: valorProduto,
+                      indTot: "1",
                     },
+                    imposto: {
+                      ICMS: {
+                        ICMSSN102: {
+                          orig: "0",
+                          CSOSN: "400",
+                        },
+                      },
+                      PIS: {
+                        PISOutr: {
+                          CST: "99",
+                          vBC: "0.00",
+                          pPIS: "0.00",
+                          vPIS: "0.00",
+                        },
+                      },
+                      COFINS: {
+                        COFINSOutr: {
+                          CST: "99",
+                          vBC: "0.00",
+                          pCOFINS: "0.00",
+                          vCOFINS: "0.00",
+                        },
+                      },
+                    },
+                  };
+                }),
+                total: {
+                  ICMSTot: {
+                    vBC: "0.00",
+                    vICMS: "0.00",
+                    vICMSDeson: "0.00",
+                    vFCP: "0.00",
+                    vBCST: "0.00",
+                    vST: "0.00",
+                    vFCPST: "0.00",
+                    vFCPSTRet: "0.00",
+                    vProd: equipamentos
+                      .reduce((acc: number, cur: any) => {
+                        const product = cur.idprod
+                          ? productMap.get(cur.idprod)
+                          : null;
+                        const valor = product?.precoatual
+                          ? parseFloat(product.precoatual as any)
+                          : 0;
+                        return acc + valor;
+                      }, 0)
+                      .toFixed(2),
+                    vFrete: "0.00",
+                    vSeg: "0.00",
+                    vDesc: "0.00",
+                    vII: "0.00",
+                    vIPI: "0.00",
+                    vIPIDevol: "0.00",
+                    vPIS: "0.00",
+                    vCOFINS: "0.00",
+                    vOutro: "0.00",
+                    vNF: equipamentos
+                      .reduce((acc: number, cur: any) => {
+                        const product = cur.idprod
+                          ? productMap.get(cur.idprod)
+                          : null;
+                        const valor = product?.precoatual
+                          ? parseFloat(product.precoatual as any)
+                          : 0;
+                        return acc + valor;
+                      }, 0)
+                      .toFixed(2),
                   },
                 },
-              };
-            }),
-            total: {
-              ICMSTot: {
-                vBC: "0.00",
-                vICMS: "0.00",
-                vICMSDeson: "0.00",
-                vFCP: "0.00",
-                vBCST: "0.00",
-                vST: "0.00",
-                vFCPST: "0.00",
-                vFCPSTRet: "0.00",
-                vProd: equipamentos
-                  .reduce((acc: number, cur: any) => {
-                    const product = cur.idprod
-                      ? productMap.get(cur.idprod)
-                      : null;
-                    const valor = product?.precoatual
-                      ? parseFloat(product.precoatual as any)
-                      : 0;
-                    return acc + valor;
-                  }, 0)
-                  .toFixed(2),
-                vFrete: "0.00",
-                vSeg: "0.00",
-                vDesc: "0.00",
-                vII: "0.00",
-                vIPI: "0.00",
-                vIPIDevol: "0.00",
-                vPIS: "0.00",
-                vCOFINS: "0.00",
-                vOutro: "0.00",
-                vNF: equipamentos
-                  .reduce((acc: number, cur: any) => {
-                    const product = cur.idprod
-                      ? productMap.get(cur.idprod)
-                      : null;
-                    const valor = product?.precoatual
-                      ? parseFloat(product.precoatual as any)
-                      : 0;
-                    return acc + valor;
-                  }, 0)
-                  .toFixed(2),
+                transp: {
+                  modFrete: "9",
+                },
+                pag: {
+                  detPag: {
+                    tPag: "90",
+                    vPag: "0.00",
+                  },
+                },
               },
-            },
-            transp: {
-              modFrete: "9",
-            },
-            pag: {
-              detPag: {
-                tPag: "90",
-                vPag: "0.00",
-              },
-            },
-          },
-        };
+            };
 
-        const chave = this.gerarChaveAcesso(nfeData.infNFe);
-        nfeData.infNFe["@Id"] = `NFe${chave}`;
-        nfeData.infNFe.ide.cDV = chave.slice(-1);
+            const chave = this.gerarChaveAcesso(nfeData.infNFe);
+            nfeData.infNFe["@Id"] = `NFe${chave}`;
+            nfeData.infNFe.ide.cDV = chave.slice(-1);
 
-        // --- SAVE RESERVATION START ---
-        nfeRecord = nfeRepository.create({
-          nNF: nfeData.infNFe.ide.nNF,
-          serie: nfeData.infNFe.ide.serie,
-          chave: chave,
-          xml: "", // Will update later
-          status: "processando", // Reserve status
-          protocolo: "",
-          data_emissao: new Date(),
-          cliente_id: client.id,
-          destinatario_nome: client.nome,
-          destinatario_cpf_cnpj: client.cpf_cnpj,
-          tipo_operacao:
-            tipo === "saida" ? "saida_comodato" : "entrada_comodato",
-          valor_total: parseFloat(nfeData.infNFe.total.ICMSTot.vNF),
-          tpAmb: isHomologacao ? 2 : 1,
-          tipo: ambiente,
-        });
+            // --- SAVE RESERVATION START ---
+            nfeRecord = nfeRepository.create({
+              nNF: nfeData.infNFe.ide.nNF,
+              serie: nfeData.infNFe.ide.serie,
+              chave: chave,
+              xml: "", // Will update later
+              status: "processando", // Reserve status
+              protocolo: "",
+              data_emissao: new Date(),
+              cliente_id: client.id,
+              destinatario_nome: client.nome,
+              destinatario_cpf_cnpj: client.cpf_cnpj,
+              tipo_operacao:
+                tipo === "saida" ? "saida_comodato" : "entrada_comodato",
+              valor_total: parseFloat(nfeData.infNFe.total.ICMSTot.vNF),
+              tpAmb: isHomologacao ? 2 : 1,
+              tipo: ambiente,
+            });
 
-        await nfeRepository.save(nfeRecord);
+            await nfeRepository.save(nfeRecord);
+            reserved = true;
+          } catch (err: any) {
+            attempts++;
+            if (attempts >= 5) throw err;
+            await new Promise((resolve) => setTimeout(resolve, 200 * attempts));
+          }
+        }
         // --- SAVE RESERVATION END ---
 
         // 5. Generate, Sign and Send
@@ -509,7 +527,7 @@ class NFEController {
         responses.push({
           success: true,
           id: nfeRecord?.id,
-          message: `NFE ${nNF} Autorizada`,
+          message: `NFE ${nfeData.infNFe.ide.nNF} Autorizada`,
           nNF: nfeData.infNFe.ide.nNF,
         });
       } catch (error: any) {
