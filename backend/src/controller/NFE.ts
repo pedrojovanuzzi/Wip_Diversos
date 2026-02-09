@@ -251,22 +251,22 @@ class NFEController {
             },
             dest: {
               CNPJ:
-                client.cpf_cnpj.length > 11
+                client.cpf_cnpj.replace(/\D/g, "").length > 11
                   ? client.cpf_cnpj.replace(/\D/g, "")
                   : undefined,
               CPF:
-                client.cpf_cnpj.length <= 11
+                client.cpf_cnpj.replace(/\D/g, "").length <= 11
                   ? client.cpf_cnpj.replace(/\D/g, "")
                   : undefined,
               xNome: isHomologacao
                 ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
-                : client.nome || "CLIENTE SEM NOME",
+                : (client.nome || "CLIENTE SEM NOME").trim(),
               enderDest: {
-                xLgr: client.endereco || "Rua Sem Nome",
-                nro: client.numero || "S/N",
-                xBairro: client.bairro || "Bairro Padrão",
+                xLgr: (client.endereco || "Rua Sem Nome").trim(),
+                nro: (client.numero || "S/N").trim(),
+                xBairro: (client.bairro || "Bairro Padrão").trim(),
                 cMun: client.cidade_ibge || "3503406",
-                xMun: client.cidade || "Arealva",
+                xMun: (client.cidade || "Arealva").trim(),
                 UF: client.estado || "SP",
                 CEP: client.cep ? client.cep.replace(/\D/g, "") : "17160000",
                 cPais: "1058",
@@ -296,7 +296,7 @@ class NFEController {
                 prod: {
                   cProd: eq.idprod,
                   cEAN: "SEM GTIN",
-                  xProd: product?.nome || eq.descricao || xProdDefault,
+                  xProd: (product?.nome || eq.descricao || xProdDefault).trim(),
                   NCM: "85176259",
                   CFOP: cfop,
                   uCom: "UN",
@@ -514,6 +514,13 @@ class NFEController {
         });
       } catch (error: any) {
         console.error(`Erro ao processar login ${login}:`, error);
+
+        // --- DEBUG: Print XML on error ---
+        if (xmlToSave) {
+          console.log("\n========== XML COM ERRO ==========\n");
+          console.log(xmlToSave);
+          console.log("\n==================================\n");
+        }
 
         // Update to error state if record was created
         if (nfeRecord) {

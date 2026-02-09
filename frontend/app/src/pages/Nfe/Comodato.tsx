@@ -41,7 +41,12 @@ export const Comodato = () => {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-      setClientes(resposta.data);
+      const clientesOrdenados = [...resposta.data].sort((a: any, b: any) => {
+        const nomeA = (a.nome || a.razao_social || "").toLowerCase();
+        const nomeB = (b.nome || b.razao_social || "").toLowerCase();
+        return nomeA.localeCompare(nomeB);
+      });
+      setClientes(clientesOrdenados);
       // Reset selection when search changes or not? Better to reset to avoid confusion
       setClientesSelecionados([]);
     } catch (erro) {

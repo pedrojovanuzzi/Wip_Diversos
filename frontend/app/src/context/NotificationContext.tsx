@@ -28,7 +28,7 @@ interface NotificationContextData {
 // });
 
 const NotificationContext = createContext<NotificationContextData>(
-  {} as NotificationContextData
+  {} as NotificationContextData,
 );
 
 export const useNotification = () => {
@@ -74,7 +74,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
   const addJob = (
     id: string,
-    type: "cancelamento" | "emissao" | "relatório"
+    type: "cancelamento" | "emissao" | "relatório",
   ) => {
     setActiveJobs((prev) => [...prev, { id, type }]);
   };
@@ -97,7 +97,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
               },
-            }
+            },
           );
 
           const jobData = response.data;
@@ -139,7 +139,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
                   "Erros: " +
                   errorsCount +
                   "\n" +
-                  JSON.stringify(jobData)
+                  JSON.stringify(jobData),
               );
             }
             if (successCount > 0) {
@@ -160,9 +160,14 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
             removeJob(job.id);
             showError(
               `Ocorreu um erro no processamento das notas (${jobData.processados}/${jobData.total}): ` +
-                JSON.stringify(jobData.resultado)
+                JSON.stringify(jobData.resultado),
             );
             console.log(jobData);
+          } else if (jobData.status === "interrompido") {
+            removeJob(job.id);
+            // Optional: visual feedback that it was interrupted, or just silent removal as requested "limpar ele"
+            // showError(`Processamento interrompido: ${jobData.description}`);
+            console.log(`Job ${job.id} foi interrompido e removido da fila.`);
           } else if (jobData.status === "pendente") {
             console.log(jobData);
           }

@@ -41,8 +41,27 @@ const AppDataSource = new DataSource({
 });
 
 AppDataSource.initialize()
-  .then(() => {
+  .then(async () => {
     console.log("Data Source has been initialized!");
+
+    // Cleanup stale jobs
+    const jobsRepo = AppDataSource.getRepository(Jobs);
+    const result = await jobsRepo
+      .createQueryBuilder()
+      .update(Jobs)
+      .set({
+        status: "interrompido",
+        description: () =>
+          "CONCAT(description, ' [Interrompido por reinicialização]')",
+      })
+      .where("status = :status", { status: "processando" })
+      .execute();
+
+    if (result.affected && result.affected > 0) {
+      console.log(
+        `🧹 Limpeza de Jobs: ${result.affected} jobs 'processando' foram marcados como 'interrompido'.`,
+      );
+    }
   })
   .catch((err) => {
     console.error("Error during Data Source initialization", err);

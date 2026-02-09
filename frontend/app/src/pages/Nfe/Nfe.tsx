@@ -161,7 +161,14 @@ export const Nfe = () => {
         },
       );
       console.log("Clientes encontrados:", resposta.data);
-      setClientes(resposta.data);
+      const clientesOrdenados = [...resposta.data].sort((a: any, b: any) => {
+        const loginA = a.login ? a.login.toLowerCase() : "";
+        const loginB = b.login ? b.login.toLowerCase() : "";
+        if (loginA < loginB) return -1;
+        if (loginA > loginB) return 1;
+        return 0;
+      });
+      setClientes(clientesOrdenados);
     } catch (erro) {
       console.error("Erro ao Buscar Clientes:", erro);
       if (
