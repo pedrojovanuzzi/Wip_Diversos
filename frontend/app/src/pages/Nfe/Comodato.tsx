@@ -10,7 +10,7 @@ import { Link } from "react-router-dom";
 export const Comodato = () => {
   const { user } = useAuth();
   const token = user?.token;
-  const { showSuccess, showError } = useNotification();
+  const { showSuccess, showError, addJob } = useNotification();
 
   // --- Main States ---
   const [searchCpf, setSearchCpf] = useState("");
@@ -93,42 +93,27 @@ export const Comodato = () => {
           ? "/NFEletronica/comodato/saida"
           : "/NFEletronica/comodato/entrada";
 
-      const targets = clientesSelecionados;
-      setProgress({ current: 0, total: targets.length });
+      // Send array of logins
+      const payload = {
+        logins: clientesSelecionados.map((c) => c.login), // Map to logins
+        password,
+        ambiente,
+      };
 
-      let successCount = 0;
-      let errorCount = 0;
+      const resposta = await axios.post(
+        `${process.env.REACT_APP_URL}${endpoint}`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
-      // Sequential Processing to update progress and avoid overloading if batch endpoint missing
-      for (let i = 0; i < targets.length; i++) {
-        const targetCliente = targets[i];
-        try {
-          // Clean payload for each client
-          const payload = {
-            login: targetCliente.login,
-            password,
-            ambiente,
-          };
-
-          await axios.post(`${process.env.REACT_APP_URL}${endpoint}`, payload, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          successCount++;
-        } catch (err) {
-          console.error(`Falha ao emitir para ${targetCliente.nome}`, err);
-          errorCount++;
-        }
-        setProgress({ current: i + 1, total: targets.length });
-      }
-
-      if (errorCount === 0) {
-        showSuccess(
-          `${successCount} NFE(s) de ${tipoOperacao} emitida(s) com sucesso!`,
-        );
+      // Start Job Notification
+      if (resposta.data.job) {
+        addJob(resposta.data.job, "emissao");
+        showSuccess("Emissão iniciada em segundo plano!");
       } else {
-        showError(
-          `${successCount} emitidas com sucesso. ${errorCount} falhas.`,
-        );
+        showSuccess("Processamento iniciado.");
       }
 
       // Cleanup
@@ -137,7 +122,7 @@ export const Comodato = () => {
     } catch (error: any) {
       console.error(error);
       const msg =
-        error.response?.data?.message || "Erro crítico ao emitir NFE.";
+        error.response?.data?.message || "Erro crítico ao iniciar emissão NFE.";
       showError(msg);
     } finally {
       setLoading(false);
@@ -316,9 +301,7 @@ export const Comodato = () => {
                 }`}
               >
                 {loading
-                  ? progress.total > 0
-                    ? "Em Processo..."
-                    : "Processando..."
+                  ? "Processando..."
                   : `Emitir para ${clientesSelecionados.length} Cliente(s)`}
               </button>
             </div>

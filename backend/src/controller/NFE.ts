@@ -21,6 +21,8 @@ import { XMLParser } from "fast-xml-parser";
 import QRCode from "qrcode";
 import PDFDocument from "pdfkit";
 import JSZip from "jszip";
+import { Jobs } from "../entities/Jobs";
+import { type } from "os";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -31,763 +33,460 @@ class NFEController {
 
   public emitirSaidaComodato = async (req: Request, res: Response) => {
     try {
-      // Changed to receive login instead of clienteId
-      const { login, password, ambiente } = req.body;
+      const { logins, password, ambiente } = req.body; // Changed validation to 'logins' array
 
-      this.homologacao = ambiente === "homologacao";
-
-      if (!login) {
-        res.status(400).json({ message: "Login não fornecido" });
+      if (!logins || !Array.isArray(logins) || logins.length === 0) {
+        res.status(400).json({ message: "Lista de logins não fornecida." });
         return;
       }
 
-      const clientRepository = MkauthSource.getRepository(ClientesEntities);
-      const nfeRepository = AppDataSource.getRepository(NFE);
-
-      // Find client by login
-      const client = await clientRepository.findOne({
-        where: { login: login },
+      // Create Job
+      const job = AppDataSource.getRepository(Jobs).create({
+        name: "Gerar NFE Saída Comodato",
+        description: `Gerando ${logins.length} notas de Saída em Background`,
+        status: "pendente",
+        total: logins.length,
+        processados: 0,
       });
 
-      console.log(login);
+      await AppDataSource.getRepository(Jobs).save(job);
 
-      if (!client) {
-        res.status(404).json({ message: "Cliente não encontrado" });
-        return;
-      }
-
-      const prodClienteRepository = MkauthSource.getRepository(Sis_prodCliente);
-      const sisProdutoRepository = MkauthSource.getRepository(SisProduto);
-
-      const prodCliente = await prodClienteRepository.findOne({
-        where: { cliente: client.login },
-      });
-
-      if (!prodCliente) {
-        res.status(404).json({ message: "Produto não encontrado" });
-        return;
-      }
-
-      const equipamentos = await prodClienteRepository.find({
-        where: { cliente: client.login },
-      });
-
-      // Fetch product details for all equipment
-      const productIds = equipamentos
-        .map((eq) => eq.idprod)
-        .filter((id) => id !== null && id !== undefined);
-
-      const products = await sisProdutoRepository.findBy({
-        id: In(productIds),
-      });
-
-      const productMap = new Map(products.map((p) => [p.id, p]));
-
-      // 1. Determine next NFE number
-      const reqSerie = req.body.serie;
-      const effectiveSerie = reqSerie
-        ? reqSerie
-        : process.env.SERVIDOR_HOMOLOGACAO
-          ? "99"
-          : "1";
-
-      const lastNfe = await nfeRepository.findOne({
-        where: { serie: effectiveSerie },
-        order: { id: "DESC" },
-      });
-
-      const nNF = lastNfe ? parseInt(lastNfe.nNF) + 1 : 1;
-      const serie = effectiveSerie;
-      // Use moment-timezone for correct formatting
-      const dhEmi = moment()
-        .tz("America/Sao_Paulo")
-        .format("YYYY-MM-DDTHH:mm:ssZ");
-
-      const cNF = Math.floor(Math.random() * 99999999)
-        .toString()
-        .padStart(8, "0");
-
-      // 2. Build XML
-      const nfeData: any = {
-        infNFe: {
-          "@Id": "",
-          "@versao": "4.00",
-          ide: {
-            cUF: "35", // SP
-            cNF: cNF,
-            natOp: "REMESSA EM COMODATO",
-            mod: "55",
-            serie: serie,
-            nNF: nNF.toString(),
-            dhEmi: dhEmi,
-            dhSaiEnt: dhEmi,
-            tpNF: "1", // Saída
-            idDest: "1", // Interna
-            cMunFG: "3503406", // Arealva
-            tpImp: "1",
-            tpEmis: "1",
-            cDV: "",
-            tpAmb: this.homologacao ? "2" : "1",
-            finNFe: "1",
-            indFinal: "1",
-            indPres: "1",
-            procEmi: "0",
-            verProc: "1.0",
-          },
-          emit: {
-            CNPJ: process.env.CPF_CNPJ?.replace(/\D/g, "") || "",
-            xNome: "WIP TELECOM MULTIMIDIA EIRELI ME",
-            xFant: "WIP TELECOM",
-            enderEmit: {
-              xLgr: "Rua Emilio Carraro",
-              nro: "945",
-              xBairro: "Altos da Cidade",
-              cMun: "3503406",
-              xMun: "Arealva",
-              UF: "SP",
-              CEP: "17160380",
-              cPais: "1058",
-              xPais: "BRASIL",
-              fone: "1432961608",
-            },
-            IE: "183013286115",
-            CRT: "1",
-          },
-          dest: {
-            CNPJ:
-              client.cpf_cnpj.length > 11
-                ? client.cpf_cnpj.replace(/\D/g, "")
-                : undefined,
-            CPF:
-              client.cpf_cnpj.length <= 11
-                ? client.cpf_cnpj.replace(/\D/g, "")
-                : undefined,
-            xNome: this.homologacao
-              ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
-              : client.nome || "CLIENTE SEM NOME",
-            enderDest: {
-              xLgr: client.endereco || "Rua Sem Nome",
-              nro: client.numero || "S/N",
-              xBairro: client.bairro || "Bairro Padrão",
-              cMun: client.cidade_ibge || "3503406",
-              xMun: client.cidade || "Arealva",
-              UF: client.estado || "SP",
-              CEP: client.cep ? client.cep.replace(/\D/g, "") : "17160000",
-              cPais: "1058",
-              xPais: "BRASIL",
-            },
-            indIEDest: "9",
-          },
-          det: equipamentos.map((eq: any, index: number) => {
-            const product = eq.idprod ? productMap.get(eq.idprod) : null;
-            const valorProduto = product?.precoatual
-              ? parseFloat(product.precoatual as any).toFixed(2)
-              : "0.00";
-
-            return {
-              "@nItem": index + 1,
-              prod: {
-                cProd: eq.idprod,
-                cEAN: "SEM GTIN",
-                xProd: product?.nome || "EQUIPAMENTO EM COMODATO",
-                // NCM: product?.codigo || "85176259",
-                NCM: "85176259",
-                CFOP: "5908",
-                uCom: "UN",
-                qCom: "1.0000",
-                vUnCom: valorProduto,
-                vProd: valorProduto,
-                cEANTrib: "SEM GTIN",
-                uTrib: "UN",
-                qTrib: "1.0000",
-                vUnTrib: valorProduto,
-                indTot: "1",
-              },
-              imposto: {
-                ICMS: {
-                  ICMSSN102: {
-                    orig: "0",
-                    CSOSN: "400",
-                  },
-                },
-                PIS: {
-                  PISOutr: {
-                    CST: "99",
-                    vBC: "0.00",
-                    pPIS: "0.00",
-                    vPIS: "0.00",
-                  },
-                },
-                COFINS: {
-                  COFINSOutr: {
-                    CST: "99",
-                    vBC: "0.00",
-                    pCOFINS: "0.00",
-                    vCOFINS: "0.00",
-                  },
-                },
-              },
-            };
-          }),
-          total: {
-            ICMSTot: {
-              vBC: "0.00",
-              vICMS: "0.00",
-              vICMSDeson: "0.00",
-              vFCP: "0.00",
-              vBCST: "0.00",
-              vST: "0.00",
-              vFCPST: "0.00",
-              vFCPSTRet: "0.00",
-              vProd: equipamentos
-                .reduce((acc: number, cur: any) => {
-                  const product = cur.idprod
-                    ? productMap.get(cur.idprod)
-                    : null;
-                  const valor = product?.precoatual
-                    ? parseFloat(product.precoatual as any)
-                    : 0;
-                  return acc + valor;
-                }, 0)
-                .toFixed(2),
-              vFrete: "0.00",
-              vSeg: "0.00",
-              vDesc: "0.00",
-              vII: "0.00",
-              vIPI: "0.00",
-              vIPIDevol: "0.00",
-              vPIS: "0.00",
-              vCOFINS: "0.00",
-              vOutro: "0.00",
-              vNF: equipamentos
-                .reduce((acc: number, cur: any) => {
-                  const product = cur.idprod
-                    ? productMap.get(cur.idprod)
-                    : null;
-                  const valor = product?.precoatual
-                    ? parseFloat(product.precoatual as any)
-                    : 0;
-                  return acc + valor;
-                }, 0)
-                .toFixed(2),
-            },
-          },
-
-          transp: {
-            modFrete: "9",
-          },
-          pag: {
-            detPag: {
-              tPag: "90",
-              vPag: "0.00",
-            },
-          },
-        },
-      };
-
-      // 3. Calculate Chave Acesso and DV
-      const chave = this.gerarChaveAcesso(nfeData.infNFe);
-      nfeData.infNFe["@Id"] = `NFe${chave}`;
-      nfeData.infNFe.ide.cDV = chave.slice(-1);
-
-      // 4. Generate inner XML (Attempting to compact)
-      let innerXml = create(
-        { encoding: "UTF-8" },
-        { NFe: { "@xmlns": "http://www.portalfiscal.inf.br/nfe", ...nfeData } },
-      ).end({ prettyPrint: false });
-
-      // 5. Sign XML
-      const signedXml = await this.assinarXml(
-        innerXml,
-        password,
-        nfeData.infNFe["@Id"],
-      );
-
-      // 6. Wrap in enviNFe (Batch)
-      const loteXml = `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>1</idLote><indSinc>1</indSinc>${signedXml.replace(/<\?xml.*?\?>/, "")}</enviNFe>`;
-
-      // 7. SOAP Envelope
-      const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body><nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">${loteXml}</nfeDadosMsg></soap12:Body></soap12:Envelope>`;
-
-      // 8. Credentials and Send
-      const { cert, key } = this.getCredentialsFromPfx(password);
-      const httpsAgent = new https.Agent({
-        cert,
-        key,
-        rejectUnauthorized: false,
-      });
-
-      const url = this.homologacao
-        ? "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx?WSDL"
-        : "https://nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx?WSDL";
-
-      console.log(`Enviando NFe para ${url}`);
-
-      const response = await axios.post(url, soapEnvelope, {
-        headers: {
-          "Content-Type":
-            'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4/nfeAutorizacaoLote"',
-        },
-        httpsAgent,
-      });
-
-      console.log("Response SEFAZ Status:", response.status);
-      const responseBody = response.data;
-
-      console.log(response);
-
-      // Extract details from protNFe (Protocolo de Autorização)
-      const protNFeMatch = responseBody.match(/<protNFe.*?>(.*?)<\/protNFe>/);
-      const protNFeContent = protNFeMatch ? protNFeMatch[1] : "";
-
-      let nProt = "";
-      const nProtMatch = protNFeContent.match(/<nProt>(.*?)<\/nProt>/);
-      nProt = nProtMatch ? nProtMatch[1] : "";
-
-      let cStat = "";
-      const cStatMatch = protNFeContent.match(/<cStat>(.*?)<\/cStat>/);
-      cStat = cStatMatch ? cStatMatch[1] : "";
-
-      let xMotivo = "";
-      const xMotivoMatch = protNFeContent.match(/<xMotivo>(.*?)<\/xMotivo>/);
-      xMotivo = xMotivoMatch ? xMotivoMatch[1] : "Erro desconhecido na SEFAZ";
-
-      // Also check if the batch itself was rejected (outside protNFe)
-      if (!cStat) {
-        const cStatBatchMatch = responseBody.match(/<cStat>(.*?)<\/cStat>/);
-        const xMotivoBatchMatch = responseBody.match(
-          /<xMotivo>(.*?)<\/xMotivo>/,
-        );
-        if (cStatBatchMatch && cStatBatchMatch[1] !== "104") {
-          // 104 = Lote Processado
-          cStat = cStatBatchMatch[1];
-          xMotivo = xMotivoBatchMatch ? xMotivoBatchMatch[1] : "Erro no Lote";
-        }
-      }
-
-      if (cStat !== "100") {
-        res.status(400).json({
-          message: "Erro ao autorizar NFE na SEFAZ",
-          cStat: cStat,
-          xMotivo: xMotivo,
-          raw_response: responseBody, // Return raw for debugging
-        });
-        return;
-      }
-
-      const status = "autorizado";
-
-      const nfeRecord = nfeRepository.create({
-        nNF: nfeData.infNFe.ide.nNF,
-        serie: nfeData.infNFe.ide.serie,
-        chave: chave,
-        xml: signedXml,
-        status: status,
-        protocolo: nProt, // Fixed column name
-        data_emissao: new Date(),
-        cliente_id: client.id,
-        destinatario_nome: client.nome,
-        destinatario_cpf_cnpj: client.cpf_cnpj,
-        tipo_operacao: "saida_comodato",
-        valor_total: parseFloat(nfeData.infNFe.total.ICMSTot.vNF),
-        tpAmb: this.homologacao ? 2 : 1,
-        tipo: ambiente,
-      });
-
-      await nfeRepository.save(nfeRecord);
+      // Trigger background processing (fire and forget)
+      this.processarFilaBackground(job, logins, password, ambiente, "saida");
 
       res.status(200).json({
-        message: "NFE Processada e Autorizada",
-        id: nfeRecord.id,
-        chave: chave,
-        nProt: nProt,
-        status_sefaz: status,
-        xMotivo: xMotivo,
-        raw_response: responseBody.substring(0, 500),
+        message: "Processamento iniciado em segundo plano.",
+        job: job.id,
       });
     } catch (error: any) {
       console.error(error);
       res
         .status(500)
-        .json({ message: "Erro ao emitir NFE", error: error.message });
+        .json({ message: "Erro ao iniciar emissão", error: error.message });
     }
   };
 
   public emitirEntradaComodato = async (req: Request, res: Response) => {
     try {
-      const { login, password, ambiente } = req.body;
+      const { logins, password, ambiente } = req.body;
 
-      this.homologacao = ambiente === "homologacao";
-
-      const clientRepository = MkauthSource.getRepository(ClientesEntities);
-      const nfeRepository = AppDataSource.getRepository(NFE);
-
-      const client = await clientRepository.findOne({
-        where: { login: login },
-      });
-      if (!client) {
-        res.status(404).json({ message: "Cliente não encontrado" });
+      if (!logins || !Array.isArray(logins) || logins.length === 0) {
+        res.status(400).json({ message: "Lista de logins não fornecida." });
         return;
       }
 
-      const produtClienteRepository =
-        MkauthSource.getRepository(Sis_prodCliente);
-      const sisProdutoRepository = MkauthSource.getRepository(SisProduto);
-
-      const prodCliente = await produtClienteRepository.findOne({
-        where: { cliente: client.login },
+      // Create Job
+      const job = AppDataSource.getRepository(Jobs).create({
+        name: "Gerar NFE Entrada Comodato",
+        description: `Gerando ${logins.length} notas de Entrada em Background`,
+        status: "pendente",
+        total: logins.length,
+        processados: 0,
       });
 
-      if (!prodCliente) {
-        res.status(404).json({ message: "Produto não encontrado" });
-        return;
-      }
+      await AppDataSource.getRepository(Jobs).save(job);
 
-      const equipamentos = await produtClienteRepository.find({
-        where: { cliente: client.login },
+      // Trigger background processing (fire and forget)
+      this.processarFilaBackground(job, logins, password, ambiente, "entrada");
+
+      res.status(200).json({
+        message: "Processamento iniciado em segundo plano.",
+        job: job.id,
       });
+    } catch (error: any) {
+      console.error(error);
+      res
+        .status(500)
+        .json({ message: "Erro ao iniciar emissão", error: error.message });
+    }
+  };
 
-      // Fetch product details for all equipment
-      const productIds = equipamentos
-        .map((eq) => eq.idprod)
-        .filter((id) => id !== null && id !== undefined);
+  private async processarFilaBackground(
+    job: Jobs,
+    logins: string[],
+    password: string,
+    ambiente: string,
+    tipo: "saida" | "entrada",
+  ) {
+    const isHomologacao = ambiente === "homologacao";
+    let contadorProcessados = 0;
+    const responses: any[] = [];
+    const clientRepository = MkauthSource.getRepository(ClientesEntities);
+    const nfeRepository = AppDataSource.getRepository(NFE);
+    const prodClienteRepository = MkauthSource.getRepository(Sis_prodCliente);
+    const sisProdutoRepository = MkauthSource.getRepository(SisProduto);
 
-      const products = await sisProdutoRepository.findBy({
-        id: In(productIds),
-      });
-
-      const productMap = new Map(products.map((p) => [p.id, p]));
-
-      // 1. Determine next NFE number
-      const reqSerie = req.body.serie;
-      const effectiveSerie = reqSerie
-        ? reqSerie
-        : this.homologacao
-          ? "99"
-          : "1";
-
-      const lastNfe = await nfeRepository.findOne({
-        where: { serie: effectiveSerie },
-        order: { id: "DESC" },
-      });
-
-      const nNF = lastNfe ? parseInt(lastNfe.nNF) + 1 : 1;
-      const serie = effectiveSerie;
-      const dhEmi = moment()
-        .tz("America/Sao_Paulo")
-        .format("YYYY-MM-DDTHH:mm:ssZ");
-      const cNF = Math.floor(Math.random() * 99999999)
-        .toString()
-        .padStart(8, "0");
-
-      // 2. Build XML
-      const nfeData = {
-        infNFe: {
-          "@Id": "",
-          "@versao": "4.00",
-          ide: {
-            cUF: "35",
-            cNF: cNF,
-            natOp: "RETORNO DE COMODATO",
-            mod: "55",
-            serie: serie,
-            nNF: nNF.toString(),
-            dhEmi: dhEmi,
-            dhSaiEnt: dhEmi,
-            tpNF: "0", // Entrada
-            idDest: "1",
-            cMunFG: "3503406",
-            tpImp: "1",
-            tpEmis: "1",
-            cDV: "",
-            tpAmb: this.homologacao ? "2" : "1",
-            finNFe: "1",
-            indFinal: "1",
-            indPres: "1",
-            procEmi: "0",
-            verProc: "1.0",
-          },
-          emit: {
-            CNPJ: process.env.CPF_CNPJ?.replace(/\D/g, ""),
-            xNome: "WIP TELECOM MULTIMIDIA EIRELI ME",
-            xFant: "WIP TELECOM",
-            enderEmit: {
-              xLgr: "Rua Emilio Carraro",
-              nro: "945",
-              xBairro: "Altos da Cidade",
-              cMun: "3503406",
-              xMun: "Arealva",
-              UF: "SP",
-              CEP: "17160380",
-              cPais: "1058",
-              xPais: "BRASIL",
-              fone: "1432961608",
-            },
-            IE: "183013286115",
-            CRT: "1",
-          },
-          dest: {
-            CNPJ:
-              client.cpf_cnpj.length > 11
-                ? client.cpf_cnpj.replace(/\D/g, "")
-                : undefined,
-            CPF:
-              client.cpf_cnpj.length <= 11
-                ? client.cpf_cnpj.replace(/\D/g, "")
-                : undefined,
-            xNome: this.homologacao
-              ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
-              : client.nome || "CLIENTE SEM NOME",
-            enderDest: {
-              xLgr: client.endereco || "Rua Sem Nome",
-              nro: client.numero || "S/N",
-              xBairro: client.bairro || "Bairro Padrão",
-              cMun: client.cidade_ibge || "3503406",
-              xMun: client.cidade || "Arealva",
-              UF: client.estado || "SP",
-              CEP: client.cep ? client.cep.replace(/\D/g, "") : "17160000",
-              cPais: "1058",
-              xPais: "BRASIL",
-            },
-            indIEDest: "9",
-          },
-          det: equipamentos.map((eq: any, index: number) => {
-            const product = eq.idprod ? productMap.get(eq.idprod) : null;
-            const valorProduto = product?.precoatual
-              ? parseFloat(product.precoatual as any).toFixed(2)
-              : "0.00";
-
-            return {
-              "@nItem": index + 1,
-              prod: {
-                cProd: eq.idprod,
-                cEAN: "SEM GTIN",
-                xProd:
-                  product?.nome || eq.descricao || "DEVOLUCAO DE EQUIPAMENTO",
-                // NCM: product?.codigo || "85176259",
-                NCM: "85176259",
-                CFOP: "1909", // Retorno de Comodato
-                uCom: "UN",
-                qCom: "1.0000",
-                vUnCom: valorProduto,
-                vProd: valorProduto,
-                cEANTrib: "SEM GTIN",
-                uTrib: "UN",
-                qTrib: "1.0000",
-                vUnTrib: valorProduto,
-                indTot: "1",
-              },
-              imposto: {
-                ICMS: {
-                  ICMSSN102: {
-                    orig: "0",
-                    CSOSN: "400",
-                  },
-                },
-                PIS: {
-                  PISOutr: {
-                    CST: "99",
-                    vBC: "0.00",
-                    pPIS: "0.00",
-                    vPIS: "0.00",
-                  },
-                },
-                COFINS: {
-                  COFINSOutr: {
-                    CST: "99",
-                    vBC: "0.00",
-                    pCOFINS: "0.00",
-                    vCOFINS: "0.00",
-                  },
-                },
-              },
-            };
-          }),
-          total: {
-            ICMSTot: {
-              vBC: "0.00",
-              vICMS: "0.00",
-              vICMSDeson: "0.00",
-              vFCP: "0.00",
-              vBCST: "0.00",
-              vST: "0.00",
-              vFCPST: "0.00",
-              vFCPSTRet: "0.00",
-              vProd: equipamentos
-                .reduce((acc: number, cur: any) => {
-                  const product = cur.idprod
-                    ? productMap.get(cur.idprod)
-                    : null;
-                  const valor = product?.precoatual
-                    ? parseFloat(product.precoatual as any)
-                    : 0;
-                  return acc + valor;
-                }, 0)
-                .toFixed(2),
-              vFrete: "0.00",
-              vSeg: "0.00",
-              vDesc: "0.00",
-              vII: "0.00",
-              vIPI: "0.00",
-              vIPIDevol: "0.00",
-              vPIS: "0.00",
-              vCOFINS: "0.00",
-              vOutro: "0.00",
-              vNF: equipamentos
-                .reduce((acc: number, cur: any) => {
-                  const product = cur.idprod
-                    ? productMap.get(cur.idprod)
-                    : null;
-                  const valor = product?.precoatual
-                    ? parseFloat(product.precoatual as any)
-                    : 0;
-                  return acc + valor;
-                }, 0)
-                .toFixed(2),
-            },
-          },
-          transp: {
-            modFrete: "9",
-          },
-          pag: {
-            detPag: {
-              tPag: "90",
-              vPag: "0.00",
-            },
-          },
-        },
-      };
-
-      const chave = this.gerarChaveAcesso(nfeData.infNFe);
-      nfeData.infNFe["@Id"] = `NFe${chave}`;
-      nfeData.infNFe.ide.cDV = chave.slice(-1);
-
-      let xml = create(
-        { encoding: "UTF-8" },
-        { NFe: { "@xmlns": "http://www.portalfiscal.inf.br/nfe", ...nfeData } },
-      ).end({ prettyPrint: false });
-
-      const signedXml = await this.assinarXml(
-        xml,
-        password,
-        nfeData.infNFe["@Id"],
-      );
-
-      // --- TRANSMISSION LOGIC START ---
-      const loteXml = `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>1</idLote><indSinc>1</indSinc>${signedXml.replace(/<\?xml.*?\?>/, "")}</enviNFe>`;
-
-      const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body><nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">${loteXml}</nfeDadosMsg></soap12:Body></soap12:Envelope>`;
-
-      const { cert, key } = this.getCredentialsFromPfx(password);
-      const httpsAgent = new https.Agent({
-        cert,
-        key,
-        rejectUnauthorized: false,
-      });
-
-      const url = this.homologacao
-        ? "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx?WSDL"
-        : "https://nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx?WSDL";
-
-      console.log(`Enviando NFe Entrada para ${url}`);
-
-      let response;
+    for (const login of logins) {
       try {
-        response = await axios.post(url, soapEnvelope, {
+        contadorProcessados++;
+        // Update job progress
+        await AppDataSource.getRepository(Jobs).update(job.id, {
+          processados: contadorProcessados,
+          status: "processando",
+        });
+
+        // 1. Fetch Client
+        const client = await clientRepository.findOne({
+          where: { login: login },
+        });
+
+        if (!client) {
+          throw new Error(`Cliente ${login} não encontrado.`);
+        }
+
+        // 2. Fetch Products
+        const equipamentos = await prodClienteRepository.find({
+          where: { cliente: client.login },
+        });
+
+        if (!equipamentos || equipamentos.length === 0) {
+          throw new Error(`Produtos não encontrados para ${login}.`);
+        }
+
+        const productIds = equipamentos
+          .map((eq) => eq.idprod)
+          .filter((id) => id !== null && id !== undefined);
+
+        const products = await sisProdutoRepository.findBy({
+          id: In(productIds),
+        });
+
+        const productMap = new Map(products.map((p) => [p.id, p]));
+
+        // 3. Determine Series and NFE Number
+        // Note: We need to do this serially to avoid number conflicts
+        const effectiveSerie = isHomologacao ? "99" : "1";
+
+        // Lock or re-check latest might be safer, but for now we query latest
+        const lastNfe = await nfeRepository.findOne({
+          where: { serie: effectiveSerie },
+          order: { id: "DESC" },
+        });
+
+        // If we are processing in parallel/background, we might need to handle concurrency.
+        // But since we are processing one by one in this loop, we just need to make sure
+        // we increment correctly. We might need to keep a local 'currentNumber' if we trust
+        // no other process is emitting for this series.
+        // BETTER: Re-query inside the loop for each one, as we are doing.
+
+        const nNF = lastNfe ? parseInt(lastNfe.nNF) + 1 : 1;
+        const serie = effectiveSerie;
+
+        const dhEmi = moment()
+          .tz("America/Sao_Paulo")
+          .format("YYYY-MM-DDTHH:mm:ssZ");
+
+        const cNF = Math.floor(Math.random() * 99999999)
+          .toString()
+          .padStart(8, "0");
+
+        // 4. Build XML based on type
+        const natOp =
+          tipo === "saida" ? "REMESSA EM COMODATO" : "RETORNO DE COMODATO";
+        const tpNF = tipo === "saida" ? "1" : "0";
+        const cfop = tipo === "saida" ? "5908" : "1909";
+        const xProdDefault =
+          tipo === "saida"
+            ? "EQUIPAMENTO EM COMODATO"
+            : "DEVOLUCAO DE EQUIPAMENTO";
+
+        const nfeData: any = {
+          infNFe: {
+            "@Id": "",
+            "@versao": "4.00",
+            ide: {
+              cUF: "35",
+              cNF: cNF,
+              natOp: natOp,
+              mod: "55",
+              serie: serie,
+              nNF: nNF.toString(),
+              dhEmi: dhEmi,
+              dhSaiEnt: dhEmi,
+              tpNF: tpNF,
+              idDest: "1",
+              cMunFG: "3503406",
+              tpImp: "1",
+              tpEmis: "1",
+              cDV: "",
+              tpAmb: isHomologacao ? "2" : "1",
+              finNFe: "1",
+              indFinal: "1",
+              indPres: "1",
+              procEmi: "0",
+              verProc: "1.0",
+            },
+            emit: {
+              CNPJ: process.env.CPF_CNPJ?.replace(/\D/g, "") || "",
+              xNome: "WIP TELECOM MULTIMIDIA EIRELI ME",
+              xFant: "WIP TELECOM",
+              enderEmit: {
+                xLgr: "Rua Emilio Carraro",
+                nro: "945",
+                xBairro: "Altos da Cidade",
+                cMun: "3503406",
+                xMun: "Arealva",
+                UF: "SP",
+                CEP: "17160380",
+                cPais: "1058",
+                xPais: "BRASIL",
+                fone: "1432961608",
+              },
+              IE: "183013286115",
+              CRT: "1",
+            },
+            dest: {
+              CNPJ:
+                client.cpf_cnpj.length > 11
+                  ? client.cpf_cnpj.replace(/\D/g, "")
+                  : undefined,
+              CPF:
+                client.cpf_cnpj.length <= 11
+                  ? client.cpf_cnpj.replace(/\D/g, "")
+                  : undefined,
+              xNome: isHomologacao
+                ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
+                : client.nome || "CLIENTE SEM NOME",
+              enderDest: {
+                xLgr: client.endereco || "Rua Sem Nome",
+                nro: client.numero || "S/N",
+                xBairro: client.bairro || "Bairro Padrão",
+                cMun: client.cidade_ibge || "3503406",
+                xMun: client.cidade || "Arealva",
+                UF: client.estado || "SP",
+                CEP: client.cep ? client.cep.replace(/\D/g, "") : "17160000",
+                cPais: "1058",
+                xPais: "BRASIL",
+              },
+              indIEDest: "9",
+            },
+            det: equipamentos.map((eq: any, index: number) => {
+              const product = eq.idprod ? productMap.get(eq.idprod) : null;
+              const valorProduto = product?.precoatual
+                ? parseFloat(product.precoatual as any).toFixed(2)
+                : "0.00";
+
+              return {
+                "@nItem": index + 1,
+                prod: {
+                  cProd: eq.idprod,
+                  cEAN: "SEM GTIN",
+                  xProd: product?.nome || eq.descricao || xProdDefault,
+                  NCM: "85176259",
+                  CFOP: cfop,
+                  uCom: "UN",
+                  qCom: "1.0000",
+                  vUnCom: valorProduto,
+                  vProd: valorProduto,
+                  cEANTrib: "SEM GTIN",
+                  uTrib: "UN",
+                  qTrib: "1.0000",
+                  vUnTrib: valorProduto,
+                  indTot: "1",
+                },
+                imposto: {
+                  ICMS: {
+                    ICMSSN102: {
+                      orig: "0",
+                      CSOSN: "400",
+                    },
+                  },
+                  PIS: {
+                    PISOutr: {
+                      CST: "99",
+                      vBC: "0.00",
+                      pPIS: "0.00",
+                      vPIS: "0.00",
+                    },
+                  },
+                  COFINS: {
+                    COFINSOutr: {
+                      CST: "99",
+                      vBC: "0.00",
+                      pCOFINS: "0.00",
+                      vCOFINS: "0.00",
+                    },
+                  },
+                },
+              };
+            }),
+            total: {
+              ICMSTot: {
+                vBC: "0.00",
+                vICMS: "0.00",
+                vICMSDeson: "0.00",
+                vFCP: "0.00",
+                vBCST: "0.00",
+                vST: "0.00",
+                vFCPST: "0.00",
+                vFCPSTRet: "0.00",
+                vProd: equipamentos
+                  .reduce((acc: number, cur: any) => {
+                    const product = cur.idprod
+                      ? productMap.get(cur.idprod)
+                      : null;
+                    const valor = product?.precoatual
+                      ? parseFloat(product.precoatual as any)
+                      : 0;
+                    return acc + valor;
+                  }, 0)
+                  .toFixed(2),
+                vFrete: "0.00",
+                vSeg: "0.00",
+                vDesc: "0.00",
+                vII: "0.00",
+                vIPI: "0.00",
+                vIPIDevol: "0.00",
+                vPIS: "0.00",
+                vCOFINS: "0.00",
+                vOutro: "0.00",
+                vNF: equipamentos
+                  .reduce((acc: number, cur: any) => {
+                    const product = cur.idprod
+                      ? productMap.get(cur.idprod)
+                      : null;
+                    const valor = product?.precoatual
+                      ? parseFloat(product.precoatual as any)
+                      : 0;
+                    return acc + valor;
+                  }, 0)
+                  .toFixed(2),
+              },
+            },
+            transp: {
+              modFrete: "9",
+            },
+            pag: {
+              detPag: {
+                tPag: "90",
+                vPag: "0.00",
+              },
+            },
+          },
+        };
+
+        // 5. Generate, Sign and Send
+        const chave = this.gerarChaveAcesso(nfeData.infNFe);
+        nfeData.infNFe["@Id"] = `NFe${chave}`;
+        nfeData.infNFe.ide.cDV = chave.slice(-1);
+
+        let innerXml = create(
+          { encoding: "UTF-8" },
+          {
+            NFe: {
+              "@xmlns": "http://www.portalfiscal.inf.br/nfe",
+              ...nfeData,
+            },
+          },
+        ).end({ prettyPrint: false });
+
+        const signedXml = await this.assinarXml(
+          innerXml,
+          password,
+          nfeData.infNFe["@Id"],
+        );
+
+        const loteXml = `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>1</idLote><indSinc>1</indSinc>${signedXml.replace(/<\?xml.*?\?>/, "")}</enviNFe>`;
+
+        const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body><nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">${loteXml}</nfeDadosMsg></soap12:Body></soap12:Envelope>`;
+
+        const { cert, key } = this.getCredentialsFromPfx(password);
+        const httpsAgent = new https.Agent({
+          cert,
+          key,
+          rejectUnauthorized: false,
+        });
+
+        const url = isHomologacao
+          ? "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx?WSDL"
+          : "https://nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx?WSDL";
+
+        console.log(`Enviando NFe para ${url}`);
+
+        const response = await axios.post(url, soapEnvelope, {
           headers: {
             "Content-Type":
               'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4/nfeAutorizacaoLote"',
           },
           httpsAgent,
         });
-      } catch (reqError: any) {
-        console.error("Erro na requisição SOAP:", reqError.message);
-        throw new Error(`Erro de comunicação com SEFAZ: ${reqError.message}`);
-      }
 
-      console.log("Response SEFAZ Status:", response.status);
-      const responseBody = response.data;
+        const responseBody = response.data;
 
-      console.log(response);
+        // Parse Response
+        const protNFeMatch = responseBody.match(/<protNFe.*?>(.*?)<\/protNFe>/);
+        const protNFeContent = protNFeMatch ? protNFeMatch[1] : "";
 
-      // Extract details from protNFe (Protocolo de Autorização)
-      const protNFeMatch = responseBody.match(/<protNFe.*?>(.*?)<\/protNFe>/);
-      const protNFeContent = protNFeMatch ? protNFeMatch[1] : "";
+        let nProt = "";
+        const nProtMatch = protNFeContent.match(/<nProt>(.*?)<\/nProt>/);
+        nProt = nProtMatch ? nProtMatch[1] : "";
 
-      let nProt = "";
-      const nProtMatch = protNFeContent.match(/<nProt>(.*?)<\/nProt>/);
-      nProt = nProtMatch ? nProtMatch[1] : "";
+        let cStat = "";
+        const cStatMatch = protNFeContent.match(/<cStat>(.*?)<\/cStat>/);
+        cStat = cStatMatch ? cStatMatch[1] : "";
 
-      let cStat = "";
-      const cStatMatch = protNFeContent.match(/<cStat>(.*?)<\/cStat>/);
-      cStat = cStatMatch ? cStatMatch[1] : "";
+        let xMotivo = "";
+        const xMotivoMatch = protNFeContent.match(/<xMotivo>(.*?)<\/xMotivo>/);
+        xMotivo = xMotivoMatch ? xMotivoMatch[1] : "Erro desconhecido na SEFAZ";
 
-      let xMotivo = "";
-      const xMotivoMatch = protNFeContent.match(/<xMotivo>(.*?)<\/xMotivo>/);
-      xMotivo = xMotivoMatch ? xMotivoMatch[1] : "Erro desconhecido na SEFAZ";
-
-      // Also check if the batch itself was rejected (outside protNFe)
-      if (!cStat) {
-        const cStatBatchMatch = responseBody.match(/<cStat>(.*?)<\/cStat>/);
-        const xMotivoBatchMatch = responseBody.match(
-          /<xMotivo>(.*?)<\/xMotivo>/,
-        );
-        if (cStatBatchMatch && cStatBatchMatch[1] !== "104") {
-          // 104 = Lote Processado
-          cStat = cStatBatchMatch[1];
-          xMotivo = xMotivoBatchMatch ? xMotivoBatchMatch[1] : "Erro no Lote";
+        if (!cStat) {
+          const cStatBatchMatch = responseBody.match(/<cStat>(.*?)<\/cStat>/);
+          const xMotivoBatchMatch = responseBody.match(
+            /<xMotivo>(.*?)<\/xMotivo>/,
+          );
+          if (cStatBatchMatch && cStatBatchMatch[1] !== "104") {
+            cStat = cStatBatchMatch[1];
+            xMotivo = xMotivoBatchMatch ? xMotivoBatchMatch[1] : "Erro no Lote";
+          }
         }
-      }
 
-      if (cStat !== "100") {
-        res.status(400).json({
-          message: "Erro ao autorizar NFE na SEFAZ",
-          cStat: cStat,
-          xMotivo: xMotivo,
-          raw_response: responseBody, // Return raw for debugging
+        if (cStat !== "100") {
+          throw new Error(`Erro SEFAZ: ${cStat} - ${xMotivo}`);
+        }
+
+        // 6. Save Success
+        const nfeRecord = nfeRepository.create({
+          nNF: nfeData.infNFe.ide.nNF,
+          serie: nfeData.infNFe.ide.serie,
+          chave: chave,
+          xml: signedXml,
+          status: "autorizado",
+          protocolo: nProt,
+          data_emissao: new Date(),
+          cliente_id: client.id,
+          destinatario_nome: client.nome,
+          destinatario_cpf_cnpj: client.cpf_cnpj,
+          tipo_operacao:
+            tipo === "saida" ? "saida_comodato" : "entrada_comodato",
+          valor_total: parseFloat(nfeData.infNFe.total.ICMSTot.vNF),
+          tpAmb: isHomologacao ? 2 : 1,
+          tipo: ambiente,
         });
-        return;
+
+        await nfeRepository.save(nfeRecord);
+
+        responses.push({
+          success: true,
+          id: nfeRecord.id,
+          message: `NFE ${nNF} Autorizada`,
+          nNF: nfeData.infNFe.ide.nNF,
+        });
+      } catch (error: any) {
+        console.error(`Erro ao processar login ${login}:`, error);
+        responses.push({
+          success: false,
+          login: login,
+          message: error.message,
+        });
       }
-
-      const status = "autorizado";
-
-      // --- TRANSMISSION LOGIC END ---
-
-      const nfeRecord = nfeRepository.create({
-        nNF: nfeData.infNFe.ide.nNF,
-        serie: nfeData.infNFe.ide.serie,
-        chave: chave,
-        xml: signedXml,
-        status: status,
-        protocolo: nProt,
-        data_emissao: new Date(),
-        cliente_id: client.id,
-        destinatario_nome: client.nome,
-        destinatario_cpf_cnpj: client.cpf_cnpj,
-        tipo_operacao: "entrada_comodato",
-        valor_total: parseFloat(nfeData.infNFe.total.ICMSTot.vNF),
-        tpAmb: this.homologacao ? 2 : 1,
-        tipo: this.homologacao ? "homologacao" : "producao",
-      });
-
-      await nfeRepository.save(nfeRecord);
-
-      res.status(200).json({
-        message: "NFE Processada e Autorizada",
-        id: nfeRecord.id,
-        chave: chave,
-        nProt: nProt,
-        status_sefaz: status,
-        xMotivo: xMotivo,
-        raw_response: responseBody.substring(0, 500),
-      });
-    } catch (error) {
-      console.error(error);
-      res
-        .status(500)
-        .json({ message: "Erro ao emitir NFE de Entrada", error: error });
     }
-  };
+
+    // Finish Job
+    await AppDataSource.getRepository(Jobs).update(job.id, {
+      status: "concluido",
+      resultado: responses,
+    });
+  }
 
   private gerarChaveAcesso(infNFe: any): string {
     const cUF = infNFe.ide.cUF;
