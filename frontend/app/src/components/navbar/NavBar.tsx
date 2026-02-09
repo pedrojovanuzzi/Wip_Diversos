@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { GrDocumentNotes } from "react-icons/gr";
+
 import {
   HiBars3,
   HiChevronLeft,
@@ -149,15 +151,25 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   </Link>
                 </li>
                 <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/Nfe">
+                  <Link to="/NFSE" title="Nota Fiscal de Serviço">
                     <HiDocumentText className="text-white size-8 transition-all hover:text-green-400" />
                   </Link>
                 </li>
+
                 <li className="p-2 grid place-items-center col-span-2">
                   <Link to="/Nfcom">
                     <FaFileInvoice className="text-white size-8 transition-all hover:text-green-400" />
                   </Link>
                 </li>
+                <li className="p-2 grid place-items-center col-span-2">
+                  <Link
+                    to="/nfe/comodato"
+                    title="Nota Fiscal Eletrônica (Comodato)"
+                  >
+                    <GrDocumentNotes className="text-white size-8 transition-all hover:text-green-400" />
+                  </Link>
+                </li>
+
                 <li className="p-2 grid place-items-center col-span-2">
                   <Link to="/Whatsapp">
                     <FaWhatsapp className="text-white size-8 transition-all hover:text-green-400" />

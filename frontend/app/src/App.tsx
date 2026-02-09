@@ -7,8 +7,10 @@ import { GoAlert } from "react-icons/go";
 import FeedbackLinkGenerator from "./pages/feedback/FeedBackLinkGenerator";
 import FeedbackPage from "./pages/feedback/FeedbackPage";
 import { Opnion } from "./pages/feedback/Opnion";
-import { Nfe } from "./pages/Nfe/Nfe";
-import { BuscarNfeGerada } from "./pages/Nfe/BuscarNfeGerada";
+import { NFSE } from "./pages/Nfse/NFSE";
+import { Comodato } from "./pages/Nfe/Comodato";
+import { BuscarNfseGerada } from "./pages/Nfse/BuscarNFSEGerada";
+import { BuscarNfe } from "./pages/Nfe/BuscarNfe";
 import PrefeituraLogin from "./pages/prefeitura_login/PrefeituraLogin";
 import CodeOtp from "./pages/prefeitura_login/CodeOtp";
 import WhatsappChat from "./pages/whatsapp_chat/WhatsappChat";
@@ -39,7 +41,7 @@ import { PagarFatura } from "./pages/TokenAutoAtendimento/PagarFatura";
 import { CriarChamado } from "./pages/TokenAutoAtendimento/CriarChamado";
 import { FazerCadastro } from "./pages/TokenAutoAtendimento/FazerCadastro";
 import { PdfViewer } from "./pages/PdfViewer/PdfViewer";
-import { GerarNotaDeServicoIndependente } from "./pages/Nfe/GerarNotaDeServicoIndependente";
+import { GerarNotaDeServicoIndependente } from "./pages/Nfse/GerarNotaDeServicoIndependente";
 import { TimeClock } from "./pages/TimeTracking/TimeClock";
 import { EmployeeManager } from "./pages/TimeTracking/Admin/EmployeeManager";
 import { TimeTrackingMap } from "./pages/TimeTracking/TimeTrackingMap";
@@ -120,20 +122,50 @@ function App() {
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
           <Route
-            path="/Nfe"
+            path="/NFSE"
             element={
               user?.token && user.permission >= 2 ? (
-                <Nfe />
+                <NFSE />
               ) : (
                 <Navigate to="/auth/login" />
               )
             }
           />
           <Route
-            path="/BuscarNfeGerada"
+            path="/nfe/comodato"
             element={
               user?.token && user.permission >= 2 ? (
-                <BuscarNfeGerada />
+                <Comodato />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/NfeComodato"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <Comodato />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/BuscarNfseGerada"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <BuscarNfseGerada />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/BuscarNfe"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <BuscarNfe />
               ) : (
                 <Navigate to="/auth/login" />
               )

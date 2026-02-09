@@ -26,6 +26,7 @@ import {
   IsNull,
   Not,
   Repository,
+  Like,
 } from "typeorm";
 import { isNotEmpty } from "class-validator";
 import { Jobs } from "../entities/Jobs";
@@ -644,7 +645,11 @@ class Nfcom {
               emailDestino = "suporte_wiptelecom@outlook.com";
             }
 
-            if (emailDestino) {
+            // Verifica se é CNPJ (mais de 11 dígitos numéricos)
+            const isCnpj =
+              item.cpf_cnpj && item.cpf_cnpj.replace(/\D/g, "").length > 11;
+
+            if (emailDestino && isCnpj) {
               // 1. Pega dados para montar o PDF (obs/Chave)
               const obsData: any = await this.getNfcomByChaveDeOlhoNoImposto();
               const obsString = obsData?.Chave || "";
@@ -679,9 +684,15 @@ class Nfcom {
                 `📧 Email com PDF enviado para: ${emailDestino} (Nota ${savedNfcom.numeracao})`,
               );
             } else {
-              console.warn(
-                `Clientes sem email cadastrado na nota ${savedNfcom.numeracao}. Email não enviado.`,
-              );
+              if (!isCnpj) {
+                console.log(
+                  `Email não enviado para nota ${savedNfcom.numeracao}: Cliente CPF (${item.cpf_cnpj}).`,
+                );
+              } else {
+                console.warn(
+                  `Clientes sem email cadastrado na nota ${savedNfcom.numeracao}. Email não enviado.`,
+                );
+              }
             }
           } catch (emailErr) {
             console.error(
@@ -1297,7 +1308,7 @@ class Nfcom {
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const w: any = {};
     let servicosFilter: string[] = ["mensalidade"];
-    if (cpf) w.cpf_cnpj = cpf;
+    if (cpf) w.cpf_cnpj = Like(`%${cpf}%`);
     if (filters) {
       let { plano, vencimento, cli_ativado, SVA, servicos } = filters;
       if (plano?.length) w.plano = In(plano);

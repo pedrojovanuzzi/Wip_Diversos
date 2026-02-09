@@ -3,7 +3,7 @@ import { FunnelIcon } from "@heroicons/react/20/solid";
 import { useState } from "react";
 import Calendar from "./Calendar";
 import Line from "./Line";
-import { CiCirclePlus, CiSearch } from "react-icons/ci";
+import { CiCirclePlus } from "react-icons/ci";
 import { IoArrowUpCircleOutline } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -69,7 +69,7 @@ export default function Filter({
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        },
+        }
       );
       window.location.reload();
     } catch {
@@ -179,15 +179,15 @@ export default function Filter({
                 <IoArrowUpCircleOutline className="text-2xl" />
                 Enviar
               </button>
-              {BuscarNfe && (
+              {/* {BuscarNfe && (
                 <button
-                  className="bg-indigo-500 ring-1 ring-black ring-opacity-5 text-white indent-2 py-3 px-8 rounded hover:bg-indigo-400 transition-all flex items-center justify-center"
-                  onClick={() => navigate("/BuscarNfe")}
+                  className="bg-teal-500 ring-1 ring-black ring-opacity-5 text-white indent-2 py-3 px-2 rounded hover:bg-teal-400 transition-all flex items-center justify-center"
+                  onClick={() => navigate("/BuscarNfeGerada")}
                 >
-                  <CiSearch className="text-2xl mr-2" />
-                  Buscar Notas
+                  <HiMiniDocumentMagnifyingGlass className="text-2xl" />
+                  NFS-e Geradas
                 </button>
-              )}
+              )} */}
               <button
                 className="bg-indigo-500 ring-1 ring-black ring-opacity-5 text-white indent-2 py-3 px-8 rounded hover:bg-indigo-400 transition-all flex items-center justify-center"
                 onClick={() => setShowPasswordPopUp(true)}

@@ -2,15 +2,18 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import Stacked from "./Components/Stacked";
+import Filter from "./Components/Filter";
 
 import { BsFiletypeDoc } from "react-icons/bs";
 import PopUpButton from "./Components/PopUpButton";
 import { useAuth } from "../../context/AuthContext";
+
 import { Link } from "react-router-dom";
 import { useNotification } from "../../context/NotificationContext";
 
-export const Nfe = () => {
-  const [arquivo] = useState<File | null>(null);
+export const NFSE = () => {
+  const [dadosNFe, setDadosNFe] = useState({});
+  const [arquivo, setArquivo] = useState<File | null>(null);
 
   // Estados para controlar envio do certificado e senha
   const [showCertPasswordPopUp, setShowCertPasswordPopUp] = useState(false);
@@ -20,6 +23,7 @@ export const Nfe = () => {
   const [clientes, setClientes] = useState<any[]>([]);
   const [aliquota, setAliquota] = useState("");
   const [lastNfe, setLastNfe] = useState<string>("");
+  const [rpsNumber, setRpsNumber] = useState<string>("");
   const [service, setService] = useState("");
   const [loading, setLoading] = useState(false);
   const [ambiente, setAmbiente] = useState("homologacao");
@@ -27,6 +31,23 @@ export const Nfe = () => {
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     [],
   );
+  const [dateFilter, setDateFilter] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
+  const [activeFilters, setActiveFilters] = useState<{
+    plano: string[];
+    vencimento: string[];
+    cli_ativado: string[];
+    nova_nfe: string[];
+    servicos: string[];
+  }>({
+    plano: [],
+    vencimento: [],
+    cli_ativado: [],
+    nova_nfe: [],
+    servicos: [],
+  });
 
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>(""); // senha para emitir nf
@@ -49,8 +70,10 @@ export const Nfe = () => {
     if (clientesSelecionados.length === clientes.length) {
       setClientesSelecionados([]);
     } else {
-      const idsValidos = clientes.map((cliente) => cliente.id);
-      setClientesSelecionados(idsValidos);
+      const titulosValidos = clientes
+        .filter((cliente) => cliente.fatura && cliente.fatura.titulo)
+        .map((cliente) => cliente.fatura.titulo);
+      setClientesSelecionados(titulosValidos);
     }
   };
 
@@ -63,7 +86,7 @@ export const Nfe = () => {
       setLoading(true);
 
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/NFEletronica/`,
+        `${process.env.REACT_APP_URL}/nfse/`,
         {
           password,
           clientesSelecionados,
@@ -72,6 +95,7 @@ export const Nfe = () => {
           reducao,
           ambiente,
           lastNfe,
+          rpsNumber,
         },
         {
           headers: {
@@ -81,7 +105,7 @@ export const Nfe = () => {
           timeout: 480000,
         },
       );
-
+      setDadosNFe(resposta.data);
       // setSuccess("NF-e emitida com sucesso.");
 
       console.log("Resposta da API:", resposta.data);
@@ -113,6 +137,15 @@ export const Nfe = () => {
     }
   };
 
+  // Função que abre o popup para senha do certificado
+  const handleEnviarCertificado = () => {
+    if (!arquivo) {
+      alert("Selecione um arquivo para enviar.");
+      return;
+    }
+    setShowCertPasswordPopUp(true);
+  };
+
   // Envia o certificado + senha
   const enviarCertificado = async () => {
     if (!arquivo || !certPassword) {
@@ -125,7 +158,7 @@ export const Nfe = () => {
       formData.append("password", certPassword);
 
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/NFEletronica/upload`,
+        `${process.env.REACT_APP_URL}/nfse/upload`,
         formData,
         {
           headers: {
@@ -149,9 +182,11 @@ export const Nfe = () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
     try {
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/NFEletronica/buscarAtivos`,
+        `${process.env.REACT_APP_URL}/nfse/BuscarClientes`,
         {
           cpf: searchCpfRegex,
+          filters: activeFilters,
+          dateFilter: dateFilter,
         },
         {
           headers: {
@@ -191,12 +226,24 @@ export const Nfe = () => {
   return (
     <div>
       <NavBar />
-      <Stacked
-        setSearchCpf={setSearchCpf}
-        onSearch={handleSearch}
-        title="Gerar Nota Fiscal Eletrônica"
+      <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
+      <Link
+        className="flex justify-center sm:justify-start"
+        to="/BuscarNfseGerada"
+      >
+        <button
+          className="bg-violet-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
+          onClick={() => setShowPopUp(true)}
+        >
+          NF-es Geradas
+        </button>
+      </Link>
+      <Filter
+        setActiveFilters={setActiveFilters}
+        setDate={setDateFilter}
+        setArquivo={setArquivo}
+        enviarCertificado={handleEnviarCertificado}
       />
-
       {clientes.length > 0 && (
         <>
           <h1 className="text-center mt-2 self-center text-2xl font-semibold text-gray-900">
@@ -230,16 +277,19 @@ export const Nfe = () => {
                   </th>
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900" />
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900">
+                    Titulo
+                  </th>
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
                     Login
                   </th>
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    CPF/CNPJ
+                    Vencimento
                   </th>
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Endereco
+                    Tipo
                   </th>
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Cidade
+                    Valor
                   </th>
                   <th className="px-6 py-3 text-sm font-semibold text-gray-900">
                     Status
@@ -253,22 +303,25 @@ export const Nfe = () => {
                       <input
                         className="cursor-pointer"
                         type="checkbox"
-                        checked={clientesSelecionados.includes(cliente.id)}
-                        onChange={() => handleCheckboxChange(cliente.id)}
+                        checked={clientesSelecionados.includes(
+                          cliente.fatura.titulo,
+                        )}
+                        onChange={() =>
+                          handleCheckboxChange(cliente.fatura.titulo)
+                        }
                       />
                     </td>
                     <td className="px-6 py-4" />
+                    <td className="px-6 py-4">{cliente.fatura.titulo}</td>
                     <td className="px-6 py-4">{cliente.login}</td>
-                    <td className="px-6 py-4">{cliente.cpf_cnpj}</td>
-                    <td className="px-6 py-4">
-                      {cliente.endereco}, {cliente.numero}, {cliente.bairro}
-                    </td>
-                    <td className="px-6 py-4">{cliente.cidade}</td>
+                    <td className="px-6 py-4">{cliente.fatura.datavenc}</td>
+                    <td className="px-6 py-4">{cliente.fatura.tipo}</td>
+                    <td className="px-6 py-4">{cliente.fatura.valor}</td>
                     <td className="px-6 py-4">
                       {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
                     </td>
                     <td className="px-6 py-4 hidden">
-                      {/* Value sum removed */}
+                      {(valueSome += Number(cliente.fatura.valor))}
                     </td>
                   </tr>
                 ))}
@@ -303,11 +356,6 @@ export const Nfe = () => {
           >
             Emitir NF-e
           </button>
-          <Link to="/nfe/comodato">
-            <button className="bg-blue-600 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-blue-500 transition-all">
-              Emitir Comodato
-            </button>
-          </Link>
         </div>
         <select
           onChange={(e) => setAmbiente(e.target.value)}
@@ -364,6 +412,16 @@ export const Nfe = () => {
           placeholder="Ultimo Numero NF-e"
           className="ring-2 ring-red-500 p-2 rounded m-5 placeholder:text-red-500"
         />
+        <input
+          type="text"
+          onChange={(e) => {
+            setRpsNumber(
+              e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, ""),
+            );
+          }}
+          placeholder="Número RPS (Opcional)"
+          className="ring-2 ring-blue-500 p-2 rounded m-5 placeholder:text-blue-500"
+        />
       </div>
 
       {arquivo && (
@@ -392,7 +450,7 @@ export const Nfe = () => {
             </h2>
             <input
               type="password"
-              autoComplete="new-password"
+              value={certPassword}
               onChange={(e) => setCertPassword(e.target.value)}
               className="block w-full border p-2 my-4 rounded"
               placeholder="Senha do PFX"

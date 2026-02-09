@@ -3,3 +3,11 @@ node_modules
 *.sql
 /backend/dist/*
 *.p12
+backend/src/test_nfe_gen.ts
+backend/soap_request.xml
+backend/response_error.html
+backend/soap_response.xml
+backend/validation_errors.txt
+backend/validate_xsd.py
+backend/soap_cancel_response.xml
+backend/soap_cancel_request.xml
