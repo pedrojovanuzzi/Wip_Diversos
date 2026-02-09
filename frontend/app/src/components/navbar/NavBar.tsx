@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import React, { useEffect, useState } from "react";
 import { GrDocumentNotes } from "react-icons/gr";
 
@@ -33,6 +34,76 @@ import Cookies from "js-cookie";
 type Color = {
   color?: string;
   className?: string;
+};
+
+interface NavItemProps {
+  to?: string;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick?: () => void;
+}
+
+const NavItem = ({ to, icon, title, description, onClick }: NavItemProps) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+  const itemRef = React.useRef<HTMLLIElement>(null);
+
+  const handleMouseEnter = () => {
+    if (itemRef.current) {
+      const rect = itemRef.current.getBoundingClientRect();
+      setTooltipPos({
+        top: rect.top + rect.height / 2, // Center vertically relative to item
+        left: rect.right + 10, // Position to the right with some gap
+      });
+      setIsHovered(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
+
+  return (
+    <li
+      ref={itemRef}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="p-2 grid place-items-center col-span-2 group relative z-50"
+    >
+      {onClick ? (
+        <button onClick={onClick}>{icon}</button>
+      ) : (
+        <Link to={to!}>{icon}</Link>
+      )}
+
+      {/* Portal Tooltip */}
+      {isHovered &&
+        createPortal(
+          <div
+            className="fixed p-3 bg-stone-900 border border-stone-700 text-white text-sm rounded-md shadow-xl z-[9999] pointer-events-none transition-all duration-200 opacity-0 animate-in fade-in zoom-in-95"
+            style={{
+              top: tooltipPos.top,
+              left: tooltipPos.left,
+              transform: "translateY(-50%)", // Perfect vertical centering
+              opacity: 1, // Override opacity-0 from base class when rendered
+            }}
+          >
+            <h3 className="font-bold text-green-400 mb-1 text-base">{title}</h3>
+            <p className="text-gray-300 text-xs font-light leading-snug max-w-[200px]">
+              {description}
+            </p>
+
+            {/* Arrow pointing left */}
+            <div
+              className="absolute top-1/2 right-full -translate-y-1/2 border-8 border-transparent border-r-stone-900"
+              style={{ marginRight: -1 }} // Fine tune arrow connection
+            ></div>
+          </div>,
+          document.body,
+        )}
+    </li>
+  );
 };
 
 export const NavBar = ({ color = "black", className = "" }: Color) => {
@@ -102,133 +173,175 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
           <ul className="grid grid-cols-2 gap-5 p-4">
             {permission >= 2 && (
               <>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/">
+                <NavItem
+                  to="/"
+                  icon={
                     <HiHome className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/Pix">
+                  }
+                  title="Início"
+                  description="Página inicial do sistema"
+                />
+                <NavItem
+                  to="/Pix"
+                  icon={
                     <FaPix className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
+                  }
+                  title="Pix"
+                  description="Gestão de pagamentos via Pix"
+                />
               </>
             )}
-            {/* <li className='p-2 grid place-items-center col-span-2'>
-              <Link to='/chamados'>
-                <VscGraph className='text-white size-8 transition-all hover:text-green-400' />
-              </Link>
-            </li> */}
             {permission >= 5 && (
               <>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/Create">
+                <NavItem
+                  to="/Create"
+                  icon={
                     <FaUserPlus className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/TimeTracking/Admin">
+                  }
+                  title="Novo Usuário"
+                  description="Cadastrar novos usuários no sistema"
+                />
+                <NavItem
+                  to="/TimeTracking/Admin"
+                  icon={
                     <FaUsers className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/TimeTracking/Map">
+                  }
+                  title="Gestão de Ponto"
+                  description="Administração de registros de ponto"
+                />
+                <NavItem
+                  to="/TimeTracking/Map"
+                  icon={
                     <FaMapMarkedAlt className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/TimeTracking/Report">
+                  }
+                  title="Mapa"
+                  description="Visualização de localização em tempo real"
+                />
+                <NavItem
+                  to="/TimeTracking/Report"
+                  icon={
                     <FaClipboardList className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
+                  }
+                  title="Relatórios"
+                  description="Relatórios detalhados de ponto"
+                />
               </>
             )}
             {permission >= 2 && (
               <>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/feedbackCreate">
+                <NavItem
+                  to="/feedbackCreate"
+                  icon={
                     <MdOutlineFeedback className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/NFSE" title="Nota Fiscal de Serviço">
+                  }
+                  title="Feedback"
+                  description="Enviar sugestões ou reportar erros"
+                />
+                <NavItem
+                  to="/NFSE"
+                  icon={
                     <HiDocumentText className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/Nfcom">
+                  }
+                  title="NFSe"
+                  description="Emissão e gestão de Nota Fiscal de Serviço"
+                />
+                <NavItem
+                  to="/Nfcom"
+                  icon={
                     <FaFileInvoice className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link
-                    to="/nfe/comodato"
-                    title="Nota Fiscal Eletrônica (Comodato)"
-                  >
+                  }
+                  title="NFCom"
+                  description="Emissão e gestão de Nota Fiscal de Telecom"
+                />
+                <NavItem
+                  to="/nfe/comodato"
+                  icon={
                     <GrDocumentNotes className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/Whatsapp">
+                  }
+                  title="NFe Comodato"
+                  description="Remessa e retorno de equipamentos"
+                />
+                <NavItem
+                  to="/Whatsapp"
+                  icon={
                     <FaWhatsapp className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/ClientAnalytics">
+                  }
+                  title="WhatsApp"
+                  description="Integração e envio de mensagens"
+                />
+                <NavItem
+                  to="/ClientAnalytics"
+                  icon={
                     <IoMdAnalytics className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
+                  }
+                  title="Analytics"
+                  description="Análise de dados de clientes"
+                />
               </>
             )}
             {permission === 1 && (
               <>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/Nfcom/Buscar">
+                <NavItem
+                  to="/Nfcom/Buscar"
+                  icon={
                     <FaSearch className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <button onClick={clearCookies}>
+                  }
+                  title="Buscar NFCom"
+                  description="Pesquisar notas fiscais"
+                />
+                <NavItem
+                  onClick={clearCookies}
+                  icon={
                     <ImExit className="text-white size-8 transition-all hover:text-green-400" />
-                  </button>
-                </li>
+                  }
+                  title="Sair"
+                  description="Encerrar sessão"
+                />
               </>
             )}
-            {/* <li className='p-2 grid place-items-center col-span-2'>
-              <Link to='/DDDOS'>
-                <PiComputerTowerBold className='text-white size-8 transition-all hover:text-green-400' />
-              </Link>
-            </li> */}
-            <li className="p-2 grid place-items-center col-span-2">
-              <Link to="/TimeTracking/ClockIn">
+            <NavItem
+              to="/TimeTracking/ClockIn"
+              icon={
                 <FaClock className="text-white size-8 transition-all hover:text-green-400" />
-              </Link>
-            </li>
+              }
+              title="Registrar Ponto"
+              description="Bater ponto (Entrada/Saída)"
+            />
 
             {permission >= 2 && (
               <>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/ServerLogs">
+                <NavItem
+                  to="/ServerLogs"
+                  icon={
                     <FaRegFolder className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/PowerDns">
+                  }
+                  title="Logs"
+                  description="Visualizar logs do servidor"
+                />
+                <NavItem
+                  to="/PowerDns"
+                  icon={
                     <MdDns className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <Link to="/Onu">
+                  }
+                  title="DNS"
+                  description="Gerenciamento de PowerDNS"
+                />
+                <NavItem
+                  to="/Onu"
+                  icon={
                     <FaPlugCirclePlus className="text-white size-8 transition-all hover:text-green-400" />
-                  </Link>
-                </li>
-                <li className="p-2 grid place-items-center col-span-2">
-                  <button onClick={clearCookies}>
+                  }
+                  title="ONU"
+                  description="Gerenciamento de ONUs"
+                />
+                <NavItem
+                  onClick={clearCookies}
+                  icon={
                     <ImExit className="text-white size-8 transition-all hover:text-green-400" />
-                  </button>
-                </li>
+                  }
+                  title="Sair"
+                  description="Encerrar sessão"
+                />
               </>
             )}
           </ul>
