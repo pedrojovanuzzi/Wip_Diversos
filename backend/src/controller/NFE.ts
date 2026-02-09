@@ -52,7 +52,15 @@ class NFEController {
       await AppDataSource.getRepository(Jobs).save(job);
 
       // Trigger background processing (fire and forget)
-      this.processarFilaBackground(job, logins, password, ambiente, "saida");
+      this.processarFilaBackground(
+        job,
+        logins,
+        password,
+        ambiente,
+        "saida",
+      ).catch((err) =>
+        console.error("Erro no processamento background (Saída):", err),
+      );
 
       res.status(200).json({
         message: "Processamento iniciado em segundo plano.",
@@ -87,7 +95,15 @@ class NFEController {
       await AppDataSource.getRepository(Jobs).save(job);
 
       // Trigger background processing (fire and forget)
-      this.processarFilaBackground(job, logins, password, ambiente, "entrada");
+      this.processarFilaBackground(
+        job,
+        logins,
+        password,
+        ambiente,
+        "entrada",
+      ).catch((err) =>
+        console.error("Erro no processamento background (Entrada):", err),
+      );
 
       res.status(200).json({
         message: "Processamento iniciado em segundo plano.",
@@ -117,6 +133,9 @@ class NFEController {
     const sisProdutoRepository = MkauthSource.getRepository(SisProduto);
 
     for (const login of logins) {
+      let nfeRecord: NFE | null = null;
+      let xmlToSave = "";
+
       try {
         contadorProcessados++;
         // Update job progress
@@ -153,21 +172,15 @@ class NFEController {
 
         const productMap = new Map(products.map((p) => [p.id, p]));
 
-        // 3. Determine Series and NFE Number
-        // Note: We need to do this serially to avoid number conflicts
+        // 3. Determine Series and NFE Number & RESERVE IT
+        // Use a transaction or lock if possible, but for now strict serialization in this loop
+        // plus immediate save should suffice to prevent simple race conditions in serial processing.
         const effectiveSerie = isHomologacao ? "99" : "1";
 
-        // Lock or re-check latest might be safer, but for now we query latest
         const lastNfe = await nfeRepository.findOne({
           where: { serie: effectiveSerie },
           order: { id: "DESC" },
         });
-
-        // If we are processing in parallel/background, we might need to handle concurrency.
-        // But since we are processing one by one in this loop, we just need to make sure
-        // we increment correctly. We might need to keep a local 'currentNumber' if we trust
-        // no other process is emitting for this series.
-        // BETTER: Re-query inside the loop for each one, as we are doing.
 
         const nNF = lastNfe ? parseInt(lastNfe.nNF) + 1 : 1;
         const serie = effectiveSerie;
@@ -215,6 +228,7 @@ class NFEController {
               indPres: "1",
               procEmi: "0",
               verProc: "1.0",
+              // cRegTrib: "1", // If needed
             },
             emit: {
               CNPJ: process.env.CPF_CNPJ?.replace(/\D/g, "") || "",
@@ -258,7 +272,18 @@ class NFEController {
                 cPais: "1058",
                 xPais: "BRASIL",
               },
-              indIEDest: "9",
+              indIEDest:
+                client.cpf_cnpj.replace(/\D/g, "").length > 11 &&
+                client.rg &&
+                client.rg.replace(/\D/g, "").length > 0
+                  ? "1"
+                  : "9",
+              IE:
+                client.cpf_cnpj.replace(/\D/g, "").length > 11 &&
+                client.rg &&
+                client.rg.replace(/\D/g, "").length > 0
+                  ? client.rg.replace(/\D/g, "")
+                  : undefined,
             },
             det: equipamentos.map((eq: any, index: number) => {
               const product = eq.idprod ? productMap.get(eq.idprod) : null;
@@ -365,11 +390,33 @@ class NFEController {
           },
         };
 
-        // 5. Generate, Sign and Send
         const chave = this.gerarChaveAcesso(nfeData.infNFe);
         nfeData.infNFe["@Id"] = `NFe${chave}`;
         nfeData.infNFe.ide.cDV = chave.slice(-1);
 
+        // --- SAVE RESERVATION START ---
+        nfeRecord = nfeRepository.create({
+          nNF: nfeData.infNFe.ide.nNF,
+          serie: nfeData.infNFe.ide.serie,
+          chave: chave,
+          xml: "", // Will update later
+          status: "processando", // Reserve status
+          protocolo: "",
+          data_emissao: new Date(),
+          cliente_id: client.id,
+          destinatario_nome: client.nome,
+          destinatario_cpf_cnpj: client.cpf_cnpj,
+          tipo_operacao:
+            tipo === "saida" ? "saida_comodato" : "entrada_comodato",
+          valor_total: parseFloat(nfeData.infNFe.total.ICMSTot.vNF),
+          tpAmb: isHomologacao ? 2 : 1,
+          tipo: ambiente,
+        });
+
+        await nfeRepository.save(nfeRecord);
+        // --- SAVE RESERVATION END ---
+
+        // 5. Generate, Sign and Send
         let innerXml = create(
           { encoding: "UTF-8" },
           {
@@ -380,11 +427,17 @@ class NFEController {
           },
         ).end({ prettyPrint: false });
 
+        // Capture unsigned XML for debugging if signing fails
+        xmlToSave = innerXml;
+
         const signedXml = await this.assinarXml(
           innerXml,
           password,
           nfeData.infNFe["@Id"],
         );
+
+        // Capture signed XML
+        xmlToSave = signedXml;
 
         const loteXml = `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>1</idLote><indSinc>1</indSinc>${signedXml.replace(/<\?xml.*?\?>/, "")}</enviNFe>`;
 
@@ -444,35 +497,32 @@ class NFEController {
           throw new Error(`Erro SEFAZ: ${cStat} - ${xMotivo}`);
         }
 
-        // 6. Save Success
-        const nfeRecord = nfeRepository.create({
-          nNF: nfeData.infNFe.ide.nNF,
-          serie: nfeData.infNFe.ide.serie,
-          chave: chave,
-          xml: signedXml,
-          status: "autorizado",
-          protocolo: nProt,
-          data_emissao: new Date(),
-          cliente_id: client.id,
-          destinatario_nome: client.nome,
-          destinatario_cpf_cnpj: client.cpf_cnpj,
-          tipo_operacao:
-            tipo === "saida" ? "saida_comodato" : "entrada_comodato",
-          valor_total: parseFloat(nfeData.infNFe.total.ICMSTot.vNF),
-          tpAmb: isHomologacao ? 2 : 1,
-          tipo: ambiente,
-        });
-
-        await nfeRepository.save(nfeRecord);
+        // 6. Update Success
+        if (nfeRecord) {
+          await nfeRepository.update(nfeRecord.id, {
+            status: "autorizado",
+            xml: signedXml, // Update with full signed XML
+            protocolo: nProt,
+          });
+        }
 
         responses.push({
           success: true,
-          id: nfeRecord.id,
+          id: nfeRecord?.id,
           message: `NFE ${nNF} Autorizada`,
           nNF: nfeData.infNFe.ide.nNF,
         });
       } catch (error: any) {
         console.error(`Erro ao processar login ${login}:`, error);
+
+        // Update to error state if record was created
+        if (nfeRecord) {
+          await nfeRepository.update(nfeRecord.id, {
+            status: "erro_emissao",
+            xml: xmlToSave, // Save whatever XML we managed to generate (signed or unsigned)
+          });
+        }
+
         responses.push({
           success: false,
           login: login,
