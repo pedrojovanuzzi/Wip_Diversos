@@ -391,6 +391,7 @@ class NFEController {
         tipo_operacao: "saida_comodato",
         valor_total: parseFloat(nfeData.infNFe.total.ICMSTot.vNF),
         tpAmb: this.homologacao ? 2 : 1,
+        tipo: ambiente,
       });
 
       await nfeRepository.save(nfeRecord);
@@ -766,6 +767,7 @@ class NFEController {
         tipo_operacao: "entrada_comodato",
         valor_total: parseFloat(nfeData.infNFe.total.ICMSTot.vNF),
         tpAmb: this.homologacao ? 2 : 1,
+        tipo: this.homologacao ? "homologacao" : "producao",
       });
 
       await nfeRepository.save(nfeRecord);

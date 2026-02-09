@@ -46,4 +46,7 @@ export class NFE {
 
   @Column({ type: "varchar", length: 255, nullable: true })
   pdf_path!: string;
+
+  @Column({ type: "varchar", length: 20, nullable: true })
+  tipo!: string; // 'producao' | 'homologacao'
 }

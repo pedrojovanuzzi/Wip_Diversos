@@ -387,6 +387,12 @@ export const BuscarNfe = () => {
                               scope="col"
                               className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
                             >
+                              Ambiente
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                            >
                               Produto
                             </th>
                             <th
@@ -474,6 +480,15 @@ export const BuscarNfe = () => {
                                     : nfe.tipo_operacao === "saida_comodato"
                                       ? "Saída"
                                       : nfe.tipo_operacao}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                  {nfe.tipo
+                                    ? nfe.tipo === "homologacao"
+                                      ? "Homologação"
+                                      : "Produção"
+                                    : nfe.tpAmb === 2
+                                      ? "Homologação"
+                                      : "Produção"}
                                 </td>
                                 <td
                                   className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 max-w-xs truncate"
