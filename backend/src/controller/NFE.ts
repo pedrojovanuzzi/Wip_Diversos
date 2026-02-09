@@ -1292,18 +1292,31 @@ class NFEController {
           order: { nNF: "ASC" },
         });
       } else {
-        // Busca por data se não tiver IDs
-        // Converter strings de data "DD/MM/YYYY" para Date se necessário,
-        // ou assumir que vem no formato ISO/correto se o frontend mandar.
-        // O frontend manda LocaleDateString pt-BR. Vamos converter.
-
+        const { dateFilter } = req.body;
         let start: Date;
         let end: Date;
 
-        if (dataInicio && dataFim) {
+        if (dateFilter && dateFilter.start && dateFilter.end) {
+          // Use Strict UTC matching like BuscarNFEs
+          start = new Date(`${dateFilter.start}T00:00:00.000Z`);
+          end = new Date(`${dateFilter.end}T23:59:59.999Z`);
+
+          const where: any = {
+            data_emissao: Between(start, end),
+          };
+
+          if (tipo_operacao) {
+            where.tipo_operacao = tipo_operacao;
+          }
+
+          nfes = await nfeRepository.find({
+            where: where,
+            order: { nNF: "ASC" },
+          });
+        } else if (dataInicio && dataFim) {
+          // Fallback for old behavior or if dateFilter is missing
           const [diaIni, mesIni, anoIni] = dataInicio.split("/");
           const [diaFim, mesFim, anoFim] = dataFim.split("/");
-          // Force explicit offset -03:00 to match Brazil time (BRT)
           start = new Date(`${anoIni}-${mesIni}-${diaIni}T00:00:00.000-03:00`);
           end = new Date(`${anoFim}-${mesFim}-${diaFim}T23:59:59.999-03:00`);
 
@@ -1351,8 +1364,17 @@ class NFEController {
       doc.fontSize(20).text("Relatório de Notas Fiscais", 30, 30);
       doc.fontSize(10).font("Helvetica");
       doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 30, 60);
+      const { dateFilter } = req.body;
+      let periodoTexto = "";
+      if (dateFilter && dateFilter.start && dateFilter.end) {
+        const fmt = (iso: string) => iso.split("-").reverse().join("/");
+        periodoTexto = `${fmt(dateFilter.start)} a ${fmt(dateFilter.end)}`;
+      } else {
+        periodoTexto = `${dataInicio || "Início"} a ${dataFim || "Fim"}`;
+      }
+
       doc.text(
-        `Período: ${dataInicio || "Início"} a ${dataFim || "Fim"}${tipo_operacao ? ` - Tipo: ${tipo_operacao}` : ""}`,
+        `Período: ${periodoTexto}${tipo_operacao ? ` - Tipo: ${tipo_operacao}` : ""}`,
         30,
         75,
       );

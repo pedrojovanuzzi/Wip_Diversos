@@ -113,6 +113,7 @@ export const BuscarNfe = () => {
         `${process.env.REACT_APP_URL}/NFEletronica/generateReportPdf`,
         {
           id: selectedIds.length > 0 ? selectedIds : undefined,
+          dateFilter: dateFilter,
           dataInicio: dateFilter?.start
             ? new Date(dateFilter.start).toLocaleDateString("pt-BR")
             : undefined,
