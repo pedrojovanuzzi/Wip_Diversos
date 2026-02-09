@@ -87,7 +87,7 @@ class NFEController {
       const reqSerie = req.body.serie;
       const effectiveSerie = reqSerie
         ? reqSerie
-        : this.homologacao
+        : process.env.SERVIDOR_HOMOLOGACAO
           ? "99"
           : "1";
 
