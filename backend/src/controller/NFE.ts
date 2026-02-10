@@ -1468,18 +1468,30 @@ class NFEController {
             { width: 440, align: "left" },
           );
 
+        // Row 1.5: Extra Info (Emissao, Valor, Destinatario)
+        let totalVal = total?.vNF || "0,00"; // Should be formatted number
+        if (typeof totalVal === "number") totalVal = totalVal.toFixed(2);
+        const formattedTotal = totalVal.replace(".", ",");
+
+        doc.fontSize(5).text(
+          `EMISSÃO: ${new Date(dataHoraEmissao).toLocaleDateString("pt-BR")}   VALOR TOTAL: R$ ${formattedTotal}   DESTINATÁRIO: ${dest.xNome.substring(0, 50)}`,
+          margin + 2,
+          y + 9, // Just below the first line
+          { width: 440, align: "left" },
+        );
+
         // Horizontal line separator
         doc
-          .moveTo(margin, y + 10)
-          .lineTo(margin + 450, y + 10)
+          .moveTo(margin, y + 15)
+          .lineTo(margin + 450, y + 15)
           .stroke();
 
         // Row 2: Data & Signature
         doc
-          .moveTo(margin + 130, y + 10)
+          .moveTo(margin + 130, y + 15)
           .lineTo(margin + 130, y + 25)
           .stroke();
-        doc.fontSize(6).text("DATA DE RECEBIMENTO", margin + 2, y + 12);
+        doc.fontSize(6).text("DATA DE RECEBIMENTO", margin + 2, y + 17);
 
         doc
           .moveTo(margin + 450, y)
@@ -1491,7 +1503,7 @@ class NFEController {
           .text(
             "IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR",
             margin + 132,
-            y + 12,
+            y + 17,
           );
 
         // Adjusted top-right block to fit text inside 25px height
@@ -2005,13 +2017,16 @@ CEP: ${ender.CEP} - Fone: ${ender.fone || ""}`;
         y += 8;
 
         const infoCompH = 60;
+        const defaultInfCpl =
+          "NAO INCIDENCIA DO ICMS, CONFORME ARTIGO 7, INCISO IX E XIV - DECRETO 45.490/00. NAO INCIDENCIA DO IPI NOS TERMOS DO ARTIGO 37, INCISO II, DECRETO N 5.544/02.";
+
         drawBox(
           margin,
           y,
           380,
           infoCompH,
           "INFORMAÇÕES COMPLEMENTARES",
-          infAdic?.infCpl || "",
+          infAdic?.infCpl || defaultInfCpl,
           "left",
           7,
         );
