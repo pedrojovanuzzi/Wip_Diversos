@@ -2010,7 +2010,7 @@ CEP: ${ender.CEP} - Fone: ${ender.fone || ""}`;
           y += rowH;
         });
 
-        y += 10;
+        y += 30;
 
         // --- 6. Dados Adicionais ---
         drawSectionTitle("DADOS ADICIONAIS", y);
@@ -2018,7 +2018,7 @@ CEP: ${ender.CEP} - Fone: ${ender.fone || ""}`;
 
         const infoCompH = 60;
         const defaultInfCpl =
-          "NAO INCIDENCIA DO ICMS, CONFORME ARTIGO 7, INCISO IX E XIV - DECRETO 45.490/00. NAO INCIDENCIA DO IPI NOS TERMOS DO ARTIGO 37, INCISO II, DECRETO N 5.544/02.";
+          "NAO INCIDENCIA DO ICMS, CONFORME ARTIGO 7, INCISO IX E XIV - DECRETO 45.490/00. NAO INCIDENCIA DO IPI NOS TERMOS DO ARTIGO 37, INCISO II, DECRETO N 5.544/02. Documento emitido por ME ou EPP optante do Simples Nacional.";
 
         drawBox(
           margin,
