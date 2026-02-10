@@ -1367,7 +1367,7 @@ class NFEController {
   };
 
   public generateDanfe = async (nfe: NFE): Promise<Buffer> => {
-    return new Promise<Buffer>((resolve, reject) => {
+    return new Promise<Buffer>(async (resolve, reject) => {
       try {
         const parser = new XMLParser({
           ignoreAttributes: false,
@@ -1379,7 +1379,8 @@ class NFEController {
         const parsed = parser.parse(xmlString);
 
         // Handle NFE structure variations (nfeProc vs NFe)
-        let root = parsed.nfeProc?.NFe || parsed.NFe; // Standard is nfeProc > NFe
+        let root = parsed.nfeProc?.NFe || parsed.NFe;
+        const protNFe = parsed.nfeProc?.protNFe || null;
 
         if (!root) throw new Error("XML inválido ou formato desconhecido");
 
@@ -1392,327 +1393,626 @@ class NFEController {
         const dest = inf.dest;
         const det = Array.isArray(inf.det) ? inf.det : [inf.det];
         const total = inf.total?.ICMSTot;
+        const transp = inf.transp;
+        const infAdic = inf.infAdic;
 
-        const doc = new PDFDocument({ margin: 20, size: "A4" });
+        // Extract Chave and Protocol from XML if available
+        let chave = inf["@Id"] ? inf["@Id"].replace("NFe", "") : nfe.chave;
+        let protocolo = protNFe?.infProt?.nProt || nfe.protocolo || "";
+        let dataHoraEmissao = ide.dhEmi;
+        let dataHoraSaida = ide.dhSaiEnt || ide.dhEmi; // Fallback to emission if not present
+
+        const doc = new PDFDocument({ margin: 10, size: "A4" });
         const chunks: Buffer[] = [];
         doc.on("data", (chunk) => chunks.push(chunk));
         doc.on("end", () => resolve(Buffer.concat(chunks)));
 
-        // --- Layout Reuse (NFE) ---
-        const margin = 20;
+        // Fonts
+        doc.font("Helvetica");
+
+        // --- Layout Constants ---
+        const margin = 10;
         const pageWidth = 595.28;
         const contentWidth = pageWidth - margin * 2;
         let y = margin;
+        const lineHeight = 10;
 
-        // Helper to draw a box
+        // --- Helpers ---
         const drawBox = (
           x: number,
           y: number,
           w: number,
           h: number,
           title: string,
+          value: string = "",
+          align: "left" | "center" | "right" = "left",
+          fontSize: number = 8,
+          boldValue: boolean = false,
         ) => {
-          doc.rect(x, y, w, h).stroke();
+          doc.rect(x, y, w, h).lineWidth(0.5).stroke();
           doc
-            .fontSize(6)
-            .font("Helvetica-Bold")
-            .text(title.toUpperCase(), x + 2, y + 2);
+            .fontSize(5)
+            .font("Helvetica")
+            .text(title.toUpperCase(), x + 2, y + 2, { width: w - 4 });
+
+          if (value) {
+            doc
+              .fontSize(fontSize)
+              .font(boldValue ? "Helvetica-Bold" : "Helvetica")
+              .text(value, x + 2, y + 8, {
+                width: w - 4,
+                align: align === "left" ? undefined : align,
+              });
+          }
         };
 
-        // Header Section
-        doc.rect(margin, y, contentWidth, 85).stroke();
+        const drawSectionTitle = (title: string, yPos: number) => {
+          doc.font("Helvetica-Bold").fontSize(7).text(title, margin, yPos);
+          return yPos + 8;
+        };
 
-        // Left: Emitente Logo/Names
-        // const emitBoxW = contentWidth * 0.45;
-        doc
-          .fontSize(12)
-          .font("Helvetica-Bold")
-          .text(emit.xNome.substring(0, 45), margin + 5, y + 15);
+        // --- 1. Header (Canhoto + Emitente) ---
 
-        doc.fontSize(8).font("Helvetica");
-        const enderEmit = emit.enderEmit || {};
-        doc.text(
-          `${enderEmit.xLgr || ""}, ${enderEmit.nro || ""}`,
-          margin + 5,
-          y + 35,
-        );
-        doc.text(
-          `Bairro: ${enderEmit.xBairro || ""} - CEP: ${enderEmit.CEP || ""}`,
-          margin + 5,
-          y + 45,
-        );
-        doc.text(
-          `${enderEmit.xMun || ""} - ${enderEmit.UF || ""}`,
-          margin + 5,
-          y + 55,
-        );
-        doc.text(`CNPJ: ${emit.CNPJ}  IE: ${emit.IE}`, margin + 5, y + 70);
-
-        // Right: DANFE Info
-        const danfeBlockX = margin + 300;
-        doc
-          .fontSize(14)
-          .font("Helvetica-Bold")
-          .text("DANFE", danfeBlockX, y + 10);
-        doc
-          .fontSize(8)
-          .font("Helvetica")
-          .text(
-            "Documento Auxiliar da Nota Fiscal Eletrônica",
-            danfeBlockX,
-            y + 25,
-          );
-
-        doc.rect(danfeBlockX, y + 35, 235, 40).stroke(); // Chave Box within Header
+        // Canhoto
+        doc.rect(margin, y, contentWidth, 25).lineWidth(0.5).stroke();
         doc
           .fontSize(6)
-          .font("Helvetica-Bold")
-          .text("CHAVE DE ACESSO", danfeBlockX + 2, y + 37);
-        doc
-          .fontSize(8)
-          .font("Helvetica")
-          .text(nfe.chave.replace(/(\d{4})/g, "$1 "), danfeBlockX + 5, y + 55);
-
-        y += 90;
-
-        // Info Row (Natureza, Protocolo side by side or just simple info)
-        drawBox(margin, y, 70, 25, "NÚMERO");
-        doc.fontSize(10).text(ide.nNF, margin + 5, y + 12);
-
-        drawBox(margin + 75, y, 40, 25, "SÉRIE");
-        doc.fontSize(10).text(ide.serie, margin + 80, y + 12);
-
-        drawBox(margin + 120, y, 320, 25, "NATUREZA DA OPERAÇÃO");
-        doc
-          .fontSize(9)
-          .text((ide.natOp || "VENDA").substring(0, 50), margin + 125, y + 12);
-
-        drawBox(margin + 445, y, contentWidth - 445, 25, "DATA DE EMISSÃO");
-        doc
-          .fontSize(10)
           .text(
-            new Date(ide.dhEmi).toLocaleDateString("pt-BR"),
-            margin + 450,
-            y + 12,
+            "RECEBEMOS DE " +
+              emit.xNome.substring(0, 60) +
+              " OS PRODUTOS/SERVIÇOS CONSTANTES DA NOTA FISCAL INDICADA AO LADO",
+            margin + 2,
+            y + 2,
           );
 
-        y += 35;
-
-        // Destinatario Section
         doc
-          .fontSize(9)
-          .font("Helvetica-Bold")
-          .text("DESTINATÁRIO / REMETENTE", margin, y);
-        y += 10;
+          .moveTo(margin + 130, y)
+          .lineTo(margin + 130, y + 25)
+          .stroke();
+        doc.fontSize(6).text("DATA DE RECEBIMENTO", margin + 2, y + 14);
 
-        // Row 1: Nome, CPF/CNPJ, Data Emissão (Again? Usually Data Saida)
-        const destNameW = 350;
-        drawBox(margin, y, destNameW, 25, "NOME / RAZÃO SOCIAL");
+        doc
+          .moveTo(margin + 450, y)
+          .lineTo(margin + 450, y + 25)
+          .stroke();
+        doc
+          .fontSize(6)
+          .text(
+            "IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR",
+            margin + 132,
+            y + 14,
+          );
+
+        // Adjusted top-right block to fit text inside 25px height
+        doc
+          .fontSize(8)
+          .font("Helvetica-Bold")
+          .text("NF-e", margin + 450, y + 2, { width: 125, align: "center" });
+        doc
+          .fontSize(7)
+          .font("Helvetica")
+          .text(`Nº ${ide.nNF}`, margin + 450, y + 10, {
+            width: 125,
+            align: "center",
+          });
+        doc.text(`SÉRIE ${ide.serie}`, margin + 450, y + 17, {
+          width: 125,
+          align: "center",
+        });
+
+        y += 30; // Gap for cut line
+        doc
+          .dash(2, { space: 2 })
+          .moveTo(margin, y - 2)
+          .lineTo(pageWidth - margin, y - 2)
+          .stroke()
+          .undash();
+
+        // Emitente Area
+        const logoHeight = 85;
+        const emitenteBoxWidth = 230; // Reduced slightly to give space to DANFE
+
+        // Logo / Identificacao Emitente
+        drawBox(margin, y, emitenteBoxWidth, logoHeight, ""); // Placeholder for logo/text
+        // Simulate Logo or Text
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(10)
+          .text(emit.xNome, margin + 5, y + 10, {
+            width: emitenteBoxWidth - 10,
+            align: "center",
+          });
+        doc
+          .font("Helvetica")
+          .fontSize(8)
+          .text(emit.xFant || "", margin + 5, y + 30, {
+            width: emitenteBoxWidth - 10,
+            align: "center",
+          });
+
+        const ender = emit.enderEmit;
+        const enderString = `${ender.xLgr}, ${ender.nro} ${ender.xCpl ? "- " + ender.xCpl : ""}
+${ender.xBairro} - ${ender.xMun} - ${ender.UF}
+CEP: ${ender.CEP} - Fone: ${ender.fone || ""}`;
+        doc.fontSize(7).text(enderString, margin + 5, y + 45, {
+          width: emitenteBoxWidth - 10,
+          align: "center",
+        });
+
+        // DANFE Label Block - INCREASED WIDTH from 35 to 80
+        const danfeX = margin + emitenteBoxWidth;
+        const danfeW = 90;
+        drawBox(danfeX, y, danfeW, logoHeight, "");
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(12)
+          .text("DANFE", danfeX, y + 5, { width: danfeW, align: "center" });
+        doc
+          .fontSize(8) // Increased font size for readability
+          .text(
+            "Documento Auxiliar da Nota Fiscal Eletrônica",
+            danfeX,
+            y + 20,
+            { width: danfeW, align: "center" },
+          );
+        doc.fontSize(8).text("0 - Entrada", danfeX + 5, y + 45);
+        doc.fontSize(8).text("1 - Saída", danfeX + 5, y + 55);
+        doc
+          .fontSize(12)
+          .rect(danfeX + 55, y + 42, 25, 20) // Adjusted box position
+          .stroke()
+          .text(ide.tpNF, danfeX + 55, y + 47, { width: 25, align: "center" });
+
+        // Barcode Block
+        const barCodeX = danfeX + danfeW;
+        const barCodeW = contentWidth - (emitenteBoxWidth + danfeW);
+        const code128Height = 50;
+
+        drawBox(barCodeX, y, barCodeW, logoHeight, "");
+
+        // Generate Barcode
+        try {
+          const bwipjs = require("bwip-js");
+          const png = await bwipjs.toBuffer({
+            bcid: "code128", // Barcode type
+            text: chave.replace(/\D/g, ""), // Text to encode
+            scale: 3, // 3x scaling factor
+            height: 10, // Bar height, in millimeters
+            includetext: false, // Show human-readable text
+            textxalign: "center", // Always good to set this
+          });
+          doc.image(png, barCodeX + 10, y + 5, {
+            height: 45,
+            width: barCodeW - 20,
+          });
+        } catch (e) {
+          doc.text("Erro Barcode", barCodeX + 5, y + 20);
+        }
+
+        // Chave de Acesso
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(9)
+          .text("CHAVE DE ACESSO", barCodeX + 5, y + 55);
+        const chaveFmt = chave
+          .replace(/\D/g, "")
+          .replace(/(\d{4})/g, "$1 ")
+          .trim();
         doc
           .fontSize(9)
           .font("Helvetica")
-          .text((dest.xNome || "").substring(0, 55), margin + 5, y + 12); // Truncate to avoid overlap
+          .text(chaveFmt, barCodeX + 5, y + 68);
 
-        drawBox(margin + destNameW, y, 120, 25, "CNPJ / CPF");
-        doc
-          .fontSize(9)
-          .text(dest.CNPJ || dest.CPF || "", margin + destNameW + 5, y + 12);
+        y += logoHeight;
 
-        // Data Saida place
+        // Nat Op / Protocolo
         drawBox(
-          margin + destNameW + 120,
+          margin,
           y,
-          contentWidth - (destNameW + 120),
+          350,
           25,
-          "DATA SAÍDA/ENTRADA",
+          "NATUREZA DA OPERAÇÃO",
+          ide.natOp || "VENDA",
+          "left",
+          9,
         );
-        // Assuming same date for simplicity or leave empty if not available
-        doc.text(
-          new Date(ide.dhEmi).toLocaleDateString("pt-BR"),
-          margin + destNameW + 125,
-          y + 12,
+        drawBox(
+          margin + 350,
+          y,
+          contentWidth - 350,
+          25,
+          "PROTOCOLO DE AUTORIZAÇÃO DE USO",
+          `${protocolo || ""} - ${new Date(dataHoraEmissao).toLocaleDateString("pt-BR")}`,
+          "center",
+          9,
         );
-
         y += 25;
 
-        // Row 2: Endereco, Bairro, CEP, Municipio, UF
-        const enderDest = dest.enderDest || {};
-        const addrW = 250;
-        drawBox(margin, y, addrW, 25, "ENDEREÇO");
-        doc.text(
-          `${enderDest.xLgr || ""}, ${enderDest.nro || ""}`,
-          margin + 5,
-          y + 12,
+        drawBox(margin, y, 190, 25, "INSCRIÇÃO ESTADUAL", emit.IE);
+        drawBox(
+          margin + 190,
+          y,
+          190,
+          25,
+          "INSCRIÇÃO ESTADUAL DO SUBST. TRIB.",
+          "",
         );
+        drawBox(margin + 380, y, contentWidth - 380, 25, "CNPJ", emit.CNPJ);
+        y += 30; // Spacing
 
-        drawBox(margin + addrW, y, 130, 25, "BAIRRO / DISTRITO");
-        doc.text(
-          (enderDest.xBairro || "").substring(0, 25),
-          margin + addrW + 5,
-          y + 12,
+        // --- 2. Destinatario ---
+        y = drawSectionTitle("DESTINATÁRIO / REMETENTE", y);
+        drawBox(
+          margin,
+          y,
+          350,
+          25,
+          "NOME / RAZÃO SOCIAL",
+          dest.xNome,
+          "left",
+          9,
+          true,
         );
+        drawBox(margin + 350, y, 110, 25, "CNPJ / CPF", dest.CNPJ || dest.CPF);
+        drawBox(
+          margin + 460,
+          y,
+          contentWidth - 460,
+          25,
+          "DATA DA EMISSÃO",
+          new Date(dataHoraEmissao).toLocaleDateString("pt-BR"),
+          "center",
+        );
+        y += 25;
 
-        drawBox(margin + addrW + 130, y, 80, 25, "CEP");
-        doc.text(enderDest.CEP || "", margin + addrW + 135, y + 12);
+        const destEnd = dest.enderDest;
+        drawBox(
+          margin,
+          y,
+          270,
+          25,
+          "ENDEREÇO",
+          `${destEnd.xLgr}, ${destEnd.nro}`,
+        );
+        drawBox(margin + 270, y, 140, 25, "BAIRRO / DISTRITO", destEnd.xBairro);
+        drawBox(margin + 410, y, 50, 25, "CEP", destEnd.CEP);
+        drawBox(
+          margin + 460,
+          y,
+          contentWidth - 460,
+          25,
+          "DATA SAÍDA/ENTRADA",
+          new Date(dataHoraSaida).toLocaleDateString("pt-BR"),
+          "center",
+        ); // replicate emission for now
+        y += 25;
+
+        drawBox(margin, y, 20, 25, "UF", destEnd.UF); // Fixed width for UF
+        drawBox(margin + 20, y, 200, 25, "MUNICÍPIO", destEnd.xMun);
+        drawBox(margin + 220, y, 100, 25, "FONE / FAX", destEnd.fone);
+        drawBox(margin + 320, y, 140, 25, "INSCRIÇÃO ESTADUAL", dest.IE);
+        drawBox(
+          margin + 460,
+          y,
+          contentWidth - 460,
+          25,
+          "HORA SAÍDA",
+          new Date(dataHoraSaida).toLocaleTimeString("pt-BR").substring(0, 5),
+          "center",
+        );
+        y += 30;
+
+        // --- 3. Imposto ---
+        // Simplified for now assuming Mock data or 0 if not present, as usually tax calc is complex
+        y = drawSectionTitle("CÁLCULO DO IMPOSTO", y);
+
+        const wBase = contentWidth / 5;
+        // Row 1
+        drawBox(
+          margin,
+          y,
+          wBase,
+          25,
+          "BASE DE CÁLCULO DO ICMS",
+          total.vBC || "0,00",
+          "right",
+        );
+        drawBox(
+          margin + wBase,
+          y,
+          wBase,
+          25,
+          "VALOR DO ICMS",
+          total.vICMS || "0,00",
+          "right",
+        );
+        drawBox(
+          margin + wBase * 2,
+          y,
+          wBase,
+          25,
+          "BASE DE CÁLC. ICMS S.T.",
+          total.vBCST || "0,00",
+          "right",
+        );
+        drawBox(
+          margin + wBase * 3,
+          y,
+          wBase,
+          25,
+          "VALOR DO ICMS SUBST.",
+          total.vST || "0,00",
+          "right",
+        );
+        drawBox(
+          margin + wBase * 4,
+          y,
+          wBase,
+          25,
+          "VALOR TOTAL DOS PRODUTOS",
+          total.vProd || "0,00",
+          "right",
+          9,
+          true,
+        );
+        y += 25;
+
+        // Row 2
+        drawBox(
+          margin,
+          y,
+          wBase,
+          25,
+          "VALOR DO FRETE",
+          total.vFrete || "0,00",
+          "right",
+        );
+        drawBox(
+          margin + wBase,
+          y,
+          wBase,
+          25,
+          "VALOR DO SEGURO",
+          total.vSeg || "0,00",
+          "right",
+        );
+        drawBox(
+          margin + wBase * 2,
+          y,
+          wBase,
+          25,
+          "DESCONTO",
+          total.vDesc || "0,00",
+          "right",
+        );
+        drawBox(
+          margin + wBase * 3,
+          y,
+          wBase,
+          25,
+          "OUTRAS DESPESAS ACESS.",
+          total.vOutro || "0,00",
+          "right",
+        );
+        drawBox(
+          margin + wBase * 4,
+          y,
+          wBase,
+          25,
+          "VALOR TOTAL DA NOTA",
+          total.vNF || "0,00",
+          "right",
+          10,
+          true,
+        );
+        y += 30;
+
+        // --- 4. Transportador ---
+        y = drawSectionTitle("TRANSPORTADOR / VOLUMES TRANSPORTADOS", y);
+        const modFrete = transp.modFrete || "9";
+        const modFreteText =
+          modFrete === "0"
+            ? "0 - Remetente (CIF)"
+            : modFrete === "1"
+              ? "1 - Destinatário (FOB)"
+              : "9 - Sem Frete";
 
         drawBox(
-          margin + addrW + 210,
+          margin,
           y,
-          contentWidth - (addrW + 210),
+          250,
           25,
-          "MUNICÍPIO / UF",
+          "NOME / RAZÃO SOCIAL",
+          transp.transporta?.xNome || "",
+          "left",
         );
-        doc.text(
-          `${enderDest.xMun || ""} - ${enderDest.UF || ""}`,
-          margin + addrW + 215,
-          y + 12,
+        drawBox(
+          margin + 250,
+          y,
+          120,
+          25,
+          "FRETE POR CONTA",
+          modFreteText,
+          "left",
+          7,
         );
+        drawBox(margin + 370, y, 80, 25, "CÓDIGO ANTT", "");
+        drawBox(margin + 450, y, 80, 25, "PLACA DO VEÍC", "");
+        drawBox(margin + 530, y, 45, 25, "UF", "");
+        y += 25;
 
-        y += 35;
+        // Vol row
+        drawBox(
+          margin,
+          y,
+          250,
+          25,
+          "ENDEREÇO",
+          transp.transporta?.xEnder || "",
+        );
+        drawBox(
+          margin + 250,
+          y,
+          120,
+          25,
+          "MUNICÍPIO",
+          transp.transporta?.xMun || "",
+        );
+        drawBox(margin + 370, y, 30, 25, "UF", transp.transporta?.UF || "");
+        drawBox(
+          margin + 400,
+          y,
+          contentWidth - 400,
+          25,
+          "INSCRIÇÃO ESTADUAL",
+          "",
+        );
+        y += 25;
 
-        // Products
-        doc
-          .fontSize(9)
-          .font("Helvetica-Bold")
-          .text("DADOS DO PRODUTO / SERVIÇO", margin, y);
-        y += 10;
+        // Vol row 2
+        const vol = transp.vol
+          ? Array.isArray(transp.vol)
+            ? transp.vol[0]
+            : transp.vol
+          : {};
+        drawBox(margin, y, 50, 25, "QUANTIDADE", vol.qVol || "");
+        drawBox(margin + 50, y, 100, 25, "ESPÉCIE", vol.esp || "");
+        drawBox(margin + 150, y, 100, 25, "MARCA", vol.marca || "");
+        drawBox(margin + 250, y, 100, 25, "NUMERAÇÃO", vol.nVol || "");
+        drawBox(
+          margin + 350,
+          y,
+          110,
+          25,
+          "PESO BRUTO",
+          vol.pesoB || "0.000",
+          "right",
+        );
+        drawBox(
+          margin + 460,
+          y,
+          contentWidth - 460,
+          25,
+          "PESO LÍQUIDO",
+          vol.pesoL || "0.000",
+          "right",
+        );
+        y += 30;
 
-        // Table Header
-        const prodCols = {
-          cod: { x: margin, w: 60, title: "CÓDIGO", align: "left" as const },
-          desc: {
-            x: margin + 60,
-            w: 220,
-            title: "DESCRIÇÃO",
-            align: "left" as const,
-          },
-          ncm: { x: margin + 280, w: 50, title: "NCM", align: "left" as const },
-          cst: { x: margin + 330, w: 30, title: "CST", align: "left" as const },
-          cfop: {
-            x: margin + 360,
-            w: 30,
-            title: "CFOP",
-            align: "left" as const,
-          },
-          un: { x: margin + 390, w: 30, title: "UN", align: "left" as const },
-          qtd: {
-            x: margin + 420,
-            w: 40,
-            title: "QTD",
-            align: "right" as const,
-          },
-          vunit: {
-            x: margin + 460,
-            w: 50,
-            title: "V.UNIT",
-            align: "right" as const,
-          },
-          vtot: {
-            x: margin + 510,
-            w: contentWidth - 510,
-            title: "V.TOTAL",
-            align: "right" as const,
-          },
+        // --- 5. Dados Produto ---
+        y = drawSectionTitle("DADOS DO PRODUTO / SERVIÇO", y);
+
+        // Columns
+        // CÓDIGO | DESCRIÇÃO | NCM | CST | CFOP | UN | QTD | V.UNIT | V.TOT | BC ICMS | V.ICMS | V.IPI | ALIQ.ICMS | ALIQ.IPI
+        // Simplified based on user image request typically showing less columns or squeezing them
+
+        const cols = {
+          cod: { x: margin, w: 40, t: "CÓD" },
+          desc: { x: margin + 40, w: 180, t: "DESCRIÇÃO DO PRODUTO/SERVIÇO" },
+          ncm: { x: margin + 220, w: 40, t: "NCM" },
+          cst: { x: margin + 260, w: 25, t: "CST" },
+          cfop: { x: margin + 285, w: 25, t: "CFOP" },
+          un: { x: margin + 310, w: 20, t: "UN" },
+          qtd: { x: margin + 330, w: 40, t: "QTD" },
+          vunit: { x: margin + 370, w: 45, t: "V.UNIT" },
+          vtot: { x: margin + 415, w: 45, t: "V.TOTAL" },
+          bcicms: { x: margin + 460, w: 40, t: "BC.ICMS" },
+          vicms: { x: margin + 500, w: 35, t: "V.ICMS" },
+          vipi: { x: margin + 535, w: 20, t: "V.IPI" }, // squeezed
+          aliqicms: { x: margin + 555, w: 20, t: "%ICMS" },
         };
 
-        doc.rect(margin, y, contentWidth, 15).fill("#e5e7eb");
-        doc.fillColor("black").fontSize(7).font("Helvetica-Bold");
-
-        Object.values(prodCols).forEach((col) => {
-          doc.text(col.title, col.x + 2, y + 5, {
-            width: col.w - 4,
-            align: col.align || "left",
-          });
+        // Header
+        const hHeight = 15;
+        doc.rect(margin, y, contentWidth, hHeight).stroke();
+        doc.fontSize(6).font("Helvetica-Bold");
+        Object.values(cols).forEach((c) => {
+          doc.text(c.t, c.x + 1, y + 5, { width: c.w - 2, align: "center" });
+          doc
+            .moveTo(c.x + c.w, y)
+            .lineTo(c.x + c.w, y + hHeight)
+            .stroke();
         });
 
-        y += 15;
-        doc.font("Helvetica");
+        y += hHeight;
 
-        det.forEach((item: any, idx: number) => {
+        // Items
+        doc.font("Helvetica").fontSize(7);
+        det.forEach((item: any) => {
           const p = item.prod;
           const imp = item.imposto || {};
+          const icms00 = imp.ICMS?.ICMS00 || imp.ICMS?.ICMSSN102 || {};
 
-          // Simple zebra within items
-          if (idx % 2 !== 0) {
-            doc.rect(margin, y, contentWidth, 12).fill("#f9fafb");
-            doc.fillColor("black");
+          // Dynamic height based on desc
+          const descHeight = doc.heightOfString(p.xProd, {
+            width: cols.desc.w - 4,
+          });
+          const rowH = Math.max(12, descHeight + 4);
+
+          // Check Page Break
+          if (y + rowH > 750) {
+            doc.addPage();
+            y = margin + 20; // simplified header for next pages
+            // redraw header? usually yes, but let's keep simple
           }
 
-          const rowY = y + 3;
-          doc.text(p.cProd, prodCols.cod.x + 2, rowY);
-          doc.text(p.xProd.substring(0, 50), prodCols.desc.x + 2, rowY, {
-            ellipsis: true,
-          });
-          doc.text(p.NCM, prodCols.ncm.x + 2, rowY);
-          // Mock CST/CFOP if mostly standard or needs extract from imp
-          doc.text("000", prodCols.cst.x + 2, rowY);
-          doc.text(p.CFOP, prodCols.cfop.x + 2, rowY);
-          doc.text(p.uCom, prodCols.un.x + 2, rowY);
+          // Vertical lines
+          doc.rect(margin, y, contentWidth, rowH).stroke(); // outer box
 
-          doc.text(
-            parseFloat(p.qCom).toLocaleString("pt-BR"),
-            prodCols.qtd.x,
-            rowY,
-            { width: prodCols.qtd.w, align: "right" },
-          );
-          doc.text(
-            parseFloat(p.vUnCom).toLocaleString("pt-BR", {
-              minimumFractionDigits: 2,
-            }),
-            prodCols.vunit.x,
-            rowY,
-            { width: prodCols.vunit.w, align: "right" },
-          );
-          doc.text(
-            parseFloat(p.vProd).toLocaleString("pt-BR", {
-              minimumFractionDigits: 2,
-            }),
-            prodCols.vtot.x,
-            rowY,
-            { width: prodCols.vtot.w, align: "right" },
-          );
+          const txt = (val: string, col: any, align: string = "center") => {
+            doc.text(val, col.x + 1, y + 4, {
+              width: col.w - 2,
+              align: align as any,
+            });
+            doc
+              .moveTo(col.x + col.w, y)
+              .lineTo(col.x + col.w, y + rowH)
+              .stroke(); // vertical separator
+          };
 
-          y += 12;
+          txt(p.cProd, cols.cod);
+          txt(p.xProd, cols.desc, "left");
+          txt(p.NCM, cols.ncm);
+          txt(icms00.CST || icms00.CSOSN || "", cols.cst);
+          txt(p.CFOP, cols.cfop);
+          txt(p.uCom, cols.un);
+          txt(p.qCom, cols.qtd, "right");
+          txt(p.vUnCom, cols.vunit, "right");
+          txt(p.vProd, cols.vtot, "right");
+          txt(icms00.vBC || "0,00", cols.bcicms, "right");
+          txt(icms00.vICMS || "0,00", cols.vicms, "right");
+          txt("0,00", cols.vipi, "right");
+          txt(icms00.pICMS || "0,00", cols.aliqicms, "right");
+
+          y += rowH;
         });
 
-        // Footer / Totals
         y += 10;
-        doc.rect(margin, y, contentWidth, 30).fill("#f3f4f6");
-        doc.fillColor("black");
 
-        const vTotTrib = total.vTotTrib
-          ? `Trib Aprox: R$ ${total.vTotTrib}`
-          : "";
-        doc
-          .fontSize(8)
-          .text(
-            "DADOS ADICIONAIS / INFORMAÇÕES COMPLEMENTARES",
-            margin + 5,
-            y + 5,
-          );
-        doc
-          .fontSize(7)
-          .text(
-            `Inf. Adicionais: ${inf.infAdic?.infCpl || ""} ${vTotTrib}`,
-            margin + 5,
-            y + 15,
-          );
+        // --- 6. Dados Adicionais ---
+        drawSectionTitle("DADOS ADICIONAIS", y);
+        y += 8;
 
-        // Total Box to the right
-        doc.rect(margin + 350, y, contentWidth - 350, 30).stroke();
-        doc
-          .fontSize(7)
-          .font("Helvetica-Bold")
-          .text("VALOR TOTAL DA NOTA", margin + 355, y + 5);
-        doc.fontSize(12).text(
-          "R$ " +
-            parseFloat(total?.vNF || "0").toLocaleString("pt-BR", {
-              minimumFractionDigits: 2,
-            }),
-          margin + 355,
-          y + 15,
-          { align: "right", width: contentWidth - 360 },
+        const infoCompH = 60;
+        drawBox(
+          margin,
+          y,
+          380,
+          infoCompH,
+          "INFORMAÇÕES COMPLEMENTARES",
+          infAdic?.infCpl || "",
+          "left",
+          7,
         );
+        drawBox(
+          margin + 380,
+          y,
+          contentWidth - 380,
+          infoCompH,
+          "RESERVADO AO FISCO",
+        );
+
+        y += infoCompH;
 
         doc.end();
       } catch (error) {
