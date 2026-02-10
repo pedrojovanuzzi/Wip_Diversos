@@ -12,6 +12,11 @@ export const EnviarMensagem = () => {
 
   // --- Main States ---
   const [searchCpf, setSearchCpf] = useState("");
+  const [searchNome, setSearchNome] = useState("");
+  const [searchCidade, setSearchCidade] = useState("");
+  const [searchPlano, setSearchPlano] = useState("");
+  const [searchStatus, setSearchStatus] = useState("s"); // Default to Active ('s')
+
   const [clientes, setClientes] = useState<any[]>([]);
   const [clientesSelecionados, setClientesSelecionados] = useState<any[]>([]);
 
@@ -25,26 +30,30 @@ export const EnviarMensagem = () => {
 
   // --- Search Methods ---
   const handleSearch = async () => {
-    const searchCpfRegex = searchCpf.replace(/\D/g, "");
-    // Reuse existing endpoint for consistency or create a new one if fields differ significantly
-    // For now, reusing 'buscarAtivos' as it returns necessary client info
+    // Only strip non-digits if it looks like a CPF/CNPJ search (numbers only or standard format).
+    // If it's empty, we might not want to send it.
+    // The backend uses 'Like', so sending empty string matches everything, which is fine if controlled.
+    // However, usually we want at least one filter or a limit. Backend has limit 100.
+
+    const cleanCpf = searchCpf.replace(/\D/g, "");
+
     try {
       setLoading(true);
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/NFEletronica/buscarAtivos`,
+        `${process.env.REACT_APP_URL}/whatsapp/clients`,
         {
-          cpf: searchCpfRegex,
+          cpf: cleanCpf,
+          nome: searchNome,
+          cidade: searchCidade,
+          plano: searchPlano,
+          status: searchStatus === "all" ? undefined : searchStatus,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-      const clientesOrdenados = [...resposta.data].sort((a: any, b: any) => {
-        const nomeA = (a.nome || a.razao_social || "").toLowerCase();
-        const nomeB = (b.nome || b.razao_social || "").toLowerCase();
-        return nomeA.localeCompare(nomeB);
-      });
-      setClientes(clientesOrdenados);
+      // Backend already sorts by name ASC
+      setClientes(resposta.data);
       setClientesSelecionados([]);
     } catch (erro) {
       console.error("Erro ao Buscar Clientes:", erro);
@@ -112,10 +121,6 @@ export const EnviarMensagem = () => {
       showSuccess(
         `Processado: ${response.data.successCount} enviados, ${response.data.failureCount} falhas.`,
       );
-
-      // Optional: Clear selection/message on success?
-      // setMessageText("");
-      // setClientesSelecionados([]);
     } catch (error: any) {
       console.error("Erro ao enviar broadcast:", error);
       showError(error.response?.data?.message || "Erro ao enviar mensagens.");
@@ -135,13 +140,80 @@ export const EnviarMensagem = () => {
 
           {/* Search Section */}
           <div className="mb-6 animate-fade-in">
-            <div className="mb-4">
-              <Stacked
-                setSearchCpf={setSearchCpf}
-                onSearch={handleSearch}
-                title="Buscar Clientes"
-                color="bg-green-900"
-              />
+            <div className="mb-4 bg-gray-50 p-4 rounded border">
+              <h2 className="font-semibold mb-2">Filtros de Busca</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    CPF/CNPJ
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchCpf}
+                    onChange={(e) => setSearchCpf(e.target.value)}
+                    placeholder="Digite CPF/CNPJ"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Nome
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchNome}
+                    onChange={(e) => setSearchNome(e.target.value)}
+                    placeholder="Digite o Nome"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Cidade
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchCidade}
+                    onChange={(e) => setSearchCidade(e.target.value)}
+                    placeholder="Digite a Cidade"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Plano
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchPlano}
+                    onChange={(e) => setSearchPlano(e.target.value)}
+                    placeholder="Digite o Plano"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Status
+                  </label>
+                  <select
+                    className="w-full border rounded p-2"
+                    value={searchStatus}
+                    onChange={(e) => setSearchStatus(e.target.value)}
+                  >
+                    <option value="all">Todos</option>
+                    <option value="s">Ativo</option>
+                    <option value="n">Inativo</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={handleSearch}
+                  className="bg-green-600 text-white py-2 px-6 rounded hover:bg-green-700 transition-all font-bold"
+                >
+                  Buscar Clientes
+                </button>
+              </div>
             </div>
 
             {clientes.length > 0 && (

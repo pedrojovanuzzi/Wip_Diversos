@@ -12,5 +12,6 @@ router.post("/conversation", AuthGuard, Whatsapp.receiveUser);
 router.get("/Lastconversation", AuthGuard, Whatsapp.getLastMessages);
 router.post("/sendMsg", AuthGuard, Whatsapp.sendMessage);
 router.post("/broadcast", AuthGuard, Whatsapp.sendBroadcast);
+router.post("/clients", AuthGuard, Whatsapp.searchClients);
 
 export default router;

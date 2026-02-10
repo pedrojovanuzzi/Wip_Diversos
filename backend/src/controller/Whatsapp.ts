@@ -4,7 +4,7 @@ import Mensagens from "../entities/APIMK/Mensagens";
 import Conversations from "../entities/APIMK/Conversations";
 import Conversation_Users from "../entities/APIMK/Conversation_Users";
 import PeopleConversations from "../entities/APIMK/People_Conversations";
-import { In } from "typeorm";
+import { In, Like } from "typeorm";
 import axios from "axios";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import MkauthSource from "../database/MkauthSource";
@@ -470,6 +470,61 @@ class WhatsappController {
     console.log("Receiving messages...");
     // Here you would typically listen for incoming messages from an API or webhook
   }
+
+  searchClients = async (req: Request, res: Response) => {
+    try {
+      const { cpf, nome, cidade, plano, status } = req.body;
+      const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+
+      const where: any = {};
+
+      // Basic filters
+      if (cpf) where.cpf_cnpj = Like(`%${cpf}%`);
+      if (nome) where.nome = Like(`%${nome}%`);
+
+      // Additional filters
+      if (cidade) where.cidade = Like(`%${cidade}%`);
+      if (plano) where.plano = Like(`%${plano}%`); // Partial match for plan usually better, or exact if dropdown
+
+      // Status filter (cli_ativado)
+      if (status) {
+        // status 'ativo' -> cli_ativado = 's', 'inativo' -> 'n'
+        // Assuming frontend sends 's' or 'n' or similar.
+        // Let's assume standard 's' or 'n' from database enum.
+        where.cli_ativado = status;
+      } else {
+        // Default to active only if not specified? Or all?
+        // User didn't specify default, but typically "Active" is preferred.
+        // Let's leave it open if not provided, or maybe default to 's' if that was previous behavior.
+        // actively deciding to NOT default here to allow full search if wanted,
+        // but frontend might default it.
+      }
+
+      const clients = await ClientRepository.find({
+        where,
+        select: {
+          id: true,
+          nome: true,
+          login: true,
+          cpf_cnpj: true,
+          celular: true,
+          fone: true,
+          cli_ativado: true,
+          cidade: true,
+          plano: true,
+        },
+        order: { nome: "ASC" },
+        take: 5000, // Increased limit for broadcast search
+      });
+
+      res.status(200).json(clients);
+    } catch (error: any) {
+      console.error("Error searching clients:", error);
+      res
+        .status(500)
+        .json({ message: "Error searching clients", error: error.message });
+    }
+  };
 }
 
 export default new WhatsappController();
