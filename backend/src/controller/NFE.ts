@@ -1455,6 +1455,8 @@ class NFEController {
 
         // Canhoto
         doc.rect(margin, y, contentWidth, 25).lineWidth(0.5).stroke();
+
+        // Row 1: Receipt Text
         doc
           .fontSize(6)
           .text(
@@ -1463,24 +1465,33 @@ class NFEController {
               " OS PRODUTOS/SERVIÇOS CONSTANTES DA NOTA FISCAL INDICADA AO LADO",
             margin + 2,
             y + 2,
+            { width: 440, align: "left" },
           );
 
+        // Horizontal line separator
         doc
-          .moveTo(margin + 130, y)
+          .moveTo(margin, y + 10)
+          .lineTo(margin + 450, y + 10)
+          .stroke();
+
+        // Row 2: Data & Signature
+        doc
+          .moveTo(margin + 130, y + 10)
           .lineTo(margin + 130, y + 25)
           .stroke();
-        doc.fontSize(6).text("DATA DE RECEBIMENTO", margin + 2, y + 14);
+        doc.fontSize(6).text("DATA DE RECEBIMENTO", margin + 2, y + 12);
 
         doc
           .moveTo(margin + 450, y)
           .lineTo(margin + 450, y + 25)
-          .stroke();
+          .stroke(); // Right border of Canhoto section (left border of NF-e box)
+
         doc
           .fontSize(6)
           .text(
             "IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR",
             margin + 132,
-            y + 14,
+            y + 12,
           );
 
         // Adjusted top-right block to fit text inside 25px height
