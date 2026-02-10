@@ -46,6 +46,7 @@ import { TimeClock } from "./pages/TimeTracking/TimeClock";
 import { EmployeeManager } from "./pages/TimeTracking/Admin/EmployeeManager";
 import { TimeTrackingMap } from "./pages/TimeTracking/TimeTrackingMap";
 import { MonthlyReport } from "./pages/TimeTracking/Reports/MonthlyReport";
+import { EnviarMensagem } from "./pages/Marketing/EnviarMensagem";
 
 function App() {
   const { user, loading } = useAuth();
@@ -188,6 +189,16 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <UserChat />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/whatsapp/broadcast"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <EnviarMensagem />
               ) : (
                 <Navigate to="/auth/login" />
               )

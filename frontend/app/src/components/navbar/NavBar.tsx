@@ -30,6 +30,7 @@ import { FaPix } from "react-icons/fa6";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Cookies from "js-cookie";
+import { BsFillSendPlusFill } from "react-icons/bs";
 
 type Color = {
   color?: string;
@@ -268,6 +269,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   }
                   title="WhatsApp"
                   description="Integração e envio de mensagens"
+                />
+                <NavItem
+                  to="/whatsapp/broadcast"
+                  icon={
+                    <BsFillSendPlusFill className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Disparo em Massa"
+                  description="Enviar mensagens para múltiplos clientes"
                 />
                 <NavItem
                   to="/ClientAnalytics"

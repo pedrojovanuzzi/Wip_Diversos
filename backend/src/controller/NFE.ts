@@ -675,6 +675,9 @@ class NFEController {
           cpf_cnpj: true,
           cli_ativado: true,
           desconto: true,
+          nome: true,
+          fone: true,
+          celular: true,
         },
         order: { id: "DESC" },
       });
@@ -936,6 +939,8 @@ class NFEController {
           cli_ativado: true,
           nome: true,
           desconto: true,
+          fone: true,
+          celular: true,
         },
         order: { id: "DESC" },
       });

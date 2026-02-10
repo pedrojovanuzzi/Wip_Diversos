@@ -6,6 +6,8 @@ import Conversation_Users from "../entities/APIMK/Conversation_Users";
 import PeopleConversations from "../entities/APIMK/People_Conversations";
 import { In } from "typeorm";
 import axios from "axios";
+import { ClientesEntities } from "../entities/ClientesEntities";
+import MkauthSource from "../database/MkauthSource";
 
 const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
 const urlMedia = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
@@ -42,7 +44,7 @@ class WhatsappController {
       const userByConvId = new Map();
       conversationUsers.forEach((user) => {
         const users = peopleConversations.find(
-          (people) => people.id === user.user_id
+          (people) => people.id === user.user_id,
         );
         if (users)
           userByConvId.set(user.conv_id, {
@@ -83,35 +85,49 @@ class WhatsappController {
 
   getLastMessages = async (req: Request, res: Response) => {
     try {
-       const lastMessagesSelect = API_MK.getRepository(Mensagens);
-       const lastMessages = await lastMessagesSelect.find({order: {id: 'DESC'}, take: 500});
+      const lastMessagesSelect = API_MK.getRepository(Mensagens);
+      const lastMessages = await lastMessagesSelect.find({
+        order: { id: "DESC" },
+        take: 500,
+      });
 
+      const conversationsSelect = API_MK.getRepository(Conversations);
+      const conversations = await Promise.all(
+        lastMessages
+          .filter((msg) => msg.sender_id !== 1)
+          .map((msg) =>
+            conversationsSelect.findOne({ where: { id: msg.sender_id } }),
+          ),
+      );
 
-       const conversationsSelect = API_MK.getRepository(Conversations);
-       const conversations = await Promise.all(lastMessages.filter((msg) => msg.sender_id !== 1).map((msg) => (conversationsSelect.findOne({where: {id: msg.sender_id}}))));
+      let conversationsNotSame = conversations.filter(
+        (msg, index, self) =>
+          index === self.findIndex((m) => m?.id === msg?.id),
+      );
 
-       let conversationsNotSame = conversations.filter((msg, index, self) => index === self.findIndex((m) => m?.id === msg?.id)); 
-       
-       const IdNamePhone = API_MK.getRepository(PeopleConversations);
+      const IdNamePhone = API_MK.getRepository(PeopleConversations);
 
-       const peopleConversations = await Promise.all(conversationsNotSame.map((p) => IdNamePhone.findOne({where: {id: p?.id}})));
+      const peopleConversations = await Promise.all(
+        conversationsNotSame.map((p) =>
+          IdNamePhone.findOne({ where: { id: p?.id } }),
+        ),
+      );
 
+      const formatted = peopleConversations
+        .filter((pc) => pc !== null)
+        .map((pc) => ({
+          id: pc?.id,
+          user: {
+            nome: pc?.nome,
+            telefone: pc?.telefone,
+          },
+        }));
 
-       const formatted = peopleConversations.filter((pc) => pc !== null)
-       .map((pc) => ({
-        id: pc?.id,
-        user: {
-          nome: pc?.nome,
-          telefone: pc?.telefone
-        }
-       }));
-
-       res.status(200).json(formatted);
-
+      res.status(200).json(formatted);
     } catch (error) {
       res.status(500).json(error);
     }
-  }
+  };
 
   getConversation = async (userId: number) => {
     try {
@@ -277,7 +293,7 @@ class WhatsappController {
     });
 
     const recipient = peopleConversations.find(
-      (pc) => pc.id !== message.sender_id
+      (pc) => pc.id !== message.sender_id,
     );
 
     if (!recipient) {
@@ -315,10 +331,136 @@ class WhatsappController {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
+      return response.data;
+    } catch (error: any) {
+      console.error(
+        "Error sending message:",
+        error.response ? error.response.data : error.message,
+      );
+      throw error;
+    }
+  };
+
+  MensagemTemplate = async (
+    recipient_number: string,
+    templateName: string,
+    languageCode: string = "pt_BR",
+  ) => {
+    try {
+      const response = await axios.post(
+        url,
+        {
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: recipient_number,
+          type: "template",
+          template: {
+            name: templateName,
+            language: {
+              code: languageCode,
+            },
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error(
+        "Error sending template message:",
+        error.response ? error.response.data : error.message,
+      );
+      throw error;
+    }
+  };
+
+  sendBroadcast = async (req: Request, res: Response) => {
+    const { clientIds, message, templateName } = req.body;
+
+    if (!clientIds || !Array.isArray(clientIds) || clientIds.length === 0) {
+      res.status(400).json({ message: "No clients selected." });
+      return;
+    }
+
+    if (!message && !templateName) {
+      res
+        .status(400)
+        .json({ message: "Message content or template name is required." });
+      return;
+    }
+
+    const clientRepository = MkauthSource.getRepository(ClientesEntities);
+    let successCount = 0;
+    let failureCount = 0;
+    const errors: any[] = [];
+
+    try {
+      const clients = await clientRepository.find({
+        where: {
+          id: In(clientIds),
+        },
+        select: ["id", "nome", "celular", "fone"], // Fetching phone numbers
+      });
+
+      for (const client of clients) {
+        // Prioritize cellphone, then landline, clean up non-digits
+        let phone = client.celular || client.fone;
+        if (!phone) {
+          failureCount++;
+          errors.push({ clientId: client.id, error: "No phone number" });
+          continue;
+        }
+
+        let cleanPhone = phone.replace(/\D/g, "");
+
+        // Basic validation - check if it looks like a phone number
+        if (cleanPhone.length < 10) {
+          failureCount++;
+          errors.push({
+            clientId: client.id,
+            error: "Invalid phone number length",
+          });
+          continue;
+        }
+
+        // Add Country Code if missing (Assuming BR +55)
+        if (!cleanPhone.startsWith("55")) {
+          cleanPhone = "55" + cleanPhone;
+        }
+
+        try {
+          if (templateName) {
+            await this.MensagemTemplate(cleanPhone, templateName);
+          } else {
+            await this.MensagensComuns(cleanPhone, message);
+          }
+          successCount++;
+        } catch (error: any) {
+          failureCount++;
+          errors.push({
+            clientId: client.id,
+            error: error.response?.data?.error?.message || error.message,
+          });
+        }
+      }
+
+      res.status(200).json({
+        message: "Broadcast completed",
+        successCount,
+        failureCount,
+        errors,
+      });
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("Error in broadcast:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error during broadcast" });
     }
   };
 
