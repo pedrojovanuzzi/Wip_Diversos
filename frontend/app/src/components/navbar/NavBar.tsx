@@ -226,7 +226,7 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   title="Relatórios"
                   description="Relatórios detalhados de ponto"
                 />
-                {permission > 5 && (
+                {permission >= 5 && (
                   <NavItem
                     to="/whatsapp/broadcast"
                     icon={

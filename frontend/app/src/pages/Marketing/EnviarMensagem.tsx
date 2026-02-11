@@ -129,7 +129,7 @@ export const EnviarMensagem = () => {
     }
   };
 
-  if (!user || user.permission <= 5) {
+  if (!user || user.permission < 5) {
     return <Navigate to="/" replace />;
   }
 

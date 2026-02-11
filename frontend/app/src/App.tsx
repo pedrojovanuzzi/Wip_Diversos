@@ -197,7 +197,7 @@ function App() {
           <Route
             path="/whatsapp/broadcast"
             element={
-              user?.token && user.permission > 5 ? (
+              user?.token && user.permission >= 5 ? (
                 <EnviarMensagem />
               ) : (
                 <Navigate to="/auth/login" />
