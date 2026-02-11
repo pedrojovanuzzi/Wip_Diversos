@@ -226,6 +226,16 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   title="Relatórios"
                   description="Relatórios detalhados de ponto"
                 />
+                {permission > 5 && (
+                  <NavItem
+                    to="/whatsapp/broadcast"
+                    icon={
+                      <BsFillSendPlusFill className="text-white size-8 transition-all hover:text-green-400" />
+                    }
+                    title="Disparo em Massa"
+                    description="Enviar mensagens para múltiplos clientes"
+                  />
+                )}
               </>
             )}
             {permission >= 2 && (
@@ -270,14 +280,7 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   title="WhatsApp"
                   description="Integração e envio de mensagens"
                 />
-                <NavItem
-                  to="/whatsapp/broadcast"
-                  icon={
-                    <BsFillSendPlusFill className="text-white size-8 transition-all hover:text-green-400" />
-                  }
-                  title="Disparo em Massa"
-                  description="Enviar mensagens para múltiplos clientes"
-                />
+
                 <NavItem
                   to="/ClientAnalytics"
                   icon={

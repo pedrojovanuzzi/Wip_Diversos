@@ -3,7 +3,7 @@ import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
-import Stacked from "../Nfe/Components/Stacked"; // Reusing Stacked component
+import { Navigate } from "react-router-dom";
 
 export const EnviarMensagem = () => {
   const { user } = useAuth();
@@ -128,6 +128,10 @@ export const EnviarMensagem = () => {
       setLoading(false);
     }
   };
+
+  if (!user || user.permission <= 5) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
