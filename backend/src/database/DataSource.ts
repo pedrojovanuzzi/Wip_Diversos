@@ -13,6 +13,8 @@ import { TimeRecord } from "../entities/TimeRecord";
 import { DailyOvertime } from "../entities/DailyOvertime";
 import { MonthlyReportSignature } from "../entities/MonthlyReportSignature";
 import { NFE } from "../entities/NFE";
+import { LicencaEntity } from "../entities/LicencaEntities";
+
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const AppDataSource = new DataSource({
@@ -36,6 +38,7 @@ const AppDataSource = new DataSource({
     DailyOvertime,
     MonthlyReportSignature,
     NFE,
+    LicencaEntity,
   ],
   migrations: [path.join(__dirname, "../migration/*.{ts,js}")],
 });

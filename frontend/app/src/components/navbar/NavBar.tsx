@@ -20,6 +20,7 @@ import {
   FaUsers,
   FaClipboardList,
   FaMapMarkedAlt,
+  FaDesktop,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -201,6 +202,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   }
                   title="Novo Usuário"
                   description="Cadastrar novos usuários no sistema"
+                />
+                <NavItem
+                  to="/licencas"
+                  icon={
+                    <FaDesktop className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Licenças"
+                  description="Gerenciamento de licenças de software"
                 />
                 <NavItem
                   to="/TimeTracking/Admin"

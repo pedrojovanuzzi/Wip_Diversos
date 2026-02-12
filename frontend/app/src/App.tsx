@@ -47,6 +47,7 @@ import { EmployeeManager } from "./pages/TimeTracking/Admin/EmployeeManager";
 import { TimeTrackingMap } from "./pages/TimeTracking/TimeTrackingMap";
 import { MonthlyReport } from "./pages/TimeTracking/Reports/MonthlyReport";
 import { EnviarMensagem } from "./pages/Marketing/EnviarMensagem";
+import { GerenciarLicencas } from "./pages/Licencas/GerenciarLicencas";
 
 function App() {
   const { user, loading } = useAuth();
@@ -104,6 +105,16 @@ function App() {
             element={
               user?.token && user.permission >= 5 ? (
                 <Create />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/licencas"
+            element={
+              user?.token && user.permission >= 5 ? (
+                <GerenciarLicencas />
               ) : (
                 <Navigate to="/auth/login" />
               )

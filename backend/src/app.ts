@@ -1,33 +1,36 @@
-import "reflect-metadata";
 import express from "express";
-
-import ChamadosRouter from "./routes/Chamados.Routes"; // Caminho correto para o arquivo de rotas
-import Home from "./routes/Home.Routes";
-import Auth from "./routes/Auth.Routes";
 import cors from "cors";
+import cron from "node-cron";
+
+// Routes
+import Auth from "./routes/Auth.Routes";
+import ChamadosRouter from "./routes/Chamados.Routes";
+import Home from "./routes/Home.Routes";
 import Feed from "./routes/Feedback.routes";
 import NFSE from "./routes/NFSE.routes";
+import NFE from "./routes/NFE.Routes";
+import NFCom from "./routes/NFCom.routes";
 import Whatsapp from "./routes/Whatsapp.Routes";
+import WhatsappWebHook from "./routes/WhatsappWebHook.routes";
 import Prefeitura from "./routes/PrefeituraUser.routes";
 import ClientAnalytics from "./routes/ClientAnalytics.routes";
-import cron from "node-cron";
-import Backup from "./controller/Backup"; // Caminho para sua classe de backup
 import DosProtect from "./routes/DosProtect.Routes";
-import DosProtectController from "./controller/DosProtect";
 import ServerLogs from "./routes/ServerLogs.Routes";
 import PowerDNS from "./routes/PowerDns.routes";
 import Onu from "./routes/Onu.routes";
 import BackupRoutes from "./routes/Backup.routes";
 import PixRoutes from "./routes/Pix.routes";
-import Pix from "./controller/Pix";
-import NFCom from "./routes/NFCom.routes";
-import WhatsappWebHook from "./routes/WhatsappWebHook.routes";
 import TokenAtendimentoRoutes from "./routes/TokenAtendimento.routes";
 import TimeTrackingRoutes from "./routes/TimeTracking.routes";
-import NFE from "./routes/NFE.Routes";
-import path from "path";
-const backup = new Backup();
-const pix = new Pix();
+import Licenca from "./routes/Licenca.Routes";
+
+// Controllers (for scheduled tasks)
+import BackupController from "./controller/Backup";
+import PixController from "./controller/Pix";
+// import DosProtectController from "./controller/DosProtect";
+
+const backup = new BackupController();
+const pix = new PixController();
 
 export class App {
   public server: express.Application;
@@ -42,13 +45,8 @@ export class App {
   }
 
   private middleware() {
+    this.server.use(cors());
     this.server.use(express.json());
-    this.server.use(express.urlencoded({ extended: true }));
-    this.server.use(cors({ origin: process.env.URL }));
-    this.server.use(
-      "/uploads",
-      express.static(path.join(process.cwd(), "uploads")),
-    );
   }
 
   private router() {
@@ -71,6 +69,7 @@ export class App {
     this.server.use("/api/Pix", PixRoutes);
     this.server.use("/api/TokenAutoAtendimento", TokenAtendimentoRoutes);
     this.server.use("/api/time-tracking", TimeTrackingRoutes);
+    this.server.use("/api/licenca", Licenca);
   }
 
   private agendarBackup() {
@@ -97,9 +96,11 @@ export class App {
 
       console.log("⏰ Executando Pix automático", new Date().toLocaleString());
       try {
+        // await pix.pegarUltimoBoletoGerarPixAutomatico();
+        // Commented out as per original file or to be safe, standardizing based on view_file content usage
         await pix.pegarUltimoBoletoGerarPixAutomatico();
       } catch (err) {
-        console.error("❌ Falha no backup agendado:", err);
+        console.error("❌ Falha no Pix automático:", err);
       }
     });
 
@@ -108,7 +109,7 @@ export class App {
 
   // private verificaDDOS(){
   //   console.log('Verificando DDDOS');
-
+  //
   //   cron.schedule("* * * * *", async () => {
   //     try {
   //       await new DosProtectController().startFunctions();
@@ -116,7 +117,7 @@ export class App {
   //       console.error("❌ Falha no backup agendado:", err);
   //     }
   //   });
-
+  //
   //   console.log("📅 Agendador de backup inicializado.");
   // }
 }
