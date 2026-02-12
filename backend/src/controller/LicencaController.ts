@@ -9,6 +9,7 @@ class LicencaController {
     this.atualizarStatus = this.atualizarStatus.bind(this);
     this.verificarLicenca = this.verificarLicenca.bind(this);
     this.removerLicenca = this.removerLicenca.bind(this);
+    this.recuperarChaveLicenca = this.recuperarChaveLicenca.bind(this);
   }
 
   public async criarLicenca(req: Request, res: Response): Promise<void> {
@@ -115,27 +116,61 @@ class LicencaController {
       }
 
       if (licenca.status !== "ativo") {
-        res
-          .status(403)
-          .json({
-            authorized: false,
-            status: licenca.status,
-            message: "Licença bloqueada ou cancelada.",
-          });
+        res.status(403).json({
+          authorized: false,
+          status: licenca.status,
+          message: "Licença bloqueada ou cancelada.",
+        });
         return;
       }
 
       // Se passou por tudo, está aprovado
-      res
-        .status(200)
-        .json({
-          authorized: true,
-          message: "Licença ativa.",
-          cliente: licenca.cliente_nome,
-        });
+      res.status(200).json({
+        authorized: true,
+        message: "Licença ativa.",
+        cliente: licenca.cliente_nome,
+      });
     } catch (error) {
       console.error("Erro ao verificar licença:", error);
       res.status(500).json({ authorized: false, message: "Erro interno." });
+    }
+  }
+
+  public async recuperarChaveLicenca(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const { software } = req.body;
+
+      if (!software) {
+        res.status(400).json({
+          message: "Software é obrigatório para recuperar a chave.",
+        });
+        return;
+      }
+
+      const licencaRepo = AppDataSource.getRepository(LicencaEntity);
+      const licenca = await licencaRepo.findOne({
+        where: {
+          software: software as string,
+        },
+      });
+
+      if (!licenca) {
+        res.status(404).json({ message: "Licença não encontrada." });
+        return;
+      }
+
+      res.status(200).json({
+        chave: licenca.chave,
+        status: licenca.status,
+        cliente: licenca.cliente_nome,
+        software: licenca.software,
+      });
+    } catch (error) {
+      console.error("Erro ao recuperar chave da licença:", error);
+      res.status(500).json({ message: "Erro interno do servidor." });
     }
   }
 
