@@ -396,7 +396,8 @@ export const PagarFatura = () => {
         // The response structure from PixDetalhe: { link, pppoe, formattedDate, valor }
         // We need to map it to our state.
         const data = response.data;
-        setQrCode(data.link); // Pix CopyPaste/Link
+        console.log(data);
+        setQrCode(data.qrcode); // Pix CopyPaste/Link
         setValorPagamento(data.valor);
         setDataPagamento(data.formattedDate);
 
