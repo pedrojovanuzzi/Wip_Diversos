@@ -24,6 +24,17 @@ router.post(
   tokenAtendimento.obterListaTerminaisEGerarPagamentoDebito,
 );
 
+router.post("/FaturasAbertas", tokenAtendimento.listarFaturasAbertas);
+router.post("/GerarPixMultiplos", tokenAtendimento.gerarPixVariasContas);
+router.post(
+  "/GerarPagamentoCreditoMultiplo",
+  tokenAtendimento.gerarPagamentoMultiploCredito,
+);
+router.post(
+  "/GerarPagamentoDebitoMultiplo",
+  tokenAtendimento.gerarPagamentoMultiploDebito,
+);
+
 router.get("/ObterOrderPorId/:order", tokenAtendimento.obterOrderPorId);
 
 export default router;

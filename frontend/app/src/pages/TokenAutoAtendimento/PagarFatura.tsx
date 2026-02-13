@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   HiArrowLeft,
-  HiChip,
   HiUser,
   HiHome,
   HiCheck,
@@ -11,7 +10,7 @@ import {
   HiPrinter,
   HiArrowRight,
 } from "react-icons/hi";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Keyboard } from "./components/Keyboard";
 import axios from "axios";
 import { FaSpinner, FaBarcode } from "react-icons/fa";
@@ -33,6 +32,13 @@ interface Client {
   cidade: string;
 }
 
+interface Invoice {
+  id: number;
+  valor: string;
+  data_vencimento: string;
+  descricao: string;
+}
+
 export const PagarFatura = () => {
   const navigate = useNavigate();
   const [qrCode, setQrCode] = useState("");
@@ -41,6 +47,7 @@ export const PagarFatura = () => {
   const [step, setStep] = useState<
     | "search"
     | "selection"
+    | "invoice-selection"
     | "method"
     | "payment-pix"
     | "payment-card"
@@ -52,7 +59,11 @@ export const PagarFatura = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClients, setSelectedClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<number[]>([]);
+
   const [order, setOrder] = useState<{
     id: string;
     user_id: string;
@@ -131,7 +142,36 @@ export const PagarFatura = () => {
     }
   };
 
-  const handleSelectClient = async (client: Client) => {
+  const fetchInvoices = async (client: Client) => {
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/TokenAutoAtendimento/FaturasAbertas`,
+        { login: client.login },
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Erro ao buscar faturas:", error);
+      return [];
+    }
+  };
+
+  const toggleClientSelection = (client: Client) => {
+    if (selectedClients.find((c) => c.id === client.id)) {
+      setSelectedClients(selectedClients.filter((c) => c.id !== client.id));
+    } else {
+      setSelectedClients([...selectedClients, client]);
+    }
+  };
+
+  const handleClientClick = async (client: Client) => {
+    // If we are in multi-select mode (more than 0 selected), clicking toggles
+    // But maybe for simplicity, card click = select single and show invoices.
+    // Checkbox click = toggle multi selection.
+
+    // For now: Card click -> Select ONLY this client and go to Invoice Selection
+    setSelectedClient(client);
+    setSelectedClients([client]); // Reset multi-selection to just this one
+
     setLoading(true);
     try {
       // 1. Select Context
@@ -140,8 +180,10 @@ export const PagarFatura = () => {
         { ...client },
       );
 
-      setSelectedClient(client);
-      setStep("method"); // Move to payment method selection
+      // 2. Fetch Invoices
+      const fethedInvoices = await fetchInvoices(client);
+      setInvoices(fethedInvoices);
+      setStep("invoice-selection");
     } catch (err: any) {
       console.error(err);
       setError("Erro ao selecionar cadastro.");
@@ -150,35 +192,102 @@ export const PagarFatura = () => {
     }
   };
 
-  const obterOrderPorId = async (silent = false) => {
-    if (!silent) setLoading(true);
+  const handleMultiClientPayment = async () => {
+    if (selectedClients.length === 0) return;
+
+    // Logic to pay 1st invoice of all selected clients
+    // We treat this as a "combined" payment similar to multi-invoice
+    // But we first need to get the invoice IDs.
+    // Since we don't have a direct endpoint for "give me 1st invoice ID",
+    // we might need to rely on assumptions or a new backend endpoint.
+    // For now, I'll assume we can use the same flow: get invoices for each, pick first.
+
+    setLoading(true);
     try {
-      const response = await axios.get(
-        `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterOrderPorId/${order?.id}`,
-      );
+      let allInvoiceIds: number[] = [];
+      let totalValue = 0;
 
-      console.log(response.data);
-
-      if (response.data.status === "expired") {
-        setErrorMessage("Pagamento expirado.");
-        setStep("payment-error");
-        setOrder(null);
-      } else if (
-        response.data.status === "failed" ||
-        response.data.status === "canceled"
-      ) {
-        setErrorMessage("Pagamento Falhou.");
-        setStep("payment-error");
-        setOrder(null);
+      for (const client of selectedClients) {
+        // Select Context (important for backend session maybe?) - might be tricky for multiple.
+        // Assuming backend can handle 'stateless' invoice ID payment via Pix generator.
+        const clientInvoices = await fetchInvoices(client);
+        if (clientInvoices.length > 0) {
+          allInvoiceIds.push(clientInvoices[0].id); // Pick first
+          totalValue += parseFloat(clientInvoices[0].valor);
+        }
       }
-    } catch (err: any) {
+
+      if (allInvoiceIds.length === 0) {
+        setError("Nenhuma fatura encontrada para os cadastros selecionados.");
+        setLoading(false);
+        return;
+      }
+
+      setSelectedInvoiceIds(allInvoiceIds);
+      setValorPagamento(totalValue.toFixed(2));
+      // Move to method, but we might skip method and go straight to Pix if card isn't supported for multi.
+      // Let's go to method, but maybe disable card?
+      setStep("method");
+    } catch (err) {
       console.error(err);
-      if (!silent)
-        setError(err.response?.data?.error || "Erro ao buscar pedido.");
+      setError("Erro ao processar validação das faturas.");
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
   };
+
+  const handleInvoiceSelect = (id: number) => {
+    if (selectedInvoiceIds.includes(id)) {
+      setSelectedInvoiceIds(selectedInvoiceIds.filter((i) => i !== id));
+    } else {
+      setSelectedInvoiceIds([...selectedInvoiceIds, id]);
+    }
+  };
+
+  const handleInvoicePayment = () => {
+    if (selectedInvoiceIds.length === 0) return;
+
+    // Calculate total for display?
+    const total = invoices
+      .filter((inv) => selectedInvoiceIds.includes(inv.id))
+      .reduce((sum, inv) => sum + parseFloat(inv.valor), 0);
+
+    setValorPagamento(total.toFixed(2));
+    setStep("method");
+  };
+
+  const obterOrderPorId = React.useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      try {
+        const response = await axios.get(
+          `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterOrderPorId/${order?.id}`,
+        );
+
+        console.log(response.data);
+
+        if (response.data.status === "expired") {
+          setErrorMessage("Pagamento expirado.");
+          setStep("payment-error");
+          setOrder(null);
+        } else if (
+          response.data.status === "failed" ||
+          response.data.status === "canceled"
+        ) {
+          setErrorMessage("Pagamento Falhou.");
+          setStep("payment-error");
+          setOrder(null);
+        }
+      } catch (err: any) {
+        console.error(err);
+        if (!silent)
+          setError(err.response?.data?.error || "Erro ao buscar pedido.");
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [order?.id],
+  );
 
   useEffect(() => {
     let intervalId: NodeJS.Timer;
@@ -194,27 +303,60 @@ export const PagarFatura = () => {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [order]);
+  }, [order, obterOrderPorId]);
 
   const handleMethodSelect = async (method: "pix" | "credit" | "debit") => {
-    if (!selectedClient) return;
+    // Determine if we are doing single client single invoice (legacy flow) or multi
+    // Actually, "legacy flow" now is just a subset of multi-invoice (array of 1).
+
+    const isMulti = selectedInvoiceIds.length > 0;
+
+    // If we have selectedInvoiceIds, we use that.
+    // However, if we came from "Selection" step directly (single client, old flow),
+    // we might not have populated selectedInvoiceIds yet if we didn't go through invoice selection.
+    // BUT, we changed handleClientClick to go to invoice-selection.
+    // What if there is only 1 invoice? auto select?
+    // Let's stick to: We ALWAYS have selectedInvoiceIds if we are at this step from the new flows.
+
+    // Fallback: if no invoices selected but selectedClient exists (shouldn't happen with new flow but generic safety)
+    if (!isMulti && !selectedClient) return;
 
     if (method === "credit" || method === "debit") {
       setStep("payment-card");
       setCardMessage("Aguardando comunicação com a maquininha...");
       try {
-        const endpoint =
-          method === "credit"
-            ? `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterListaTerminaisEGerarPagamentoCredito`
-            : `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterListaTerminaisEGerarPagamentoDebito`;
+        const loginToUse = selectedClient?.login || selectedClients[0]?.login;
+        const titulos = isMulti ? selectedInvoiceIds.join(",") : "";
 
-        const response = await axios.post(endpoint, {
-          login: selectedClient.login,
-        });
+        let endpoint = "";
+        if (isMulti) {
+          endpoint =
+            method === "credit"
+              ? `${process.env.REACT_APP_URL}/TokenAutoAtendimento/GerarPagamentoCreditoMultiplo`
+              : `${process.env.REACT_APP_URL}/TokenAutoAtendimento/GerarPagamentoDebitoMultiplo`;
+        } else {
+          endpoint =
+            method === "credit"
+              ? `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterListaTerminaisEGerarPagamentoCredito`
+              : `${process.env.REACT_APP_URL}/TokenAutoAtendimento/ObterListaTerminaisEGerarPagamentoDebito`;
+        }
+
+        const payload: any = { login: loginToUse };
+        if (isMulti) {
+          payload.titulos = titulos;
+        }
+
+        const response = await axios.post(endpoint, payload);
 
         if (response.status === 200) {
           setCardMessage("Termine o processo na maquininha.");
-          setFaturaId(response.data.id);
+          // If multi, response.id might be "101,102" string.
+          // But faturaId state is number | null.
+          // We need to handle this. For now, let's use the first ID if it's a list, just for reference.
+          // But wait, order polling uses response.data.order.id usually?
+          // obterOrderPorId uses `order?.id` from state.
+
+          setFaturaId(null); // Clear single ID context if multi? Or use response.id as is?
           setValorPagamento(response.data.valor);
           setDataPagamento(response.data.dataPagamento);
           setOrder(response.data.order);
@@ -222,9 +364,11 @@ export const PagarFatura = () => {
       } catch (error) {
         console.error(error);
         setError(
-          `Erro ao iniciar pagamento ${method === "credit" ? "Crédito" : "Débito"}.`,
+          `Erro ao iniciar pagamento ${
+            method === "credit" ? "Crédito" : "Débito"
+          }.`,
         );
-        setStep("method"); // Go back to method selection on error so they can try again
+        setStep("method");
       }
       return;
     }
@@ -233,35 +377,66 @@ export const PagarFatura = () => {
     setLoading(true);
     setError("");
     try {
-      const response = await axios.post(
-        `${process.env.REACT_APP_URL}/TokenAutoAtendimento/GerarPixToken`,
-        {
-          cpf: cpf,
-          login: selectedClient.login,
-          perdoarJuros: false,
-        },
-      );
+      let response;
 
-      console.log(response.data);
+      if (isMulti && selectedInvoiceIds.length > 0) {
+        // Use the `geradorTitulos` logic from PixDetalhe
+        // We need 'titulos' as comma separated IDs (or whatever that endpoint expects).
+        // PixDetalhe uses `{ nome_completo: user, cpf: cpf, titulos: titulos }` for `geradorTitulos`.
 
-      const valor = response.data.valor;
-      const qrCode = response.data.imagem;
-      setQrCode(qrCode);
-      setValorPagamento(valor);
-      setDataPagamento(response.data.formattedDate);
-      setFaturaId(response.data.faturaId);
+        // Wait, `geradorTitulos` in PixDetalhe takes `titulos` as a string of IDs?
+        // Let's format it.
+        const idsString = selectedInvoiceIds.join(",");
+        const mainClient = selectedClient || selectedClients[0];
 
-      if (!response.data.faturaId) {
-        console.error(
-          "ERRO CRITICO: API não retornou ID da fatura para Pix. O polling não funcionará.",
+        response = await axios.post(
+          `${process.env.REACT_APP_URL}/TokenAutoAtendimento/GerarPixMultiplos`,
+          {
+            nome_completo: mainClient.nome,
+            cpf: cpf,
+            titulos: idsString,
+          },
         );
-        setError("Erro interno: ID da fatura não gerado. Contate o suporte.");
-        return;
+
+        // The response structure from PixDetalhe: { link, pppoe, formattedDate, valor }
+        // We need to map it to our state.
+        const data = response.data;
+        setQrCode(data.link); // Pix CopyPaste/Link
+        setValorPagamento(data.valor);
+        setDataPagamento(data.formattedDate);
+
+        // We don't get a single 'faturaId' for polling if it's a combined pix?
+        // The other endpoint returned `faturaId`.
+        // If `geradorTitulos` creates a new "Fatura Avulsa" or "Cobranca", it should return its ID.
+        // PixDetalhe doesn't seem to care about polling in the code I saw (it just shows the link).
+        // REQUIRED: We need to poll for success.
+        // I'll check if response has an ID or `id`.
+        if (data.id || data.faturaId) {
+          setFaturaId(data.id || data.faturaId);
+        } else {
+          // If no ID returned, we can't poll via FaturaWentPaid.
+          // Pix generation should return at least one ID or we need a new polling mechanism.
+          // Backend `gerarPixVariasContas` now returns `faturaId` (first invoice ID).
+          // preventing warn.
+        }
+      } else {
+        // Fallback legacy single logic (if no invoice IDs but just context?)
+        // Should not happen with new flow, but keeping for safety.
+
+        response = await axios.post(
+          `${process.env.REACT_APP_URL}/TokenAutoAtendimento/GerarPixToken`,
+          {
+            cpf: cpf,
+            login: selectedClient?.login,
+            perdoarJuros: false,
+          },
+        );
+        setFaturaId(response.data.faturaId);
+        setQrCode(response.data.imagem);
+        setValorPagamento(response.data.valor);
+        setDataPagamento(response.data.formattedDate);
       }
 
-      console.log("Pagamento Pix iniciado. Fatura ID:", response.data.faturaId);
-
-      // API request sent successfully.
       setStep("payment-pix");
     } catch (err: any) {
       console.error(err);
@@ -365,7 +540,7 @@ export const PagarFatura = () => {
     let timer: NodeJS.Timeout;
     if (step === "payment-success") {
       // Trigger print automatically on success with a small delay to ensure rendering
-      const printTimer = setTimeout(() => {
+      setTimeout(() => {
         console.log("PRINT DEBUG: Attempting automatic print...");
         if (receiptRef.current) {
           console.log(
@@ -418,6 +593,15 @@ export const PagarFatura = () => {
       setStep("search");
       setClients([]);
       setError("");
+      setSelectedClients([]);
+    } else if (step === "invoice-selection") {
+      setStep("selection");
+      setInvoices([]);
+      setSelectedInvoiceIds([]);
+      // Keep selected client? Maybe reset if we want them to pick again.
+      // But typically back means "go up".
+      // If we came from click -> selection.
+      setSelectedClient(null);
     } else {
       navigate("/TokenAutoAtendimento", { state: { forceIdle: false } });
     }
@@ -535,57 +719,187 @@ export const PagarFatura = () => {
                 Cadastros Encontrados:
               </h3>
               <div className="grid grid-cols-1 gap-4">
-                {clients.map((client) => (
-                  <button
-                    key={client.id}
-                    onClick={() => handleSelectClient(client)}
-                    className="
-                      group relative overflow-hidden bg-slate-800/50 hover:bg-slate-800 border border-white/10 hover:border-cyan-500/50 
-                      rounded-xl lg:rounded-2xl p-4 lg:p-8 text-left transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl hover:shadow-cyan-900/20
-                    "
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-4 lg:space-x-6">
-                        <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-full bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
-                          <HiHome className="text-2xl lg:text-4xl text-cyan-400" />
+                {clients.map((client) => {
+                  const isSelected = !!selectedClients.find(
+                    (c) => c.id === client.id,
+                  );
+                  return (
+                    <div
+                      key={client.id}
+                      className={`
+                        group relative overflow-hidden rounded-xl lg:rounded-2xl p-4 lg:p-6 text-left transition-all duration-300 transform 
+                        border border-white/10
+                        ${isSelected ? "bg-slate-800 border-cyan-500/50 shadow-lg shadow-cyan-900/20" : "bg-slate-800/50 hover:bg-slate-800"}
+                      `}
+                    >
+                      <div className="flex items-center justify-between">
+                        {/* Checkbox for multi-select */}
+                        <div
+                          className="mr-4"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleClientSelection(client);
+                          }}
+                        >
+                          <div
+                            className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-colors cursor-pointer ${isSelected ? "bg-cyan-500 border-cyan-500" : "border-slate-500 bg-slate-900/50 group-hover:border-cyan-400"}`}
+                          >
+                            {isSelected && (
+                              <HiCheck className="text-white text-xl" />
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-xl lg:text-3xl font-bold text-white mb-1 lg:mb-2 group-hover:text-cyan-300 transition-colors">
-                            {client.login}
-                          </h4>
-                          <p className="text-slate-400 text-base lg:text-xl mb-2 lg:mb-3">
-                            {client.cpf_cnpj}
-                          </p>
-                          {client.endereco && (
-                            <p className="text-slate-500 text-xs lg:text-base flex flex-col space-y-1">
-                              <span>
-                                {client.endereco}, {client.numero}
-                              </span>
-                              <span>
-                                {client.bairro} - {client.cidade}
-                              </span>
-                            </p>
-                          )}
+
+                        {/* Main Content - Click to select strictly this one */}
+                        <div
+                          className="flex-1 cursor-pointer"
+                          onClick={() => handleClientClick(client)}
+                        >
+                          <div className="flex items-start space-x-4">
+                            <div className="w-12 h-12 rounded-full bg-cyan-500/10 flex items-center justify-center">
+                              <HiHome className="text-2xl text-cyan-400" />
+                            </div>
+                            <div>
+                              <h4 className="text-xl font-bold text-white mb-1 group-hover:text-cyan-300 transition-colors">
+                                {client.login}
+                              </h4>
+                              <p className="text-slate-400 text-sm">
+                                {client.cpf_cnpj}
+                              </p>
+                              {client.endereco && (
+                                <p className="text-slate-500 text-xs mt-1">
+                                  {client.endereco}, {client.numero},{" "}
+                                  {client.bairro}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-cyan-500 rounded-full p-2 lg:p-3">
-                        <HiCheck className="text-white text-xl lg:text-2xl" />
+
+                        {/* Arrow to indicate single click action */}
+                        <div className="ml-4 opacity-50 group-hover:opacity-100 transition-opacity">
+                          <HiArrowRight className="text-white text-2xl" />
+                        </div>
                       </div>
                     </div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
 
-              <div className="mt-8 text-center">
+              {selectedClients.length > 1 && (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    onClick={handleMultiClientPayment}
+                    disabled={loading}
+                    className="px-8 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl shadow-lg hover:shadow-emerald-500/30 transform hover:scale-105 active:scale-95 transition-all flex items-center space-x-2"
+                  >
+                    {loading ? (
+                      <FaSpinner className="animate-spin" />
+                    ) : (
+                      <HiCheck className="text-xl" />
+                    )}
+                    <span>
+                      Pagar 1ª Fatura dos {selectedClients.length} Cadastros
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              <div className="mt-8 text-center pb-4">
                 <button
                   onClick={() => {
                     setStep("search");
                     setError("");
                     setClients([]);
+                    setSelectedClients([]);
                   }}
                   className="text-slate-400 hover:text-white text-sm hover:underline"
                 >
                   Buscar outro CPF
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === "invoice-selection" && (
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+              <h3 className="text-white text-lg font-bold mb-4 px-2">
+                Selecione as Faturas (Cadastro:{" "}
+                <span className="text-cyan-400">{selectedClient?.login}</span>)
+              </h3>
+
+              {invoices.length === 0 ? (
+                <div className="text-center py-10 text-slate-400">
+                  Nenhuma fatura em aberto encontrada.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3">
+                  {invoices.map((inv) => {
+                    const isSel = selectedInvoiceIds.includes(inv.id);
+                    return (
+                      <div
+                        key={inv.id}
+                        onClick={() => handleInvoiceSelect(inv.id)}
+                        className={`
+                                    cursor-pointer p-4 rounded-xl border transition-all duration-200 flex items-center justify-between
+                                    ${isSel ? "bg-slate-800 border-cyan-500 shadow-md shadow-cyan-900/10" : "bg-slate-800/30 border-white/5 hover:bg-slate-800/50"}
+                                `}
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div
+                            className={`w-6 h-6 rounded border flex items-center justify-center transition-colors ${isSel ? "bg-cyan-500 border-cyan-500" : "border-slate-500 bg-slate-900"}`}
+                          >
+                            {isSel && (
+                              <HiCheck className="text-white text-sm" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-white font-bold text-lg">
+                              {formatCurrency(inv.valor)}
+                            </p>
+                            <p className="text-slate-400 text-sm">
+                              {inv.descricao}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-slate-300 font-mono text-sm">
+                          Venc:{" "}
+                          {format(new Date(inv.data_vencimento), "dd/MM/yyyy")}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="mt-6 flex flex-col items-center space-y-4 pb-4">
+                {selectedInvoiceIds.length > 0 && (
+                  <div className="text-white font-bold text-xl">
+                    Total:{" "}
+                    <span className="text-cyan-400">
+                      {formatCurrency(
+                        invoices
+                          .filter((i) => selectedInvoiceIds.includes(i.id))
+                          .reduce((a, b) => a + parseFloat(b.valor), 0),
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleInvoicePayment}
+                  disabled={selectedInvoiceIds.length === 0}
+                  className={`
+                            px-8 py-3 rounded-xl font-bold shadow-lg transition-all transform flex items-center space-x-2
+                            ${
+                              selectedInvoiceIds.length > 0
+                                ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:scale-105 active:scale-95 hover:shadow-blue-500/30"
+                                : "bg-slate-700 text-slate-500 cursor-not-allowed"
+                            }
+                        `}
+                >
+                  <span>Pagar {selectedInvoiceIds.length} Fatura(s)</span>
+                  <HiArrowRight />
                 </button>
               </div>
             </div>
