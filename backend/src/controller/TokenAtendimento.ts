@@ -863,7 +863,20 @@ class TokenAtendimento {
 
       // 🔹 Cria a cobrança PIX somando todos os títulos
       const params = { txid: crypto.randomBytes(16).toString("hex") };
-      await efipay.pixCreateCharge(params, body);
+
+      console.log("********** PAYLOAD PIX MULTIPLO **********");
+      console.log(JSON.stringify(body, null, 2));
+      console.log("******************************************");
+
+      try {
+        await efipay.pixCreateCharge(params, body);
+      } catch (error: any) {
+        console.error("********** ERRO EFIPAY CREATE CHARGE **********");
+        console.error(JSON.stringify(error.response?.data || error, null, 2));
+        console.error(JSON.stringify(error.response, null, 2));
+        console.error("***********************************************");
+        throw error; // Re-throw to be caught by outer catch
+      }
 
       // 🔹 Retorna o resultado ao frontend
       res.status(200).json({
