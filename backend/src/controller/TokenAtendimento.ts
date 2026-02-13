@@ -883,6 +883,7 @@ class TokenAtendimento {
         valor: valorSomado,
         nome_completo,
         link: qrlink.linkVisualizacao,
+        qrcode: qrlink.qrcode, // Add EMV payload for frontend generation
         titulos: structuredData,
         faturaId: structuredData.map((d) => d.id).join(","), // Return all IDs for polling
       });
