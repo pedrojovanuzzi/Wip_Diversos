@@ -281,17 +281,21 @@ class TokenAtendimento {
     try {
       let { faturaId } = req.body;
 
-      const fatura = await this.recordRepo.findOne({
-        where: { id: faturaId },
+      const ids = String(faturaId).split(/[,-]/);
+
+      const faturas = await this.recordRepo.find({
+        where: { id: In(ids.map((id) => Number(id))) },
       });
 
-      if (!fatura) {
-        res.status(404).json({ error: "Fatura nao encontrada" });
+      if (!faturas || faturas.length === 0) {
+        res.status(404).json({ error: "Faturas nao encontradas" });
         return;
       }
 
-      if (fatura.status != "pago") {
-        res.status(400).json({ error: "Fatura ainda nao foi paga" });
+      const allPaid = faturas.every((f) => f.status === "pago");
+
+      if (!allPaid) {
+        res.status(400).json({ error: "Alguma fatura ainda nao foi paga" });
         return;
       }
 
