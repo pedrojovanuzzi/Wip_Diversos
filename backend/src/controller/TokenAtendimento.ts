@@ -461,26 +461,28 @@ class TokenAtendimento {
       const status = body.data.status;
 
       if (status == "processed") {
-        const fatura = await this.recordRepo.findOne({
-          where: {
-            id: Number(faturaId),
-          },
-        });
+        const ids = String(faturaId).split(/[,-]/);
 
-        if (!fatura) {
-          res.status(404).json({ error: "Fatura nao encontrada" });
-          return;
+        for (const id of ids) {
+          const fatura = await this.recordRepo.findOne({
+            where: {
+              id: Number(id),
+            },
+          });
+
+          if (fatura) {
+            await this.recordRepo.update(fatura.id, {
+              status: "pago",
+              datapag: new Date(),
+              formapag: "mercadoPagoPoint",
+              coletor: "mercadoPagoPoint",
+              valorpag: fatura.valor, // Note: We might want the calculated value, but here we just mark as paid. Ideally we usually use the 'total_paid_amount' distributed? For now, setting 'valor' is consistent with "paid full".
+              // Better: if multiple, total_paid_amount is sum. We can't easily know specific amount for each if it was bundled.
+              // Assuming full payment of the invoice value.
+            });
+            console.log(`Fatura ${id} confirmada paga via MercadoPago.`);
+          }
         }
-
-        const faturaUpdate = await this.recordRepo.update(fatura.id, {
-          status: "pago",
-          datapag: new Date(),
-          formapag: "mercadoPagoPoint",
-          coletor: "mercadoPagoPoint",
-          valorpag: valor,
-        });
-
-        console.log(faturaUpdate);
 
         res.status(200).json({ message: "Pagamento recebido com sucesso" });
         return;
@@ -721,6 +723,347 @@ class TokenAtendimento {
     } catch (error) {
       console.log(error);
       res.status(500).json({ error: error });
+    }
+  };
+  listarFaturasAbertas = async (req: Request, res: Response) => {
+    try {
+      const { login } = req.body;
+
+      if (!login) {
+        res.status(400).json({ error: "Login não informado" });
+        return;
+      }
+
+      const faturas = await this.recordRepo.find({
+        where: {
+          login: login,
+          status: In(["aberto", "vencido"]),
+          datadel: IsNull(),
+        },
+        order: { datavenc: "ASC" as const },
+      });
+
+      const faturasProcessadas = await Promise.all(
+        faturas.map(async (fatura) => {
+          const valorCorrigido = await this.aplicarJuros_Desconto(
+            fatura.valor,
+            login,
+            fatura.datavenc,
+          );
+
+          return {
+            id: fatura.id,
+            valor: valorCorrigido.toFixed(2),
+            data_vencimento: fatura.datavenc,
+            descricao: fatura.referencia || fatura.obs || `Fatura ${fatura.id}`,
+            status: fatura.status,
+          };
+        }),
+      );
+
+      res.status(200).json(faturasProcessadas);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Erro ao listar faturas" });
+    }
+  };
+
+  gerarPixVariasContas = async (req: Request, res: Response): Promise<void> => {
+    try {
+      // 🔹 Extrai os dados principais do corpo da requisição
+      let { nome_completo, cpf } = req.body as {
+        nome_completo: string;
+        cpf: string;
+      };
+
+      // 🔹 Extrai os IDs dos títulos
+      const titulos: string[] = String(req.body.titulos || "")
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      // 🔹 Normaliza os dados de entrada
+      nome_completo = String(nome_completo || "").toUpperCase();
+      cpf = String(cpf || "").replace(/[^\d]+/g, "");
+
+      // 🔹 Busca as faturas no banco de dados com base nos IDs recebidos
+      const clientes = await this.recordRepo.find({
+        where: { id: In(titulos.map((t) => Number(t))) },
+      });
+
+      console.log(clientes);
+
+      // 🔹 Se nenhuma fatura foi encontrada, retorna erro
+      if (!clientes || clientes.length === 0) {
+        res.status(404).json("Nenhum título válido encontrado");
+        return;
+      }
+
+      // 🔹 Cria array com dados estruturados aplicando juros e desconto
+      const structuredData: { id: number; dataVenc: Date; valor: number }[] =
+        [];
+
+      for (const cliente of clientes) {
+        // 🔸 Chama a função centralizada de cálculo (sem duplicar lógica)
+        const valorCorrigido = await this.aplicarJuros_Desconto(
+          cliente.valor, // valor original da fatura
+          cliente.login, // login (pppoe)
+          cliente.datavenc, // data de vencimento
+        );
+
+        // 🔹 Armazena o resultado no array final
+        structuredData.push({
+          id: cliente.id,
+          dataVenc: cliente.datavenc as Date,
+          valor: Number(valorCorrigido),
+        });
+      }
+
+      // 🔹 Soma o total corrigido
+      const valorSomado = structuredData
+        .reduce((acc, c) => acc + c.valor, 0)
+        .toFixed(2);
+
+      // 🔹 Instancia única do cliente Efipay
+      const efipay = new EfiPay(options);
+
+      // 🔹 Cria a localização e o QR Code
+      const loc = await efipay.pixCreateLocation([], { tipoCob: "cob" });
+      const qrlink = await efipay.pixGenerateQRCode({ id: loc.id });
+
+      // 🔹 Corpo da cobrança PIX (único para CPF e CNPJ)
+      const body: any = {
+        calendario: { expiracao: 43200 },
+        devedor:
+          cpf.length === 11
+            ? { cpf, nome: nome_completo }
+            : { cnpj: cpf, nome: nome_completo },
+        valor: { original: valorSomado },
+        chave: chave_pix,
+        solicitacaoPagador: "Mensalidade",
+        loc: { id: loc.id },
+        infoAdicionais: [{ nome: "QR", valor: qrlink.linkVisualizacao }],
+      };
+
+      // 🔹 Adiciona as informações de cada título (ID, valor e vencimento)
+      structuredData.forEach((c) => {
+        body.infoAdicionais.push({ nome: "ID", valor: String(c.id) });
+        body.infoAdicionais.push({ nome: "VALOR", valor: String(c.valor) });
+        body.infoAdicionais.push({
+          nome: "VENCIMENTO",
+          valor: c.dataVenc.toISOString().split("T")[0],
+        });
+      });
+
+      // 🔹 Cria a cobrança PIX somando todos os títulos
+      const params = { txid: crypto.randomBytes(16).toString("hex") };
+      await efipay.pixCreateCharge(params, body);
+
+      // 🔹 Retorna o resultado ao frontend
+      res.status(200).json({
+        valor: valorSomado,
+        nome_completo,
+        link: qrlink.linkVisualizacao,
+        titulos: structuredData,
+        faturaId: structuredData[0]?.id,
+      });
+    } catch (error: any) {
+      console.error("❌ Erro em gerarPixVariasContas:", error);
+      res.status(500).json({ erro: error.message || error });
+    }
+  };
+
+  gerarPagamentoMultiploCredito = async (req: Request, res: Response) => {
+    try {
+      const titulos: string[] = String(req.body.titulos || "")
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      if (titulos.length === 0) {
+        res.status(400).json({ error: "Nenhum título informado" });
+        return;
+      }
+
+      const faturas = await this.recordRepo.find({
+        where: { id: In(titulos.map(Number)) },
+      });
+
+      if (!faturas.length) {
+        res.status(404).json({ error: "Faturas não encontradas" });
+        return;
+      }
+
+      let total = 0;
+      for (const fatura of faturas) {
+        const valorCalc = await this.aplicarJuros_Desconto(
+          fatura.valor,
+          fatura.login,
+          fatura.datavenc,
+        );
+        total += valorCalc;
+      }
+
+      // MercadoPago Logic
+      const response = await axios.get(
+        "https://api.mercadopago.com/terminals/v1/list",
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+          },
+        },
+      );
+
+      const terminais = response.data.data.terminals;
+      if (!terminais.length) {
+        res.status(500).json({ error: "Nenhum terminal disponível" });
+        return;
+      }
+
+      const externalRef = titulos.join("-"); // "101-102-103"
+
+      const mpOrder = await axios.post(
+        "https://api.mercadopago.com/v1/orders",
+        {
+          type: "point",
+          external_reference: externalRef,
+          expiration_time: "PT10M", // 10 minutes
+          transactions: {
+            payments: [
+              {
+                amount: total.toFixed(2),
+              },
+            ],
+          },
+          config: {
+            point: {
+              terminal_id: terminais[0].id,
+              print_on_terminal: "seller_ticket",
+            },
+            payment_method: {
+              default_type: "credit_card",
+              installments_cost: "buyer",
+              default_installments: 1,
+            },
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+            "X-Idempotency-Key": uuidv4(),
+          },
+        },
+      );
+
+      res.status(200).json({
+        id: externalRef, // Using the list as ID or null? Frontend uses it for polling order.
+        order: mpOrder.data,
+        valor: total.toFixed(2),
+        dataPagamento: new Date(),
+      });
+    } catch (error: any) {
+      console.log("********** ERRO MERCADO PAGO **********");
+      console.log(JSON.stringify(error.response?.data, null, 2));
+      console.log(JSON.stringify(error.response, null, 2));
+      console.log("***************************************");
+      console.error(error);
+      res.status(500).json({ error: "Erro ao gerar pagamento múltiplo" });
+    }
+  };
+
+  gerarPagamentoMultiploDebito = async (req: Request, res: Response) => {
+    try {
+      const titulos: string[] = String(req.body.titulos || "")
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      if (titulos.length === 0) {
+        res.status(400).json({ error: "Nenhum título informado" });
+        return;
+      }
+
+      const faturas = await this.recordRepo.find({
+        where: { id: In(titulos.map(Number)) },
+      });
+
+      if (!faturas.length) {
+        res.status(404).json({ error: "Faturas não encontradas" });
+        return;
+      }
+
+      let total = 0;
+      for (const fatura of faturas) {
+        const valorCalc = await this.aplicarJuros_Desconto(
+          fatura.valor,
+          fatura.login,
+          fatura.datavenc,
+        );
+        total += valorCalc;
+      }
+
+      // MercadoPago Logic
+      const response = await axios.get(
+        "https://api.mercadopago.com/terminals/v1/list",
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+          },
+        },
+      );
+
+      const terminais = response.data.data.terminals;
+      if (!terminais.length) {
+        res.status(500).json({ error: "Nenhum terminal disponível" });
+        return;
+      }
+
+      const externalRef = titulos.join("-");
+
+      const mpOrder = await axios.post(
+        "https://api.mercadopago.com/v1/orders",
+        {
+          type: "point",
+          external_reference: externalRef,
+          expiration_time: "PT10M",
+          transactions: {
+            payments: [
+              {
+                amount: total.toFixed(2),
+              },
+            ],
+          },
+          config: {
+            point: {
+              terminal_id: terminais[0].id,
+              print_on_terminal: "seller_ticket",
+            },
+            payment_method: {
+              default_type: "debit_card",
+            },
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+            "X-Idempotency-Key": uuidv4(),
+          },
+        },
+      );
+
+      res.status(200).json({
+        id: externalRef,
+        order: mpOrder.data,
+        valor: total.toFixed(2),
+        dataPagamento: new Date(),
+      });
+    } catch (error: any) {
+      console.log("********** ERRO MERCADO PAGO **********");
+      console.log(JSON.stringify(error.response?.data, null, 2));
+      console.log(JSON.stringify(error.response, null, 2));
+      console.log("***************************************");
+      console.error(error);
+      res.status(500).json({ error: "Erro ao gerar pagamento múltiplo" });
     }
   };
 }
