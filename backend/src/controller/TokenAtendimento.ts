@@ -854,10 +854,9 @@ class TokenAtendimento {
       // 🔹 Adiciona as informações de cada título (ID, valor e vencimento)
       structuredData.forEach((c) => {
         body.infoAdicionais.push({ nome: "ID", valor: String(c.id) });
-        body.infoAdicionais.push({ nome: "VALOR", valor: String(c.valor) });
         body.infoAdicionais.push({
-          nome: "VENCIMENTO",
-          valor: c.dataVenc.toISOString().split("T")[0],
+          nome: "VALOR",
+          valor: c.valor.toFixed(2),
         });
       });
 
