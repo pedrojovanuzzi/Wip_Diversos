@@ -292,6 +292,8 @@ class TokenAtendimento {
         return;
       }
 
+      console.log(faturas);
+
       const allPaid = faturas.every((f) => f.status === "pago");
 
       if (!allPaid) {
@@ -869,7 +871,7 @@ class TokenAtendimento {
         nome_completo,
         link: qrlink.linkVisualizacao,
         titulos: structuredData,
-        faturaId: structuredData[0]?.id,
+        faturaId: structuredData.map((d) => d.id).join(","), // Return all IDs for polling
       });
     } catch (error: any) {
       console.error("❌ Erro em gerarPixVariasContas:", error);

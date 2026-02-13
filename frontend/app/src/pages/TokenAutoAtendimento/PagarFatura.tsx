@@ -70,7 +70,7 @@ export const PagarFatura = () => {
     external_reference: string;
     status: string;
   } | null>(null);
-  const [faturaId, setFaturaId] = useState<number | null>(null);
+  const [faturaId, setFaturaId] = useState<number | string | null>(null);
   const [cardMessage, setCardMessage] = useState(
     "Insira o cartão na maquininha e siga as instruções.",
   );
@@ -350,13 +350,8 @@ export const PagarFatura = () => {
 
         if (response.status === 200) {
           setCardMessage("Termine o processo na maquininha.");
-          // If multi, response.id might be "101,102" string.
-          // But faturaId state is number | null.
-          // We need to handle this. For now, let's use the first ID if it's a list, just for reference.
-          // But wait, order polling uses response.data.order.id usually?
-          // obterOrderPorId uses `order?.id` from state.
-
-          setFaturaId(null); // Clear single ID context if multi? Or use response.id as is?
+          // response.id contains the comma/hyphen separated IDs
+          setFaturaId(response.data.id);
           setValorPagamento(response.data.valor);
           setDataPagamento(response.data.dataPagamento);
           setOrder(response.data.order);

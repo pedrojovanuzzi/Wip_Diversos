@@ -4,7 +4,7 @@ import { format } from "date-fns";
 interface ReceiptProps {
   clientName: string;
   cpfCnpj: string;
-  faturaId: number | null;
+  faturaId: number | string | null;
   valor: string;
   dataPagamento: string;
   plano: string;
@@ -133,5 +133,5 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(
         </div>
       </div>
     );
-  }
+  },
 );
