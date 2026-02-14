@@ -104,7 +104,7 @@ class TimeRecordController {
   calculateAndsaveOvertime = async (
     employeeId: number,
     date: Date,
-    scale: "8h" | "12h" = "8h",
+    scale: "8h" | "12h" | "Integral" = "8h",
   ) => {
     try {
       const startOfDay = new Date(date);
@@ -154,7 +154,8 @@ class TimeRecordController {
         }
       }
 
-      const thresholdMinutes = scale === "12h" ? 720 : 480; // 12*60 or 8*60
+      const thresholdMinutes =
+        scale === "12h" ? 720 : scale === "Integral" ? 0 : 480; // 12*60 or 0 or 8*60
       const TOLERANCE = 10;
 
       // Se passar da tolerância (ex: 8h10m), paga TUDO (os 10m + excedente).

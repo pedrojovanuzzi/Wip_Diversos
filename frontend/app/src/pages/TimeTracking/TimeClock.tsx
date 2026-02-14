@@ -39,7 +39,7 @@ export const TimeClock = () => {
   );
   const [showSigModal, setShowSigModal] = useState(false);
 
-  const [scale, setScale] = useState<"8h" | "12h">("8h");
+  const [scale, setScale] = useState<"8h" | "12h" | "Integral">("8h");
 
   const [dailyRecords, setDailyRecords] = useState<any[]>([]);
 
@@ -310,6 +310,16 @@ export const TimeClock = () => {
               }`}
             >
               Escala 12h
+            </button>
+            <button
+              onClick={() => setScale("Integral")}
+              className={`flex-1 py-2 rounded text-sm font-bold transition-all ${
+                scale === "Integral"
+                  ? "bg-white text-green-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Integral
             </button>
           </div>
 
