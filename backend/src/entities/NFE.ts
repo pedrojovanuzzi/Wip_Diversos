@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, Unique } from "typeorm";
 
 @Entity("nfe")
+@Unique(["nNF", "serie"])
 export class NFE {
   @PrimaryGeneratedColumn()
   id!: number;
