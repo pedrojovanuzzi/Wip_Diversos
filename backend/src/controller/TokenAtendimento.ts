@@ -487,6 +487,28 @@ class TokenAtendimento {
               // Assuming full payment of the invoice value.
             });
             console.log(`Fatura ${id} confirmada paga via MercadoPago.`);
+
+            const cliente = await this.clienteRepo.findOne({
+              where: {
+                login: fatura.login,
+              },
+            });
+
+            if (!cliente) {
+              console.log(`Cliente ${fatura.login} nao encontrado.`);
+              continue;
+            }
+
+            if (cliente) {
+              const remObsDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
+                .toISOString()
+                .replace("T", " ")
+                .replace("Z", "");
+              await this.clienteRepo.update(
+                { login: cliente.login },
+                { observacao: "sim", rem_obs: remObsDate },
+              );
+            }
           }
         }
 
