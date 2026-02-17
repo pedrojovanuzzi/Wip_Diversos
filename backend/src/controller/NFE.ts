@@ -180,7 +180,7 @@ class NFEController {
 
         while (!reserved && attempts < 5) {
           try {
-            const effectiveSerie = isHomologacao ? "99" : "3";
+            const effectiveSerie = isHomologacao ? "99" : "4";
 
             const result = await nfeRepository
               .createQueryBuilder("nfe")
