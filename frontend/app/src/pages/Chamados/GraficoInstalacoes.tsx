@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from "react";
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  LabelList,
 } from "recharts";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
@@ -17,13 +16,27 @@ import { NavBar } from "../../components/navbar/NavBar";
 
 interface InstallationStat {
   day: number;
-  count: number;
+  instalacao: number;
+  renovacao: number;
+  migracao: number;
+  mudanca: number;
+  troca: number;
+  cancelamento: number;
+}
+
+interface Totals {
+  instalacao: number;
+  renovacao: number;
+  migracao: number;
+  mudanca: number;
+  troca: number;
+  cancelamento: number;
 }
 
 export const GraficoInstalacoes = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<InstallationStat[]>([]);
-  const [total, setTotal] = useState<number>(0);
+  const [totals, setTotals] = useState<Totals | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
@@ -61,7 +74,7 @@ export const GraficoInstalacoes = () => {
         },
       );
       setStats(response.data.stats);
-      setTotal(response.data.total);
+      setTotals(response.data.totals);
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
       alert("Erro ao carregar gráfico de instalações.");
@@ -83,7 +96,7 @@ export const GraficoInstalacoes = () => {
       <div className="p-6 bg-gray-100 min-h-screen">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-bold text-gray-800 mb-6">
-            Gráfico de Instalações Mensais
+            Gráfico de Suporte Mensal
           </h1>
 
           <div className="bg-white p-6 rounded-lg shadow-md mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -122,17 +135,19 @@ export const GraficoInstalacoes = () => {
               </div>
             </div>
 
-            <div className="bg-indigo-600 text-white p-4 rounded-lg shadow-lg">
-              <p className="text-sm font-medium uppercase tracking-wider">
-                Total de Instalações
-              </p>
-              <p className="text-4xl font-bold text-center">
-                {loading ? (
-                  <AiOutlineLoading3Quarters className="animate-spin inline" />
-                ) : (
-                  total
-                )}
-              </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+              {totals &&
+                Object.entries(totals).map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="bg-white p-2 rounded border border-gray-200 shadow-sm"
+                  >
+                    <p className="text-xs text-gray-500 uppercase font-semibold">
+                      {key}
+                    </p>
+                    <p className="text-lg font-bold text-gray-800">{value}</p>
+                  </div>
+                ))}
             </div>
           </div>
 
@@ -143,7 +158,7 @@ export const GraficoInstalacoes = () => {
               </div>
             ) : stats.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
+                <LineChart
                   data={stats}
                   margin={{
                     top: 20,
@@ -163,20 +178,57 @@ export const GraficoInstalacoes = () => {
                   />
                   <YAxis
                     label={{
-                      value: "Qtd. Instalações",
+                      value: "Qtd. Tickets",
                       angle: -90,
                       position: "insideLeft",
                     }}
                   />
-                  <Tooltip
-                    formatter={(value: number) => [`${value} Instalações`, ""]}
-                    labelFormatter={(label) => `Dia ${label}`}
-                  />
+                  <Tooltip labelFormatter={(label) => `Dia ${label}`} />
                   <Legend />
-                  <Bar dataKey="count" fill="#4f46e5" name="Instalações">
-                    <LabelList dataKey="count" position="top" />
-                  </Bar>
-                </BarChart>
+                  <Line
+                    type="monotone"
+                    dataKey="instalacao"
+                    stroke="#4f46e5"
+                    name="Instalação"
+                    strokeWidth={2}
+                    activeDot={{ r: 8 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="renovacao"
+                    stroke="#10b981"
+                    name="Renovação"
+                    strokeWidth={2}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="migracao"
+                    stroke="#f59e0b"
+                    name="Migração"
+                    strokeWidth={2}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="mudanca"
+                    stroke="#8b5cf6"
+                    name="Mudança"
+                    strokeWidth={2}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="troca"
+                    stroke="#ec4899"
+                    name="Troca"
+                    strokeWidth={2}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="cancelamento"
+                    stroke="#ef4444"
+                    name="Cancelamento"
+                    strokeWidth={2}
+                  />
+                </LineChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex h-full items-center justify-center text-gray-500">

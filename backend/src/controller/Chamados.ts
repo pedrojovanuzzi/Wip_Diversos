@@ -225,13 +225,33 @@ class Chamados {
     try {
       const stats = await MkRepository.createQueryBuilder("chamado")
         .select("DAY(chamado.abertura)", "day")
-        .addSelect("COUNT(chamado.id)", "count")
+        .addSelect(
+          "SUM(CASE WHEN chamado.assunto LIKE '%Instala%' THEN 1 ELSE 0 END)",
+          "instalacao",
+        )
+        .addSelect(
+          "SUM(CASE WHEN chamado.assunto LIKE '%Renova%' THEN 1 ELSE 0 END)",
+          "renovacao",
+        )
+        .addSelect(
+          "SUM(CASE WHEN chamado.assunto LIKE '%Migra%' THEN 1 ELSE 0 END)",
+          "migracao",
+        )
+        .addSelect(
+          "SUM(CASE WHEN chamado.assunto LIKE '%Mudan%' THEN 1 ELSE 0 END)",
+          "mudanca",
+        )
+        .addSelect(
+          "SUM(CASE WHEN chamado.assunto LIKE '%Troca%' THEN 1 ELSE 0 END)",
+          "troca",
+        )
+        .addSelect(
+          "SUM(CASE WHEN chamado.assunto LIKE '%Cancela%' THEN 1 ELSE 0 END)",
+          "cancelamento",
+        )
         .where("chamado.abertura BETWEEN :start AND :end", {
           start: firstDay,
           end: lastDay,
-        })
-        .andWhere("chamado.assunto LIKE :assunto", {
-          assunto: "%Instala%",
         })
         .groupBy("day")
         .orderBy("day", "ASC")
@@ -239,17 +259,36 @@ class Chamados {
 
       const formattedStats = stats.map((item: any) => ({
         day: Number(item.day),
-        count: Number(item.count),
+        instalacao: Number(item.instalacao),
+        renovacao: Number(item.renovacao),
+        migracao: Number(item.migracao),
+        mudanca: Number(item.mudanca),
+        troca: Number(item.troca),
+        cancelamento: Number(item.cancelamento),
       }));
 
-      const total = formattedStats.reduce(
-        (acc: number, curr: { count: number }) => acc + curr.count,
-        0,
+      const totals = formattedStats.reduce(
+        (acc: any, curr: any) => ({
+          instalacao: acc.instalacao + curr.instalacao,
+          renovacao: acc.renovacao + curr.renovacao,
+          migracao: acc.migracao + curr.migracao,
+          mudanca: acc.mudanca + curr.mudanca,
+          troca: acc.troca + curr.troca,
+          cancelamento: acc.cancelamento + curr.cancelamento,
+        }),
+        {
+          instalacao: 0,
+          renovacao: 0,
+          migracao: 0,
+          mudanca: 0,
+          troca: 0,
+          cancelamento: 0,
+        },
       );
 
       res.status(200).json({
         stats: formattedStats,
-        total,
+        totals,
         month: m + 1,
         year: y,
       });
