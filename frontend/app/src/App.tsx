@@ -48,6 +48,7 @@ import { TimeTrackingMap } from "./pages/TimeTracking/TimeTrackingMap";
 import { MonthlyReport } from "./pages/TimeTracking/Reports/MonthlyReport";
 import { EnviarMensagem } from "./pages/Marketing/EnviarMensagem";
 import { GerenciarLicencas } from "./pages/Licencas/GerenciarLicencas";
+import { GraficoInstalacoes } from "./pages/Chamados/GraficoInstalacoes";
 
 function App() {
   const { user, loading } = useAuth();
@@ -441,6 +442,16 @@ function App() {
             element={
               user?.token && user.permission >= 5 ? (
                 <MonthlyReport />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/grafico-instalacoes"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <GraficoInstalacoes />
               ) : (
                 <Navigate to="/auth/login" />
               )

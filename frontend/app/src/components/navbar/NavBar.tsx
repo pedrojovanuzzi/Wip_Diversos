@@ -21,6 +21,7 @@ import {
   FaClipboardList,
   FaMapMarkedAlt,
   FaDesktop,
+  FaChartLine,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -297,6 +298,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   }
                   title="Analytics"
                   description="Análise de dados de clientes"
+                />
+                <NavItem
+                  to="/grafico-instalacoes"
+                  icon={
+                    <FaChartLine className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Gráfico Instalações"
+                  description="Acompanhe instalações mensais"
                 />
               </>
             )}
