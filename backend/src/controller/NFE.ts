@@ -669,6 +669,7 @@ class NFEController {
         w.vendedor = In(["SVA"]);
       }
       if (servicos?.length) servicosFilter = servicos;
+      w.comomodato = In(["sim"]);
     }
     try {
       const clientesResponse = await ClientRepository.find({
@@ -920,7 +921,9 @@ class NFEController {
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const w: any = {};
     w.cli_ativado = "s";
+    w.comodato = "sim";
     let servicosFilter: string[] = ["mensalidade"];
+
     if (cpf) w.cpf_cnpj = Like(`%${cpf}%`);
     if (filters) {
       let { plano, vencimento, SCM, servicos } = filters;
@@ -950,7 +953,8 @@ class NFEController {
       });
 
       res.status(200).json(clientesResponse);
-    } catch {
+    } catch (error) {
+      console.error(error);
       res.status(500).json({ message: "Erro ao buscar clientes" });
     }
   };
