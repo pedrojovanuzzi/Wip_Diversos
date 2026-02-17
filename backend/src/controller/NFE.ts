@@ -1095,14 +1095,20 @@ class NFEController {
       } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
-      // Determine WHERE clause (Synced with baixarZipXml logic for consistency)
-      const where: any = {};
+      // Determine WHERE clause using QueryBuilder
+      const query = nfeRepository.createQueryBuilder("nfe");
 
       if (id && id.length > 0) {
-        where.id = In(id);
+        query.where("nfe.id IN (:...ids)", { ids: id });
       } else {
-        if (cpf) where.destinatario_cpf_cnpj = cpf.replace(/\D/g, "");
-        if (serie) where.serie = serie;
+        if (cpf) {
+          query.andWhere("nfe.destinatario_cpf_cnpj = :cpf", {
+            cpf: cpf.replace(/\D/g, ""),
+          });
+        }
+        if (serie) {
+          query.andWhere("nfe.serie = :serie", { serie });
+        }
 
         // Handle both new dateFilter and old dataInicio/dataFim
         if (dateFilter && dateFilter.start && dateFilter.end) {
@@ -1112,7 +1118,10 @@ class NFEController {
           const end = new Date(
             `${dateFilter.end.substring(0, 10)}T23:59:59.999Z`,
           );
-          where.data_emissao = Between(start, end);
+          query.andWhere("nfe.data_emissao BETWEEN :start AND :end", {
+            start,
+            end,
+          });
         } else if (dataInicio && dataFim) {
           const [diaIni, mesIni, anoIni] = dataInicio.split("/");
           const [diaFim, mesFim, anoFim] = dataFim.split("/");
@@ -1122,16 +1131,27 @@ class NFEController {
           const end = new Date(
             `${anoFim}-${mesFim}-${diaFim}T23:59:59.999-03:00`,
           );
-          where.data_emissao = Between(start, end);
+          query.andWhere("nfe.data_emissao BETWEEN :start AND :end", {
+            start,
+            end,
+          });
         }
 
-        if (status) where.status = status;
-        if (ambiente) where.tpAmb = ambiente === "homologacao" ? 2 : 1;
-        if (tipo_operacao) where.tipo_operacao = tipo_operacao;
+        if (status) query.andWhere("nfe.status = :status", { status });
+        if (ambiente) {
+          query.andWhere("nfe.tpAmb = :tpAmb", {
+            tpAmb: ambiente === "homologacao" ? 2 : 1,
+          });
+        }
+        if (tipo_operacao) {
+          query.andWhere("nfe.tipo_operacao = :tipo_operacao", {
+            tipo_operacao,
+          });
+        }
       }
 
       // 1. Check Count first
-      const totalCount = await nfeRepository.count({ where });
+      const totalCount = await query.getCount();
 
       if (totalCount === 0) {
         res
@@ -1224,24 +1244,11 @@ class NFEController {
       const batchSize = 200; // Larger batch for simple DB reads
       let processed = 0;
 
+      // Add Sorting
+      query.orderBy("CAST(nfe.nNF AS UNSIGNED)", "ASC");
+
       while (processed < totalCount) {
-        const batch = await nfeRepository.find({
-          where,
-          order: { nNF: "ASC" },
-          skip: processed,
-          take: batchSize,
-          select: {
-            id: true,
-            nNF: true,
-            serie: true,
-            data_emissao: true,
-            valor_total: true,
-            status: true,
-            destinatario_nome: true,
-            tipo_operacao: true,
-            xml: true,
-          },
-        });
+        const batch = await query.skip(processed).take(batchSize).getMany();
 
         for (let i = 0; i < batch.length; i++) {
           const nfe = batch[i];
@@ -1352,14 +1359,20 @@ class NFEController {
         req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
-      // Determine WHERE clause
-      const where: any = {};
+      // Determine WHERE clause using QueryBuilder
+      const query = nfeRepository.createQueryBuilder("nfe");
 
       if (id && id.length > 0) {
-        where.id = In(id);
+        query.where("nfe.id IN (:...ids)", { ids: id });
       } else {
-        if (cpf) where.destinatario_cpf_cnpj = cpf.replace(/\D/g, "");
-        if (serie) where.serie = serie;
+        if (cpf) {
+          query.andWhere("nfe.destinatario_cpf_cnpj = :cpf", {
+            cpf: cpf.replace(/\D/g, ""),
+          });
+        }
+        if (serie) {
+          query.andWhere("nfe.serie = :serie", { serie });
+        }
         if (dateFilter && dateFilter.start && dateFilter.end) {
           const start = new Date(
             `${dateFilter.start.substring(0, 10)}T00:00:00.000Z`,
@@ -1367,15 +1380,26 @@ class NFEController {
           const end = new Date(
             `${dateFilter.end.substring(0, 10)}T23:59:59.999Z`,
           );
-          where.data_emissao = Between(start, end);
+          query.andWhere("nfe.data_emissao BETWEEN :start AND :end", {
+            start,
+            end,
+          });
         }
-        if (status) where.status = status;
-        if (ambiente) where.tpAmb = ambiente === "homologacao" ? 2 : 1;
-        if (tipo_operacao) where.tipo_operacao = tipo_operacao;
+        if (status) query.andWhere("nfe.status = :status", { status });
+        if (ambiente) {
+          query.andWhere("nfe.tpAmb = :tpAmb", {
+            tpAmb: ambiente === "homologacao" ? 2 : 1,
+          });
+        }
+        if (tipo_operacao) {
+          query.andWhere("nfe.tipo_operacao = :tipo_operacao", {
+            tipo_operacao,
+          });
+        }
       }
 
       // Count total first to ensure we have something to download
-      const totalCount = await nfeRepository.count({ where });
+      const totalCount = await query.getCount();
       console.log(`Total de notas para ZIP: ${totalCount}`);
 
       if (totalCount === 0) {
@@ -1415,16 +1439,14 @@ class NFEController {
       const batchSize = 10;
       let processed = 0;
 
+      // Add Sorting
+      query.orderBy("CAST(nfe.nNF AS UNSIGNED)", "ASC");
+
       while (processed < totalCount) {
         // Stop if response is closed
         if (res.writableEnded || res.closed) break;
 
-        const batch = await nfeRepository.find({
-          where,
-          order: { id: "DESC" },
-          skip: processed,
-          take: batchSize,
-        });
+        const batch = await query.skip(processed).take(batchSize).getMany();
 
         for (const nfe of batch) {
           const nomeArquivo = `NFe_${nfe.nNF}_Serie_${nfe.serie}`;
