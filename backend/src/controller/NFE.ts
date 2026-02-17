@@ -192,6 +192,8 @@ class NFEController {
             const nNF = maxNfe + 1;
             const serie = effectiveSerie;
 
+            console.log(nNF);
+
             const dhEmi = moment()
               .tz("America/Sao_Paulo")
               .format("YYYY-MM-DDTHH:mm:ssZ");
