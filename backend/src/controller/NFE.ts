@@ -959,6 +959,7 @@ class NFEController {
     try {
       const {
         cpf,
+        serie,
         dateFilter,
         status,
         ambiente,
@@ -972,6 +973,10 @@ class NFEController {
 
       if (cpf) {
         where.destinatario_cpf_cnpj = cpf.replace(/\D/g, "");
+      }
+
+      if (serie) {
+        where.serie = serie;
       }
 
       if (dateFilter && dateFilter.start && dateFilter.end) {
@@ -1086,6 +1091,7 @@ class NFEController {
         tipo_operacao,
         dataInicio,
         dataFim,
+        serie,
       } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
@@ -1096,6 +1102,7 @@ class NFEController {
         where.id = In(id);
       } else {
         if (cpf) where.destinatario_cpf_cnpj = cpf.replace(/\D/g, "");
+        if (serie) where.serie = serie;
 
         // Handle both new dateFilter and old dataInicio/dataFim
         if (dateFilter && dateFilter.start && dateFilter.end) {
@@ -1341,7 +1348,8 @@ class NFEController {
   public baixarZipXml = async (req: Request, res: Response) => {
     try {
       console.log("Iniciando geração de ZIP...");
-      const { id, cpf, dateFilter, status, ambiente, tipo_operacao } = req.body;
+      const { id, cpf, serie, dateFilter, status, ambiente, tipo_operacao } =
+        req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
       // Determine WHERE clause
@@ -1351,6 +1359,7 @@ class NFEController {
         where.id = In(id);
       } else {
         if (cpf) where.destinatario_cpf_cnpj = cpf.replace(/\D/g, "");
+        if (serie) where.serie = serie;
         if (dateFilter && dateFilter.start && dateFilter.end) {
           const start = new Date(
             `${dateFilter.start.substring(0, 10)}T00:00:00.000Z`,

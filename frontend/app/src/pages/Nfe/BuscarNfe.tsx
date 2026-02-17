@@ -8,6 +8,7 @@ import { useNotification } from "../../context/NotificationContext";
 
 export const BuscarNfe = () => {
   const [searchCpf, setSearchCpf] = useState<string>("");
+  const [searchSerie, setSearchSerie] = useState<string>("");
   const [nfes, setNfes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [ambiente, setAmbiente] = useState<string>("homologacao");
@@ -36,6 +37,7 @@ export const BuscarNfe = () => {
         `${process.env.REACT_APP_URL}/NFEletronica/buscarGeradas`,
         {
           cpf: searchCpf,
+          serie: searchSerie,
           dateFilter: dateFilter,
           status: status,
           ambiente: ambiente,
@@ -146,6 +148,7 @@ export const BuscarNfe = () => {
           tipo_operacao: tipoOperacao, // Always send for filtering if needed
           // Full filters for "Select All Matching"
           cpf: selectAllMatching ? searchCpf : undefined,
+          serie: selectAllMatching ? searchSerie : undefined,
           status: selectAllMatching ? status : undefined,
           ambiente: selectAllMatching ? ambiente : undefined,
           dateFilter: dateFilter,
@@ -187,6 +190,7 @@ export const BuscarNfe = () => {
           id: selectAllMatching ? undefined : selectedIds,
           // Include filters for "Select All Matching" fallback in backend
           cpf: selectAllMatching ? searchCpf : undefined,
+          serie: selectAllMatching ? searchSerie : undefined,
           status: selectAllMatching ? status : undefined,
           ambiente: selectAllMatching ? ambiente : undefined,
           tipo_operacao: selectAllMatching ? tipoOperacao : undefined,
@@ -282,6 +286,24 @@ export const BuscarNfe = () => {
                     placeholder="000.000.000-00"
                     value={searchCpf}
                     onChange={(e) => setSearchCpf(e.target.value)}
+                  />
+                </div>
+
+                <div className="col-span-1">
+                  <label
+                    htmlFor="serie"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Série
+                  </label>
+                  <input
+                    type="text"
+                    name="serie"
+                    id="serie"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    placeholder="Ex: 1"
+                    value={searchSerie}
+                    onChange={(e) => setSearchSerie(e.target.value)}
                   />
                 </div>
 
