@@ -182,12 +182,14 @@ class NFEController {
           try {
             const effectiveSerie = isHomologacao ? "99" : "1";
 
-            const lastNfe = await nfeRepository.findOne({
-              where: { serie: effectiveSerie },
-              order: { id: "DESC" },
-            });
+            const result = await nfeRepository
+              .createQueryBuilder("nfe")
+              .select("MAX(CAST(nfe.nNF AS UNSIGNED))", "maxNfe")
+              .where("nfe.serie = :serie", { serie: effectiveSerie })
+              .getRawOne();
 
-            const nNF = lastNfe ? parseInt(lastNfe.nNF) + 1 : 1;
+            const maxNfe = result?.maxNfe ? parseInt(result.maxNfe, 10) : 0;
+            const nNF = maxNfe + 1;
             const serie = effectiveSerie;
 
             const dhEmi = moment()
