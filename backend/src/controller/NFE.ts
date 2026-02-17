@@ -270,6 +270,9 @@ class NFEController {
                   xNome: isHomologacao
                     ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
                     : (client.nome || "CLIENTE SEM NOME").trim(),
+                  email: (
+                    client.email || "suporte_wiptelecom@outlook.com"
+                  ).trim(),
                   enderDest: {
                     xLgr: (client.endereco || "Rua Sem Nome").trim(),
                     nro: (client.numero || "S/N").trim(),
