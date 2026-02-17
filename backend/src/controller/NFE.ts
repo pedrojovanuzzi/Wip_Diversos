@@ -1340,6 +1340,7 @@ class NFEController {
 
   public baixarZipXml = async (req: Request, res: Response) => {
     try {
+      console.log("Iniciando geração de ZIP...");
       const { id, cpf, dateFilter, status, ambiente, tipo_operacao } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
@@ -1366,6 +1367,8 @@ class NFEController {
 
       // Count total first to ensure we have something to download
       const totalCount = await nfeRepository.count({ where });
+      console.log(`Total de notas para ZIP: ${totalCount}`);
+
       if (totalCount === 0) {
         res.status(404).json({ message: "Nenhuma nota encontrada." });
         return;
@@ -1374,6 +1377,22 @@ class NFEController {
       // Initialize Archiver
       const archiver = require("archiver");
       const archive = archiver("zip", { zlib: { level: 9 } });
+
+      // Handle Archive Errors
+      archive.on("error", (err: any) => {
+        console.error("Erro no Archiver:", err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: err.message });
+        } else {
+          res.end();
+        }
+      });
+
+      // Handle Client Disconnect
+      res.on("close", () => {
+        console.log("Cliente cancelou o download do ZIP.");
+        archive.abort();
+      });
 
       res.setHeader("Content-Type", "application/zip");
       res.setHeader(
@@ -1388,6 +1407,9 @@ class NFEController {
       let processed = 0;
 
       while (processed < totalCount) {
+        // Stop if response is closed
+        if (res.writableEnded || res.closed) break;
+
         const batch = await nfeRepository.find({
           where,
           order: { id: "DESC" },
@@ -1408,6 +1430,7 @@ class NFEController {
             const pdfBuffer = await this.generateDanfe(nfe);
             archive.append(pdfBuffer, { name: `pdfs/${nomeArquivo}.pdf` });
           } catch (err) {
+            console.error(`Erro ao gerar PDF da nota ${nfe.nNF}:`, err);
             archive.append(`Erro: ${err}`, {
               name: `pdfs/ERRO_${nomeArquivo}.txt`,
             });
@@ -1415,14 +1438,19 @@ class NFEController {
         }
 
         processed += batch.length;
+        console.log(`Processado ${processed}/${totalCount}`);
+
         // Minimal delay to allow event loop to handle I/O
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
 
+      console.log("Finalizando arquivo ZIP.");
       await archive.finalize();
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Erro ao gerar ZIP." });
+      console.error("Erro geral no baixarZipXml:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Erro ao gerar ZIP." });
+      }
     }
   };
 
