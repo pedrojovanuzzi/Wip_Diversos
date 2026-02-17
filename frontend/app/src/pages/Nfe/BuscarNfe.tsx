@@ -18,11 +18,18 @@ export const BuscarNfe = () => {
     end: string;
   } | null>(null);
 
+  // Pagination & Selection State
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(100);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [selectAllMatching, setSelectAllMatching] = useState(false);
+
   const { user } = useAuth();
   const token = user?.token;
   const { showError } = useNotification();
 
-  const handleSearch = async () => {
+  const fetchNfes = async (pageToFetch: number) => {
     setLoading(true);
     try {
       const resposta = await axios.post(
@@ -33,6 +40,8 @@ export const BuscarNfe = () => {
           status: status,
           ambiente: ambiente,
           tipo_operacao: tipoOperacao,
+          page: pageToFetch,
+          limit: limit,
         },
         {
           headers: {
@@ -41,12 +50,28 @@ export const BuscarNfe = () => {
           },
         },
       );
-      setNfes(resposta.data);
+      setNfes(resposta.data.data);
+      setTotalPages(resposta.data.totalPages);
+      setTotalCount(resposta.data.total);
+      setPage(pageToFetch);
     } catch (erro) {
       console.error("Erro ao buscar NFEs:", erro);
       showError("Erro ao buscar NFEs.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSearch = async () => {
+    // New search: reset pagination and selection
+    setSelectedIds([]);
+    setSelectAllMatching(false);
+    await fetchNfes(1);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      fetchNfes(newPage);
     }
   };
 
@@ -112,15 +137,25 @@ export const BuscarNfe = () => {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/NFEletronica/generateReportPdf`,
         {
-          id: selectedIds.length > 0 ? selectedIds : undefined,
+          // If selecting all matching, send filters. Otherwise send IDs.
+          id: selectAllMatching
+            ? undefined
+            : selectedIds.length > 0
+              ? selectedIds
+              : undefined,
+          tipo_operacao: tipoOperacao, // Always send for filtering if needed
+          // Full filters for "Select All Matching"
+          cpf: selectAllMatching ? searchCpf : undefined,
+          status: selectAllMatching ? status : undefined,
+          ambiente: selectAllMatching ? ambiente : undefined,
           dateFilter: dateFilter,
+
           dataInicio: dateFilter?.start
             ? new Date(dateFilter.start).toLocaleDateString("pt-BR")
             : undefined,
           dataFim: dateFilter?.end
             ? new Date(dateFilter.end).toLocaleDateString("pt-BR")
             : undefined,
-          tipo_operacao: tipoOperacao,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -141,14 +176,22 @@ export const BuscarNfe = () => {
   };
 
   const handleDownloadZip = async () => {
-    if (selectedIds.length === 0) {
+    if (selectedIds.length === 0 && !selectAllMatching) {
       showError("Selecione pelo menos uma nota para baixar o ZIP.");
       return;
     }
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/NFEletronica/downloadZipXMLs`,
-        { id: selectedIds },
+        {
+          id: selectAllMatching ? undefined : selectedIds,
+          // Include filters for "Select All Matching" fallback in backend
+          cpf: selectAllMatching ? searchCpf : undefined,
+          status: selectAllMatching ? status : undefined,
+          ambiente: selectAllMatching ? ambiente : undefined,
+          tipo_operacao: selectAllMatching ? tipoOperacao : undefined,
+          dateFilter: selectAllMatching ? dateFilter : undefined,
+        },
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",
@@ -169,19 +212,42 @@ export const BuscarNfe = () => {
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedIds(nfes.map((n) => n.id));
+      // Select only current page
+      const currentIds = nfes.map((n) => n.id);
+      // Merge with existing selection
+      const newSelection = Array.from(new Set([...selectedIds, ...currentIds]));
+      setSelectedIds(newSelection);
     } else {
-      setSelectedIds([]);
+      // Deselect current page
+      const currentIds = nfes.map((n) => n.id);
+      setSelectedIds(selectedIds.filter((id) => !currentIds.includes(id)));
+      setSelectAllMatching(false);
     }
+  };
+
+  const handleSelectMatching = () => {
+    setSelectAllMatching(true);
+    // Visual feedback: select current page IDs to make checkbox checked
+    const currentIds = nfes.map((n) => n.id);
+    setSelectedIds(Array.from(new Set([...selectedIds, ...currentIds])));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+    setSelectAllMatching(false);
   };
 
   const handleSelect = (id: number) => {
     if (selectedIds.includes(id)) {
       setSelectedIds(selectedIds.filter((i) => i !== id));
+      setSelectAllMatching(false); // Valid assumption: if you deselect one, you aren't selecting all matching anymore
     } else {
       setSelectedIds([...selectedIds, id]);
     }
   };
+
+  const allPageSelected =
+    nfes.length > 0 && nfes.every((n) => selectedIds.includes(n.id));
 
   return (
     <div>
@@ -350,7 +416,45 @@ export const BuscarNfe = () => {
                 </div>
               </div>
 
-              <div className="mt-8 flex flex-col">
+              <div className="mt-4 flex flex-col">
+                {/* Selection Banner */}
+                {selectedIds.length > 0 && (
+                  <div className="bg-indigo-50 border-l-4 border-indigo-400 p-4 mb-4">
+                    <div className="flex">
+                      <div className="flex-shrink-0">{/* Icon */}</div>
+                      <div className="ml-3">
+                        <p className="text-sm text-indigo-700">
+                          {selectAllMatching ? (
+                            <>
+                              Todas as <strong>{totalCount}</strong> notas dessa
+                              busca estão selecionadas.
+                              <button
+                                onClick={clearSelection}
+                                className="ml-2 font-medium underline hover:text-indigo-900"
+                              >
+                                Limpar seleção
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              {selectedIds.length} notas selecionadas.
+                              {allPageSelected && totalCount > nfes.length && (
+                                <button
+                                  onClick={handleSelectMatching}
+                                  className="ml-2 font-medium underline hover:text-indigo-900"
+                                >
+                                  Selecionar todas as {totalCount} notas dessa
+                                  busca
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
                   <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
                     <div className="overflow-auto shadow ring-1 ring-black ring-opacity-5 md:rounded-lg max-h-[500px]">
@@ -364,10 +468,7 @@ export const BuscarNfe = () => {
                               <input
                                 type="checkbox"
                                 className="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                checked={
-                                  nfes.length > 0 &&
-                                  selectedIds.length === nfes.length
-                                }
+                                checked={nfes.length > 0 && allPageSelected}
                                 onChange={handleSelectAll}
                               />
                             </th>
@@ -555,6 +656,66 @@ export const BuscarNfe = () => {
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+                <div className="flex flex-1 justify-between sm:hidden">
+                  <button
+                    onClick={() => handlePageChange(page - 1)}
+                    disabled={page === 1}
+                    className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(page + 1)}
+                    disabled={page === totalPages}
+                    className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Próxima
+                  </button>
+                </div>
+                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      Mostrando{" "}
+                      <span className="font-medium">
+                        {(page - 1) * limit + 1}
+                      </span>{" "}
+                      a{" "}
+                      <span className="font-medium">
+                        {Math.min(page * limit, totalCount)}
+                      </span>{" "}
+                      de <span className="font-medium">{totalCount}</span>{" "}
+                      resultados
+                    </p>
+                  </div>
+                  <div>
+                    <nav
+                      className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+                      aria-label="Pagination"
+                    >
+                      <button
+                        onClick={() => handlePageChange(page - 1)}
+                        disabled={page === 1}
+                        className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                      >
+                        <span className="sr-only">Anterior</span>
+                        &larr;
+                      </button>
+                      <span className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-offset-0">
+                        Página {page} de {totalPages}
+                      </span>
+                      <button
+                        onClick={() => handlePageChange(page + 1)}
+                        disabled={page === totalPages}
+                        className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                      >
+                        <span className="sr-only">Próxima</span>
+                        &rarr;
+                      </button>
+                    </nav>
                   </div>
                 </div>
               </div>

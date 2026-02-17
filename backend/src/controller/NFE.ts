@@ -1077,86 +1077,56 @@ class NFEController {
 
   public generateReportPdf = async (req: Request, res: Response) => {
     try {
-      const { id, dataInicio, dataFim, password, tipo_operacao } = req.body;
-
-      // Se tiver IDs selecionados, usa eles. Se não, usa os filtros de data.
-      let nfes: NFE[] = [];
+      const {
+        id,
+        cpf,
+        dateFilter,
+        status,
+        ambiente,
+        tipo_operacao,
+        dataInicio,
+        dataFim,
+      } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
-      if (id && id.length > 0) {
-        nfes = await nfeRepository.find({
-          where: { id: In(id) },
-          order: { nNF: "ASC" },
-        });
-      } else {
-        const { dateFilter } = req.body;
-        let start: Date;
-        let end: Date;
+      // Determine WHERE clause (Synced with baixarZipXml logic for consistency)
+      const where: any = {};
 
+      if (id && id.length > 0) {
+        where.id = In(id);
+      } else {
+        if (cpf) where.destinatario_cpf_cnpj = cpf.replace(/\D/g, "");
+
+        // Handle both new dateFilter and old dataInicio/dataFim
         if (dateFilter && dateFilter.start && dateFilter.end) {
-          // Use Strict UTC matching like BuscarNFEs
-          start = new Date(
+          const start = new Date(
             `${dateFilter.start.substring(0, 10)}T00:00:00.000Z`,
           );
-          end = new Date(`${dateFilter.end.substring(0, 10)}T23:59:59.999Z`);
-
-          const where: any = {
-            data_emissao: Between(start, end),
-          };
-
-          if (tipo_operacao) {
-            where.tipo_operacao = tipo_operacao;
-          }
-
-          nfes = await nfeRepository.find({
-            where: where,
-            order: { nNF: "ASC" },
-            select: {
-              id: true,
-              nNF: true,
-              serie: true,
-              data_emissao: true,
-              valor_total: true,
-              status: true,
-              destinatario_nome: true,
-              tipo_operacao: true,
-              xml: true, // Needed for product extraction
-            },
-          });
+          const end = new Date(
+            `${dateFilter.end.substring(0, 10)}T23:59:59.999Z`,
+          );
+          where.data_emissao = Between(start, end);
         } else if (dataInicio && dataFim) {
-          // Fallback for old behavior or if dateFilter is missing
           const [diaIni, mesIni, anoIni] = dataInicio.split("/");
           const [diaFim, mesFim, anoFim] = dataFim.split("/");
-          start = new Date(`${anoIni}-${mesIni}-${diaIni}T00:00:00.000-03:00`);
-          end = new Date(`${anoFim}-${mesFim}-${diaFim}T23:59:59.999-03:00`);
-
-          const where: any = {
-            data_emissao: Between(start, end),
-          };
-
-          if (tipo_operacao) {
-            where.tipo_operacao = tipo_operacao;
-          }
-
-          nfes = await nfeRepository.find({
-            where: where,
-            order: { nNF: "ASC" },
-            select: {
-              id: true,
-              nNF: true,
-              serie: true,
-              data_emissao: true,
-              valor_total: true,
-              status: true,
-              destinatario_nome: true,
-              tipo_operacao: true,
-              xml: true, // Needed for product extraction
-            },
-          });
+          const start = new Date(
+            `${anoIni}-${mesIni}-${diaIni}T00:00:00.000-03:00`,
+          );
+          const end = new Date(
+            `${anoFim}-${mesFim}-${diaFim}T23:59:59.999-03:00`,
+          );
+          where.data_emissao = Between(start, end);
         }
+
+        if (status) where.status = status;
+        if (ambiente) where.tpAmb = ambiente === "homologacao" ? 2 : 1;
+        if (tipo_operacao) where.tipo_operacao = tipo_operacao;
       }
 
-      if (nfes.length === 0) {
+      // 1. Check Count first
+      const totalCount = await nfeRepository.count({ where });
+
+      if (totalCount === 0) {
         res
           .status(404)
           .json({ message: "Nenhuma nota encontrada para o relatório." });
@@ -1171,25 +1141,22 @@ class NFEController {
       );
 
       const doc = new PDFDocument({ margin: 30, size: "A4" });
-
-      // Pipe directly to response to avoid memory buffering
       doc.pipe(res);
 
       // --- Cabeçalho do Relatório ---
-      // Draw Header Background
-      doc.rect(0, 0, 595.28, 100).fill("#1e293b"); // Slate-900 like color
+      doc.rect(0, 0, 595.28, 100).fill("#1e293b");
       doc.fillColor("white");
 
       doc.fontSize(20).text("Relatório de Notas Fiscais", 30, 30);
       doc.fontSize(10).font("Helvetica");
       doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 30, 60);
-      const { dateFilter } = req.body;
-      let periodoTexto = "";
+
+      let periodoTexto = "Todo o período";
       if (dateFilter && dateFilter.start && dateFilter.end) {
         const fmt = (iso: string) => iso.split("-").reverse().join("/");
         periodoTexto = `${fmt(dateFilter.start)} a ${fmt(dateFilter.end)}`;
-      } else {
-        periodoTexto = `${dataInicio || "Início"} a ${dataFim || "Fim"}`;
+      } else if (dataInicio && dataFim) {
+        periodoTexto = `${dataInicio} a ${dataFim}`;
       }
 
       doc.text(
@@ -1197,20 +1164,16 @@ class NFEController {
         30,
         75,
       );
+      doc.text(`Total de Notas: ${totalCount}`, 400, 60, { align: "right" });
 
-      doc.text(`Total de Notas: ${nfes.length}`, 400, 60, { align: "right" });
-
-      // Reset Colors
       doc.fillColor("black");
-
       doc.moveDown();
-      doc.y = 120; // Start content below header
+      doc.y = 120;
 
-      // --- Tabela (Streaming / Batch) ---
+      // --- Tabela Setup ---
       const startX = 30;
       let currentY = doc.y;
 
-      // Column Configuration (Same as before)
       const cols = {
         numero: { x: 30, w: 45, title: "NÚMERO", align: "left" as const },
         serie: { x: 75, w: 25, title: "SÉR", align: "left" as const },
@@ -1243,6 +1206,7 @@ class NFEController {
       currentY += 20;
       doc.font("Helvetica").fontSize(8);
 
+      // --- Streaming Loop ---
       let totalValor = 0;
       const parser = new XMLParser({
         ignoreAttributes: false,
@@ -1250,107 +1214,106 @@ class NFEController {
         parseTagValue: false,
       });
 
-      const batchSize = 100;
+      const batchSize = 200; // Larger batch for simple DB reads
       let processed = 0;
-      // We know nfes array from previous logic might be huge or we need to query count.
-      // To strictly fix memory, we should QUERY in batches.
-      // But for this patch, let's assume we replace the fetching logic too.
-      // Wait, currently 'nfes' IS FETCHED FULLY closer to line 1128.
-      // I need to change how 'nfes' is obtained.
 
-      // Since 'nfes' is already fetched at the top of this function (lines 1074-1132),
-      // modifying ONLY the loop here won't save memory if the array is already 15k items.
-      // I need to refactor the FETCHING part.
-
-      // REPLACING THE ENTIRE FUNCTION LOGIC WOULD BE BETTER.
-      // But to fit in 'ReplacementChunks', I'll iterate the existing array if it's already there
-      // OR I can assume I will rewrite the fetch logic in another chunk.
-
-      // Actually, fetching 15k IDs is "okay" ish for Node (15k * object size), but
-      // if I can stream it, it's better.
-      // Given the constraints and the previous "OOM" fear,
-      // I'll stick to iterating the array for now because rewriting the whole fetch logic
-      // involves changing multiple if/else blocks for filters.
-      // The array 'nfes' is already in memory when we reach here.
-      // If the user says "relatio nao funcionou", maybe the fetch ITSELF timed out or OOM'd.
-
-      // Let's assume the array is present (since I am not changing lines 1068-1140 here).
-      // I will process it to write to PDF.
-
-      for (let i = 0; i < nfes.length; i++) {
-        const nfe = nfes[i];
-
-        if (currentY > 750) {
-          doc.addPage();
-          currentY = 30;
-          drawHeader(currentY);
-          currentY += 20;
-          doc.font("Helvetica").fontSize(8);
-        }
-
-        if (i % 2 !== 0) {
-          doc.rect(startX, currentY, 535, 20).fill("#f8fafc");
-          doc.fillColor("black");
-        }
-
-        let xProd = "-";
-        try {
-          if (nfe.xml) {
-            const parsed = parser.parse(nfe.xml);
-            const root = parsed.nfeProc?.NFe || parsed.NFe;
-            const firstItem = Array.isArray(root?.infNFe?.det)
-              ? root.infNFe.det[0]
-              : root?.infNFe?.det;
-            xProd = firstItem?.prod?.xProd || "-";
-          }
-        } catch (e) {}
-
-        const dateStr = new Date(nfe.data_emissao).toLocaleDateString("pt-BR");
-        const valor = parseFloat(nfe.valor_total.toString());
-        totalValor += valor;
-
-        const textY = currentY + 6;
-        doc.text(nfe.nNF, cols.numero.x + 5, textY);
-        doc.text(nfe.serie, cols.serie.x + 5, textY);
-
-        let tipo =
-          nfe.tipo_operacao === "entrada_comodato"
-            ? "ENTRADA"
-            : nfe.tipo_operacao === "saida_comodato"
-              ? "SAIDA"
-              : "OUTRO";
-        doc.text(tipo, cols.tipo.x + 5, textY);
-
-        doc.text(xProd.substring(0, 30), cols.produto.x + 5, textY, {
-          width: cols.produto.w - 5,
-          ellipsis: true,
+      while (processed < totalCount) {
+        const batch = await nfeRepository.find({
+          where,
+          order: { nNF: "ASC" },
+          skip: processed,
+          take: batchSize,
+          select: {
+            id: true,
+            nNF: true,
+            serie: true,
+            data_emissao: true,
+            valor_total: true,
+            status: true,
+            destinatario_nome: true,
+            tipo_operacao: true,
+            xml: true,
+          },
         });
-        doc.text(
-          (nfe.destinatario_nome || "").substring(0, 35),
-          cols.dest.x + 5,
-          textY,
-          { width: cols.dest.w - 5, ellipsis: true },
-        );
-        doc.text(dateStr, cols.emissao.x + 5, textY);
-        doc.text(
-          valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
-          cols.valor.x,
-          textY,
-          { width: cols.valor.w, align: "right" },
-        );
 
-        doc.save();
-        if (nfe.status === "autorizado") doc.fillColor("green");
-        else if (nfe.status === "cancelado" || nfe.status.includes("erro"))
-          doc.fillColor("red");
-        else doc.fillColor("blue");
-        doc.text(nfe.status.toUpperCase(), cols.status.x + 5, textY);
-        doc.restore();
+        for (let i = 0; i < batch.length; i++) {
+          const nfe = batch[i];
+          const globalIndex = processed + i;
 
-        currentY += 20;
+          if (currentY > 750) {
+            doc.addPage();
+            currentY = 30;
+            drawHeader(currentY);
+            currentY += 20;
+            doc.font("Helvetica").fontSize(8);
+          }
 
-        // Free memory if possible (though array holds ref)
-        // To truly free, we'd need to shift() or nullify, but let's trust V8 for now or basic loop is fine.
+          if (globalIndex % 2 !== 0) {
+            doc.rect(startX, currentY, 535, 20).fill("#f8fafc");
+            doc.fillColor("black");
+          }
+
+          let xProd = "-";
+          try {
+            if (nfe.xml) {
+              const parsed = parser.parse(nfe.xml);
+              const root = parsed.nfeProc?.NFe || parsed.NFe;
+              const det = root?.infNFe?.det;
+              const firstItem = Array.isArray(det) ? det[0] : det;
+              xProd = firstItem?.prod?.xProd || "-";
+            }
+          } catch (e) {}
+
+          const dateStr = new Date(nfe.data_emissao).toLocaleDateString(
+            "pt-BR",
+          );
+          const valor = parseFloat(nfe.valor_total.toString());
+          totalValor += valor;
+
+          const textY = currentY + 6;
+          doc.text(nfe.nNF.toString(), cols.numero.x + 5, textY);
+          doc.text(nfe.serie.toString(), cols.serie.x + 5, textY);
+
+          let tipo =
+            nfe.tipo_operacao === "entrada_comodato"
+              ? "ENTRADA"
+              : nfe.tipo_operacao === "saida_comodato"
+                ? "SAIDA"
+                : "OUTRO";
+          doc.text(tipo, cols.tipo.x + 5, textY);
+
+          doc.text(xProd.substring(0, 30), cols.produto.x + 5, textY, {
+            width: cols.produto.w - 5,
+            ellipsis: true,
+          });
+          doc.text(
+            (nfe.destinatario_nome || "").substring(0, 35),
+            cols.dest.x + 5,
+            textY,
+            { width: cols.dest.w - 5, ellipsis: true },
+          );
+          doc.text(dateStr, cols.emissao.x + 5, textY);
+          doc.text(
+            valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
+            cols.valor.x,
+            textY,
+            { width: cols.valor.w, align: "right" },
+          );
+
+          doc.save();
+          if (nfe.status === "autorizado") doc.fillColor("green");
+          else if (nfe.status === "cancelado" || nfe.status.includes("erro"))
+            doc.fillColor("red");
+          else doc.fillColor("blue");
+          doc.text(nfe.status.toUpperCase(), cols.status.x + 5, textY);
+          doc.restore();
+
+          currentY += 20;
+        }
+
+        processed += batch.length;
+        // Allow event loop to breathe
+        await new Promise((resolve) => setTimeout(resolve, 5));
       }
 
       doc.moveDown();
@@ -1421,7 +1384,7 @@ class NFEController {
       archive.pipe(res);
 
       // Fetch and process in batches to avoid OOM
-      const batchSize = 50;
+      const batchSize = 10;
       let processed = 0;
 
       while (processed < totalCount) {
