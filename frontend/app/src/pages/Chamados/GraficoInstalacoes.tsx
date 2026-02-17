@@ -37,6 +37,7 @@ export const GraficoInstalacoes = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<InstallationStat[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
+  const [yearTotals, setYearTotals] = useState<Totals | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
@@ -75,6 +76,7 @@ export const GraficoInstalacoes = () => {
       );
       setStats(response.data.stats);
       setTotals(response.data.totals);
+      setYearTotals(response.data.yearTotals);
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
       alert("Erro ao carregar gráfico de instalações.");
@@ -99,55 +101,86 @@ export const GraficoInstalacoes = () => {
             Gráfico de Suporte Mensal
           </h1>
 
-          <div className="bg-white p-6 rounded-lg shadow-md mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Mês
-                </label>
-                <select
-                  value={month}
-                  onChange={(e) => setMonth(Number(e.target.value))}
-                  className="block w-40 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                >
-                  {months.map((m, index) => (
-                    <option key={index} value={index + 1}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ano
-                </label>
-                <select
-                  value={year}
-                  onChange={(e) => setYear(Number(e.target.value))}
-                  className="block w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                >
-                  {years.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
+          <div className="bg-white p-6 rounded-lg shadow-md mb-6 flex flex-col gap-6">
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="flex gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Mês
+                  </label>
+                  <select
+                    value={month}
+                    onChange={(e) => setMonth(Number(e.target.value))}
+                    className="block w-40 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                  >
+                    {months.map((m, index) => (
+                      <option key={index} value={index + 1}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ano
+                  </label>
+                  <select
+                    value={year}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                    className="block w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                  >
+                    {years.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-              {totals &&
-                Object.entries(totals).map(([key, value]) => (
-                  <div
-                    key={key}
-                    className="bg-white p-2 rounded border border-gray-200 shadow-sm"
-                  >
-                    <p className="text-xs text-gray-500 uppercase font-semibold">
-                      {key}
-                    </p>
-                    <p className="text-lg font-bold text-gray-800">{value}</p>
-                  </div>
-                ))}
+            {/* Monthly Totals */}
+            <div>
+              <h2 className="text-sm font-bold text-gray-500 uppercase mb-2">
+                Totais de {months[month - 1]}
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                {totals &&
+                  Object.entries(totals).map(([key, value]) => (
+                    <div
+                      key={key}
+                      className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm text-center"
+                    >
+                      <p className="text-xs text-gray-500 uppercase font-semibold">
+                        {key}
+                      </p>
+                      <p className="text-lg font-bold text-gray-800">{value}</p>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            {/* Yearly Totals */}
+            <div>
+              <h2 className="text-sm font-bold text-gray-500 uppercase mb-2">
+                Acumulado do Ano {year}
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                {yearTotals &&
+                  Object.entries(yearTotals).map(([key, value]) => (
+                    <div
+                      key={key}
+                      className="bg-indigo-50 p-2 rounded border border-indigo-100 shadow-sm text-center"
+                    >
+                      <p className="text-xs text-indigo-600 uppercase font-semibold">
+                        {key}
+                      </p>
+                      <p className="text-lg font-bold text-indigo-900">
+                        {value}
+                      </p>
+                    </div>
+                  ))}
+              </div>
             </div>
           </div>
 

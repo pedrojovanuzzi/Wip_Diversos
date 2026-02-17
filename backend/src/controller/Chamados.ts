@@ -222,6 +222,9 @@ class Chamados {
     const firstDay = new Date(y, m, 1);
     const lastDay = new Date(y, m + 1, 0, 23, 59, 59);
 
+    const firstDayOfYear = new Date(y, 0, 1);
+    const lastDayOfYear = new Date(y, 11, 31, 23, 59, 59);
+
     try {
       const stats = await MkRepository.createQueryBuilder("chamado")
         .select("DAY(chamado.abertura)", "day")
@@ -257,6 +260,38 @@ class Chamados {
         .orderBy("day", "ASC")
         .getRawMany();
 
+      // Yearly Totals Query
+      const yearStats = await MkRepository.createQueryBuilder("chamado")
+        .select(
+          "SUM(CASE WHEN chamado.assunto LIKE '%Instala%' THEN 1 ELSE 0 END)",
+          "instalacao",
+        )
+        .addSelect(
+          "SUM(CASE WHEN chamado.assunto LIKE '%Renova%' THEN 1 ELSE 0 END)",
+          "renovacao",
+        )
+        .addSelect(
+          "SUM(CASE WHEN chamado.assunto LIKE '%Migra%' THEN 1 ELSE 0 END)",
+          "migracao",
+        )
+        .addSelect(
+          "SUM(CASE WHEN chamado.assunto LIKE '%Mudan%' THEN 1 ELSE 0 END)",
+          "mudanca",
+        )
+        .addSelect(
+          "SUM(CASE WHEN chamado.assunto LIKE '%Troca%' THEN 1 ELSE 0 END)",
+          "troca",
+        )
+        .addSelect(
+          "SUM(CASE WHEN chamado.assunto LIKE '%Cancela%' THEN 1 ELSE 0 END)",
+          "cancelamento",
+        )
+        .where("chamado.abertura BETWEEN :start AND :end", {
+          start: firstDayOfYear,
+          end: lastDayOfYear,
+        })
+        .getRawOne();
+
       const formattedStats = stats.map((item: any) => ({
         day: Number(item.day),
         instalacao: Number(item.instalacao),
@@ -286,9 +321,19 @@ class Chamados {
         },
       );
 
+      const yearTotals = {
+        instalacao: Number(yearStats.instalacao || 0),
+        renovacao: Number(yearStats.renovacao || 0),
+        migracao: Number(yearStats.migracao || 0),
+        mudanca: Number(yearStats.mudanca || 0),
+        troca: Number(yearStats.troca || 0),
+        cancelamento: Number(yearStats.cancelamento || 0),
+      };
+
       res.status(200).json({
         stats: formattedStats,
         totals,
+        yearTotals,
         month: m + 1,
         year: y,
       });
