@@ -42,6 +42,9 @@ export class NFE {
   @Column({ type: "boolean", default: false, nullable: true })
   equipamento_perdido!: boolean;
 
+  @Column({ type: "text", nullable: true })
+  observacao!: string;
+
   @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
   valor_total!: number;
 

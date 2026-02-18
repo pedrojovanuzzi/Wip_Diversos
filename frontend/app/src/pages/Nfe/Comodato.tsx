@@ -27,6 +27,7 @@ export const Comodato = () => {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [equipamentoPerdido, setEquipamentoPerdido] = useState(false);
+  const [observacao, setObservacao] = useState("");
 
   // --- Search Methods ---
   const handleSearch = async () => {
@@ -106,6 +107,10 @@ export const Comodato = () => {
         ambiente,
         equipamentoPerdido:
           tipoOperacao === "entrada" ? equipamentoPerdido : undefined,
+        observacao:
+          tipoOperacao === "entrada" && equipamentoPerdido
+            ? observacao
+            : undefined,
       };
 
       const resposta = await axios.post(
@@ -127,6 +132,8 @@ export const Comodato = () => {
       // Cleanup
       setPassword("");
       setClientesSelecionados([]);
+      setEquipamentoPerdido(false);
+      setObservacao("");
     } catch (error: any) {
       console.error(error);
       const msg =
@@ -283,6 +290,21 @@ export const Comodato = () => {
                   Marque esta opção se o equipamento foi perdido, roubado ou
                   danificado.
                 </p>
+
+                {equipamentoPerdido && (
+                  <div className="mt-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Observação (Opcional)
+                    </label>
+                    <textarea
+                      value={observacao}
+                      onChange={(e) => setObservacao(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      rows={3}
+                      placeholder="Descreva o estado do equipamento ou motivo..."
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

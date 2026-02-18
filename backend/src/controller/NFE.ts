@@ -77,7 +77,13 @@ class NFEController {
 
   public emitirEntradaComodato = async (req: Request, res: Response) => {
     try {
-      const { logins, password, ambiente, equipamentoPerdido } = req.body;
+      const {
+        logins,
+        password,
+        ambiente,
+        equipamentoPerdido = false,
+        observacao = "",
+      } = req.body;
 
       if (!logins || !Array.isArray(logins) || logins.length === 0) {
         res.status(400).json({ message: "Lista de logins não fornecida." });
@@ -103,6 +109,7 @@ class NFEController {
         ambiente,
         "entrada",
         equipamentoPerdido,
+        observacao,
       ).catch((err) =>
         console.error("Erro no processamento background (Entrada):", err),
       );
@@ -125,7 +132,8 @@ class NFEController {
     password: string,
     ambiente: string,
     tipo: "saida" | "entrada",
-    equipamentoPerdido?: boolean,
+    equipamentoPerdido: boolean = false,
+    observacao: string = "",
   ) {
     const isHomologacao = ambiente === "homologacao";
     let contadorProcessados = 0;
@@ -429,6 +437,7 @@ class NFEController {
               tpAmb: isHomologacao ? 2 : 1,
               tipo: ambiente,
               equipamento_perdido: equipamentoPerdido || false,
+              observacao: observacao,
             });
 
             await nfeRepository.save(nfeRecord);
@@ -1341,6 +1350,17 @@ class NFEController {
 
           doc.fillColor("black"); // Reset color
 
+          if (nfe.observacao) {
+            doc.fontSize(7).font("Helvetica-Oblique").fillColor("#64748b");
+            doc.text(
+              `Obs: ${nfe.observacao.substring(0, 90)}`,
+              cols.produto.x + 5,
+              textY + 10,
+            );
+            doc.fillColor("black").font("Helvetica").fontSize(8);
+            currentY += 10; // Extra space for observation
+          }
+
           doc.save();
           if (nfe.status === "autorizado") doc.fillColor("green");
           else if (nfe.status === "cancelado" || nfe.status.includes("erro"))
@@ -1349,7 +1369,7 @@ class NFEController {
           doc.text(nfe.status.toUpperCase(), cols.status.x + 5, textY);
           doc.restore();
 
-          currentY += 20;
+          currentY += 25; // Increased padding between rows
         }
 
         processed += batch.length;
