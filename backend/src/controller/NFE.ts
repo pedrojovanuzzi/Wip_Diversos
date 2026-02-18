@@ -1249,6 +1249,7 @@ class NFEController {
 
       // --- Streaming Loop ---
       let totalValor = 0;
+      let totalPerdido = 0;
       const parser = new XMLParser({
         ignoreAttributes: false,
         attributeNamePrefix: "",
@@ -1297,6 +1298,9 @@ class NFEController {
           );
           const valor = parseFloat(nfe.valor_total.toString());
           totalValor += valor;
+          if (nfe.equipamento_perdido) {
+            totalPerdido += valor;
+          }
 
           const textY = currentY + 6;
           doc.text(nfe.nNF.toString(), cols.numero.x + 5, textY);
@@ -1308,6 +1312,13 @@ class NFEController {
               : nfe.tipo_operacao === "saida_comodato"
                 ? "SAIDA"
                 : "OUTRO";
+
+          if (nfe.equipamento_perdido) {
+            doc.fillColor("red");
+          } else {
+            doc.fillColor("black");
+          }
+
           doc.text(tipo, cols.tipo.x + 5, textY);
 
           doc.text(xProd.substring(0, 30), cols.produto.x + 5, textY, {
@@ -1327,6 +1338,8 @@ class NFEController {
             textY,
             { width: cols.valor.w, align: "right" },
           );
+
+          doc.fillColor("black"); // Reset color
 
           doc.save();
           if (nfe.status === "autorizado") doc.fillColor("green");
@@ -1349,13 +1362,35 @@ class NFEController {
         doc.addPage();
         currentY = 30;
       }
-      doc.rect(350, currentY, 215, 30).fill("#f1f5f9");
-      doc.fillColor("black").fontSize(10).font("Helvetica-Bold");
-      doc.text("TOTAL DO PERÍODO", 360, currentY + 10);
+      doc.rect(350, currentY, 215, 60).fill("#f1f5f9");
+      doc.fillColor("black").fontSize(9).font("Helvetica");
+
+      // Total Bruto
+      doc.text("TOTAL BRUTO:", 360, currentY + 10);
       doc.text(
         `R$ ${totalValor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
         360,
         currentY + 10,
+        { align: "right", width: 195 },
+      );
+
+      // Total Perdido
+      doc.fillColor("red");
+      doc.text("(-) TOTAL PERDIDO:", 360, currentY + 25);
+      doc.text(
+        `R$ ${totalPerdido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+        360,
+        currentY + 25,
+        { align: "right", width: 195 },
+      );
+
+      // Total Liquido
+      doc.fillColor("black").font("Helvetica-Bold").fontSize(10);
+      doc.text("TOTAL LÍQUIDO:", 360, currentY + 40);
+      doc.text(
+        `R$ ${(totalValor - totalPerdido).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+        360,
+        currentY + 40,
         { align: "right", width: 195 },
       );
 

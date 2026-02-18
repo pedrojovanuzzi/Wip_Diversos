@@ -1,4 +1,4 @@
-import { Field, Label, Switch } from '@headlessui/react'
+import { Field, Label, Switch } from "@headlessui/react";
 
 interface ToggleProps {
   checked: boolean;
@@ -19,7 +19,9 @@ export default function Toggle({ checked, onChange }: ToggleProps) {
         />
       </Switch>
       <Label as="span" className="ml-3 text-sm">
-        <span className="font-medium text-gray-900">{checked ? "Ano" : "Mês"}</span>{' '}
+        <span className="font-medium text-gray-900">
+          {checked ? "Ano" : "Mês"}
+        </span>{" "}
       </Label>
     </Field>
   );
