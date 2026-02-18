@@ -14,6 +14,8 @@ export const BuscarNfe = () => {
   const [ambiente, setAmbiente] = useState<string>("homologacao");
   const [status, setStatus] = useState<string>(""); // autorizado, cancelado, etc.
   const [tipoOperacao, setTipoOperacao] = useState<string>(""); // entrada_comodato, saida_comodato
+  const [equipamentoPerdidoFilter, setEquipamentoPerdidoFilter] =
+    useState<string>(""); // "", "sim", "nao"
   const [dateFilter, setDateFilter] = useState<{
     start: string;
     end: string;
@@ -42,6 +44,7 @@ export const BuscarNfe = () => {
           status: status,
           ambiente: ambiente,
           tipo_operacao: tipoOperacao,
+          equipamentoPerdido: equipamentoPerdidoFilter,
           page: pageToFetch,
           limit: limit,
         },
@@ -194,6 +197,9 @@ export const BuscarNfe = () => {
           status: selectAllMatching ? status : undefined,
           ambiente: selectAllMatching ? ambiente : undefined,
           tipo_operacao: selectAllMatching ? tipoOperacao : undefined,
+          equipamentoPerdido: selectAllMatching
+            ? equipamentoPerdidoFilter
+            : undefined,
           dateFilter: selectAllMatching ? dateFilter : undefined,
         },
         {
@@ -393,6 +399,28 @@ export const BuscarNfe = () => {
                     <option value="">Todos</option>
                     <option value="entrada_comodato">Entrada Comodato</option>
                     <option value="saida_comodato">Saída Comodato</option>
+                  </select>
+                </div>
+
+                <div className="col-span-1">
+                  <label
+                    htmlFor="equipamentoPerdido"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Equipamento Perdido?
+                  </label>
+                  <select
+                    id="equipamentoPerdido"
+                    name="equipamentoPerdido"
+                    value={equipamentoPerdidoFilter}
+                    onChange={(e) =>
+                      setEquipamentoPerdidoFilter(e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Todos</option>
+                    <option value="sim">Sim</option>
+                    <option value="nao">Não</option>
                   </select>
                 </div>
 

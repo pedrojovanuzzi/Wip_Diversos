@@ -39,6 +39,9 @@ export class NFE {
   @Column({ type: "varchar", length: 50 })
   tipo_operacao!: string; // 'saida_comodato' | 'entrada_comodato'
 
+  @Column({ type: "boolean", default: false, nullable: true })
+  equipamento_perdido!: boolean;
+
   @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
   valor_total!: number;
 

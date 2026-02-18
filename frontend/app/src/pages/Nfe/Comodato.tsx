@@ -26,6 +26,7 @@ export const Comodato = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [equipamentoPerdido, setEquipamentoPerdido] = useState(false);
 
   // --- Search Methods ---
   const handleSearch = async () => {
@@ -103,6 +104,8 @@ export const Comodato = () => {
         logins: clientesSelecionados.map((c) => c.login), // Map to logins
         password,
         ambiente,
+        equipamentoPerdido:
+          tipoOperacao === "entrada" ? equipamentoPerdido : undefined,
       };
 
       const resposta = await axios.post(
@@ -261,6 +264,27 @@ export const Comodato = () => {
                 <option value="producao">Produção</option>
               </select>
             </div>
+            {/* Equipamento Perdido (Only for Entrada) */}
+            {tipoOperacao === "entrada" && (
+              <div className="bg-red-50 p-4 rounded border border-red-200">
+                <h2 className="font-semibold text-lg mb-2 text-red-700">
+                  Condição do Equipamento
+                </h2>
+                <label className="flex items-center gap-2 cursor-pointer text-red-700 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={equipamentoPerdido}
+                    onChange={(e) => setEquipamentoPerdido(e.target.checked)}
+                    className="w-5 h-5 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                  />
+                  Equipamento Perdido / Queimado
+                </label>
+                <p className="text-sm text-red-500 mt-1">
+                  Marque esta opção se o equipamento foi perdido, roubado ou
+                  danificado.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Password and Emission */}

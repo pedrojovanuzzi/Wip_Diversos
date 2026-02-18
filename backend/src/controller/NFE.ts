@@ -77,7 +77,7 @@ class NFEController {
 
   public emitirEntradaComodato = async (req: Request, res: Response) => {
     try {
-      const { logins, password, ambiente } = req.body;
+      const { logins, password, ambiente, equipamentoPerdido } = req.body;
 
       if (!logins || !Array.isArray(logins) || logins.length === 0) {
         res.status(400).json({ message: "Lista de logins não fornecida." });
@@ -102,6 +102,7 @@ class NFEController {
         password,
         ambiente,
         "entrada",
+        equipamentoPerdido,
       ).catch((err) =>
         console.error("Erro no processamento background (Entrada):", err),
       );
@@ -124,6 +125,7 @@ class NFEController {
     password: string,
     ambiente: string,
     tipo: "saida" | "entrada",
+    equipamentoPerdido?: boolean,
   ) {
     const isHomologacao = ambiente === "homologacao";
     let contadorProcessados = 0;
@@ -426,6 +428,7 @@ class NFEController {
               valor_total: parseFloat(nfeData.infNFe.total.ICMSTot.vNF),
               tpAmb: isHomologacao ? 2 : 1,
               tipo: ambiente,
+              equipamento_perdido: equipamentoPerdido || false,
             });
 
             await nfeRepository.save(nfeRecord);
@@ -968,6 +971,7 @@ class NFEController {
         status,
         ambiente,
         tipo_operacao,
+        equipamentoPerdido,
         page = 1,
         limit = 100,
       } = req.body;
@@ -1008,6 +1012,12 @@ class NFEController {
 
       if (tipo_operacao) {
         where.tipo_operacao = tipo_operacao;
+      }
+
+      if (equipamentoPerdido === "sim") {
+        where.equipamento_perdido = true;
+      } else if (equipamentoPerdido === "nao") {
+        where.equipamento_perdido = false;
       }
 
       const take = Number(limit);
