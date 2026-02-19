@@ -230,7 +230,7 @@ class PrefeituraLogin {
       console.log(
         `📲 OTP enviado para ${phone} (MAC: ${mac || "não informado"}) — SID: ${
           envio.sid
-        }`
+        }`,
       );
 
       res.status(200).json({ sucesso: "Código enviado com sucesso" });
@@ -261,7 +261,7 @@ class PrefeituraLogin {
           user: process.env.FACILITA_USER,
           hashSeguranca: process.env.FACILITA_HASH,
         },
-      }
+      },
     );
 
     console.log(response);

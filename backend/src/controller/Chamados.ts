@@ -342,6 +342,85 @@ class Chamados {
       res.status(500).json({ message: "Erro ao buscar estatísticas." });
     }
   }
+
+  public async getAgentStats(req: Request, res: Response) {
+    const MkRepository = MkauthSource.getRepository(ChamadosEntities);
+    const { month, year } = req.query;
+
+    if (!month || !year) {
+      res.status(400).json({ message: "Mês e Ano são obrigatórios." });
+      return;
+    }
+
+    const m = Number(month) - 1;
+    const y = Number(year);
+
+    const firstDay = new Date(y, m, 1);
+    const lastDay = new Date(y, m + 1, 0, 23, 59, 59);
+
+    try {
+      // Tickets Opened by Agent
+      const openedStats = await MkRepository.createQueryBuilder("chamado")
+        .select("chamado.atendente", "agent") // Changed from login_atend_string to atendente
+        .addSelect("COUNT(chamado.id)", "opened")
+        .where("chamado.abertura BETWEEN :start AND :end", {
+          start: firstDay,
+          end: lastDay,
+        })
+        .andWhere("chamado.atendente IS NOT NULL")
+        .andWhere("chamado.atendente != ''")
+        // Removed check for 'full_users' as it might not be relevant for 'atendente' column, or can be added back if needed
+        .groupBy("chamado.atendente")
+        .getRawMany();
+
+      // Tickets Closed by Agent
+      const closedStats = await MkRepository.createQueryBuilder("chamado")
+        .select("func.nome", "agent")
+        .addSelect("COUNT(chamado.id)", "closed")
+        .innerJoin(FuncionariosEntities, "func", "chamado.tecnico = func.id")
+        .where("chamado.fechamento BETWEEN :start AND :end", {
+          // Use fechamento date for closed tickets
+          start: firstDay,
+          end: lastDay,
+        })
+        .andWhere("chamado.status = 'fechado'")
+        .groupBy("func.nome")
+        .getRawMany();
+
+      // Merge results
+      const agentMap = new Map<
+        string,
+        { agent: string; opened: number; closed: number }
+      >();
+
+      openedStats.forEach((stat) => {
+        const agent = stat.agent;
+        if (!agentMap.has(agent)) {
+          agentMap.set(agent, { agent, opened: 0, closed: 0 });
+        }
+        agentMap.get(agent)!.opened += Number(stat.opened);
+      });
+
+      closedStats.forEach((stat) => {
+        const agent = stat.agent;
+        if (!agentMap.has(agent)) {
+          agentMap.set(agent, { agent, opened: 0, closed: 0 });
+        }
+        agentMap.get(agent)!.closed += Number(stat.closed);
+      });
+
+      const result = Array.from(agentMap.values()).sort(
+        (a, b) => b.closed - a.closed,
+      ); // Sort by closed tickets desc
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error(error);
+      res
+        .status(500)
+        .json({ message: "Erro ao buscar estatísticas por atendente." });
+    }
+  }
 }
 
 export default new Chamados();

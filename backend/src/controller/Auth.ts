@@ -242,7 +242,7 @@ class Auth {
 
           res.json({ valid: true, user: user });
           return;
-        }
+        },
       );
     } catch (error) {
       res.status(401).json({ errors: [{ msg: "Ocorreu um Erro" }] });

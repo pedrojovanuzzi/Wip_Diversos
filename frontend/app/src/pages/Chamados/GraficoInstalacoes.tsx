@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
+  BarChart,
+  Bar,
   LineChart,
   Line,
   XAxis,
@@ -24,6 +26,12 @@ interface InstallationStat {
   cancelamento: number;
 }
 
+interface AgentStat {
+  agent: string;
+  opened: number;
+  closed: number;
+}
+
 interface Totals {
   instalacao: number;
   renovacao: number;
@@ -36,6 +44,7 @@ interface Totals {
 export const GraficoInstalacoes = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<InstallationStat[]>([]);
+  const [agentStats, setAgentStats] = useState<AgentStat[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
   const [yearTotals, setYearTotals] = useState<Totals | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -77,9 +86,20 @@ export const GraficoInstalacoes = () => {
       setStats(response.data.stats);
       setTotals(response.data.totals);
       setYearTotals(response.data.yearTotals);
+
+      const agentResponse = await axios.get(
+        `${process.env.REACT_APP_URL}/chamados/analytics/agents`,
+        {
+          params: { month, year },
+          headers: {
+            Authorization: `Bearer ${user?.token}`,
+          },
+        },
+      );
+      setAgentStats(agentResponse.data);
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
-      alert("Erro ao carregar gráfico de instalações.");
+      alert("Erro ao carregar gráficos.");
     } finally {
       setLoading(false);
     }
@@ -184,90 +204,138 @@ export const GraficoInstalacoes = () => {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-md h-[500px]">
-            {loading ? (
-              <div className="flex h-full items-center justify-center">
-                <AiOutlineLoading3Quarters className="animate-spin text-4xl text-indigo-600" />
-              </div>
-            ) : stats.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={stats}
-                  margin={{
-                    top: 20,
-                    right: 30,
-                    left: 20,
-                    bottom: 5,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="day"
-                    label={{
-                      value: "Dia do Mês",
-                      position: "insideBottomRight",
-                      offset: -5,
+          <div className="flex flex-col gap-6">
+            <div className="bg-white p-6 rounded-lg shadow-md h-[500px]">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">
+                Evolução Diária
+              </h2>
+              {loading ? (
+                <div className="flex h-full items-center justify-center">
+                  <AiOutlineLoading3Quarters className="animate-spin text-4xl text-indigo-600" />
+                </div>
+              ) : stats.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={stats}
+                    margin={{
+                      top: 20,
+                      right: 30,
+                      left: 20,
+                      bottom: 5,
                     }}
-                  />
-                  <YAxis
-                    label={{
-                      value: "Qtd. Tickets",
-                      angle: -90,
-                      position: "insideLeft",
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="day"
+                      label={{
+                        value: "Dia do Mês",
+                        position: "insideBottomRight",
+                        offset: -5,
+                      }}
+                    />
+                    <YAxis
+                      label={{
+                        value: "Qtd. Tickets",
+                        angle: -90,
+                        position: "insideLeft",
+                      }}
+                    />
+                    <Tooltip labelFormatter={(label) => `Dia ${label}`} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="instalacao"
+                      stroke="#4f46e5"
+                      name="Instalação"
+                      strokeWidth={2}
+                      activeDot={{ r: 8 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="renovacao"
+                      stroke="#10b981"
+                      name="Renovação"
+                      strokeWidth={2}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="migracao"
+                      stroke="#f59e0b"
+                      name="Migração"
+                      strokeWidth={2}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="mudanca"
+                      stroke="#8b5cf6"
+                      name="Mudança"
+                      strokeWidth={2}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="troca"
+                      stroke="#ec4899"
+                      name="Troca"
+                      strokeWidth={2}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="cancelamento"
+                      stroke="#ef4444"
+                      name="Cancelamento"
+                      strokeWidth={2}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-gray-500">
+                  Nenhum dado encontrado para o período selecionado.
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-md h-[500px]">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">
+                Produtividade por Atendente
+              </h2>
+              {loading ? (
+                <div className="flex h-full items-center justify-center">
+                  <AiOutlineLoading3Quarters className="animate-spin text-4xl text-indigo-600" />
+                </div>
+              ) : agentStats.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={agentStats}
+                    margin={{
+                      top: 20,
+                      right: 30,
+                      left: 20,
+                      bottom: 5,
                     }}
-                  />
-                  <Tooltip labelFormatter={(label) => `Dia ${label}`} />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="instalacao"
-                    stroke="#4f46e5"
-                    name="Instalação"
-                    strokeWidth={2}
-                    activeDot={{ r: 8 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="renovacao"
-                    stroke="#10b981"
-                    name="Renovação"
-                    strokeWidth={2}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="migracao"
-                    stroke="#f59e0b"
-                    name="Migração"
-                    strokeWidth={2}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="mudanca"
-                    stroke="#8b5cf6"
-                    name="Mudança"
-                    strokeWidth={2}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="troca"
-                    stroke="#ec4899"
-                    name="Troca"
-                    strokeWidth={2}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="cancelamento"
-                    stroke="#ef4444"
-                    name="Cancelamento"
-                    strokeWidth={2}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex h-full items-center justify-center text-gray-500">
-                Nenhum dado encontrado para o período selecionado.
-              </div>
-            )}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="agent" />
+                    <YAxis />
+                    <Tooltip cursor={{ fill: "transparent" }} />
+                    <Legend />
+                    <Bar
+                      dataKey="opened"
+                      name="Chamados Abertos"
+                      fill="#8884d8"
+                    />
+                    <Bar
+                      dataKey="closed"
+                      name="Chamados Fechados"
+                      fill="#82ca9d"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-gray-500">
+                  Nenhum dado encontrado para o período selecionado.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

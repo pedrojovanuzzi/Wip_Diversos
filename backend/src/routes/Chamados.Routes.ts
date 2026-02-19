@@ -11,5 +11,6 @@ router.get("/all", AuthGuard, Chamados.showAll);
 router.get("/returns/month", AuthGuard, Chamados.returnMonth);
 router.get("/returns/year", AuthGuard, Chamados.returnYear);
 router.get("/analytics/instalacoes", AuthGuard, Chamados.getInstallationStats);
+router.get("/analytics/agents", AuthGuard, Chamados.getAgentStats);
 
 export default router;
