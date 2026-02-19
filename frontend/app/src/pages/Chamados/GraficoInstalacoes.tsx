@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  LabelList,
 } from "recharts";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
@@ -294,7 +295,7 @@ export const GraficoInstalacoes = () => {
               )}
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-md h-[500px]">
+            <div className="bg-white p-6 rounded-lg shadow-md h-[600px]">
               <h2 className="text-xl font-bold text-gray-800 mb-4">
                 Produtividade por Atendente
               </h2>
@@ -310,24 +311,34 @@ export const GraficoInstalacoes = () => {
                       top: 20,
                       right: 30,
                       left: 20,
-                      bottom: 5,
+                      bottom: 100,
                     }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="agent" />
+                    <XAxis
+                      dataKey="agent"
+                      interval={0}
+                      angle={-45}
+                      textAnchor="end"
+                      height={100}
+                    />
                     <YAxis />
                     <Tooltip cursor={{ fill: "transparent" }} />
-                    <Legend />
+                    <Legend wrapperStyle={{ paddingTop: "20px" }} />
                     <Bar
                       dataKey="opened"
                       name="Chamados Abertos"
                       fill="#8884d8"
-                    />
+                    >
+                      <LabelList dataKey="opened" position="top" />
+                    </Bar>
                     <Bar
                       dataKey="closed"
                       name="Chamados Fechados"
                       fill="#82ca9d"
-                    />
+                    >
+                      <LabelList dataKey="closed" position="top" />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
