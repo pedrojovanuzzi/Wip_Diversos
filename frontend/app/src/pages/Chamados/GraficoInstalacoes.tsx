@@ -222,7 +222,7 @@ export const GraficoInstalacoes = () => {
                       top: 20,
                       right: 30,
                       left: 20,
-                      bottom: 5,
+                      bottom: 40,
                     }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
@@ -297,7 +297,7 @@ export const GraficoInstalacoes = () => {
 
             <div className="bg-white p-6 rounded-lg shadow-md h-[600px]">
               <h2 className="text-xl font-bold text-gray-800 mb-4">
-                Produtividade por Atendente
+                Chamados Abertos/Fechados por Atendente
               </h2>
               {loading ? (
                 <div className="flex h-full items-center justify-center">
@@ -318,13 +318,22 @@ export const GraficoInstalacoes = () => {
                     <XAxis
                       dataKey="agent"
                       interval={0}
-                      angle={-45}
-                      textAnchor="end"
-                      height={100}
+                      tickFormatter={(value) => {
+                        const firstName = value.split(" ")[0];
+                        return value.includes(" ")
+                          ? `${firstName}...`
+                          : firstName;
+                      }}
                     />
                     <YAxis />
                     <Tooltip cursor={{ fill: "transparent" }} />
-                    <Legend wrapperStyle={{ paddingTop: "20px" }} />
+                    <Legend
+                      verticalAlign="top"
+                      wrapperStyle={{
+                        paddingBottom: "20px",
+                        paddingTop: "10px",
+                      }}
+                    />
                     <Bar
                       dataKey="opened"
                       name="Chamados Abertos"
