@@ -39,8 +39,7 @@ export const TimeClock = () => {
   );
   const [showSigModal, setShowSigModal] = useState(false);
 
-  const [scale, setScale] = useState<"8h" | "12h" | "Integral">("8h");
-
+  const [scale, setScale] = useState<"8h" | "12h" | "Integral" | "4h">("8h");
   const [dailyRecords, setDailyRecords] = useState<any[]>([]);
 
   // Check permission
@@ -123,9 +122,16 @@ export const TimeClock = () => {
     if (selectedTime) {
       const datePart = selectedTime.split("T")[0];
       setSignatureDate(datePart);
+
+      const isSaturday = moment(selectedTime).day() === 6;
+      if (isSaturday && scale === "8h") {
+        setScale("4h");
+      } else if (!isSaturday && scale === "4h") {
+        setScale("8h");
+      }
     }
     fetchDailyRecords();
-  }, [selectedTime, employeeId, fetchDailyRecords]);
+  }, [selectedTime, employeeId, fetchDailyRecords, scale]);
 
   const isTypeRegistered = (type: string) => {
     return dailyRecords.some((record) => record.type === type);
@@ -291,16 +297,29 @@ export const TimeClock = () => {
 
           {/* Scale Selector */}
           <div className="flex space-x-2 mb-4 w-full bg-gray-200 p-1 rounded">
-            <button
-              onClick={() => setScale("8h")}
-              className={`flex-1 py-2 rounded text-sm font-bold transition-all ${
-                scale === "8h"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Escala 8h
-            </button>
+            {moment(selectedTime).day() === 6 ? (
+              <button
+                onClick={() => setScale("4h")}
+                className={`flex-1 py-2 rounded text-sm font-bold transition-all ${
+                  scale === "4h"
+                    ? "bg-white text-blue-600 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Escala 4h
+              </button>
+            ) : (
+              <button
+                onClick={() => setScale("8h")}
+                className={`flex-1 py-2 rounded text-sm font-bold transition-all ${
+                  scale === "8h"
+                    ? "bg-white text-blue-600 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Escala 8h
+              </button>
+            )}
             <button
               onClick={() => setScale("12h")}
               className={`flex-1 py-2 rounded text-sm font-bold transition-all ${
