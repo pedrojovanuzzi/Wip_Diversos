@@ -16,6 +16,7 @@ export const EnviarMensagem = () => {
   const [searchCidade, setSearchCidade] = useState("");
   const [searchPlano, setSearchPlano] = useState("");
   const [searchStatus, setSearchStatus] = useState("s"); // Default to Active ('s')
+  const [searchCaixaHerm, setSearchCaixaHerm] = useState("");
 
   const [clientes, setClientes] = useState<any[]>([]);
   const [clientesSelecionados, setClientesSelecionados] = useState<any[]>([]);
@@ -47,6 +48,7 @@ export const EnviarMensagem = () => {
           cidade: searchCidade,
           plano: searchPlano,
           status: searchStatus === "all" ? undefined : searchStatus,
+          caixa_herm: searchCaixaHerm,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -146,7 +148,7 @@ export const EnviarMensagem = () => {
           <div className="mb-6 animate-fade-in">
             <div className="mb-4 bg-gray-50 p-4 rounded border">
               <h2 className="font-semibold mb-2">Filtros de Busca</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     CPF/CNPJ
@@ -208,6 +210,27 @@ export const EnviarMensagem = () => {
                     <option value="s">Ativo</option>
                     <option value="n">Inativo</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Caixa Herm.
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchCaixaHerm}
+                    onChange={(e) => {
+                      const digits = e.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, 5);
+                      let formatted = digits;
+                      if (digits.length >= 3) {
+                        formatted = digits.split("").join("-");
+                      }
+                      setSearchCaixaHerm(formatted);
+                    }}
+                    placeholder="Ex: 3-2-5"
+                  />
                 </div>
               </div>
               <div className="mt-4 flex justify-end">

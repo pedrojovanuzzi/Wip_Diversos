@@ -473,7 +473,7 @@ class WhatsappController {
 
   searchClients = async (req: Request, res: Response) => {
     try {
-      const { cpf, nome, cidade, plano, status } = req.body;
+      const { cpf, nome, cidade, plano, status, caixa_herm } = req.body;
       const ClientRepository = MkauthSource.getRepository(ClientesEntities);
 
       const where: any = {};
@@ -485,6 +485,7 @@ class WhatsappController {
       // Additional filters
       if (cidade) where.cidade = Like(`%${cidade}%`);
       if (plano) where.plano = Like(`%${plano}%`); // Partial match for plan usually better, or exact if dropdown
+      if (caixa_herm) where.caixa_herm = Like(`%${caixa_herm}%`);
 
       // Status filter (cli_ativado)
       if (status) {
@@ -512,6 +513,7 @@ class WhatsappController {
           cli_ativado: true,
           cidade: true,
           plano: true,
+          caixa_herm: true,
         },
         order: { nome: "ASC" },
         take: 5000, // Increased limit for broadcast search
