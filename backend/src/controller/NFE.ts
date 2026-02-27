@@ -1354,8 +1354,9 @@ class NFEController {
             doc.fontSize(7).font("Helvetica-Oblique").fillColor("#64748b");
             doc.text(
               `Obs: ${nfe.observacao.substring(0, 90)}`,
-              cols.produto.x + 5,
+              cols.emissao.x,
               textY + 10,
+              { width: 190, ellipsis: true },
             );
             doc.fillColor("black").font("Helvetica").fontSize(8);
             currentY += 10; // Extra space for observation
