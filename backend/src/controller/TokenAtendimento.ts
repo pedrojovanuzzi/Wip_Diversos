@@ -762,9 +762,18 @@ class TokenAtendimento {
         return;
       }
 
+      const sis_cliente = await this.clienteRepo.findOne({
+        where: { login: login, cli_ativado: "s" },
+      });
+
+      if (!sis_cliente) {
+        res.status(404).json({ error: "Cliente nao encontrado" });
+        return;
+      }
+
       const faturas = await this.recordRepo.find({
         where: {
-          login: login,
+          login: sis_cliente.login,
           status: In(["aberto", "vencido"]),
           datadel: IsNull(),
         },
