@@ -57,7 +57,7 @@ class TokenAtendimento {
   chooseHome = async (req: Request, res: Response) => {
     try {
       const cadastros = await this.clienteRepo.findOne({
-        where: { login: req.body.login },
+        where: { login: req.body.login, cli_ativado: "s" },
       });
       res.status(200).json(cadastros);
       return;
@@ -784,7 +784,7 @@ class TokenAtendimento {
         faturas.map(async (fatura) => {
           const valorCorrigido = await this.aplicarJuros_Desconto(
             fatura.valor,
-            login,
+            sis_cliente.login,
             fatura.datavenc,
           );
 
