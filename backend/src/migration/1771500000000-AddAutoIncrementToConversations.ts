@@ -10,13 +10,8 @@ export class AddAutoIncrementToConversations1771500000000 implements MigrationIn
           await queryRunner.createPrimaryKey("people_conversations", ["id"]);
         }
         if (!idColumn.isGenerated) {
-          const newColumn = idColumn.clone();
-          newColumn.isGenerated = true;
-          newColumn.generationStrategy = "increment";
-          await queryRunner.changeColumn(
-            "people_conversations",
-            idColumn,
-            newColumn,
+          await queryRunner.query(
+            "ALTER TABLE `people_conversations` MODIFY `id` INT NOT NULL AUTO_INCREMENT",
           );
         }
       }
@@ -30,10 +25,9 @@ export class AddAutoIncrementToConversations1771500000000 implements MigrationIn
           await queryRunner.createPrimaryKey("conversations", ["id"]);
         }
         if (!idColumn.isGenerated) {
-          const newColumn = idColumn.clone();
-          newColumn.isGenerated = true;
-          newColumn.generationStrategy = "increment";
-          await queryRunner.changeColumn("conversations", idColumn, newColumn);
+          await queryRunner.query(
+            "ALTER TABLE `conversations` MODIFY `id` INT NOT NULL AUTO_INCREMENT",
+          );
         }
       }
     }
