@@ -43,7 +43,7 @@ class TokenAtendimento {
   login = async (req: Request, res: Response) => {
     try {
       const cadastros = await this.clienteRepo.find({
-        where: { cpf_cnpj: req.body.cpf },
+        where: { cpf_cnpj: req.body.cpf, cli_ativado: "s" },
       });
       res.status(200).json(cadastros);
       return;
@@ -531,6 +531,7 @@ class TokenAtendimento {
       const cliente = await this.clienteRepo.findOne({
         where: {
           login,
+          cli_ativado: "s",
         },
       });
 
@@ -635,6 +636,7 @@ class TokenAtendimento {
       const cliente = await this.clienteRepo.findOne({
         where: {
           login,
+          cli_ativado: "s",
         },
       });
 
