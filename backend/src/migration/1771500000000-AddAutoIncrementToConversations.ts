@@ -14,6 +14,11 @@ export class AddAutoIncrementToConversations1771500000000 implements MigrationIn
             "ALTER TABLE `people_conversations` MODIFY `id` INT NOT NULL AUTO_INCREMENT",
           );
         }
+      } else {
+        // A coluna 'id' foi dropada pela migração que falhou anteriormente no servidor. Recriar.
+        await queryRunner.query(
+          "ALTER TABLE `people_conversations` ADD `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY FIRST",
+        );
       }
     }
 
@@ -29,6 +34,11 @@ export class AddAutoIncrementToConversations1771500000000 implements MigrationIn
             "ALTER TABLE `conversations` MODIFY `id` INT NOT NULL AUTO_INCREMENT",
           );
         }
+      } else {
+        // A coluna 'id' foi dropada pela migração que falhou anteriormente no servidor. Recriar.
+        await queryRunner.query(
+          "ALTER TABLE `conversations` ADD `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY FIRST",
+        );
       }
     }
   }
