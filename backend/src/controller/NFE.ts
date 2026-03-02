@@ -129,25 +129,95 @@ class NFEController {
   public devolucaoComodato = async (req: Request, res: Response) => {
     try {
       const {
-        nfeIds,
+        nfeIds, // backwards compatible array id mapping
+        id, // alternative for the same thing
+        cpf,
+        dateFilter,
+        status,
+        ambiente,
+        tipo_operacao,
+        serie,
         password,
-        equipamentoPerdido = false,
+        equipamentoPerdidoFilter, // Para o filtro WHERE
+        equipamentoPerdido = false, // Booleano para a NOVA nota gerada
         observacao = "",
       } = req.body;
 
-      if (!nfeIds || !Array.isArray(nfeIds) || nfeIds.length === 0) {
+      if (!password) {
         res
           .status(400)
-          .json({ message: "Lista de IDs das notas não fornecida." });
+          .json({ message: "Senha do certificado é obrigatória." });
         return;
       }
+
+      const nfeRepository = AppDataSource.getRepository(NFE);
+      const query = nfeRepository.createQueryBuilder("nfe");
+      const targetIds = nfeIds || id;
+
+      if (targetIds && targetIds.length > 0) {
+        query.where("nfe.id IN (:...ids)", { ids: targetIds });
+      } else {
+        if (cpf) {
+          query.andWhere("nfe.destinatario_cpf_cnpj = :cpf", {
+            cpf: cpf.replace(/\D/g, ""),
+          });
+        }
+        if (serie) {
+          query.andWhere("nfe.serie = :serie", { serie });
+        }
+        if (dateFilter && dateFilter.start && dateFilter.end) {
+          const start = new Date(
+            `${dateFilter.start.substring(0, 10)}T00:00:00.000Z`,
+          );
+          const end = new Date(
+            `${dateFilter.end.substring(0, 10)}T23:59:59.999Z`,
+          );
+          query.andWhere("nfe.data_emissao BETWEEN :start AND :end", {
+            start,
+            end,
+          });
+        }
+        if (status) query.andWhere("nfe.status = :status", { status });
+        if (ambiente) {
+          query.andWhere("nfe.tpAmb = :tpAmb", {
+            tpAmb: ambiente === "homologacao" ? 2 : 1,
+          });
+        }
+        if (tipo_operacao) {
+          query.andWhere("nfe.tipo_operacao = :tipo_operacao", {
+            tipo_operacao,
+          });
+        }
+        if (equipamentoPerdidoFilter === "sim") {
+          query.andWhere("nfe.equipamento_perdido = :eqp", { eqp: true });
+        } else if (equipamentoPerdidoFilter === "nao") {
+          query.andWhere("nfe.equipamento_perdido = :eqp", { eqp: false });
+        }
+      }
+
+      // We only care about notes that actually HAVE a protocol and can be returned
+      query.andWhere("nfe.protocolo IS NOT NULL");
+      query.andWhere("nfe.protocolo != ''");
+      query.andWhere("nfe.status = 'autorizado'");
+
+      const nfesToReturn = await query.getMany();
+
+      if (nfesToReturn.length === 0) {
+        res.status(404).json({
+          message:
+            "Nenhuma nota autorizada encontrada para devolução com os filtros informados.",
+        });
+        return;
+      }
+
+      const finalIds = nfesToReturn.map((n) => n.id);
 
       // Create Job
       const job = AppDataSource.getRepository(Jobs).create({
         name: "Gerar NFE Devolução Comodato",
-        description: `Gerando ${nfeIds.length} notas de Devolução em Background`,
+        description: `Gerando ${finalIds.length} notas de Devolução em Background`,
         status: "pendente",
-        total: nfeIds.length,
+        total: finalIds.length,
         processados: 0,
       });
 
@@ -156,7 +226,7 @@ class NFEController {
       // Trigger background processing (fire and forget)
       this.processarFilaDevolucao(
         job,
-        nfeIds,
+        finalIds,
         password,
         equipamentoPerdido,
         observacao,

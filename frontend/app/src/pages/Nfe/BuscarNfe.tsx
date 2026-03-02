@@ -212,7 +212,7 @@ export const BuscarNfe = () => {
   };
 
   const handleOpenDevolucaoModal = () => {
-    if (selectedIds.length === 0) {
+    if (selectedIds.length === 0 && !selectAllMatching) {
       showError("Selecione pelo menos uma NFe para realizar a devolução.");
       return;
     }
@@ -229,7 +229,16 @@ export const BuscarNfe = () => {
     try {
       const payload = {
         password: devolucaoPassword,
-        nfeIds: selectedIds,
+        nfeIds: selectAllMatching ? undefined : selectedIds,
+        cpf: selectAllMatching ? searchCpf : undefined,
+        serie: selectAllMatching ? searchSerie : undefined,
+        status: selectAllMatching ? status : undefined,
+        ambiente: selectAllMatching ? ambiente : undefined,
+        tipo_operacao: selectAllMatching ? tipoOperacao : undefined,
+        equipamentoPerdidoFilter: selectAllMatching
+          ? equipamentoPerdidoFilter
+          : undefined,
+        dateFilter: selectAllMatching ? dateFilter : undefined,
         equipamentoPerdido: devolucaoEquipamentoPerdido,
         observacao: devolucaoEquipamentoPerdido
           ? devolucaoObservacao
