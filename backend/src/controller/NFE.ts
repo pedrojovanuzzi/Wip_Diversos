@@ -131,7 +131,6 @@ class NFEController {
       const {
         nfeIds,
         password,
-        ambiente,
         equipamentoPerdido = false,
         observacao = "",
       } = req.body;
@@ -159,7 +158,6 @@ class NFEController {
         job,
         nfeIds,
         password,
-        ambiente,
         equipamentoPerdido,
         observacao,
       ).catch((err) =>
@@ -814,11 +812,9 @@ class NFEController {
     job: Jobs,
     nfeIds: number[],
     password: string,
-    ambiente: string,
     equipamentoPerdido: boolean = false,
     observacao: string = "",
   ) {
-    const isHomologacao = ambiente === "homologacao";
     let contadorProcessados = 0;
     const responses: any[] = [];
     const clientRepository = MkauthSource.getRepository(ClientesEntities);
@@ -884,10 +880,13 @@ class NFEController {
         let attempts = 0;
         let nfeData: any = {};
 
+        const isHomologacao =
+          originalNfe.tpAmb === 2 || originalNfe.tipo === "homologacao";
+        const effectiveSerie =
+          originalNfe.serie || (isHomologacao ? "99" : "4");
+
         while (!reserved && attempts < 5) {
           try {
-            const effectiveSerie = isHomologacao ? "99" : "4";
-
             const result = await nfeRepository
               .createQueryBuilder("nfe")
               .select("MAX(CAST(nfe.nNF AS UNSIGNED))", "maxNfe")
@@ -1126,7 +1125,7 @@ class NFEController {
               tipo_operacao: "entrada_comodato",
               valor_total: parseFloat(nfeData.infNFe.total.ICMSTot.vNF),
               tpAmb: isHomologacao ? 2 : 1,
-              tipo: ambiente,
+              tipo: originalNfe.tipo, // Inherits type
               equipamento_perdido: equipamentoPerdido || false,
               observacao: observacao,
             });

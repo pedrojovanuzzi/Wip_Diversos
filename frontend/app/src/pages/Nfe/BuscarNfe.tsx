@@ -230,7 +230,6 @@ export const BuscarNfe = () => {
       const payload = {
         password: devolucaoPassword,
         nfeIds: selectedIds,
-        ambiente,
         equipamentoPerdido: devolucaoEquipamentoPerdido,
         observacao: devolucaoEquipamentoPerdido
           ? devolucaoObservacao
