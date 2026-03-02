@@ -529,12 +529,14 @@ export const BuscarNfe = () => {
                   >
                     ZIP
                   </button>
-                  <button
-                    onClick={handleOpenCancelModal}
-                    className="inline-flex justify-center rounded-md border border-red-300 bg-white py-2 px-4 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                  >
-                    Cancelar
-                  </button>
+                  {user?.permission && user.permission >= 5 && (
+                    <button
+                      onClick={handleOpenCancelModal}
+                      className="inline-flex justify-center rounded-md border border-red-300 bg-white py-2 px-4 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                 </div>
               </div>
 
