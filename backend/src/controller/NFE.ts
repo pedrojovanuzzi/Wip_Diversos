@@ -862,6 +862,220 @@ class NFEController {
     }
   };
 
+  public cancelarNotas = async (req: Request, res: Response) => {
+    try {
+      const {
+        id,
+        cpf,
+        dateFilter,
+        status,
+        ambiente,
+        tipo_operacao,
+        equipamentoPerdido,
+        serie,
+        password,
+        justificativa = "Cancelamento de Nota em Lote",
+      } = req.body;
+
+      if (!password) {
+        res
+          .status(400)
+          .json({ message: "Senha do certificado é obrigatória." });
+        return;
+      }
+
+      const nfeRepository = AppDataSource.getRepository(NFE);
+      const query = nfeRepository.createQueryBuilder("nfe");
+
+      if (id && id.length > 0) {
+        query.where("nfe.id IN (:...ids)", { ids: id });
+      } else {
+        if (cpf) {
+          query.andWhere("nfe.destinatario_cpf_cnpj = :cpf", {
+            cpf: cpf.replace(/\D/g, ""),
+          });
+        }
+        if (serie) {
+          query.andWhere("nfe.serie = :serie", { serie });
+        }
+        if (dateFilter && dateFilter.start && dateFilter.end) {
+          const start = new Date(
+            `${dateFilter.start.substring(0, 10)}T00:00:00.000Z`,
+          );
+          const end = new Date(
+            `${dateFilter.end.substring(0, 10)}T23:59:59.999Z`,
+          );
+          query.andWhere("nfe.data_emissao BETWEEN :start AND :end", {
+            start,
+            end,
+          });
+        }
+        if (status) query.andWhere("nfe.status = :status", { status });
+        if (ambiente) {
+          query.andWhere("nfe.tpAmb = :tpAmb", {
+            tpAmb: ambiente === "homologacao" ? 2 : 1,
+          });
+        }
+        if (tipo_operacao) {
+          query.andWhere("nfe.tipo_operacao = :tipo_operacao", {
+            tipo_operacao,
+          });
+        }
+        if (equipamentoPerdido === "sim") {
+          query.andWhere("nfe.equipamento_perdido = :eqp", { eqp: true });
+        } else if (equipamentoPerdido === "nao") {
+          query.andWhere("nfe.equipamento_perdido = :eqp", { eqp: false });
+        }
+      }
+
+      // We only care about notes that actually HAVE a protocol and can be cancelled.
+      query.andWhere("nfe.protocolo IS NOT NULL");
+      query.andWhere("nfe.protocolo != ''");
+      query.andWhere("nfe.status = 'autorizado'"); // Only authorized notes can be cancelled
+
+      const nfesToCancel = await query.getMany();
+
+      if (nfesToCancel.length === 0) {
+        res.status(404).json({
+          message: "Nenhuma nota autorizada encontrada para cancelamento.",
+        });
+        return;
+      }
+
+      const tpEvento = "110111"; // Cancelamento
+      const nSeqEvento = "1";
+      const cnpj = process.env.CPF_CNPJ;
+
+      // Extract credentials once to reuse
+      let certObj;
+      try {
+        certObj = this.getCredentialsFromPfx(password);
+      } catch (err: any) {
+        res.status(400).json({
+          message: "Falha ao ler certificado. Verifique a senha.",
+          error: err.message,
+        });
+        return;
+      }
+      const { cert, key } = certObj;
+      const httpsAgent = new https.Agent({
+        cert,
+        key,
+        rejectUnauthorized: false,
+      });
+
+      const responses: any[] = [];
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const nota of nfesToCancel) {
+        try {
+          const isHomologacao = nota.tpAmb === 2;
+          const dhEvento = moment()
+            .tz("America/Sao_Paulo")
+            .format("YYYY-MM-DDTHH:mm:ssZ");
+          const idTag = `ID${tpEvento}${nota.chave}${nSeqEvento.padStart(2, "0")}`;
+
+          const infEventoXml = `<infEvento Id="${idTag}" xmlns="http://www.portalfiscal.inf.br/nfe"><cOrgao>35</cOrgao><tpAmb>${isHomologacao ? "2" : "1"}</tpAmb><CNPJ>${cnpj}</CNPJ><chNFe>${nota.chave}</chNFe><dhEvento>${dhEvento}</dhEvento><tpEvento>${tpEvento}</tpEvento><nSeqEvento>${nSeqEvento}</nSeqEvento><verEvento>1.00</verEvento><detEvento versao="1.00"><descEvento>Cancelamento</descEvento><nProt>${nota.protocolo}</nProt><xJust>${justificativa}</xJust></detEvento></infEvento>`;
+
+          const signedEvento = await this.assinarEvento(
+            infEventoXml,
+            password,
+            idTag,
+          );
+          const envEventoXml = `<envEvento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00"><idLote>1</idLote>${signedEvento}</envEvento>`;
+          const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body><nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4">${envEventoXml}</nfeDadosMsg></soap12:Body></soap12:Envelope>`;
+
+          const url = isHomologacao
+            ? "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeRecepcaoEvento4.asmx?WSDL"
+            : "https://nfe.fazenda.sp.gov.br/ws/nfeRecepcaoEvento4.asmx?WSDL";
+
+          const response = await axios.post(url, soapEnvelope, {
+            headers: {
+              "Content-Type":
+                'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4/nfeRecepcaoEvento"',
+            },
+            httpsAgent,
+          });
+
+          console.log(response);
+
+          const responseBody = response.data;
+          const cStatMatch = responseBody.match(/<cStat>(.*?)<\/cStat>/);
+          const cStat = cStatMatch ? cStatMatch[1] : "";
+
+          let xMotivo = "Erro Desconhecido";
+          const xMotivoMatch = responseBody.match(/<xMotivo>(.*?)<\/xMotivo>/);
+          if (xMotivoMatch) {
+            // In batch responses, the second xMotivo is usually the specific event response. Let's try to get all and take the last.
+            const motivos = Array.from(
+              responseBody.matchAll(/<xMotivo>(.*?)<\/xMotivo>/g),
+            ) as RegExpMatchArray[];
+            if (motivos && motivos.length > 0) {
+              const lastMotivo = motivos[motivos.length - 1];
+              if (lastMotivo) {
+                xMotivo = lastMotivo[1];
+              }
+            }
+          }
+
+          if (
+            responseBody.includes("<cStat>135</cStat>") ||
+            responseBody.includes("<cStat>155</cStat>") ||
+            cStat === "135" ||
+            cStat === "155" ||
+            responseBody.includes("Evento registrado e vinculado a NF-e") ||
+            responseBody.includes("Cancelamento homologado fora de prazo")
+          ) {
+            await nfeRepository.update(
+              { id: nota.id },
+              { status: "cancelado" },
+            );
+            successCount++;
+            responses.push({
+              id: nota.id,
+              nNF: nota.nNF,
+              success: true,
+              message: xMotivo,
+            });
+          } else {
+            errorCount++;
+            responses.push({
+              id: nota.id,
+              nNF: nota.nNF,
+              success: false,
+              message: xMotivo,
+              cStat,
+            });
+          }
+        } catch (innerError: any) {
+          errorCount++;
+          console.error(`Erro ao cancelar nota ${nota.nNF}:`, innerError);
+          responses.push({
+            id: nota.id,
+            nNF: nota.nNF,
+            success: false,
+            message: innerError?.message || "Erro desconhecido",
+          });
+        }
+      }
+
+      res.status(200).json({
+        message: `Processamento concluído. ${successCount} sucesso(s), ${errorCount} erro(s).`,
+        totalProcessed: nfesToCancel.length,
+        successCount,
+        errorCount,
+        details: responses,
+      });
+    } catch (error: any) {
+      console.error("Erro geral no cancelarNotas:", error);
+      res.status(500).json({
+        message: "Erro ao processar lote de cancelamentos",
+        error: error.message,
+      });
+    }
+  };
+
   private getCredentialsFromPfx(password: string) {
     if (!fs.existsSync(this.certPath)) {
       throw new Error(`Certificado não encontrado em: ${this.certPath}`);

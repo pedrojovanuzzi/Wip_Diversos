@@ -3,7 +3,11 @@ import * as os from "os";
 import { execSync } from "child_process";
 import * as path from "path";
 
-export function processarCertificado(certPath: string, password: string, tempDir: string) {
+export function processarCertificado(
+  certPath: string,
+  password: string,
+  tempDir: string,
+) {
   if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
   const DECRYPTED_CERT_PATH = path.join(tempDir, "decrypted_certificado.tmp");
@@ -16,24 +20,27 @@ export function processarCertificado(certPath: string, password: string, tempDir
     if (isLinux) {
       execSync(
         `openssl pkcs12 -in "${certPath}" -nodes -legacy -passin pass:${password} -out "${DECRYPTED_CERT_PATH}"`,
-        { stdio: "inherit" }
+        { stdio: "inherit" },
       );
       execSync(
         `openssl pkcs12 -in "${DECRYPTED_CERT_PATH}" -export -out "${NEW_CERT_PATH}" -passout pass:${password}`,
-        { stdio: "inherit" }
+        { stdio: "inherit" },
       );
     } else if (isWindows) {
       const powershellCommand = `
             try {
               $certificado = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('${certPath}', '${password}', [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable);
               $bytes = $certificado.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12, '${password}');
-              [System.IO.File]::WriteAllBytes('${NEW_CERT_PATH}', $bytes)
+              [System.IO.File]::WriteAllBytes('${NEW_CERT_PATH}', $bytes);
             } catch {
-              Write-Error $_.Exception.Message
-              exit 1
+              Write-Error $_.Exception.Message;
+              exit 1;
             }
           `;
-      execSync(`powershell -Command "${powershellCommand.replace(/\n/g, " ")}"`, { stdio: ["ignore", "inherit", "pipe"] });
+      execSync(
+        `powershell -Command "${powershellCommand.replace(/\n/g, " ")}"`,
+        { stdio: ["ignore", "inherit", "pipe"] },
+      );
     }
 
     return NEW_CERT_PATH;

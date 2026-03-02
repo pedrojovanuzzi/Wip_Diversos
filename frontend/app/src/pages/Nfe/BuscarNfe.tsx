@@ -30,7 +30,13 @@ export const BuscarNfe = () => {
 
   const { user } = useAuth();
   const token = user?.token;
-  const { showError } = useNotification();
+  const { showError, showSuccess } = useNotification();
+
+  // Cancel State
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelPassword, setCancelPassword] = useState("");
+  const [cancelJustificativa, setCancelJustificativa] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const fetchNfes = async (pageToFetch: number) => {
     setLoading(true);
@@ -134,6 +140,66 @@ export const BuscarNfe = () => {
     } catch (error) {
       console.error("Erro ao baixar PDF:", error);
       showError("Erro ao baixar PDF.");
+    }
+  };
+
+  const handleOpenCancelModal = () => {
+    if (selectedIds.length === 0 && !selectAllMatching) {
+      showError("Selecione pelo menos uma NFe para cancelar.");
+      return;
+    }
+    setShowCancelModal(true);
+  };
+
+  const handleCancelNfes = async () => {
+    if (!cancelPassword) {
+      showError("A senha do certificado é obrigatória.");
+      return;
+    }
+
+    if (cancelJustificativa.length < 15) {
+      showError("A justificativa deve ter no mínimo 15 caracteres.");
+      return;
+    }
+
+    setCancelLoading(true);
+    try {
+      const payload = {
+        password: cancelPassword,
+        justificativa: cancelJustificativa,
+        id: selectAllMatching ? undefined : selectedIds,
+        cpf: selectAllMatching ? searchCpf : undefined,
+        serie: selectAllMatching ? searchSerie : undefined,
+        status: selectAllMatching ? status : undefined,
+        ambiente: selectAllMatching ? ambiente : undefined,
+        tipo_operacao: selectAllMatching ? tipoOperacao : undefined,
+        equipamentoPerdido: selectAllMatching
+          ? equipamentoPerdidoFilter
+          : undefined,
+        dateFilter: selectAllMatching ? dateFilter : undefined,
+      };
+
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/NFEletronica/cancelarNotas`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      showSuccess(response.data.message || "Solicitação processada.");
+      setShowCancelModal(false);
+      setCancelPassword("");
+      setCancelJustificativa("");
+      clearSelection();
+      fetchNfes(1); // Refresh the list
+    } catch (error: any) {
+      console.error("Erro ao cancelar NFEs:", error);
+      showError(
+        error.response?.data?.message || "Erro ao solicitar cancelamento.",
+      );
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -463,6 +529,12 @@ export const BuscarNfe = () => {
                   >
                     ZIP
                   </button>
+                  <button
+                    onClick={handleOpenCancelModal}
+                    className="inline-flex justify-center rounded-md border border-red-300 bg-white py-2 px-4 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                  >
+                    Cancelar
+                  </button>
                 </div>
               </div>
 
@@ -773,6 +845,69 @@ export const BuscarNfe = () => {
           </div>
         </main>
       </div>
+
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Cancelar NF-e(s)
+            </h3>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">
+                Você está prestes a cancelar as NF-es selecionadas. Esta ação
+                requer a senha do Certificado Digital.
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Senha do Certificado (PFX)
+              </label>
+              <input
+                type="password"
+                className="mt-1 block w-full rounded-md border-gray-300 border shadow-sm p-2 focus:border-red-500 focus:ring-red-500 sm:text-sm"
+                value={cancelPassword}
+                onChange={(e) => setCancelPassword(e.target.value)}
+                autoComplete="off"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Justificativa (mín. 15 caracteres)
+              </label>
+              <textarea
+                className="mt-1 block w-full rounded-md border-gray-300 border shadow-sm p-2 focus:border-red-500 focus:ring-red-500 sm:text-sm"
+                rows={3}
+                value={cancelJustificativa}
+                onChange={(e) => setCancelJustificativa(e.target.value)}
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setCancelPassword("");
+                  setCancelJustificativa("");
+                }}
+                disabled={cancelLoading}
+                className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={handleCancelNfes}
+                disabled={cancelLoading}
+                className="inline-flex justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none disabled:opacity-50"
+              >
+                {cancelLoading ? "Processando..." : "Confirmar Cancelamento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

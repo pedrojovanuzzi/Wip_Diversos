@@ -19,6 +19,7 @@ router.get("/xml/:chave", AuthGuard, nfe.downloadXml);
 router.post("/comodato/saida", AuthGuard, nfe.emitirSaidaComodato);
 router.post("/comodato/entrada", AuthGuard, nfe.emitirEntradaComodato);
 router.post("/cancelar", AuthGuard, nfe.cancelarNota);
+router.post("/cancelarNotas", AuthGuard, nfe.cancelarNotas);
 
 router.post("/generateReportPdf", AuthGuard, nfe.generateReportPdf);
 router.post("/generateDanfe", AuthGuard, nfe.generatePdfFromNfXML);
