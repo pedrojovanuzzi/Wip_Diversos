@@ -17,19 +17,10 @@ export const Comodato = () => {
   const [clientes, setClientes] = useState<any[]>([]);
   const [clientesSelecionados, setClientesSelecionados] = useState<any[]>([]); // Array of full client objects or IDs
 
-  // --- Shared States ---
-
-  const [tipoOperacao, setTipoOperacao] = useState<"saida" | "entrada">(
-    "saida",
-  );
   const [ambiente, setAmbiente] = useState("homologacao");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
-  const [equipamentoPerdido, setEquipamentoPerdido] = useState(false);
-  const [observacao, setObservacao] = useState("");
-
-  // --- Search Methods ---
   const handleSearch = async () => {
     const searchCpfRegex = searchCpf.replace(/\D/g, "");
     try {
@@ -95,26 +86,16 @@ export const Comodato = () => {
 
     try {
       setLoading(true);
-      const endpoint =
-        tipoOperacao === "saida"
-          ? "/NFEletronica/comodato/saida"
-          : "/NFEletronica/comodato/entrada";
 
       // Send array of logins
       const payload = {
         logins: clientesSelecionados.map((c) => c.login), // Map to logins
         password,
         ambiente,
-        equipamentoPerdido:
-          tipoOperacao === "entrada" ? equipamentoPerdido : undefined,
-        observacao:
-          tipoOperacao === "entrada" && equipamentoPerdido
-            ? observacao
-            : undefined,
       };
 
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}${endpoint}`,
+        `${process.env.REACT_APP_URL}/NFEletronica/comodato/saida`,
         payload,
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -132,8 +113,6 @@ export const Comodato = () => {
       // Cleanup
       setPassword("");
       setClientesSelecionados([]);
-      setEquipamentoPerdido(false);
-      setObservacao("");
     } catch (error: any) {
       console.error(error);
       const msg =
@@ -232,34 +211,6 @@ export const Comodato = () => {
 
           {/* --- Shared Settings (Operation, Equipments, Emit) --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {/* Operation Type */}
-            <div className="bg-gray-50 p-4 rounded border">
-              <h2 className="font-semibold text-lg mb-2">Tipo de Operação</h2>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="operacao"
-                    value="saida"
-                    checked={tipoOperacao === "saida"}
-                    onChange={() => setTipoOperacao("saida")}
-                  />
-                  Saída (Envio)
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="operacao"
-                    value="entrada"
-                    checked={tipoOperacao === "entrada"}
-                    onChange={() => setTipoOperacao("entrada")}
-                  />
-                  Entrada (Devolução)
-                </label>
-              </div>
-            </div>
-
-            {/* Environment */}
             <div className="bg-gray-50 p-4 rounded border">
               <h2 className="font-semibold text-lg mb-2">Ambiente</h2>
               <select
@@ -271,42 +222,6 @@ export const Comodato = () => {
                 <option value="producao">Produção</option>
               </select>
             </div>
-            {/* Equipamento Perdido (Only for Entrada) */}
-            {tipoOperacao === "entrada" && (
-              <div className="bg-red-50 p-4 rounded border border-red-200">
-                <h2 className="font-semibold text-lg mb-2 text-red-700">
-                  Condição do Equipamento
-                </h2>
-                <label className="flex items-center gap-2 cursor-pointer text-red-700 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={equipamentoPerdido}
-                    onChange={(e) => setEquipamentoPerdido(e.target.checked)}
-                    className="w-5 h-5 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-                  />
-                  Equipamento Perdido / Queimado
-                </label>
-                <p className="text-sm text-red-500 mt-1">
-                  Marque esta opção se o equipamento foi perdido, roubado ou
-                  danificado.
-                </p>
-
-                {equipamentoPerdido && (
-                  <div className="mt-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Observação (Opcional)
-                    </label>
-                    <textarea
-                      value={observacao}
-                      onChange={(e) => setObservacao(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      rows={3}
-                      placeholder="Descreva o estado do equipamento ou motivo..."
-                    />
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Password and Emission */}

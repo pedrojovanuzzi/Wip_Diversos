@@ -30,13 +30,21 @@ export const BuscarNfe = () => {
 
   const { user } = useAuth();
   const token = user?.token;
-  const { showError, showSuccess } = useNotification();
+  const { showError, showSuccess, addJob } = useNotification();
 
   // Cancel State
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelPassword, setCancelPassword] = useState("");
   const [cancelJustificativa, setCancelJustificativa] = useState("");
   const [cancelLoading, setCancelLoading] = useState(false);
+
+  // Devolucao State
+  const [showDevolucaoModal, setShowDevolucaoModal] = useState(false);
+  const [devolucaoPassword, setDevolucaoPassword] = useState("");
+  const [devolucaoEquipamentoPerdido, setDevolucaoEquipamentoPerdido] =
+    useState(false);
+  const [devolucaoObservacao, setDevolucaoObservacao] = useState("");
+  const [devolucaoLoading, setDevolucaoLoading] = useState(false);
 
   const fetchNfes = async (pageToFetch: number) => {
     setLoading(true);
@@ -200,6 +208,65 @@ export const BuscarNfe = () => {
       );
     } finally {
       setCancelLoading(false);
+    }
+  };
+
+  const handleOpenDevolucaoModal = () => {
+    if (selectedIds.length === 0) {
+      showError("Selecione pelo menos uma NFe para realizar a devolução.");
+      return;
+    }
+    setShowDevolucaoModal(true);
+  };
+
+  const handleDevolucaoNfes = async () => {
+    if (!devolucaoPassword) {
+      showError("A senha do certificado é obrigatória.");
+      return;
+    }
+
+    setDevolucaoLoading(true);
+    try {
+      const payload = {
+        password: devolucaoPassword,
+        nfeIds: selectedIds,
+        ambiente,
+        equipamentoPerdido: devolucaoEquipamentoPerdido,
+        observacao: devolucaoEquipamentoPerdido
+          ? devolucaoObservacao
+          : undefined,
+      };
+
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/NFEletronica/comodato/devolucao`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      // Trata como job em segundo plano da NotificationContext
+      if (response.data.job) {
+        addJob(response.data.job, "emissao"); // Reutiliza estilo de emissão
+        showSuccess("Devolução iniciada em segundo plano!");
+      } else {
+        showSuccess(
+          response.data.message || "Processamento de devolução iniciado.",
+        );
+      }
+
+      setShowDevolucaoModal(false);
+      setDevolucaoPassword("");
+      setDevolucaoEquipamentoPerdido(false);
+      setDevolucaoObservacao("");
+      clearSelection();
+    } catch (error: any) {
+      console.error("Erro ao devolver NFEs:", error);
+      showError(
+        error.response?.data?.message || "Erro ao solicitar devolução.",
+      );
+    } finally {
+      setDevolucaoLoading(false);
     }
   };
 
@@ -537,6 +604,12 @@ export const BuscarNfe = () => {
                       Cancelar
                     </button>
                   )}
+                  <button
+                    onClick={handleOpenDevolucaoModal}
+                    className="inline-flex justify-center rounded-md border border-yellow-400 bg-white py-2 px-4 text-sm font-medium text-yellow-700 shadow-sm hover:bg-yellow-50 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2"
+                  >
+                    Devolver
+                  </button>
                 </div>
               </div>
 
@@ -905,6 +978,95 @@ export const BuscarNfe = () => {
                 className="inline-flex justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none disabled:opacity-50"
               >
                 {cancelLoading ? "Processando..." : "Confirmar Cancelamento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDevolucaoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Devolver NF-e de Comodato
+            </h3>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">
+                Você está prestes a emitir Notas de Entrada (Devolução)
+                REFERENCIADAS às NF-es originais selecionadas. As notas passarão
+                pela SEFAZ através da fila de processamento.
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Senha do Certificado (PFX)
+              </label>
+              <input
+                type="password"
+                className="mt-1 block w-full rounded-md border-gray-300 border shadow-sm p-2 focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm"
+                value={devolucaoPassword}
+                onChange={(e) => setDevolucaoPassword(e.target.value)}
+                autoComplete="off"
+              />
+            </div>
+
+            <div className="mb-4 bg-red-50 p-4 rounded border border-red-200">
+              <h2 className="font-semibold text-sm mb-2 text-red-700">
+                Condição do Equipamento
+              </h2>
+              <label className="flex items-center gap-2 cursor-pointer text-red-700 font-medium text-sm">
+                <input
+                  type="checkbox"
+                  checked={devolucaoEquipamentoPerdido}
+                  onChange={(e) =>
+                    setDevolucaoEquipamentoPerdido(e.target.checked)
+                  }
+                  className="w-4 h-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                />
+                Equipamento Perdido / Queimado
+              </label>
+              <p className="text-xs text-red-500 mt-1">
+                Marque esta opção se o referenciado não possuir valor comercial
+                devido a perdas.
+              </p>
+
+              {devolucaoEquipamentoPerdido && (
+                <div className="mt-2">
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Observação (Opcional)
+                  </label>
+                  <textarea
+                    value={devolucaoObservacao}
+                    onChange={(e) => setDevolucaoObservacao(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 text-sm"
+                    rows={2}
+                    placeholder="Descreva o estado do equipamento ou motivo..."
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDevolucaoModal(false);
+                  setDevolucaoPassword("");
+                  setDevolucaoEquipamentoPerdido(false);
+                  setDevolucaoObservacao("");
+                }}
+                disabled={devolucaoLoading}
+                className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={handleDevolucaoNfes}
+                disabled={devolucaoLoading}
+                className="inline-flex justify-center rounded-md border border-transparent bg-yellow-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-yellow-700 focus:outline-none disabled:opacity-50"
+              >
+                {devolucaoLoading ? "Processando..." : "Confirmar Devolução"}
               </button>
             </div>
           </div>
