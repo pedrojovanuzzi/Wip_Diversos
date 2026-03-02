@@ -932,7 +932,7 @@ class NFEController {
                   tpEmis: "1",
                   cDV: "",
                   tpAmb: isHomologacao ? "2" : "1",
-                  finNFe: "4", // Devolução de Mercadoria
+                  finNFe: "1", // Operação Normal (Retorno de Comodato não usa 4)
                   indFinal: "1",
                   indPres: "1",
                   procEmi: "0",
