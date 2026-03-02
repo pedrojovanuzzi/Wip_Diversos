@@ -445,12 +445,13 @@ export const BuscarNfe = () => {
                   </label>
                   <input
                     type="text"
-                    name="serie"
-                    id="serie"
+                    name="serie_pesquisa"
+                    id="serie_pesquisa"
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
                     placeholder="Ex: 1"
                     value={searchSerie}
                     onChange={(e) => setSearchSerie(e.target.value)}
+                    autoComplete="nope"
                   />
                 </div>
 
@@ -955,10 +956,11 @@ export const BuscarNfe = () => {
               </label>
               <input
                 type="password"
+                name="senha_cancel"
                 className="mt-1 block w-full rounded-md border-gray-300 border shadow-sm p-2 focus:border-red-500 focus:ring-red-500 sm:text-sm"
                 value={cancelPassword}
                 onChange={(e) => setCancelPassword(e.target.value)}
-                autoComplete="off"
+                autoComplete="new-password"
               />
             </div>
 
@@ -1019,10 +1021,11 @@ export const BuscarNfe = () => {
               </label>
               <input
                 type="password"
+                name="senha_devolucao"
                 className="mt-1 block w-full rounded-md border-gray-300 border shadow-sm p-2 focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm"
                 value={devolucaoPassword}
                 onChange={(e) => setDevolucaoPassword(e.target.value)}
-                autoComplete="off"
+                autoComplete="new-password"
               />
             </div>
 
