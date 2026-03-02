@@ -69,8 +69,14 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("notification_activeJobs", JSON.stringify(activeJobs));
   }, [activeJobs]);
 
-  const showSuccess = (message: string) => setSuccess(message);
-  const showError = (message: string) => setError(message);
+  const showSuccess = (message: string) => {
+    setError(null);
+    setSuccess(message);
+  };
+  const showError = (message: string) => {
+    setSuccess(null);
+    setError(message);
+  };
 
   const addJob = (
     id: string,
@@ -183,10 +189,11 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   return (
     <NotificationContext.Provider value={{ showSuccess, showError, addJob }}>
       {children}
-      {success && (
+      {error ? (
+        <Error message={error} onClose={() => setError(null)} />
+      ) : success ? (
         <Success message={success} onClose={() => setSuccess(null)} />
-      )}
-      {error && <Error message={error} onClose={() => setError(null)} />}
+      ) : null}
     </NotificationContext.Provider>
   );
 };
