@@ -773,11 +773,17 @@ export const BuscarNfe = () => {
                                   {nfe.nNF} / {nfe.serie}
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                  {nfe.tipo_operacao === "entrada_comodato"
-                                    ? "Entrada"
-                                    : nfe.tipo_operacao === "saida_comodato"
-                                      ? "Saída"
-                                      : nfe.tipo_operacao}
+                                  {nfe.tipo_operacao === "entrada_comodato" ? (
+                                    <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-600/20">
+                                      Entrada
+                                    </span>
+                                  ) : nfe.tipo_operacao === "saida_comodato" ? (
+                                    <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                                      Saída
+                                    </span>
+                                  ) : (
+                                    nfe.tipo_operacao
+                                  )}
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                   {nfe.tipo
