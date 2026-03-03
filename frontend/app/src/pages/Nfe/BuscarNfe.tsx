@@ -322,6 +322,54 @@ export const BuscarNfe = () => {
     }
   };
 
+  const handleGenerateExcel = async () => {
+    try {
+      if (selectedIds.length === 0 && !selectAllMatching) {
+        showError("Selecione pelo menos uma nota para exportar para Excel.");
+        return;
+      }
+
+      showSuccess("Gerando Excel, aguarde...");
+
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/NFEletronica/generateExcel`,
+        {
+          id: selectAllMatching
+            ? undefined
+            : selectedIds.length > 0
+              ? selectedIds
+              : undefined,
+          tipo_operacao: tipoOperacao,
+          cpf: selectAllMatching ? searchCpf : undefined,
+          serie: selectAllMatching ? searchSerie : undefined,
+          status: selectAllMatching ? status : undefined,
+          ambiente: selectAllMatching ? ambiente : undefined,
+          dateFilter: dateFilter,
+          dataInicio: dateFilter?.start
+            ? new Date(dateFilter.start).toLocaleDateString("pt-BR")
+            : undefined,
+          dataFim: dateFilter?.end
+            ? new Date(dateFilter.end).toLocaleDateString("pt-BR")
+            : undefined,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        },
+      );
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Exportacao_NFe.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Erro ao gerar Excel:", error);
+      showError("Erro ao gerar o arquivo Excel.");
+    }
+  };
+
   const handleDownloadZip = async () => {
     if (selectedIds.length === 0 && !selectAllMatching) {
       showError("Selecione pelo menos uma nota para baixar o ZIP.");
@@ -598,6 +646,12 @@ export const BuscarNfe = () => {
                     className="inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                   >
                     Relatório
+                  </button>
+                  <button
+                    onClick={handleGenerateExcel}
+                    className="inline-flex justify-center items-center rounded-md border border-green-600 bg-green-50 py-2 px-4 text-sm font-medium text-green-700 shadow-sm hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                  >
+                    Excel
                   </button>
                   <button
                     onClick={handleDownloadZip}

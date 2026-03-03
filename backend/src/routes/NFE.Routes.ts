@@ -24,6 +24,7 @@ router.post("/cancelarNotas", AuthGuard, nfe.cancelarNotas);
 
 router.post("/generateReportPdf", AuthGuard, nfe.generateReportPdf);
 router.post("/generateDanfe", AuthGuard, nfe.generatePdfFromNfXML);
+router.post("/generateExcel", AuthGuard, nfe.generateExcel);
 router.post("/downloadZipXMLs", AuthGuard, nfe.baixarZipXml);
 
 export default router;

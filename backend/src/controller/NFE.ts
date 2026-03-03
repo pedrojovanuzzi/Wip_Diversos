@@ -24,6 +24,7 @@ import PDFDocument from "pdfkit";
 import JSZip from "jszip";
 import { Jobs } from "../entities/Jobs";
 import { type } from "os";
+import * as xlsx from "xlsx";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -2207,6 +2208,162 @@ class NFEController {
     } catch (error) {
       console.error("Erro ao gerar relatório PDF:", error);
       res.status(500).json({ message: "Erro ao gerar relatório PDF." });
+    }
+  };
+
+  public generateExcel = async (req: Request, res: Response) => {
+    try {
+      const {
+        id,
+        cpf,
+        dateFilter,
+        status,
+        ambiente,
+        tipo_operacao,
+        dataInicio,
+        dataFim,
+        serie,
+      } = req.body;
+      const nfeRepository = AppDataSource.getRepository(NFE);
+
+      const query = nfeRepository.createQueryBuilder("nfe");
+
+      if (id && id.length > 0) {
+        query.where("nfe.id IN (:...ids)", { ids: id });
+      } else {
+        if (cpf) {
+          query.andWhere("nfe.destinatario_cpf_cnpj = :cpf", {
+            cpf: cpf.replace(/\D/g, ""),
+          });
+        }
+        if (serie) {
+          query.andWhere("nfe.serie = :serie", { serie });
+        }
+
+        if (dateFilter && dateFilter.start && dateFilter.end) {
+          const start = new Date(
+            `${dateFilter.start.substring(0, 10)}T00:00:00.000Z`,
+          );
+          const end = new Date(
+            `${dateFilter.end.substring(0, 10)}T23:59:59.999Z`,
+          );
+          query.andWhere("nfe.data_emissao BETWEEN :start AND :end", {
+            start,
+            end,
+          });
+        } else if (dataInicio && dataFim) {
+          const [diaIni, mesIni, anoIni] = dataInicio.split("/");
+          const [diaFim, mesFim, anoFim] = dataFim.split("/");
+          const start = new Date(
+            `${anoIni}-${mesIni}-${diaIni}T00:00:00.000-03:00`,
+          );
+          const end = new Date(
+            `${anoFim}-${mesFim}-${diaFim}T23:59:59.999-03:00`,
+          );
+          query.andWhere("nfe.data_emissao BETWEEN :start AND :end", {
+            start,
+            end,
+          });
+        }
+
+        if (status) query.andWhere("nfe.status = :status", { status });
+        if (ambiente) {
+          query.andWhere("nfe.tpAmb = :tpAmb", {
+            tpAmb: ambiente === "homologacao" ? 2 : 1,
+          });
+        }
+        if (tipo_operacao) {
+          query.andWhere("nfe.tipo_operacao = :tipo_operacao", {
+            tipo_operacao,
+          });
+        }
+      }
+
+      const totalCount = await query.getCount();
+
+      if (totalCount === 0) {
+        res
+          .status(404)
+          .json({ message: "Nenhuma nota encontrada para exportar." });
+        return;
+      }
+
+      query.orderBy("CAST(nfe.nNF AS UNSIGNED)", "ASC");
+
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: "",
+        parseTagValue: false,
+      });
+
+      const batchSize = 1000;
+      let processed = 0;
+      const excelData: any[] = [];
+
+      while (processed < totalCount) {
+        const batch = await query.skip(processed).take(batchSize).getMany();
+
+        for (const nfe of batch) {
+          let xProd = "-";
+          try {
+            if (nfe.xml) {
+              const parsed = parser.parse(nfe.xml);
+              const root = parsed.nfeProc?.NFe || parsed.NFe;
+              const det = root?.infNFe?.det;
+              const firstItem = Array.isArray(det) ? det[0] : det;
+              xProd = firstItem?.prod?.xProd || "-";
+            }
+          } catch (e) {}
+
+          const dateStr = new Date(nfe.data_emissao).toLocaleDateString(
+            "pt-BR",
+          );
+          const valor = parseFloat(nfe.valor_total.toString());
+
+          let tipo =
+            nfe.tipo_operacao === "entrada_comodato"
+              ? "ENTRADA"
+              : nfe.tipo_operacao === "saida_comodato"
+                ? "SAIDA"
+                : "OUTRO";
+
+          excelData.push({
+            "Número NFe": nfe.nNF,
+            Série: nfe.serie,
+            Tipo: tipo,
+            Produto: xProd,
+            "Destinatário Nome": nfe.destinatario_nome || "-",
+            "Destinatário CPF/CNPJ": nfe.destinatario_cpf_cnpj || "-",
+            "Data Emissão": dateStr,
+            "Valor Total": valor,
+            Status: nfe.status.toUpperCase(),
+            "Chave de Acesso": nfe.chave,
+            "Equipamento Perdido": nfe.equipamento_perdido ? "Sim" : "Não",
+            Observação: nfe.observacao || "-",
+          });
+        }
+
+        processed += batch.length;
+      }
+
+      const worksheet = xlsx.utils.json_to_sheet(excelData);
+      const workbook = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(workbook, worksheet, "Notas Fiscais");
+
+      const buffer = xlsx.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=nfes_export.xlsx",
+      );
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Erro ao gerar Excel:", error);
+      res.status(500).json({ message: "Erro ao gerar arquivo Excel." });
     }
   };
 
