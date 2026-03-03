@@ -133,6 +133,7 @@ class NFEController {
         nfeIds, // backwards compatible array id mapping
         id, // alternative for the same thing
         cpf,
+        nome,
         dateFilter,
         status,
         ambiente,
@@ -161,6 +162,11 @@ class NFEController {
         if (cpf) {
           query.andWhere("nfe.destinatario_cpf_cnpj = :cpf", {
             cpf: cpf.replace(/\D/g, ""),
+          });
+        }
+        if (nome) {
+          query.andWhere("nfe.destinatario_nome LIKE :nome", {
+            nome: `%${nome}%`,
           });
         }
         if (serie) {
@@ -1442,6 +1448,7 @@ class NFEController {
       const {
         id,
         cpf,
+        nome,
         dateFilter,
         status,
         ambiente,
@@ -1468,6 +1475,11 @@ class NFEController {
         if (cpf) {
           query.andWhere("nfe.destinatario_cpf_cnpj = :cpf", {
             cpf: cpf.replace(/\D/g, ""),
+          });
+        }
+        if (nome) {
+          query.andWhere("nfe.destinatario_nome LIKE :nome", {
+            nome: `%${nome}%`,
           });
         }
         if (serie) {
@@ -1764,6 +1776,7 @@ class NFEController {
     try {
       const {
         cpf,
+        nome,
         serie,
         dateFilter,
         status,
@@ -1779,6 +1792,10 @@ class NFEController {
 
       if (cpf) {
         where.destinatario_cpf_cnpj = cpf.replace(/\D/g, "");
+      }
+
+      if (nome) {
+        where.destinatario_nome = Like(`%${nome}%`);
       }
 
       if (serie) {
@@ -1897,6 +1914,7 @@ class NFEController {
       const {
         id,
         cpf,
+        nome,
         dateFilter,
         status,
         ambiente,
@@ -1916,6 +1934,11 @@ class NFEController {
         if (cpf) {
           query.andWhere("nfe.destinatario_cpf_cnpj = :cpf", {
             cpf: cpf.replace(/\D/g, ""),
+          });
+        }
+        if (nome) {
+          query.andWhere("nfe.destinatario_nome LIKE :nome", {
+            nome: `%${nome}%`,
           });
         }
         if (serie) {
@@ -2216,6 +2239,7 @@ class NFEController {
       const {
         id,
         cpf,
+        nome,
         dateFilter,
         status,
         ambiente,
@@ -2234,6 +2258,11 @@ class NFEController {
         if (cpf) {
           query.andWhere("nfe.destinatario_cpf_cnpj = :cpf", {
             cpf: cpf.replace(/\D/g, ""),
+          });
+        }
+        if (nome) {
+          query.andWhere("nfe.destinatario_nome LIKE :nome", {
+            nome: `%${nome}%`,
           });
         }
         if (serie) {
@@ -2370,8 +2399,16 @@ class NFEController {
   public baixarZipXml = async (req: Request, res: Response) => {
     try {
       console.log("Iniciando geração de ZIP...");
-      const { id, cpf, serie, dateFilter, status, ambiente, tipo_operacao } =
-        req.body;
+      const {
+        id,
+        cpf,
+        nome,
+        serie,
+        dateFilter,
+        status,
+        ambiente,
+        tipo_operacao,
+      } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
       // Determine WHERE clause using QueryBuilder
@@ -2383,6 +2420,11 @@ class NFEController {
         if (cpf) {
           query.andWhere("nfe.destinatario_cpf_cnpj = :cpf", {
             cpf: cpf.replace(/\D/g, ""),
+          });
+        }
+        if (nome) {
+          query.andWhere("nfe.destinatario_nome LIKE :nome", {
+            nome: `%${nome}%`,
           });
         }
         if (serie) {

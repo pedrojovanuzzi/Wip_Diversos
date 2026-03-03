@@ -8,6 +8,7 @@ import { useNotification } from "../../context/NotificationContext";
 
 export const BuscarNfe = () => {
   const [searchCpf, setSearchCpf] = useState<string>("");
+  const [searchNome, setSearchNome] = useState<string>("");
   const [searchSerie, setSearchSerie] = useState<string>("");
   const [nfes, setNfes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -53,6 +54,7 @@ export const BuscarNfe = () => {
         `${process.env.REACT_APP_URL}/NFEletronica/buscarGeradas`,
         {
           cpf: searchCpf,
+          nome: searchNome,
           serie: searchSerie,
           dateFilter: dateFilter,
           status: status,
@@ -177,6 +179,7 @@ export const BuscarNfe = () => {
         justificativa: cancelJustificativa,
         id: selectAllMatching ? undefined : selectedIds,
         cpf: selectAllMatching ? searchCpf : undefined,
+        nome: selectAllMatching ? searchNome : undefined,
         serie: selectAllMatching ? searchSerie : undefined,
         status: selectAllMatching ? status : undefined,
         ambiente: selectAllMatching ? ambiente : undefined,
@@ -231,6 +234,7 @@ export const BuscarNfe = () => {
         password: devolucaoPassword,
         nfeIds: selectAllMatching ? undefined : selectedIds,
         cpf: selectAllMatching ? searchCpf : undefined,
+        nome: selectAllMatching ? searchNome : undefined,
         serie: selectAllMatching ? searchSerie : undefined,
         status: selectAllMatching ? status : undefined,
         ambiente: selectAllMatching ? ambiente : undefined,
@@ -292,6 +296,7 @@ export const BuscarNfe = () => {
           tipo_operacao: tipoOperacao, // Always send for filtering if needed
           // Full filters for "Select All Matching"
           cpf: selectAllMatching ? searchCpf : undefined,
+          nome: selectAllMatching ? searchNome : undefined,
           serie: selectAllMatching ? searchSerie : undefined,
           status: selectAllMatching ? status : undefined,
           ambiente: selectAllMatching ? ambiente : undefined,
@@ -341,6 +346,7 @@ export const BuscarNfe = () => {
               : undefined,
           tipo_operacao: tipoOperacao,
           cpf: selectAllMatching ? searchCpf : undefined,
+          nome: selectAllMatching ? searchNome : undefined,
           serie: selectAllMatching ? searchSerie : undefined,
           status: selectAllMatching ? status : undefined,
           ambiente: selectAllMatching ? ambiente : undefined,
@@ -382,6 +388,7 @@ export const BuscarNfe = () => {
           id: selectAllMatching ? undefined : selectedIds,
           // Include filters for "Select All Matching" fallback in backend
           cpf: selectAllMatching ? searchCpf : undefined,
+          nome: selectAllMatching ? searchNome : undefined,
           serie: selectAllMatching ? searchSerie : undefined,
           status: selectAllMatching ? status : undefined,
           ambiente: selectAllMatching ? ambiente : undefined,
@@ -481,6 +488,24 @@ export const BuscarNfe = () => {
                     placeholder="000.000.000-00"
                     value={searchCpf}
                     onChange={(e) => setSearchCpf(e.target.value)}
+                  />
+                </div>
+
+                <div className="col-span-1">
+                  <label
+                    htmlFor="nome"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Nome Cliente
+                  </label>
+                  <input
+                    type="text"
+                    name="nome"
+                    id="nome"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    placeholder="Nome completo ou parcial"
+                    value={searchNome}
+                    onChange={(e) => setSearchNome(e.target.value)}
                   />
                 </div>
 
