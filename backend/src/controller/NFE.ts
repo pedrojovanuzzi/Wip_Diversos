@@ -966,24 +966,55 @@ class NFEController {
           );
         }
 
-        // 3. Fetch Products
-        const equipamentos = await prodClienteRepository.find({
-          where: { cliente: client.login },
+        // 3. Extract products/items directly from the original NFE XML
+        const xmlParser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: "",
+          parseTagValue: false,
         });
 
-        if (!equipamentos || equipamentos.length === 0) {
-          throw new Error(`Produtos não encontrados para ${client.login}.`);
+        let originalItems: Array<{
+          xProd: string;
+          vUnCom: string;
+          cProd: string;
+          NCM: string;
+        }> = [];
+
+        try {
+          const parsedOriginal = xmlParser.parse(originalNfe.xml);
+          const rootNfe = parsedOriginal.nfeProc?.NFe || parsedOriginal.NFe;
+          const originalDet = rootNfe?.infNFe?.det;
+          const detArray = Array.isArray(originalDet)
+            ? originalDet
+            : originalDet
+              ? [originalDet]
+              : [];
+
+          originalItems = detArray.map((item: any) => ({
+            xProd:
+              item?.prod?.xProd?.toString().trim() ||
+              "DEVOLUCAO DE EQUIPAMENTO",
+            vUnCom: item?.prod?.vUnCom?.toString() || "0.00",
+            cProd: item?.prod?.cProd?.toString() || "0",
+            NCM: item?.prod?.NCM?.toString() || "85176259",
+          }));
+        } catch {
+          console.warn(
+            `Aviso: não foi possível parsear XML da NFe origem ${id}`,
+          );
         }
 
-        const productIds = equipamentos
-          .map((eq) => eq.idprod)
-          .filter((id) => id !== null && id !== undefined);
-
-        const products = await sisProdutoRepository.findBy({
-          id: In(productIds),
-        });
-
-        const productMap = new Map(products.map((p) => [p.id, p]));
+        if (originalItems.length === 0) {
+          // fallback: single generic item
+          originalItems = [
+            {
+              xProd: "DEVOLUCAO DE EQUIPAMENTO",
+              vUnCom: "0.00",
+              cProd: "0",
+              NCM: "85176259",
+            },
+          ];
+        }
 
         // 4. Determine Series and NFE Number & RESERVE IT WITH RETRY
         let reserved = false;
@@ -1107,32 +1138,23 @@ class NFEController {
                       ? client.rg.replace(/\D/g, "")
                       : undefined,
                 },
-                det: equipamentos.map((eq: any, index: number) => {
-                  const product = eq.idprod ? productMap.get(eq.idprod) : null;
-                  const valorProduto = product?.precoatual
-                    ? parseFloat(product.precoatual as any).toFixed(2)
-                    : "0.00";
-
+                det: originalItems.map((item, index) => {
                   return {
                     "@nItem": index + 1,
                     prod: {
-                      cProd: eq.idprod,
+                      cProd: item.cProd,
                       cEAN: "SEM GTIN",
-                      xProd: (
-                        product?.nome ||
-                        eq.descricao ||
-                        xProdDefault
-                      ).trim(),
-                      NCM: product?.codigo || "85176259",
+                      xProd: item.xProd,
+                      NCM: item.NCM,
                       CFOP: cfop,
                       uCom: "UN",
                       qCom: "1.0000",
-                      vUnCom: valorProduto,
-                      vProd: valorProduto,
+                      vUnCom: item.vUnCom,
+                      vProd: item.vUnCom,
                       cEANTrib: "SEM GTIN",
                       uTrib: "UN",
                       qTrib: "1.0000",
-                      vUnTrib: valorProduto,
+                      vUnTrib: item.vUnCom,
                       indTot: "1",
                     },
                     imposto: {
@@ -1171,16 +1193,11 @@ class NFEController {
                     vST: "0.00",
                     vFCPST: "0.00",
                     vFCPSTRet: "0.00",
-                    vProd: equipamentos
-                      .reduce((acc: number, cur: any) => {
-                        const product = cur.idprod
-                          ? productMap.get(cur.idprod)
-                          : null;
-                        const valor = product?.precoatual
-                          ? parseFloat(product.precoatual as any)
-                          : 0;
-                        return acc + valor;
-                      }, 0)
+                    vProd: originalItems
+                      .reduce(
+                        (acc, item) => acc + parseFloat(item.vUnCom || "0"),
+                        0,
+                      )
                       .toFixed(2),
                     vFrete: "0.00",
                     vSeg: "0.00",
@@ -1191,16 +1208,11 @@ class NFEController {
                     vPIS: "0.00",
                     vCOFINS: "0.00",
                     vOutro: "0.00",
-                    vNF: equipamentos
-                      .reduce((acc: number, cur: any) => {
-                        const product = cur.idprod
-                          ? productMap.get(cur.idprod)
-                          : null;
-                        const valor = product?.precoatual
-                          ? parseFloat(product.precoatual as any)
-                          : 0;
-                        return acc + valor;
-                      }, 0)
+                    vNF: originalItems
+                      .reduce(
+                        (acc, item) => acc + parseFloat(item.vUnCom || "0"),
+                        0,
+                      )
                       .toFixed(2),
                   },
                 },
