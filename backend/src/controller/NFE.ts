@@ -211,6 +211,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
+              AND ExtractValue(nfe.xml, '//dest/enderDest/xLgr') = ExtractValue(n2.xml, '//dest/enderDest/xLgr')
+              AND ExtractValue(nfe.xml, '//dest/enderDest/nro') = ExtractValue(n2.xml, '//dest/enderDest/nro')
           )`);
         }
       }
@@ -1537,6 +1539,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
+              AND ExtractValue(nfe.xml, '//dest/enderDest/xLgr') = ExtractValue(n2.xml, '//dest/enderDest/xLgr')
+              AND ExtractValue(nfe.xml, '//dest/enderDest/nro') = ExtractValue(n2.xml, '//dest/enderDest/nro')
           )`);
         }
       }
@@ -1872,6 +1876,8 @@ class NFEController {
             AND nfe.status = 'autorizado'
             AND n2.status = 'autorizado'
             AND nfe.id != n2.id
+            AND ExtractValue(nfe.xml, '//dest/enderDest/xLgr') = ExtractValue(n2.xml, '//dest/enderDest/xLgr')
+            AND ExtractValue(nfe.xml, '//dest/enderDest/nro') = ExtractValue(n2.xml, '//dest/enderDest/nro')
         )`);
       }
 
@@ -1881,7 +1887,9 @@ class NFEController {
       const total = await qb.getCount();
 
       if (inconsistenciaValor) {
-        qb.orderBy("nfe.destinatario_nome", "ASC").addOrderBy("nfe.id", "DESC");
+        qb.orderBy("nfe.destinatario_nome", "ASC")
+          .addOrderBy("nfe.tipo_operacao", "DESC")
+          .addOrderBy("nfe.id", "DESC");
       } else {
         qb.orderBy("nfe.id", "DESC");
       }
@@ -2026,6 +2034,20 @@ class NFEController {
           query.andWhere("nfe.tipo_operacao = :tipo_operacao", {
             tipo_operacao,
           });
+        }
+        if (inconsistenciaValor) {
+          query.andWhere(`EXISTS (
+            SELECT 1 FROM nfe n2 
+            WHERE nfe.destinatario_cpf_cnpj = n2.destinatario_cpf_cnpj
+              AND nfe.destinatario_nome = n2.destinatario_nome 
+              AND nfe.tipo_operacao != n2.tipo_operacao 
+              AND nfe.valor_total != n2.valor_total
+              AND nfe.status = 'autorizado'
+              AND n2.status = 'autorizado'
+              AND nfe.id != n2.id
+              AND ExtractValue(nfe.xml, '//dest/enderDest/xLgr') = ExtractValue(n2.xml, '//dest/enderDest/xLgr')
+              AND ExtractValue(nfe.xml, '//dest/enderDest/nro') = ExtractValue(n2.xml, '//dest/enderDest/nro')
+          )`);
         }
       }
 
@@ -2351,6 +2373,20 @@ class NFEController {
             tipo_operacao,
           });
         }
+        if (inconsistenciaValor) {
+          query.andWhere(`EXISTS (
+            SELECT 1 FROM nfe n2 
+            WHERE nfe.destinatario_cpf_cnpj = n2.destinatario_cpf_cnpj
+              AND nfe.destinatario_nome = n2.destinatario_nome 
+              AND nfe.tipo_operacao != n2.tipo_operacao 
+              AND nfe.valor_total != n2.valor_total
+              AND nfe.status = 'autorizado'
+              AND n2.status = 'autorizado'
+              AND nfe.id != n2.id
+              AND ExtractValue(nfe.xml, '//dest/enderDest/xLgr') = ExtractValue(n2.xml, '//dest/enderDest/xLgr')
+              AND ExtractValue(nfe.xml, '//dest/enderDest/nro') = ExtractValue(n2.xml, '//dest/enderDest/nro')
+          )`);
+        }
       }
 
       const totalCount = await query.getCount();
@@ -2509,6 +2545,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
+              AND ExtractValue(nfe.xml, '//dest/enderDest/xLgr') = ExtractValue(n2.xml, '//dest/enderDest/xLgr')
+              AND ExtractValue(nfe.xml, '//dest/enderDest/nro') = ExtractValue(n2.xml, '//dest/enderDest/nro')
           )`);
         }
       }
