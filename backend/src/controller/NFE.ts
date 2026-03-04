@@ -211,8 +211,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
-              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</xLgr>', 1), '<xLgr>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</xLgr>', 1), '<xLgr>', -1)
-              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</nro>', 1), '<nro>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</nro>', 1), '<nro>', -1)
+              AND nfe.endereco = n2.endereco
+              AND nfe.endereco IS NOT NULL
           )`);
         }
       }
@@ -675,10 +675,28 @@ class NFEController {
 
         // 6. Update Success
         if (nfeRecord) {
+          // Extract endereco and equipamentos from already-built nfeData object
+          const enderDest = nfeData.infNFe?.dest?.enderDest;
+          const enderecoStr = enderDest
+            ? `${(enderDest.xLgr || "").trim()}, ${(enderDest.nro || "").trim()}`.replace(
+                /,\s*$/,
+                "",
+              )
+            : null;
+
+          const det = nfeData.infNFe?.det;
+          const detArray = Array.isArray(det) ? det : det ? [det] : [];
+          const equipamentosArr = detArray
+            .map((item: any) => item?.prod?.xProd?.toString().trim())
+            .filter(Boolean);
+
           await nfeRepository.update(nfeRecord.id, {
             status: "autorizado",
             xml: signedXml, // Update with full signed XML
             protocolo: nProt,
+            endereco: enderecoStr || undefined,
+            equipamentos:
+              equipamentosArr.length > 0 ? equipamentosArr : undefined,
           });
         }
 
@@ -1539,8 +1557,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
-              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</xLgr>', 1), '<xLgr>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</xLgr>', 1), '<xLgr>', -1)
-              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</nro>', 1), '<nro>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</nro>', 1), '<nro>', -1)
+              AND nfe.endereco = n2.endereco
+              AND nfe.endereco IS NOT NULL
           )`);
         }
       }
@@ -1876,8 +1894,8 @@ class NFEController {
             AND nfe.status = 'autorizado'
             AND n2.status = 'autorizado'
             AND nfe.id != n2.id
-            AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</xLgr>', 1), '<xLgr>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</xLgr>', 1), '<xLgr>', -1)
-            AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</nro>', 1), '<nro>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</nro>', 1), '<nro>', -1)
+            AND nfe.endereco = n2.endereco
+            AND nfe.endereco IS NOT NULL
         )`);
       }
 
@@ -2045,8 +2063,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
-              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</xLgr>', 1), '<xLgr>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</xLgr>', 1), '<xLgr>', -1)
-              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</nro>', 1), '<nro>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</nro>', 1), '<nro>', -1)
+              AND nfe.endereco = n2.endereco
+              AND nfe.endereco IS NOT NULL
           )`);
         }
       }
@@ -2383,8 +2401,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
-              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</xLgr>', 1), '<xLgr>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</xLgr>', 1), '<xLgr>', -1)
-              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</nro>', 1), '<nro>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</nro>', 1), '<nro>', -1)
+              AND nfe.endereco = n2.endereco
+              AND nfe.endereco IS NOT NULL
           )`);
         }
       }
@@ -2545,8 +2563,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
-              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</xLgr>', 1), '<xLgr>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</xLgr>', 1), '<xLgr>', -1)
-              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</nro>', 1), '<nro>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</nro>', 1), '<nro>', -1)
+              AND nfe.endereco = n2.endereco
+              AND nfe.endereco IS NOT NULL
           )`);
         }
       }

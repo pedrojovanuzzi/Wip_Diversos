@@ -56,4 +56,10 @@ export class NFE {
 
   @Column({ type: "varchar", length: 20, nullable: true })
   tipo!: string; // 'producao' | 'homologacao'
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  endereco!: string;
+
+  @Column({ type: "json", nullable: true })
+  equipamentos!: any;
 }
