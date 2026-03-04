@@ -211,8 +211,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
-              AND ExtractValue(nfe.xml, '//dest/enderDest/xLgr') = ExtractValue(n2.xml, '//dest/enderDest/xLgr')
-              AND ExtractValue(nfe.xml, '//dest/enderDest/nro') = ExtractValue(n2.xml, '//dest/enderDest/nro')
+              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</xLgr>', 1), '<xLgr>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</xLgr>', 1), '<xLgr>', -1)
+              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</nro>', 1), '<nro>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</nro>', 1), '<nro>', -1)
           )`);
         }
       }
@@ -1539,8 +1539,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
-              AND ExtractValue(nfe.xml, '//dest/enderDest/xLgr') = ExtractValue(n2.xml, '//dest/enderDest/xLgr')
-              AND ExtractValue(nfe.xml, '//dest/enderDest/nro') = ExtractValue(n2.xml, '//dest/enderDest/nro')
+              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</xLgr>', 1), '<xLgr>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</xLgr>', 1), '<xLgr>', -1)
+              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</nro>', 1), '<nro>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</nro>', 1), '<nro>', -1)
           )`);
         }
       }
@@ -1876,8 +1876,8 @@ class NFEController {
             AND nfe.status = 'autorizado'
             AND n2.status = 'autorizado'
             AND nfe.id != n2.id
-            AND ExtractValue(nfe.xml, '//dest/enderDest/xLgr') = ExtractValue(n2.xml, '//dest/enderDest/xLgr')
-            AND ExtractValue(nfe.xml, '//dest/enderDest/nro') = ExtractValue(n2.xml, '//dest/enderDest/nro')
+            AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</xLgr>', 1), '<xLgr>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</xLgr>', 1), '<xLgr>', -1)
+            AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</nro>', 1), '<nro>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</nro>', 1), '<nro>', -1)
         )`);
       }
 
@@ -2045,8 +2045,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
-              AND ExtractValue(nfe.xml, '//dest/enderDest/xLgr') = ExtractValue(n2.xml, '//dest/enderDest/xLgr')
-              AND ExtractValue(nfe.xml, '//dest/enderDest/nro') = ExtractValue(n2.xml, '//dest/enderDest/nro')
+              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</xLgr>', 1), '<xLgr>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</xLgr>', 1), '<xLgr>', -1)
+              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</nro>', 1), '<nro>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</nro>', 1), '<nro>', -1)
           )`);
         }
       }
@@ -2383,8 +2383,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
-              AND ExtractValue(nfe.xml, '//dest/enderDest/xLgr') = ExtractValue(n2.xml, '//dest/enderDest/xLgr')
-              AND ExtractValue(nfe.xml, '//dest/enderDest/nro') = ExtractValue(n2.xml, '//dest/enderDest/nro')
+              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</xLgr>', 1), '<xLgr>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</xLgr>', 1), '<xLgr>', -1)
+              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</nro>', 1), '<nro>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</nro>', 1), '<nro>', -1)
           )`);
         }
       }
@@ -2545,8 +2545,8 @@ class NFEController {
               AND nfe.status = 'autorizado'
               AND n2.status = 'autorizado'
               AND nfe.id != n2.id
-              AND ExtractValue(nfe.xml, '//dest/enderDest/xLgr') = ExtractValue(n2.xml, '//dest/enderDest/xLgr')
-              AND ExtractValue(nfe.xml, '//dest/enderDest/nro') = ExtractValue(n2.xml, '//dest/enderDest/nro')
+              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</xLgr>', 1), '<xLgr>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</xLgr>', 1), '<xLgr>', -1)
+              AND SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(nfe.xml, LOCATE('<enderDest>', nfe.xml)), '</nro>', 1), '<nro>', -1) = SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING(n2.xml, LOCATE('<enderDest>', n2.xml)), '</nro>', 1), '<nro>', -1)
           )`);
         }
       }
