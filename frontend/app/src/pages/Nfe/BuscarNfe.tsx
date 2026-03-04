@@ -17,6 +17,8 @@ export const BuscarNfe = () => {
   const [tipoOperacao, setTipoOperacao] = useState<string>(""); // entrada_comodato, saida_comodato
   const [equipamentoPerdidoFilter, setEquipamentoPerdidoFilter] =
     useState<string>(""); // "", "sim", "nao"
+  const [inconsistenciaValor, setInconsistenciaValor] =
+    useState<boolean>(false);
   const [dateFilter, setDateFilter] = useState<{
     start: string;
     end: string;
@@ -61,6 +63,7 @@ export const BuscarNfe = () => {
           ambiente: ambiente,
           tipo_operacao: tipoOperacao,
           equipamentoPerdido: equipamentoPerdidoFilter,
+          inconsistenciaValor: inconsistenciaValor,
           page: pageToFetch,
           limit: limit,
         },
@@ -187,6 +190,9 @@ export const BuscarNfe = () => {
         equipamentoPerdido: selectAllMatching
           ? equipamentoPerdidoFilter
           : undefined,
+        inconsistenciaValor: selectAllMatching
+          ? inconsistenciaValor
+          : undefined,
         dateFilter: selectAllMatching ? dateFilter : undefined,
       };
 
@@ -241,6 +247,9 @@ export const BuscarNfe = () => {
         tipo_operacao: selectAllMatching ? tipoOperacao : undefined,
         equipamentoPerdidoFilter: selectAllMatching
           ? equipamentoPerdidoFilter
+          : undefined,
+        inconsistenciaValor: selectAllMatching
+          ? inconsistenciaValor
           : undefined,
         dateFilter: selectAllMatching ? dateFilter : undefined,
         equipamentoPerdido: devolucaoEquipamentoPerdido,
@@ -300,6 +309,9 @@ export const BuscarNfe = () => {
           serie: selectAllMatching ? searchSerie : undefined,
           status: selectAllMatching ? status : undefined,
           ambiente: selectAllMatching ? ambiente : undefined,
+          inconsistenciaValor: selectAllMatching
+            ? inconsistenciaValor
+            : undefined,
           dateFilter: dateFilter,
 
           dataInicio: dateFilter?.start
@@ -350,6 +362,9 @@ export const BuscarNfe = () => {
           serie: selectAllMatching ? searchSerie : undefined,
           status: selectAllMatching ? status : undefined,
           ambiente: selectAllMatching ? ambiente : undefined,
+          inconsistenciaValor: selectAllMatching
+            ? inconsistenciaValor
+            : undefined,
           dateFilter: dateFilter,
           dataInicio: dateFilter?.start
             ? new Date(dateFilter.start).toLocaleDateString("pt-BR")
@@ -395,6 +410,9 @@ export const BuscarNfe = () => {
           tipo_operacao: selectAllMatching ? tipoOperacao : undefined,
           equipamentoPerdido: selectAllMatching
             ? equipamentoPerdidoFilter
+            : undefined,
+          inconsistenciaValor: selectAllMatching
+            ? inconsistenciaValor
             : undefined,
           dateFilter: selectAllMatching ? dateFilter : undefined,
         },
@@ -658,6 +676,24 @@ export const BuscarNfe = () => {
                   </select>
                 </div>
 
+                {user?.permission! >= 5 && (
+                  <div className="col-span-1 flex items-center mt-6">
+                    <input
+                      id="inconsistenciaValor"
+                      name="inconsistenciaValor"
+                      type="checkbox"
+                      checked={inconsistenciaValor}
+                      onChange={(e) => setInconsistenciaValor(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label
+                      htmlFor="inconsistenciaValor"
+                      className="ml-2 block text-sm text-gray-900"
+                    >
+                      Inconsistências de Valor
+                    </label>
+                  </div>
+                )}
                 <div className="col-span-2 flex items-end space-x-2">
                   <button
                     onClick={handleSearch}

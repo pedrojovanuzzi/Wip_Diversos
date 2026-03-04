@@ -143,6 +143,7 @@ class NFEController {
         equipamentoPerdidoFilter, // Para o filtro WHERE
         equipamentoPerdido = false, // Booleano para a NOVA nota gerada
         observacao = "",
+        inconsistenciaValor,
       } = req.body;
 
       if (!password) {
@@ -199,6 +200,18 @@ class NFEController {
           query.andWhere("nfe.equipamento_perdido = :eqp", { eqp: true });
         } else if (equipamentoPerdidoFilter === "nao") {
           query.andWhere("nfe.equipamento_perdido = :eqp", { eqp: false });
+        }
+        if (inconsistenciaValor) {
+          query.andWhere(`EXISTS (
+            SELECT 1 FROM nfe n2 
+            WHERE nfe.destinatario_cpf_cnpj = n2.destinatario_cpf_cnpj
+              AND nfe.destinatario_nome = n2.destinatario_nome 
+              AND nfe.tipo_operacao != n2.tipo_operacao 
+              AND nfe.valor_total != n2.valor_total
+              AND nfe.status = 'autorizado'
+              AND n2.status = 'autorizado'
+              AND nfe.id != n2.id
+          )`);
         }
       }
 
@@ -1457,6 +1470,7 @@ class NFEController {
         serie,
         password,
         justificativa = "Cancelamento de Nota em Lote",
+        inconsistenciaValor,
       } = req.body;
 
       if (!password) {
@@ -1512,6 +1526,18 @@ class NFEController {
           query.andWhere("nfe.equipamento_perdido = :eqp", { eqp: true });
         } else if (equipamentoPerdido === "nao") {
           query.andWhere("nfe.equipamento_perdido = :eqp", { eqp: false });
+        }
+        if (inconsistenciaValor) {
+          query.andWhere(`EXISTS (
+            SELECT 1 FROM nfe n2 
+            WHERE nfe.destinatario_cpf_cnpj = n2.destinatario_cpf_cnpj
+              AND nfe.destinatario_nome = n2.destinatario_nome 
+              AND nfe.tipo_operacao != n2.tipo_operacao 
+              AND nfe.valor_total != n2.valor_total
+              AND nfe.status = 'autorizado'
+              AND n2.status = 'autorizado'
+              AND nfe.id != n2.id
+          )`);
         }
       }
 
@@ -1783,67 +1809,84 @@ class NFEController {
         ambiente,
         tipo_operacao,
         equipamentoPerdido,
+        inconsistenciaValor,
         page = 1,
         limit = 100,
       } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
-      const where: any = {};
+      const qb = nfeRepository.createQueryBuilder("nfe");
 
       if (cpf) {
-        where.destinatario_cpf_cnpj = cpf.replace(/\D/g, "");
+        qb.andWhere("nfe.destinatario_cpf_cnpj = :cpf", {
+          cpf: cpf.replace(/\D/g, ""),
+        });
       }
 
       if (nome) {
-        where.destinatario_nome = Like(`%${nome}%`);
+        qb.andWhere("nfe.destinatario_nome LIKE :nome", { nome: `%${nome}%` });
       }
 
       if (serie) {
-        where.serie = serie;
+        qb.andWhere("nfe.serie = :serie", { serie });
       }
 
       if (dateFilter && dateFilter.start && dateFilter.end) {
-        // Force UTC boundaries to ensure we search exactly from 00:00:00 to 23:59:59 of the selected days
-        // irrespective of the server timezone. This assumes the DB stores dates naively or we want strict visual matching.
+        // Force UTC boundaries
         const start = new Date(
           `${dateFilter.start.substring(0, 10)}T00:00:00.000Z`,
         );
         const end = new Date(
           `${dateFilter.end.substring(0, 10)}T23:59:59.999Z`,
         );
-
-        console.log("Filter Range (UTC):", start, end);
-
-        where.data_emissao = Between(start, end);
+        qb.andWhere("nfe.data_emissao BETWEEN :start AND :end", { start, end });
       }
 
       if (status) {
-        where.status = status;
+        qb.andWhere("nfe.status = :status", { status });
       }
 
       if (ambiente) {
-        where.tpAmb = ambiente === "homologacao" ? 2 : 1;
+        qb.andWhere("nfe.tpAmb = :tpAmb", {
+          tpAmb: ambiente === "homologacao" ? 2 : 1,
+        });
       }
 
       if (tipo_operacao) {
-        where.tipo_operacao = tipo_operacao;
+        qb.andWhere("nfe.tipo_operacao = :tipo_operacao", { tipo_operacao });
       }
 
       if (equipamentoPerdido === "sim") {
-        where.equipamento_perdido = true;
+        qb.andWhere("nfe.equipamento_perdido = :eqp", { eqp: true });
       } else if (equipamentoPerdido === "nao") {
-        where.equipamento_perdido = false;
+        qb.andWhere("nfe.equipamento_perdido = :eqp", { eqp: false });
+      }
+
+      if (inconsistenciaValor) {
+        qb.andWhere(`EXISTS (
+          SELECT 1 FROM nfe n2 
+          WHERE nfe.destinatario_cpf_cnpj = n2.destinatario_cpf_cnpj
+            AND nfe.destinatario_nome = n2.destinatario_nome 
+            AND nfe.tipo_operacao != n2.tipo_operacao 
+            AND nfe.valor_total != n2.valor_total
+            AND nfe.status = 'autorizado'
+            AND n2.status = 'autorizado'
+            AND nfe.id != n2.id
+        )`);
       }
 
       const take = Number(limit);
       const skip = (Number(page) - 1) * take;
 
-      const [nfes, total] = await nfeRepository.findAndCount({
-        where: where,
-        order: { id: "DESC" },
-        take: take,
-        skip: skip,
-      });
+      const total = await qb.getCount();
+
+      if (inconsistenciaValor) {
+        qb.orderBy("nfe.destinatario_nome", "ASC").addOrderBy("nfe.id", "DESC");
+      } else {
+        qb.orderBy("nfe.id", "DESC");
+      }
+
+      const nfes = await qb.take(take).skip(skip).getMany();
 
       // Parse XML to extract product info for frontend display
       const parser = new XMLParser({
@@ -1922,6 +1965,7 @@ class NFEController {
         dataInicio,
         dataFim,
         serie,
+        inconsistenciaValor,
       } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
@@ -2247,6 +2291,7 @@ class NFEController {
         dataInicio,
         dataFim,
         serie,
+        inconsistenciaValor,
       } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
@@ -2408,6 +2453,7 @@ class NFEController {
         status,
         ambiente,
         tipo_operacao,
+        inconsistenciaValor,
       } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
@@ -2452,6 +2498,18 @@ class NFEController {
           query.andWhere("nfe.tipo_operacao = :tipo_operacao", {
             tipo_operacao,
           });
+        }
+        if (inconsistenciaValor) {
+          query.andWhere(`EXISTS (
+            SELECT 1 FROM nfe n2 
+            WHERE nfe.destinatario_cpf_cnpj = n2.destinatario_cpf_cnpj
+              AND nfe.destinatario_nome = n2.destinatario_nome 
+              AND nfe.tipo_operacao != n2.tipo_operacao 
+              AND nfe.valor_total != n2.valor_total
+              AND nfe.status = 'autorizado'
+              AND n2.status = 'autorizado'
+              AND nfe.id != n2.id
+          )`);
         }
       }
 
