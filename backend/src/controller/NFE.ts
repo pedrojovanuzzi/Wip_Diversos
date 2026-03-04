@@ -1329,10 +1329,28 @@ class NFEController {
 
         // 6. Update Success
         if (nfeRecord) {
+          // Extract endereco and equipamentos from already-built nfeData object
+          const enderDest = nfeData.infNFe?.dest?.enderDest;
+          const enderecoStr = enderDest
+            ? `${(enderDest.xLgr || "").trim()}, ${(enderDest.nro || "").trim()}`.replace(
+                /,\s*$/,
+                "",
+              )
+            : null;
+
+          const det = nfeData.infNFe?.det;
+          const detArray = Array.isArray(det) ? det : det ? [det] : [];
+          const equipamentosArr = detArray
+            .map((item: any) => item?.prod?.xProd?.toString().trim())
+            .filter(Boolean);
+
           await nfeRepository.update(nfeRecord.id, {
             status: "autorizado",
             xml: signedXml,
             protocolo: nProt,
+            endereco: enderecoStr || undefined,
+            equipamentos:
+              equipamentosArr.length > 0 ? equipamentosArr : undefined,
           });
         }
 
