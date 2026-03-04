@@ -144,6 +144,7 @@ class NFEController {
         equipamentoPerdido = false, // Booleano para a NOVA nota gerada
         observacao = "",
         inconsistenciaValor,
+        semPar,
       } = req.body;
 
       if (!password) {
@@ -213,6 +214,27 @@ class NFEController {
               AND nfe.id != n2.id
               AND nfe.endereco = n2.endereco
               AND nfe.endereco IS NOT NULL
+          )`);
+        }
+        if (semPar === "entrada_sem_saida") {
+          query.andWhere("nfe.tipo_operacao = :tipEnt", {
+            tipEnt: "entrada_comodato",
+          });
+          query.andWhere(`NOT EXISTS (
+            SELECT 1 FROM nfe n2
+            WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
+              AND n2.tipo_operacao = 'saida_comodato'
+              AND n2.status = 'autorizado'
+          )`);
+        } else if (semPar === "saida_sem_entrada") {
+          query.andWhere("nfe.tipo_operacao = :tipSai", {
+            tipSai: "saida_comodato",
+          });
+          query.andWhere(`NOT EXISTS (
+            SELECT 1 FROM nfe n2
+            WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
+              AND n2.tipo_operacao = 'entrada_comodato'
+              AND n2.status = 'autorizado'
           )`);
         }
       }
@@ -1521,6 +1543,7 @@ class NFEController {
         password,
         justificativa = "Cancelamento de Nota em Lote",
         inconsistenciaValor,
+        semPar,
       } = req.body;
 
       if (!password) {
@@ -1589,6 +1612,27 @@ class NFEController {
               AND nfe.id != n2.id
               AND nfe.endereco = n2.endereco
               AND nfe.endereco IS NOT NULL
+          )`);
+        }
+        if (semPar === "entrada_sem_saida") {
+          query.andWhere("nfe.tipo_operacao = :tipEnt", {
+            tipEnt: "entrada_comodato",
+          });
+          query.andWhere(`NOT EXISTS (
+            SELECT 1 FROM nfe n2
+            WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
+              AND n2.tipo_operacao = 'saida_comodato'
+              AND n2.status = 'autorizado'
+          )`);
+        } else if (semPar === "saida_sem_entrada") {
+          query.andWhere("nfe.tipo_operacao = :tipSai", {
+            tipSai: "saida_comodato",
+          });
+          query.andWhere(`NOT EXISTS (
+            SELECT 1 FROM nfe n2
+            WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
+              AND n2.tipo_operacao = 'entrada_comodato'
+              AND n2.status = 'autorizado'
           )`);
         }
       }
@@ -1862,6 +1906,7 @@ class NFEController {
         tipo_operacao,
         equipamentoPerdido,
         inconsistenciaValor,
+        semPar,
         page = 1,
         limit = 100,
       } = req.body;
@@ -1926,6 +1971,28 @@ class NFEController {
             AND nfe.id != n2.id
             AND nfe.endereco = n2.endereco
             AND nfe.endereco IS NOT NULL
+        )`);
+      }
+
+      if (semPar === "entrada_sem_saida") {
+        qb.andWhere("nfe.tipo_operacao = :tipEnt", {
+          tipEnt: "entrada_comodato",
+        });
+        qb.andWhere(`NOT EXISTS (
+          SELECT 1 FROM nfe n2
+          WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
+            AND n2.tipo_operacao = 'saida_comodato'
+            AND n2.status = 'autorizado'
+        )`);
+      } else if (semPar === "saida_sem_entrada") {
+        qb.andWhere("nfe.tipo_operacao = :tipSai", {
+          tipSai: "saida_comodato",
+        });
+        qb.andWhere(`NOT EXISTS (
+          SELECT 1 FROM nfe n2
+          WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
+            AND n2.tipo_operacao = 'entrada_comodato'
+            AND n2.status = 'autorizado'
         )`);
       }
 
@@ -2022,6 +2089,7 @@ class NFEController {
         dataFim,
         serie,
         inconsistenciaValor,
+        semPar,
       } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
@@ -2095,6 +2163,27 @@ class NFEController {
               AND nfe.id != n2.id
               AND nfe.endereco = n2.endereco
               AND nfe.endereco IS NOT NULL
+          )`);
+        }
+        if (semPar === "entrada_sem_saida") {
+          query.andWhere("nfe.tipo_operacao = :tipEnt", {
+            tipEnt: "entrada_comodato",
+          });
+          query.andWhere(`NOT EXISTS (
+            SELECT 1 FROM nfe n2
+            WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
+              AND n2.tipo_operacao = 'saida_comodato'
+              AND n2.status = 'autorizado'
+          )`);
+        } else if (semPar === "saida_sem_entrada") {
+          query.andWhere("nfe.tipo_operacao = :tipSai", {
+            tipSai: "saida_comodato",
+          });
+          query.andWhere(`NOT EXISTS (
+            SELECT 1 FROM nfe n2
+            WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
+              AND n2.tipo_operacao = 'entrada_comodato'
+              AND n2.status = 'autorizado'
           )`);
         }
       }
@@ -2362,6 +2451,7 @@ class NFEController {
         dataFim,
         serie,
         inconsistenciaValor,
+        semPar,
       } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
@@ -2433,6 +2523,27 @@ class NFEController {
               AND nfe.id != n2.id
               AND nfe.endereco = n2.endereco
               AND nfe.endereco IS NOT NULL
+          )`);
+        }
+        if (semPar === "entrada_sem_saida") {
+          query.andWhere("nfe.tipo_operacao = :tipEnt", {
+            tipEnt: "entrada_comodato",
+          });
+          query.andWhere(`NOT EXISTS (
+            SELECT 1 FROM nfe n2
+            WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
+              AND n2.tipo_operacao = 'saida_comodato'
+              AND n2.status = 'autorizado'
+          )`);
+        } else if (semPar === "saida_sem_entrada") {
+          query.andWhere("nfe.tipo_operacao = :tipSai", {
+            tipSai: "saida_comodato",
+          });
+          query.andWhere(`NOT EXISTS (
+            SELECT 1 FROM nfe n2
+            WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
+              AND n2.tipo_operacao = 'entrada_comodato'
+              AND n2.status = 'autorizado'
           )`);
         }
       }
@@ -2538,6 +2649,7 @@ class NFEController {
         ambiente,
         tipo_operacao,
         inconsistenciaValor,
+        semPar,
       } = req.body;
       const nfeRepository = AppDataSource.getRepository(NFE);
 
@@ -2595,6 +2707,27 @@ class NFEController {
               AND nfe.id != n2.id
               AND nfe.endereco = n2.endereco
               AND nfe.endereco IS NOT NULL
+          )`);
+        }
+        if (semPar === "entrada_sem_saida") {
+          query.andWhere("nfe.tipo_operacao = :tipEnt", {
+            tipEnt: "entrada_comodato",
+          });
+          query.andWhere(`NOT EXISTS (
+            SELECT 1 FROM nfe n2
+            WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
+              AND n2.tipo_operacao = 'saida_comodato'
+              AND n2.status = 'autorizado'
+          )`);
+        } else if (semPar === "saida_sem_entrada") {
+          query.andWhere("nfe.tipo_operacao = :tipSai", {
+            tipSai: "saida_comodato",
+          });
+          query.andWhere(`NOT EXISTS (
+            SELECT 1 FROM nfe n2
+            WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
+              AND n2.tipo_operacao = 'entrada_comodato'
+              AND n2.status = 'autorizado'
           )`);
         }
       }

@@ -19,6 +19,7 @@ export const BuscarNfe = () => {
     useState<string>(""); // "", "sim", "nao"
   const [inconsistenciaValor, setInconsistenciaValor] =
     useState<boolean>(false);
+  const [semPar, setSemPar] = useState<string>(""); // "" | "entrada_sem_saida" | "saida_sem_entrada"
   const [dateFilter, setDateFilter] = useState<{
     start: string;
     end: string;
@@ -64,6 +65,7 @@ export const BuscarNfe = () => {
           tipo_operacao: tipoOperacao,
           equipamentoPerdido: equipamentoPerdidoFilter,
           inconsistenciaValor: inconsistenciaValor,
+          semPar: semPar || undefined,
           page: pageToFetch,
           limit: limit,
         },
@@ -193,6 +195,7 @@ export const BuscarNfe = () => {
         inconsistenciaValor: selectAllMatching
           ? inconsistenciaValor
           : undefined,
+        semPar: selectAllMatching ? semPar || undefined : undefined,
         dateFilter: selectAllMatching ? dateFilter : undefined,
       };
 
@@ -251,6 +254,7 @@ export const BuscarNfe = () => {
         inconsistenciaValor: selectAllMatching
           ? inconsistenciaValor
           : undefined,
+        semPar: selectAllMatching ? semPar || undefined : undefined,
         dateFilter: selectAllMatching ? dateFilter : undefined,
         equipamentoPerdido: devolucaoEquipamentoPerdido,
         observacao: devolucaoEquipamentoPerdido
@@ -312,6 +316,7 @@ export const BuscarNfe = () => {
           inconsistenciaValor: selectAllMatching
             ? inconsistenciaValor
             : undefined,
+          semPar: selectAllMatching ? semPar || undefined : undefined,
           dateFilter: dateFilter,
 
           dataInicio: dateFilter?.start
@@ -365,6 +370,7 @@ export const BuscarNfe = () => {
           inconsistenciaValor: selectAllMatching
             ? inconsistenciaValor
             : undefined,
+          semPar: selectAllMatching ? semPar || undefined : undefined,
           dateFilter: dateFilter,
           dataInicio: dateFilter?.start
             ? new Date(dateFilter.start).toLocaleDateString("pt-BR")
@@ -414,6 +420,7 @@ export const BuscarNfe = () => {
           inconsistenciaValor: selectAllMatching
             ? inconsistenciaValor
             : undefined,
+          semPar: selectAllMatching ? semPar || undefined : undefined,
           dateFilter: selectAllMatching ? dateFilter : undefined,
         },
         {
@@ -692,6 +699,31 @@ export const BuscarNfe = () => {
                     >
                       Inconsistências de Valor
                     </label>
+                  </div>
+                )}
+                {user?.permission! >= 5 && (
+                  <div className="col-span-1">
+                    <label
+                      htmlFor="semPar"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Notas Sem Par
+                    </label>
+                    <select
+                      id="semPar"
+                      name="semPar"
+                      value={semPar}
+                      onChange={(e) => setSemPar(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    >
+                      <option value="">Todos</option>
+                      <option value="entrada_sem_saida">
+                        Entrada sem Saída
+                      </option>
+                      <option value="saida_sem_entrada">
+                        Saída sem Entrada
+                      </option>
+                    </select>
                   </div>
                 )}
                 <div className="col-span-2 flex items-end space-x-2">
