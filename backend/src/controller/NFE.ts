@@ -220,21 +220,27 @@ class NFEController {
           query.andWhere("nfe.tipo_operacao = :tipEnt", {
             tipEnt: "entrada_comodato",
           });
+          query.andWhere("nfe.status = 'autorizado'");
           query.andWhere(`NOT EXISTS (
             SELECT 1 FROM nfe n2
             WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
               AND n2.tipo_operacao = 'saida_comodato'
               AND n2.status = 'autorizado'
+              AND n2.endereco = nfe.endereco
+              AND n2.endereco IS NOT NULL
           )`);
         } else if (semPar === "saida_sem_entrada") {
           query.andWhere("nfe.tipo_operacao = :tipSai", {
             tipSai: "saida_comodato",
           });
+          query.andWhere("nfe.status = 'autorizado'");
           query.andWhere(`NOT EXISTS (
             SELECT 1 FROM nfe n2
             WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
               AND n2.tipo_operacao = 'entrada_comodato'
               AND n2.status = 'autorizado'
+              AND n2.endereco = nfe.endereco
+              AND n2.endereco IS NOT NULL
           )`);
         }
       }
@@ -1618,21 +1624,27 @@ class NFEController {
           query.andWhere("nfe.tipo_operacao = :tipEnt", {
             tipEnt: "entrada_comodato",
           });
+          query.andWhere("nfe.status = 'autorizado'");
           query.andWhere(`NOT EXISTS (
             SELECT 1 FROM nfe n2
             WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
               AND n2.tipo_operacao = 'saida_comodato'
               AND n2.status = 'autorizado'
+              AND n2.endereco = nfe.endereco
+              AND n2.endereco IS NOT NULL
           )`);
         } else if (semPar === "saida_sem_entrada") {
           query.andWhere("nfe.tipo_operacao = :tipSai", {
             tipSai: "saida_comodato",
           });
+          query.andWhere("nfe.status = 'autorizado'");
           query.andWhere(`NOT EXISTS (
             SELECT 1 FROM nfe n2
             WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
               AND n2.tipo_operacao = 'entrada_comodato'
               AND n2.status = 'autorizado'
+              AND n2.endereco = nfe.endereco
+              AND n2.endereco IS NOT NULL
           )`);
         }
       }
@@ -1978,21 +1990,27 @@ class NFEController {
         qb.andWhere("nfe.tipo_operacao = :tipEnt", {
           tipEnt: "entrada_comodato",
         });
+        qb.andWhere("nfe.status = 'autorizado'");
         qb.andWhere(`NOT EXISTS (
           SELECT 1 FROM nfe n2
           WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
             AND n2.tipo_operacao = 'saida_comodato'
             AND n2.status = 'autorizado'
+            AND n2.endereco = nfe.endereco
+            AND n2.endereco IS NOT NULL
         )`);
       } else if (semPar === "saida_sem_entrada") {
         qb.andWhere("nfe.tipo_operacao = :tipSai", {
           tipSai: "saida_comodato",
         });
+        qb.andWhere("nfe.status = 'autorizado'");
         qb.andWhere(`NOT EXISTS (
           SELECT 1 FROM nfe n2
           WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
             AND n2.tipo_operacao = 'entrada_comodato'
             AND n2.status = 'autorizado'
+            AND n2.endereco = nfe.endereco
+            AND n2.endereco IS NOT NULL
         )`);
       }
 
@@ -2169,21 +2187,27 @@ class NFEController {
           query.andWhere("nfe.tipo_operacao = :tipEnt", {
             tipEnt: "entrada_comodato",
           });
+          query.andWhere("nfe.status = 'autorizado'");
           query.andWhere(`NOT EXISTS (
             SELECT 1 FROM nfe n2
             WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
               AND n2.tipo_operacao = 'saida_comodato'
               AND n2.status = 'autorizado'
+              AND n2.endereco = nfe.endereco
+              AND n2.endereco IS NOT NULL
           )`);
         } else if (semPar === "saida_sem_entrada") {
           query.andWhere("nfe.tipo_operacao = :tipSai", {
             tipSai: "saida_comodato",
           });
+          query.andWhere("nfe.status = 'autorizado'");
           query.andWhere(`NOT EXISTS (
             SELECT 1 FROM nfe n2
             WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
               AND n2.tipo_operacao = 'entrada_comodato'
               AND n2.status = 'autorizado'
+              AND n2.endereco = nfe.endereco
+              AND n2.endereco IS NOT NULL
           )`);
         }
       }
@@ -2529,21 +2553,27 @@ class NFEController {
           query.andWhere("nfe.tipo_operacao = :tipEnt", {
             tipEnt: "entrada_comodato",
           });
+          query.andWhere("nfe.status = 'autorizado'");
           query.andWhere(`NOT EXISTS (
             SELECT 1 FROM nfe n2
             WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
               AND n2.tipo_operacao = 'saida_comodato'
               AND n2.status = 'autorizado'
+              AND n2.endereco = nfe.endereco
+              AND n2.endereco IS NOT NULL
           )`);
         } else if (semPar === "saida_sem_entrada") {
           query.andWhere("nfe.tipo_operacao = :tipSai", {
             tipSai: "saida_comodato",
           });
+          query.andWhere("nfe.status = 'autorizado'");
           query.andWhere(`NOT EXISTS (
             SELECT 1 FROM nfe n2
             WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
               AND n2.tipo_operacao = 'entrada_comodato'
               AND n2.status = 'autorizado'
+              AND n2.endereco = nfe.endereco
+              AND n2.endereco IS NOT NULL
           )`);
         }
       }
@@ -2713,21 +2743,27 @@ class NFEController {
           query.andWhere("nfe.tipo_operacao = :tipEnt", {
             tipEnt: "entrada_comodato",
           });
+          query.andWhere("nfe.status = 'autorizado'");
           query.andWhere(`NOT EXISTS (
             SELECT 1 FROM nfe n2
             WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
               AND n2.tipo_operacao = 'saida_comodato'
               AND n2.status = 'autorizado'
+              AND n2.endereco = nfe.endereco
+              AND n2.endereco IS NOT NULL
           )`);
         } else if (semPar === "saida_sem_entrada") {
           query.andWhere("nfe.tipo_operacao = :tipSai", {
             tipSai: "saida_comodato",
           });
+          query.andWhere("nfe.status = 'autorizado'");
           query.andWhere(`NOT EXISTS (
             SELECT 1 FROM nfe n2
             WHERE n2.destinatario_cpf_cnpj = nfe.destinatario_cpf_cnpj
               AND n2.tipo_operacao = 'entrada_comodato'
               AND n2.status = 'autorizado'
+              AND n2.endereco = nfe.endereco
+              AND n2.endereco IS NOT NULL
           )`);
         }
       }
