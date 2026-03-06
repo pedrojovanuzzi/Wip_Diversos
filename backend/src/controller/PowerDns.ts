@@ -1,5 +1,9 @@
 import { Request, Response } from "express";
-import { extrairDominios, inserirDominios } from "../utils/createDns";
+import {
+  extrairDominios,
+  inserirDominios,
+  listarDominios,
+} from "../utils/createDns";
 import path from "path";
 
 const PATH = path.join(__dirname, "..", "..", "uploads", "DnsPdf.pdf");
@@ -34,6 +38,16 @@ class PowerDNS {
     const dominiosExtraidos = await extrairDominios(PATH);
     const response = await inserirDominios(dominiosExtraidos);
     res.status(200).json({ message: response });
+  }
+
+  public async obterDominios(req: Request, res: Response): Promise<void> {
+    try {
+      const dominios = await listarDominios();
+      res.status(200).json({ dominios });
+    } catch (error) {
+      console.error("Erro ao listar domínios:", error);
+      res.status(500).json({ error: "Erro interno ao listar os domínios." });
+    }
   }
 }
 

@@ -60,7 +60,7 @@ const PADRAO_DOMINIO = /\b(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b/g;
 // Função que extrai domínios de arquivos
 // =========================================
 export async function extrairDominios(
-  caminhoArquivo: string
+  caminhoArquivo: string,
 ): Promise<string[]> {
   // pega a extensão do arquivo
   const extensao = path.extname(caminhoArquivo).toLowerCase();
@@ -96,7 +96,7 @@ export async function extrairDominios(
 
   // normaliza: minúsculas, remove pontos extras e adiciona ponto final
   const normalizados = new Set(
-    dominios.map((d) => d.toLowerCase().replace(/\.+$/, "") + ".")
+    dominios.map((d) => d.toLowerCase().replace(/\.+$/, "") + "."),
   );
 
   return Array.from(normalizados).sort();
@@ -143,6 +143,29 @@ export async function inserirDominios(dominios: string[]) {
     return resumo; // aqui sim retorna string
   } catch (e) {
     console.error("❌ Falha ao inserir domínios:", e);
+    throw e;
+  } finally {
+    await client.end();
+  }
+}
+
+// ======================================
+// Listagem de Domínios
+// ======================================
+export async function listarDominios(): Promise<string[]> {
+  await ensureTable();
+
+  const client = getClient();
+  await client.connect();
+
+  try {
+    const sql = `SELECT domain FROM ${TABLE_NAME} ORDER BY domain ASC`;
+    const res = await client.query(sql);
+
+    // Retorna apenas um array de strings com os nomes dos domínios
+    return res.rows.map((row) => row.domain);
+  } catch (e) {
+    console.error("❌ Falha ao listar domínios:", e);
     throw e;
   } finally {
     await client.end();

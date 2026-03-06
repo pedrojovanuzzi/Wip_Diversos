@@ -33,5 +33,6 @@ router.post(
   AuthGuard,
   powerdns.inserirDominio.bind(powerdns),
 );
+router.get("/obterDominios", AuthGuard, powerdns.obterDominios.bind(powerdns));
 
 export default router;

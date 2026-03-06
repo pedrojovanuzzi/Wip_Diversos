@@ -8,12 +8,15 @@ export const PowerDns = () => {
   const { user } = useAuth();
   const token = user?.token;
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error" | "">("");
   const [dominioText, setDominioText] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   async function handleFile(file: File) {
     const formData = new FormData();
     formData.append("file", file);
+    setMessage("");
+    setMessageType("");
 
     try {
       const response = await axios.post(
@@ -29,15 +32,19 @@ export const PowerDns = () => {
       );
       console.log("✅ Enviado:", response.data);
       setMessage(response.data.message);
-    } catch (error) {
+      setMessageType("success");
+    } catch (error: any) {
       console.error("❌ Erro:", error);
-      setMessage("Erro ao processar o arquivo.");
+      setMessage(error.response?.data?.error || "Erro ao processar o arquivo.");
+      setMessageType("error");
     }
   }
 
   async function handleDomainSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!dominioText.trim()) return;
+    setMessage("");
+    setMessageType("");
 
     try {
       const response = await axios.post(
@@ -53,10 +60,61 @@ export const PowerDns = () => {
       );
       console.log("✅ Domínio inserido:", response.data);
       setMessage(response.data.message);
+      setMessageType("success");
       setDominioText(""); // Limpa o campo após sucesso
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Erro:", error);
-      setMessage("Erro ao inserir domínio.");
+      setMessage(error.response?.data?.error || "Erro ao inserir domínio.");
+      setMessageType("error");
+    }
+  }
+
+  async function handleDownloadDominios() {
+    setMessage("");
+    setMessageType("");
+
+    try {
+      const response = await axios.get(
+        `${process.env.REACT_APP_URL}/PowerDns/obterDominios`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          timeout: 60000,
+        },
+      );
+
+      const dominios: string[] = response.data.dominios;
+
+      if (!dominios || dominios.length === 0) {
+        setMessage("Nenhum domínio cadastrado no banco de dados.");
+        setMessageType("error");
+        return;
+      }
+
+      // Converte o array em string separando por quebra de linha
+      const textContent = dominios.join("\n");
+      const blob = new Blob([textContent], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "dominios_powerdns.txt";
+      document.body.appendChild(link);
+      link.click();
+
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setMessage("Download da lista de domínios realizado com sucesso.");
+      setMessageType("success");
+    } catch (error: any) {
+      console.error("❌ Erro ao baixar domínios:", error);
+      setMessage(
+        error.response?.data?.error ||
+          "Erro ao baixar os domínios do banco de dados.",
+      );
+      setMessageType("error");
     }
   }
 
@@ -112,9 +170,30 @@ export const PowerDns = () => {
           </form>
         </div>
 
+        {/* Baixar lista de domínios cadastrados */}
+        <div className="bg-white p-6 rounded-lg shadow-md flex flex-col items-center w-full max-w-md">
+          <h2 className="text-lg font-semibold mb-4 text-gray-700">
+            Baixar Lista de Domínios
+          </h2>
+          <button
+            onClick={handleDownloadDominios}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors w-full"
+          >
+            Baixar Lista de Domínios (.txt)
+          </button>
+        </div>
+
         {/* Mensagem de Feedback */}
         {message && (
-          <div className="p-4 bg-blue-100 text-blue-800 rounded-md shadow mt-4 text-center max-w-md w-full whitespace-pre-line">
+          <div
+            className={`p-4 rounded-md shadow mt-4 text-center max-w-md w-full whitespace-pre-line ${
+              messageType === "success"
+                ? "bg-green-100 text-green-800"
+                : messageType === "error"
+                  ? "bg-red-100 text-red-800"
+                  : "bg-blue-100 text-blue-800"
+            }`}
+          >
             {message}
           </div>
         )}
