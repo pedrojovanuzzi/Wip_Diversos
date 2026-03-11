@@ -832,10 +832,10 @@ class Nfcom {
     return;
   }
 
-  private buildWhereConditions(
+  private buildWhereConditions = (
     searchParams: any,
     excludedIds?: any[],
-  ): FindOptionsWhere<NFCom> {
+  ): FindOptionsWhere<NFCom> => {
     const whereConditions: FindOptionsWhere<NFCom> = {
       fatura_id: searchParams.titulo ? Number(searchParams.titulo) : undefined,
       pppoe: searchParams.pppoe || undefined,
@@ -865,9 +865,9 @@ class Nfcom {
     }
 
     return whereConditions;
-  }
+  };
 
-  public async buscarNFCom(req: Request, res: Response) {
+  public buscarNFCom = async (req: Request, res: Response) => {
     try {
       const { searchParams, excludedIds, pagination } = req.body;
       const whereConditions = this.buildWhereConditions(
@@ -895,9 +895,9 @@ class Nfcom {
       console.error("Erro ao buscar NFCom:", error);
       res.status(500).json({ error: "Erro ao buscar NFCom" });
     }
-  }
+  };
 
-  public async buscarNFComAll(req: Request, res: Response) {
+  public buscarNFComAll = async (req: Request, res: Response) => {
     try {
       const { searchParams, excludedIds } = req.body;
       const whereConditions = this.buildWhereConditions(
@@ -915,9 +915,9 @@ class Nfcom {
       console.error("Erro ao buscar NFCom:", error);
       res.status(500).json({ error: "Erro ao buscar NFCom" });
     }
-  }
+  };
 
-  public async NFComPages(req: Request, res: Response) {
+  public NFComPages = async (req: Request, res: Response) => {
     try {
       const { searchParams, excludedIds } = req.body;
       const whereConditions = this.buildWhereConditions(
@@ -937,7 +937,7 @@ class Nfcom {
       console.error("Erro ao buscar NFCom:", error);
       res.status(500).json({ error: "Erro ao buscar NFCom" });
     }
-  }
+  };
 
   private cleanXml(xml: string): string {
     return xml
