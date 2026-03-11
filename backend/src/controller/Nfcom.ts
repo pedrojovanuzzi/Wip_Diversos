@@ -832,79 +832,63 @@ class Nfcom {
     return;
   }
 
+  private buildWhereConditions(
+    searchParams: any,
+    excludedIds?: any[],
+  ): FindOptionsWhere<NFCom> {
+    const whereConditions: FindOptionsWhere<NFCom> = {
+      fatura_id: searchParams.titulo ? Number(searchParams.titulo) : undefined,
+      pppoe: searchParams.pppoe || undefined,
+      tpAmb: searchParams.tpAmb || undefined,
+      serie: searchParams.serie || undefined,
+      status: searchParams.status || undefined,
+      tipo: searchParams.clientType || undefined,
+      cpf_cnpj: searchParams.cpf_cnpj || undefined,
+    };
+
+    if (searchParams.dataInicio && searchParams.dataFim) {
+      const dataInicio = new Date(`${searchParams.dataInicio}T00:00:00`);
+      const dataFim = new Date(`${searchParams.dataFim}T23:59:59`);
+      whereConditions.data_emissao = Between(dataInicio, dataFim);
+    } else if (searchParams.data) {
+      const dataStringLocalInicio = `${searchParams.data}T00:00:00`;
+      const dataInicio = new Date(dataStringLocalInicio);
+
+      const dataFimLimite = new Date(dataInicio);
+      dataFimLimite.setDate(dataFimLimite.getDate() + 1);
+
+      whereConditions.data_emissao = Between(dataInicio, dataFimLimite);
+    }
+
+    if (excludedIds && excludedIds.length > 0) {
+      whereConditions.nNF = Not(In(excludedIds));
+    }
+
+    return whereConditions;
+  }
+
   public async buscarNFCom(req: Request, res: Response) {
     try {
       const { searchParams, excludedIds, pagination } = req.body;
-      console.log(searchParams);
-      console.log(excludedIds);
-      type NFComWhere = FindOptionsWhere<NFCom>;
-      // 1. Inicia o objeto WHERE com os filtros obrigatórios
-      const whereConditions: NFComWhere = {
-        // Garante que 'titulo' (ID da fatura) seja tratado como número, se for o caso
-        fatura_id: searchParams.titulo
-          ? Number(searchParams.titulo)
-          : undefined,
-        pppoe: searchParams.pppoe || undefined, // Evita buscar por pppoe vazio se não fornecido
-        tpAmb: searchParams.tpAmb || undefined,
-        serie: searchParams.serie || undefined,
-        status: searchParams.status || undefined,
-        tipo: searchParams.clientType || undefined,
-        cpf_cnpj: searchParams.cpf_cnpj || undefined,
-      };
-
-      console.log(whereConditions);
-
-      // 2. Adiciona o filtro de data
-      if (searchParams.dataInicio && searchParams.dataFim) {
-        const dataInicio = new Date(`${searchParams.dataInicio}T00:00:00`);
-        const dataFim = new Date(`${searchParams.dataFim}T23:59:59`);
-
-        whereConditions.data_emissao = Between(dataInicio, dataFim);
-      } else if (searchParams.data) {
-        // Lógica CORRETA para buscar o dia inteiro, ignorando o problema do fuso
-
-        // Define o início do dia no fuso horário local (ex: 2025-11-29T00:00:00 local)
-        const dataStringLocalInicio = `${searchParams.data}T00:00:00`;
-        const dataInicio = new Date(dataStringLocalInicio);
-
-        // Define o limite superior como o INÍCIO do dia seguinte (ex: 2025-11-30T00:00:00 local)
-        const dataFimLimite = new Date(dataInicio);
-        dataFimLimite.setDate(dataFimLimite.getDate() + 1);
-        // setHours(0, 0, 0, 0) não é necessário aqui, pois já está no início do dia.
-
-        // Adiciona a condição BETWEEN usando o formato ISO string (recomendado pelo TypeORM)
-        // WHERE data_emissao >= dataInicio AND data_emissao < dataFimLimite
-        whereConditions.data_emissao = Between(
-          dataInicio, // Type Date (correto!)
-          dataFimLimite, // Type Date (correto!)
-        );
-      }
-
-      if (excludedIds) {
-        whereConditions.nNF = Not(In(excludedIds));
-      }
+      const whereConditions = this.buildWhereConditions(
+        searchParams,
+        excludedIds,
+      );
 
       const pageNumber = Number(pagination.page);
 
-      console.log(pageNumber);
-
-      // Verifica se o número da página é válido e calcula o 'skip'
       if (pageNumber > 0) {
-        // CORREÇÃO: (Página Atual - 1) * Itens por página
         pagination.skip = (pageNumber - 1) * pagination.take;
       } else {
-        pagination.skip = 0; // Se for página 0 ou inválida, começa do zero
+        pagination.skip = 0;
       }
 
-      // 3. Executa a busca com as condições montadas
       const NFComRepository = DataSource.getRepository(NFCom);
       const nfcom = await NFComRepository.find({
         where: whereConditions,
         skip: pagination.skip,
         take: pagination.take,
       });
-
-      // Se precisar de mais detalhes, considere adicionar .relations, .order, etc.
 
       res.status(200).json(nfcom);
     } catch (error) {
@@ -915,63 +899,16 @@ class Nfcom {
 
   public async buscarNFComAll(req: Request, res: Response) {
     try {
-      const { searchParams, excludedIds, pagination } = req.body;
-      console.log(searchParams);
-      console.log(excludedIds);
-      type NFComWhere = FindOptionsWhere<NFCom>;
-      // 1. Inicia o objeto WHERE com os filtros obrigatórios
-      const whereConditions: NFComWhere = {
-        // Garante que 'titulo' (ID da fatura) seja tratado como número, se for o caso
-        fatura_id: searchParams.titulo
-          ? Number(searchParams.titulo)
-          : undefined,
-        pppoe: searchParams.pppoe || undefined, // Evita buscar por pppoe vazio se não fornecido
-        tpAmb: searchParams.tpAmb || undefined,
-        serie: searchParams.serie || undefined,
-        status: searchParams.status || undefined,
-        tipo: searchParams.clientType || undefined,
-        cpf_cnpj: searchParams.cpf_cnpj || undefined,
-      };
+      const { searchParams, excludedIds } = req.body;
+      const whereConditions = this.buildWhereConditions(
+        searchParams,
+        excludedIds,
+      );
 
-      console.log(whereConditions);
-
-      // 2. Adiciona o filtro de data
-      if (searchParams.dataInicio && searchParams.dataFim) {
-        const dataInicio = new Date(`${searchParams.dataInicio}T00:00:00`);
-        const dataFim = new Date(`${searchParams.dataFim}T23:59:59`);
-
-        whereConditions.data_emissao = Between(dataInicio, dataFim);
-      } else if (searchParams.data) {
-        // Lógica CORRETA para buscar o dia inteiro, ignorando o problema do fuso
-
-        // Define o início do dia no fuso horário local (ex: 2025-11-29T00:00:00 local)
-        const dataStringLocalInicio = `${searchParams.data}T00:00:00`;
-        const dataInicio = new Date(dataStringLocalInicio);
-
-        // Define o limite superior como o INÍCIO do dia seguinte (ex: 2025-11-30T00:00:00 local)
-        const dataFimLimite = new Date(dataInicio);
-        dataFimLimite.setDate(dataFimLimite.getDate() + 1);
-        // setHours(0, 0, 0, 0) não é necessário aqui, pois já está no início do dia.
-
-        // Adiciona a condição BETWEEN usando o formato ISO string (recomendado pelo TypeORM)
-        // WHERE data_emissao >= dataInicio AND data_emissao < dataFimLimite
-        whereConditions.data_emissao = Between(
-          dataInicio, // Type Date (correto!)
-          dataFimLimite, // Type Date (correto!)
-        );
-      }
-
-      if (excludedIds) {
-        whereConditions.nNF = Not(In(excludedIds));
-      }
-
-      // 3. Executa a busca com as condições montadas
       const NFComRepository = DataSource.getRepository(NFCom);
       const nfcom = await NFComRepository.find({
         where: whereConditions,
       });
-
-      // Se precisar de mais detalhes, considere adicionar .relations, .order, etc.
 
       res.status(200).json(nfcom);
     } catch (error) {
@@ -982,29 +919,18 @@ class Nfcom {
 
   public async NFComPages(req: Request, res: Response) {
     try {
-      const { searchParams } = req.body;
-      type NFComWhere = FindOptionsWhere<NFCom>;
+      const { searchParams, excludedIds } = req.body;
+      const whereConditions = this.buildWhereConditions(
+        searchParams,
+        excludedIds,
+      );
 
-      const whereConditions: NFComWhere = {
-        // Garante que 'titulo' (ID da fatura) seja tratado como número, se for o caso
-        fatura_id: searchParams.titulo
-          ? Number(searchParams.titulo)
-          : undefined,
-        pppoe: searchParams.pppoe || undefined, // Evita buscar por pppoe vazio se não fornecido
-        tpAmb: searchParams.tpAmb || undefined,
-        serie: searchParams.serie || undefined,
-        status: searchParams.status || undefined,
-        tipo: searchParams.clientType || undefined,
-        cpf_cnpj: searchParams.cpf_cnpj || undefined,
-      };
-      // 3. Executa a busca com as condições montadas
       const NFComRepository = DataSource.getRepository(NFCom);
-      const nfcom = await NFComRepository.find({
+      const count = await NFComRepository.count({
         where: whereConditions,
       });
 
-      // Se precisar de mais detalhes, considere adicionar .relations, .order, etc.
-      const pages = Math.ceil(nfcom.length / 50);
+      const pages = Math.ceil(count / 50);
 
       res.status(200).json(pages);
     } catch (error) {
