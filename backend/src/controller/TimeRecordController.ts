@@ -7,6 +7,7 @@ import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { Between } from "typeorm";
 import Holidays from "date-holidays";
+import { DailyOvertime } from "../entities/DailyOvertime";
 
 class TimeRecordController {
   private timeRepo = AppDataSource.getRepository(TimeRecord);
@@ -177,8 +178,7 @@ class TimeRecordController {
 
         const isSundayOrHoliday = this.isHoliday(date);
 
-        const dailyOvertimeRepo = AppDataSource.getRepository("DailyOvertime"); // Use string if entity not imported directly/circular
-        // But we can import DailyOvertime. Importing at top.
+        const dailyOvertimeRepo = AppDataSource.getRepository(DailyOvertime);
 
         // Check if exists update
         // Fix for date shift: avoid toISOString() which uses UTC. Use local date.
@@ -187,14 +187,12 @@ class TimeRecordController {
         const day = String(date.getDate()).padStart(2, "0");
         const dateStr = `${year}-${month}-${day}`;
 
-        let overtimeEntry = await AppDataSource.getRepository(
-          "DailyOvertime",
-        ).findOne({
+        let overtimeEntry = await dailyOvertimeRepo.findOne({
           where: { employeeId, date: dateStr },
         });
 
         if (!overtimeEntry) {
-          overtimeEntry = AppDataSource.getRepository("DailyOvertime").create({
+          overtimeEntry = dailyOvertimeRepo.create({
             employeeId,
             date: dateStr,
           });
@@ -208,7 +206,7 @@ class TimeRecordController {
           overtimeEntry.hours100 = 0;
         }
 
-        await AppDataSource.getRepository("DailyOvertime").save(overtimeEntry);
+        await dailyOvertimeRepo.save(overtimeEntry);
         console.log(
           `Overtime saved for ${employeeId}: ${extraHoursFormatted.toFixed(
             2,
