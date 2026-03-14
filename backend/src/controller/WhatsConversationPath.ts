@@ -208,9 +208,8 @@ class WhatsPixController {
       }
 
       // console.log(JSON.stringify(body, null, 2));
-
       if (!body.entry) {
-        res.status(200);
+        res.status(200).send("Sem entry no body");
         return;
       }
 
