@@ -7,7 +7,7 @@ const router: Router = Router();
 router.post("/", Whatsapp.index);
 router.get("/", Whatsapp.verify);
 
-router.post("/test", Whatsapp.index);
-router.get("/test", Whatsapp.verify);
+// router.post("/test", Whatsapp.index);
+// router.get("/test", Whatsapp.verify);
 
 export default router;
