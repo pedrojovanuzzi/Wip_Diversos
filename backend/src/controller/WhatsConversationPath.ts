@@ -233,7 +233,6 @@ class WhatsPixController {
           console.log(body.entry[0].id);
 
           console.log("Webhook recebido, mas não é do sandbox");
-          res.status(200);
           return;
         }
 
