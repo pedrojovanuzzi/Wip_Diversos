@@ -185,35 +185,39 @@ class WhatsPixController {
     console.log("Webhook recebido");
     console.log(req.body);
 
-    try {
-      const [insertPeople] = await findOrCreate(
-        ApiMkDataSource.getRepository(PeopleConversation),
-        {
-          where: { telefone: process.env.SENDER_NUMBER },
-          defaults: { nome: "Você", telefone: process.env.SENDER_NUMBER },
-        },
-      );
+    let body = req.body;
+    if (body.reqbody) {
+      body = body.reqbody;
+    }
 
-      const [insertConversation] = await findOrCreate(
-        ApiMkDataSource.getRepository(Conversations),
-        {
-          where: { id: conversation.receiver_id },
-          defaults: { nome: "Você" },
-        },
-      );
+    if (!body.entry) {
+      res.status(200).send("Sem entry no body");
+      return;
+    }
 
-      let body = req.body;
-      if (body.reqbody) {
-        body = body.reqbody;
-      }
+    // Retorna 200 OK imediatamente para evitar Erro 522 de Timeout no Cloudflare!
+    res.status(200).send("EVENT_RECEIVED");
 
-      // console.log(JSON.stringify(body, null, 2));
-      if (!body.entry) {
-        res.status(200).send("Sem entry no body");
-        return;
-      }
+    // Inicia processamento em background (Async)
+    (async () => {
+      try {
+        const [insertPeople] = await findOrCreate(
+          ApiMkDataSource.getRepository(PeopleConversation),
+          {
+            where: { telefone: process.env.SENDER_NUMBER },
+            defaults: { nome: "Você", telefone: process.env.SENDER_NUMBER },
+          },
+        );
 
-      if (body.entry) {
+        const [insertConversation] = await findOrCreate(
+          ApiMkDataSource.getRepository(Conversations),
+          {
+            where: { id: conversation.receiver_id },
+            defaults: { nome: "Você" },
+          },
+        );
+
+        if (body.entry) {
         for (const entry of body.entry) {
           if (entry.changes) {
             for (const change of entry.changes) {
@@ -341,14 +345,11 @@ class WhatsPixController {
             }
           }
         }
-        res.status(200).send("EVENT_RECEIVED");
-      } else {
-        res.sendStatus(404);
       }
     } catch (error) {
-      console.error("Erro ao processar o webhook:", error);
-      res.status(500).send("Erro interno do servidor");
+      console.error("Erro interno ao processar webhook de forma assíncrona:", error);
     }
+    })();
   }
 
   getActiveSessionsCount() {
