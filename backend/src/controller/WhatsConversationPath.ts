@@ -230,6 +230,8 @@ class WhatsPixController {
                     continue; // Pula para a próxima mensagem
                   }
 
+                  console.log(message);
+
                   this.processedMessages.add(messageId);
                   // Remove o ID do conjunto após 2 minutos para liberar memória
                   setTimeout(
@@ -921,8 +923,8 @@ class WhatsPixController {
                       .trim()
                       .slice(0, 1)
                       .toUpperCase()}${session.dadosCompleto.cidade
-                      .trim()
-                      .slice(1)}`,
+                        .trim()
+                        .slice(1)}`,
                     bairro: session.dadosCompleto.bairro.toUpperCase().trim(),
                     estado: (session.dadosCompleto.estado || "")
                       .toUpperCase()
@@ -940,9 +942,9 @@ class WhatsPixController {
                       .trim()
                       .replace(/\s/g, "")
                       .slice(0, 5)}-${session.dadosCompleto.cep
-                      .trim()
-                      .replace(/\s/g, "")
-                      .slice(5)}`,
+                        .trim()
+                        .replace(/\s/g, "")
+                        .slice(5)}`,
                     plano: session.planoEscolhido,
                     fone: "(14)3296-1608",
                     venc: (session.vencimentoEscolhido || "")
@@ -969,15 +971,15 @@ class WhatsPixController {
                       .trim()
                       .slice(0, 1)
                       .toUpperCase()}${session.dadosCompleto.cidade
-                      .trim()
-                      .slice(1)}`,
+                        .trim()
+                        .slice(1)}`,
                     cep_res: `${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
                       .slice(0, 5)}-${session.dadosCompleto.cep
-                      .trim()
-                      .replace(/\s/g, "")
-                      .slice(5)}`,
+                        .trim()
+                        .replace(/\s/g, "")
+                        .slice(5)}`,
                     numero_res: session.dadosCompleto.numero
                       .trim()
                       .replace(/\s/g, ""),
@@ -1921,7 +1923,7 @@ class WhatsPixController {
             this.deleteSession(celular);
             console.log(
               "Clientes Utilizando o Bot no momento: " +
-                this.getActiveSessionsCount(),
+              this.getActiveSessionsCount(),
             );
           } else {
             await this.MensagensComuns(
