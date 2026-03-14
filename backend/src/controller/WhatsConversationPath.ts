@@ -226,6 +226,16 @@ class WhatsPixController {
       }
 
       if (body.entry) {
+        if (
+          body.entry[0].id === process.env.WHATS_BUSSINES_TESTID &&
+          !isSandbox
+        ) {
+          console.log(body.entry[0].id);
+
+          console.log("Webhook recebido, mas não é do sandbox");
+          return;
+        }
+
         for (const entry of body.entry) {
           if (entry.changes) {
             for (const change of entry.changes) {
