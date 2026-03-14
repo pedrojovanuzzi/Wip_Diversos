@@ -193,6 +193,9 @@ class WhatsPixController {
     console.log("Webhook recebido");
     console.log(req.body);
 
+    console.log(url);
+    console.log(token);
+
     try {
       const [insertPeople] = await findOrCreate(
         ApiMkDataSource.getRepository(PeopleConversation),
