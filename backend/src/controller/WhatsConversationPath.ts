@@ -28,7 +28,6 @@ import moment from "moment-timezone";
 dotenv.config();
 
 const logFilePath = path.join(__dirname, "log.json");
-const logMsgFilePath = path.join(__dirname, "msg.json");
 
 const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
 const urlMedia = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
@@ -320,53 +319,7 @@ class WhatsPixController {
                       continue;
                     }
 
-                    fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-                      let logs = [];
-                      if (err && err.code === "ENOENT") {
-                        console.log(
-                          "Arquivo de log não encontrado, criando um novo.",
-                        );
-                      } else if (err) {
-                        console.error("Erro ao ler o arquivo de log:", err);
-                        return;
-                      } else {
-                        try {
-                          logs = JSON.parse(data);
-                          if (!Array.isArray(logs)) {
-                            logs = [];
-                          }
-                        } catch (parseErr) {
-                          console.error(
-                            "Erro ao analisar o arquivo de log:",
-                            parseErr,
-                          );
-                          logs = [];
-                        }
-                      }
 
-                      const log = {
-                        messages: [message],
-                        timestamp: new Date().toISOString(),
-                      };
-
-                      logs.push(log);
-
-                      const jsonString = JSON.stringify(logs, null, 2);
-
-                      fs.writeFile(
-                        logMsgFilePath,
-                        jsonString,
-                        "utf8",
-                        (err) => {
-                          if (err) {
-                            console.error(
-                              "Erro ao escrever no arquivo de log:",
-                              err,
-                            );
-                          }
-                        },
-                      );
-                    });
 
                     this.handleMessage(
                       session,
@@ -757,50 +710,7 @@ class WhatsPixController {
                     : "Dados não encontrados";
                   session.msgDadosFinais = `*🏠 Mudança de Endereço* \n\n*💰 Forma: Paga com ${pagamento}*\nDados do Cliente: ${dadosCliente}`;
 
-                  fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-                    let logs = [];
-                    if (err && err.code === "ENOENT") {
-                      console.log(
-                        "Arquivo de log não encontrado, criando um novo.",
-                      );
-                    } else if (err) {
-                      console.error("Erro ao ler o arquivo de log:", err);
-                      return;
-                    } else {
-                      try {
-                        logs = JSON.parse(data);
-                        if (!Array.isArray(logs)) {
-                          logs = [];
-                        }
-                      } catch (parseErr) {
-                        console.error(
-                          "Erro ao analisar o arquivo de log:",
-                          parseErr,
-                        );
-                        logs = [];
-                      }
-                    }
 
-                    const log = {
-                      messages: session.msgDadosFinais,
-                      timestamp: new Date().toISOString(),
-                    };
-
-                    logs.push(log);
-
-                    const jsonString = JSON.stringify(logs, null, 2);
-
-                    fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                      if (err) {
-                        console.error(
-                          "Erro ao escrever no arquivo de log:",
-                          err,
-                        );
-                        return;
-                      }
-                      console.log("Log atualizado com sucesso!");
-                    });
-                  });
 
                   mailOptions(session.msgDadosFinais);
                   await this.MensagemBotao(
@@ -821,50 +731,7 @@ class WhatsPixController {
                     : "Dados não encontrados";
                   session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*💰 Forma: Paga com ${pagamento}*\nDados do Cliente: ${dadosCliente}`;
 
-                  fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-                    let logs = [];
-                    if (err && err.code === "ENOENT") {
-                      console.log(
-                        "Arquivo de log não encontrado, criando um novo.",
-                      );
-                    } else if (err) {
-                      console.error("Erro ao ler o arquivo de log:", err);
-                      return;
-                    } else {
-                      try {
-                        logs = JSON.parse(data);
-                        if (!Array.isArray(logs)) {
-                          logs = [];
-                        }
-                      } catch (parseErr) {
-                        console.error(
-                          "Erro ao analisar o arquivo de log:",
-                          parseErr,
-                        );
-                        logs = [];
-                      }
-                    }
 
-                    const log = {
-                      messages: session.msgDadosFinais,
-                      timestamp: new Date().toISOString(),
-                    };
-
-                    logs.push(log);
-
-                    const jsonString = JSON.stringify(logs, null, 2);
-
-                    fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                      if (err) {
-                        console.error(
-                          "Erro ao escrever no arquivo de log:",
-                          err,
-                        );
-                        return;
-                      }
-                      console.log("Log atualizado com sucesso!");
-                    });
-                  });
                   mailOptions(session.msgDadosFinais);
                   await this.MensagemBotao(
                     celular,
@@ -1013,47 +880,7 @@ class WhatsPixController {
                   : "Dados não encontrados";
                 session.msgDadosFinais = `*🧑 Instalação Nova* \nPlano Escolhido: ${session.planoEscolhido}\nVencimento: ${session.vencimentoEscolhido}\nDados do Cliente: ${dadosCliente}`;
 
-                fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-                  let logs = [];
-                  if (err && err.code === "ENOENT") {
-                    console.log(
-                      "Arquivo de log não encontrado, criando um novo.",
-                    );
-                  } else if (err) {
-                    console.error("Erro ao ler o arquivo de log:", err);
-                    return;
-                  } else {
-                    try {
-                      logs = JSON.parse(data);
-                      if (!Array.isArray(logs)) {
-                        logs = [];
-                      }
-                    } catch (parseErr) {
-                      console.error(
-                        "Erro ao analisar o arquivo de log:",
-                        parseErr,
-                      );
-                      logs = [];
-                    }
-                  }
 
-                  const log = {
-                    messages: session.msgDadosFinais,
-                    timestamp: new Date().toISOString(),
-                  };
-
-                  logs.push(log);
-
-                  const jsonString = JSON.stringify(logs, null, 2);
-
-                  fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                    if (err) {
-                      console.error("Erro ao escrever no arquivo de log:", err);
-                      return;
-                    }
-                    console.log("Log atualizado com sucesso!");
-                  });
-                });
 
                 mailOptions(session.msgDadosFinais);
 
@@ -1260,50 +1087,7 @@ class WhatsPixController {
                     : "Dados não encontrados";
                   session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*🆓 Forma: Gratis*\nDados do Cliente: ${dadosCliente}`;
 
-                  fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-                    let logs = [];
-                    if (err && err.code === "ENOENT") {
-                      console.log(
-                        "Arquivo de log não encontrado, criando um novo.",
-                      );
-                    } else if (err) {
-                      console.error("Erro ao ler o arquivo de log:", err);
-                      return;
-                    } else {
-                      try {
-                        logs = JSON.parse(data);
-                        if (!Array.isArray(logs)) {
-                          logs = [];
-                        }
-                      } catch (parseErr) {
-                        console.error(
-                          "Erro ao analisar o arquivo de log:",
-                          parseErr,
-                        );
-                        logs = [];
-                      }
-                    }
 
-                    const log = {
-                      messages: session.msgDadosFinais,
-                      timestamp: new Date().toISOString(),
-                    };
-
-                    logs.push(log);
-
-                    const jsonString = JSON.stringify(logs, null, 2);
-
-                    fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                      if (err) {
-                        console.error(
-                          "Erro ao escrever no arquivo de log:",
-                          err,
-                        );
-                        return;
-                      }
-                      console.log("Log atualizado com sucesso!");
-                    });
-                  });
                   mailOptions(session.msgDadosFinais);
                   await this.MensagemBotao(
                     celular,
@@ -1504,47 +1288,7 @@ class WhatsPixController {
                 : "Dados não encontrados";
               session.msgDadosFinais = `*🎭 Troca de Titularidade*\n\nDados do Cliente: ${dadosCliente}`;
 
-              fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-                let logs = [];
-                if (err && err.code === "ENOENT") {
-                  console.log(
-                    "Arquivo de log não encontrado, criando um novo.",
-                  );
-                } else if (err) {
-                  console.error("Erro ao ler o arquivo de log:", err);
-                  return;
-                } else {
-                  try {
-                    logs = JSON.parse(data);
-                    if (!Array.isArray(logs)) {
-                      logs = [];
-                    }
-                  } catch (parseErr) {
-                    console.error(
-                      "Erro ao analisar o arquivo de log:",
-                      parseErr,
-                    );
-                    logs = [];
-                  }
-                }
 
-                const log = {
-                  messages: session.msgDadosFinais,
-                  timestamp: new Date().toISOString(),
-                };
-
-                logs.push(log);
-
-                const jsonString = JSON.stringify(logs, null, 2);
-
-                fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                  if (err) {
-                    console.error("Erro ao escrever no arquivo de log:", err);
-                    return;
-                  }
-                  console.log("Log atualizado com sucesso!");
-                });
-              });
 
               mailOptions(session.msgDadosFinais);
               await this.MensagemBotao(
@@ -1576,42 +1320,7 @@ class WhatsPixController {
               : "Dados não encontrados";
             session.msgDadosFinais = `*🔌 Wifi Estendido 100 Megas* \nDados do Cliente: ${dadosCliente}`;
 
-            fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-              let logs = [];
-              if (err && err.code === "ENOENT") {
-                console.log("Arquivo de log não encontrado, criando um novo.");
-              } else if (err) {
-                console.error("Erro ao ler o arquivo de log:", err);
-                return;
-              } else {
-                try {
-                  logs = JSON.parse(data);
-                  if (!Array.isArray(logs)) {
-                    logs = [];
-                  }
-                } catch (parseErr) {
-                  console.error("Erro ao analisar o arquivo de log:", parseErr);
-                  logs = [];
-                }
-              }
 
-              const log = {
-                messages: session.msgDadosFinais,
-                timestamp: new Date().toISOString(),
-              };
-
-              logs.push(log);
-
-              const jsonString = JSON.stringify(logs, null, 2);
-
-              fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                if (err) {
-                  console.error("Erro ao escrever no arquivo de log:", err);
-                  return;
-                }
-                console.log("Log atualizado com sucesso!");
-              });
-            });
 
             mailOptions(session.msgDadosFinais);
             await this.MensagemBotao(
@@ -1637,42 +1346,7 @@ class WhatsPixController {
               : "Dados não encontrados";
             session.msgDadosFinais = `*🔌 Wifi Estendido 100 Megas* \nDados do Cliente: ${dadosCliente}`;
 
-            fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-              let logs = [];
-              if (err && err.code === "ENOENT") {
-                console.log("Arquivo de log não encontrado, criando um novo.");
-              } else if (err) {
-                console.error("Erro ao ler o arquivo de log:", err);
-                return;
-              } else {
-                try {
-                  logs = JSON.parse(data);
-                  if (!Array.isArray(logs)) {
-                    logs = [];
-                  }
-                } catch (parseErr) {
-                  console.error("Erro ao analisar o arquivo de log:", parseErr);
-                  logs = [];
-                }
-              }
 
-              const log = {
-                messages: session.msgDadosFinais,
-                timestamp: new Date().toISOString(),
-              };
-
-              logs.push(log);
-
-              const jsonString = JSON.stringify(logs, null, 2);
-
-              fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                if (err) {
-                  console.error("Erro ao escrever no arquivo de log:", err);
-                  return;
-                }
-                console.log("Log atualizado com sucesso!");
-              });
-            });
 
             mailOptions(session.msgDadosFinais);
             await this.MensagemBotao(
@@ -1882,42 +1556,7 @@ class WhatsPixController {
               : "Dados não encontrados";
             session.msgDadosFinais = `*🔌 Alteração de Plano* \nPlano Escolhido: ${session.planoEscolhido}\nDados do Cliente: ${dadosCliente}`;
 
-            fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-              let logs = [];
-              if (err && err.code === "ENOENT") {
-                console.log("Arquivo de log não encontrado, criando um novo.");
-              } else if (err) {
-                console.error("Erro ao ler o arquivo de log:", err);
-                return;
-              } else {
-                try {
-                  logs = JSON.parse(data);
-                  if (!Array.isArray(logs)) {
-                    logs = [];
-                  }
-                } catch (parseErr) {
-                  console.error("Erro ao analisar o arquivo de log:", parseErr);
-                  logs = [];
-                }
-              }
 
-              const log = {
-                messages: session.msgDadosFinais,
-                timestamp: new Date().toISOString(),
-              };
-
-              logs.push(log);
-
-              const jsonString = JSON.stringify(logs, null, 2);
-
-              fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                if (err) {
-                  console.error("Erro ao escrever no arquivo de log:", err);
-                  return;
-                }
-                console.log("Log atualizado com sucesso!");
-              });
-            });
 
             mailOptions(session.msgDadosFinais);
             await this.MensagemBotao(
@@ -1968,47 +1607,7 @@ class WhatsPixController {
                   : "Dados não encontrados";
                 session.msgDadosFinais = `*🏠 Mudança de Endereço* \n\n*🆓 Forma: Gratis*\nDados do Cliente: ${dadosCliente}`;
 
-                fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-                  let logs = [];
-                  if (err && err.code === "ENOENT") {
-                    console.log(
-                      "Arquivo de log não encontrado, criando um novo.",
-                    );
-                  } else if (err) {
-                    console.error("Erro ao ler o arquivo de log:", err);
-                    return;
-                  } else {
-                    try {
-                      logs = JSON.parse(data);
-                      if (!Array.isArray(logs)) {
-                        logs = [];
-                      }
-                    } catch (parseErr) {
-                      console.error(
-                        "Erro ao analisar o arquivo de log:",
-                        parseErr,
-                      );
-                      logs = [];
-                    }
-                  }
 
-                  const log = {
-                    messages: session.msgDadosFinais,
-                    timestamp: new Date().toISOString(),
-                  };
-
-                  logs.push(log);
-
-                  const jsonString = JSON.stringify(logs, null, 2);
-
-                  fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                    if (err) {
-                      console.error("Erro ao escrever no arquivo de log:", err);
-                      return;
-                    }
-                    console.log("Log atualizado com sucesso!");
-                  });
-                });
 
                 mailOptions(session.msgDadosFinais);
                 await this.MensagemBotao(
@@ -2053,47 +1652,7 @@ class WhatsPixController {
                   : "Dados não encontrados";
                 session.msgDadosFinais = `*🆕 Renovação Contratual* \nDados do Cliente: ${dadosCliente}`;
 
-                fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-                  let logs = [];
-                  if (err && err.code === "ENOENT") {
-                    console.log(
-                      "Arquivo de log não encontrado, criando um novo.",
-                    );
-                  } else if (err) {
-                    console.error("Erro ao ler o arquivo de log:", err);
-                    return;
-                  } else {
-                    try {
-                      logs = JSON.parse(data);
-                      if (!Array.isArray(logs)) {
-                        logs = [];
-                      }
-                    } catch (parseErr) {
-                      console.error(
-                        "Erro ao analisar o arquivo de log:",
-                        parseErr,
-                      );
-                      logs = [];
-                    }
-                  }
 
-                  const log = {
-                    messages: session.msgDadosFinais,
-                    timestamp: new Date().toISOString(),
-                  };
-
-                  logs.push(log);
-
-                  const jsonString = JSON.stringify(logs, null, 2);
-
-                  fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                    if (err) {
-                      console.error("Erro ao escrever no arquivo de log:", err);
-                      return;
-                    }
-                    console.log("Log atualizado com sucesso!");
-                  });
-                });
 
                 mailOptions(session.msgDadosFinais);
                 await this.MensagemBotao(
