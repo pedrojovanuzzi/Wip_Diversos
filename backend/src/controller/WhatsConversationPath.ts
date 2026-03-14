@@ -226,13 +226,23 @@ class WhatsPixController {
       }
 
       if (body.entry) {
-        if (
-          body.entry[0].id === process.env.WHATS_BUSSINES_TESTID &&
-          !isSandbox
-        ) {
-          console.log(body.entry[0].id);
+        const entryId = body.entry[0].id;
 
-          console.log("Webhook recebido, mas não é do sandbox");
+        // Se a mensagem for da conta de Teste, mas o servidor NÃO estiver em Sandbox (Produção)
+        if (entryId === process.env.WHATS_BUSSINES_TESTID && !isSandbox) {
+          console.log(
+            `[IGNORE] Webhook de Teste (${entryId}) recebido em ambiente de Produção.`,
+          );
+          res.status(200).send("EVENT_RECEIVED");
+          return;
+        }
+
+        // Se a mensagem NÃO for da conta de Teste (Produção), mas o servidor ESTIVER em Sandbox
+        if (entryId !== process.env.WHATS_BUSSINES_TESTID && isSandbox) {
+          console.log(
+            `[IGNORE] Webhook de Produção (${entryId}) recebido em ambiente Sandbox.`,
+          );
+          res.status(200).send("EVENT_RECEIVED");
           return;
         }
 
