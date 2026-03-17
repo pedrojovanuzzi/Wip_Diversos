@@ -572,26 +572,26 @@ class WhatsPixController {
           return;
         }
 
-        //Easter Egg
-        if (texto === "G.O.A.T") {
-          await this.MensagensComuns(celular, "QuinhoRox");
-          return;
-        }
+        // //Easter Egg
+        // if (texto === "G.O.A.T") {
+        //   await this.MensagensComuns(celular, "QuinhoRox");
+        //   return;
+        // }
 
-        //Easter Egg
-        if (texto === "T.O.D.D.Y") {
-          await this.MensagensComuns(celular, "Tem coisa que desanima");
-          return;
-        }
+        // //Easter Egg
+        // if (texto === "T.O.D.D.Y") {
+        //   await this.MensagensComuns(celular, "Tem coisa que desanima");
+        //   return;
+        // }
 
-        //Easter Egg
-        if (texto === "Mamaezinha") {
-          await this.MensagensComuns(
-            celular,
-            "Coquinha Geladinha para limpar os dentinhos",
-          );
-          return;
-        }
+        // //Easter Egg
+        // if (texto === "Mamaezinha") {
+        //   await this.MensagensComuns(
+        //     celular,
+        //     "Coquinha Geladinha para limpar os dentinhos",
+        //   );
+        //   return;
+        // }
       } catch (error) {
         console.error("Erro ao inserir ou encontrar a pessoa:", error);
       }
