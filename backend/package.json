@@ -22,6 +22,7 @@
     "archiver": "^7.0.1",
     "axios": "^1.7.9",
     "bcrypt": "^5.1.1",
+    "bullmq": "^5.71.0",
     "bwip-js": "^4.8.0",
     "class-validator": "^0.14.1",
     "connect-flash": "^0.1.1",

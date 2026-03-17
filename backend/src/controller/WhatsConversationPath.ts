@@ -24,8 +24,25 @@ import Mensagens from "../entities/APIMK/Mensagens";
 import Sessions from "../entities/APIMK/Sessions";
 import AppDataSource from "../database/DataSource";
 import moment from "moment-timezone";
+import { Queue, Worker, Job } from "bullmq";
 
 dotenv.config();
+
+const redisOptions = {
+  host: process.env.REDIS_HOST || "localhost",
+  port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT) : 6379,
+  password: process.env.DATABASE_PASSWORD_API,
+};
+
+// --- Inbound Queue (Webhooks) ---
+export const whatsappIncomingQueue = new Queue("whatsapp-incoming", {
+  connection: redisOptions,
+});
+
+// --- Outbound Queue (Axios Requests) ---
+export const whatsappOutgoingQueue = new Queue("whatsapp-outgoing", {
+  connection: redisOptions,
+});
 
 const logFilePath = path.join(__dirname, "log.json");
 const logMsgFilePath = path.join(__dirname, "msg.json");
@@ -398,19 +415,18 @@ class WhatsPixController {
                       );
                     });
 
-                    this.handleMessage(
-                      session,
-                      texto,
-                      celular,
-                      type,
-                      manutencao,
-                    ).then(() => {
-                      // Atualiza last_message_id na sessão em memória antes de salvar
-                      if (sessions[celular]) {
-                        (sessions[celular] as any).last_message_id = messageId;
-                      }
-                      this.saveSession(celular);
-                    });
+                    // Add the job to the BullMQ Incoming Queue instead of processing synchronously
+                    whatsappIncomingQueue.add(
+                      "process-message",
+                      {
+                        texto,
+                        celular,
+                        type,
+                        manutencao,
+                        messageId,
+                      },
+                      { removeOnComplete: true, removeOnFail: false },
+                    );
                   }
                 }
               }
@@ -3428,23 +3444,32 @@ class WhatsPixController {
 
   async MensagensComuns(recipient_number: any, msg: any) {
     try {
-      const response = await axios.post(
-        url,
-        {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: recipient_number,
-          type: "text",
-          text: {
-            preview_url: false,
-            body: String(msg),
-          },
+      const payload = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: recipient_number,
+        type: "text",
+        text: {
+          preview_url: false,
+          body: String(msg),
         },
+      };
+
+      await whatsappOutgoingQueue.add(
+        "send-message",
         {
+          url,
+          payload,
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
         },
       );
 
@@ -3456,10 +3481,8 @@ class WhatsPixController {
           timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
         },
       );
-
-      // console.log(response.data);
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("Error queueing message:", error);
     }
   }
 
@@ -3469,23 +3492,30 @@ class WhatsPixController {
         "Sim, De acordo com a *Lei Geral de Proteção de Dados* 🔒 é preciso do seu consentimento para troca de dados, pode me fornecer seu *CPF/CNPJ*? 🖋️\n\n";
       msg += "Caso queira voltar ao Menu Inicial digite *início*";
 
-      const response = await axios.post(
-        url,
+      await whatsappOutgoingQueue.add(
+        "send-message",
         {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: recipient_number,
-          type: "text",
-          text: {
-            preview_url: false,
-            body: String(msg),
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: recipient_number,
+            type: "text",
+            text: {
+              preview_url: false,
+              body: String(msg),
+            },
           },
-        },
-        {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
         },
       );
 
@@ -3638,30 +3668,37 @@ class WhatsPixController {
 
   async boasVindas(receivenumber: any) {
     try {
-      const response = await axios.post(
-        url,
+      await whatsappOutgoingQueue.add(
+        "send-template",
         {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: receivenumber,
-          type: "template",
-          template: {
-            name: "bem_vindo",
-            language: {
-              code: "pt_BR",
-            },
-            components: [
-              {
-                type: "body",
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber,
+            type: "template",
+            template: {
+              name: "bem_vindo",
+              language: {
+                code: "pt_BR",
               },
-            ],
+              components: [
+                {
+                  type: "body",
+                },
+              ],
+            },
           },
-        },
-        {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
         },
       );
 
@@ -3721,36 +3758,43 @@ class WhatsPixController {
     url_site: any,
   ) {
     try {
-      const response = await axios.post(
-        url,
+      await whatsappOutgoingQueue.add(
+        "send-terms",
         {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: receivenumber, // O número de telefone do destinatário
-          type: "interactive",
-          interactive: {
-            type: "cta_url",
-            header: {
-              type: "text",
-              text: header,
-            },
-            body: {
-              text: body,
-            },
-            action: {
-              name: "cta_url",
-              parameters: {
-                display_text: right_text_url,
-                url: url_site,
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber, // O número de telefone do destinatário
+            type: "interactive",
+            interactive: {
+              type: "cta_url",
+              header: {
+                type: "text",
+                text: header,
+              },
+              body: {
+                text: body,
+              },
+              action: {
+                name: "cta_url",
+                parameters: {
+                  display_text: right_text_url,
+                  url: url_site,
+                },
               },
             },
           },
-        },
-        {
           headers: {
             Authorization: `Bearer ${token}`, // Substitua pelo seu token de acesso
             "Content-Type": "application/json",
           },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
         },
       );
 
@@ -3763,48 +3807,55 @@ class WhatsPixController {
         },
       );
 
-      console.log(response.data); // Log da resposta da API
+      console.log("Termos na fila para enviar"); // Log placeholder res
     } catch (error: any) {
       console.error(
         "Erro ao enviar mensagem com botão de link:",
-        error.response?.data || error.message,
+        error.message,
       );
     }
   }
 
   async MensagemLista(receivenumber: any, titulo: any, campos: any) {
     try {
-      const response = await axios.post(
-        url, // Substitua pelo ID correto do telefone
+      await whatsappOutgoingQueue.add(
+        "send-list",
         {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: receivenumber,
-          type: "interactive",
-          interactive: {
-            type: "list",
-            body: {
-              text: titulo,
-            },
-            action: {
-              button: "Ver opções",
-              sections: campos.sections.map(
-                (section: { title: any; rows: any[] }) => ({
-                  title: section.title, // Título da seção
-                  rows: section.rows.map((row: { id: any; title: any }) => ({
-                    id: row.id, // ID da linha
-                    title: row.title, // Título da linha
-                  })),
-                }),
-              ),
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber,
+            type: "interactive",
+            interactive: {
+              type: "list",
+              body: {
+                text: titulo,
+              },
+              action: {
+                button: "Ver opções",
+                sections: campos.sections.map(
+                  (section: { title: any; rows: any[] }) => ({
+                    title: section.title, // Título da seção
+                    rows: section.rows.map((row: { id: any; title: any }) => ({
+                      id: row.id, // ID da linha
+                      title: row.title, // Título da linha
+                    })),
+                  }),
+                ),
+              },
             },
           },
-        },
-        {
           headers: {
             Authorization: `Bearer ${token}`, // Substitua pelo seu token de acesso
             "Content-Type": "application/json",
           },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
         },
       );
 
@@ -3817,12 +3868,9 @@ class WhatsPixController {
         },
       );
 
-      console.log(response.data); // Log da resposta da API
+      console.log("Lista de opções enviada a fila."); // Log da API
     } catch (error: any) {
-      console.error(
-        "Erro ao enviar mensagem de lista:",
-        error.response?.data || error.message,
-      );
+      console.error("Erro ao enviar mensagem de lista:", error.message);
     }
   }
 
@@ -3835,169 +3883,193 @@ class WhatsPixController {
   ) {
     try {
       if (title3 != 0 && title2 != 0) {
-        const response = await axios.post(
-          url,
+        await whatsappOutgoingQueue.add(
+          "send-button",
           {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: receivenumber,
-            type: "interactive",
-            interactive: {
-              type: "button",
-              body: {
-                text: texto,
-              },
-              action: {
-                buttons: [
-                  {
-                    type: "reply",
-                    reply: {
-                      id: "1",
-                      title: title1,
+            url,
+            payload: {
+              messaging_product: "whatsapp",
+              recipient_type: "individual",
+              to: receivenumber,
+              type: "interactive",
+              interactive: {
+                type: "button",
+                body: {
+                  text: texto,
+                },
+                action: {
+                  buttons: [
+                    {
+                      type: "reply",
+                      reply: {
+                        id: "1",
+                        title: title1,
+                      },
                     },
-                  },
-                  {
-                    type: "reply",
-                    reply: {
-                      id: "2",
-                      title: title2,
+                    {
+                      type: "reply",
+                      reply: {
+                        id: "2",
+                        title: title2,
+                      },
                     },
-                  },
-                  {
-                    type: "reply",
-                    reply: {
-                      id: "3",
-                      title: title3,
+                    {
+                      type: "reply",
+                      reply: {
+                        id: "3",
+                        title: title3,
+                      },
                     },
-                  },
-                ],
+                  ],
+                },
               },
             },
-          },
-          {
             headers: {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
           },
+          {
+            removeOnComplete: true,
+            removeOnFail: false,
+            attempts: 3,
+            backoff: { type: "exponential", delay: 5000 },
+          },
         );
-        console.log(response.data);
       } else if (title3 != 0) {
-        const response = await axios.post(
-          url,
+        await whatsappOutgoingQueue.add(
+          "send-button",
           {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: receivenumber,
-            type: "interactive",
-            interactive: {
-              type: "button",
-              body: {
-                text: texto,
-              },
-              action: {
-                buttons: [
-                  {
-                    type: "reply",
-                    reply: {
-                      id: "1",
-                      title: title1,
+            url,
+            payload: {
+              messaging_product: "whatsapp",
+              recipient_type: "individual",
+              to: receivenumber,
+              type: "interactive",
+              interactive: {
+                type: "button",
+                body: {
+                  text: texto,
+                },
+                action: {
+                  buttons: [
+                    {
+                      type: "reply",
+                      reply: {
+                        id: "1",
+                        title: title1,
+                      },
                     },
-                  },
-                  {
-                    type: "reply",
-                    reply: {
-                      id: "2",
-                      title: title2,
+                    {
+                      type: "reply",
+                      reply: {
+                        id: "2",
+                        title: title2,
+                      },
                     },
-                  },
-                ],
+                  ],
+                },
               },
             },
-          },
-          {
             headers: {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
           },
+          {
+            removeOnComplete: true,
+            removeOnFail: false,
+            attempts: 3,
+            backoff: { type: "exponential", delay: 5000 },
+          },
         );
-        console.log(response.data);
       } else if (title3 == 0 && title2 == 0) {
-        const response = await axios.post(
-          url,
+        await whatsappOutgoingQueue.add(
+          "send-button",
           {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: receivenumber,
-            type: "interactive",
-            interactive: {
-              type: "button",
-              body: {
-                text: texto,
-              },
-              action: {
-                buttons: [
-                  {
-                    type: "reply",
-                    reply: {
-                      id: "1",
-                      title: title1,
+            url,
+            payload: {
+              messaging_product: "whatsapp",
+              recipient_type: "individual",
+              to: receivenumber,
+              type: "interactive",
+              interactive: {
+                type: "button",
+                body: {
+                  text: texto,
+                },
+                action: {
+                  buttons: [
+                    {
+                      type: "reply",
+                      reply: {
+                        id: "1",
+                        title: title1,
+                      },
                     },
-                  },
-                ],
+                  ],
+                },
               },
             },
-          },
-          {
             headers: {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
           },
+          {
+            removeOnComplete: true,
+            removeOnFail: false,
+            attempts: 3,
+            backoff: { type: "exponential", delay: 5000 },
+          },
         );
-        console.log(response.data);
       } else {
-        const response = await axios.post(
-          url,
+        await whatsappOutgoingQueue.add(
+          "send-button",
           {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: receivenumber,
-            type: "interactive",
-            interactive: {
-              type: "button",
-              body: {
-                text: texto,
-              },
-              action: {
-                buttons: [
-                  {
-                    type: "reply",
-                    reply: {
-                      id: "1",
-                      title: title1,
+            url,
+            payload: {
+              messaging_product: "whatsapp",
+              recipient_type: "individual",
+              to: receivenumber,
+              type: "interactive",
+              interactive: {
+                type: "button",
+                body: {
+                  text: texto,
+                },
+                action: {
+                  buttons: [
+                    {
+                      type: "reply",
+                      reply: {
+                        id: "1",
+                        title: title1,
+                      },
                     },
-                  },
-                  {
-                    type: "reply",
-                    reply: {
-                      id: "2",
-                      title: title2,
+                    {
+                      type: "reply",
+                      reply: {
+                        id: "2",
+                        title: title2,
+                      },
                     },
-                  },
-                ],
+                  ],
+                },
               },
             },
-          },
-          {
             headers: {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
           },
+          {
+            removeOnComplete: true,
+            removeOnFail: false,
+            attempts: 3,
+            backoff: { type: "exponential", delay: 5000 },
+          },
         );
-        console.log(response.data);
       }
 
       const insertMessage = await ApiMkDataSource.getRepository(Mensagens).save(
@@ -4009,10 +4081,7 @@ class WhatsPixController {
         },
       );
     } catch (error: any) {
-      console.error(
-        "Error sending button message:",
-        error.response?.data || error.message,
-      );
+      console.error("Error queueing button message:", error.message);
     }
   }
 
@@ -4027,6 +4096,8 @@ class WhatsPixController {
     formData.append("type", type);
     formData.append("messaging_product", messaging_product);
 
+    // Media upload will remain synchronous since getMediaID needs the ID right away
+    // to pass to MensagensDeMidia.
     try {
       const response = await axios.post(urlMedia, formData, {
         headers: {
@@ -4054,25 +4125,27 @@ class WhatsPixController {
     filename: any,
   ) {
     try {
-      const response = await axios.post(
-        url,
+      await whatsappOutgoingQueue.add(
+        "send-media",
         {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: receivenumber,
-          type: type,
-          document: {
-            // Substituímos "image" por "document"
-            id: mediaID,
-            filename: filename, // O nome do arquivo enviado
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber,
+            type: type,
+            document: {
+              // Substituímos "image" por "document"
+              id: mediaID,
+              filename: filename, // O nome do arquivo enviado
+            },
           },
-        },
-        {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
         },
+        { removeOnComplete: true, removeOnFail: false },
       );
 
       const insertMessage = await ApiMkDataSource.getRepository(Mensagens).save(
@@ -4084,10 +4157,7 @@ class WhatsPixController {
         },
       );
     } catch (error: any) {
-      console.error(
-        "Error sending media message:",
-        error.response?.data || error.message,
-      );
+      console.error("Error queueing media message:", error.message);
     }
   }
 
@@ -4112,4 +4182,104 @@ class WhatsPixController {
     }
   }
 }
-export default new WhatsPixController();
+
+const whatsPixController = new WhatsPixController();
+
+// --- Incoming Message Worker ---
+const incomingWorker = new Worker(
+  "whatsapp-incoming",
+  async (job: Job) => {
+    const { texto, celular, type, manutencao, messageId } = job.data;
+    console.log(`[BullMQ] Processando webhook ID: ${messageId}`);
+
+    // Use the live in-memory session, NOT the serialized copy from the job.
+    // The serialized copy is a dead snapshot — changes to session.stage would be lost.
+    if (!sessions[celular]) {
+      // Tenta buscar do banco caso o servidor tenha reiniciado
+      const sessionDB = await ApiMkDataSource.getRepository(Sessions).findOne({
+        where: { celular },
+      });
+      if (sessionDB) {
+        sessions[celular] = {
+          stage: sessionDB.stage,
+          ...sessionDB.dados,
+        };
+      } else {
+        sessions[celular] = { stage: "" };
+      }
+    }
+    const session = sessions[celular];
+
+    try {
+      await whatsPixController.handleMessage(
+        session,
+        texto,
+        celular,
+        type,
+        manutencao,
+      );
+    } catch (err: any) {
+      console.error(
+        `[BullMQ] Erro ao processar mensagem ${messageId}:`,
+        err.message,
+      );
+      throw err; // re-throw para o BullMQ marcar como falha
+    }
+
+    // Save session state after handling the message correctly in the background
+    if (sessions[celular]) {
+      sessions[celular].last_message_id = messageId;
+    }
+    await whatsPixController.saveSession(celular);
+  },
+  { connection: redisOptions },
+);
+
+// --- Outgoing Message Worker ---
+const outgoingWorker = new Worker(
+  "whatsapp-outgoing",
+  async (job: Job) => {
+    const { url, payload, headers } = job.data;
+    console.log(`[BullMQ] Enviando mensagem para ${payload?.to || "mídia"}`);
+
+    try {
+      await axios.post(url, payload, { headers });
+    } catch (err: any) {
+      console.error(
+        `[BullMQ] Erro ao enviar mensagem:`,
+        err.response?.data || err.message,
+      );
+      throw err; // re-throw para o BullMQ marcar como falha
+    }
+  },
+  {
+    connection: redisOptions,
+    limiter: { max: 10, duration: 1000 }, // Rate limit: max 10 msgs/seg
+  },
+);
+
+// --- Worker Event Listeners ---
+incomingWorker.on("failed", (job, err) => {
+  console.error(`[BullMQ:incoming] Job ${job?.id} falhou:`, err.message);
+});
+
+outgoingWorker.on("failed", (job, err) => {
+  console.error(`[BullMQ:outgoing] Job ${job?.id} falhou:`, err.message);
+});
+
+// Limpa jobs falhados antigos na inicialização
+(async () => {
+  try {
+    const failedIncoming = await whatsappIncomingQueue.getFailed(0, 100);
+    const failedOutgoing = await whatsappOutgoingQueue.getFailed(0, 100);
+    for (const job of failedIncoming) await job.remove();
+    for (const job of failedOutgoing) await job.remove();
+    console.log(
+      `[BullMQ] Limpou ${failedIncoming.length} incoming + ${failedOutgoing.length} outgoing jobs falhados`,
+    );
+  } catch (e: any) {
+    console.error("[BullMQ] Erro ao limpar jobs falhados:", e.message);
+  }
+})();
+
+export default whatsPixController;
