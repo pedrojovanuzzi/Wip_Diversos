@@ -5,3 +5,4 @@ uploads/*
 dist/*
 test_nfcom.ts
 msg.json
+log.json
