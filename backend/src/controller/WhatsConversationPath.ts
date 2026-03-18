@@ -1163,6 +1163,13 @@ class WhatsPixController {
                       .replace(/\s/g, "")
                       .slice(5)}`,
                     plano: session.planoEscolhido,
+                    pool_name: "LAN_PPPOE",
+                    plano15: "Plano_15",
+                    plano_bloqc: "Plano_bloqueado",
+                    vendedor: "SCM",
+                    conta: "WIP TELECOM MULTIMIDIA EIRELI ME",
+                    contrato: "CONTRATO WIP",
+                    comodato: "sim",
                     fone: "(14)3296-1608",
                     venc: (session.vencimentoEscolhido || "")
                       .trim()
@@ -2520,6 +2527,17 @@ class WhatsPixController {
           );
           return; // Não avança para a próxima pergunta
         }
+      }
+
+      if (ultimaPergunta === "nome") {
+        texto = String(texto)
+          .replace(/^[^a-zA-ZÀ-ÿ0-9]+|[^a-zA-ZÀ-ÿ0-9]+$/g, "")
+          .trim();
+      } else if (
+        ultimaPergunta === "celular" ||
+        ultimaPergunta === "celularSecundario"
+      ) {
+        texto = String(texto).replace(/\D/g, "");
       }
 
       session.dadosCadastro[ultimaPergunta] = texto; // Armazena a resposta
