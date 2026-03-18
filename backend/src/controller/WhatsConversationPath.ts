@@ -2531,7 +2531,7 @@ class WhatsPixController {
 
       if (ultimaPergunta === "nome") {
         texto = String(texto)
-          .replace(/^[^a-zA-ZÀ-ÿ0-9]+|[^a-zA-ZÀ-ÿ0-9]+$/g, "")
+          .replace(/[^a-zA-ZÀ-ÿ\s]/g, "")
           .trim();
       } else if (
         ultimaPergunta === "celular" ||
