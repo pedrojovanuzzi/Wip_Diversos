@@ -1022,6 +1022,78 @@ class WhatsPixController {
             if (dadosFlow && dadosFlow.nome) {
               console.log("Dados recebidos do Flow Cadastro:", dadosFlow);
 
+              // ==== HIGIENIZAÇÃO DE NOME E LOGIN ====
+              // Remove números e pontuações, mantendo apenas letras e espaços
+              let nomeLimpo = (dadosFlow.nome || "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "") // remove acentos
+                .replace(/[^a-zA-Z\s]/g, "") // remove tudo que não for letra ou espaço
+                .replace(/\s+/g, " ") // tira espaços duplicados
+                .trim()
+                .toUpperCase();
+
+              const partesNome = nomeLimpo.split(" ");
+              if (partesNome.length < 2 || partesNome[0].length < 2) {
+                await this.MensagensComuns(
+                  celular,
+                  "⚠️ *Atenção!*\nPor favor, informe o seu *Nome Completo* (nome e sobrenome), sem números ou abreviações."
+                );
+                await this.MensagemFlow(celular, "Cadastro", "📋 Preencher novamente");
+                break;
+              }
+
+              dadosFlow.nome = nomeLimpo;
+
+              // O Login será APENAS (PRIMEIRO NOME + ÚLTIMO NOME) tudo junto
+              const primeiroNome = partesNome[0];
+              const ultimoNome = partesNome[partesNome.length - 1];
+              dadosFlow.login = (primeiroNome + ultimoNome).toUpperCase();
+
+              // ==== VALIDAÇÃO EXTRA: CEP E CELULAR ====
+              const cepLimpo = (dadosFlow.cep || "").replace(/\D/g, "");
+              const celLimpo = (dadosFlow.celular || "").replace(/\D/g, "");
+              
+              if (cepLimpo.length !== 8) {
+                await this.MensagensComuns(celular, "⚠️ *Atenção!*\nO *CEP* informado é inválido. Digite os 8 números corretamente.");
+                await this.MensagemFlow(celular, "Cadastro", "📋 Preencher novamente");
+                break;
+              }
+              if (celLimpo.length < 10) {
+                await this.MensagensComuns(celular, "⚠️ *Atenção!*\nO *Celular* informado é inválido. Digite o DDD + Número corretamente.");
+                await this.MensagemFlow(celular, "Cadastro", "📋 Preencher novamente");
+                break;
+              }
+
+              // ==== VALIDAÇÃO CPF E RG ====
+              const cpfValido = await this.validarCPF(dadosFlow.cpf || "");
+              const rgValido = await this.validarRG(dadosFlow.rg || "");
+
+              if (!cpfValido || !rgValido) {
+                let msgErro = "⚠️ *Atenção!*\n\n";
+                if (!cpfValido && !rgValido) {
+                  msgErro += "O *CPF* e o *RG* informados são inválidos.\n";
+                } else if (!cpfValido) {
+                  msgErro += "O *CPF* informado é inválido.\n";
+                } else {
+                  msgErro += "O *RG* informado é inválido.\n";
+                }
+
+                await this.MensagensComuns(
+                  celular,
+                  msgErro +
+                    "Por favor, verifique os dados e preencha o formulário novamente.",
+                );
+
+                // Reenvia o Flow pedindo para preencher de novo
+                await this.MensagemFlow(
+                  celular,
+                  "Cadastro",
+                  "📋 Preencher novamente",
+                );
+                break; // Para a execução do switch e espera nova resposta
+              }
+              // ============================
+
               // Popula a sessão com os dados do formulário
               session.dadosCompleto = {
                 nome: dadosFlow.nome,
@@ -1091,7 +1163,7 @@ class WhatsPixController {
               try {
                 const findLogin = await ClientesRepository.findOne({
                   where: {
-                    login: (dadosFlow.nome || "")
+                    login: dadosFlow.login || (dadosFlow.nome || "")
                       .trim()
                       .replace(/\s/g, "")
                       .toUpperCase(),
@@ -1113,10 +1185,7 @@ class WhatsPixController {
 
                 const addClient = await ClientesRepository.save({
                   nome: (dadosFlow.nome || "").toUpperCase(),
-                  login: (dadosFlow.nome || "")
-                    .trim()
-                    .replace(/\s/g, "")
-                    .toUpperCase(),
+                  login: dadosFlow.login || (dadosFlow.nome || "").trim().replace(/\s/g, "").toUpperCase(),
                   rg: (dadosFlow.rg || "").trim().replace(/\s/g, ""),
                   cpf_cnpj: (dadosFlow.cpf || "").trim().replace(/\s/g, ""),
                   uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
