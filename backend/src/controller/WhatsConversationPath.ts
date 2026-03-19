@@ -3869,6 +3869,19 @@ class WhatsPixController {
     }
   }
 
+  async Flow(req: Request, res: Response) {
+    try {
+      const { body } = req;
+      console.log(body);
+      res.status(200).json({ message: "Flow" });
+    } catch (error) {
+      console.error("Erro ao enviar mensagem com botão de link:", error);
+      res
+        .status(500)
+        .json({ message: "Erro ao enviar mensagem com botão de link" });
+    }
+  }
+
   async MensagemLista(receivenumber: any, titulo: any, campos: any) {
     try {
       await whatsappOutgoingQueue.add(
