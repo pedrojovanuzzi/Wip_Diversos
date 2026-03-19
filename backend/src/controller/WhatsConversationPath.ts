@@ -1132,6 +1132,14 @@ class WhatsPixController {
               const planoFlow = dadosFlow.plano || "";
               session.planoEscolhido = planoFlow;
 
+              await this.MensagemTermos(
+                celular,
+                "Contrato Hospedado",
+                "Este é o Nosso Contrato Oficial Completo",
+                "Ler o contrato",
+                "https://wiptelecomunicacoes.com.br/contrato",
+              );
+
               await this.MensagensComuns(
                 celular,
                 `✅ *Cadastro recebido com sucesso!*\n\n` +
@@ -1283,15 +1291,6 @@ class WhatsPixController {
               } catch (dbError) {
                 console.error("Erro ao salvar cliente no MKAuth:", dbError);
               }
-
-              // Envia os termos e avança
-              await this.MensagemTermos(
-                celular,
-                "Contrato Hospedado",
-                "Este é o Nosso Contrato Oficial Completo",
-                "Ler o contrato",
-                "https://wiptelecomunicacoes.com.br/contrato",
-              );
 
               const resumoCadastro =
                 `📋 *Novo Cadastro via Flow*\n\n` +
