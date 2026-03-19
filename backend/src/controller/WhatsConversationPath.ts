@@ -1175,6 +1175,7 @@ class WhatsPixController {
                       ? "fisica"
                       : "juridica",
                   dias_corte: 80,
+                  senha: moment().format("DDMMYYYY"),
                   cadastro: moment().format("DD-MM-YYYY").split("-").join("/"),
                   data_ip: moment().format("YYYY-MM-DD HH:mm:ss"),
                   data_ins: moment().format("YYYY-MM-DD HH:mm:ss"),
