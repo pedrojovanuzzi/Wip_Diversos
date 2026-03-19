@@ -1279,7 +1279,25 @@ class WhatsPixController {
                 `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
                 `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
                 `📮 *CEP:* ${dadosFlow.cep}\n` +
-                `📶 *Plano:* ${planoFlow}`;
+                `📶 *Plano:* ${planoFlow}\n` + 
+                `📅 *Vencimento:* Dia ${dadosFlow.vencimento}`;
+
+              const resumoEmailHtml =
+                `<h3>Novo Cadastro via WhatsApp Flow</h3>` +
+                `<p><b>Nome:</b> ${dadosFlow.nome}</p>` +
+                `<p><b>CPF:</b> ${dadosFlow.cpf}</p>` +
+                `<p><b>RG:</b> ${dadosFlow.rg}</p>` +
+                `<p><b>Nascimento:</b> ${dadosFlow.dataNascimento}</p>` +
+                `<p><b>Celular:</b> ${dadosFlow.celular}</p>` +
+                `<p><b>Email:</b> ${dadosFlow.email}</p>` +
+                `<p><b>Endereço:</b> ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}</p>` +
+                `<p><b>Cidade:</b> ${dadosFlow.cidade}/${dadosFlow.estado}</p>` +
+                `<p><b>CEP:</b> ${dadosFlow.cep}</p>` +
+                `<p><b>Plano Escolhido:</b> ${planoFlow}</p>` +
+                `<p><b>Vencimento:</b> Dia ${dadosFlow.vencimento}</p>`;
+
+              // Envia o e-mail para o setor financeiro
+              mailOptions(resumoEmailHtml);
 
               await this.Finalizar(resumoCadastro, celular, sessions);
               session.stage = "end";
