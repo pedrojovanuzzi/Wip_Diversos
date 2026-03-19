@@ -1036,9 +1036,13 @@ class WhatsPixController {
               if (partesNome.length < 2 || partesNome[0].length < 2) {
                 await this.MensagensComuns(
                   celular,
-                  "⚠️ *Atenção!*\nPor favor, informe o seu *Nome Completo* (nome e sobrenome), sem números ou abreviações."
+                  "⚠️ *Atenção!*\nPor favor, informe o seu *Nome Completo* (nome e sobrenome), sem números ou abreviações.",
                 );
-                await this.MensagemFlow(celular, "Cadastro", "📋 Preencher novamente");
+                await this.MensagemFlow(
+                  celular,
+                  "Cadastro",
+                  "📋 Preencher novamente",
+                );
                 break;
               }
 
@@ -1052,15 +1056,29 @@ class WhatsPixController {
               // ==== VALIDAÇÃO EXTRA: CEP E CELULAR ====
               const cepLimpo = (dadosFlow.cep || "").replace(/\D/g, "");
               const celLimpo = (dadosFlow.celular || "").replace(/\D/g, "");
-              
+
               if (cepLimpo.length !== 8) {
-                await this.MensagensComuns(celular, "⚠️ *Atenção!*\nO *CEP* informado é inválido. Digite os 8 números corretamente.");
-                await this.MensagemFlow(celular, "Cadastro", "📋 Preencher novamente");
+                await this.MensagensComuns(
+                  celular,
+                  "⚠️ *Atenção!*\nO *CEP* informado é inválido. Digite os 8 números corretamente.",
+                );
+                await this.MensagemFlow(
+                  celular,
+                  "Cadastro",
+                  "📋 Preencher novamente",
+                );
                 break;
               }
               if (celLimpo.length < 10) {
-                await this.MensagensComuns(celular, "⚠️ *Atenção!*\nO *Celular* informado é inválido. Digite o DDD + Número corretamente.");
-                await this.MensagemFlow(celular, "Cadastro", "📋 Preencher novamente");
+                await this.MensagensComuns(
+                  celular,
+                  "⚠️ *Atenção!*\nO *Celular* informado é inválido. Digite o DDD + Número corretamente.",
+                );
+                await this.MensagemFlow(
+                  celular,
+                  "Cadastro",
+                  "📋 Preencher novamente",
+                );
                 break;
               }
 
@@ -1122,7 +1140,7 @@ class WhatsPixController {
                   `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
                   `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
                   `📶 *Plano:* ${planoFlow}\n\n` +
-                  `Aguarde, estamos finalizando...`,
+                  `💰 O Financeiro vai entrar em contato em breve para finalizar o cadastro!`,
               );
 
               // === Salvar no MKAuth ===
@@ -1163,10 +1181,12 @@ class WhatsPixController {
               try {
                 const findLogin = await ClientesRepository.findOne({
                   where: {
-                    login: dadosFlow.login || (dadosFlow.nome || "")
-                      .trim()
-                      .replace(/\s/g, "")
-                      .toUpperCase(),
+                    login:
+                      dadosFlow.login ||
+                      (dadosFlow.nome || "")
+                        .trim()
+                        .replace(/\s/g, "")
+                        .toUpperCase(),
                   },
                 });
 
@@ -1185,7 +1205,12 @@ class WhatsPixController {
 
                 const addClient = await ClientesRepository.save({
                   nome: (dadosFlow.nome || "").toUpperCase(),
-                  login: dadosFlow.login || (dadosFlow.nome || "").trim().replace(/\s/g, "").toUpperCase(),
+                  login:
+                    dadosFlow.login ||
+                    (dadosFlow.nome || "")
+                      .trim()
+                      .replace(/\s/g, "")
+                      .toUpperCase(),
                   rg: (dadosFlow.rg || "").trim().replace(/\s/g, ""),
                   cpf_cnpj: (dadosFlow.cpf || "").trim().replace(/\s/g, ""),
                   uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
@@ -1279,7 +1304,7 @@ class WhatsPixController {
                 `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
                 `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
                 `📮 *CEP:* ${dadosFlow.cep}\n` +
-                `📶 *Plano:* ${planoFlow}\n` + 
+                `📶 *Plano:* ${planoFlow}\n` +
                 `📅 *Vencimento:* Dia ${dadosFlow.vencimento}`;
 
               const resumoEmailHtml =
