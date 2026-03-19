@@ -415,6 +415,17 @@ class WhatsPixController {
                       console.log("list_reply object:", listReply);
                       mensagemCorpo = listReply.title;
                     }
+
+                    if (interactive.type === "nfm_reply") {
+                      // Resposta vinda de um WhatsApp Flow
+                      const nfmReply = interactive.nfm_reply;
+                      console.log("nfm_reply (Flow) object:", nfmReply);
+                      // response_json já é uma string JSON, não precisa de stringify
+                      mensagemCorpo =
+                        nfmReply?.response_json ||
+                        nfmReply?.body ||
+                        "Flow preenchido";
+                    }
                   } else {
                     mensagemCorpo = message?.text?.body;
                   }
@@ -615,7 +626,7 @@ class WhatsPixController {
         await ApiMkDataSource.getRepository(Mensagens).save({
           conv_id: insertConversation.id,
           sender_id: insertPeople.id,
-          content: texto,
+          content: texto || "[sem conteúdo]",
           timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000), // adiciona 3 horas
         });
 
@@ -796,8 +807,12 @@ class WhatsPixController {
           if (this.verificaType(type)) {
             if (texto.toLowerCase() === "sim aceito") {
               if (session.service === "instalacao") {
-                session.stage = "register";
-                await this.iniciarCadastro(celular, texto, session, type);
+                session.stage = "awaiting_flow_cadastro";
+                await this.MensagemFlow(
+                  celular,
+                  "Cadastro",
+                  "📋 Preencha seus dados",
+                );
               } else if (session.service === "mudanca_endereco") {
                 session.stage = "mudanca_endereco";
                 await this.iniciarMudanca(celular, texto, session, type);
@@ -999,9 +1014,215 @@ class WhatsPixController {
           }
           break;
 
-        //Cadastro
-        case "register":
-          await this.iniciarCadastro(celular, texto, session, type);
+        //Cadastro via Flow
+        case "awaiting_flow_cadastro":
+          // Verifica se o texto é um JSON vindo do nfm_reply (resposta do Flow)
+          try {
+            const dadosFlow = JSON.parse(texto);
+            if (dadosFlow && dadosFlow.nome) {
+              console.log("Dados recebidos do Flow Cadastro:", dadosFlow);
+
+              // Popula a sessão com os dados do formulário
+              session.dadosCompleto = {
+                nome: dadosFlow.nome,
+                rg: dadosFlow.rg,
+                cpf: dadosFlow.cpf,
+                dataNascimento: dadosFlow.dataNascimento,
+                celular: dadosFlow.celular,
+                celularSecundario: dadosFlow.celularSecundario || "",
+                email: dadosFlow.email,
+                cep: dadosFlow.cep,
+                rua: dadosFlow.rua,
+                numero: dadosFlow.numero,
+                bairro: dadosFlow.bairro,
+                cidade: dadosFlow.cidade,
+                estado: dadosFlow.estado,
+              };
+
+              const planoFlow = dadosFlow.plano || "";
+              session.planoEscolhido = planoFlow;
+
+              await this.MensagensComuns(
+                celular,
+                `✅ *Cadastro recebido com sucesso!*\n\n` +
+                  `👤 *Nome:* ${dadosFlow.nome}\n` +
+                  `📄 *CPF:* ${dadosFlow.cpf}\n` +
+                  `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
+                  `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
+                  `📶 *Plano:* ${planoFlow}\n\n` +
+                  `Aguarde, estamos finalizando...`,
+              );
+
+              // === Salvar no MKAuth ===
+              const ClientesRepository =
+                MkauthDataSource.getRepository(ClientesEntities);
+
+              let ibgeCode: string | null = null;
+              try {
+                const ufStr = (dadosFlow.estado || "").trim().toLowerCase();
+                const cityStr = (dadosFlow.cidade || "").trim().toLowerCase();
+                if (ufStr && cityStr) {
+                  const response = await axios.get(
+                    `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${ufStr}/municipios`,
+                  );
+                  const municipios = response.data;
+                  const nmNormalized = cityStr
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[^\w\s]/gi, "")
+                    .trim();
+                  const munFind = municipios.find((m: any) => {
+                    const mNmNorm = m.nome
+                      .toLowerCase()
+                      .normalize("NFD")
+                      .replace(/[\u0300-\u036f]/g, "")
+                      .replace(/[^\w\s]/gi, "")
+                      .trim();
+                    return mNmNorm === nmNormalized;
+                  });
+                  if (munFind) {
+                    ibgeCode = munFind.id.toString();
+                  }
+                }
+              } catch (err) {
+                console.error("Erro ao buscar IBGE da API externa:");
+              }
+
+              try {
+                const findLogin = await ClientesRepository.findOne({
+                  where: {
+                    login: (dadosFlow.nome || "")
+                      .trim()
+                      .replace(/\s/g, "")
+                      .toUpperCase(),
+                  },
+                });
+
+                if (findLogin) {
+                  console.log("Login já existe:", findLogin);
+                  dadosFlow.nome = dadosFlow.nome + " " + findLogin.id;
+                }
+
+                const celularFormatado = (dadosFlow.celular || "").replace(
+                  /\D/g,
+                  "",
+                );
+                const celular2Formatado = (
+                  dadosFlow.celularSecundario || ""
+                ).replace(/\D/g, "");
+
+                const addClient = await ClientesRepository.save({
+                  nome: (dadosFlow.nome || "").toUpperCase(),
+                  login: (dadosFlow.nome || "")
+                    .trim()
+                    .replace(/\s/g, "")
+                    .toUpperCase(),
+                  rg: (dadosFlow.rg || "").trim().replace(/\s/g, ""),
+                  cpf_cnpj: (dadosFlow.cpf || "").trim().replace(/\s/g, ""),
+                  uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
+                  email: (dadosFlow.email || "").trim().replace(/\s/g, ""),
+                  cidade: `${(dadosFlow.cidade || "").trim().slice(0, 1).toUpperCase()}${(dadosFlow.cidade || "").trim().slice(1)}`,
+                  bairro: (dadosFlow.bairro || "").toUpperCase().trim(),
+                  estado: (dadosFlow.estado || "")
+                    .toUpperCase()
+                    .replace(/\s/g, "")
+                    .slice(0, 2),
+                  nascimento: (dadosFlow.dataNascimento || "").replace(
+                    /(\d{2})\/(\d{2})\/(\d{4})/,
+                    "$3-$2-$1",
+                  ),
+                  numero: (dadosFlow.numero || "").trim().replace(/\s/g, ""),
+                  endereco: (dadosFlow.rua || "").toUpperCase().trim(),
+                  cep: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
+                  plano: planoFlow,
+                  pool_name: "LAN_PPPOE",
+                  plano15: "Plano_15",
+                  plano_bloqc: "Plano_bloqueado",
+                  vendedor: "SCM",
+                  conta: "3",
+                  comodato: "sim",
+                  cidade_ibge: ibgeCode || "3503406",
+                  fone: "(14)3296-1608",
+                  venc: (dadosFlow.vencimento || "")
+                    .trim()
+                    .replace(/\s/g, "")
+                    .replace(/\D/g, ""),
+                  celular:
+                    celularFormatado.length >= 4
+                      ? `(${celularFormatado.slice(0, 2)})${celularFormatado.slice(2)}`
+                      : celularFormatado,
+                  celular2:
+                    celular2Formatado.length >= 4
+                      ? `(${celular2Formatado.slice(0, 2)})${celular2Formatado.slice(2)}`
+                      : celular2Formatado,
+                  estado_res: (dadosFlow.estado || "")
+                    .toUpperCase()
+                    .replace(/\s/g, "")
+                    .slice(0, 2),
+                  bairro_res: (dadosFlow.bairro || "").toUpperCase().trim(),
+                  tipo: "pppoe",
+                  cidade_res: `${(dadosFlow.cidade || "").trim().slice(0, 1).toUpperCase()}${(dadosFlow.cidade || "").trim().slice(1)}`,
+                  cep_res: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
+                  numero_res: (dadosFlow.numero || "")
+                    .trim()
+                    .replace(/\s/g, ""),
+                  endereco_res: (dadosFlow.rua || "").toUpperCase().trim(),
+                  tipo_cob: "titulo",
+                  mesref: "now",
+                  prilanc: "tot",
+                  pessoa:
+                    (dadosFlow.cpf || "").replace(/\D/g, "").length <= 11
+                      ? "fisica"
+                      : "juridica",
+                  dias_corte: 80,
+                  cadastro: moment().format("DD-MM-YYYY").split("-").join("/"),
+                  data_ip: moment().format("YYYY-MM-DD HH:mm:ss"),
+                  data_ins: moment().format("YYYY-MM-DD HH:mm:ss"),
+                });
+
+                await ClientesRepository.update(addClient.id, {
+                  termo: `${addClient.id}C/${moment().format("YYYY")}`,
+                });
+
+                console.log("Cliente salvo com sucesso no MKAuth:", addClient);
+              } catch (dbError) {
+                console.error("Erro ao salvar cliente no MKAuth:", dbError);
+              }
+
+              // Envia os termos e avança
+              await this.MensagemTermos(
+                celular,
+                "Contrato Hospedado",
+                "Este é o Nosso Contrato Oficial Completo",
+                "Ler o contrato",
+                "https://wiptelecomunicacoes.com.br/contrato",
+              );
+
+              const resumoCadastro =
+                `📋 *Novo Cadastro via Flow*\n\n` +
+                `👤 *Nome:* ${dadosFlow.nome}\n` +
+                `📄 *CPF:* ${dadosFlow.cpf}\n` +
+                `🪪 *RG:* ${dadosFlow.rg}\n` +
+                `🎂 *Nascimento:* ${dadosFlow.dataNascimento}\n` +
+                `📱 *Celular:* ${dadosFlow.celular}\n` +
+                `📧 *Email:* ${dadosFlow.email}\n` +
+                `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
+                `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
+                `📮 *CEP:* ${dadosFlow.cep}\n` +
+                `📶 *Plano:* ${planoFlow}`;
+
+              await this.Finalizar(resumoCadastro, celular, sessions);
+              session.stage = "end";
+              break;
+            }
+          } catch (e) {
+            // Não é JSON, o usuário mandou texto normal
+          }
+          // Se não foi uma resposta de Flow, pede pra preencher
+          await this.MensagensComuns(
+            celular,
+            "📋 Por favor, preencha o formulário do *Cadastro* clicando no botão acima.",
+          );
           break;
         case "plan":
           if (this.verificaType(type)) {
@@ -3929,6 +4150,51 @@ class WhatsPixController {
         "Erro ao enviar mensagem com botão de link:",
         error.message,
       );
+    }
+  }
+
+  async MensagemFlow(receivenumber: any, flowName: string, ctaText: string) {
+    try {
+      await whatsappOutgoingQueue.add(
+        "send-flow",
+        {
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber,
+            type: "interactive",
+            interactive: {
+              type: "flow",
+              body: {
+                text: "Preencha o formulário abaixo para prosseguir com o seu cadastro.",
+              },
+              action: {
+                name: "flow",
+                parameters: {
+                  flow_message_version: "3",
+                  flow_name: flowName,
+                  flow_cta: ctaText,
+                },
+              },
+            },
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
+        },
+      );
+
+      console.log(`Flow '${flowName}' enviado para ${receivenumber}`);
+    } catch (error: any) {
+      console.error("Erro ao enviar Flow:", error.message);
     }
   }
 
