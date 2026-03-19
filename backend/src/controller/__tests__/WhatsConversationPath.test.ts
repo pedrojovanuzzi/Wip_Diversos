@@ -213,6 +213,37 @@ describe("WhatsPixController", () => {
     );
     expect(sessionMock.stage).not.toBe("options_start");
 
-    clearTimeout(sessionMock.inactivityTimer);
+  });
+
+  describe("Validações de CPF e RG", () => {
+    it("deve retornar false para CPFs inválidos ou sequências repetidas", async () => {
+      // Seq repetidas
+      expect(await whatsPixController.validarCPF("11111111111")).toBe(false);
+      expect(await whatsPixController.validarCPF("00000000000")).toBe(false);
+      
+      // Matemática falha
+      expect(await whatsPixController.validarCPF("12312312312")).toBe(false);
+      expect(await whatsPixController.validarCPF("98765432111")).toBe(false);
+    });
+
+    it("deve retornar true para CPFs válidos, ignorando máscara", async () => {
+      // CPF Fictício válido matematicamente: 52557942871
+      expect(await whatsPixController.validarCPF("52557942871")).toBe(true);
+      expect(await whatsPixController.validarCPF("525.579.428-71")).toBe(true);
+    });
+
+    it("deve retornar false para RGs inválidos (tamanho inadequado ou repetidos)", async () => {
+      expect(await whatsPixController.validarRG("123456")).toBe(false); // Curto
+      expect(await whatsPixController.validarRG("12345678901")).toBe(false); // Longo (11)
+      expect(await whatsPixController.validarRG("111111111")).toBe(false); // Repetido
+    });
+
+    it("deve retornar true para RGs válidos", async () => {
+      // RG com tamanho de 7 a 10 dígitos com ou sem letras mascaradas
+      expect(await whatsPixController.validarRG("1234567")).toBe(true); // 7 digitos
+      expect(await whatsPixController.validarRG("12.345.678-9")).toBe(true); // 9 digitos
+      expect(await whatsPixController.validarRG("2342425245")).toBe(true); // Ficticio usado no sistema
+    });
   });
 });
+
