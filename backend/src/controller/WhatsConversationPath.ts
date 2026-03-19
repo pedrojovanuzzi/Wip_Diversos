@@ -572,26 +572,26 @@ class WhatsPixController {
           return;
         }
 
-        //Easter Egg
-        if (texto === "G.O.A.T") {
-          await this.MensagensComuns(celular, "QuinhoRox");
-          return;
-        }
+        // //Easter Egg
+        // if (texto === "G.O.A.T") {
+        //   await this.MensagensComuns(celular, "QuinhoRox");
+        //   return;
+        // }
 
-        //Easter Egg
-        if (texto === "T.O.D.D.Y") {
-          await this.MensagensComuns(celular, "Tem coisa que desanima");
-          return;
-        }
+        // //Easter Egg
+        // if (texto === "T.O.D.D.Y") {
+        //   await this.MensagensComuns(celular, "Tem coisa que desanima");
+        //   return;
+        // }
 
-        //Easter Egg
-        if (texto === "Mamaezinha") {
-          await this.MensagensComuns(
-            celular,
-            "Coquinha Geladinha para limpar os dentinhos",
-          );
-          return;
-        }
+        // //Easter Egg
+        // if (texto === "Mamaezinha") {
+        //   await this.MensagensComuns(
+        //     celular,
+        //     "Coquinha Geladinha para limpar os dentinhos",
+        //   );
+        //   return;
+        // }
       } catch (error) {
         console.error("Erro ao inserir ou encontrar a pessoa:", error);
       }
@@ -1106,6 +1106,41 @@ class WhatsPixController {
                 const ClientesRepository =
                   MkauthDataSource.getRepository(ClientesEntities);
 
+                let ibgeCode: string | null = null;
+                try {
+                  const ufStr = (session.dadosCompleto.estado || "")
+                    .trim()
+                    .toLowerCase();
+                  const cityStr = (session.dadosCompleto.cidade || "")
+                    .trim()
+                    .toLowerCase();
+                  if (ufStr && cityStr) {
+                    const response = await axios.get(
+                      `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${ufStr}/municipios`,
+                    );
+                    const municipios = response.data;
+                    const nmNormalized = cityStr
+                      .normalize("NFD")
+                      .replace(/[\u0300-\u036f]/g, "")
+                      .replace(/[^\w\s]/gi, "")
+                      .trim();
+                    const munFind = municipios.find((m: any) => {
+                      const mNmNorm = m.nome
+                        .toLowerCase()
+                        .normalize("NFD")
+                        .replace(/[\u0300-\u036f]/g, "")
+                        .replace(/[^\w\s]/gi, "")
+                        .trim();
+                      return mNmNorm === nmNormalized;
+                    });
+                    if (munFind) {
+                      ibgeCode = munFind.id.toString();
+                    }
+                  }
+                } catch (err) {
+                  console.error("Erro ao buscar IBGE da API externa:");
+                }
+
                 try {
                   const findLogin = await ClientesRepository.findOne({
                     where: {
@@ -1163,6 +1198,13 @@ class WhatsPixController {
                       .replace(/\s/g, "")
                       .slice(5)}`,
                     plano: session.planoEscolhido,
+                    pool_name: "LAN_PPPOE",
+                    plano15: "Plano_15",
+                    plano_bloqc: "Plano_bloqueado",
+                    vendedor: "SCM",
+                    conta: "3",
+                    comodato: "sim",
+                    cidade_ibge: ibgeCode || "3503406",
                     fone: "(14)3296-1608",
                     venc: (session.vencimentoEscolhido || "")
                       .trim()
@@ -2520,6 +2562,17 @@ class WhatsPixController {
           );
           return; // Não avança para a próxima pergunta
         }
+      }
+
+      if (ultimaPergunta === "nome") {
+        texto = String(texto)
+          .replace(/[^a-zA-ZÀ-ÿ\s]/g, "")
+          .trim();
+      } else if (
+        ultimaPergunta === "celular" ||
+        ultimaPergunta === "celularSecundario"
+      ) {
+        texto = String(texto).replace(/\D/g, "");
       }
 
       session.dadosCadastro[ultimaPergunta] = texto; // Armazena a resposta

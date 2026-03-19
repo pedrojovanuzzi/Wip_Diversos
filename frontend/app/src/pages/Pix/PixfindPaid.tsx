@@ -1,5 +1,6 @@
 import React, { FormEvent, useState } from "react";
 import axios from "axios";
+import * as XLSX from "xlsx";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 
@@ -132,6 +133,43 @@ export const PixfindPaid: React.FC = () => {
   const handleCopy = (texto: string) => {
     navigator.clipboard.writeText(texto);
     alert("✅ Pix Copia e Cola copiado!");
+  };
+
+  const handleExportExcel = () => {
+    if (!status || !Array.isArray(status) || status.length === 0) {
+      alert("Não há dados para exportar.");
+      return;
+    }
+
+    const linhas = status.map((pix) => {
+      const dataFormatada = pix.calendario?.criacao 
+        ? new Date(pix.calendario.criacao).toLocaleString("pt-BR") 
+        : "";
+      
+      const titulo = pix.infoAdicionais && pix.infoAdicionais.length > 0 
+        ? pix.infoAdicionais[0].valor 
+        : "";
+        
+      const endToEndId = pix.pix && pix.pix.length > 0 
+        ? pix.pix[0].endToEndId 
+        : "";
+
+      return {
+        "Status": pix.status || "",
+        "Valor (R$)": pix.valor?.original || "",
+        "TXID": pix.txid || "",
+        "Pagador (PPPOE)": pix.devedor?.nome || "",
+        "Título": titulo,
+        "Data do Pix": dataFormatada,
+        "EndToEndId": endToEndId
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(linhas);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Pagamentos PIX");
+
+    XLSX.writeFile(workbook, `Relatorio_Pix_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   return (
@@ -326,7 +364,15 @@ export const PixfindPaid: React.FC = () => {
         {/* 🔸 Caso venha MAIS DE UM resultado */}
         {Array.isArray(status) && (
           <div className="mt-8 space-y-4">
-            <h1>Quantidade de Titulos: {status.length}</h1>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
+              <h1 className="text-xl font-bold text-gray-800">Quantidade de Titulos: {status.length}</h1>
+              <button
+                onClick={handleExportExcel}
+                className="mt-4 sm:mt-0 bg-green-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-400 transition"
+              >
+                📊 Exportar para Excel
+              </button>
+            </div>
             {status.map((pix, index) => (
               <div
                 key={index}
