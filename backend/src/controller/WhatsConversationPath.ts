@@ -228,6 +228,7 @@ class WhatsPixController {
     this.saveSession = this.saveSession.bind(this);
     this.deleteSession = this.deleteSession.bind(this);
     this.getPlanosDoSistema = this.getPlanosDoSistema.bind(this);
+    this.limparEndereco = this.limparEndereco.bind(this);
   }
 
   async saveSession(celular: string) {
@@ -1226,8 +1227,8 @@ class WhatsPixController {
                   cpf_cnpj: (dadosFlow.cpf || "").trim().replace(/\s/g, ""),
                   uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
                   email: (dadosFlow.email || "").trim().replace(/\s/g, ""),
-                  cidade: `${(dadosFlow.cidade || "").trim().slice(0, 1).toUpperCase()}${(dadosFlow.cidade || "").trim().slice(1)}`,
-                  bairro: (dadosFlow.bairro || "").toUpperCase().trim(),
+                  cidade: this.limparEndereco(dadosFlow.cidade || ""),
+                  bairro: this.limparEndereco(dadosFlow.bairro || ""),
                   estado: (dadosFlow.estado || "")
                     .toUpperCase()
                     .replace(/\s/g, "")
@@ -1236,8 +1237,8 @@ class WhatsPixController {
                     /(\d{2})\/(\d{2})\/(\d{4})/,
                     "$3-$2-$1",
                   ),
-                  numero: (dadosFlow.numero || "").trim().replace(/\s/g, ""),
-                  endereco: (dadosFlow.rua || "").toUpperCase().trim(),
+                  numero: this.limparEndereco(dadosFlow.numero || ""),
+                  endereco: this.limparEndereco(dadosFlow.rua || ""),
                   cep: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
                   plano: planoFlow,
                   pool_name: "LAN_PPPOE",
@@ -1264,14 +1265,12 @@ class WhatsPixController {
                     .toUpperCase()
                     .replace(/\s/g, "")
                     .slice(0, 2),
-                  bairro_res: (dadosFlow.bairro || "").toUpperCase().trim(),
+                  bairro_res: this.limparEndereco(dadosFlow.bairro || ""),
                   tipo: "pppoe",
-                  cidade_res: `${(dadosFlow.cidade || "").trim().slice(0, 1).toUpperCase()}${(dadosFlow.cidade || "").trim().slice(1)}`,
+                  cidade_res: this.limparEndereco(dadosFlow.cidade || ""),
                   cep_res: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
-                  numero_res: (dadosFlow.numero || "")
-                    .trim()
-                    .replace(/\s/g, ""),
-                  endereco_res: (dadosFlow.rua || "").toUpperCase().trim(),
+                  numero_res: this.limparEndereco(dadosFlow.numero || ""),
+                  endereco_res: this.limparEndereco(dadosFlow.rua || ""),
                   tipo_cob: "titulo",
                   mesref: "now",
                   prilanc: "tot",
@@ -1559,13 +1558,8 @@ class WhatsPixController {
                     email: session.dadosCompleto.email
                       .trim()
                       .replace(/\s/g, ""),
-                    cidade: `${session.dadosCompleto.cidade
-                      .trim()
-                      .slice(0, 1)
-                      .toUpperCase()}${session.dadosCompleto.cidade
-                      .trim()
-                      .slice(1)}`,
-                    bairro: session.dadosCompleto.bairro.toUpperCase().trim(),
+                    cidade: this.limparEndereco(session.dadosCompleto.cidade),
+                    bairro: this.limparEndereco(session.dadosCompleto.bairro),
                     estado: (session.dadosCompleto.estado || "")
                       .toUpperCase()
                       .replace(/\s/g, "")
@@ -1574,10 +1568,8 @@ class WhatsPixController {
                       /(\d{2})\/(\d{2})\/(\d{4})/,
                       "$3-$2-$1",
                     ),
-                    numero: session.dadosCompleto.numero
-                      .trim()
-                      .replace(/\s/g, ""),
-                    endereco: session.dadosCompleto.rua.toUpperCase().trim(),
+                    numero: this.limparEndereco(session.dadosCompleto.numero),
+                    endereco: this.limparEndereco(session.dadosCompleto.rua),
                     cep: `${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
@@ -1602,24 +1594,26 @@ class WhatsPixController {
                       0,
                       2,
                     )})${session.dadosCompleto.celular.slice(2)}`,
-                    celular2: `(${session.dadosCompleto.celularSecundario.slice(
-                      0,
-                      2,
-                    )})${session.dadosCompleto.celularSecundario.slice(2)}`,
+                    celular2: (() => {
+                      const celular2Formatado =
+                        session.dadosCompleto.celularSecundario
+                          .trim()
+                          .replace(/\D/g, "");
+                      return celular2Formatado.length === 11
+                        ? `(${celular2Formatado.slice(0, 2)})${celular2Formatado.slice(2)}`
+                        : celular2Formatado;
+                    })(),
                     estado_res: (session.dadosCompleto.estado || "")
                       .toUpperCase()
                       .replace(/\s/g, "")
                       .slice(0, 2),
-                    bairro_res: session.dadosCompleto.bairro
-                      .toUpperCase()
-                      .trim(),
+                    bairro_res: this.limparEndereco(
+                      session.dadosCompleto.bairro,
+                    ),
                     tipo: "pppoe",
-                    cidade_res: `${session.dadosCompleto.cidade
-                      .trim()
-                      .slice(0, 1)
-                      .toUpperCase()}${session.dadosCompleto.cidade
-                      .trim()
-                      .slice(1)}`,
+                    cidade_res: this.limparEndereco(
+                      session.dadosCompleto.cidade,
+                    ),
                     cep_res: `${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
@@ -1627,12 +1621,12 @@ class WhatsPixController {
                       .trim()
                       .replace(/\s/g, "")
                       .slice(5)}`,
-                    numero_res: session.dadosCompleto.numero
-                      .trim()
-                      .replace(/\s/g, ""),
-                    endereco_res: session.dadosCompleto.rua
-                      .toUpperCase()
-                      .trim(),
+                    numero_res: this.limparEndereco(
+                      session.dadosCompleto.numero,
+                    ),
+                    endereco_res: this.limparEndereco(
+                      session.dadosCompleto.rua,
+                    ),
                     tipo_cob: "titulo",
                     mesref: "now",
                     prilanc: "tot",
@@ -4330,6 +4324,16 @@ class WhatsPixController {
     } catch (error: any) {
       console.error("Erro ao enviar Flow:", error.message);
     }
+  }
+
+  limparEndereco(texto: string) {
+    return (texto || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // remove acentos
+      .replace(/[^a-zA-Z0-9\s]/g, "") // remove tudo que não for letra, número ou espaço
+      .replace(/\s+/g, " ") // tira espaços duplicados
+      .trim()
+      .toUpperCase();
   }
 
   async Flow(req: Request, res: Response): Promise<void> {
