@@ -1425,7 +1425,7 @@ class WhatsPixController {
               "Finalizando....",
               `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
               "Ler o contrato",
-              "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
+              "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
             );
             await this.MensagemBotao(
               celular,
@@ -1824,7 +1824,7 @@ class WhatsPixController {
                 "Finalizando....",
                 `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
                 "Ler o contrato",
-                "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
+                "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
               );
               await this.MensagemTermos(
                 celular,
@@ -3105,7 +3105,7 @@ class WhatsPixController {
         "Finalizando....",
         `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
       );
       await this.MensagemTermos(
         celular,
@@ -3200,7 +3200,7 @@ class WhatsPixController {
         "Finalizando....",
         `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
       );
 
       await this.MensagemBotao(
@@ -3292,7 +3292,7 @@ class WhatsPixController {
         "Finalizando....",
         `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
       );
       await this.MensagemTermos(
         celular,
@@ -3471,7 +3471,7 @@ class WhatsPixController {
         "Finalizando....",
         `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
       );
       await this.MensagemTermos(
         celular,
@@ -3563,7 +3563,7 @@ class WhatsPixController {
         "Finalizando....",
         `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
       );
       await this.MensagemTermos(
         celular,
@@ -3605,7 +3605,7 @@ class WhatsPixController {
       "Termos SCM",
       "📄 Leia também o contrato para provedores de serviços SCM, devidamente registrado em cartório.",
       "Ler Termos",
-      "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
+      "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
     );
 
     await this.MensagemBotao(
