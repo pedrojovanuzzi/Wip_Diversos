@@ -1200,6 +1200,7 @@ class WhatsPixController {
                 if (findLogin) {
                   console.log("Login já existe:", findLogin);
                   dadosFlow.nome = dadosFlow.nome + " " + findLogin.id;
+                  dadosFlow.login = dadosFlow.login + " " + findLogin.id;
                 }
 
                 const celularFormatado = (dadosFlow.celular || "").replace(
