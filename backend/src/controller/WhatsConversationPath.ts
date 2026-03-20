@@ -1132,14 +1132,6 @@ class WhatsPixController {
               const planoFlow = dadosFlow.plano || "";
               session.planoEscolhido = planoFlow;
 
-              await this.MensagemTermos(
-                celular,
-                "Finalizando....",
-                `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
-                "Ler o contrato",
-                "https://wiptelecomunicacoes.com.br/contrato",
-              );
-
               await this.MensagensComuns(
                 celular,
                 `✅ *Cadastro recebido com sucesso!*\n\n` +
@@ -1149,6 +1141,13 @@ class WhatsPixController {
                   `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
                   `📶 *Plano:* ${planoFlow}\n\n` +
                   `💰 O Financeiro vai entrar em contato em breve para finalizar o cadastro!`,
+              );
+
+              await this.MensagensComuns(
+                celular,
+                `🎉 Agora falta pouco para finalizar sua contratação!\n` +
+                  `📩 Enviaremos o link para assinatura dos demais documentos para formalização do contrato.\n` +
+                  `🙏 Agradecemos sua preferência!`,
               );
 
               // === Salvar no MKAuth ===
@@ -1426,7 +1425,7 @@ class WhatsPixController {
               "Finalizando....",
               `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
               "Ler o contrato",
-              "https://wiptelecomunicacoes.com.br/contrato",
+              "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
             );
             await this.MensagemBotao(
               celular,
@@ -1825,7 +1824,7 @@ class WhatsPixController {
                 "Finalizando....",
                 `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
                 "Ler o contrato",
-                "https://wiptelecomunicacoes.com.br/contrato",
+                "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
               );
               await this.MensagemTermos(
                 celular,
@@ -3106,7 +3105,7 @@ class WhatsPixController {
         "Finalizando....",
         `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
-        "https://wiptelecomunicacoes.com.br/contrato",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
       );
       await this.MensagemTermos(
         celular,
@@ -3201,7 +3200,7 @@ class WhatsPixController {
         "Finalizando....",
         `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
-        "https://wiptelecomunicacoes.com.br/contrato",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
       );
 
       await this.MensagemBotao(
@@ -3293,7 +3292,7 @@ class WhatsPixController {
         "Finalizando....",
         `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
-        "https://wiptelecomunicacoes.com.br/contrato",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
       );
       await this.MensagemTermos(
         celular,
@@ -3472,7 +3471,7 @@ class WhatsPixController {
         "Finalizando....",
         `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
-        "https://wiptelecomunicacoes.com.br/contrato",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
       );
       await this.MensagemTermos(
         celular,
@@ -3564,7 +3563,7 @@ class WhatsPixController {
         "Finalizando....",
         `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
-        "https://wiptelecomunicacoes.com.br/contrato",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
       );
       await this.MensagemTermos(
         celular,
@@ -3606,7 +3605,7 @@ class WhatsPixController {
       "Termos SCM",
       "📄 Leia também o contrato para provedores de serviços SCM, devidamente registrado em cartório.",
       "Ler Termos",
-      "https://wiptelecomunicacoes.com.br/contrato",
+      "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contract",
     );
 
     await this.MensagemBotao(
