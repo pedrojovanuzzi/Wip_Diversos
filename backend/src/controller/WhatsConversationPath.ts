@@ -25,6 +25,7 @@ import Sessions from "../entities/APIMK/Sessions";
 import AppDataSource from "../database/DataSource";
 import moment from "moment-timezone";
 import { Queue, Worker, Job } from "bullmq";
+import { log } from "console";
 
 dotenv.config();
 
@@ -4296,6 +4297,50 @@ class WhatsPixController {
                   flow_message_version: "3",
                   flow_name: flowName,
                   flow_cta: ctaText,
+                  flow_token: `sessao_${receivenumber}_${Date.now()}`,
+                  flow_action: "navigate",
+                  flow_action_payload: {
+                    screen: "CADASTRO_COMPLETO",
+                    data: {
+                      // OS DADOS VÃO AQUI! O nome tem que bater com o "${data.planos_do_sistema}" do seu JSON
+                      planos_do_sistema: [
+                        {
+                          id: "_FIBRA_400MEGA",
+                          title: "Fibra Urbano: 400 MEGA - R$ 89,90",
+                        },
+                        {
+                          id: "_FIBRA_500MEGA",
+                          title: "Fibra Urbano: 500 MEGA - R$ 99,90",
+                        },
+                        {
+                          id: "_FIBRA_600MEGA",
+                          title: "Fibra Urbano: 600 MEGA - R$ 109,90",
+                        },
+                        {
+                          id: "_FIBRA_700MEGA",
+                          title: "Fibra Urbano: 700 MEGA - R$ 129,90",
+                        },
+                        {
+                          id: "_FIBRA_800MEGA",
+                          title: "Fibra Urbano: 800 MEGA - R$ 159,90",
+                        },
+                        {
+                          id: "_FIBRA_RURAL_340M",
+                          title: "Fibra Rural: 340 MEGA - R$ 159,90",
+                        },
+                        {
+                          id: "_FIBRA_RURAL_500M",
+                          title: "Fibra Rural: 500 MEGA - R$ 199,90",
+                        },
+                        { id: "_Radio20M", title: "Rádio: 20 MEGA - R$ 89,90" },
+                        {
+                          id: "_Radio30M",
+                          title: "Rádio: 30 MEGA - R$ 119,90",
+                        },
+                      ],
+                    },
+                  },
+                  mode: "published",
                 },
               },
             },
@@ -4323,16 +4368,15 @@ class WhatsPixController {
     try {
       const { body } = req;
       const privatePemPath = path.resolve(__dirname, "..", "..", "private.pem");
+      console.log(body);
 
       if (!fs.existsSync(privatePemPath)) {
         console.error(
           "Arquivo private.pem não encontrado na raiz do projeto. Necessário para WhatsApp Flows.",
         );
-        res
-          .status(500)
-          .json({
-            message: "Servidor não configurado propriamente para Flows",
-          });
+        res.status(500).json({
+          message: "Servidor não configurado propriamente para Flows",
+        });
         return;
       }
 
