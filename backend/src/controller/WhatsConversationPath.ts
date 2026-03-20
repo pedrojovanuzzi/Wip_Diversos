@@ -4322,27 +4322,31 @@ class WhatsPixController {
   async Flow(req: Request, res: Response): Promise<void> {
     try {
       const { body } = req;
-
       const privatePemPath = path.resolve(__dirname, "..", "..", "private.pem");
 
       if (!fs.existsSync(privatePemPath)) {
         console.error(
           "Arquivo private.pem não encontrado na raiz do projeto. Necessário para WhatsApp Flows.",
         );
-        res.status(500).json({
-          message: "Servidor não configurado propriamente para Flows",
-        });
+        res
+          .status(500)
+          .json({
+            message: "Servidor não configurado propriamente para Flows",
+          });
         return;
       }
 
+      // LÊ A CHAVE
       const privatePem = fs.readFileSync(privatePemPath, "utf-8");
 
+      // ABRE O ENVELOPE DA META
       const { decryptedBody, aesKeyBuffer, initialVectorBuffer } =
         decryptFlowRequest(body, privatePem);
-      const { screen, data, version, action, flow_token } = decryptedBody;
+      const { screen, data, action, flow_token } = decryptedBody;
 
       console.log("Recebido via Flow", { action, screen, data, flow_token });
 
+      // 1. AÇÃO PING: Apenas um check de saúde que a Meta faz
       if (action === "ping") {
         const responseData = { data: { status: "active" } };
         res.send(
@@ -4351,13 +4355,43 @@ class WhatsPixController {
         return;
       }
 
-      if (action === "INIT" || action === "data_exchange") {
-        // Retorna tela e dados customizados para o Whatsapp Cliente.
+      // 2. AÇÃO INIT: Cliente abriu o Flow. Vamos injetar os planos dinâmicos.
+      if (action === "INIT") {
         const screenData = {
-          screen: "SUCCESS", // Substitua "SUCCESS" pelo nome da primeira tela do seu Flow
+          screen: "CADASTRO_COMPLETO", // Nome exato da sua primeira tela no JSON
           data: {
-            // Insira os campos esperados pela tela
-            status_message: "Processamento concluído com sucesso!",
+            planos_do_sistema: [
+              {
+                id: "_FIBRA_400MEGA",
+                title: "Fibra Urbano: 400 MEGA - R$ 89,90",
+              },
+              {
+                id: "_FIBRA_500MEGA",
+                title: "Fibra Urbano: 500 MEGA - R$ 99,90",
+              },
+              {
+                id: "_FIBRA_600MEGA",
+                title: "Fibra Urbano: 600 MEGA - R$ 109,90",
+              },
+              {
+                id: "_FIBRA_700MEGA",
+                title: "Fibra Urbano: 700 MEGA - R$ 129,90",
+              },
+              {
+                id: "_FIBRA_800MEGA",
+                title: "Fibra Urbano: 800 MEGA - R$ 159,90",
+              },
+              {
+                id: "_FIBRA_RURAL_340M",
+                title: "Fibra Rural: 340 MEGA - R$ 159,90",
+              },
+              {
+                id: "_FIBRA_RURAL_500M",
+                title: "Fibra Rural: 500 MEGA - R$ 199,90",
+              },
+              { id: "_Radio20M", title: "Rádio: 20 MEGA - R$ 89,90" },
+              { id: "_Radio30M", title: "Rádio: 30 MEGA - R$ 119,90" },
+            ],
           },
         };
 
@@ -4366,12 +4400,44 @@ class WhatsPixController {
         );
         return;
       }
+
+      // 3. AÇÃO DATA_EXCHANGE: Cliente preencheu tudo e apertou "Enviar Cadastro"
+      if (action === "data_exchange") {
+        console.log("🟢 Formulário preenchido pelo cliente:", data);
+
+        // TODO: Aqui você implementa a lógica para salvar no Banco de Dados
+
+        // Retorna o comando para fechar o Flow (ou ir para uma tela de Sucesso)
+        const successScreenData = {
+          screen: "SUCCESS", // Sua tela final no JSON
+          data: {
+            // Este bloco extension_message_response é um padrão da Meta para
+            // finalizar o fluxo e devolver o controle para a conversa
+            extension_message_response: {
+              params: {
+                flow_token: flow_token,
+              },
+            },
+          },
+        };
+
+        res.send(
+          encryptFlowResponse(
+            successScreenData,
+            aesKeyBuffer,
+            initialVectorBuffer,
+          ),
+        );
+        return;
+      }
+
+      // Fallback de segurança para ações desconhecidas
+      res.status(400).send("Ação não suportada pelo endpoint");
     } catch (error) {
       console.error(
         "Erro na descriptografia/processamento do Flow Endpoint:",
         error,
       );
-      // O Guia do Meta Flows recomenda enviar HTTP 421 se o body não puder ser descriptografado.
       res.status(421).send();
     }
   }
