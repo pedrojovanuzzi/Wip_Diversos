@@ -7,6 +7,7 @@ import { Faturas } from "../entities/Faturas";
 import { Radacct } from "../entities/Radacct";
 import { Sis_prodCliente } from "../entities/Sis_prodCliente";
 import { SisProduto } from "../entities/SisProduto";
+import { SisPlano } from "../entities/SisPlano";
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ const AppDataSource = new DataSource({
     Radacct,
     Sis_prodCliente,
     SisProduto,
+    SisPlano,
   ],
   synchronize: false,
   database: process.env.DATABASE_API,

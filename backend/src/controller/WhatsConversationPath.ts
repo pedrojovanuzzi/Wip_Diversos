@@ -4,7 +4,8 @@ import {
   ClientesEntities,
   ClientesEntities as Sis_Cliente,
 } from "../entities/ClientesEntities";
-import { getRepository, In, IsNull } from "typeorm";
+import { SisPlano } from "../entities/SisPlano";
+import { getRepository, In, IsNull, Like } from "typeorm";
 import ApiMkDataSource from "../database/API_MK";
 import MkauthDataSource from "../database/MkauthSource";
 import EfiPay from "sdk-node-apis-efi";
@@ -226,6 +227,7 @@ class WhatsPixController {
     this.verify = this.verify.bind(this);
     this.saveSession = this.saveSession.bind(this);
     this.deleteSession = this.deleteSession.bind(this);
+    this.getPlanosDoSistema = this.getPlanosDoSistema.bind(this);
   }
 
   async saveSession(celular: string) {
@@ -1340,24 +1342,13 @@ class WhatsPixController {
         case "plan":
           if (this.verificaType(type)) {
             let planoEscolhido;
-            if (texto === "🟣 400 MEGA R$ 89,90") {
-              planoEscolhido = "🟣 400 MEGA R$ 89,90";
-            } else if (texto === "🟩 500 MEGA R$ 99,90") {
-              planoEscolhido = "🟩 500 MEGA R$ 99,90";
-            } else if (texto === "🔴 600 MEGA R$ 109,90") {
-              planoEscolhido = "🔴 600 MEGA R$ 109,90";
-            } else if (texto === "🟡 700 MEGA R$ 129,90") {
-              planoEscolhido = "🟡 700 MEGA R$ 129,90";
-            } else if (texto === "🟦 800 MEGA R$ 159,90") {
-              planoEscolhido = "🟦 800 MEGA R$ 159,90";
-            } else if (texto === "🟤 340 MEGA R$ 159,90") {
-              planoEscolhido = "🟤 340 MEGA R$ 159,90";
-            } else if (texto === "🟠 500 MEGA R$ 199,90") {
-              planoEscolhido = "🟠 500 MEGA R$ 199,90";
-            } else if (texto === "🟩 20 MEGA R$ 89,90") {
-              planoEscolhido = "🟩 20 MEGA R$ 89,90";
-            } else if (texto === "🟦 30 MEGA R$ 119,90") {
-              planoEscolhido = "🟦 30 MEGA R$ 119,90";
+            const planosDoSistema = await this.getPlanosDoSistema();
+            const planoEncontrado = planosDoSistema.find(
+              (p) => p.title === texto,
+            );
+
+            if (planoEncontrado) {
+              planoEscolhido = planoEncontrado.title;
             } else {
               await this.MensagensComuns(
                 celular,
@@ -2992,31 +2983,15 @@ class WhatsPixController {
         celular,
         "🛜 Vamos escolher o seu *Plano de Internet*",
       );
+      const planosDoSistema = await this.getPlanosDoSistema();
       await this.MensagemLista(celular, "Escolha seu Plano:", {
         sections: [
           {
-            title: "Fibra (Urbano)",
-            rows: [
-              { id: "option_1", title: "🟣 400 MEGA R$ 89,90" },
-              { id: "option_2", title: "🟩 500 MEGA R$ 99,90" },
-              { id: "option_3", title: "🔴 600 MEGA R$ 109,90" },
-              { id: "option_4", title: "🟡 700 MEGA R$ 129,90" },
-              { id: "option_5", title: "🟦 800 MEGA R$ 159,90" },
-            ],
-          },
-          {
-            title: "Fibra (Rural)",
-            rows: [
-              { id: "option_6", title: "🟤 340 MEGA R$ 159,90" },
-              { id: "option_7", title: "🟠 500 MEGA R$ 199,90" },
-            ],
-          },
-          {
-            title: "Rádio (Consultar)",
-            rows: [
-              { id: "option_9", title: "🟩 20 MEGA R$ 89,90" },
-              { id: "option_10", title: "🟦 30 MEGA R$ 119,90" },
-            ],
+            title: "Planos Disponíveis",
+            rows: planosDoSistema.slice(0, 10).map((p) => ({
+              id: p.id,
+              title: p.title,
+            })),
           },
         ],
       });
@@ -4275,8 +4250,36 @@ class WhatsPixController {
     }
   }
 
+  async getPlanosDoSistema() {
+    try {
+      const planoRepository = MkauthDataSource.getRepository(SisPlano);
+      const planos = await planoRepository.find({
+        where: {
+          nome: Like("\\_%"),
+        },
+        order: {
+          nome: "ASC",
+        },
+      });
+
+      console.log(
+        `🔍 [getPlanosDoSistema] ${planos.length} planos encontrados.`,
+      );
+
+      return planos.map((p) => ({
+        id: p.nome,
+        title: `${p.nome.replace(/_/g, " ").trim()} - R$ ${Number((p.valor || "0").replace(",", ".")).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+      }));
+    } catch (error: any) {
+      console.error("❌ [getPlanosDoSistema] Erro ao buscar planos:", error);
+      return [];
+    }
+  }
+
   async MensagemFlow(receivenumber: any, flowName: string, ctaText: string) {
     try {
+      const planosDoSistema = await this.getPlanosDoSistema();
+
       await whatsappOutgoingQueue.add(
         "send-flow",
         {
@@ -4302,42 +4305,7 @@ class WhatsPixController {
                   flow_action_payload: {
                     screen: "CADASTRO_COMPLETO",
                     data: {
-                      // OS DADOS VÃO AQUI! O nome tem que bater com o "${data.planos_do_sistema}" do seu JSON
-                      planos_do_sistema: [
-                        {
-                          id: "_FIBRA_400MEGA",
-                          title: "Fibra Urbano: 400 MEGA - R$ 89,90",
-                        },
-                        {
-                          id: "_FIBRA_500MEGA",
-                          title: "Fibra Urbano: 500 MEGA - R$ 99,90",
-                        },
-                        {
-                          id: "_FIBRA_600MEGA",
-                          title: "Fibra Urbano: 600 MEGA - R$ 109,90",
-                        },
-                        {
-                          id: "_FIBRA_700MEGA",
-                          title: "Fibra Urbano: 700 MEGA - R$ 129,90",
-                        },
-                        {
-                          id: "_FIBRA_800MEGA",
-                          title: "Fibra Urbano: 800 MEGA - R$ 159,90",
-                        },
-                        {
-                          id: "_FIBRA_RURAL_340M",
-                          title: "Fibra Rural: 340 MEGA - R$ 159,90",
-                        },
-                        {
-                          id: "_FIBRA_RURAL_500M",
-                          title: "Fibra Rural: 500 MEGA - R$ 199,90",
-                        },
-                        { id: "_Radio20M", title: "Rádio: 20 MEGA - R$ 89,90" },
-                        {
-                          id: "_Radio30M",
-                          title: "Rádio: 30 MEGA - R$ 119,90",
-                        },
-                      ],
+                      planos_do_sistema: planosDoSistema,
                     },
                   },
                   mode: "published",
@@ -4401,41 +4369,11 @@ class WhatsPixController {
 
       // 2. AÇÃO INIT: Cliente abriu o Flow. Vamos injetar os planos dinâmicos.
       if (action === "INIT") {
+        const planosDoSistema = await this.getPlanosDoSistema();
         const screenData = {
           screen: "CADASTRO_COMPLETO", // Nome exato da sua primeira tela no JSON
           data: {
-            planos_do_sistema: [
-              {
-                id: "_FIBRA_400MEGA",
-                title: "Fibra Urbano: 400 MEGA - R$ 89,90",
-              },
-              {
-                id: "_FIBRA_500MEGA",
-                title: "Fibra Urbano: 500 MEGA - R$ 99,90",
-              },
-              {
-                id: "_FIBRA_600MEGA",
-                title: "Fibra Urbano: 600 MEGA - R$ 109,90",
-              },
-              {
-                id: "_FIBRA_700MEGA",
-                title: "Fibra Urbano: 700 MEGA - R$ 129,90",
-              },
-              {
-                id: "_FIBRA_800MEGA",
-                title: "Fibra Urbano: 800 MEGA - R$ 159,90",
-              },
-              {
-                id: "_FIBRA_RURAL_340M",
-                title: "Fibra Rural: 340 MEGA - R$ 159,90",
-              },
-              {
-                id: "_FIBRA_RURAL_500M",
-                title: "Fibra Rural: 500 MEGA - R$ 199,90",
-              },
-              { id: "_Radio20M", title: "Rádio: 20 MEGA - R$ 89,90" },
-              { id: "_Radio30M", title: "Rádio: 30 MEGA - R$ 119,90" },
-            ],
+            planos_do_sistema: planosDoSistema,
           },
         };
 
