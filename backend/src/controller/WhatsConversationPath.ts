@@ -1089,17 +1089,17 @@ class WhatsPixController {
               if (!cpfValido || !rgValido) {
                 let msgErro = "⚠️ *Atenção!*\n\n";
                 if (!cpfValido && !rgValido) {
-                  msgErro += "O *CPF* e o *RG* informados são inválidos.\n";
+                  msgErro += "O *CPF* e o *RG/IE* informados são inválidos.\n";
                 } else if (!cpfValido) {
                   msgErro += "O *CPF* informado é inválido.\n";
                 } else {
-                  msgErro += "O *RG* informado é inválido.\n";
+                  msgErro += "O *RG/IE* informado é inválido.\n";
                 }
 
                 await this.MensagensComuns(
                   celular,
                   msgErro +
-                    "Por favor, verifique os dados e preencha o formulário novamente.",
+                  "Por favor, verifique os dados e preencha o formulário novamente.",
                 );
 
                 // Reenvia o Flow pedindo para preencher de novo
@@ -1143,12 +1143,12 @@ class WhatsPixController {
               await this.MensagensComuns(
                 celular,
                 `✅ *Cadastro recebido com sucesso!*\n\n` +
-                  `👤 *Nome:* ${dadosFlow.nome}\n` +
-                  `📄 *CPF:* ${dadosFlow.cpf}\n` +
-                  `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
-                  `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
-                  `📶 *Plano:* ${planoFlow}\n\n` +
-                  `💰 O Financeiro vai entrar em contato em breve para finalizar o cadastro!`,
+                `👤 *Nome:* ${dadosFlow.nome}\n` +
+                `📄 *CPF:* ${dadosFlow.cpf}\n` +
+                `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
+                `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
+                `📶 *Plano:* ${planoFlow}\n\n` +
+                `💰 O Financeiro vai entrar em contato em breve para finalizar o cadastro!`,
               );
 
               // === Salvar no MKAuth ===
@@ -1296,7 +1296,7 @@ class WhatsPixController {
                 `📋 *Novo Cadastro via Flow*\n\n` +
                 `👤 *Nome:* ${dadosFlow.nome}\n` +
                 `📄 *CPF:* ${dadosFlow.cpf}\n` +
-                `🪪 *RG:* ${dadosFlow.rg}\n` +
+                `🪪 *RG/IE:* ${dadosFlow.rg}\n` +
                 `🎂 *Nascimento:* ${dadosFlow.dataNascimento}\n` +
                 `📱 *Celular:* ${dadosFlow.celular}\n` +
                 `📧 *Email:* ${dadosFlow.email}\n` +
@@ -1310,7 +1310,7 @@ class WhatsPixController {
                 `<h3>Novo Cadastro via WhatsApp Flow</h3>` +
                 `<p><b>Nome:</b> ${dadosFlow.nome}</p>` +
                 `<p><b>CPF:</b> ${dadosFlow.cpf}</p>` +
-                `<p><b>RG:</b> ${dadosFlow.rg}</p>` +
+                `<p><b>RG/IE:</b> ${dadosFlow.rg}</p>` +
                 `<p><b>Nascimento:</b> ${dadosFlow.dataNascimento}</p>` +
                 `<p><b>Celular:</b> ${dadosFlow.celular}</p>` +
                 `<p><b>Email:</b> ${dadosFlow.email}</p>` +
@@ -1571,8 +1571,8 @@ class WhatsPixController {
                       .trim()
                       .slice(0, 1)
                       .toUpperCase()}${session.dadosCompleto.cidade
-                      .trim()
-                      .slice(1)}`,
+                        .trim()
+                        .slice(1)}`,
                     bairro: session.dadosCompleto.bairro.toUpperCase().trim(),
                     estado: (session.dadosCompleto.estado || "")
                       .toUpperCase()
@@ -1590,9 +1590,9 @@ class WhatsPixController {
                       .trim()
                       .replace(/\s/g, "")
                       .slice(0, 5)}-${session.dadosCompleto.cep
-                      .trim()
-                      .replace(/\s/g, "")
-                      .slice(5)}`,
+                        .trim()
+                        .replace(/\s/g, "")
+                        .slice(5)}`,
                     plano: session.planoEscolhido,
                     pool_name: "LAN_PPPOE",
                     plano15: "Plano_15",
@@ -1626,15 +1626,15 @@ class WhatsPixController {
                       .trim()
                       .slice(0, 1)
                       .toUpperCase()}${session.dadosCompleto.cidade
-                      .trim()
-                      .slice(1)}`,
+                        .trim()
+                        .slice(1)}`,
                     cep_res: `${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
                       .slice(0, 5)}-${session.dadosCompleto.cep
-                      .trim()
-                      .replace(/\s/g, "")
-                      .slice(5)}`,
+                        .trim()
+                        .replace(/\s/g, "")
+                        .slice(5)}`,
                     numero_res: session.dadosCompleto.numero
                       .trim()
                       .replace(/\s/g, ""),
@@ -2846,7 +2846,7 @@ class WhatsPixController {
             this.deleteSession(celular);
             console.log(
               "Clientes Utilizando o Bot no momento: " +
-                this.getActiveSessionsCount(),
+              this.getActiveSessionsCount(),
             );
           } else {
             await this.MensagensComuns(
@@ -4056,8 +4056,8 @@ class WhatsPixController {
     // Remove tudo que não for número
     rg = rg.replace(/[^\d]+/g, "");
 
-    // Valida o comprimento do RG (geralmente varia entre 7 e 10 dígitos)
-    if (rg.length < 7 || rg.length > 10) return false;
+    // Valida o comprimento do RG/IE (RG geralmente varia entre 7 e 10 dígitos, IE pode chegar a 14)
+    if (rg.length < 7 || rg.length > 14) return false;
 
     // Verifica se todos os dígitos são iguais (não permitido)
     if (/^(\d)\1+$/.test(rg)) return false;
