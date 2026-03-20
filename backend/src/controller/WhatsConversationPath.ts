@@ -1099,7 +1099,7 @@ class WhatsPixController {
                 await this.MensagensComuns(
                   celular,
                   msgErro +
-                  "Por favor, verifique os dados e preencha o formulário novamente.",
+                    "Por favor, verifique os dados e preencha o formulário novamente.",
                 );
 
                 // Reenvia o Flow pedindo para preencher de novo
@@ -1143,12 +1143,12 @@ class WhatsPixController {
               await this.MensagensComuns(
                 celular,
                 `✅ *Cadastro recebido com sucesso!*\n\n` +
-                `👤 *Nome:* ${dadosFlow.nome}\n` +
-                `📄 *CPF:* ${dadosFlow.cpf}\n` +
-                `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
-                `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
-                `📶 *Plano:* ${planoFlow}\n\n` +
-                `💰 O Financeiro vai entrar em contato em breve para finalizar o cadastro!`,
+                  `👤 *Nome:* ${dadosFlow.nome}\n` +
+                  `📄 *CPF:* ${dadosFlow.cpf}\n` +
+                  `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
+                  `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
+                  `📶 *Plano:* ${planoFlow}\n\n` +
+                  `💰 O Financeiro vai entrar em contato em breve para finalizar o cadastro!`,
               );
 
               // === Salvar no MKAuth ===
@@ -1571,8 +1571,8 @@ class WhatsPixController {
                       .trim()
                       .slice(0, 1)
                       .toUpperCase()}${session.dadosCompleto.cidade
-                        .trim()
-                        .slice(1)}`,
+                      .trim()
+                      .slice(1)}`,
                     bairro: session.dadosCompleto.bairro.toUpperCase().trim(),
                     estado: (session.dadosCompleto.estado || "")
                       .toUpperCase()
@@ -1590,9 +1590,9 @@ class WhatsPixController {
                       .trim()
                       .replace(/\s/g, "")
                       .slice(0, 5)}-${session.dadosCompleto.cep
-                        .trim()
-                        .replace(/\s/g, "")
-                        .slice(5)}`,
+                      .trim()
+                      .replace(/\s/g, "")
+                      .slice(5)}`,
                     plano: session.planoEscolhido,
                     pool_name: "LAN_PPPOE",
                     plano15: "Plano_15",
@@ -1626,15 +1626,15 @@ class WhatsPixController {
                       .trim()
                       .slice(0, 1)
                       .toUpperCase()}${session.dadosCompleto.cidade
-                        .trim()
-                        .slice(1)}`,
+                      .trim()
+                      .slice(1)}`,
                     cep_res: `${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
                       .slice(0, 5)}-${session.dadosCompleto.cep
-                        .trim()
-                        .replace(/\s/g, "")
-                        .slice(5)}`,
+                      .trim()
+                      .replace(/\s/g, "")
+                      .slice(5)}`,
                     numero_res: session.dadosCompleto.numero
                       .trim()
                       .replace(/\s/g, ""),
@@ -2846,7 +2846,7 @@ class WhatsPixController {
             this.deleteSession(celular);
             console.log(
               "Clientes Utilizando o Bot no momento: " +
-              this.getActiveSessionsCount(),
+                this.getActiveSessionsCount(),
             );
           } else {
             await this.MensagensComuns(
@@ -3600,9 +3600,18 @@ class WhatsPixController {
       "Ler Termos",
       "https://wipdiversos.wiptelecomunicacoes.com.br/doc/privacidade",
     );
+
+    await this.MensagemTermos(
+      celular,
+      "Termos SCM",
+      "📄 Leia também o contrato para provedores de serviços SCM, devidamente registrado em cartório.",
+      "Ler Termos",
+      "https://wiptelecomunicacoes.com.br/contrato",
+    );
+
     await this.MensagemBotao(
       celular,
-      "Concorda com os Termos?",
+      "Aceita as informações?",
       "Sim Aceito",
       "Não",
     );
