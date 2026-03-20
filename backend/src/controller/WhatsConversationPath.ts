@@ -1134,8 +1134,8 @@ class WhatsPixController {
 
               await this.MensagemTermos(
                 celular,
-                "Contrato Hospedado",
-                "Este é o Nosso Contrato Oficial Completo",
+                "Finalizando....",
+                `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
                 "Ler o contrato",
                 "https://wiptelecomunicacoes.com.br/contrato",
               );
@@ -1423,8 +1423,8 @@ class WhatsPixController {
             );
             await this.MensagemTermos(
               celular,
-              "Contrato Hospedado",
-              "Este é o Nosso Contrato Oficial Completo",
+              "Finalizando....",
+              `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
               "Ler o contrato",
               "https://wiptelecomunicacoes.com.br/contrato",
             );
@@ -1822,8 +1822,8 @@ class WhatsPixController {
             if (texto.toLowerCase() === "sim") {
               await this.MensagemTermos(
                 celular,
-                "Contrato Hospedado",
-                "Este é o Nosso Contrato Oficial Completo",
+                "Finalizando....",
+                `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
                 "Ler o contrato",
                 "https://wiptelecomunicacoes.com.br/contrato",
               );
@@ -3103,8 +3103,8 @@ class WhatsPixController {
 
       await this.MensagemTermos(
         celular,
-        "Contrato Hospedado",
-        "Este é o Nosso Contrato Oficial Completo",
+        "Finalizando....",
+        `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
         "https://wiptelecomunicacoes.com.br/contrato",
       );
@@ -3198,8 +3198,8 @@ class WhatsPixController {
 
       await this.MensagemTermos(
         celular,
-        "Contrato Hospedado",
-        "Este é o Nosso Contrato Oficial Completo",
+        "Finalizando....",
+        `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
         "https://wiptelecomunicacoes.com.br/contrato",
       );
@@ -3290,8 +3290,8 @@ class WhatsPixController {
       console.log("Dados atualizados:", session.dadosCadastro);
       await this.MensagemTermos(
         celular,
-        "Contrato Hospedado",
-        "Este é o Nosso Contrato Oficial Completo",
+        "Finalizando....",
+        `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
         "https://wiptelecomunicacoes.com.br/contrato",
       );
@@ -3469,8 +3469,8 @@ class WhatsPixController {
       console.log("Dados atualizados:", session.dadosCadastro);
       await this.MensagemTermos(
         celular,
-        "Contrato Hospedado",
-        "Este é o Nosso Contrato Oficial Completo",
+        "Finalizando....",
+        `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
         "https://wiptelecomunicacoes.com.br/contrato",
       );
@@ -3561,8 +3561,8 @@ class WhatsPixController {
       console.log("Dados atualizados:", session.dadosCadastro);
       await this.MensagemTermos(
         celular,
-        "Contrato Hospedado",
-        "Este é o Nosso Contrato Oficial Completo",
+        "Finalizando....",
+        `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
         "Ler o contrato",
         "https://wiptelecomunicacoes.com.br/contrato",
       );
