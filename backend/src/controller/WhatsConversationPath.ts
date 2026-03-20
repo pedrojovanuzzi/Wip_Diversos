@@ -1148,9 +1148,9 @@ class WhatsPixController {
 
               await this.MensagensComuns(
                 celular,
-                `🎉 Agora falta pouco para finalizar sua contratação!\n` +
-                  `📩 Enviaremos o link para assinatura dos demais documentos para formalização do contrato.\n` +
-                  `🙏 Agradecemos sua preferência!`,
+                `🎉 *Agora falta pouco para finalizar sua contratação!*\n` +
+                  `📩 Enviaremos o *link* para assinatura dos demais *documentos* para formalização do contrato.\n` +
+                  `🙏 *Agradecemos sua preferência!*`,
               );
 
               // === Salvar no MKAuth ===
