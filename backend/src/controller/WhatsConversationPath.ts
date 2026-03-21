@@ -229,6 +229,7 @@ class WhatsPixController {
     this.deleteSession = this.deleteSession.bind(this);
     this.getPlanosDoSistema = this.getPlanosDoSistema.bind(this);
     this.limparEndereco = this.limparEndereco.bind(this);
+    this.Flow = this.Flow.bind(this);
   }
 
   async saveSession(celular: string) {
@@ -3009,13 +3010,6 @@ class WhatsPixController {
 
     await this.MensagemTermos(
       celular,
-      "Finalizando....",
-      `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
-      "Ler o contrato",
-      "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
-    );
-    await this.MensagemTermos(
-      celular,
       "Termos Mudança de Endereço",
       "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
       "Ler Termos",
@@ -3189,55 +3183,58 @@ class WhatsPixController {
       try {
         const payload = JSON.parse(texto);
         if (payload.flow_token) {
-           
-           // Recarrega a sessão do banco para garantir que temos as atualizações
-           // feitas pelo processo do webhook (data_exchange) paralelo.
-           let dadosFlow = session.dadosCadastro;
-           try {
-             const dbSession = await ApiMkDataSource.getRepository(Sessions).findOne({ where: { celular } });
-             if (dbSession && dbSession.dados) {
-                dadosFlow = dbSession.dados.dadosCadastro;
-                // Atualiza a sessão em memória do worker
-                session.dadosCadastro = dadosFlow;
-             }
-           } catch(e) {
-             console.error("Erro ao recarregar sessão:", e);
-           }
+          // Recarrega a sessão do banco para garantir que temos as atualizações
+          // feitas pelo processo do webhook (data_exchange) paralelo.
+          let dadosFlow = session.dadosCadastro;
+          try {
+            const dbSession = await ApiMkDataSource.getRepository(
+              Sessions,
+            ).findOne({ where: { celular } });
+            if (dbSession && dbSession.dados) {
+              dadosFlow = dbSession.dados.dadosCadastro;
+              // Atualiza a sessão em memória do worker
+              session.dadosCadastro = dadosFlow;
+            }
+          } catch (e) {
+            console.error("Erro ao recarregar sessão:", e);
+          }
 
-           // Check if it's properly populated
-           if (dadosFlow && Object.keys(dadosFlow).length > 0) {
-              const resumoMudanca = `🔄 *Nova Solicitação de Mudança de Endereço*\n\n` +
-                 `👤 *Nome:* ${dadosFlow.nome}\n` +
-                 `📄 *CPF:* ${dadosFlow.cpf}\n` +
-                 `📱 *Celular:* ${dadosFlow.celular}\n` +
-                 `🔑 *Login Escolhido:* ${dadosFlow.login}\n` +
-                 `📍 *Antigo Endereço:* ${dadosFlow.endereco_antigo}\n` +
-                 `🆕 *Novo Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}\n` +
-                 `📮 *CEP:* ${dadosFlow.cep}`;
+          // Check if it's properly populated
+          if (dadosFlow && Object.keys(dadosFlow).length > 0) {
+            const resumoMudanca =
+              `🔄 *Nova Solicitação de Mudança de Endereço*\n\n` +
+              `👤 *Nome:* ${dadosFlow.nome}\n` +
+              `📄 *CPF:* ${dadosFlow.cpf}\n` +
+              `📱 *Celular:* ${dadosFlow.celular}\n` +
+              `🔑 *Login Escolhido:* ${dadosFlow.login}\n` +
+              `📍 *Antigo Endereço:* ${dadosFlow.endereco_antigo}\n` +
+              `🆕 *Novo Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}\n` +
+              `📮 *CEP:* ${dadosFlow.cep}`;
 
-              const resumoEmailHtml = `<h3>Solicitação de Mudança de Endereço</h3>` +
-                 `<p><b>Nome:</b> ${dadosFlow.nome}</p>` +
-                 `<p><b>CPF:</b> ${dadosFlow.cpf}</p>` +
-                 `<p><b>Celular:</b> ${dadosFlow.celular}</p>` +
-                 `<p><b>Login Escolhido:</b> ${dadosFlow.login}</p>` +
-                 `<p><b>Antigo Endereço:</b> ${dadosFlow.endereco_antigo}</p>` +
-                 `<p><b>Novo Endereço:</b> ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}</p>` +
-                 `<p><b>CEP:</b> ${dadosFlow.cep}</p>`;
+            const resumoEmailHtml =
+              `<h3>Solicitação de Mudança de Endereço</h3>` +
+              `<p><b>Nome:</b> ${dadosFlow.nome}</p>` +
+              `<p><b>CPF:</b> ${dadosFlow.cpf}</p>` +
+              `<p><b>Celular:</b> ${dadosFlow.celular}</p>` +
+              `<p><b>Login Escolhido:</b> ${dadosFlow.login}</p>` +
+              `<p><b>Antigo Endereço:</b> ${dadosFlow.endereco_antigo}</p>` +
+              `<p><b>Novo Endereço:</b> ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}</p>` +
+              `<p><b>CEP:</b> ${dadosFlow.cep}</p>`;
 
-              try {
-                  // @ts-ignore
-                  if (typeof mailOptions === 'function') {
-                      // @ts-ignore
-                      mailOptions(resumoEmailHtml);
-                  }
-              } catch (e) {
-                  console.error("Erro ao enviar email de mudança de endereço:", e);
+            try {
+              // @ts-ignore
+              if (typeof mailOptions === "function") {
+                // @ts-ignore
+                mailOptions(resumoEmailHtml);
               }
+            } catch (e) {
+              console.error("Erro ao enviar email de mudança de endereço:", e);
+            }
 
-              await this.Finalizar(resumoMudanca, celular, sessions);
-              await this.finalizarMudancaEndereco(celular, session);
-              return;
-           }
+            await this.Finalizar(resumoMudanca, celular, sessions);
+            await this.finalizarMudancaEndereco(celular, session);
+            return;
+          }
         }
       } catch (e) {
         // Ignora erro de parse, pois pode ser texto normal enviado pelo usuário
@@ -4601,12 +4598,25 @@ class WhatsPixController {
         console.log("🟢 Formulário preenchido pelo cliente:", data);
 
         // Verifica se é o flow de mudança de endereço
-        if (data.action === "submit_mudanca_endereco") {
+        if (screen === "MUDANCA_ENDERECO") {
           const celular = flow_token.split("_")[1];
+
+          if (!sessions[celular]) {
+            const dbSession = await ApiMkDataSource.getRepository(
+              Sessions,
+            ).findOne({ where: { celular } });
+            if (dbSession) {
+              sessions[celular] = {
+                stage: dbSession.stage,
+                ...dbSession.dados,
+              };
+            }
+          }
+
           const session = sessions[celular];
 
           if (session) {
-             session.dadosCadastro = {
+            session.dadosCadastro = {
               login: session.login,
               endereco_antigo: session.endereco_antigo,
               nome: this.limparEndereco(data.nome),
@@ -4621,7 +4631,7 @@ class WhatsPixController {
             // Salvar no banco explicitamente para outros processos (como o BullMQ worker) enxergarem
             try {
               await this.saveSession(celular);
-            } catch(e) {
+            } catch (e) {
               console.error("Erro ao salvar sessão do Webhook Flow", e);
             }
 
