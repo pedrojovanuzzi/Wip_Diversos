@@ -3128,7 +3128,7 @@ class WhatsPixController {
 
             await this.MensagensComuns(
               celular,
-              "✅ *Recebemos a sua solicitação!* \nEntraremos em contato em breve para agendar a sua mudança de endereço. Obrigado!",
+              "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link de assinatura da Renovação Contratual com período de 12 meses*. Obrigado pela confiança",
             );
 
             session.stage = "finalizar";
