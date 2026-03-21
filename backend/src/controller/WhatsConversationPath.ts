@@ -3003,6 +3003,36 @@ class WhatsPixController {
     }
   }
 
+  async finalizarMudancaEndereco(celular: string, session: any) {
+    console.log("Dados atualizados:", session.dadosCadastro);
+
+    await this.MensagemTermos(
+      celular,
+      "Finalizando....",
+      `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
+      "Ler o contrato",
+      "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
+    );
+    await this.MensagemTermos(
+      celular,
+      "Termos Mudança de Endereço",
+      "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
+      "Ler Termos",
+      "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_endereco",
+    );
+    await this.MensagemBotao(celular, "Escolha a Forma", "Grátis", "Paga");
+    session.stage = "choose_type_endereco";
+
+    // Aqui você armazena todos os dados na sessão
+    session.dadosCompleto = {
+      ...session.dadosCadastro, // Inclui todos os dados do cadastro
+    };
+
+    // Finaliza o cadastro
+    session.dadosCadastro = null;
+    session.ultimaPergunta = null;
+  }
+
   async iniciarMudanca(celular: any, texto: any, session: any, type: any) {
     console.log("Mudança Type: " + type);
 
@@ -3014,88 +3044,151 @@ class WhatsPixController {
       return;
     }
 
-    const perguntas = [
-      { campo: "nome", pergunta: "➡️ Digite seu *nome completo*:" },
-      { campo: "cpf", pergunta: "➡️ Digite seu *CPF/CNPJ*:" },
-      { campo: "celular", pergunta: "➡️ Digite seu *Celular* com *DDD*:" },
-      {
-        campo: "novo_endereco",
-        pergunta: "➡️ Digite seu *Novo Endereço*: (Rua e Numero)",
-      },
-      { campo: "novo_bairro", pergunta: "➡️ Digite seu *Novo Bairro*:" },
-      { campo: "cep", pergunta: "➡️ Digite seu *CEP*:" },
-    ];
-
-    // Se a sessão ainda não foi iniciada ou estamos começando, inicia o cadastro
-    if (!session.dadosCadastro || session.ultimaPergunta === null) {
+    if (!session.mudancaStep) {
       console.log("Iniciando mudança...");
+      session.mudancaStep = "ask_cpf";
       await this.MensagensComuns(
         celular,
-        "🔤 Pronto, agora vamos coletar todos os *Dados* para realizar a mudança de endereço",
+        "Para iniciar a mudança de endereço, por favor digite o seu *CPF/CNPJ*:",
       );
-      session.dadosCadastro = {}; // Inicializa os dados do cadastro
-      session.ultimaPergunta = perguntas[0].campo; // Começa com a primeira pergunta
-      await this.MensagensComuns(celular, perguntas[0].pergunta); // Envia a primeira pergunta
+      session.stage = "mudanca_endereco"; // garante que volta para iniciarMudanca
       return;
     }
 
-    // Se existe uma última pergunta, armazena a resposta
-    const ultimaPergunta = session.ultimaPergunta;
-    if (ultimaPergunta) {
-      // Valida o CPF antes de prosseguir
-      if (ultimaPergunta === "cpf") {
-        const cpfValido = await this.validarCPF(texto);
-        if (!cpfValido) {
-          await this.MensagensComuns(
-            celular,
-            "❌ *CPF* inválido. Por favor, insira um *CPF* válido.",
-          );
-          return; // Não avança para a próxima pergunta
-        }
+    if (session.mudancaStep === "ask_cpf") {
+      const cpf = texto.replace(/[^\d]+/g, "");
+      const cpfValido = await this.validarCPF(texto);
+
+      if (!cpfValido && cpf.length !== 14 && cpf.length !== 11) {
+        await this.MensagensComuns(
+          celular,
+          "❌ *CPF/CNPJ* inválido. Por favor, verifique e digite novamente.",
+        );
+        return;
       }
 
-      session.dadosCadastro[ultimaPergunta] = texto; // Armazena a resposta
-      console.log(`Resposta para ${ultimaPergunta}:`, texto);
-      console.log("Dados atualizados:", session.dadosCadastro);
+      session.cpf = cpf;
+
+      const sis_cliente = await MkauthDataSource.getRepository(
+        Sis_Cliente,
+      ).find({
+        select: {
+          id: true,
+          nome: true,
+          endereco: true,
+          login: true,
+          numero: true,
+        },
+        where: { cpf_cnpj: cpf, cli_ativado: "s" },
+      });
+
+      if (sis_cliente.length > 1) {
+        let currentIndex = 1;
+        let structuredData = sis_cliente.map((client) => {
+          return {
+            index: currentIndex++,
+            id: Number(client.id),
+            nome: client.nome,
+            endereco: client.endereco,
+            login: client.login,
+            numero: client.numero,
+            cpf: cpf,
+          };
+        });
+
+        session.structuredData = structuredData;
+        session.mudancaStep = "select_address";
+
+        let messageText =
+          "🔍 Encontramos mais de um *Cadastro!* Digite o *Número* para o qual deseja realizar a Mudança de Endereço 👇🏻\n\n";
+        structuredData.forEach((client) => {
+          messageText += `*${client.index}* Nome: ${client.nome}, Endereço atual: ${client.endereco} N: ${client.numero}\n\n`;
+        });
+        messageText += "👉🏻 Caso queira cancelar digite *início*";
+
+        await this.MensagensComuns(celular, messageText);
+        return;
+      } else if (sis_cliente.length === 1) {
+        session.login = sis_cliente[0].login;
+        session.endereco_antigo = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
+        session.mudancaStep = "flow";
+        session.dadosCadastro = {};
+        session.stage = "awaiting_mudanca_flow";
+
+        await this.MensagensComuns(
+          celular,
+          "🔤 Cadastro encontrado! Clique no botão abaixo para preencher o formulário com o *Novo Endereço*.",
+        );
+        await this.MensagemFlowEndereco(
+          celular,
+          "mudanca_endereco",
+          "Preencher Formulário",
+        );
+        return;
+      } else {
+        await this.MensagensComuns(
+          celular,
+          "🙁 Seu cadastro *não* foi *encontrado*, verifique se digitou corretamente o seu *CPF/CNPJ* ou digite *início* para voltar.",
+        );
+        return;
+      }
     }
 
-    // Encontra a próxima pergunta
-    const proximaPerguntaIndex =
-      perguntas.findIndex((q) => q.campo === ultimaPergunta) + 1;
+    if (session.mudancaStep === "select_address") {
+      if (
+        texto.toLowerCase() === "inicio" ||
+        texto.toLowerCase() === "início"
+      ) {
+        await this.boasVindas(celular);
+        await this.MensagemBotao(
+          celular,
+          "Escolha um Botão",
+          "Boleto/Pix",
+          "Serviços/Contratação",
+          "Falar com Atendente",
+        );
+        session.stage = "options_start";
+        return;
+      }
 
-    if (proximaPerguntaIndex < perguntas.length) {
-      const proximaPergunta = perguntas[proximaPerguntaIndex].pergunta;
-      session.ultimaPergunta = perguntas[proximaPerguntaIndex].campo; // Atualiza para a próxima pergunta
-      console.log("Próxima pergunta:", proximaPergunta);
-      await this.MensagensComuns(celular, proximaPergunta); // Envia a próxima pergunta
-    } else {
-      console.log("Dados atualizados:", session.dadosCadastro);
+      const selectedIndex = parseInt(texto, 10) - 1;
 
-      await this.MensagemTermos(
+      if (
+        !isNaN(selectedIndex) &&
+        selectedIndex >= 0 &&
+        selectedIndex < session.structuredData.length
+      ) {
+        const selectedClient = session.structuredData[selectedIndex];
+        session.login = selectedClient.login;
+        session.endereco_antigo = `${selectedClient.endereco}, ${selectedClient.numero}`;
+        session.mudancaStep = "flow";
+        session.dadosCadastro = {};
+        session.stage = "awaiting_mudanca_flow";
+
+        await this.MensagensComuns(
+          celular,
+          "🔤 Cadastro selecionado! Clique no botão abaixo para preencher o formulário com o *Novo Endereço*.",
+        );
+        await this.MensagemFlowEndereco(
+          celular,
+          "mudanca_endereco",
+          "Preencher Formulário",
+        );
+        return;
+      } else {
+        await this.MensagensComuns(
+          celular,
+          "⚠️ Opção *inválida*, por favor digite o número correto da opção desejada.",
+        );
+        return;
+      }
+    }
+
+    if (session.stage === "awaiting_mudanca_flow") {
+      await this.MensagensComuns(
         celular,
-        "Finalizando....",
-        `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
-        "Ler o contrato",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
+        "Por favor, preencha o formulário clicando no botão que enviamos acima para prosseguir.",
       );
-      await this.MensagemTermos(
-        celular,
-        "Termos Mudança de Endereço",
-        "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
-        "Ler Termos",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_endereco",
-      );
-      await this.MensagemBotao(celular, "Escolha a Forma", "Grátis", "Paga");
-      session.stage = "choose_type_endereco";
-
-      // Aqui você armazena todos os dados na sessão
-      session.dadosCompleto = {
-        ...session.dadosCadastro, // Inclui todos os dados do cadastro
-      };
-
-      // Finaliza o cadastro
-      session.dadosCadastro = null;
-      session.ultimaPergunta = null;
     }
   }
 
@@ -4326,6 +4419,64 @@ class WhatsPixController {
     }
   }
 
+  async MensagemFlowEndereco(
+    receivenumber: any,
+    flowName: string,
+    ctaText: string,
+  ) {
+    try {
+      await whatsappOutgoingQueue.add(
+        "send-flow",
+        {
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber,
+            type: "interactive",
+            interactive: {
+              type: "flow",
+              body: {
+                text: "Preencha o formulário abaixo para prosseguir com a mudança de endereço.",
+              },
+              action: {
+                name: "flow",
+                parameters: {
+                  flow_message_version: "3",
+                  flow_name: flowName,
+                  flow_cta: ctaText,
+                  flow_token: `sessao_${receivenumber}_${Date.now()}`,
+                  flow_action: "navigate",
+                  flow_action_payload: {
+                    screen: "MUDANCA_ENDERECO",
+                  },
+                  mode: "published",
+                },
+              },
+            },
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
+        },
+      );
+
+      console.log(`Flow '${flowName}' enviado para ${receivenumber}`);
+    } catch (error: any) {
+      console.error(
+        "Erro ao enviar Flow de Mudança de Endereço:",
+        error.message,
+      );
+    }
+  }
+
   limparEndereco(texto: string) {
     return (texto || "")
       .normalize("NFD")
@@ -4391,7 +4542,35 @@ class WhatsPixController {
       if (action === "data_exchange") {
         console.log("🟢 Formulário preenchido pelo cliente:", data);
 
-        // TODO: Aqui você implementa a lógica para salvar no Banco de Dados
+        // Verifica se é o flow de mudança de endereço
+        if (data.action === "submit_mudanca_endereco") {
+          const celular = flow_token.split("_")[1];
+          const session = sessions[celular];
+
+          if (session) {
+            session.dadosCadastro = {
+              login: session.login,
+              endereco_antigo: session.endereco_antigo,
+              nome: this.limparEndereco(data.nome),
+              cpf: session.cpf || data.cpf, // fallback to data.cpf if flow still sends it
+              celular: data.celular,
+              rua: this.limparEndereco(data.rua),
+              numero: this.limparEndereco(data.numero),
+              novo_bairro: this.limparEndereco(data.novo_bairro),
+              cep: data.cep,
+            };
+
+            // O método finalizarMudancaEndereco enviará a mensagem com os termos
+            // Assíncronamente, podemos chamar isso para dar continuidade na conversa do WhatsApp.
+            // Aguardaremos um curto período ou simplesmente chamaremos a função para que a fila processe.
+            // Como a finalização manda botões, o Whatsapp fechará o fluxo de qualquer modo.
+            this.finalizarMudancaEndereco(celular, session).catch((e) =>
+              console.error(e),
+            );
+          }
+        } else {
+          // TODO: Aqui você implementa a lógica para salvar no Banco de Dados
+        }
 
         // Retorna o comando para fechar o Flow (ou ir para uma tela de Sucesso)
         const successScreenData = {
