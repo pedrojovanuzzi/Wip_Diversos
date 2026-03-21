@@ -2918,7 +2918,7 @@ class WhatsPixController {
     );
     await this.MensagemBotao(
       celular,
-      "📝 Este serviço pode ser realizado de 2 formas: Grátis renovação contratual 12 meses ou Paga consulte o valor.",
+      "📝 Este serviço pode ser realizado de 2 formas: *Grátis* renovação contratual 12 meses ou *Paga* consulte o valor.",
       "Grátis",
       "Paga",
     );
