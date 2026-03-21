@@ -877,68 +877,17 @@ class WhatsPixController {
               ) {
                 if (session.service === "mudanca_endereco") {
                   const pagamento = texto;
+                  session.formaPagamento = `Paga com ${pagamento}`;
                   await this.MensagensComuns(
                     celular,
-                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de endereço*\n\n*Clique no botão abaixo para finalizar*",
+                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nAgora, por favor, preencha o formulário abaixo com os dados do seu *Novo Endereço*.",
                   );
-                  let dadosCliente = session.dadosCompleto
-                    ? JSON.stringify(session.dadosCompleto, null, 2)
-                    : "Dados não encontrados";
-                  session.msgDadosFinais = `*🏠 Mudança de Endereço* \n\n*💰 Forma: Paga com ${pagamento}*\nDados do Cliente: ${dadosCliente}`;
-
-                  fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-                    let logs = [];
-                    if (err && err.code === "ENOENT") {
-                      console.log(
-                        "Arquivo de log não encontrado, criando um novo.",
-                      );
-                    } else if (err) {
-                      console.error("Erro ao ler o arquivo de log:", err);
-                      return;
-                    } else {
-                      try {
-                        logs = JSON.parse(data);
-                        if (!Array.isArray(logs)) {
-                          logs = [];
-                        }
-                      } catch (parseErr) {
-                        console.error(
-                          "Erro ao analisar o arquivo de log:",
-                          parseErr,
-                        );
-                        logs = [];
-                      }
-                    }
-
-                    const log = {
-                      messages: session.msgDadosFinais,
-                      timestamp: new Date().toISOString(),
-                    };
-
-                    logs.push(log);
-
-                    const jsonString = JSON.stringify(logs, null, 2);
-
-                    fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                      if (err) {
-                        console.error(
-                          "Erro ao escrever no arquivo de log:",
-                          err,
-                        );
-                        return;
-                      }
-                      console.log("Log atualizado com sucesso!");
-                    });
-                  });
-
-                  mailOptions(session.msgDadosFinais);
-                  await this.MensagemBotao(
+                  await this.MensagemFlowEndereco(
                     celular,
-                    "Concluir Solicitação",
-                    "Finalizar",
+                    "mudanca_endereco",
+                    "Preencher Formulário",
                   );
-
-                  session.stage = "finalizar";
+                  session.stage = "awaiting_mudanca_flow";
                 } else if (session.service === "mudanca_comodo") {
                   const pagamento = texto;
                   await this.MensagensComuns(
@@ -2431,65 +2380,17 @@ class WhatsPixController {
                 texto.toLowerCase() === "grátis" ||
                 texto.toLowerCase() === "gratis"
               ) {
+                session.formaPagamento = "Grátis";
                 await this.MensagensComuns(
                   celular,
-                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de endereço* enviando o *link* com os *Termos de Alteração de Endereço, Termo de Adesão e Contrato de Permanência* a serem *assinados*\n\nClique no Botão abaixo para finalizar",
+                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nAgora, por favor, preencha o formulário abaixo com os dados do seu *Novo Endereço*.",
                 );
-                let dadosCliente = session.dadosCompleto
-                  ? JSON.stringify(session.dadosCompleto, null, 2)
-                  : "Dados não encontrados";
-                session.msgDadosFinais = `*🏠 Mudança de Endereço* \n\n*🆓 Forma: Gratis*\nDados do Cliente: ${dadosCliente}`;
-
-                fs.readFile(logMsgFilePath, "utf8", (err, data) => {
-                  let logs = [];
-                  if (err && err.code === "ENOENT") {
-                    console.log(
-                      "Arquivo de log não encontrado, criando um novo.",
-                    );
-                  } else if (err) {
-                    console.error("Erro ao ler o arquivo de log:", err);
-                    return;
-                  } else {
-                    try {
-                      logs = JSON.parse(data);
-                      if (!Array.isArray(logs)) {
-                        logs = [];
-                      }
-                    } catch (parseErr) {
-                      console.error(
-                        "Erro ao analisar o arquivo de log:",
-                        parseErr,
-                      );
-                      logs = [];
-                    }
-                  }
-
-                  const log = {
-                    messages: session.msgDadosFinais,
-                    timestamp: new Date().toISOString(),
-                  };
-
-                  logs.push(log);
-
-                  const jsonString = JSON.stringify(logs, null, 2);
-
-                  fs.writeFile(logMsgFilePath, jsonString, "utf8", (err) => {
-                    if (err) {
-                      console.error("Erro ao escrever no arquivo de log:", err);
-                      return;
-                    }
-                    console.log("Log atualizado com sucesso!");
-                  });
-                });
-
-                mailOptions(session.msgDadosFinais);
-                await this.MensagemBotao(
+                await this.MensagemFlowEndereco(
                   celular,
-                  "Concluir Solicitação",
-                  "Finalizar",
+                  "mudanca_endereco",
+                  "Preencher Formulário",
                 );
-
-                session.stage = "finalizar";
+                session.stage = "awaiting_mudanca_flow";
               } else {
                 await this.MensagensComuns(
                   celular,
@@ -3108,17 +3009,9 @@ class WhatsPixController {
         session.endereco_antigo = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
         session.mudancaStep = "flow";
         session.dadosCadastro = {};
-        session.stage = "awaiting_mudanca_flow";
 
-        await this.MensagensComuns(
-          celular,
-          "🔤 Cadastro encontrado! Clique no botão abaixo para preencher o formulário com o *Novo Endereço*.",
-        );
-        await this.MensagemFlowEndereco(
-          celular,
-          "mudanca_endereco",
-          "Preencher Formulário",
-        );
+        // Em vez de enviar o Flow agora, enviamos os Termos e Opções de Pagamento primeiro
+        await this.finalizarMudancaEndereco(celular, session);
         return;
       } else {
         await this.MensagensComuns(
@@ -3158,17 +3051,9 @@ class WhatsPixController {
         session.endereco_antigo = `${selectedClient.endereco}, ${selectedClient.numero}`;
         session.mudancaStep = "flow";
         session.dadosCadastro = {};
-        session.stage = "awaiting_mudanca_flow";
 
-        await this.MensagensComuns(
-          celular,
-          "🔤 Cadastro selecionado! Clique no botão abaixo para preencher o formulário com o *Novo Endereço*.",
-        );
-        await this.MensagemFlowEndereco(
-          celular,
-          "mudanca_endereco",
-          "Preencher Formulário",
-        );
+        // Em vez de enviar o Flow agora, enviamos os Termos e Opções de Pagamento primeiro
+        await this.finalizarMudancaEndereco(celular, session);
         return;
       } else {
         await this.MensagensComuns(
@@ -3201,6 +3086,7 @@ class WhatsPixController {
 
           // Check if it's properly populated
           if (dadosFlow && Object.keys(dadosFlow).length > 0) {
+            const formaPagto = session.formaPagamento || "Não informada";
             const resumoMudanca =
               `🔄 *Nova Solicitação de Mudança de Endereço*\n\n` +
               `👤 *Nome:* ${dadosFlow.nome}\n` +
@@ -3209,7 +3095,8 @@ class WhatsPixController {
               `🔑 *Login Escolhido:* ${dadosFlow.login}\n` +
               `📍 *Antigo Endereço:* ${dadosFlow.endereco_antigo}\n` +
               `🆕 *Novo Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}\n` +
-              `📮 *CEP:* ${dadosFlow.cep}`;
+              `📮 *CEP:* ${dadosFlow.cep}\n` +
+              `💰 *Forma de Pagamento:* ${formaPagto}`;
 
             const resumoEmailHtml =
               `<h3>Solicitação de Mudança de Endereço</h3>` +
@@ -3219,7 +3106,8 @@ class WhatsPixController {
               `<p><b>Login Escolhido:</b> ${dadosFlow.login}</p>` +
               `<p><b>Antigo Endereço:</b> ${dadosFlow.endereco_antigo}</p>` +
               `<p><b>Novo Endereço:</b> ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}</p>` +
-              `<p><b>CEP:</b> ${dadosFlow.cep}</p>`;
+              `<p><b>CEP:</b> ${dadosFlow.cep}</p>` +
+              `<p><b>Forma de Pagamento:</b> ${formaPagto}</p>`;
 
             try {
               // @ts-ignore
@@ -3232,7 +3120,13 @@ class WhatsPixController {
             }
 
             await this.Finalizar(resumoMudanca, celular, sessions);
-            await this.finalizarMudancaEndereco(celular, session);
+            
+            await this.MensagensComuns(
+              celular,
+              "✅ *Recebemos a sua solicitação!* \nEntraremos em contato em breve para agendar a sua mudança de endereço. Obrigado!"
+            );
+            
+            session.stage = "finalizar";
             return;
           }
         }
@@ -4601,16 +4495,17 @@ class WhatsPixController {
         if (screen === "MUDANCA_ENDERECO") {
           const celular = flow_token.split("_")[1];
 
-          if (!sessions[celular]) {
-            const dbSession = await ApiMkDataSource.getRepository(
-              Sessions,
-            ).findOne({ where: { celular } });
-            if (dbSession) {
-              sessions[celular] = {
-                stage: dbSession.stage,
-                ...dbSession.dados,
-              };
-            }
+          // Sempre recarrega do banco para não sobrescrever dados (como formaPagamento) 
+          // que podem ter sido atualizados pelo worker em outro processo.
+          const dbSession = await ApiMkDataSource.getRepository(Sessions).findOne({ where: { celular } });
+          if (dbSession) {
+            sessions[celular] = {
+              stage: dbSession.stage,
+              ...dbSession.dados,
+            };
+          } else if (!sessions[celular]) {
+            // Se não tem no banco nem na memória, cria objeto básico (não deve acontecer no Flow)
+            sessions[celular] = { stage: "start" };
           }
 
           const session = sessions[celular];
