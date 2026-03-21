@@ -2916,7 +2916,12 @@ class WhatsPixController {
       "Ler Termos",
       "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_endereco",
     );
-    await this.MensagemBotao(celular, "Escolha a Forma", "Grátis", "Paga");
+    await this.MensagemBotao(
+      celular,
+      "📝 Este serviço pode ser realizado de 2 formas: Grátis renovação contratual 12 meses ou Paga consulte o valor.",
+      "Grátis",
+      "Paga",
+    );
     session.stage = "choose_type_endereco";
 
     // Aqui você armazena todos os dados na sessão
@@ -3120,12 +3125,12 @@ class WhatsPixController {
             }
 
             await this.Finalizar(resumoMudanca, celular, sessions);
-            
+
             await this.MensagensComuns(
               celular,
-              "✅ *Recebemos a sua solicitação!* \nEntraremos em contato em breve para agendar a sua mudança de endereço. Obrigado!"
+              "✅ *Recebemos a sua solicitação!* \nEntraremos em contato em breve para agendar a sua mudança de endereço. Obrigado!",
             );
-            
+
             session.stage = "finalizar";
             return;
           }
@@ -3314,7 +3319,12 @@ class WhatsPixController {
         "Ler Termos",
         "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_comodo",
       );
-      await this.MensagemBotao(celular, "Escolha a Forma", "Grátis", "Paga");
+      await this.MensagemBotao(
+        celular,
+        "📝 Este serviço pode ser realizado de 2 formas: Grátis renovação contratual 12 meses ou Paga consulte o valor.",
+        "Grátis",
+        "Paga",
+      );
       session.stage = "choose_type_comodo";
 
       // Aqui você armazena todos os dados na sessão
@@ -4495,9 +4505,11 @@ class WhatsPixController {
         if (screen === "MUDANCA_ENDERECO") {
           const celular = flow_token.split("_")[1];
 
-          // Sempre recarrega do banco para não sobrescrever dados (como formaPagamento) 
+          // Sempre recarrega do banco para não sobrescrever dados (como formaPagamento)
           // que podem ter sido atualizados pelo worker em outro processo.
-          const dbSession = await ApiMkDataSource.getRepository(Sessions).findOne({ where: { celular } });
+          const dbSession = await ApiMkDataSource.getRepository(
+            Sessions,
+          ).findOne({ where: { celular } });
           if (dbSession) {
             sessions[celular] = {
               stage: dbSession.stage,
