@@ -2404,6 +2404,7 @@ class WhatsPixController {
 
         //Mudança de Endereço
         case "mudanca_endereco":
+        case "awaiting_mudanca_flow":
           if (this.verificaType(type)) {
             await this.iniciarMudanca(celular, texto, session, type);
           } else {
@@ -3185,6 +3186,63 @@ class WhatsPixController {
     }
 
     if (session.stage === "awaiting_mudanca_flow") {
+      try {
+        const payload = JSON.parse(texto);
+        if (payload.flow_token) {
+           
+           // Recarrega a sessão do banco para garantir que temos as atualizações
+           // feitas pelo processo do webhook (data_exchange) paralelo.
+           let dadosFlow = session.dadosCadastro;
+           try {
+             const dbSession = await ApiMkDataSource.getRepository(Sessions).findOne({ where: { celular } });
+             if (dbSession && dbSession.dados) {
+                dadosFlow = dbSession.dados.dadosCadastro;
+                // Atualiza a sessão em memória do worker
+                session.dadosCadastro = dadosFlow;
+             }
+           } catch(e) {
+             console.error("Erro ao recarregar sessão:", e);
+           }
+
+           // Check if it's properly populated
+           if (dadosFlow && Object.keys(dadosFlow).length > 0) {
+              const resumoMudanca = `🔄 *Nova Solicitação de Mudança de Endereço*\n\n` +
+                 `👤 *Nome:* ${dadosFlow.nome}\n` +
+                 `📄 *CPF:* ${dadosFlow.cpf}\n` +
+                 `📱 *Celular:* ${dadosFlow.celular}\n` +
+                 `🔑 *Login Escolhido:* ${dadosFlow.login}\n` +
+                 `📍 *Antigo Endereço:* ${dadosFlow.endereco_antigo}\n` +
+                 `🆕 *Novo Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}\n` +
+                 `📮 *CEP:* ${dadosFlow.cep}`;
+
+              const resumoEmailHtml = `<h3>Solicitação de Mudança de Endereço</h3>` +
+                 `<p><b>Nome:</b> ${dadosFlow.nome}</p>` +
+                 `<p><b>CPF:</b> ${dadosFlow.cpf}</p>` +
+                 `<p><b>Celular:</b> ${dadosFlow.celular}</p>` +
+                 `<p><b>Login Escolhido:</b> ${dadosFlow.login}</p>` +
+                 `<p><b>Antigo Endereço:</b> ${dadosFlow.endereco_antigo}</p>` +
+                 `<p><b>Novo Endereço:</b> ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}</p>` +
+                 `<p><b>CEP:</b> ${dadosFlow.cep}</p>`;
+
+              try {
+                  // @ts-ignore
+                  if (typeof mailOptions === 'function') {
+                      // @ts-ignore
+                      mailOptions(resumoEmailHtml);
+                  }
+              } catch (e) {
+                  console.error("Erro ao enviar email de mudança de endereço:", e);
+              }
+
+              await this.Finalizar(resumoMudanca, celular, sessions);
+              await this.finalizarMudancaEndereco(celular, session);
+              return;
+           }
+        }
+      } catch (e) {
+        // Ignora erro de parse, pois pode ser texto normal enviado pelo usuário
+      }
+
       await this.MensagensComuns(
         celular,
         "Por favor, preencha o formulário clicando no botão que enviamos acima para prosseguir.",
@@ -4548,7 +4606,7 @@ class WhatsPixController {
           const session = sessions[celular];
 
           if (session) {
-            session.dadosCadastro = {
+             session.dadosCadastro = {
               login: session.login,
               endereco_antigo: session.endereco_antigo,
               nome: this.limparEndereco(data.nome),
@@ -4560,13 +4618,15 @@ class WhatsPixController {
               cep: data.cep,
             };
 
-            // O método finalizarMudancaEndereco enviará a mensagem com os termos
-            // Assíncronamente, podemos chamar isso para dar continuidade na conversa do WhatsApp.
-            // Aguardaremos um curto período ou simplesmente chamaremos a função para que a fila processe.
-            // Como a finalização manda botões, o Whatsapp fechará o fluxo de qualquer modo.
-            this.finalizarMudancaEndereco(celular, session).catch((e) =>
-              console.error(e),
-            );
+            // Salvar no banco explicitamente para outros processos (como o BullMQ worker) enxergarem
+            try {
+              await this.saveSession(celular);
+            } catch(e) {
+              console.error("Erro ao salvar sessão do Webhook Flow", e);
+            }
+
+            // O cliente finaliza no próprio Whatsapp e envia a resposta com o flow_token.
+            // Lá em 'iniciarMudanca' trataremos o `nfm_reply`.
           }
         } else {
           // TODO: Aqui você implementa a lógica para salvar no Banco de Dados
