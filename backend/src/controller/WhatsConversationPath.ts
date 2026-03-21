@@ -3126,10 +3126,17 @@ class WhatsPixController {
 
             await this.Finalizar(resumoMudanca, celular, sessions);
 
-            await this.MensagensComuns(
-              celular,
-              "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link de assinatura da Renovação Contratual com período de 12 meses*. Obrigado pela confiança",
-            );
+            if (formaPagto === "Grátis") {
+              await this.MensagensComuns(
+                celular,
+                "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link de assinatura da Renovação Contratual com período de 12 meses*. Obrigado pela confiança!",
+              );
+            } else {
+              await this.MensagensComuns(
+                celular,
+                "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link com Termo de Alteração de Endereço*. Obrigado pela confiança!",
+              );
+            }
 
             session.stage = "finalizar";
             return;
@@ -3321,7 +3328,7 @@ class WhatsPixController {
       );
       await this.MensagemBotao(
         celular,
-        "📝 Este serviço pode ser realizado de 2 formas: Grátis renovação contratual 12 meses ou Paga consulte o valor.",
+        "📝 Este serviço pode ser realizado de 2 formas: *Grátis* renovação contratual 12 meses ou *Paga* consulte o valor.",
         "Grátis",
         "Paga",
       );
