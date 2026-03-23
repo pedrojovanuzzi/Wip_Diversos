@@ -27,6 +27,7 @@ import Licenca from "./routes/Licenca.Routes";
 // Controllers (for scheduled tasks)
 import BackupController from "./controller/Backup";
 import PixController from "./controller/Pix";
+import ZapSignRoutes from "./routes/ZapSign.routes";
 // import DosProtectController from "./controller/DosProtect";
 
 const backup = new BackupController();
@@ -70,6 +71,7 @@ export class App {
     this.server.use("/api/TokenAutoAtendimento", TokenAtendimentoRoutes);
     this.server.use("/api/time-tracking", TimeTrackingRoutes);
     this.server.use("/api/licenca", Licenca);
+    this.server.use("/api/zapsign", ZapSignRoutes);
   }
 
   private agendarBackup() {
