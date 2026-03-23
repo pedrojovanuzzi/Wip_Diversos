@@ -1,5 +1,6 @@
 import axios from "axios";
 import { Request, Response } from "express";
+const homologacao = process.env.SERVIDOR_HOMOLOGACAO;
 
 class ZapSign {
   async generatePdf(req: Request, res: Response) {
@@ -8,7 +9,9 @@ class ZapSign {
     console.log(pdfName);
     if (pdfName === "contratacao") {
       const response = await axios.post(
-        "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/",
+        homologacao
+          ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
+          : "https://api.zapsign.com.br/api/v1/models/create-doc/",
         data,
         {
           headers: {
