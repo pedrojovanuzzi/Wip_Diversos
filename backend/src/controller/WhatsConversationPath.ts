@@ -1080,7 +1080,7 @@ class WhatsPixController {
                 rua: this.limparEndereco(dadosFlow.rua, true),
                 numero: this.limparEndereco(dadosFlow.numero),
                 bairro: this.limparEndereco(dadosFlow.bairro),
-                cidade: this.limparEndereco(dadosFlow.cidade),
+                cidade: this.FormatarCidade(this.limparEndereco(dadosFlow.cidade)),
                 estado: this.limparEndereco(dadosFlow.estado),
               };
 
@@ -1179,7 +1179,7 @@ class WhatsPixController {
                   cpf_cnpj: (dadosFlow.cpf || "").trim().replace(/\s/g, ""),
                   uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
                   email: (dadosFlow.email || "").trim().replace(/\s/g, ""),
-                  cidade: this.limparEndereco(dadosFlow.cidade || ""),
+                  cidade: this.FormatarCidade(this.limparEndereco(dadosFlow.cidade || "")),
                   bairro: this.limparEndereco(dadosFlow.bairro || ""),
                   estado: (dadosFlow.estado || "")
                     .toUpperCase()
@@ -1219,7 +1219,7 @@ class WhatsPixController {
                     .slice(0, 2),
                   bairro_res: this.limparEndereco(dadosFlow.bairro || ""),
                   tipo: "pppoe",
-                  cidade_res: this.limparEndereco(dadosFlow.cidade || ""),
+                  cidade_res: this.FormatarCidade(this.limparEndereco(dadosFlow.cidade || "")),
                   cep_res: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
                   numero_res: this.limparEndereco(dadosFlow.numero || ""),
                   endereco_res: this.limparEndereco(dadosFlow.rua || "", true),
@@ -1624,7 +1624,7 @@ class WhatsPixController {
                     email: session.dadosCompleto.email
                       .trim()
                       .replace(/\s/g, ""),
-                    cidade: this.limparEndereco(session.dadosCompleto.cidade),
+                    cidade: this.FormatarCidade(this.limparEndereco(session.dadosCompleto.cidade)),
                     bairro: this.limparEndereco(session.dadosCompleto.bairro),
                     estado: (session.dadosCompleto.estado || "")
                       .toUpperCase()
@@ -3216,6 +3216,30 @@ class WhatsPixController {
             console.error("Erro ao recarregar sessão:", e);
           }
 
+          // Fallback robusto: se o session.dadosCadastro estiver vazio (o webhook não chegou a tempo),
+          // tenta extrair diretamente do payload do nfm_reply
+          if (!dadosFlow || Object.keys(dadosFlow).length === 0) {
+            console.log(
+              "⚠️ session.dadosCadastro vazio. Tentando extrair do payload do nfm_reply...",
+            );
+            if (payload && (payload.nome || payload.rua || payload.cidade)) {
+              dadosFlow = {
+                login: session.login,
+                endereco_antigo: session.endereco_antigo,
+                nome: this.limparEndereco(payload.nome),
+                cpf: session.cpf || payload.cpf,
+                celular: payload.celular,
+                rua: this.limparEndereco(payload.rua, true),
+                numero: this.limparEndereco(payload.numero),
+                novo_bairro: this.limparEndereco(payload.novo_bairro),
+                cidade: this.FormatarCidade(this.limparEndereco(payload.cidade)),
+                estado: (payload.estado || "").toUpperCase().slice(0, 2),
+                cep: payload.cep || session.cep,
+              };
+              session.dadosCadastro = dadosFlow;
+            }
+          }
+
           // Check if it's properly populated
           if (dadosFlow && Object.keys(dadosFlow).length > 0) {
             const formaPagto = session.formaPagamento || "Não informada";
@@ -3226,7 +3250,7 @@ class WhatsPixController {
               `📱 *Celular:* ${dadosFlow.celular}\n` +
               `🔑 *Login Escolhido:* ${dadosFlow.login}\n` +
               `📍 *Antigo Endereço:* ${dadosFlow.endereco_antigo}\n` +
-              `🆕 *Novo Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}\n` +
+              `🆕 *Novo Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}\n` +
               `📮 *CEP:* ${dadosFlow.cep}\n` +
               `💰 *Forma de Pagamento:* ${formaPagto}`;
 
@@ -3237,7 +3261,7 @@ class WhatsPixController {
             `<p><b>Celular:</b> ${dadosFlow.celular}</p>` +
             `<p><b>Login Escolhido:</b> ${dadosFlow.login}</p>` +
             `<p><b>Antigo Endereço:</b> ${dadosFlow.endereco_antigo}</p>` +
-            `<p><b>Novo Endereço:</b> ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}</p>` +
+            `<p><b>Novo Endereço:</b> ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}</p>` +
             `<p><b>CEP:</b> ${dadosFlow.cep}</p>` +
             `<p><b>Forma de Pagamento:</b> ${formaPagto}</p>`;
 
@@ -3252,7 +3276,7 @@ class WhatsPixController {
                   endereco: this.limparEndereco(dadosFlow.rua, true),
                   numero: this.limparEndereco(dadosFlow.numero),
                   bairro: this.limparEndereco(dadosFlow.novo_bairro),
-                  cidade: this.limparEndereco(dadosFlow.cidade || ""),
+                  cidade: this.FormatarCidade(this.limparEndereco(dadosFlow.cidade || "")),
                   estado: (dadosFlow.estado || "")
                     .toUpperCase()
                     .replace(/\s/g, "")
@@ -3292,7 +3316,7 @@ class WhatsPixController {
                 numero: dadosFlow.numero,
                 complemento: dadosFlow.complemento || "",
                 bairro: dadosFlow.novo_bairro,
-                cidade: dadosFlow.cidade || "Franca",
+                cidade: this.FormatarCidade(dadosFlow.cidade || "Franca"),
                 estado: dadosFlow.estado || "SP",
                 cep: dadosFlow.cep,
                 valor: formaPagto === "Grátis" ? "0.00" : "60.00", // Default value for paid if not specified
@@ -4661,6 +4685,14 @@ class WhatsPixController {
       .trim()
       .toUpperCase();
   }
+  
+  FormatarCidade(texto: string) {
+    if (!texto) return "";
+    return texto
+      .toLowerCase()
+      .replace(/(^\w|\s\w)/g, (m: string) => m.toUpperCase())
+      .trim();
+  }
 
   async Flow(req: Request, res: Response): Promise<void> {
     try {
@@ -4748,7 +4780,7 @@ class WhatsPixController {
               rua: this.limparEndereco(data.rua, true),
               numero: this.limparEndereco(data.numero),
               novo_bairro: this.limparEndereco(data.novo_bairro),
-              cidade: this.limparEndereco(data.cidade),
+              cidade: this.FormatarCidade(this.limparEndereco(data.cidade)),
               estado: (data.estado || "").toUpperCase().slice(0, 2),
               cep: data.cep,
             };
