@@ -14,3 +14,4 @@ backend/soap_cancel_request.xml
 backend/src/controller/log.json
 backend/private.pem
 backend/public.pem
+backend/src/zapsign_id/contratacao.ts
