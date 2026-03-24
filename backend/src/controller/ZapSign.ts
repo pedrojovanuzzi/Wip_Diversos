@@ -2,8 +2,8 @@ import axios from "axios";
 import { Request, Response } from "express";
 import moment from "moment";
 import dotenv from "dotenv";
-import { contratacao } from "../zapsign_id/contratacao";
-import { mudanca_endereco } from "../zapsign_id/mudanca_endereco";
+import ApiMkDataSource from "../database/API_MK";
+import ZapSignTemplates from "../entities/APIMK/ZapSignTemplates";
 
 dotenv.config();
 
@@ -65,8 +65,17 @@ class ZapSign {
         rg = "Não informado",
       } = params;
 
+      const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
+      const template = await templateRepo.findOne({
+        where: { nome_servico: "Instalação" },
+      });
+
+      if (!template || !template.token_id) {
+        throw new Error("Token do template 'Instalação' não encontrado no banco de dados.");
+      }
+
       const data = {
-        template_id: contratacao,
+        template_id: template.token_id,
         signer_name: nome,
         send_automatic_email: false,
         send_automatic_whatsapp: false,
@@ -150,8 +159,17 @@ class ZapSign {
         rg = "Não informado",
       } = params;
 
+      const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
+      const template = await templateRepo.findOne({
+        where: { nome_servico: "Mudança de Endereço" },
+      });
+
+      if (!template || !template.token_id) {
+        throw new Error("Token do template 'Mudança de Endereço' não encontrado no banco de dados.");
+      }
+
       const data = {
-        template_id: mudanca_endereco,
+        template_id: template.token_id,
         signer_name: nome,
         send_automatic_email: false,
         send_automatic_whatsapp: false,

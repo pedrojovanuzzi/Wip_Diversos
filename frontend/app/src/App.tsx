@@ -49,6 +49,7 @@ import { MonthlyReport } from "./pages/TimeTracking/Reports/MonthlyReport";
 import { EnviarMensagem } from "./pages/Marketing/EnviarMensagem";
 import { GerenciarLicencas } from "./pages/Licencas/GerenciarLicencas";
 import { GraficoInstalacoes } from "./pages/Chamados/GraficoInstalacoes";
+import { ZapSignConfig } from "./pages/zapsign/ZapSignConfig";
 
 function App() {
   const { user, loading } = useAuth();
@@ -448,10 +449,30 @@ function App() {
             }
           />
           <Route
+            path="/ZapSignConfig"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <ZapSignConfig />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
             path="/grafico-instalacoes"
             element={
               user?.token && user.permission >= 2 ? (
                 <GraficoInstalacoes />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/zapsign-config"
+            element={
+              user?.token && user.permission >= 5 ? (
+                <ZapSignConfig />
               ) : (
                 <Navigate to="/auth/login" />
               )

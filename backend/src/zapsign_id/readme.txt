@@ -1,1 +1,0 @@
-Está pasta contem os ids dos modelos do zapsign
