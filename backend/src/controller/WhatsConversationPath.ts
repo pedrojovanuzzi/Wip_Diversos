@@ -26,6 +26,7 @@ import Sessions from "../entities/APIMK/Sessions";
 import AppDataSource from "../database/DataSource";
 import moment from "moment-timezone";
 import { Queue, Worker, Job } from "bullmq";
+import ZapSign from "./ZapSign";
 import { log } from "console";
 
 dotenv.config();
@@ -1085,6 +1086,7 @@ class WhatsPixController {
 
               const planoFlow = dadosFlow.plano || "";
               session.planoEscolhido = planoFlow;
+              session.zapSignUrl = null;
 
               await this.MensagensComuns(
                 celular,
@@ -1240,6 +1242,53 @@ class WhatsPixController {
                 });
 
                 console.log("Cliente salvo com sucesso no MKAuth:", addClient);
+
+                // === ZapSign Integration for Flow ===
+                try {
+                  const planosDoSistema = await this.getPlanosDoSistema();
+                  const planoEncontrado = planosDoSistema.find(
+                    (p) => p.title === planoFlow,
+                  );
+
+                  let planoNome = planoFlow;
+                  let planoValor = "0,00";
+
+                  if (planoEncontrado && planoEncontrado.title.includes(" - R$ ")) {
+                    const parts = planoEncontrado.title.split(" - R$ ");
+                    planoNome = parts[0];
+                    planoValor = parts[1];
+                  }
+
+                  const zapSignData = {
+                    nome: dadosFlow.nome,
+                    cpf: dadosFlow.cpf,
+                    email: dadosFlow.email,
+                    telefone: dadosFlow.celular,
+                    endereco: dadosFlow.rua,
+                    numero: dadosFlow.numero,
+                    bairro: dadosFlow.bairro,
+                    cidade: dadosFlow.cidade,
+                    estado: dadosFlow.estado,
+                    cep: dadosFlow.cep,
+                    plano: planoNome,
+                    valor: planoValor,
+                    vencimento: `Dia ${dadosFlow.vencimento}`,
+                    rg: dadosFlow.rg,
+                  };
+
+                  const zapResponse = await ZapSign.createContract(zapSignData);
+                  const zapSignUrl = zapResponse.signers[0].sign_url;
+                  
+                  session.zapSignUrl = zapSignUrl;
+
+                  // Send link directly to client
+                  await this.MensagensComuns(
+                    celular,
+                    `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
+                  );
+                } catch (zapError) {
+                  console.error("Error creating ZapSign document during Flow registration:", zapError);
+                }
               } catch (dbError) {
                 console.error("Erro ao salvar cliente no MKAuth:", dbError);
               }
@@ -1256,7 +1305,8 @@ class WhatsPixController {
                 `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
                 `📮 *CEP:* ${dadosFlow.cep}\n` +
                 `📶 *Plano:* ${planoFlow}\n` +
-                `📅 *Vencimento:* Dia ${dadosFlow.vencimento}`;
+                `📅 *Vencimento:* Dia ${dadosFlow.vencimento}` +
+                (session.zapSignUrl ? `\n\n📄 *Link de Assinatura:* ${session.zapSignUrl}` : "");
 
               const resumoEmailHtml =
                 `<h3>Novo Cadastro via WhatsApp Flow</h3>` +
@@ -1270,7 +1320,8 @@ class WhatsPixController {
                 `<p><b>Cidade:</b> ${dadosFlow.cidade}/${dadosFlow.estado}</p>` +
                 `<p><b>CEP:</b> ${dadosFlow.cep}</p>` +
                 `<p><b>Plano Escolhido:</b> ${planoFlow}</p>` +
-                `<p><b>Vencimento:</b> Dia ${dadosFlow.vencimento}</p>`;
+                `<p><b>Vencimento:</b> Dia ${dadosFlow.vencimento}</p>` +
+                (session.zapSignUrl ? `<p><b>Link ZapSign:</b> ${session.zapSignUrl}</p>` : "");
 
               // Envia o e-mail para o setor financeiro
               mailOptions(resumoEmailHtml);
@@ -1308,6 +1359,16 @@ class WhatsPixController {
             }
 
             session.planoEscolhido = planoEscolhido;
+
+            // Extract price for ZapSign
+            if (planoEncontrado && planoEncontrado.title.includes(" - R$ ")) {
+              const parts = planoEncontrado.title.split(" - R$ ");
+              session.planoNome = parts[0];
+              session.planoValor = parts[1];
+            } else {
+              session.planoNome = planoEscolhido;
+              session.planoValor = "0,00";
+            }
 
             await this.MensagensComuns(
               celular,
@@ -1389,12 +1450,46 @@ class WhatsPixController {
               if (texto.toLowerCase() === "sim, li e aceito") {
                 await this.MensagensComuns(
                   celular,
-                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Vamos realizar a *Consulta do seu CPF*. \nUm de nossos *atendentes* entrará em contato para finalizar a sua *contratação* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n*Clique no Botão abaixo para finalizar*",
+                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Vamos realizar a *Consulta do seu CPF*. \n\n*Clique no Botão abaixo para finalizar*",
                 );
                 let dadosCliente = session.dadosCompleto
                   ? JSON.stringify(session.dadosCompleto, null, 2)
                   : "Dados não encontrados";
                 session.msgDadosFinais = `*🧑 Instalação Nova* \nPlano Escolhido: ${session.planoEscolhido}\nVencimento: ${session.vencimentoEscolhido}\nDados do Cliente: ${dadosCliente}`;
+
+                try {
+                  const zapSignData = {
+                    nome: session.dadosCompleto.nome,
+                    cpf: session.dadosCompleto.cpf,
+                    email: session.dadosCompleto.email,
+                    telefone: session.dadosCompleto.celular,
+                    endereco: session.dadosCompleto.rua,
+                    numero: session.dadosCompleto.numero,
+                    bairro: session.dadosCompleto.bairro,
+                    cidade: session.dadosCompleto.cidade,
+                    estado: session.dadosCompleto.estado,
+                    cep: session.dadosCompleto.cep,
+                    plano: session.planoNome || session.planoEscolhido,
+                    valor: session.planoValor || "0,00",
+                    vencimento: session.vencimentoEscolhido,
+                    rg: session.dadosCompleto.rg,
+                  };
+
+                  const zapResponse = await ZapSign.createContract(zapSignData);
+                  console.log("ZapSign Document Created:", zapResponse.token);
+                  
+                  // Optionally store the signing URL to send it later or log it
+                  session.zapSignUrl = zapResponse.signers[0].sign_url;
+                  session.msgDadosFinais += `\n\n📄 *Link de Assinatura:* ${session.zapSignUrl}`;
+
+                  // Send the link directly to the client
+                  await this.MensagensComuns(
+                    celular,
+                    `📄 *Aqui está o seu Link de Assinatura:* ${session.zapSignUrl}\n\nPor favor, *Assine* o quanto antes para podermos agendar a sua instalação! 🚀`,
+                  );
+                } catch (zapError) {
+                  console.error("Error creating ZapSign document during registration:", zapError);
+                }
 
                 fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                   let logs = [];

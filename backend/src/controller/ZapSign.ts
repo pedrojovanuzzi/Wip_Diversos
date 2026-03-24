@@ -1,9 +1,33 @@
 import axios from "axios";
 import { Request, Response } from "express";
+import moment from "moment";
+import dotenv from "dotenv";
+import { contratacao } from "../zapsign_id/contratacao";
+
+dotenv.config();
+
 const homologacao = process.env.SERVIDOR_HOMOLOGACAO;
 
+interface ZapSignData {
+  nome: string;
+  cpf: string;
+  email: string;
+  telefone: string;
+  endereco: string;
+  numero: string;
+  complemento?: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  cep: string;
+  plano: string;
+  valor: string;
+  vencimento: string;
+  rg?: string;
+}
+
 class ZapSign {
-  async generatePdfContratacao(req: Request, res: Response) {
+  async createContract(params: ZapSignData) {
     try {
       const {
         nome,
@@ -12,7 +36,7 @@ class ZapSign {
         telefone,
         endereco,
         numero,
-        complemento,
+        complemento = "",
         bairro,
         cidade,
         estado,
@@ -20,127 +44,55 @@ class ZapSign {
         plano,
         valor,
         vencimento,
-      } = req.body;
+        rg = "Não informado",
+      } = params;
+
       const data = {
-        template_id: "59caaa4b-f045-44fe-9099-f993c3a112fa",
+        template_id: contratacao,
         signer_name: nome,
         send_automatic_email: false,
         send_automatic_whatsapp: false,
         lang: "pt-br",
         external_id: null,
         data: [
-          {
-            de: "{{nomecliente}}",
-            para: nome,
-          },
-          {
-            de: "{{termo}}",
-            para: "ABCD",
-          },
-          {
-            de: "{{data}}",
-            para: "24/03/2026",
-          },
-          {
-            de: "{{cpfcliente}}",
-            para: cpf,
-          },
-          {
-            de: "{{provedornome}}",
-            para: "Wip Telecom",
-          },
-          {
-            de: "{{provedorcnpj}}",
-            para: "100000000",
-          },
-          {
-            de: "{{rgcliente}}",
-            para: "12.345.678-9",
-          },
-          {
-            de: "{{fonecliente}}",
-            para: telefone,
-          },
-          {
-            de: "{{celularcliente}}",
-            para: telefone,
-          },
+          { de: "{{nomecliente}}", para: nome },
+          { de: "{{termo}}", para: "Adesão" },
+          { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
+          { de: "{{cpfcliente}}", para: cpf },
+          { de: "{{provedornome}}", para: "Wip Telecom" },
+          { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
+          { de: "{{rgcliente}}", para: rg },
+          { de: "{{fonecliente}}", para: telefone },
+          { de: "{{celularcliente}}", para: telefone },
           {
             de: "{{enderecocliente}}",
-            para: endereco,
+            para: `${endereco}, ${numero} ${complemento}`,
           },
-          {
-            de: "{{bairrocliente}}",
-            para: bairro,
-          },
-          {
-            de: "{{cidadecliente}}",
-            para: cidade,
-          },
-          {
-            de: "{{estadocliente}}",
-            para: estado,
-          },
-          {
-            de: "{{cepcliente}}",
-            para: cep,
-          },
+          { de: "{{bairrocliente}}", para: bairro },
+          { de: "{{cidadecliente}}", para: cidade },
+          { de: "{{estadocliente}}", para: estado },
+          { de: "{{cepcliente}}", para: cep },
           {
             de: "{{enderecorescliente}}",
-            para: endereco,
+            para: `${endereco}, ${numero} ${complemento}`,
           },
-          {
-            de: "{{emailcliente}}",
-            para: email,
-          },
-          {
-            de: "{{bairrorescliente}}",
-            para: bairro,
-          },
-          {
-            de: "{{cidaderescliente}}",
-            para: cidade,
-          },
-          {
-            de: "{{estadorescliente}}",
-            para: estado,
-          },
-          {
-            de: "{{ceprescliente}}",
-            para: cep,
-          },
-          {
-            de: "{{provedoremail}}",
-            para: "[EMAIL_ADDRESS]",
-          },
-          {
-            de: "{{planodeacesso}}",
-            para: plano,
-          },
-          {
-            de: "{{velocidadeplano}}",
-            para: "500 Mbps / 250 Mbps",
-          },
-          {
-            de: "{{valor}}",
-            para: valor,
-          },
-          {
-            de: "{{descontocliente}}",
-            para: "20,00",
-          },
-          {
-            de: "{{diavencimento}}",
-            para: vencimento,
-          },
-          {
-            de: "{{equipamento}}",
-            para: "Roteador TP-Link AX1500",
-          },
+          { de: "{{emailcliente}}", para: email },
+          { de: "{{bairrorescliente}}", para: bairro },
+          { de: "{{cidaderescliente}}", para: cidade },
+          { de: "{{estadorescliente}}", para: estado },
+          { de: "{{ceprescliente}}", para: cep },
+          { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
+          { de: "{{planodeacesso}}", para: plano },
+          { de: "{{velocidadeplano}}", para: "Consultar Viabilidade" },
+          { de: "{{valor}}", para: valor },
+          { de: "{{descontocliente}}", para: "0,00" },
+          { de: "{{diavencimento}}", para: vencimento },
+          { de: "{{equipamento}}", para: "Roteador em Comodato" },
         ],
         signature_placement: "<<assinatura>>",
         rubrica_placement: "<<visto>>",
       };
+
       const response = await axios.post(
         homologacao
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
@@ -153,7 +105,18 @@ class ZapSign {
           },
         },
       );
-      res.status(200).json(response.data);
+
+      return response.data;
+    } catch (error) {
+      console.error("Error in createContract:", error);
+      throw error;
+    }
+  }
+
+  async generatePdfContratacao(req: Request, res: Response) {
+    try {
+      const result = await this.createContract(req.body);
+      res.status(200).json(result);
     } catch (error) {
       console.error("Error generating PDF:", error);
       res.status(500).json({ error: "Failed to generate PDF" });
