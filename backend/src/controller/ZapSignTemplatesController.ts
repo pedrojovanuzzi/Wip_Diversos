@@ -52,12 +52,23 @@ export default class ZapSignTemplatesController {
       }
 
       const zapSignUrl = homologacao === "true"
-        ? "https://sandbox.api.zapsign.com.br/api/v1/templates/"
-        : "https://api.zapsign.com.br/api/v1/templates/";
+        ? "https://sandbox.api.zapsign.com.br/api/v1/templates/create"
+        : "https://api.zapsign.com.br/api/v1/templates/create";
 
       const zapSignData = {
         name: `Template - ${template.nome_servico}`,
         base64_docx: finalBase64,
+        lang: "pt-br",
+        observers: ["financeiro@wiptelecom.com.br"],
+        first_signer: {
+          blank_email: false,
+          blank_phone: false,
+          auth_mode: "assinaturaTela",
+          require_selfie_photo: false,
+          require_document_photo: false,
+          selfie_validation_type: "",
+          qualification: "Witness"
+        }
       };
 
       console.log(`Atualizando template no ZapSign para: ${template.nome_servico}`);
