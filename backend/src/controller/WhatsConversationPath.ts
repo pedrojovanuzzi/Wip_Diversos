@@ -1253,7 +1253,10 @@ class WhatsPixController {
                   let planoNome = planoFlow;
                   let planoValor = "0,00";
 
-                  if (planoEncontrado && planoEncontrado.title.includes(" - R$ ")) {
+                  if (
+                    planoEncontrado &&
+                    planoEncontrado.title.includes(" - R$ ")
+                  ) {
                     const parts = planoEncontrado.title.split(" - R$ ");
                     planoNome = parts[0];
                     planoValor = parts[1];
@@ -1276,9 +1279,10 @@ class WhatsPixController {
                     rg: dadosFlow.rg,
                   };
 
-                  const zapResponse = await ZapSign.createContract(zapSignData);
+                  const zapResponse =
+                    await ZapSign.createContractInstalacao(zapSignData);
                   const zapSignUrl = zapResponse.signers[0].sign_url;
-                  
+
                   session.zapSignUrl = zapSignUrl;
 
                   // Send link directly to client
@@ -1287,7 +1291,10 @@ class WhatsPixController {
                     `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
                   );
                 } catch (zapError) {
-                  console.error("Error creating ZapSign document during Flow registration:", zapError);
+                  console.error(
+                    "Error creating ZapSign document during Flow registration:",
+                    zapError,
+                  );
                 }
               } catch (dbError) {
                 console.error("Erro ao salvar cliente no MKAuth:", dbError);
@@ -1306,7 +1313,9 @@ class WhatsPixController {
                 `📮 *CEP:* ${dadosFlow.cep}\n` +
                 `📶 *Plano:* ${planoFlow}\n` +
                 `📅 *Vencimento:* Dia ${dadosFlow.vencimento}` +
-                (session.zapSignUrl ? `\n\n📄 *Link de Assinatura:* ${session.zapSignUrl}` : "");
+                (session.zapSignUrl
+                  ? `\n\n📄 *Link de Assinatura:* ${session.zapSignUrl}`
+                  : "");
 
               const resumoEmailHtml =
                 `<h3>Novo Cadastro via WhatsApp Flow</h3>` +
@@ -1321,7 +1330,9 @@ class WhatsPixController {
                 `<p><b>CEP:</b> ${dadosFlow.cep}</p>` +
                 `<p><b>Plano Escolhido:</b> ${planoFlow}</p>` +
                 `<p><b>Vencimento:</b> Dia ${dadosFlow.vencimento}</p>` +
-                (session.zapSignUrl ? `<p><b>Link ZapSign:</b> ${session.zapSignUrl}</p>` : "");
+                (session.zapSignUrl
+                  ? `<p><b>Link ZapSign:</b> ${session.zapSignUrl}</p>`
+                  : "");
 
               // Envia o e-mail para o setor financeiro
               mailOptions(resumoEmailHtml);
@@ -1475,9 +1486,10 @@ class WhatsPixController {
                     rg: session.dadosCompleto.rg,
                   };
 
-                  const zapResponse = await ZapSign.createContract(zapSignData);
+                  const zapResponse =
+                    await ZapSign.createContractInstalacao(zapSignData);
                   console.log("ZapSign Document Created:", zapResponse.token);
-                  
+
                   // Optionally store the signing URL to send it later or log it
                   session.zapSignUrl = zapResponse.signers[0].sign_url;
                   session.msgDadosFinais += `\n\n📄 *Link de Assinatura:* ${session.zapSignUrl}`;
@@ -1488,7 +1500,10 @@ class WhatsPixController {
                     `📄 *Aqui está o seu Link de Assinatura:* ${session.zapSignUrl}\n\nPor favor, *Assine* o quanto antes para podermos agendar a sua instalação! 🚀`,
                   );
                 } catch (zapError) {
-                  console.error("Error creating ZapSign document during registration:", zapError);
+                  console.error(
+                    "Error creating ZapSign document during registration:",
+                    zapError,
+                  );
                 }
 
                 fs.readFile(logMsgFilePath, "utf8", (err, data) => {

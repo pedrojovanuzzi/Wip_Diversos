@@ -8,7 +8,7 @@ dotenv.config();
 
 const homologacao = process.env.SERVIDOR_HOMOLOGACAO;
 
-interface ZapSignData {
+interface ZapSignDataInstalacao {
   nome: string;
   cpf: string;
   email: string;
@@ -27,7 +27,7 @@ interface ZapSignData {
 }
 
 class ZapSign {
-  async createContract(params: ZapSignData) {
+  async createContractInstalacao(params: ZapSignDataInstalacao) {
     try {
       const {
         nome,
@@ -115,7 +115,7 @@ class ZapSign {
 
   async generatePdfContratacao(req: Request, res: Response) {
     try {
-      const result = await this.createContract(req.body);
+      const result = await this.createContractInstalacao(req.body);
       res.status(200).json(result);
     } catch (error) {
       console.error("Error generating PDF:", error);
