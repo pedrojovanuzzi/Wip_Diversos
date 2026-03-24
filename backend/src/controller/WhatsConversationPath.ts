@@ -3095,6 +3095,9 @@ class WhatsPixController {
           endereco: true,
           login: true,
           numero: true,
+          email: true,
+          rg: true,
+          cpf_cnpj: true,
         },
         where: { cpf_cnpj: cpf, cli_ativado: "s" },
       });
@@ -3110,6 +3113,8 @@ class WhatsPixController {
             login: client.login,
             numero: client.numero,
             cpf: cpf,
+            email: client.email,
+            rg: client.rg,
           };
         });
 
@@ -3128,6 +3133,9 @@ class WhatsPixController {
       } else if (sis_cliente.length === 1) {
         session.login = sis_cliente[0].login;
         session.endereco_antigo = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
+        session.email = sis_cliente[0].email;
+        session.nome = sis_cliente[0].nome;
+        session.rg = sis_cliente[0].rg;
         session.mudancaStep = "flow";
         session.dadosCadastro = {};
 
@@ -3170,6 +3178,9 @@ class WhatsPixController {
         const selectedClient = session.structuredData[selectedIndex];
         session.login = selectedClient.login;
         session.endereco_antigo = `${selectedClient.endereco}, ${selectedClient.numero}`;
+        session.email = selectedClient.email;
+        session.nome = selectedClient.nome;
+        session.rg = selectedClient.rg;
         session.mudancaStep = "flow";
         session.dadosCadastro = {};
 
@@ -3208,7 +3219,7 @@ class WhatsPixController {
           // Check if it's properly populated
           if (dadosFlow && Object.keys(dadosFlow).length > 0) {
             const formaPagto = session.formaPagamento || "Não informada";
-            const resumoMudanca =
+            let resumoMudanca =
               `🔄 *Nova Solicitação de Mudança de Endereço*\n\n` +
               `👤 *Nome:* ${dadosFlow.nome}\n` +
               `📄 *CPF:* ${dadosFlow.cpf}\n` +
@@ -3240,6 +3251,48 @@ class WhatsPixController {
               console.error("Erro ao enviar email de mudança de endereço:", e);
             }
 
+            // ZapSign Integration for Address Change
+            let zapSignUrl = "";
+            try {
+              console.log("Generating ZapSign document for Address Change...");
+              const zapSignData = {
+                nome: dadosFlow.nome || session.nome,
+                cpf: dadosFlow.cpf || session.cpf,
+                email: session.email || "financeiro@wiptelecom.com.br",
+                telefone: celular,
+                endereco_antigo: session.endereco_antigo || "Não informado",
+                rua: dadosFlow.rua,
+                numero: dadosFlow.numero,
+                complemento: dadosFlow.complemento || "",
+                bairro: dadosFlow.novo_bairro,
+                cidade: dadosFlow.cidade || "Franca",
+                estado: dadosFlow.estado || "SP",
+                cep: dadosFlow.cep,
+                valor: formaPagto === "Grátis" ? "0.00" : "60.00", // Default value for paid if not specified
+                rg: session.rg || "Não informado",
+              };
+
+              const zapResult = await ZapSign.createContractMudancaEndereco(
+                zapSignData,
+              );
+              zapSignUrl = zapResult.signers[0].sign_url;
+              session.zapSignUrlMudanca = zapSignUrl;
+
+              // Send link directly to client
+              await this.MensagensComuns(
+                celular,
+                `📄 *Aqui está o seu Link de Assinatura (Mudança de Endereço):* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos a sua solicitação! 🚀`,
+              );
+              
+              // Add link to the summary for internal use
+              resumoMudanca += `\n\n📄 *Link ZapSign:* ${zapSignUrl}`;
+            } catch (zapError) {
+              console.error(
+                "Error creating ZapSign document during Address Change:",
+                zapError,
+              );
+            }
+
             await this.Finalizar(resumoMudanca, celular, sessions);
 
             if (formaPagto === "Grátis") {
@@ -3254,6 +3307,7 @@ class WhatsPixController {
               );
             }
 
+            await this.enviarNotificacaoServico(celular);
             session.stage = "finalizar";
             return;
           }

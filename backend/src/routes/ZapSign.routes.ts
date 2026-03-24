@@ -11,4 +11,10 @@ router.post(
   ZapSign.generatePdfContratacao,
 );
 
+router.post(
+  "/generatePdf/mudanca_endereco",
+  AuthGuard,
+  ZapSign.generatePdfMudancaEndereco,
+);
+
 export default router;
