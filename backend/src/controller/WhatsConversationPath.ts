@@ -1290,6 +1290,9 @@ class WhatsPixController {
                     celular,
                     `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
                   );
+
+                  // Send notification template
+                  await this.enviarNotificacaoServico(celular);
                 } catch (zapError) {
                   console.error(
                     "Error creating ZapSign document during Flow registration:",
@@ -1499,6 +1502,9 @@ class WhatsPixController {
                     celular,
                     `📄 *Aqui está o seu Link de Assinatura:* ${session.zapSignUrl}\n\nPor favor, *Assine* o quanto antes para podermos agendar a sua instalação! 🚀`,
                   );
+
+                  // Send notification template
+                  await this.enviarNotificacaoServico(celular);
                 } catch (zapError) {
                   console.error(
                     "Error creating ZapSign document during registration:",
@@ -5043,6 +5049,49 @@ class WhatsPixController {
       );
     } catch (error: any) {
       console.error("Error queueing media message:", error.message);
+    }
+  }
+
+  async enviarNotificacaoServico(receivenumber: any) {
+    try {
+      await whatsappOutgoingQueue.add(
+        "send-template",
+        {
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber,
+            type: "template",
+            template: {
+              name: "notificacao_servico",
+              language: {
+                code: "pt_BR",
+              },
+              components: [
+                {
+                  type: "body",
+                },
+              ],
+            },
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
+        },
+      );
+    } catch (error: any) {
+      console.error(
+        "Error queueing notificacao_servico template:",
+        error.message,
+      );
     }
   }
 
