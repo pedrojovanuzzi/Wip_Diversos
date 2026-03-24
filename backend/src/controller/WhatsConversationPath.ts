@@ -1285,14 +1285,14 @@ class WhatsPixController {
 
                   session.zapSignUrl = zapSignUrl;
 
-                  // Send link directly to client
+                  // Send notification template
+                  await this.enviarNotificacaoServico(celular);
+
+                  // Send link directly to client (LAST MESSAGE)
                   await this.MensagensComuns(
                     celular,
                     `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
                   );
-
-                  // Send notification template
-                  await this.enviarNotificacaoServico(celular);
                 } catch (zapError) {
                   console.error(
                     "Error creating ZapSign document during Flow registration:",
@@ -1497,14 +1497,14 @@ class WhatsPixController {
                   session.zapSignUrl = zapResponse.signers[0].sign_url;
                   session.msgDadosFinais += `\n\n📄 *Link de Assinatura:* ${session.zapSignUrl}`;
 
-                  // Send the link directly to the client
+                  // Send notification template
+                  await this.enviarNotificacaoServico(celular);
+
+                  // Send link directly to client (LAST MESSAGE)
                   await this.MensagensComuns(
                     celular,
                     `📄 *Aqui está o seu Link de Assinatura:* ${session.zapSignUrl}\n\nPor favor, *Assine* o quanto antes para podermos agendar a sua instalação! 🚀`,
                   );
-
-                  // Send notification template
-                  await this.enviarNotificacaoServico(celular);
                 } catch (zapError) {
                   console.error(
                     "Error creating ZapSign document during registration:",
@@ -3278,11 +3278,7 @@ class WhatsPixController {
               zapSignUrl = zapResult.signers[0].sign_url;
               session.zapSignUrlMudanca = zapSignUrl;
 
-              // Send link directly to client
-              await this.MensagensComuns(
-                celular,
-                `📄 *Aqui está o seu Link de Assinatura (Mudança de Endereço):* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos a sua solicitação! 🚀`,
-              );
+              // Link sending moved to the end of this block
               
               // Add link to the summary for internal use
               resumoMudanca += `\n\n📄 *Link ZapSign:* ${zapSignUrl}`;
@@ -3308,6 +3304,15 @@ class WhatsPixController {
             }
 
             await this.enviarNotificacaoServico(celular);
+
+            // Send link directly to client (LAST MESSAGE)
+            if (zapSignUrl) {
+              await this.MensagensComuns(
+                celular,
+                `📄 *Aqui está o seu Link de Assinatura (Mudança de Endereço):* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos a sua solicitação! 🚀`,
+              );
+            }
+
             session.stage = "finalizar";
             return;
           }
