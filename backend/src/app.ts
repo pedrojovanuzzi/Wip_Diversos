@@ -23,11 +23,11 @@ import PixRoutes from "./routes/Pix.routes";
 import TokenAtendimentoRoutes from "./routes/TokenAtendimento.routes";
 import TimeTrackingRoutes from "./routes/TimeTracking.routes";
 import Licenca from "./routes/Licenca.Routes";
+import ZapSignRoutes from "./routes/ZapSign.routes";
 
 // Controllers (for scheduled tasks)
 import BackupController from "./controller/Backup";
 import PixController from "./controller/Pix";
-import ZapSignRoutes from "./routes/ZapSign.routes";
 // import DosProtectController from "./controller/DosProtect";
 
 const backup = new BackupController();

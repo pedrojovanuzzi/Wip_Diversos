@@ -5,6 +5,10 @@ import AuthGuard from "../middleware/AuthGuard";
 const router: Router = Router();
 
 //Routes
-router.post("/generatePdf/:pdfName", AuthGuard, ZapSign.generatePdf);
+router.post(
+  "/generatePdf/contratacao",
+  AuthGuard,
+  ZapSign.generatePdfContratacao,
+);
 
 export default router;

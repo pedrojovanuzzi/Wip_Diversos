@@ -3,11 +3,9 @@ import { Request, Response } from "express";
 const homologacao = process.env.SERVIDOR_HOMOLOGACAO;
 
 class ZapSign {
-  async generatePdf(req: Request, res: Response) {
-    const { data } = req.body;
-    const pdfName = req.params.pdfName as string;
-    console.log(pdfName);
-    if (pdfName === "contratacao") {
+  async generatePdfContratacao(req: Request, res: Response) {
+    try {
+      const data = req.body;
       const response = await axios.post(
         homologacao
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
@@ -20,9 +18,10 @@ class ZapSign {
           },
         },
       );
-      res.json(response.data);
-    } else {
-      res.status(400).json({ error: "PDF name not supported" });
+      res.status(200).json(response.data);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ error: "Failed to generate PDF" });
     }
   }
 }
