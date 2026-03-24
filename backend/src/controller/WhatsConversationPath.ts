@@ -698,6 +698,20 @@ class WhatsPixController {
               session.stage = "awaiting_cpf";
             } else if (texto == "2" || texto == "Serviços/Contratação") {
               const campos = {
+                // sections: [
+                //   {
+                //     title: "Serviços",
+                //     rows: [
+                //       { id: "option_1", title: "Instalação" },
+                //       { id: "option_2", title: "Mudança de Endereço" },
+                //       { id: "option_3", title: "Mudança de Cômodo" },
+                //       { id: "option_4", title: "Troca de Titularidade" },
+                //       { id: "option_5", title: "Alteração de Plano" },
+                //       { id: "option_6", title: "Renovação Contratual" },
+                //       { id: "option_7", title: "Wifi Estendido" },
+                //     ],
+                //   },
+                // ],
                 sections: [
                   {
                     title: "Serviços",
@@ -707,8 +721,8 @@ class WhatsPixController {
                       { id: "option_3", title: "Mudança de Cômodo" },
                       { id: "option_4", title: "Troca de Titularidade" },
                       { id: "option_5", title: "Alteração de Plano" },
-                      { id: "option_6", title: "Renovação Contratual" },
-                      { id: "option_7", title: "Wifi Estendido" },
+                      //{ id: "option_6", title: "Renovação Contratual" },
+                      // { id: "option_7", title: "Wifi Estendido" },
                     ],
                   },
                 ],
@@ -1080,7 +1094,9 @@ class WhatsPixController {
                 rua: this.limparEndereco(dadosFlow.rua, true),
                 numero: this.limparEndereco(dadosFlow.numero),
                 bairro: this.limparEndereco(dadosFlow.bairro),
-                cidade: this.FormatarCidade(this.limparEndereco(dadosFlow.cidade)),
+                cidade: this.FormatarCidade(
+                  this.limparEndereco(dadosFlow.cidade),
+                ),
                 estado: this.limparEndereco(dadosFlow.estado),
               };
 
@@ -1179,7 +1195,9 @@ class WhatsPixController {
                   cpf_cnpj: (dadosFlow.cpf || "").trim().replace(/\s/g, ""),
                   uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
                   email: (dadosFlow.email || "").trim().replace(/\s/g, ""),
-                  cidade: this.FormatarCidade(this.limparEndereco(dadosFlow.cidade || "")),
+                  cidade: this.FormatarCidade(
+                    this.limparEndereco(dadosFlow.cidade || ""),
+                  ),
                   bairro: this.limparEndereco(dadosFlow.bairro || ""),
                   estado: (dadosFlow.estado || "")
                     .toUpperCase()
@@ -1219,7 +1237,9 @@ class WhatsPixController {
                     .slice(0, 2),
                   bairro_res: this.limparEndereco(dadosFlow.bairro || ""),
                   tipo: "pppoe",
-                  cidade_res: this.FormatarCidade(this.limparEndereco(dadosFlow.cidade || "")),
+                  cidade_res: this.FormatarCidade(
+                    this.limparEndereco(dadosFlow.cidade || ""),
+                  ),
                   cep_res: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
                   numero_res: this.limparEndereco(dadosFlow.numero || ""),
                   endereco_res: this.limparEndereco(dadosFlow.rua || "", true),
@@ -1477,7 +1497,10 @@ class WhatsPixController {
                     cpf: session.dadosCompleto.cpf,
                     email: session.dadosCompleto.email,
                     telefone: session.dadosCompleto.celular,
-                    endereco: this.limparEndereco(session.dadosCompleto.rua, true),
+                    endereco: this.limparEndereco(
+                      session.dadosCompleto.rua,
+                      true,
+                    ),
                     numero: session.dadosCompleto.numero,
                     bairro: session.dadosCompleto.bairro,
                     cidade: session.dadosCompleto.cidade,
@@ -1624,7 +1647,9 @@ class WhatsPixController {
                     email: session.dadosCompleto.email
                       .trim()
                       .replace(/\s/g, ""),
-                    cidade: this.FormatarCidade(this.limparEndereco(session.dadosCompleto.cidade)),
+                    cidade: this.FormatarCidade(
+                      this.limparEndereco(session.dadosCompleto.cidade),
+                    ),
                     bairro: this.limparEndereco(session.dadosCompleto.bairro),
                     estado: (session.dadosCompleto.estado || "")
                       .toUpperCase()
@@ -1635,7 +1660,10 @@ class WhatsPixController {
                       "$3-$2-$1",
                     ),
                     numero: this.limparEndereco(session.dadosCompleto.numero),
-                    endereco: this.limparEndereco(session.dadosCompleto.rua, true),
+                    endereco: this.limparEndereco(
+                      session.dadosCompleto.rua,
+                      true,
+                    ),
                     cep: `${session.dadosCompleto.cep
                       .trim()
                       .replace(/\s/g, "")
@@ -3232,7 +3260,9 @@ class WhatsPixController {
                 rua: this.limparEndereco(payload.rua, true),
                 numero: this.limparEndereco(payload.numero),
                 novo_bairro: this.limparEndereco(payload.novo_bairro),
-                cidade: this.FormatarCidade(this.limparEndereco(payload.cidade)),
+                cidade: this.FormatarCidade(
+                  this.limparEndereco(payload.cidade),
+                ),
                 estado: (payload.estado || "").toUpperCase().slice(0, 2),
                 cep: payload.cep || session.cep,
               };
@@ -3255,42 +3285,44 @@ class WhatsPixController {
               `💰 *Forma de Pagamento:* ${formaPagto}`;
 
             const resumoEmailHtml =
-            `<h3>Solicitação de Mudança de Endereço</h3>` +
-            `<p><b>Nome:</b> ${dadosFlow.nome}</p>` +
-            `<p><b>CPF:</b> ${dadosFlow.cpf}</p>` +
-            `<p><b>Celular:</b> ${dadosFlow.celular}</p>` +
-            `<p><b>Login Escolhido:</b> ${dadosFlow.login}</p>` +
-            `<p><b>Antigo Endereço:</b> ${dadosFlow.endereco_antigo}</p>` +
-            `<p><b>Novo Endereço:</b> ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}</p>` +
-            `<p><b>CEP:</b> ${dadosFlow.cep}</p>` +
-            `<p><b>Forma de Pagamento:</b> ${formaPagto}</p>`;
+              `<h3>Solicitação de Mudança de Endereço</h3>` +
+              `<p><b>Nome:</b> ${dadosFlow.nome}</p>` +
+              `<p><b>CPF:</b> ${dadosFlow.cpf}</p>` +
+              `<p><b>Celular:</b> ${dadosFlow.celular}</p>` +
+              `<p><b>Login Escolhido:</b> ${dadosFlow.login}</p>` +
+              `<p><b>Antigo Endereço:</b> ${dadosFlow.endereco_antigo}</p>` +
+              `<p><b>Novo Endereço:</b> ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}</p>` +
+              `<p><b>CEP:</b> ${dadosFlow.cep}</p>` +
+              `<p><b>Forma de Pagamento:</b> ${formaPagto}</p>`;
 
-          // === Atualizar Endereço no MKAuth ===
-          try {
-            if (session.login) {
-              const ClientesRepository =
-                MkauthDataSource.getRepository(Sis_Cliente);
-              await ClientesRepository.update(
-                { login: session.login },
-                {
-                  endereco: this.limparEndereco(dadosFlow.rua, true),
-                  numero: this.limparEndereco(dadosFlow.numero),
-                  bairro: this.limparEndereco(dadosFlow.novo_bairro),
-                  cidade: this.FormatarCidade(this.limparEndereco(dadosFlow.cidade || "")),
-                  estado: (dadosFlow.estado || "")
-                    .toUpperCase()
-                    .replace(/\s/g, "")
-                    .slice(0, 2),
-                  cep: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
-                },
-              );
-              console.log(
-                `Endereço atualizado no MKAuth para o login: ${session.login}`,
-              );
+            // === Atualizar Endereço no MKAuth ===
+            try {
+              if (session.login) {
+                const ClientesRepository =
+                  MkauthDataSource.getRepository(Sis_Cliente);
+                await ClientesRepository.update(
+                  { login: session.login },
+                  {
+                    endereco: this.limparEndereco(dadosFlow.rua, true),
+                    numero: this.limparEndereco(dadosFlow.numero),
+                    bairro: this.limparEndereco(dadosFlow.novo_bairro),
+                    cidade: this.FormatarCidade(
+                      this.limparEndereco(dadosFlow.cidade || ""),
+                    ),
+                    estado: (dadosFlow.estado || "")
+                      .toUpperCase()
+                      .replace(/\s/g, "")
+                      .slice(0, 2),
+                    cep: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
+                  },
+                );
+                console.log(
+                  `Endereço atualizado no MKAuth para o login: ${session.login}`,
+                );
+              }
+            } catch (dbError) {
+              console.error("Erro ao atualizar endereço no MKAuth:", dbError);
             }
-          } catch (dbError) {
-            console.error("Erro ao atualizar endereço no MKAuth:", dbError);
-          }
 
             try {
               // @ts-ignore
@@ -3323,14 +3355,13 @@ class WhatsPixController {
                 rg: session.rg || "Não informado",
               };
 
-              const zapResult = await ZapSign.createContractMudancaEndereco(
-                zapSignData,
-              );
+              const zapResult =
+                await ZapSign.createContractMudancaEndereco(zapSignData);
               zapSignUrl = zapResult.signers[0].sign_url;
               session.zapSignUrlMudanca = zapSignUrl;
 
               // Link sending moved to the end of this block
-              
+
               // Add link to the summary for internal use
               resumoMudanca += `\n\n📄 *Link ZapSign:* ${zapSignUrl}`;
             } catch (zapError) {
@@ -4670,9 +4701,7 @@ class WhatsPixController {
   }
 
   limparEndereco(texto: string, removerNumeros = false) {
-    let limpo = (texto || "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, ""); // remove acentos
+    let limpo = (texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // remove acentos
 
     if (removerNumeros) {
       limpo = limpo.replace(/[^a-zA-Z\s]/g, ""); // remove tudo que não for letra ou espaço
@@ -4685,7 +4714,7 @@ class WhatsPixController {
       .trim()
       .toUpperCase();
   }
-  
+
   FormatarCidade(texto: string) {
     if (!texto) return "";
     return texto
