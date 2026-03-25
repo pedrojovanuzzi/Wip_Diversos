@@ -3715,13 +3715,6 @@ class WhatsPixController {
           // Mostrar termos e opções grátis/paga
           await this.MensagemTermos(
             celular,
-            "Finalizando....",
-            `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
-            "Ler o contrato",
-            "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
-          );
-          await this.MensagemTermos(
-            celular,
             "Termos Mudança de Cômodo",
             "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
             "Ler Termos",
@@ -5039,91 +5032,71 @@ class WhatsPixController {
             // O cliente finaliza no próprio Whatsapp e envia a resposta com o flow_token.
             // Lá em 'iniciarMudanca' trataremos o `nfm_reply`.
           }
-        }
-      } else if (screen === "MUDANCA_COMODO") {
-        const celular = flow_token.split("_")[1];
+        } else if (screen === "MUDANCA_COMODO") {
+          const celular = flow_token.split("_")[1];
 
-        const dbSession = await ApiMkDataSource.getRepository(Sessions).findOne(
-          { where: { celular } },
-        );
-        if (dbSession) {
-          sessions[celular] = {
-            stage: dbSession.stage,
-            ...dbSession.dados,
-          };
-        } else if (!sessions[celular]) {
-          sessions[celular] = { stage: "start" };
-        }
-
-        const session = sessions[celular];
-        if (session) {
-          session.dadosCadastro = {
-            ...(session.dadosCadastro || {}),
-            observacao: data.nome, // Mapeado como 'nome' no payload do Flow
-          };
-
-          try {
-            await this.saveSession(celular);
-          } catch (e) {
-            console.error("Erro ao salvar sessão do Webhook Flow (Cômodo)", e);
+          const dbSession = await ApiMkDataSource.getRepository(
+            Sessions,
+          ).findOne({ where: { celular } });
+          if (dbSession) {
+            sessions[celular] = {
+              stage: dbSession.stage,
+              ...dbSession.dados,
+            };
+          } else if (!sessions[celular]) {
+            sessions[celular] = { stage: "start" };
           }
 
-          // Enviar link de assinatura ZapSign
-          try {
-            const zapSignData = {
-              nome: session.nome || "Não informado",
-              cpf: session.cpf || "Não informado",
-              email: session.email || "Não informado",
-              telefone: session.celularCliente || celular,
-              endereco: session.endereco_comodo || "Não informado",
-              rg: session.rg || "Não informado",
+          const session = sessions[celular];
+          if (session) {
+            session.dadosCadastro = {
+              ...(session.dadosCadastro || {}),
+              observacao: data.nome, // Mapeado como 'nome' no payload do Flow
             };
 
-            const zapResponse =
-              await ZapSign.createContractMudancaComodo(zapSignData);
-            const zapSignUrl = zapResponse.signers[0].sign_url;
+            try {
+              await this.saveSession(celular);
+            } catch (e) {
+              console.error(
+                "Erro ao salvar sessão do Webhook Flow (Cômodo)",
+                e,
+              );
+            }
 
-            session.zapSignUrl = zapSignUrl;
+            // Enviar link de assinatura ZapSign
+            try {
+              const zapSignData = {
+                nome: session.nome || "Não informado",
+                cpf: session.cpf || "Não informado",
+                email: session.email || "Não informado",
+                telefone: session.celularCliente || celular,
+                endereco: session.endereco_comodo || "Não informado",
+                rg: session.rg || "Não informado",
+              };
 
-            await this.MensagensComuns(
-              celular,
-              `📄 *Aqui está o seu Link de Assinatura para Mudança de Cômodo:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
-            );
-          } catch (zapError) {
-            console.error(
-              "Error creating ZapSign document for Mudança de Cômodo:",
-              zapError,
-            );
+              const zapResponse =
+                await ZapSign.createContractMudancaComodo(zapSignData);
+              const zapSignUrl = zapResponse.signers[0].sign_url;
+
+              session.zapSignUrl = zapSignUrl;
+
+              await this.MensagensComuns(
+                celular,
+                `📄 *Aqui está o seu Link de Assinatura para Mudança de Cômodo:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+              );
+            } catch (zapError) {
+              console.error(
+                "Error creating ZapSign document for Mudança de Cômodo:",
+                zapError,
+              );
+            }
           }
         }
 
-        // Retornar tela de sucesso ao WhatsApp
+        // Retornar tela de sucesso ao WhatsApp para qualquer data_exchange
         const successScreenData = {
           screen: "SUCCESS",
           data: {
-            extension_message_response: {
-              params: {
-                flow_token: flow_token,
-              },
-            },
-          },
-        };
-
-        res.send(
-          encryptFlowResponse(
-            successScreenData,
-            aesKeyBuffer,
-            initialVectorBuffer,
-          ),
-        );
-        return;
-      } else {
-        // Retorna o comando para fechar o Flow (ou ir para uma tela de Sucesso)
-        const successScreenData = {
-          screen: "SUCCESS", // Sua tela final no JSON
-          data: {
-            // Este bloco extension_message_response é um padrão da Meta para
-            // finalizar o fluxo e devolver o controle para a conversa
             extension_message_response: {
               params: {
                 flow_token: flow_token,
