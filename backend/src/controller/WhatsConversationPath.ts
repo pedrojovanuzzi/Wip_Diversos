@@ -224,6 +224,7 @@ class WhatsPixController {
     this.iniciarCadastro = this.iniciarCadastro.bind(this);
     this.LGPD = this.LGPD.bind(this);
     this.iniciarMudancaComodo = this.iniciarMudancaComodo.bind(this);
+    this.finalizarMudancaComodo = this.finalizarMudancaComodo.bind(this);
     this.Finalizar = this.Finalizar.bind(this);
     this.verify = this.verify.bind(this);
     this.saveSession = this.saveSession.bind(this);
@@ -3511,6 +3512,8 @@ class WhatsPixController {
     session: any,
     type: any,
   ) {
+    console.log("MudancaComodo Type: " + type);
+
     if (type !== "text" && type !== "interactive" && type !== undefined) {
       await this.MensagensComuns(
         celular,
@@ -3519,87 +3522,244 @@ class WhatsPixController {
       return;
     }
 
-    const perguntas = [
-      { campo: "nome", pergunta: "➡️ Digite seu *nome completo*:" },
-      { campo: "cpf", pergunta: "➡️ Digite seu *CPF/CNPJ*:" },
-      { campo: "celular", pergunta: "➡️ Digite seu *Celular* com *DDD*:" },
-    ];
-
-    // Se a sessão ainda não foi iniciada ou estamos começando, inicia o cadastro
-    if (!session.dadosCadastro || session.ultimaPergunta === null) {
-      console.log("Iniciando mudança...");
+    // Step 1: Pedir CPF
+    if (!session.mudancaComodoStep) {
+      console.log("Iniciando mudança de cômodo...");
+      session.mudancaComodoStep = "ask_cpf";
       await this.MensagensComuns(
         celular,
-        "🔤 Agora vamos coletar todos os *Dados* para realizar a mudança de cômodo e agendar a visita",
+        "Para iniciar a mudança de cômodo, por favor digite o seu *CPF/CNPJ*:",
       );
-      session.dadosCadastro = {}; // Inicializa os dados do cadastro
-      session.ultimaPergunta = perguntas[0].campo; // Começa com a primeira pergunta
-      await this.MensagensComuns(celular, perguntas[0].pergunta); // Envia a primeira pergunta
+      session.stage = "mudanca_comodo";
       return;
     }
 
-    // Se existe uma última pergunta, armazena a resposta
-    const ultimaPergunta = session.ultimaPergunta;
-    if (ultimaPergunta) {
-      // Valida o CPF antes de prosseguir
-      if (ultimaPergunta === "cpf") {
-        const cpfValido = await this.validarCPF(texto);
-        if (!cpfValido) {
-          await this.MensagensComuns(
-            celular,
-            "❌ *CPF* inválido. Por favor, insira um *CPF* válido.",
-          );
-          return; // Não avança para a próxima pergunta
-        }
+    // Step 2: Validar CPF e buscar cadastros
+    if (session.mudancaComodoStep === "ask_cpf") {
+      const cpf = texto.replace(/[^\d]+/g, "");
+      const cpfValido = await this.validarCPF(texto);
+
+      if (!cpfValido && cpf.length !== 14 && cpf.length !== 11) {
+        await this.MensagensComuns(
+          celular,
+          "❌ *CPF/CNPJ* inválido. Por favor, verifique e digite novamente.",
+        );
+        return;
       }
 
-      session.dadosCadastro[ultimaPergunta] = texto; // Armazena a resposta
-      console.log(`Resposta para ${ultimaPergunta}:`, texto);
-      console.log("Dados atualizados:", session.dadosCadastro);
+      session.cpf = cpf;
+
+      const sis_cliente = await MkauthDataSource.getRepository(
+        Sis_Cliente,
+      ).find({
+        select: {
+          id: true,
+          nome: true,
+          endereco: true,
+          login: true,
+          numero: true,
+          email: true,
+          rg: true,
+          cpf_cnpj: true,
+          celular: true,
+        },
+        where: { cpf_cnpj: cpf, cli_ativado: "s" },
+      });
+
+      if (sis_cliente.length > 1) {
+        // Múltiplos cadastros: listar para o cliente escolher
+        let currentIndex = 1;
+        let structuredData = sis_cliente.map((client) => {
+          return {
+            index: currentIndex++,
+            id: Number(client.id),
+            nome: client.nome,
+            endereco: client.endereco,
+            login: client.login,
+            numero: client.numero,
+            cpf: cpf,
+            email: client.email,
+            rg: client.rg,
+            celular: client.celular,
+          };
+        });
+
+        session.structuredDataComodo = structuredData;
+        session.mudancaComodoStep = "select_address";
+
+        let messageText =
+          "🔍 Encontramos mais de um *Cadastro!* Digite o *Número* para o qual deseja realizar a Mudança de Cômodo 👇🏻\n\n";
+        structuredData.forEach((client) => {
+          messageText += `*${client.index}* Nome: ${client.nome}, Endereço: ${client.endereco} N: ${client.numero}\n\n`;
+        });
+        messageText += "👉🏻 Caso queira cancelar digite *início*";
+
+        await this.MensagensComuns(celular, messageText);
+        return;
+      } else if (sis_cliente.length === 1) {
+        // Apenas 1 cadastro: pular a seleção
+        session.login = sis_cliente[0].login;
+        session.nome = sis_cliente[0].nome;
+        session.email = sis_cliente[0].email;
+        session.rg = sis_cliente[0].rg;
+        session.endereco_comodo = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
+        session.celularCliente = sis_cliente[0].celular;
+        session.mudancaComodoStep = "flow";
+        session.dadosCadastro = {};
+
+        // Enviar o Flow de observação
+        await this.finalizarMudancaComodo(celular, session);
+        return;
+      } else {
+        await this.MensagensComuns(
+          celular,
+          "🙁 Seu cadastro *não* foi *encontrado*, verifique se digitou corretamente o seu *CPF/CNPJ* ou digite *início* para voltar.",
+        );
+        return;
+      }
     }
 
-    // Encontra a próxima pergunta
-    const proximaPerguntaIndex =
-      perguntas.findIndex((q) => q.campo === ultimaPergunta) + 1;
+    // Step 3: Selecionar endereço (múltiplos cadastros)
+    if (session.mudancaComodoStep === "select_address") {
+      if (
+        texto.toLowerCase() === "inicio" ||
+        texto.toLowerCase() === "início"
+      ) {
+        await this.boasVindas(celular);
+        await this.MensagemBotao(
+          celular,
+          "Escolha um Botão",
+          "Boleto/Pix",
+          "Serviços/Contratação",
+          "Falar com Atendente",
+        );
+        session.stage = "options_start";
+        return;
+      }
 
-    if (proximaPerguntaIndex < perguntas.length) {
-      const proximaPergunta = perguntas[proximaPerguntaIndex].pergunta;
-      session.ultimaPergunta = perguntas[proximaPerguntaIndex].campo; // Atualiza para a próxima pergunta
-      console.log("Próxima pergunta:", proximaPergunta);
-      await this.MensagensComuns(celular, proximaPergunta); // Envia a próxima pergunta
-    } else {
-      console.log("Dados atualizados:", session.dadosCadastro);
-      await this.MensagemTermos(
-        celular,
-        "Finalizando....",
-        `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
-        "Ler o contrato",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
-      );
-      await this.MensagemTermos(
-        celular,
-        "Termos Mudança de Cômodo",
-        "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
-        "Ler Termos",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_comodo",
-      );
-      await this.MensagemBotao(
-        celular,
-        "📝 Este serviço pode ser realizado de 2 formas: *Grátis* renovação contratual 12 meses ou *Paga* consulte o valor.",
-        "Grátis",
-        "Paga",
-      );
-      session.stage = "choose_type_comodo";
+      const selectedIndex = parseInt(texto, 10) - 1;
 
-      // Aqui você armazena todos os dados na sessão
-      session.dadosCompleto = {
-        ...session.dadosCadastro, // Inclui todos os dados do cadastro
-      };
+      if (
+        !isNaN(selectedIndex) &&
+        selectedIndex >= 0 &&
+        selectedIndex < session.structuredDataComodo.length
+      ) {
+        const selectedClient = session.structuredDataComodo[selectedIndex];
+        session.login = selectedClient.login;
+        session.nome = selectedClient.nome;
+        session.email = selectedClient.email;
+        session.rg = selectedClient.rg;
+        session.endereco_comodo = `${selectedClient.endereco}, ${selectedClient.numero}`;
+        session.celularCliente = selectedClient.celular;
+        session.mudancaComodoStep = "flow";
+        session.dadosCadastro = {};
 
-      // Finaliza o cadastro
-      session.dadosCadastro = null;
-      session.ultimaPergunta = null;
+        // Enviar o Flow de observação
+        await this.finalizarMudancaComodo(celular, session);
+        return;
+      } else {
+        await this.MensagensComuns(
+          celular,
+          "⚠️ Opção *inválida*, por favor digite o número correto da opção desejada.",
+        );
+        return;
+      }
     }
+
+    // Step 4: Aguardando resposta do Flow (nfm_reply)
+    if (session.mudancaComodoStep === "flow") {
+      try {
+        const payload = JSON.parse(texto);
+        if (payload.flow_token) {
+          // Recarrega a sessão do banco para garantir que temos as atualizações
+          let dadosFlow = session.dadosCadastro;
+          try {
+            const dbSession = await ApiMkDataSource.getRepository(
+              Sessions,
+            ).findOne({ where: { celular } });
+            if (dbSession && dbSession.dados) {
+              dadosFlow = dbSession.dados.dadosCadastro;
+              session.dadosCadastro = dadosFlow;
+            }
+          } catch (e) {
+            console.error("Erro ao recarregar sessão (Cômodo):", e);
+          }
+
+          // Fallback: extrair do payload do nfm_reply
+          if (!dadosFlow || Object.keys(dadosFlow).length === 0) {
+            console.log(
+              "⚠️ session.dadosCadastro vazio (Cômodo). Tentando extrair do payload...",
+            );
+            if (payload && payload.nome) {
+              dadosFlow = {
+                observacao: payload.nome,
+              };
+              session.dadosCadastro = dadosFlow;
+            }
+          }
+
+          const observacao = dadosFlow?.observacao || "Sem observação";
+
+          // Armazena dados completos
+          session.dadosCompleto = {
+            nome: session.nome,
+            cpf: session.cpf,
+            login: session.login,
+            email: session.email,
+            rg: session.rg,
+            endereco: session.endereco_comodo,
+            celular: session.celularCliente,
+            observacao: observacao,
+          };
+
+          // Mostrar termos e opções grátis/paga
+          await this.MensagemTermos(
+            celular,
+            "Finalizando....",
+            `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
+            "Ler o contrato",
+            "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
+          );
+          await this.MensagemTermos(
+            celular,
+            "Termos Mudança de Cômodo",
+            "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
+            "Ler Termos",
+            "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_comodo",
+          );
+          await this.MensagemBotao(
+            celular,
+            "📝 Este serviço pode ser realizado de 2 formas: *Grátis* renovação contratual 12 meses ou *Paga* consulte o valor.",
+            "Grátis",
+            "Paga",
+          );
+          session.stage = "choose_type_comodo";
+
+          // Limpar dados temporários
+          session.dadosCadastro = null;
+          session.mudancaComodoStep = null;
+        }
+      } catch (e) {
+        // Se não for JSON, o usuário pode ter digitado algo inesperado
+        await this.MensagensComuns(
+          celular,
+          "📋 Por favor, preencha o *formulário* acima para continuar.",
+        );
+      }
+    }
+  }
+
+  async finalizarMudancaComodo(celular: any, session: any) {
+    await this.MensagensComuns(
+      celular,
+      "🔤 Agora vamos coletar os *dados* para realizar a mudança de cômodo e agendar a visita.",
+    );
+    await this.MensagemFlowMudancaComodo(
+      celular,
+      "mudanca_comodo",
+      "Preencher Formulário",
+    );
+    session.stage = "mudanca_comodo";
   }
 
   async iniciarMudancaTitularidade(
@@ -4700,6 +4860,61 @@ class WhatsPixController {
     }
   }
 
+  async MensagemFlowMudancaComodo(
+    receivenumber: any,
+    flowName: string,
+    ctaText: string,
+  ) {
+    try {
+      await whatsappOutgoingQueue.add(
+        "send-flow",
+        {
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber,
+            type: "interactive",
+            interactive: {
+              type: "flow",
+              body: {
+                text: "Preencha o formulário abaixo para prosseguir com a mudança de cômodo.",
+              },
+              action: {
+                name: "flow",
+                parameters: {
+                  flow_message_version: "3",
+                  flow_name: flowName,
+                  flow_cta: ctaText,
+                  flow_token: `sessao_${receivenumber}_${Date.now()}`,
+                  flow_action: "navigate",
+                  flow_action_payload: {
+                    screen: "MUDANCA_COMODO",
+                  },
+                  mode: "published",
+                },
+              },
+            },
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
+        },
+      );
+
+      console.log(`Flow '${flowName}' enviado para ${receivenumber}`);
+    } catch (error: any) {
+      console.error("Erro ao enviar Flow de Mudança de Cômodo:", error.message);
+    }
+  }
+
   limparEndereco(texto: string, removerNumeros = false) {
     let limpo = (texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // remove acentos
 
@@ -4824,10 +5039,85 @@ class WhatsPixController {
             // O cliente finaliza no próprio Whatsapp e envia a resposta com o flow_token.
             // Lá em 'iniciarMudanca' trataremos o `nfm_reply`.
           }
-        } else {
-          // TODO: Aqui você implementa a lógica para salvar no Banco de Dados
+        }
+      } else if (screen === "MUDANCA_COMODO") {
+        const celular = flow_token.split("_")[1];
+
+        const dbSession = await ApiMkDataSource.getRepository(Sessions).findOne(
+          { where: { celular } },
+        );
+        if (dbSession) {
+          sessions[celular] = {
+            stage: dbSession.stage,
+            ...dbSession.dados,
+          };
+        } else if (!sessions[celular]) {
+          sessions[celular] = { stage: "start" };
         }
 
+        const session = sessions[celular];
+        if (session) {
+          session.dadosCadastro = {
+            ...(session.dadosCadastro || {}),
+            observacao: data.nome, // Mapeado como 'nome' no payload do Flow
+          };
+
+          try {
+            await this.saveSession(celular);
+          } catch (e) {
+            console.error("Erro ao salvar sessão do Webhook Flow (Cômodo)", e);
+          }
+
+          // Enviar link de assinatura ZapSign
+          try {
+            const zapSignData = {
+              nome: session.nome || "Não informado",
+              cpf: session.cpf || "Não informado",
+              email: session.email || "Não informado",
+              telefone: session.celularCliente || celular,
+              endereco: session.endereco_comodo || "Não informado",
+              rg: session.rg || "Não informado",
+            };
+
+            const zapResponse =
+              await ZapSign.createContractMudancaComodo(zapSignData);
+            const zapSignUrl = zapResponse.signers[0].sign_url;
+
+            session.zapSignUrl = zapSignUrl;
+
+            await this.MensagensComuns(
+              celular,
+              `📄 *Aqui está o seu Link de Assinatura para Mudança de Cômodo:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+            );
+          } catch (zapError) {
+            console.error(
+              "Error creating ZapSign document for Mudança de Cômodo:",
+              zapError,
+            );
+          }
+        }
+
+        // Retornar tela de sucesso ao WhatsApp
+        const successScreenData = {
+          screen: "SUCCESS",
+          data: {
+            extension_message_response: {
+              params: {
+                flow_token: flow_token,
+              },
+            },
+          },
+        };
+
+        res.send(
+          encryptFlowResponse(
+            successScreenData,
+            aesKeyBuffer,
+            initialVectorBuffer,
+          ),
+        );
+        return;
+      } else {
         // Retorna o comando para fechar o Flow (ou ir para uma tela de Sucesso)
         const successScreenData = {
           screen: "SUCCESS", // Sua tela final no JSON
