@@ -13,4 +13,7 @@ export default class ZapSignTemplates {
 
   @Column({ type: "varchar", length: 255, nullable: true })
   token_id!: string;
+
+  @Column({ type: "varchar", length: 20, default: "pago" })
+  tipo!: string; // 'pago' ou 'gratis'
 }

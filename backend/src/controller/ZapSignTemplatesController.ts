@@ -17,6 +17,7 @@ export default class ZapSignTemplatesController {
         id: t.id,
         nome_servico: t.nome_servico,
         token_id: t.token_id,
+        tipo: t.tipo,
         has_document: !!t.base64_docx,
       }));
 
@@ -71,7 +72,7 @@ export default class ZapSignTemplatesController {
         }
       };
 
-      console.log(`Atualizando template no ZapSign para: ${template.nome_servico}`);
+      console.log(`Atualizando template no ZapSign para: ${template.nome_servico} (${template.tipo})`);
 
       const zapResponse = await axios.post(zapSignUrl, zapSignData, {
         headers: {

@@ -1795,10 +1795,7 @@ class WhatsPixController {
               );
             }
           } catch (zapError) {
-            console.error(
-              "Error in final_register processing:",
-              zapError,
-            );
+            console.error("Error in final_register processing:", zapError);
           }
           break;
 
@@ -3685,6 +3682,7 @@ class WhatsPixController {
         email: session.email || "Não informado",
         telefone: session.celularCliente || celular,
         endereco: session.endereco_comodo || "Não informado",
+        valor: session.formaPagamento === "Grátis" ? "0" : "60",
         rg: session.rg || "Não informado",
       };
 

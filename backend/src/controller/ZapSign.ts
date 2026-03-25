@@ -50,6 +50,7 @@ interface ZapSignDataMudancaComodo {
   email: string;
   telefone: string;
   endereco: string;
+  valor: string;
   rg?: string;
 }
 
@@ -75,8 +76,10 @@ class ZapSign {
       } = params;
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
+      const tipo = (valor === "0,00" || valor === "0" || valor === "0.00") ? "gratis" : "pago";
+      
       const template = await templateRepo.findOne({
-        where: { nome_servico: "Instalação" },
+        where: { nome_servico: "Instalação", tipo: tipo },
       });
 
       if (!template || !template.token_id) {
@@ -169,8 +172,10 @@ class ZapSign {
       } = params;
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
+      const tipo = (valor === "0,00" || valor === "0" || valor === "0.00") ? "gratis" : "pago";
+
       const template = await templateRepo.findOne({
-        where: { nome_servico: "Mudança de Endereço" },
+        where: { nome_servico: "Mudança de Endereço", tipo: tipo },
       });
 
       if (!template || !template.token_id) {
@@ -271,12 +276,15 @@ class ZapSign {
         email,
         telefone,
         endereco,
+        valor,
         rg = "Não informado",
       } = params;
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
+      const tipo = (valor === "0,00" || valor === "0" || valor === "0.00") ? "gratis" : "pago";
+
       const template = await templateRepo.findOne({
-        where: { nome_servico: "Mudança de Cômodo" },
+        where: { nome_servico: "Mudança de Cômodo", tipo: tipo },
       });
 
       if (!template || !template.token_id) {
