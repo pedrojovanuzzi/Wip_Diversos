@@ -896,10 +896,7 @@ class WhatsPixController {
                 if (session.service === "mudanca_endereco") {
                   const pagamento = texto;
                   session.formaPagamento = `Paga com ${pagamento}`;
-                  await this.MensagensComuns(
-                    celular,
-                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nAgora, por favor, preencha o formulário abaixo com os dados do seu *Novo Endereço*.",
-                  );
+
                   await this.MensagemFlowEndereco(
                     celular,
                     "mudanca_endereco",
@@ -909,10 +906,7 @@ class WhatsPixController {
                 } else if (session.service === "mudanca_comodo") {
                   const pagamento = texto;
                   session.formaPagamento = `Paga com ${pagamento}`;
-                  await this.MensagensComuns(
-                    celular,
-                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de cômodo*",
-                  );
+
                   let dadosCliente = session.dadosCompleto
                     ? JSON.stringify(session.dadosCompleto, null, 2)
                     : "Dados não encontrados";
@@ -969,12 +963,12 @@ class WhatsPixController {
                     });
                   });
                   mailOptions(session.msgDadosFinais);
-                  await this.MensagemBotao(
+
+                  await this.Finalizar(
+                    session.msgDadosFinais,
                     celular,
-                    "Concluir Solicitação",
-                    "Finalizar",
+                    sessions,
                   );
-                  session.stage = "finalizar";
                 }
               } else {
                 await this.MensagensComuns(
@@ -1492,10 +1486,6 @@ class WhatsPixController {
           try {
             if (this.verificaType(type)) {
               if (texto.toLowerCase() === "sim, li e aceito") {
-                await this.MensagensComuns(
-                  celular,
-                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Vamos realizar a *Consulta do seu CPF*. \n\n*Clique no Botão abaixo para finalizar*",
-                );
                 let dadosCliente = session.dadosCompleto
                   ? JSON.stringify(session.dadosCompleto, null, 2)
                   : "Dados não encontrados";
@@ -1826,10 +1816,6 @@ class WhatsPixController {
                   texto.toLowerCase() === "gratis"
                 ) {
                   session.formaPagamento = "Grátis";
-                  await this.MensagensComuns(
-                    celular,
-                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de cômodo* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*",
-                  );
 
                   // Enviar link de assinatura ZapSign apenas ao final
                   await this.gerarEEnviarLinkZapSignMudancaComodo(
@@ -1887,13 +1873,15 @@ class WhatsPixController {
                     });
                   });
                   mailOptions(session.msgDadosFinais);
-                  await this.MensagemBotao(
+                  await this.MensagensComuns(
                     celular,
-                    "Concluir Solicitação",
-                    "Finalizar",
+                    "*✅ Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o link de assinatura da Renovação Contratual com período de 12 meses. Obrigado pela confiança!",
                   );
-
-                  session.stage = "finalizar";
+                  await this.Finalizar(
+                    session.msgDadosFinais,
+                    celular,
+                    sessions,
+                  );
                 } else {
                   await this.MensagensComuns(
                     celular,
@@ -2076,11 +2064,6 @@ class WhatsPixController {
         case "choose_type_titularidade":
           try {
             if (this.verificaType(type)) {
-              await this.MensagensComuns(
-                celular,
-                "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *Alteração de Titularidade* enviando o *link* para o cliente atual com o *Termo de Alteração de Titularidade* \n\ne ao Novo Cliente o *link* com os *Termos de Adesão, Alteração de Titularidade e Contrato de Permanência* a serem *assinados*.\n\n*Clique no Botão abaixo para finalizar*",
-              );
-
               let dadosCliente = session.dadosCompleto
                 ? JSON.stringify(session.dadosCompleto, null, 2)
                 : "Dados não encontrados";
@@ -2129,13 +2112,11 @@ class WhatsPixController {
               });
 
               mailOptions(session.msgDadosFinais);
-              await this.MensagemBotao(
+              await this.MensagensComuns(
                 celular,
-                "Concluir Solicitação",
-                "Finalizar",
+                "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
               );
-
-              session.stage = "finalizar";
+              await this.Finalizar(session.msgDadosFinais, celular, sessions);
             } else {
               await this.MensagensComuns(
                 celular,
@@ -2196,13 +2177,11 @@ class WhatsPixController {
             });
 
             mailOptions(session.msgDadosFinais);
-            await this.MensagemBotao(
+            await this.MensagensComuns(
               celular,
-              "Concluir Solicitação",
-              "Finalizar",
+              "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
             );
-
-            session.stage = "finalizar";
+            await this.Finalizar(session.msgDadosFinais, celular, sessions);
           } catch (error) {
             console.log(error);
           }
@@ -2257,13 +2236,11 @@ class WhatsPixController {
             });
 
             mailOptions(session.msgDadosFinais);
-            await this.MensagemBotao(
+            await this.MensagensComuns(
               celular,
-              "Concluir Solicitação",
-              "Finalizar",
+              "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
             );
-
-            session.stage = "finalizar";
+            await this.Finalizar(session.msgDadosFinais, celular, sessions);
           } catch (error) {
             console.log(error);
           }
@@ -2455,10 +2432,6 @@ class WhatsPixController {
           break;
         case "finish_troca_plan":
           try {
-            await this.MensagensComuns(
-              celular,
-              "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Um de nossos *atendentes* entrará em contato para concluir a sua *Alteração de plano* enviando o *link* com os *Termos de Alteração de Plano, Termo de Adesão e Contrato de Permanência* a serem *assinados*\n\nClique no botão abaixo para finalizar",
-            );
             let dadosCliente = session.dadosCompleto
               ? JSON.stringify(session.dadosCompleto, null, 2)
               : "Dados não encontrados";
@@ -2502,13 +2475,11 @@ class WhatsPixController {
             });
 
             mailOptions(session.msgDadosFinais);
-            await this.MensagemBotao(
+            await this.MensagensComuns(
               celular,
-              "Concluir Solicitação",
-              "Finalizar",
+              "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
             );
-
-            session.stage = "finalizar";
+            await this.Finalizar(session.msgDadosFinais, celular, sessions);
           } catch (error) {
             console.log(error);
           }
@@ -2543,10 +2514,7 @@ class WhatsPixController {
                 texto.toLowerCase() === "gratis"
               ) {
                 session.formaPagamento = "Grátis";
-                await this.MensagensComuns(
-                  celular,
-                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nAgora, por favor, preencha o formulário abaixo com os dados do seu *Novo Endereço*.",
-                );
+
                 await this.MensagemFlowEndereco(
                   celular,
                   "mudanca_endereco",
@@ -2578,11 +2546,6 @@ class WhatsPixController {
           try {
             if (this.verificaType(type)) {
               if (texto.toLowerCase() === "sim concordo") {
-                await this.MensagensComuns(
-                  celular,
-                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Um de nossos *atendentes* entrará em contato para concluir a sua *Renovação* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n Clique em finalizar abaixo para terminar a conversa",
-                );
-
                 let dadosCliente = session.dadosCompleto
                   ? JSON.stringify(session.dadosCompleto, null, 2)
                   : "Dados não encontrados";
@@ -2631,13 +2594,11 @@ class WhatsPixController {
                 });
 
                 mailOptions(session.msgDadosFinais);
-                await this.MensagemBotao(
+                await this.MensagensComuns(
                   celular,
-                  "Concluir Solicitação",
-                  "Finalizar",
+                  "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
                 );
-
-                session.stage = "finalizar";
+                await this.Finalizar(session.msgDadosFinais, celular, sessions);
               } else if (
                 texto.toLowerCase() === "nao" ||
                 texto.toLowerCase() === "não"
@@ -2904,29 +2865,6 @@ class WhatsPixController {
               celular,
               "⚠️ Seleção *Inválida*, Verifique se Digitou o Número Corretamente!!!",
             );
-          }
-          break;
-
-        //FinalizarServicos
-        case "finalizar":
-          try {
-            if (this.verificaType(type)) {
-              if (texto.toLowerCase() === "finalizar") {
-                await this.Finalizar(session.msgDadosFinais, celular, sessions);
-              } else {
-                await this.MensagensComuns(
-                  celular,
-                  "Opção Invalída, Clique no Botão",
-                );
-              }
-            } else {
-              await this.MensagensComuns(
-                celular,
-                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Clique no Botão",
-              );
-            }
-          } catch (error) {
-            console.log(error);
           }
           break;
       }
@@ -3788,6 +3726,11 @@ class WhatsPixController {
       const zapSignUrl = zapResponse.signers[0].sign_url;
 
       session.zapSignUrl = zapSignUrl;
+
+      await this.MensagensComuns(
+        celular,
+        "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para enviar o link de assinatura da Renovação Contratual com período de 12 meses. Obrigado pela confiança!",
+      );
 
       await this.MensagensComuns(
         celular,
