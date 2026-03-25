@@ -10,6 +10,7 @@ import axios from "axios";
 import { Request, Response } from "express";
 import { Between, In, IsNull, Not, Repository } from "typeorm";
 import { isNotIn } from "class-validator";
+import Whatsapp from "./Whatsapp";
 
 dotenv.config();
 
@@ -342,6 +343,27 @@ class Pix {
             { login: sis_cliente.login },
             { observacao: "sim", rem_obs: remObsDate },
           );
+
+          // Notificação de sucesso via WhatsApp para serviços
+          if (record_pppoe.tipo === "servicos") {
+            try {
+              const telefone = sis_cliente.celular || sis_cliente.fone;
+              if (telefone) {
+                const cleanPhone = telefone.replace(/\D/g, "");
+                const finalPhone = cleanPhone.startsWith("55") ? cleanPhone : "55" + cleanPhone;
+                
+                const servicoNome = record_pppoe.obs.split("Serviço: ")[1]?.split(" -")[0] || "Contratado";
+                
+                await Whatsapp.MensagensComuns(
+                  finalPhone,
+                  `✅ *Pagamento Confirmado!*\n\nOlá ${sis_cliente.nome}, recebemos o pagamento do serviço: *${servicoNome}*.\n\nNossa equipe entrará em contato em breve para dar prosseguimento ao atendimento. Obrigado pela confiança! 🚀`
+                );
+                console.log(`[Webhook PIX] Mensagem de sucesso enviada para ${finalPhone}`);
+              }
+            } catch (waError) {
+              console.error("[Webhook PIX] Erro ao enviar mensagem de sucesso via WhatsApp:", waError);
+            }
+          }
         }
 
         try {
@@ -794,6 +816,55 @@ class Pix {
       console.error("Erro em gerarPixAberto:", error);
       res.status(500).json(error);
       return;
+    }
+  };
+
+  /**
+   * Gera um PIX para um lançamento de serviço específico
+   */
+  gerarPixServico = async (params: { 
+    idLancamento: number, 
+    valor: string, 
+    pppoe: string, 
+    cpf: string 
+  }) => {
+    try {
+      const { idLancamento, valor, pppoe, cpf } = params;
+      const cleanCpf = cpf.replace(/\D/g, "");
+
+      const efipay = new EfiPay(options);
+      const loc = await efipay.pixCreateLocation([], { tipoCob: "cob" });
+      const qrlink = await efipay.pixGenerateQRCode({ id: loc.id });
+
+      const txid = crypto.randomBytes(16).toString("hex");
+      const efiParams = { txid };
+
+      const body = {
+        calendario: { expiracao: 3600 }, // Expira em 1 hora para serviços
+        devedor: cleanCpf.length === 11 
+          ? { cpf: cleanCpf, nome: pppoe } 
+          : { cnpj: cleanCpf, nome: pppoe },
+        valor: { original: valor },
+        chave: chave_pix,
+        solicitacaoPagador: "Pagamento de Serviço",
+        infoAdicionais: [
+          { nome: "ID", valor: String(idLancamento) },
+          { nome: "VALOR", valor: valor },
+          { nome: "QR", valor: String(qrlink.linkVisualizacao) }
+        ],
+        loc: { id: loc.id }
+      };
+
+      await efipay.pixCreateCharge(efiParams, body);
+
+      return {
+        link: qrlink.linkVisualizacao,
+        qrcode: qrlink.qrcode, // Pix Copia e Cola
+        txid: txid
+      };
+    } catch (error) {
+      console.error("❌ Erro ao gerar PIX de serviço:", error);
+      throw error;
     }
   };
 

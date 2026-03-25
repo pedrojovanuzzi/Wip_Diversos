@@ -27,6 +27,7 @@ import AppDataSource from "../database/DataSource";
 import moment from "moment-timezone";
 import { Queue, Worker, Job } from "bullmq";
 import ZapSign from "./ZapSign";
+import Pix from "./Pix";
 import { log } from "console";
 
 dotenv.config();
@@ -883,7 +884,34 @@ class WhatsPixController {
                   session.formaPagamento = `Paga com ${pagamento}`;
 
                   // Gerar lançamento de serviço no MKAuth
-                  await this.gerarLancamentoServico(session, "mudanca_endereco");
+                  const lancamento = await this.gerarLancamentoServico(
+                    session,
+                    "mudanca_endereco",
+                  );
+
+                  // Se for Pix, gerar o QR Code e enviar
+                  if (pagamento === "Pix" && lancamento) {
+                    try {
+                      const pixController = new Pix();
+                      const pixData = await pixController.gerarPixServico({
+                        idLancamento: lancamento.id,
+                        valor: lancamento.valor,
+                        pppoe: lancamento.login,
+                        cpf: session.cpf || session.dadosCompleto?.cpf,
+                      });
+
+                      await this.MensagensComuns(
+                        celular,
+                        `✨ *Aqui está seu PIX para pagamento da Mudança de Endereço:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+                      );
+                      await this.MensagensComuns(celular, pixData.qrcode);
+                    } catch (pixError) {
+                      console.error(
+                        "Erro ao gerar PIX para Mudança de Endereço:",
+                        pixError,
+                      );
+                    }
+                  }
 
                   await this.MensagemFlowEndereco(
                     celular,
@@ -896,7 +924,34 @@ class WhatsPixController {
                   session.formaPagamento = `Paga com ${pagamento}`;
 
                   // Gerar lançamento de serviço no MKAuth
-                  await this.gerarLancamentoServico(session, "mudanca_comodo");
+                  const lancamento = await this.gerarLancamentoServico(
+                    session,
+                    "mudanca_comodo",
+                  );
+
+                  // Se for Pix, gerar o QR Code e enviar
+                  if (pagamento === "Pix" && lancamento) {
+                    try {
+                      const pixController = new Pix();
+                      const pixData = await pixController.gerarPixServico({
+                        idLancamento: lancamento.id,
+                        valor: lancamento.valor,
+                        pppoe: lancamento.login,
+                        cpf: session.cpf || session.dadosCompleto?.cpf,
+                      });
+
+                      await this.MensagensComuns(
+                        celular,
+                        `✨ *Aqui está seu PIX para pagamento da Mudança de Cômodo:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+                      );
+                      await this.MensagensComuns(celular, pixData.qrcode);
+                    } catch (pixError) {
+                      console.error(
+                        "Erro ao gerar PIX para Mudança de Cômodo:",
+                        pixError,
+                      );
+                    }
+                  }
 
                   // Enviar link de assinatura ZapSign antes do resumo
                   await this.gerarEEnviarLinkZapSignMudancaComodo(
@@ -1469,7 +1524,7 @@ class WhatsPixController {
               "Sim, li e aceito",
               "Não",
             );
-            session.stage = "final_register";
+            session.stage = "final_register_options";
           } else {
             await this.MensagensComuns(
               celular,
@@ -1477,10 +1532,67 @@ class WhatsPixController {
             );
           }
           break;
-        case "final_register":
+        case "final_register_options":
+          if (this.verificaType(type)) {
+            if (texto.toLowerCase() === "sim, li e aceito") {
+              await this.MensagemBotao(
+                celular,
+                "💰 *Como deseja realizar o pagamento da Taxa de Instalação (R$ 350,00)?*",
+                "Pix",
+                "Dinheiro",
+                "Cartão",
+              );
+              session.stage = "choose_payment_instalacao";
+            } else {
+              await this.MensagensComuns(
+                celular,
+                "Para prosseguir com a contratação, é necessário aceitar os termos. Caso tenha dúvidas, peça para falar com um atendente.",
+              );
+            }
+          }
+          break;
+        case "choose_payment_instalacao":
           try {
             if (this.verificaType(type)) {
-              if (texto.toLowerCase() === "sim, li e aceito") {
+              if (
+                texto === "Pix" ||
+                texto === "Dinheiro" ||
+                texto === "Cartão"
+              ) {
+                const pagamento = texto;
+                session.formaPagamento = `Paga com ${pagamento}`;
+
+                // Gerar lançamento de serviço no MKAuth (Instalação = R$ 350)
+                const lancamento = await this.gerarLancamentoServico(
+                  session,
+                  "instalacao",
+                );
+
+                // Se for Pix, gerar o QR Code e enviar
+                if (pagamento === "Pix" && lancamento) {
+                  try {
+                    const pixController = new Pix();
+                    const pixData = await pixController.gerarPixServico({
+                      idLancamento: lancamento.id,
+                      valor: lancamento.valor,
+                      pppoe: lancamento.login,
+                      cpf: session.cpf || session.dadosCompleto?.cpf,
+                    });
+
+                    await this.MensagensComuns(
+                      celular,
+                      `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+                    );
+                    await this.MensagensComuns(celular, pixData.qrcode);
+                  } catch (pixError) {
+                    console.error(
+                      "Erro ao gerar PIX para Instalação:",
+                      pixError,
+                    );
+                  }
+                }
+
+                // Agora segue para a criação do contrato ZapSign (antigo final_register)
                 const zapSignData = {
                   nome: session.dadosCompleto.nome,
                   cpf: session.dadosCompleto.cpf,
@@ -1799,8 +1911,6 @@ class WhatsPixController {
                     celular,
                     "Escolha Forma de Pagamento",
                     "Pix",
-                    "Cartão",
-                    "Dinheiro",
                   );
                   session.stage = "choose_type_payment";
                 } else if (
@@ -2506,8 +2616,6 @@ class WhatsPixController {
                   celular,
                   "Escolha Forma de Pagamento",
                   "Pix",
-                  "Cartão",
-                  "Dinheiro",
                 );
                 session.stage = "choose_type_payment";
               } else if (
@@ -3704,40 +3812,48 @@ class WhatsPixController {
     try {
       // Mapeamento de valores por tipo de serviço
       const valoresServico: { [key: string]: number } = {
-        instalacao: 350,
-        mudanca_endereco: 200,
-        mudanca_comodo: 200,
+        instalacao: process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 350,
+        mudanca_endereco: process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 200,
+        mudanca_comodo: process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 200,
       };
 
       const valor = valoresServico[tipoServico];
       if (!valor) {
-        console.error(`Tipo de serviço desconhecido para lançamento: ${tipoServico}`);
+        console.error(
+          `Tipo de serviço desconhecido para lançamento: ${tipoServico}`,
+        );
         return;
       }
 
       // Identificar o login do cliente pelo CPF
       const cpf = session.cpf || session.dadosCompleto?.cpf;
       if (!cpf) {
-        console.error("CPF não encontrado na sessão para gerar lançamento de serviço.");
+        console.error(
+          "CPF não encontrado na sessão para gerar lançamento de serviço.",
+        );
         return;
       }
 
-      const ClientesRepository = MkauthDataSource.getRepository(ClientesEntities);
+      const ClientesRepository =
+        MkauthDataSource.getRepository(ClientesEntities);
       const cliente = await ClientesRepository.findOne({
         where: { cpf_cnpj: cpf.trim().replace(/\s/g, "") },
       });
 
       if (!cliente) {
-        console.error(`Cliente com CPF ${cpf} não encontrado no MKAuth para gerar lançamento.`);
+        console.error(
+          `Cliente com CPF ${cpf} não encontrado no MKAuth para gerar lançamento.`,
+        );
         return;
       }
 
       const login = cliente.login;
-      const nomeServico = tipoServico === "instalacao" 
-        ? "Instalação" 
-        : tipoServico === "mudanca_endereco" 
-          ? "Mudança de Endereço" 
-          : "Mudança de Cômodo";
+      const nomeServico =
+        tipoServico === "instalacao"
+          ? "Instalação"
+          : tipoServico === "mudanca_endereco"
+            ? "Mudança de Endereço"
+            : "Mudança de Cômodo";
 
       // Gerar o lançamento no sis_lanc
       const FaturasRepository = MkauthDataSource.getRepository(Record);
@@ -3760,9 +3876,13 @@ class WhatsPixController {
         uuid_lanc: uuidv4().slice(0, 16),
       });
 
-      console.log(`✅ Lançamento de serviço criado com sucesso! ID: ${novoLancamento.id}, Login: ${login}, Valor: R$ ${valor}, Serviço: ${nomeServico}`);
+      console.log(
+        `✅ Lançamento de serviço criado com sucesso! ID: ${novoLancamento.id}, Login: ${login}, Valor: R$ ${valor}, Serviço: ${nomeServico}`,
+      );
+      return novoLancamento;
     } catch (error) {
       console.error("❌ Erro ao gerar lançamento de serviço no MKAuth:", error);
+      return null;
     }
   }
 
