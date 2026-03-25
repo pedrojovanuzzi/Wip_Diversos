@@ -225,6 +225,8 @@ class WhatsPixController {
     this.LGPD = this.LGPD.bind(this);
     this.iniciarMudancaComodo = this.iniciarMudancaComodo.bind(this);
     this.finalizarMudancaComodo = this.finalizarMudancaComodo.bind(this);
+    this.gerarEEnviarLinkZapSignMudancaComodo =
+      this.gerarEEnviarLinkZapSignMudancaComodo.bind(this);
     this.Finalizar = this.Finalizar.bind(this);
     this.verify = this.verify.bind(this);
     this.saveSession = this.saveSession.bind(this);
@@ -906,14 +908,21 @@ class WhatsPixController {
                   session.stage = "awaiting_mudanca_flow";
                 } else if (session.service === "mudanca_comodo") {
                   const pagamento = texto;
+                  session.formaPagamento = `Paga com ${pagamento}`;
                   await this.MensagensComuns(
                     celular,
-                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de cômodo*\n\n*Clique no Botão abaixo para finalizar*",
+                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de cômodo*",
                   );
                   let dadosCliente = session.dadosCompleto
                     ? JSON.stringify(session.dadosCompleto, null, 2)
                     : "Dados não encontrados";
-                  session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*💰 Forma: Paga com ${pagamento}*\nDados do Cliente: ${dadosCliente}`;
+                  session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*💰 Forma: ${session.formaPagamento}*\nDados do Cliente: ${dadosCliente}`;
+
+                  // Enviar link de assinatura ZapSign apenas ao final
+                  await this.gerarEEnviarLinkZapSignMudancaComodo(
+                    celular,
+                    session,
+                  );
 
                   fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                     let logs = [];
@@ -1816,10 +1825,18 @@ class WhatsPixController {
                   texto.toLowerCase() === "grátis" ||
                   texto.toLowerCase() === "gratis"
                 ) {
+                  session.formaPagamento = "Grátis";
                   await this.MensagensComuns(
                     celular,
-                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de cômodo* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n*Clique no botão abaixo para finalizar*",
+                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de cômodo* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*",
                   );
+
+                  // Enviar link de assinatura ZapSign apenas ao final
+                  await this.gerarEEnviarLinkZapSignMudancaComodo(
+                    celular,
+                    session,
+                  );
+
                   let dadosCliente = session.dadosCompleto
                     ? JSON.stringify(session.dadosCompleto, null, 2)
                     : "Dados não encontrados";
@@ -3755,6 +3772,39 @@ class WhatsPixController {
     session.stage = "mudanca_comodo";
   }
 
+  async gerarEEnviarLinkZapSignMudancaComodo(celular: any, session: any) {
+    try {
+      const zapSignData = {
+        nome: session.nome || "Não informado",
+        cpf: session.cpf || "Não informado",
+        email: session.email || "Não informado",
+        telefone: session.celularCliente || celular,
+        endereco: session.endereco_comodo || "Não informado",
+        rg: session.rg || "Não informado",
+      };
+
+      const zapResponse =
+        await ZapSign.createContractMudancaComodo(zapSignData);
+      const zapSignUrl = zapResponse.signers[0].sign_url;
+
+      session.zapSignUrl = zapSignUrl;
+
+      await this.MensagensComuns(
+        celular,
+        `📄 *Aqui está o seu Link de Assinatura para Mudança de Cômodo:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+      );
+    } catch (zapError) {
+      console.error(
+        "Error creating ZapSign document for Mudança de Cômodo:",
+        zapError,
+      );
+      await this.MensagensComuns(
+        celular,
+        "⚠️ Ocorreu um erro ao gerar seu link de assinatura. Um atendente entrará em contato em breve.",
+      );
+    }
+  }
+
   async iniciarMudancaTitularidade(
     celular: any,
     texto: any,
@@ -5060,34 +5110,6 @@ class WhatsPixController {
               console.error(
                 "Erro ao salvar sessão do Webhook Flow (Cômodo)",
                 e,
-              );
-            }
-
-            // Enviar link de assinatura ZapSign
-            try {
-              const zapSignData = {
-                nome: session.nome || "Não informado",
-                cpf: session.cpf || "Não informado",
-                email: session.email || "Não informado",
-                telefone: session.celularCliente || celular,
-                endereco: session.endereco_comodo || "Não informado",
-                rg: session.rg || "Não informado",
-              };
-
-              const zapResponse =
-                await ZapSign.createContractMudancaComodo(zapSignData);
-              const zapSignUrl = zapResponse.signers[0].sign_url;
-
-              session.zapSignUrl = zapSignUrl;
-
-              await this.MensagensComuns(
-                celular,
-                `📄 *Aqui está o seu Link de Assinatura para Mudança de Cômodo:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
-              );
-            } catch (zapError) {
-              console.error(
-                "Error creating ZapSign document for Mudança de Cômodo:",
-                zapError,
               );
             }
           }
