@@ -912,16 +912,19 @@ class WhatsPixController {
                   const pagamento = texto;
                   session.formaPagamento = `Paga com ${pagamento}`;
 
+                  session.formaPagamento = `Paga com ${pagamento}`;
+
+                  // Enviar link de assinatura ZapSign antes do resumo
+                  await this.gerarEEnviarLinkZapSignMudancaComodo(
+                    celular,
+                    session,
+                  );
+
                   session.msgDadosFinais = this.formatarResumo(
                     session,
                     "*🧱 Mudança de Cômodo*",
                     { forma_pagamento: session.formaPagamento },
-                  );
-
-                  // Enviar link de assinatura ZapSign apenas ao final
-                  await this.gerarEEnviarLinkZapSignMudancaComodo(
-                    celular,
-                    session,
+                    session.zapSignUrl, // Agora o link vai no e-mail!
                   );
 
                   await this.enviarNotificacaoServico(celular);
@@ -1494,59 +1497,48 @@ class WhatsPixController {
           try {
             if (this.verificaType(type)) {
               if (texto.toLowerCase() === "sim, li e aceito") {
+                const zapSignData = {
+                  nome: session.dadosCompleto.nome,
+                  cpf: session.dadosCompleto.cpf,
+                  email: session.dadosCompleto.email,
+                  telefone: session.dadosCompleto.celular,
+                  endereco: this.limparEndereco(
+                    session.dadosCompleto.rua,
+                    true,
+                  ),
+                  numero: session.dadosCompleto.numero,
+                  bairro: session.dadosCompleto.bairro,
+                  cidade: session.dadosCompleto.cidade,
+                  estado: session.dadosCompleto.estado,
+                  cep: session.dadosCompleto.cep,
+                  plano: session.planoNome || session.planoEscolhido,
+                  valor: session.planoValor || "0,00",
+                  vencimento: session.vencimentoEscolhido,
+                  rg: session.dadosCompleto.rg,
+                };
+
+                const zapResponse =
+                  await ZapSign.createContractInstalacao(zapSignData);
+                console.log("ZapSign Document Created:", zapResponse.token);
+
+                session.zapSignUrl = zapResponse.signers[0].sign_url;
+
                 session.msgDadosFinais = this.formatarResumo(
                   session,
-                  "*🧑 Instalação Nova*",
+                  "*🏠 Instalação Nova*",
                   {
                     plano_escolhido: session.planoEscolhido,
                     vencimento: session.vencimentoEscolhido,
                   },
+                  session.zapSignUrl,
                 );
 
                 await this.enviarNotificacaoServico(celular);
 
-                try {
-                  const zapSignData = {
-                    nome: session.dadosCompleto.nome,
-                    cpf: session.dadosCompleto.cpf,
-                    email: session.dadosCompleto.email,
-                    telefone: session.dadosCompleto.celular,
-                    endereco: this.limparEndereco(
-                      session.dadosCompleto.rua,
-                      true,
-                    ),
-                    numero: session.dadosCompleto.numero,
-                    bairro: session.dadosCompleto.bairro,
-                    cidade: session.dadosCompleto.cidade,
-                    estado: session.dadosCompleto.estado,
-                    cep: session.dadosCompleto.cep,
-                    plano: session.planoNome || session.planoEscolhido,
-                    valor: session.planoValor || "0,00",
-                    vencimento: session.vencimentoEscolhido,
-                    rg: session.dadosCompleto.rg,
-                  };
-
-                  const zapResponse =
-                    await ZapSign.createContractInstalacao(zapSignData);
-                  console.log("ZapSign Document Created:", zapResponse.token);
-
-                  // Optionally store the signing URL to send it later or log it
-                  session.zapSignUrl = zapResponse.signers[0].sign_url;
-                  session.msgDadosFinais += `\n\n📄 *Link de Assinatura:* ${session.zapSignUrl}`;
-
-                  // Removida chamada duplicada de enviarNotificacaoServico aqui
-
-                  // Send link directly to client (LAST MESSAGE)
-                  await this.MensagensComuns(
-                    celular,
-                    `📄 *Aqui está o seu Link de Assinatura:* ${session.zapSignUrl}\n\nPor favor, *Assine* o quanto antes para podermos agendar a sua instalação! 🚀`,
-                  );
-                } catch (zapError) {
-                  console.error(
-                    "Error creating ZapSign document during registration:",
-                    zapError,
-                  );
-                }
+                await this.MensagensComuns(
+                  celular,
+                  `📄 *Aqui está o seu Link de Assinatura:* ${session.zapSignUrl}\n\nPor favor, *Assine* o quanto antes para podermos agendar a sua instalação! 🚀`,
+                );
 
                 fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                   let logs = [];
@@ -1802,8 +1794,11 @@ class WhatsPixController {
                 "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione um Botão",
               );
             }
-          } catch (error) {
-            console.log(error);
+          } catch (zapError) {
+            console.error(
+              "Error in final_register processing:",
+              zapError,
+            );
           }
           break;
 
@@ -1830,7 +1825,7 @@ class WhatsPixController {
                 ) {
                   session.formaPagamento = "Grátis";
 
-                  // Enviar link de assinatura ZapSign apenas ao final
+                  // Enviar link de assinatura ZapSign antes do resumo
                   await this.gerarEEnviarLinkZapSignMudancaComodo(
                     celular,
                     session,
@@ -1842,6 +1837,7 @@ class WhatsPixController {
                     session,
                     "*🧱 Mudança de Cômodo*",
                     { forma_pagamento: "Grátis" },
+                    session.zapSignUrl, // Agora o link vai no e-mail!
                   );
 
                   fs.readFile(logMsgFilePath, "utf8", (err, data) => {
@@ -3252,19 +3248,8 @@ class WhatsPixController {
           // Check if it's properly populated
           if (dadosFlow && Object.keys(dadosFlow).length > 0) {
             const formaPagto = session.formaPagamento || "Não informada";
-            session.msgDadosFinais = this.formatarResumo(
-              session,
-              "*🔄 Mudança de Endereço*",
-              {
-                antigo_endereco: dadosFlow.endereco_antigo,
-                novo_endereco: `${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}`,
-                forma_pagamento: formaPagto,
-              },
-            );
 
-            await this.enviarNotificacaoServico(celular);
-
-            // ZapSign Integration for Address Change
+            // ZapSign Integration for Address Change - MOVIDO PARA ANTES DO RESUMO
             let zapSignUrl = "";
             try {
               console.log("Generating ZapSign document for Address Change...");
@@ -3281,7 +3266,7 @@ class WhatsPixController {
                 cidade: this.FormatarCidade(dadosFlow.cidade || "Franca"),
                 estado: dadosFlow.estado || "SP",
                 cep: dadosFlow.cep,
-                valor: formaPagto === "Grátis" ? "0.00" : "60.00", // Default value for paid if not specified
+                valor: formaPagto === "Grátis" ? "0.00" : "60.00",
                 rg: session.rg || "Não informado",
               };
 
@@ -3289,17 +3274,25 @@ class WhatsPixController {
                 await ZapSign.createContractMudancaEndereco(zapSignData);
               zapSignUrl = zapResult.signers[0].sign_url;
               session.zapSignUrlMudanca = zapSignUrl;
-
-              // Link sending moved to the end of this block
-
-              // Add link to the summary for internal use
-              session.msgDadosFinais += `\n\n📄 *Link ZapSign:* ${zapSignUrl}`;
             } catch (zapError) {
               console.error(
                 "Error creating ZapSign document during Address Change:",
                 zapError,
               );
             }
+
+            session.msgDadosFinais = this.formatarResumo(
+              session,
+              "*🔄 Mudança de Endereço*",
+              {
+                antigo_endereco: dadosFlow.endereco_antigo,
+                novo_endereco: `${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}`,
+                forma_pagamento: formaPagto,
+              },
+              zapSignUrl, // Agora o link vai no e-mail!
+            );
+
+            await this.enviarNotificacaoServico(celular);
 
             await this.Finalizar(session.msgDadosFinais, celular, sessions);
 
@@ -5422,7 +5415,12 @@ class WhatsPixController {
     }
   }
 
-  formatarResumo(session: any, titulo: string, extraDados: any = {}) {
+  formatarResumo(
+    session: any,
+    titulo: string,
+    extraDados: any = {},
+    zapSignUrl?: string,
+  ) {
     const dados = session.dadosCompleto || {};
     let resumo = `${titulo}\n\n`;
 
@@ -5445,6 +5443,10 @@ class WhatsPixController {
     }
 
     if (dados.observacao) resumo += `📝 *Observação:* ${dados.observacao}\n`;
+
+    if (zapSignUrl) {
+      resumo += `\n\n📄 *Link de Assinatura:* ${zapSignUrl}`;
+    }
 
     // Centralizar envio de e-mail aqui (evita duplicidade)
     try {
