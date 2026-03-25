@@ -89,11 +89,16 @@ const transporter = nodemailer.createTransport({
 });
 
 function mailOptions(msg: any) {
+  const htmlContent = msg
+    .toString()
+    .replace(/\n/g, "<br>")
+    .replace(/\*(.*?)\*/g, "<b>$1</b>");
+
   const mailOptions = {
     from: process.env.MAILGUNNER_USER,
     to: process.env.EMAIL_FINANCEIRO,
     subject: `🛠️ Serviço Solicitado 🛠️`,
-    html: msg,
+    html: htmlContent,
   };
   transporter.sendMail(mailOptions);
 }
@@ -907,16 +912,16 @@ class WhatsPixController {
                   const pagamento = texto;
                   session.formaPagamento = `Paga com ${pagamento}`;
 
-                  let dadosCliente = session.dadosCompleto
-                    ? JSON.stringify(session.dadosCompleto, null, 2)
-                    : "Dados não encontrados";
-                  session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*💰 Forma: ${session.formaPagamento}*\nDados do Cliente: ${dadosCliente}`;
+                  let dadosCliente = this.formatarResumo(session.dadosCompleto);
+                  session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*💰 Forma: ${session.formaPagamento}*\n\n${dadosCliente}`;
 
                   // Enviar link de assinatura ZapSign apenas ao final
                   await this.gerarEEnviarLinkZapSignMudancaComodo(
                     celular,
                     session,
                   );
+
+                  await this.enviarNotificacaoServico(celular);
 
                   fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                     let logs = [];
@@ -1486,10 +1491,10 @@ class WhatsPixController {
           try {
             if (this.verificaType(type)) {
               if (texto.toLowerCase() === "sim, li e aceito") {
-                let dadosCliente = session.dadosCompleto
-                  ? JSON.stringify(session.dadosCompleto, null, 2)
-                  : "Dados não encontrados";
-                session.msgDadosFinais = `*🧑 Instalação Nova* \nPlano Escolhido: ${session.planoEscolhido}\nVencimento: ${session.vencimentoEscolhido}\nDados do Cliente: ${dadosCliente}`;
+                let dadosCliente = this.formatarResumo(session.dadosCompleto);
+                session.msgDadosFinais = `*🧑 Instalação Nova* \nPlano Escolhido: ${session.planoEscolhido}\nVencimento: ${session.vencimentoEscolhido}\n\n${dadosCliente}`;
+
+                await this.enviarNotificacaoServico(celular);
 
                 try {
                   const zapSignData = {
@@ -1823,10 +1828,10 @@ class WhatsPixController {
                     session,
                   );
 
-                  let dadosCliente = session.dadosCompleto
-                    ? JSON.stringify(session.dadosCompleto, null, 2)
-                    : "Dados não encontrados";
-                  session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*🆓 Forma: Gratis*\nDados do Cliente: ${dadosCliente}`;
+                  await this.enviarNotificacaoServico(celular);
+
+                  let dadosCliente = this.formatarResumo(session.dadosCompleto);
+                  session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*🆓 Forma: Gratis*\n\n${dadosCliente}`;
 
                   fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                     let logs = [];
@@ -1873,10 +1878,7 @@ class WhatsPixController {
                     });
                   });
                   mailOptions(session.msgDadosFinais);
-                  await this.MensagensComuns(
-                    celular,
-                    "*✅ Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o link de assinatura da Renovação Contratual com período de 12 meses. Obrigado pela confiança!",
-                  );
+
                   await this.Finalizar(
                     session.msgDadosFinais,
                     celular,
@@ -2064,10 +2066,10 @@ class WhatsPixController {
         case "choose_type_titularidade":
           try {
             if (this.verificaType(type)) {
-              let dadosCliente = session.dadosCompleto
-                ? JSON.stringify(session.dadosCompleto, null, 2)
-                : "Dados não encontrados";
-              session.msgDadosFinais = `*🎭 Troca de Titularidade*\n\nDados do Cliente: ${dadosCliente}`;
+              let dadosCliente = this.formatarResumo(session.dadosCompleto);
+              session.msgDadosFinais = `*🎭 Troca de Titularidade*\n\n${dadosCliente}`;
+
+              await this.enviarNotificacaoServico(celular);
 
               fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                 let logs = [];
@@ -2134,10 +2136,10 @@ class WhatsPixController {
               celular,
               "✅️ Receberá em breve o *Termo de Adesão* e *Contrato de Permanência*  para assinatura online. Após a *confirmação*, daremos continuidade com a instalação do *Wi-Fi Estendido*.",
             );
-            let dadosCliente = session.dadosCompleto
-              ? JSON.stringify(session.dadosCompleto, null, 2)
-              : "Dados não encontrados";
-            session.msgDadosFinais = `*🔌 Wifi Estendido 100 Megas* \nDados do Cliente: ${dadosCliente}`;
+            let dadosCliente = this.formatarResumo(session.dadosCompleto);
+            session.msgDadosFinais = `*🔌 Wifi Estendido 100 Megas* \n\n${dadosCliente}`;
+
+            await this.enviarNotificacaoServico(celular);
 
             fs.readFile(logMsgFilePath, "utf8", (err, data) => {
               let logs = [];
@@ -2193,10 +2195,10 @@ class WhatsPixController {
               celular,
               "✅️ Receberá em breve o *Termo de Adesão* e *Contrato de Permanência*  para assinatura online. Após a *confirmação*, daremos continuidade com a instalação do *Wi-Fi Estendido*.",
             );
-            let dadosCliente = session.dadosCompleto
-              ? JSON.stringify(session.dadosCompleto, null, 2)
-              : "Dados não encontrados";
-            session.msgDadosFinais = `*🔌 Wifi Estendido 100 Megas* \nDados do Cliente: ${dadosCliente}`;
+            let dadosCliente = this.formatarResumo(session.dadosCompleto);
+            session.msgDadosFinais = `*🔌 Wifi Estendido 1Gbps* \n\n${dadosCliente}`;
+
+            await this.enviarNotificacaoServico(celular);
 
             fs.readFile(logMsgFilePath, "utf8", (err, data) => {
               let logs = [];
@@ -2432,10 +2434,8 @@ class WhatsPixController {
           break;
         case "finish_troca_plan":
           try {
-            let dadosCliente = session.dadosCompleto
-              ? JSON.stringify(session.dadosCompleto, null, 2)
-              : "Dados não encontrados";
-            session.msgDadosFinais = `*🔌 Alteração de Plano* \nPlano Escolhido: ${session.planoEscolhido}\nDados do Cliente: ${dadosCliente}`;
+            let dadosCliente = this.formatarResumo(session.dadosCompleto);
+            session.msgDadosFinais = `*🔌 Alteração de Plano* \nPlano Escolhido: ${session.planoEscolhido}\n\n${dadosCliente}`;
 
             fs.readFile(logMsgFilePath, "utf8", (err, data) => {
               let logs = [];
@@ -2546,10 +2546,10 @@ class WhatsPixController {
           try {
             if (this.verificaType(type)) {
               if (texto.toLowerCase() === "sim concordo") {
-                let dadosCliente = session.dadosCompleto
-                  ? JSON.stringify(session.dadosCompleto, null, 2)
-                  : "Dados não encontrados";
-                session.msgDadosFinais = `*🆕 Renovação Contratual* \nDados do Cliente: ${dadosCliente}`;
+                let dadosCliente = this.formatarResumo(session.dadosCompleto);
+                session.msgDadosFinais = `*🆕 Renovação Contratual* \n\n${dadosCliente}`;
+
+                await this.enviarNotificacaoServico(celular);
 
                 fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                   let logs = [];
@@ -3230,7 +3230,7 @@ class WhatsPixController {
           if (dadosFlow && Object.keys(dadosFlow).length > 0) {
             const formaPagto = session.formaPagamento || "Não informada";
             let resumoMudanca =
-              `🔄 *Nova Solicitação de Mudança de Endereço*\n\n` +
+              `🔄 *Solicitação de Mudança de Endereço*\n\n` +
               `👤 *Nome:* ${dadosFlow.nome}\n` +
               `📄 *CPF:* ${dadosFlow.cpf}\n` +
               `📱 *Celular:* ${dadosFlow.celular}\n` +
@@ -3239,17 +3239,6 @@ class WhatsPixController {
               `🆕 *Novo Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}\n` +
               `📮 *CEP:* ${dadosFlow.cep}\n` +
               `💰 *Forma de Pagamento:* ${formaPagto}`;
-
-            const resumoEmailHtml =
-              `<h3>Solicitação de Mudança de Endereço</h3>` +
-              `<p><b>Nome:</b> ${dadosFlow.nome}</p>` +
-              `<p><b>CPF:</b> ${dadosFlow.cpf}</p>` +
-              `<p><b>Celular:</b> ${dadosFlow.celular}</p>` +
-              `<p><b>Login Escolhido:</b> ${dadosFlow.login}</p>` +
-              `<p><b>Antigo Endereço:</b> ${dadosFlow.endereco_antigo}</p>` +
-              `<p><b>Novo Endereço:</b> ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}</p>` +
-              `<p><b>CEP:</b> ${dadosFlow.cep}</p>` +
-              `<p><b>Forma de Pagamento:</b> ${formaPagto}</p>`;
 
             // === Atualizar Endereço no MKAuth ===
             try {
@@ -3284,7 +3273,7 @@ class WhatsPixController {
               // @ts-ignore
               if (typeof mailOptions === "function") {
                 // @ts-ignore
-                mailOptions(resumoEmailHtml);
+                mailOptions(resumoMudanca);
               }
             } catch (e) {
               console.error("Erro ao enviar email de mudança de endereço:", e);
@@ -5436,6 +5425,22 @@ class WhatsPixController {
     }
   }
 
+  formatarResumo(dados: any) {
+    if (!dados) return "⚠️ Dados não encontrados";
+
+    let resumo = "";
+    if (dados.nome) resumo += `👤 *Nome:* ${dados.nome}\n`;
+    if (dados.cpf) resumo += `📄 *CPF/CNPJ:* ${dados.cpf}\n`;
+    if (dados.login) resumo += `🔑 *Login:* ${dados.login}\n`;
+    if (dados.email) resumo += `📧 *E-mail:* ${dados.email}\n`;
+    if (dados.rg) resumo += `🆔 *RG:* ${dados.rg}\n`;
+    if (dados.endereco) resumo += `📍 *Endereço:* ${dados.endereco}\n`;
+    if (dados.celular) resumo += `📱 *Celular:* ${dados.celular}\n`;
+    if (dados.observacao) resumo += `📝 *Observação:* ${dados.observacao}\n`;
+
+    return resumo;
+  }
+
   async enviarNotificacaoServico(receivenumber: any) {
     try {
       await whatsappOutgoingQueue.add(
@@ -5452,11 +5457,6 @@ class WhatsPixController {
               language: {
                 code: "pt_BR",
               },
-              components: [
-                {
-                  type: "body",
-                },
-              ],
             },
           },
           headers: {
