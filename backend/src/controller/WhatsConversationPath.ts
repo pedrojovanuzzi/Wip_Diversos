@@ -912,8 +912,11 @@ class WhatsPixController {
                   const pagamento = texto;
                   session.formaPagamento = `Paga com ${pagamento}`;
 
-                  let dadosCliente = this.formatarResumo(session.dadosCompleto);
-                  session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*💰 Forma: ${session.formaPagamento}*\n\n${dadosCliente}`;
+                  session.msgDadosFinais = this.formatarResumo(
+                    session,
+                    "*🧱 Mudança de Cômodo*",
+                    { forma_pagamento: session.formaPagamento },
+                  );
 
                   // Enviar link de assinatura ZapSign apenas ao final
                   await this.gerarEEnviarLinkZapSignMudancaComodo(
@@ -967,7 +970,7 @@ class WhatsPixController {
                       console.log("Log atualizado com sucesso!");
                     });
                   });
-                  mailOptions(session.msgDadosFinais);
+            // E-mail enviado via formatarResumo
 
                   await this.Finalizar(
                     session.msgDadosFinais,
@@ -1491,8 +1494,14 @@ class WhatsPixController {
           try {
             if (this.verificaType(type)) {
               if (texto.toLowerCase() === "sim, li e aceito") {
-                let dadosCliente = this.formatarResumo(session.dadosCompleto);
-                session.msgDadosFinais = `*🧑 Instalação Nova* \nPlano Escolhido: ${session.planoEscolhido}\nVencimento: ${session.vencimentoEscolhido}\n\n${dadosCliente}`;
+                session.msgDadosFinais = this.formatarResumo(
+                  session,
+                  "*🧑 Instalação Nova*",
+                  {
+                    plano_escolhido: session.planoEscolhido,
+                    vencimento: session.vencimentoEscolhido,
+                  },
+                );
 
                 await this.enviarNotificacaoServico(celular);
 
@@ -1582,7 +1591,7 @@ class WhatsPixController {
                   });
                 });
 
-                mailOptions(session.msgDadosFinais);
+            // E-mail enviado via formatarResumo
 
                 const ClientesRepository =
                   MkauthDataSource.getRepository(ClientesEntities);
@@ -1830,8 +1839,11 @@ class WhatsPixController {
 
                   await this.enviarNotificacaoServico(celular);
 
-                  let dadosCliente = this.formatarResumo(session.dadosCompleto);
-                  session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*🆓 Forma: Gratis*\n\n${dadosCliente}`;
+                  session.msgDadosFinais = this.formatarResumo(
+                    session,
+                    "*🧱 Mudança de Cômodo*",
+                    { forma_pagamento: "Grátis" },
+                  );
 
                   fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                     let logs = [];
@@ -1877,7 +1889,7 @@ class WhatsPixController {
                       console.log("Log atualizado com sucesso!");
                     });
                   });
-                  mailOptions(session.msgDadosFinais);
+            // E-mail enviado via formatarResumo
 
                   await this.Finalizar(
                     session.msgDadosFinais,
@@ -2066,8 +2078,10 @@ class WhatsPixController {
         case "choose_type_titularidade":
           try {
             if (this.verificaType(type)) {
-              let dadosCliente = this.formatarResumo(session.dadosCompleto);
-              session.msgDadosFinais = `*🎭 Troca de Titularidade*\n\n${dadosCliente}`;
+              session.msgDadosFinais = this.formatarResumo(
+                session,
+                "*🎭 Troca de Titularidade*",
+              );
 
               await this.enviarNotificacaoServico(celular);
 
@@ -2113,7 +2127,7 @@ class WhatsPixController {
                 });
               });
 
-              mailOptions(session.msgDadosFinais);
+            // E-mail enviado via formatarResumo
               await this.MensagensComuns(
                 celular,
                 "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
@@ -2136,8 +2150,11 @@ class WhatsPixController {
               celular,
               "✅️ Receberá em breve o *Termo de Adesão* e *Contrato de Permanência*  para assinatura online. Após a *confirmação*, daremos continuidade com a instalação do *Wi-Fi Estendido*.",
             );
-            let dadosCliente = this.formatarResumo(session.dadosCompleto);
-            session.msgDadosFinais = `*🔌 Wifi Estendido 100 Megas* \n\n${dadosCliente}`;
+            session.msgDadosFinais = this.formatarResumo(
+              session,
+              "*📶 Wi-Fi Estendido 100 Megas*",
+              { mensalidade: "R$ 10,00" },
+            );
 
             await this.enviarNotificacaoServico(celular);
 
@@ -2178,7 +2195,7 @@ class WhatsPixController {
               });
             });
 
-            mailOptions(session.msgDadosFinais);
+            // E-mail enviado via formatarResumo
             await this.MensagensComuns(
               celular,
               "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
@@ -2195,8 +2212,11 @@ class WhatsPixController {
               celular,
               "✅️ Receberá em breve o *Termo de Adesão* e *Contrato de Permanência*  para assinatura online. Após a *confirmação*, daremos continuidade com a instalação do *Wi-Fi Estendido*.",
             );
-            let dadosCliente = this.formatarResumo(session.dadosCompleto);
-            session.msgDadosFinais = `*🔌 Wifi Estendido 1Gbps* \n\n${dadosCliente}`;
+            session.msgDadosFinais = this.formatarResumo(
+              session,
+              "*📶 Wi-Fi Estendido 1Gbps*",
+              { mensalidade: "R$ 20,00" },
+            );
 
             await this.enviarNotificacaoServico(celular);
 
@@ -2237,7 +2257,7 @@ class WhatsPixController {
               });
             });
 
-            mailOptions(session.msgDadosFinais);
+            // E-mail enviado via formatarResumo
             await this.MensagensComuns(
               celular,
               "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
@@ -2434,8 +2454,11 @@ class WhatsPixController {
           break;
         case "finish_troca_plan":
           try {
-            let dadosCliente = this.formatarResumo(session.dadosCompleto);
-            session.msgDadosFinais = `*🔌 Alteração de Plano* \nPlano Escolhido: ${session.planoEscolhido}\n\n${dadosCliente}`;
+            session.msgDadosFinais = this.formatarResumo(
+              session,
+              "*🔌 Alteração de Plano*",
+              { plano_escolhido: session.planoEscolhido },
+            );
 
             fs.readFile(logMsgFilePath, "utf8", (err, data) => {
               let logs = [];
@@ -2474,7 +2497,6 @@ class WhatsPixController {
               });
             });
 
-            mailOptions(session.msgDadosFinais);
             await this.MensagensComuns(
               celular,
               "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
@@ -2546,8 +2568,10 @@ class WhatsPixController {
           try {
             if (this.verificaType(type)) {
               if (texto.toLowerCase() === "sim concordo") {
-                let dadosCliente = this.formatarResumo(session.dadosCompleto);
-                session.msgDadosFinais = `*🆕 Renovação Contratual* \n\n${dadosCliente}`;
+                session.msgDadosFinais = this.formatarResumo(
+                  session,
+                  "*🆕 Renovação Contratual*",
+                );
 
                 await this.enviarNotificacaoServico(celular);
 
@@ -2593,7 +2617,7 @@ class WhatsPixController {
                   });
                 });
 
-                mailOptions(session.msgDadosFinais);
+            // E-mail enviado via formatarResumo
                 await this.MensagensComuns(
                   celular,
                   "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
@@ -3229,55 +3253,17 @@ class WhatsPixController {
           // Check if it's properly populated
           if (dadosFlow && Object.keys(dadosFlow).length > 0) {
             const formaPagto = session.formaPagamento || "Não informada";
-            let resumoMudanca =
-              `🔄 *Solicitação de Mudança de Endereço*\n\n` +
-              `👤 *Nome:* ${dadosFlow.nome}\n` +
-              `📄 *CPF:* ${dadosFlow.cpf}\n` +
-              `📱 *Celular:* ${dadosFlow.celular}\n` +
-              `🔑 *Login Escolhido:* ${dadosFlow.login}\n` +
-              `📍 *Antigo Endereço:* ${dadosFlow.endereco_antigo}\n` +
-              `🆕 *Novo Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}\n` +
-              `📮 *CEP:* ${dadosFlow.cep}\n` +
-              `💰 *Forma de Pagamento:* ${formaPagto}`;
+            session.msgDadosFinais = this.formatarResumo(
+              session,
+              "*🔄 Mudança de Endereço*",
+              {
+                antigo_endereco: dadosFlow.endereco_antigo,
+                novo_endereco: `${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}`,
+                forma_pagamento: formaPagto,
+              },
+            );
 
-            // === Atualizar Endereço no MKAuth ===
-            try {
-              if (session.login) {
-                const ClientesRepository =
-                  MkauthDataSource.getRepository(Sis_Cliente);
-                await ClientesRepository.update(
-                  { login: session.login },
-                  {
-                    endereco: this.limparEndereco(dadosFlow.rua, true),
-                    numero: this.limparEndereco(dadosFlow.numero),
-                    bairro: this.limparEndereco(dadosFlow.novo_bairro),
-                    cidade: this.FormatarCidade(
-                      this.limparEndereco(dadosFlow.cidade || ""),
-                    ),
-                    estado: (dadosFlow.estado || "")
-                      .toUpperCase()
-                      .replace(/\s/g, "")
-                      .slice(0, 2),
-                    cep: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
-                  },
-                );
-                console.log(
-                  `Endereço atualizado no MKAuth para o login: ${session.login}`,
-                );
-              }
-            } catch (dbError) {
-              console.error("Erro ao atualizar endereço no MKAuth:", dbError);
-            }
-
-            try {
-              // @ts-ignore
-              if (typeof mailOptions === "function") {
-                // @ts-ignore
-                mailOptions(resumoMudanca);
-              }
-            } catch (e) {
-              console.error("Erro ao enviar email de mudança de endereço:", e);
-            }
+            await this.enviarNotificacaoServico(celular);
 
             // ZapSign Integration for Address Change
             let zapSignUrl = "";
@@ -3308,7 +3294,7 @@ class WhatsPixController {
               // Link sending moved to the end of this block
 
               // Add link to the summary for internal use
-              resumoMudanca += `\n\n📄 *Link ZapSign:* ${zapSignUrl}`;
+              session.msgDadosFinais += `\n\n📄 *Link ZapSign:* ${zapSignUrl}`;
             } catch (zapError) {
               console.error(
                 "Error creating ZapSign document during Address Change:",
@@ -3316,7 +3302,11 @@ class WhatsPixController {
               );
             }
 
-            await this.Finalizar(resumoMudanca, celular, sessions);
+            await this.Finalizar(
+              session.msgDadosFinais,
+              celular,
+              sessions,
+            );
 
             if (formaPagto === "Grátis") {
               await this.MensagensComuns(
@@ -5425,10 +5415,10 @@ class WhatsPixController {
     }
   }
 
-  formatarResumo(dados: any) {
-    if (!dados) return "⚠️ Dados não encontrados";
+  formatarResumo(session: any, titulo: string, extraDados: any = {}) {
+    const dados = session.dadosCompleto || {};
+    let resumo = `${titulo}\n\n`;
 
-    let resumo = "";
     if (dados.nome) resumo += `👤 *Nome:* ${dados.nome}\n`;
     if (dados.cpf) resumo += `📄 *CPF/CNPJ:* ${dados.cpf}\n`;
     if (dados.login) resumo += `🔑 *Login:* ${dados.login}\n`;
@@ -5436,7 +5426,25 @@ class WhatsPixController {
     if (dados.rg) resumo += `🆔 *RG:* ${dados.rg}\n`;
     if (dados.endereco) resumo += `📍 *Endereço:* ${dados.endereco}\n`;
     if (dados.celular) resumo += `📱 *Celular:* ${dados.celular}\n`;
+
+    // Dados extras específicos do serviço
+    for (const [key, value] of Object.entries(extraDados)) {
+      if (value) {
+        // Formata a chave para capitalizar e remover underscores
+        const label =
+          key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " ");
+        resumo += `🔹 *${label}:* ${value}\n`;
+      }
+    }
+
     if (dados.observacao) resumo += `📝 *Observação:* ${dados.observacao}\n`;
+
+    // Centralizar envio de e-mail aqui (evita duplicidade)
+    try {
+      mailOptions(resumo);
+    } catch (e) {
+      console.error("Erro ao enviar e-mail via formatarResumo:", e);
+    }
 
     return resumo;
   }
