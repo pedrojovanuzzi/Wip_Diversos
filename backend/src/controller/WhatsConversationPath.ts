@@ -970,7 +970,7 @@ class WhatsPixController {
                       console.log("Log atualizado com sucesso!");
                     });
                   });
-            // E-mail enviado via formatarResumo
+                  // E-mail enviado via formatarResumo
 
                   await this.Finalizar(
                     session.msgDadosFinais,
@@ -1534,8 +1534,7 @@ class WhatsPixController {
                   session.zapSignUrl = zapResponse.signers[0].sign_url;
                   session.msgDadosFinais += `\n\n📄 *Link de Assinatura:* ${session.zapSignUrl}`;
 
-                  // Send notification template
-                  await this.enviarNotificacaoServico(celular);
+                  // Removida chamada duplicada de enviarNotificacaoServico aqui
 
                   // Send link directly to client (LAST MESSAGE)
                   await this.MensagensComuns(
@@ -1591,7 +1590,7 @@ class WhatsPixController {
                   });
                 });
 
-            // E-mail enviado via formatarResumo
+                // E-mail enviado via formatarResumo
 
                 const ClientesRepository =
                   MkauthDataSource.getRepository(ClientesEntities);
@@ -1889,7 +1888,7 @@ class WhatsPixController {
                       console.log("Log atualizado com sucesso!");
                     });
                   });
-            // E-mail enviado via formatarResumo
+                  // E-mail enviado via formatarResumo
 
                   await this.Finalizar(
                     session.msgDadosFinais,
@@ -2127,7 +2126,7 @@ class WhatsPixController {
                 });
               });
 
-            // E-mail enviado via formatarResumo
+              // E-mail enviado via formatarResumo
               await this.MensagensComuns(
                 celular,
                 "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
@@ -2617,7 +2616,7 @@ class WhatsPixController {
                   });
                 });
 
-            // E-mail enviado via formatarResumo
+                // E-mail enviado via formatarResumo
                 await this.MensagensComuns(
                   celular,
                   "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
@@ -3302,11 +3301,7 @@ class WhatsPixController {
               );
             }
 
-            await this.Finalizar(
-              session.msgDadosFinais,
-              celular,
-              sessions,
-            );
+            await this.Finalizar(session.msgDadosFinais, celular, sessions);
 
             if (formaPagto === "Grátis") {
               await this.MensagensComuns(
@@ -3320,7 +3315,7 @@ class WhatsPixController {
               );
             }
 
-            await this.enviarNotificacaoServico(celular);
+            // Removida chamada duplicada de enviarNotificacaoServico aqui
 
             // Send link directly to client (LAST MESSAGE)
             if (zapSignUrl) {
@@ -4713,6 +4708,10 @@ class WhatsPixController {
 
   async MensagemFlow(receivenumber: any, flowName: string, ctaText: string) {
     try {
+      const planoAviso =
+        "⚠️Esta contratação estará sujeito à análise de viabilidade técnica e consulta cadastral (CPF/CNPJ), podendo influenciar na disponibilidade, valores (pagos ou gratuitos da instalação), valores do plano e condições do serviço. A contratação será confirmada após análise. Caso esteja de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
+      await this.MensagensComuns(receivenumber, planoAviso);
+
       const planosDoSistema = await this.getPlanosDoSistema();
 
       await whatsappOutgoingQueue.add(
@@ -4773,6 +4772,10 @@ class WhatsPixController {
     ctaText: string,
   ) {
     try {
+      const planoAviso =
+        "⚠️Esta contratação estará sujeito à análise de viabilidade técnica ou consulta cadastral (CPF/CNPJ), podendo influenciar na disponibilidade, valores (pagos ou gratuitos da instalação), valores do plano e condições do serviço. A contratação será confirmada após análise. Caso esteja de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
+      await this.MensagensComuns(receivenumber, planoAviso);
+
       await whatsappOutgoingQueue.add(
         "send-flow",
         {
@@ -4831,6 +4834,10 @@ class WhatsPixController {
     ctaText: string,
   ) {
     try {
+      const planoAviso =
+        "⚠️Esta contratação estará sujeito à análise de viabilidade técnica ou consulta cadastral (CPF/CNPJ), podendo influenciar na disponibilidade, valores (pagos ou gratuitos da instalação), valores do plano e condições do serviço. A contratação será confirmada após análise. Caso esteja de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
+      await this.MensagensComuns(receivenumber, planoAviso);
+
       await whatsappOutgoingQueue.add(
         "send-flow",
         {
