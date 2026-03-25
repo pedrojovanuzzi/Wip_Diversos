@@ -232,6 +232,7 @@ class WhatsPixController {
     this.finalizarMudancaComodo = this.finalizarMudancaComodo.bind(this);
     this.gerarEEnviarLinkZapSignMudancaComodo =
       this.gerarEEnviarLinkZapSignMudancaComodo.bind(this);
+    this.gerarLancamentoServico = this.gerarLancamentoServico.bind(this);
     this.Finalizar = this.Finalizar.bind(this);
     this.verify = this.verify.bind(this);
     this.saveSession = this.saveSession.bind(this);
@@ -659,27 +660,6 @@ class WhatsPixController {
           await this.deleteSession(celular);
           return;
         }
-
-        // //Easter Egg
-        // if (texto === "G.O.A.T") {
-        //   await this.MensagensComuns(celular, "QuinhoRox");
-        //   return;
-        // }
-
-        // //Easter Egg
-        // if (texto === "T.O.D.D.Y") {
-        //   await this.MensagensComuns(celular, "Tem coisa que desanima");
-        //   return;
-        // }
-
-        // //Easter Egg
-        // if (texto === "Mamaezinha") {
-        //   await this.MensagensComuns(
-        //     celular,
-        //     "Coquinha Geladinha para limpar os dentinhos",
-        //   );
-        //   return;
-        // }
       } catch (error) {
         console.error("Erro ao inserir ou encontrar a pessoa:", error);
       }
@@ -902,6 +882,9 @@ class WhatsPixController {
                   const pagamento = texto;
                   session.formaPagamento = `Paga com ${pagamento}`;
 
+                  // Gerar lançamento de serviço no MKAuth
+                  await this.gerarLancamentoServico(session, "mudanca_endereco");
+
                   await this.MensagemFlowEndereco(
                     celular,
                     "mudanca_endereco",
@@ -912,7 +895,8 @@ class WhatsPixController {
                   const pagamento = texto;
                   session.formaPagamento = `Paga com ${pagamento}`;
 
-                  session.formaPagamento = `Paga com ${pagamento}`;
+                  // Gerar lançamento de serviço no MKAuth
+                  await this.gerarLancamentoServico(session, "mudanca_comodo");
 
                   // Enviar link de assinatura ZapSign antes do resumo
                   await this.gerarEEnviarLinkZapSignMudancaComodo(
@@ -1534,6 +1518,9 @@ class WhatsPixController {
                 );
 
                 await this.enviarNotificacaoServico(celular);
+
+                // Gerar lançamento de serviço no MKAuth (Instalação = R$ 350)
+                await this.gerarLancamentoServico(session, "instalacao");
 
                 await this.MensagensComuns(
                   celular,
@@ -3710,6 +3697,72 @@ class WhatsPixController {
         celular,
         "⚠️ Ocorreu um erro ao gerar seu link de assinatura. Um atendente entrará em contato em breve.",
       );
+    }
+  }
+
+  async gerarLancamentoServico(session: any, tipoServico: string) {
+    try {
+      // Mapeamento de valores por tipo de serviço
+      const valoresServico: { [key: string]: number } = {
+        instalacao: 350,
+        mudanca_endereco: 200,
+        mudanca_comodo: 200,
+      };
+
+      const valor = valoresServico[tipoServico];
+      if (!valor) {
+        console.error(`Tipo de serviço desconhecido para lançamento: ${tipoServico}`);
+        return;
+      }
+
+      // Identificar o login do cliente pelo CPF
+      const cpf = session.cpf || session.dadosCompleto?.cpf;
+      if (!cpf) {
+        console.error("CPF não encontrado na sessão para gerar lançamento de serviço.");
+        return;
+      }
+
+      const ClientesRepository = MkauthDataSource.getRepository(ClientesEntities);
+      const cliente = await ClientesRepository.findOne({
+        where: { cpf_cnpj: cpf.trim().replace(/\s/g, "") },
+      });
+
+      if (!cliente) {
+        console.error(`Cliente com CPF ${cpf} não encontrado no MKAuth para gerar lançamento.`);
+        return;
+      }
+
+      const login = cliente.login;
+      const nomeServico = tipoServico === "instalacao" 
+        ? "Instalação" 
+        : tipoServico === "mudanca_endereco" 
+          ? "Mudança de Endereço" 
+          : "Mudança de Cômodo";
+
+      // Gerar o lançamento no sis_lanc
+      const FaturasRepository = MkauthDataSource.getRepository(Record);
+      const novoLancamento = await FaturasRepository.save({
+        login: login,
+        nome: cliente.nome || login,
+        tipo: "servicos",
+        valor: valor.toFixed(2),
+        datavenc: new Date(),
+        processamento: new Date(),
+        status: "aberto",
+        recibo: `SRV-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+        obs: `Serviço: ${nomeServico} - Gerado automaticamente via WhatsApp Bot`,
+        valorger: "completo",
+        aviso: "nao",
+        imp: "nao",
+        tipocob: "fat",
+        cfop_lanc: "5307",
+        referencia: moment().format("MM/YYYY"),
+        uuid_lanc: uuidv4().slice(0, 16),
+      });
+
+      console.log(`✅ Lançamento de serviço criado com sucesso! ID: ${novoLancamento.id}, Login: ${login}, Valor: R$ ${valor}, Serviço: ${nomeServico}`);
+    } catch (error) {
+      console.error("❌ Erro ao gerar lançamento de serviço no MKAuth:", error);
     }
   }
 

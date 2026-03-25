@@ -76,14 +76,19 @@ class ZapSign {
       } = params;
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
-      const tipo = (valor === "0,00" || valor === "0" || valor === "0.00") ? "gratis" : "pago";
-      
+      const tipo =
+        valor === "0,00" || valor === "0" || valor === "0.00"
+          ? "gratis"
+          : "pago";
+
       const template = await templateRepo.findOne({
         where: { nome_servico: "Instalação", tipo: tipo },
       });
 
       if (!template || !template.token_id) {
-        throw new Error("Token do template 'Instalação' não encontrado no banco de dados.");
+        throw new Error(
+          "Token do template 'Instalação' não encontrado no banco de dados.",
+        );
       }
 
       const data = {
@@ -172,14 +177,19 @@ class ZapSign {
       } = params;
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
-      const tipo = (valor === "0,00" || valor === "0" || valor === "0.00") ? "gratis" : "pago";
+      const tipo =
+        valor === "0,00" || valor === "0" || valor === "0.00"
+          ? "gratis"
+          : "pago";
 
       const template = await templateRepo.findOne({
         where: { nome_servico: "Mudança de Endereço", tipo: tipo },
       });
 
       if (!template || !template.token_id) {
-        throw new Error("Token do template 'Mudança de Endereço' não encontrado no banco de dados.");
+        throw new Error(
+          "Token do template 'Mudança de Endereço' não encontrado no banco de dados.",
+        );
       }
 
       const data = {
@@ -281,14 +291,19 @@ class ZapSign {
       } = params;
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
-      const tipo = (valor === "0,00" || valor === "0" || valor === "0.00") ? "gratis" : "pago";
+      const tipo =
+        valor === "0,00" || valor === "0" || valor === "0.00"
+          ? "gratis"
+          : "pago";
 
       const template = await templateRepo.findOne({
         where: { nome_servico: "Mudança de Cômodo", tipo: tipo },
       });
 
       if (!template || !template.token_id) {
-        throw new Error("Token do template 'Mudança de Cômodo' não encontrado no banco de dados.");
+        throw new Error(
+          "Token do template 'Mudança de Cômodo' não encontrado no banco de dados.",
+        );
       }
 
       const data = {
