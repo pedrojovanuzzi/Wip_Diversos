@@ -1317,6 +1317,7 @@ class WhatsPixController {
                   const zapSignUrl = zapResponse.signers[0].sign_url;
 
                   session.zapSignUrl = zapSignUrl;
+                  session.tokenZapSign = zapResponse.token;
 
                   // Send notification template
                   await this.enviarNotificacaoServico(celular);
@@ -1574,6 +1575,7 @@ class WhatsPixController {
                 console.log("ZapSign Document Created:", zapResponse.token);
 
                 session.zapSignUrl = zapResponse.signers[0].sign_url;
+                session.tokenZapSign = zapResponse.token;
 
                 session.msgDadosFinais = this.formatarResumo(
                   session,
@@ -2596,6 +2598,7 @@ class WhatsPixController {
                     await ZapSign.createContractMudancaEndereco(zapSignData);
                   zapSignUrl = zapResult.signers[0].sign_url;
                   session.zapSignUrlMudanca = zapSignUrl;
+                  session.tokenZapSign = zapResult.token;
                 } catch (zapError) {
                   console.error("Erro ZapSign (Pix):", zapError);
                 }
@@ -2678,6 +2681,7 @@ class WhatsPixController {
                     await ZapSign.createContractMudancaEndereco(zapSignData);
                   zapSignUrl = zapResult.signers[0].sign_url;
                   session.zapSignUrlMudanca = zapSignUrl;
+                  session.tokenZapSign = zapResult.token;
                 } catch (zapError) {
                   console.error("Erro ZapSign (Grátis):", zapError);
                 }
@@ -3811,6 +3815,7 @@ class WhatsPixController {
       const zapSignUrl = zapResponse.signers[0].sign_url;
 
       session.zapSignUrl = zapSignUrl;
+      session.tokenZapSign = zapResponse.token;
 
       await this.MensagensComuns(
         celular,
@@ -5733,6 +5738,7 @@ class WhatsPixController {
           novaSolicitacao.pago = session.formaPagamento === "Grátis";
           novaSolicitacao.id_fatura = session.idFatura || null;
           novaSolicitacao.gratis = session.formaPagamento === "Grátis" ? 1 : 0;
+          novaSolicitacao.token_zapsign = session.tokenZapSign || null;
 
           await repo.save(novaSolicitacao);
           console.log(

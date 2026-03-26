@@ -25,4 +25,7 @@ export class SolicitacaoServico {
 
     @Column({ type: 'int', default: 0 })
     gratis?: number;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    token_zapsign?: string;
 }

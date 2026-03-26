@@ -3,7 +3,9 @@ import { Request, Response } from "express";
 import moment from "moment";
 import dotenv from "dotenv";
 import ApiMkDataSource from "../database/API_MK";
+import AppDataSource from "../database/DataSource";
 import ZapSignTemplates from "../entities/APIMK/ZapSignTemplates";
+import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 
 dotenv.config();
 
@@ -358,6 +360,38 @@ class ZapSign {
     } catch (error) {
       console.error("Error generating Mudança Cômodo PDF:", error);
       res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  }
+
+  async webhook(req: Request, res: Response) {
+    try {
+      const { event_type, token } = req.body;
+      console.log(`[ZapSign Webhook] Evento recebido: ${event_type}`);
+
+      if (event_type === "doc_signed" || event_type === "all_signed") {
+        const repo = AppDataSource.getRepository(SolicitacaoServico);
+
+        const solicitacao = await repo.findOne({
+          where: { token_zapsign: token },
+        });
+
+        if (solicitacao) {
+          solicitacao.assinado = true;
+          await repo.save(solicitacao);
+          console.log(
+            `[ZapSign Webhook] Solicitação ID ${solicitacao.id} marcada como assinada (Token: ${token}).`,
+          );
+        } else {
+          console.warn(
+            `[ZapSign Webhook] Nenhuma solicitação encontrada para o token: ${token}`,
+          );
+        }
+      }
+
+      res.status(200).send("OK");
+    } catch (error) {
+      console.error("[ZapSign Webhook] Erro ao processar:", error);
+      res.status(500).send("Internal Server Error");
     }
   }
 }

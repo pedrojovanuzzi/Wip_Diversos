@@ -17,4 +17,6 @@ router.post(
   ZapSign.generatePdfMudancaEndereco,
 );
 
+router.post("/webhook", ZapSign.webhook);
+
 export default router;
