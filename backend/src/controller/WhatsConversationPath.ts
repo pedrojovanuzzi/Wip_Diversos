@@ -874,11 +874,7 @@ class WhatsPixController {
         case "choose_type_payment":
           try {
             if (this.verificaType(type)) {
-              if (
-                texto === "Pix" ||
-                texto === "Dinheiro" ||
-                texto === "Cartão"
-              ) {
+              if (texto === "Pix") {
                 if (session.service === "mudanca_endereco") {
                   const pagamento = texto;
                   session.formaPagamento = `Paga com ${pagamento}`;
@@ -1535,8 +1531,6 @@ class WhatsPixController {
                 celular,
                 "💰 *Como deseja realizar o pagamento da Taxa de Instalação (R$ 350,00)?*",
                 "Pix",
-                "Dinheiro",
-                "Cartão",
               );
               session.stage = "choose_payment_instalacao";
             } else {
@@ -1550,11 +1544,7 @@ class WhatsPixController {
         case "choose_payment_instalacao":
           try {
             if (this.verificaType(type)) {
-              if (
-                texto === "Pix" ||
-                texto === "Dinheiro" ||
-                texto === "Cartão"
-              ) {
+              if (texto === "Pix") {
                 const pagamento = texto;
                 session.formaPagamento = `Paga com ${pagamento}`;
 
