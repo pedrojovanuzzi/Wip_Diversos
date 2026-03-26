@@ -900,6 +900,8 @@ class WhatsPixController {
                         cpf: session.cpf || session.dadosCompleto?.cpf,
                       });
 
+                      await this.enviarNotificacaoServico(celular);
+
                       await this.MensagensComuns(
                         celular,
                         `✨ *Aqui está seu PIX para pagamento da Mudança de Cômodo:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
@@ -1875,8 +1877,6 @@ class WhatsPixController {
                     celular,
                     session,
                   );
-
-                  await this.enviarNotificacaoServico(celular);
 
                   session.msgDadosFinais = this.formatarResumo(
                     session,
