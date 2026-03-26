@@ -350,18 +350,27 @@ class Pix {
               const telefone = sis_cliente.celular || sis_cliente.fone;
               if (telefone) {
                 const cleanPhone = telefone.replace(/\D/g, "");
-                const finalPhone = cleanPhone.startsWith("55") ? cleanPhone : "55" + cleanPhone;
-                
-                const servicoNome = record_pppoe.obs.split("Serviço: ")[1]?.split(" -")[0] || "Contratado";
-                
+                const finalPhone = cleanPhone.startsWith("55")
+                  ? cleanPhone
+                  : "55" + cleanPhone;
+
+                const servicoNome =
+                  record_pppoe.obs.split("Serviço: ")[1]?.split(" -")[0] ||
+                  "Contratado";
+
                 await Whatsapp.MensagensComuns(
                   finalPhone,
-                  `✅ *Pagamento Confirmado!*\n\nOlá ${sis_cliente.nome}, recebemos o pagamento do serviço: *${servicoNome}*.\n\nNossa equipe entrará em contato em breve para dar prosseguimento ao atendimento. Obrigado pela confiança! 🚀`
+                  `✅ *Pagamento Confirmado!*\n\nOlá ${sis_cliente.nome}, recebemos o pagamento do serviço: *${servicoNome}*.\n\nNossa equipe entrará em contato em breve para dar prosseguimento ao atendimento. Obrigado pela confiança! 🚀`,
                 );
-                console.log(`[Webhook PIX] Mensagem de sucesso enviada para ${finalPhone}`);
+                console.log(
+                  `[Webhook PIX] Mensagem de sucesso enviada para ${finalPhone}`,
+                );
               }
             } catch (waError) {
-              console.error("[Webhook PIX] Erro ao enviar mensagem de sucesso via WhatsApp:", waError);
+              console.error(
+                "[Webhook PIX] Erro ao enviar mensagem de sucesso via WhatsApp:",
+                waError,
+              );
             }
           }
         }
@@ -822,11 +831,11 @@ class Pix {
   /**
    * Gera um PIX para um lançamento de serviço específico
    */
-  gerarPixServico = async (params: { 
-    idLancamento: number, 
-    valor: string, 
-    pppoe: string, 
-    cpf: string 
+  gerarPixServico = async (params: {
+    idLancamento: number;
+    valor: string;
+    pppoe: string;
+    cpf: string;
   }) => {
     try {
       const { idLancamento, valor, pppoe, cpf } = params;
@@ -841,18 +850,19 @@ class Pix {
 
       const body = {
         calendario: { expiracao: 3600 }, // Expira em 1 hora para serviços
-        devedor: cleanCpf.length === 11 
-          ? { cpf: cleanCpf, nome: pppoe } 
-          : { cnpj: cleanCpf, nome: pppoe },
+        devedor:
+          cleanCpf.length === 11
+            ? { cpf: cleanCpf, nome: pppoe }
+            : { cnpj: cleanCpf, nome: pppoe },
         valor: { original: valor },
         chave: chave_pix,
         solicitacaoPagador: "Pagamento de Serviço",
         infoAdicionais: [
           { nome: "ID", valor: String(idLancamento) },
           { nome: "VALOR", valor: valor },
-          { nome: "QR", valor: String(qrlink.linkVisualizacao) }
+          { nome: "QR", valor: String(qrlink.linkVisualizacao) },
         ],
-        loc: { id: loc.id }
+        loc: { id: loc.id },
       };
 
       await efipay.pixCreateCharge(efiParams, body);
@@ -860,7 +870,7 @@ class Pix {
       return {
         link: qrlink.linkVisualizacao,
         qrcode: qrlink.qrcode, // Pix Copia e Cola
-        txid: txid
+        txid: txid,
       };
     } catch (error) {
       console.error("❌ Erro ao gerar PIX de serviço:", error);
