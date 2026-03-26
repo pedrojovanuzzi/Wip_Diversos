@@ -885,6 +885,9 @@ class WhatsPixController {
                     session,
                     "mudanca_comodo",
                   );
+                  if (lancamento) {
+                    session.idFatura = lancamento.id;
+                  }
 
                   // Se for Pix, gerar o QR Code e enviar
                   if (pagamento === "Pix" && lancamento) {
@@ -1515,6 +1518,9 @@ class WhatsPixController {
                   session,
                   "instalacao",
                 );
+                if (lancamento) {
+                  session.idFatura = lancamento.id;
+                }
 
                 // Se for Pix, gerar o QR Code e enviar
                 if (pagamento === "Pix" && lancamento) {
@@ -2599,6 +2605,9 @@ class WhatsPixController {
                   session,
                   "mudanca_endereco",
                 );
+                if (lancamento) {
+                  session.idFatura = lancamento.id;
+                }
 
                 if (lancamento) {
                   const pixController = new Pix();
@@ -5722,6 +5731,7 @@ class WhatsPixController {
 
           // Determina se foi pago (Grátis = true, qualquer outro = false inicialmente)
           novaSolicitacao.pago = session.formaPagamento === "Grátis";
+          novaSolicitacao.id_fatura = session.idFatura || null;
 
           await repo.save(novaSolicitacao);
           console.log(

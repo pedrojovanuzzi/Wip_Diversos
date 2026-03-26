@@ -19,4 +19,7 @@ export class SolicitacaoServico {
 
     @Column({ type: 'boolean', default: false })
     assinado?: boolean;
+
+    @Column({ type: 'int', nullable: true })
+    id_fatura?: number;
 }

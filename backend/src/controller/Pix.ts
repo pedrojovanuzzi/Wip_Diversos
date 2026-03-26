@@ -11,6 +11,8 @@ import { Request, Response } from "express";
 import { Between, In, IsNull, Not, Repository } from "typeorm";
 import { isNotIn } from "class-validator";
 import Whatsapp from "./Whatsapp";
+import LocalDataSource from "../database/DataSource";
+import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 
 dotenv.config();
 
@@ -335,18 +337,52 @@ class Pix {
         });
 
         if (sis_cliente) {
-          const remObsDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
-            .toISOString()
-            .replace("T", " ")
-            .replace("Z", "");
-          await this.clienteRepo.update(
-            { login: sis_cliente.login },
-            { observacao: "sim", rem_obs: remObsDate },
-          );
-
           // Notificação de sucesso via WhatsApp para serviços
           if (record_pppoe.tipo === "servicos") {
             try {
+              // --- Sincronização Dashboard Local ---
+              try {
+                const localRepo =
+                  LocalDataSource.getRepository(SolicitacaoServico);
+                const servicoNome = record_pppoe.obs
+                  .split("Serviço: ")[1]
+                  ?.split(" -")[0];
+
+                // Busca prioritariamente pelo ID da fatura vinculada
+                let solicitacao = await localRepo.findOne({
+                  where: {
+                    id_fatura: Number(record_pppoe.id),
+                    pago: false,
+                  },
+                  order: { data_solicitacao: "DESC" },
+                });
+
+                // Fallback para o método anterior (login + serviço) se id_fatura não estiver preenchido
+                if (!solicitacao && servicoNome) {
+                  solicitacao = await localRepo.findOne({
+                    where: {
+                      login_cliente: record_pppoe.login,
+                      servico: servicoNome,
+                      pago: false,
+                    },
+                    order: { data_solicitacao: "DESC" },
+                  });
+                }
+
+                if (solicitacao) {
+                  await localRepo.update(solicitacao.id!, { pago: true });
+                  console.log(
+                    `[Dashboard Sync] Solicitação ${solicitacao.id} marcada como paga para login ${record_pppoe.login} (Fatura ID: ${record_pppoe.id})`,
+                  );
+                }
+              } catch (localDbError) {
+                console.error(
+                  "[Dashboard Sync] Erro ao sincronizar pagamento local:",
+                  localDbError,
+                );
+              }
+              // -------------------------------------
+
               const telefone = sis_cliente.celular || sis_cliente.fone;
               if (telefone) {
                 const cleanPhone = telefone.replace(/\D/g, "");
@@ -372,6 +408,15 @@ class Pix {
                 waError,
               );
             }
+          } else {
+            const remObsDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
+              .toISOString()
+              .replace("T", " ")
+              .replace("Z", "");
+            await this.clienteRepo.update(
+              { login: sis_cliente.login },
+              { observacao: "sim", rem_obs: remObsDate },
+            );
           }
         }
 
