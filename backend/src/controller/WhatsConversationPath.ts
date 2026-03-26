@@ -953,20 +953,17 @@ class WhatsPixController {
                     }
                   }
 
-                  // Enviar link de assinatura ZapSign antes do resumo
-                  await this.gerarEEnviarLinkZapSignMudancaComodo(
-                    celular,
-                    session,
-                  );
+                  // Removida geração de assinatura ZapSign para Mudança de Cômodo conforme nova regra
+                  // await this.gerarEEnviarLinkZapSignMudancaComodo(celular, session);
 
                   session.msgDadosFinais = this.formatarResumo(
                     session,
                     "*🧱 Mudança de Cômodo*",
-                    { forma_pagamento: session.formaPagamento },
-                    session.zapSignUrl, // Agora o link vai no e-mail!
+                    { forma_pagamento: session.formaPagamento }
                   );
 
-                  await this.enviarNotificacaoServico(celular);
+                  // Removida notificação redundante para Mudança de Cômodo
+                  // await this.enviarNotificacaoServico(celular);
 
                   fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                     let logs = [];
@@ -1012,7 +1009,6 @@ class WhatsPixController {
                       console.log("Log atualizado com sucesso!");
                     });
                   });
-                  // E-mail enviado via formatarResumo
 
                   await this.Finalizar(
                     session.msgDadosFinais,
@@ -1975,7 +1971,6 @@ class WhatsPixController {
                       console.log("Log atualizado com sucesso!");
                     });
                   });
-                  // E-mail enviado via formatarResumo
 
                   await this.Finalizar(
                     session.msgDadosFinais,
@@ -3397,7 +3392,7 @@ class WhatsPixController {
             } else {
               await this.MensagensComuns(
                 celular,
-                "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link com Termo de Alteração de Endereço*. Obrigado pela confiança!",
+                "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link de assinatura da Mudança de Endereço*. Obrigado pela confiança!",
               );
             }
 
