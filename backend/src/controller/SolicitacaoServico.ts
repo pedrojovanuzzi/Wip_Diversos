@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import AppDataSource from "../database/DataSource";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { Between, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
+import moment from "moment-timezone";
 
 class SolicitacaoServicoController {
   public async list(req: Request, res: Response) {
@@ -13,13 +14,17 @@ class SolicitacaoServicoController {
 
       if (startDate && endDate) {
         where.data_solicitacao = Between(
-          new Date(startDate as string),
-          new Date(endDate as string)
+          moment(startDate as string).startOf("day").toDate(),
+          moment(endDate as string).endOf("day").toDate()
         );
       } else if (startDate) {
-        where.data_solicitacao = MoreThanOrEqual(new Date(startDate as string));
+        where.data_solicitacao = MoreThanOrEqual(
+          moment(startDate as string).startOf("day").toDate()
+        );
       } else if (endDate) {
-        where.data_solicitacao = LessThanOrEqual(new Date(endDate as string));
+        where.data_solicitacao = LessThanOrEqual(
+          moment(endDate as string).endOf("day").toDate()
+        );
       }
 
       const list = await repository.find({
