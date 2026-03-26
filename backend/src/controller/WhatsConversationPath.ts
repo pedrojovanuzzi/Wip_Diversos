@@ -184,8 +184,8 @@ const encryptFlowResponse = (
 ) => {
   // Flip the initialization vector
   const flipped_iv = [];
-  for (const pair of initialVectorBuffer.entries()) {
-    flipped_iv.push(~pair[1]);
+  for (let i = 0; i < initialVectorBuffer.length; i++) {
+    flipped_iv.push(~initialVectorBuffer[i]);
   }
   // Encrypt the response data
   const cipher = crypto.createCipheriv(
@@ -867,7 +867,7 @@ class WhatsPixController {
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes",
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
             );
           }
           break;
@@ -875,47 +875,7 @@ class WhatsPixController {
           try {
             if (this.verificaType(type)) {
               if (texto === "Pix") {
-                if (session.service === "mudanca_endereco") {
-                  const pagamento = texto;
-                  session.formaPagamento = `Paga com ${pagamento}`;
-
-                  // Gerar lançamento de serviço no MKAuth
-                  const lancamento = await this.gerarLancamentoServico(
-                    session,
-                    "mudanca_endereco",
-                  );
-
-                  // Se for Pix, gerar o QR Code e enviar
-                  if (pagamento === "Pix" && lancamento) {
-                    try {
-                      const pixController = new Pix();
-                      const pixData = await pixController.gerarPixServico({
-                        idLancamento: lancamento.id,
-                        valor: lancamento.valor,
-                        pppoe: lancamento.login,
-                        cpf: session.cpf || session.dadosCompleto?.cpf,
-                      });
-
-                      await this.MensagensComuns(
-                        celular,
-                        `✨ *Aqui está seu PIX para pagamento da Mudança de Endereço:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
-                      );
-                      await this.MensagensComuns(celular, pixData.qrcode);
-                    } catch (pixError) {
-                      console.error(
-                        "Erro ao gerar PIX para Mudança de Endereço:",
-                        pixError,
-                      );
-                    }
-                  }
-
-                  await this.MensagemFlowEndereco(
-                    celular,
-                    "mudanca_endereco",
-                    "Preencher Formulário",
-                  );
-                  session.stage = "awaiting_mudanca_flow";
-                } else if (session.service === "mudanca_comodo") {
+                if (session.service === "mudanca_comodo") {
                   const pagamento = texto;
                   session.formaPagamento = `Paga com ${pagamento}`;
 
@@ -2590,46 +2550,60 @@ class WhatsPixController {
             );
           }
           break;
-        case "choose_type_endereco":
-          try {
-            if (this.verificaType(type)) {
-              if (texto.toLowerCase() === "paga") {
-                await this.MensagemBotao(
-                  celular,
-                  "Escolha Forma de Pagamento",
-                  "Pix",
-                );
-                session.stage = "choose_type_payment";
-              } else if (
-                texto.toLowerCase() === "grátis" ||
-                texto.toLowerCase() === "gratis"
-              ) {
-                session.formaPagamento = "Grátis";
-
-                await this.MensagemFlowEndereco(
-                  celular,
+        case "mudanca_finalize_with_payment":
+          if (this.verificaType(type)) {
+            if (texto === "Pagar com Pix") {
+              session.formaPagamento = "Paga com Pix";
+              try {
+                const lancamento = await this.gerarLancamentoServico(
+                  session,
                   "mudanca_endereco",
-                  "Preencher Formulário",
                 );
-                session.stage = "awaiting_mudanca_flow";
-              } else {
+
+                if (lancamento) {
+                  const pixController = new Pix();
+                  const pixData = await pixController.gerarPixServico({
+                    idLancamento: lancamento.id,
+                    valor: lancamento.valor,
+                    pppoe: lancamento.login,
+                    cpf: session.cpf || session.dadosCompleto?.cpf,
+                  });
+
+                  await this.MensagensComuns(
+                    celular,
+                    `✨ *Aqui está seu PIX para pagamento da Mudança de Endereço:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+                  );
+                  await this.MensagensComuns(celular, pixData.qrcode);
+                }
+
                 await this.MensagensComuns(
                   celular,
-                  "Opção Invalída, Selecione a Opção da Lista",
+                  "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link de assinatura da Mudança de Endereço*. Obrigado pela confiança!",
                 );
+                await this.Finalizar(session.msgDadosFinais, celular, sessions);
+              } catch (pixError) {
+                console.error("Erro ao gerar PIX final:", pixError);
+                await this.MensagensComuns(
+                  celular,
+                  "⚠️ Ocorreu um erro ao gerar o seu PIX. Um atendente entrará em contato em breve para finalizar o seu pedido.",
+                );
+                await this.Finalizar(session.msgDadosFinais, celular, sessions);
               }
+            } else if (texto === "Grátis (Fidelidade)") {
+              session.formaPagamento = "Grátis";
+              await this.MensagensComuns(
+                celular,
+                "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link de assinatura da Mudança de Endereço*. Obrigado pela confiança!",
+              );
+              await this.Finalizar(session.msgDadosFinais, celular, sessions);
             } else {
               await this.MensagensComuns(
                 celular,
-                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
+                "⚠️ Por favor, selecione uma das opções de pagamento acima para finalizar.",
               );
             }
-          } catch (error) {
-            console.log(error);
           }
           break;
-
-        //Renovacão
         case "renovacao":
           await this.iniciarRenovacao(celular, texto, session, type);
           break;
@@ -3109,17 +3083,17 @@ class WhatsPixController {
     await this.MensagemTermos(
       celular,
       "Termos Mudança de Endereço",
-      "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
+      "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e prossiga com o preenchimento do formulário.",
       "Ler Termos",
       "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_endereco",
     );
-    await this.MensagemBotao(
+
+    await this.MensagemFlowEndereco(
       celular,
-      "📝 Este serviço pode ser realizado de 2 formas: *Grátis* renovação contratual 12 meses ou *Paga* consulte o valor.",
-      "Grátis",
-      "Paga",
+      "mudanca_endereco",
+      "Preencher Formulário",
     );
-    session.stage = "choose_type_endereco";
+    session.stage = "awaiting_mudanca_flow";
 
     // Aqui você armazena todos os dados na sessão
     session.dadosCompleto = {
@@ -3365,30 +3339,12 @@ class WhatsPixController {
               {
                 antigo_endereco: dadosFlow.endereco_antigo,
                 novo_endereco: `${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}`,
-                forma_pagamento: formaPagto,
               },
-              zapSignUrl, // Agora o link vai no e-mail!
+              zapSignUrl,
             );
 
             await this.enviarNotificacaoServico(celular);
 
-            await this.Finalizar(session.msgDadosFinais, celular, sessions);
-
-            if (formaPagto === "Grátis") {
-              await this.MensagensComuns(
-                celular,
-                "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link de assinatura da Renovação Contratual com período de 12 meses*. Obrigado pela confiança!",
-              );
-            } else {
-              await this.MensagensComuns(
-                celular,
-                "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link de assinatura da Mudança de Endereço*. Obrigado pela confiança!",
-              );
-            }
-
-            // Removida chamada duplicada de enviarNotificacaoServico aqui
-
-            // Send link directly to client (LAST MESSAGE)
             if (zapSignUrl) {
               await this.MensagensComuns(
                 celular,
@@ -3396,7 +3352,15 @@ class WhatsPixController {
               );
             }
 
-            session.stage = "finalizar";
+            // PERGUNTA A FORMA DE PAGAMENTO DEPOIS DO FLOW
+            await this.MensagemBotao(
+              celular,
+              "📝 Como deseja realizar o pagamento deste serviço?",
+              "Pagar com Pix",
+              "Grátis (Fidelidade)",
+            );
+
+            session.stage = "mudanca_finalize_with_payment";
             return;
           }
         }
@@ -4252,10 +4216,10 @@ class WhatsPixController {
 
     const dataHoje = new Date();
 
-    function resetTime(date: any) {
+    const resetTime = (date: any) => {
       date.setHours(0, 0, 0, 0);
       return date;
-    }
+    };
 
     let dataVencSemHora = resetTime(new Date(dataVenc));
     let dataHojeSemHora = resetTime(new Date(dataHoje));
@@ -4269,11 +4233,11 @@ class WhatsPixController {
       const date2 = new Date(dataHoje);
 
       // Função para calcular a diferença em dias
-      function differenceInDays(date1: any, date2: any) {
+      const differenceInDays = (date1: any, date2: any) => {
         const oneDay = 24 * 60 * 60 * 1000;
-        const diffDays = Math.floor(Math.abs((date1 - date2) / oneDay));
+        const diffDays = Math.floor(Math.abs((date1.getTime() - date2.getTime()) / oneDay));
         return diffDays;
-      }
+      };
 
       const diffInDays = differenceInDays(date1, date2);
 

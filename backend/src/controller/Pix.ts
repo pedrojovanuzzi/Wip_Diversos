@@ -916,7 +916,8 @@ class Pix {
         [];
 
       // 🔹 Calcula o valor corrigido (com juros/desconto) para cada fatura
-      for (const [index, cliente] of clientes.entries()) {
+      for (let index = 0; index < clientes.length; index++) {
+        const cliente = clientes[index];
         let valorCorrigido = await this.aplicarJuros_Desconto(
           cliente.valor, // valor original da fatura
           pppoe, // login do cliente
