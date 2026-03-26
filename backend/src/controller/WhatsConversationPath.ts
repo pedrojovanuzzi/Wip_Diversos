@@ -5732,6 +5732,7 @@ class WhatsPixController {
           // Determina se foi pago (Grátis = true, qualquer outro = false inicialmente)
           novaSolicitacao.pago = session.formaPagamento === "Grátis";
           novaSolicitacao.id_fatura = session.idFatura || null;
+          novaSolicitacao.gratis = session.formaPagamento === "Grátis" ? 1 : 0;
 
           await repo.save(novaSolicitacao);
           console.log(

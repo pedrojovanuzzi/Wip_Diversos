@@ -22,4 +22,7 @@ export class SolicitacaoServico {
 
     @Column({ type: 'int', nullable: true })
     id_fatura?: number;
+
+    @Column({ type: 'int', default: 0 })
+    gratis?: number;
 }
