@@ -110,9 +110,15 @@ const SolicitacoesServico = () => {
                   <TableCell>{service.servico}</TableCell>
                   <TableCell>
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold ${service.pago ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        service.gratis
+                          ? "bg-blue-100 text-blue-800"
+                          : service.pago
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                      }`}
                     >
-                      {service.pago ? "Pago" : "Pendente"}
+                      {service.gratis ? "Grátis" : service.pago ? "Pago" : "Pendente"}
                     </span>
                   </TableCell>
                   <TableCell>{service.login_cliente}</TableCell>
