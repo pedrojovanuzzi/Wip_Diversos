@@ -915,7 +915,7 @@ class WhatsPixController {
                   session.msgDadosFinais = this.formatarResumo(
                     session,
                     "*🧱 Mudança de Cômodo*",
-                    { forma_pagamento: session.formaPagamento }
+                    { forma_pagamento: session.formaPagamento },
                   );
 
                   // Removida notificação redundante para Mudança de Cômodo
@@ -2552,9 +2552,47 @@ class WhatsPixController {
           break;
         case "mudanca_finalize_with_payment":
           if (this.verificaType(type)) {
+            const dadosFlow = session.dadosCadastro;
+            if (!dadosFlow) {
+              await this.MensagensComuns(
+                celular,
+                "⚠️ Ocorreu um erro ao recuperar seus dados. Por favor, tente preencher o formulário novamente.",
+              );
+              await this.finalizarMudancaEndereco(celular, session);
+              break;
+            }
+
             if (texto === "Pagar com Pix") {
               session.formaPagamento = "Paga com Pix";
               try {
+                // 1. Gerar link ZapSign (Pago)
+                let zapSignUrl = "";
+                try {
+                  const zapSignData = {
+                    nome: dadosFlow.nome || session.nome,
+                    cpf: dadosFlow.cpf || session.cpf,
+                    email: session.email || "financeiro@wiptelecom.com.br",
+                    telefone: celular,
+                    endereco_antigo: session.endereco_antigo || "Não informado",
+                    rua: this.limparEndereco(dadosFlow.rua, true),
+                    numero: dadosFlow.numero,
+                    complemento: dadosFlow.complemento || "",
+                    bairro: dadosFlow.novo_bairro,
+                    cidade: this.FormatarCidade(dadosFlow.cidade || "Franca"),
+                    estado: dadosFlow.estado || "SP",
+                    cep: dadosFlow.cep,
+                    valor: "60.00", // Valor para mudança paga
+                    rg: session.rg || "Não informado",
+                  };
+                  const zapResult =
+                    await ZapSign.createContractMudancaEndereco(zapSignData);
+                  zapSignUrl = zapResult.signers[0].sign_url;
+                  session.zapSignUrlMudanca = zapSignUrl;
+                } catch (zapError) {
+                  console.error("Erro ZapSign (Pix):", zapError);
+                }
+
+                // 2. Gerar Lançamento no MKAuth
                 const lancamento = await this.gerarLancamentoServico(
                   session,
                   "mudanca_endereco",
@@ -2571,37 +2609,98 @@ class WhatsPixController {
 
                   await this.MensagensComuns(
                     celular,
-                    `✨ *Aqui está seu PIX para pagamento da Mudança de Endereço:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+                    `✨ *Aqui está seu PIX para pagamento da Mudança de Endereço de R$ ${lancamento.valor}:*\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
                   );
                   await this.MensagensComuns(celular, pixData.qrcode);
                 }
 
-                await this.MensagensComuns(
-                  celular,
-                  "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link de assinatura da Mudança de Endereço*. Obrigado pela confiança!",
+                if (zapSignUrl) {
+                  await this.MensagensComuns(
+                    celular,
+                    `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos a sua solicitação! 🚀`,
+                  );
+                }
+
+                session.msgDadosFinais = this.formatarResumo(
+                  session,
+                  "*🔄 Mudança de Endereço*",
+                  {
+                    antigo_endereco: dadosFlow.endereco_antigo,
+                    novo_endereco: `${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}`,
+                    forma_pagamento: "Pix",
+                  },
+                  zapSignUrl,
                 );
+
                 await this.Finalizar(session.msgDadosFinais, celular, sessions);
-              } catch (pixError) {
-                console.error("Erro ao gerar PIX final:", pixError);
+              } catch (error) {
+                console.error("Erro finalizar mudança (Pix):", error);
                 await this.MensagensComuns(
                   celular,
-                  "⚠️ Ocorreu um erro ao gerar o seu PIX. Um atendente entrará em contato em breve para finalizar o seu pedido.",
+                  "⚠️ Ocorreu um erro ao finalizar sua solicitação. Um atendente entrará em contato em breve.",
                 );
                 await this.Finalizar(session.msgDadosFinais, celular, sessions);
               }
             } else if (texto === "Grátis (Fidelidade)") {
               session.formaPagamento = "Grátis";
-              await this.MensagensComuns(
-                celular,
-                "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link de assinatura da Mudança de Endereço*. Obrigado pela confiança!",
-              );
-              await this.Finalizar(session.msgDadosFinais, celular, sessions);
+              try {
+                // 1. Gerar link ZapSign (Grátis)
+                let zapSignUrl = "";
+                try {
+                  const zapSignData = {
+                    nome: dadosFlow.nome || session.nome,
+                    cpf: dadosFlow.cpf || session.cpf,
+                    email: session.email || "financeiro@wiptelecom.com.br",
+                    telefone: celular,
+                    endereco_antigo: session.endereco_antigo || "Não informado",
+                    rua: this.limparEndereco(dadosFlow.rua, true),
+                    numero: dadosFlow.numero,
+                    complemento: dadosFlow.complemento || "",
+                    bairro: dadosFlow.novo_bairro,
+                    cidade: this.FormatarCidade(dadosFlow.cidade || "Franca"),
+                    estado: dadosFlow.estado || "SP",
+                    cep: dadosFlow.cep,
+                    valor: "0.00",
+                    rg: session.rg || "Não informado",
+                  };
+                  const zapResult =
+                    await ZapSign.createContractMudancaEndereco(zapSignData);
+                  zapSignUrl = zapResult.signers[0].sign_url;
+                  session.zapSignUrlMudanca = zapSignUrl;
+                } catch (zapError) {
+                  console.error("Erro ZapSign (Grátis):", zapError);
+                }
+
+                if (zapSignUrl) {
+                  await this.MensagensComuns(
+                    celular,
+                    `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos a sua solicitação! 🚀`,
+                  );
+                }
+
+                session.msgDadosFinais = this.formatarResumo(
+                  session,
+                  "*🔄 Mudança de Endereço*",
+                  {
+                    antigo_endereco: dadosFlow.endereco_antigo,
+                    novo_endereco: `${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}`,
+                    forma_pagamento: "Grátis (Fidelidade)",
+                  },
+                  zapSignUrl,
+                );
+
+                await this.Finalizar(session.msgDadosFinais, celular, sessions);
+              } catch (error) {
+                console.error("Erro finalizar mudança (Grátis):", error);
+                await this.Finalizar(session.msgDadosFinais, celular, sessions);
+              }
             } else {
               await this.MensagensComuns(
                 celular,
                 "⚠️ Por favor, selecione uma das opções de pagamento acima para finalizar.",
               );
             }
+            await this.enviarNotificacaoServico(celular);
           }
           break;
         case "renovacao":
@@ -3301,37 +3400,8 @@ class WhatsPixController {
           if (dadosFlow && Object.keys(dadosFlow).length > 0) {
             const formaPagto = session.formaPagamento || "Não informada";
 
-            // ZapSign Integration for Address Change - MOVIDO PARA ANTES DO RESUMO
-            let zapSignUrl = "";
-            try {
-              console.log("Generating ZapSign document for Address Change...");
-              const zapSignData = {
-                nome: dadosFlow.nome || session.nome,
-                cpf: dadosFlow.cpf || session.cpf,
-                email: session.email || "financeiro@wiptelecom.com.br",
-                telefone: celular,
-                endereco_antigo: session.endereco_antigo || "Não informado",
-                rua: this.limparEndereco(dadosFlow.rua, true),
-                numero: dadosFlow.numero,
-                complemento: dadosFlow.complemento || "",
-                bairro: dadosFlow.novo_bairro,
-                cidade: this.FormatarCidade(dadosFlow.cidade || "Franca"),
-                estado: dadosFlow.estado || "SP",
-                cep: dadosFlow.cep,
-                valor: formaPagto === "Grátis" ? "0.00" : "60.00",
-                rg: session.rg || "Não informado",
-              };
-
-              const zapResult =
-                await ZapSign.createContractMudancaEndereco(zapSignData);
-              zapSignUrl = zapResult.signers[0].sign_url;
-              session.zapSignUrlMudanca = zapSignUrl;
-            } catch (zapError) {
-              console.error(
-                "Error creating ZapSign document during Address Change:",
-                zapError,
-              );
-            }
+            // MOVIDO: A geração do link ZapSign agora ocorre no estágio mudanca_finalize_with_payment
+            // após o usuário escolher se quer pagar ou fidelidade.
 
             session.msgDadosFinais = this.formatarResumo(
               session,
@@ -3340,17 +3410,7 @@ class WhatsPixController {
                 antigo_endereco: dadosFlow.endereco_antigo,
                 novo_endereco: `${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}`,
               },
-              zapSignUrl,
             );
-
-            await this.enviarNotificacaoServico(celular);
-
-            if (zapSignUrl) {
-              await this.MensagensComuns(
-                celular,
-                `📄 *Aqui está o seu Link de Assinatura (Mudança de Endereço):* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos a sua solicitação! 🚀`,
-              );
-            }
 
             // PERGUNTA A FORMA DE PAGAMENTO DEPOIS DO FLOW
             await this.MensagemBotao(
@@ -4235,7 +4295,9 @@ class WhatsPixController {
       // Função para calcular a diferença em dias
       const differenceInDays = (date1: any, date2: any) => {
         const oneDay = 24 * 60 * 60 * 1000;
-        const diffDays = Math.floor(Math.abs((date1.getTime() - date2.getTime()) / oneDay));
+        const diffDays = Math.floor(
+          Math.abs((date1.getTime() - date2.getTime()) / oneDay),
+        );
         return diffDays;
       };
 
