@@ -28,6 +28,7 @@ import moment from "moment-timezone";
 import { Queue, Worker, Job } from "bullmq";
 import ZapSign from "./ZapSign";
 import Pix from "./Pix";
+import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { log } from "console";
 
 dotenv.config();
@@ -1104,6 +1105,7 @@ class WhatsPixController {
                   this.limparEndereco(dadosFlow.cidade),
                 ),
                 estado: this.limparEndereco(dadosFlow.estado),
+                login: dadosFlow.login,
               };
 
               const planoFlow = dadosFlow.plano || "";
@@ -2867,6 +2869,7 @@ class WhatsPixController {
                   celular,
                   `🔍 Cadastro encontrado! ${sis_cliente[0].login.toUpperCase()}`,
                 );
+                session.login = sis_cliente[0].login;
                 await this.enviarBoleto(
                   sis_cliente[0].login,
                   celular,
@@ -3036,6 +3039,9 @@ class WhatsPixController {
               "⚠️ Seleção *Inválida*, Verifique se Digitou o Número Corretamente!!!",
             );
           }
+          break;
+        case "finalizar":
+          await this.Finalizar(session.msgDadosFinais, celular, sessions);
           break;
       }
     }
@@ -5689,20 +5695,56 @@ class WhatsPixController {
 
   async Finalizar(msg: any, celular: any, sessions: any) {
     try {
-      await this.MensagensComuns(process.env.TEST_PHONE, msg);
-      if (sessions[celular] && sessions[celular].inactivityTimer) {
-        clearTimeout(sessions[celular].inactivityTimer);
-      }
-      this.deleteSession(celular);
+      const session = sessions[celular];
+      if (session) {
+        // --- Persistence Logic ---
+        try {
+          const repo = AppDataSource.getRepository(SolicitacaoServico);
+          const novaSolicitacao = new SolicitacaoServico();
 
-      const insertMessage = await ApiMkDataSource.getRepository(Mensagens).save(
-        {
-          conv_id: conversation.conv_id as number,
-          sender_id: conversation.receiver_id,
-          content: msg,
-          timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
-        },
-      );
+          // Mapeia identificador interno para nome amigável
+          const serviceMap: { [key: string]: string } = {
+            instalacao: "Instalação",
+            mudanca_endereco: "Mudança de Endereço",
+            mudanca_comodo: "Mudança de Cômodo",
+            troca_titularidade: "Troca de Titularidade",
+            troca_plano: "Alteração de Plano",
+            wifi_estendido: "Wifi Estendido",
+            renovação_contratual: "Renovação Contratual",
+          };
+
+          novaSolicitacao.servico =
+            serviceMap[session.service] || session.service || "Outro";
+          novaSolicitacao.login_cliente =
+            session.login || session.dadosCompleto?.login || "Desconhecido";
+          novaSolicitacao.data_solicitacao = new Date();
+          novaSolicitacao.assinado = false; // Inicialmente falso, será assinado via ZapSign
+
+          // Determina se foi pago (Grátis = true, qualquer outro = false inicialmente)
+          novaSolicitacao.pago = session.formaPagamento === "Grátis";
+
+          await repo.save(novaSolicitacao);
+          console.log(
+            `[Persistence] Solicitação de ${novaSolicitacao.servico} salva para o login ${novaSolicitacao.login_cliente}`,
+          );
+        } catch (dbError) {
+          console.error("Erro ao persistir solicitação de serviço:", dbError);
+        }
+        // -------------------------
+
+        await this.MensagensComuns(process.env.TEST_PHONE, msg);
+        if (session.inactivityTimer) {
+          clearTimeout(session.inactivityTimer);
+        }
+        this.deleteSession(celular);
+      }
+
+      await ApiMkDataSource.getRepository(Mensagens).save({
+        conv_id: conversation.conv_id as number,
+        sender_id: conversation.receiver_id,
+        content: msg,
+        timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
+      });
     } catch (error) {
       console.log("Error sending message:", error);
     }
