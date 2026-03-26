@@ -25,6 +25,7 @@ import TimeTrackingRoutes from "./routes/TimeTracking.routes";
 import Licenca from "./routes/Licenca.Routes";
 import ZapSignRoutes from "./routes/ZapSign.routes";
 import ZapSignTemplatesRoutes from "./routes/ZapSignTemplates.routes";
+import SolicitacaoServicoRouter from "./routes/SolicitacaoServico.routes";
 
 // Controllers (for scheduled tasks)
 import BackupController from "./controller/Backup";
@@ -74,6 +75,7 @@ export class App {
     this.server.use("/api/licenca", Licenca);
     this.server.use("/api/zapsign", ZapSignRoutes);
     this.server.use("/api/zapsign-templates", ZapSignTemplatesRoutes);
+    this.server.use("/api/solicitacao-servico", SolicitacaoServicoRouter);
   }
 
   private agendarBackup() {

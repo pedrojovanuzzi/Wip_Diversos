@@ -23,6 +23,7 @@ import {
   FaDesktop,
   FaChartLine,
   FaFilePdf,
+  FaList,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -315,6 +316,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   }
                   title="Gráfico Instalações"
                   description="Acompanhe instalações mensais"
+                />
+                <NavItem
+                  to="/solicitacoes-servico"
+                  icon={
+                    <FaList className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Serviços Solicitados"
+                  description="Ver solicitações de serviços"
                 />
               </>
             )}
