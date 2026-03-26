@@ -13,11 +13,20 @@ import { isNotIn } from "class-validator";
 import Whatsapp from "./Whatsapp";
 import LocalDataSource from "../database/DataSource";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
+import { whatsappOutgoingQueue } from "./WhatsConversationPath";
 
 dotenv.config();
 
 const logFilePath = path.join(__dirname, "..", "..", "/log", "logPix.json");
 const isSandbox = process.env.SERVIDOR_HOMOLOGACAO === "true";
+
+const waToken = isSandbox
+  ? process.env.CLOUD_API_ACCESS_TOKEN_TEST
+  : process.env.CLOUD_API_ACCESS_TOKEN;
+
+const waUrl = isSandbox
+  ? `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID_TEST}/messages`
+  : `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
 
 const options = {
   sandbox: isSandbox,
@@ -380,6 +389,49 @@ class Pix {
                   "[Dashboard Sync] Erro ao sincronizar pagamento local:",
                   localDbError,
                 );
+              }
+
+              // Enviar notificação para o celular de teste do .env
+              const testPhone = process.env.TEST_PHONE;
+              if (testPhone) {
+                try {
+                  await whatsappOutgoingQueue.add(
+                    "send-template",
+                    {
+                      url: waUrl,
+                      payload: {
+                        messaging_product: "whatsapp",
+                        recipient_type: "individual",
+                        to: testPhone,
+                        type: "template",
+                        template: {
+                          name: "notificacao_pagamento",
+                          language: {
+                            code: "pt_BR",
+                          },
+                        },
+                      },
+                      headers: {
+                        Authorization: `Bearer ${waToken}`,
+                        "Content-Type": "application/json",
+                      },
+                    },
+                    {
+                      removeOnComplete: true,
+                      removeOnFail: false,
+                      attempts: 3,
+                      backoff: { type: "exponential", delay: 5000 },
+                    },
+                  );
+                  console.log(
+                    `[Webhook PIX] Notificação 'notificacao_pagamento' enfileirada para ${testPhone}`,
+                  );
+                } catch (queueError) {
+                  console.error(
+                    "[Webhook PIX] Erro ao enfileirar notificação de pagamento:",
+                    queueError,
+                  );
+                }
               }
               // -------------------------------------
 

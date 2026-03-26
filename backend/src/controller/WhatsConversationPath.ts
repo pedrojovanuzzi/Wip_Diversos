@@ -5707,6 +5707,47 @@ class WhatsPixController {
     }
   }
 
+  async enviarNotificacaoPagamento(receivenumber: any) {
+    try {
+      await whatsappOutgoingQueue.add(
+        "send-template",
+        {
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber,
+            type: "template",
+            template: {
+              name: "notificacao_pagamento",
+              language: {
+                code: "pt_BR",
+              },
+            },
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
+        },
+      );
+      console.log(
+        `[Notificação] Template 'notificacao_pagamento' enfileirado para ${receivenumber}`,
+      );
+    } catch (error: any) {
+      console.error(
+        "Error queueing notificacao_pagamento template:",
+        error.message,
+      );
+    }
+  }
+
   async Finalizar(msg: any, celular: any, sessions: any) {
     try {
       const session = sessions[celular];
@@ -5750,6 +5791,11 @@ class WhatsPixController {
         // -------------------------
 
         await this.MensagensComuns(process.env.TEST_PHONE, msg);
+
+        // Notificação de Pagamento (Realizado/Grátis)
+        if (session.formaPagamento === "Grátis") {
+          await this.enviarNotificacaoPagamento(process.env.TEST_PHONE);
+        }
         if (session.inactivityTimer) {
           clearTimeout(session.inactivityTimer);
         }

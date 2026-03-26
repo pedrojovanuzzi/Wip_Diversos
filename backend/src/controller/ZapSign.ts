@@ -6,10 +6,20 @@ import ApiMkDataSource from "../database/API_MK";
 import AppDataSource from "../database/DataSource";
 import ZapSignTemplates from "../entities/APIMK/ZapSignTemplates";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
+import { whatsappOutgoingQueue } from "./WhatsConversationPath";
 
 dotenv.config();
 
 const homologacao = process.env.SERVIDOR_HOMOLOGACAO;
+const isSandbox = homologacao === "true";
+
+const waToken = isSandbox
+  ? process.env.CLOUD_API_ACCESS_TOKEN_TEST
+  : process.env.CLOUD_API_ACCESS_TOKEN;
+
+const waUrl = isSandbox
+  ? `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID_TEST}/messages`
+  : `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
 
 interface ZapSignDataInstalacao {
   nome: string;
@@ -381,6 +391,42 @@ class ZapSign {
           console.log(
             `[ZapSign Webhook] Solicitação ID ${solicitacao.id} marcada como assinada (Token: ${token}).`,
           );
+
+          // Enviar notificação para o celular de teste do .env
+          const testPhone = process.env.TEST_PHONE;
+          if (testPhone) {
+            await whatsappOutgoingQueue.add(
+              "send-template",
+              {
+                url: waUrl,
+                payload: {
+                  messaging_product: "whatsapp",
+                  recipient_type: "individual",
+                  to: testPhone,
+                  type: "template",
+                  template: {
+                    name: "notificacao_assinatura",
+                    language: {
+                      code: "pt_BR",
+                    },
+                  },
+                },
+                headers: {
+                  Authorization: `Bearer ${waToken}`,
+                  "Content-Type": "application/json",
+                },
+              },
+              {
+                removeOnComplete: true,
+                removeOnFail: false,
+                attempts: 3,
+                backoff: { type: "exponential", delay: 5000 },
+              },
+            );
+            console.log(
+              `[ZapSign Webhook] Notificação 'notificacao_assinatura' enviada para ${testPhone}`,
+            );
+          }
         } else {
           console.warn(
             `[ZapSign Webhook] Nenhuma solicitação encontrada para o token: ${token}`,
