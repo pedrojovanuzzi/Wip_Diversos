@@ -1631,9 +1631,6 @@ class WhatsPixController {
 
                 await this.enviarNotificacaoServico(celular);
 
-                // Gerar lançamento de serviço no MKAuth (Instalação = R$ 350)
-                await this.gerarLancamentoServico(session, "instalacao");
-
                 await this.MensagensComuns(
                   celular,
                   `📄 *Aqui está o seu Link de Assinatura:* ${session.zapSignUrl}\n\nPor favor, *Assine* o quanto antes para podermos agendar a sua instalação! 🚀`,
@@ -2865,11 +2862,15 @@ class WhatsPixController {
                 if (selectedIndex < options) {
                   const selectedClient = session.structuredData[selectedIndex];
                   console.log(selectedClient);
+
+                  // Salva o login selecionado na sessão para garantir o vínculo correto nos lançamentos
+                  session.login = selectedClient.login;
+
                   console.log(
-                    `Usuário selecionou o cliente com ID: ${selectedClient.id}`,
+                    `Usuário selecionou o cliente com ID: ${selectedClient.id}, Login: ${session.login}`,
                   );
                   await this.enviarBoleto(
-                    selectedClient.login,
+                    session.login,
                     celular,
                     selectedClient.endereco,
                     selectedClient.cpf,
@@ -3825,24 +3826,32 @@ class WhatsPixController {
         return;
       }
 
-      // Identificar o login do cliente pelo CPF
+      // Identificar o login do cliente (prioriza o login da sessão, se disponível)
       const cpf = session.cpf || session.dadosCompleto?.cpf;
-      if (!cpf) {
-        console.error(
-          "CPF não encontrado na sessão para gerar lançamento de serviço.",
-        );
-        return;
-      }
+      const loginSessao = session.login;
 
       const ClientesRepository =
         MkauthDataSource.getRepository(ClientesEntities);
-      const cliente = await ClientesRepository.findOne({
-        where: { cpf_cnpj: cpf.trim().replace(/\s/g, "") },
-      });
+
+      let cliente;
+
+      if (loginSessao) {
+        // Se temos o login na sessão, usamos ele diretamente (mais preciso)
+        cliente = await ClientesRepository.findOne({
+          where: { login: loginSessao, cli_ativado: "s" },
+        });
+      }
+
+      // Se não encontrou pelo login ou não tinha login, tenta pelo CPF (apenas ativos)
+      if (!cliente && cpf) {
+        cliente = await ClientesRepository.findOne({
+          where: { cpf_cnpj: cpf.trim().replace(/\s/g, ""), cli_ativado: "s" },
+        });
+      }
 
       if (!cliente) {
         console.error(
-          `Cliente com CPF ${cpf} não encontrado no MKAuth para gerar lançamento.`,
+          `Cliente (Ativo) com Login "${loginSessao || ""}" ou CPF "${cpf || ""}" não encontrado no MKAuth para gerar lançamento.`,
         );
         return;
       }
