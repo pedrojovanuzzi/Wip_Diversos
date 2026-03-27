@@ -1152,24 +1152,36 @@ class WhatsPixController {
               );
 
               // === Nome Completo Check (Consult Center) ===
-              console.log(`[ConsultCenter] Validando nome para CPF: ${dadosFlow.cpf} | Nome API: ${consulta.nome || "NÃO RETORNADO"}`);
+              console.log(
+                `[ConsultCenter] Validando nome para CPF: ${dadosFlow.cpf} | Nome API: ${consulta.nome || "NÃO RETORNADO"}`,
+              );
               if (consulta.nome) {
                 const nomeFormulario = this.normalizeName(dadosFlow.nome);
                 const nomeApi = this.normalizeName(consulta.nome);
 
                 if (nomeFormulario !== nomeApi) {
-                  console.warn(`[ConsultCenter] DIVERGÊNCIA DE NOME! Form: ${nomeFormulario} | API: ${nomeApi}`);
+                  console.warn(
+                    `[ConsultCenter] DIVERGÊNCIA DE NOME! Form: ${nomeFormulario} | API: ${nomeApi}`,
+                  );
                   await this.MensagensComuns(
                     celular,
-                    "⚠️ *Divergência de Dados!*\n\nO nome informado no formulário não coincide com o nome registrado para este CPF em nossa base de consulta.\n\n*Por favor, preencha o formulário novamente com o nome completo correto.*"
+                    "⚠️ *Divergência de Dados!*\n\nO nome informado no formulário não coincide com o nome registrado para este CPF em nossa base de consulta.\n\n*Por favor, preencha o formulário novamente com o nome completo correto.*",
                   );
-                  await this.MensagemFlow(celular, "Cadastro", "📋 Preencher novamente");
+                  await this.MensagemFlow(
+                    celular,
+                    "Cadastro",
+                    "📋 Preencher novamente",
+                  );
                   break;
                 } else {
-                  console.log(`[ConsultCenter] Nomes conferem: ${nomeFormulario}`);
+                  console.log(
+                    `[ConsultCenter] Nomes conferem: ${nomeFormulario}`,
+                  );
                 }
               } else {
-                console.warn(`[ConsultCenter] Nome não retornado pela API para o CPF: ${dadosFlow.cpf}. Pulando validação de nome.`);
+                console.warn(
+                  `[ConsultCenter] Nome não retornado pela API para o CPF: ${dadosFlow.cpf}. Pulando validação de nome.`,
+                );
               }
 
               const devePagar = consulta.devePagar;
@@ -1397,6 +1409,9 @@ class WhatsPixController {
                     telefone_conversa: celular,
                   };
 
+                  // Armazena metadados para persistência (independente de ser pago ou grátis)
+                  session.zapSignMetadata = zapSignData;
+
                   if (!session.instalacaoPaga) {
                     const zapResponse =
                       await ZapSign.createContractInstalacao(zapSignData);
@@ -1414,8 +1429,6 @@ class WhatsPixController {
                       `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
                     );
                   } else {
-                    // Armazena metadados para gerar após o pagamento
-                    session.zapSignMetadata = zapSignData;
                     console.log(
                       "[Installation] ZapSign postergado para após o pagamento PIX.",
                     );
@@ -2768,6 +2781,7 @@ class WhatsPixController {
                   zapSignUrl = zapResult.signers[0].sign_url;
                   session.zapSignUrlMudanca = zapSignUrl;
                   session.tokenZapSign = zapResult.token;
+                  session.zapSignMetadata = zapSignData; // Popula para persistência
                 } catch (zapError) {
                   console.error("Erro ZapSign (Grátis):", zapError);
                 }
@@ -3902,6 +3916,7 @@ class WhatsPixController {
 
       session.zapSignUrl = zapSignUrl;
       session.tokenZapSign = zapResponse.token;
+      session.zapSignMetadata = zapSignData; // Popula para persistência
 
       await this.MensagensComuns(
         celular,
@@ -4999,7 +5014,7 @@ class WhatsPixController {
   async MensagemFlow(receivenumber: any, flowName: string, ctaText: string) {
     try {
       const planoAviso =
-        "⚠️Esta contratação estará sujeito à análise de viabilidade técnica e consulta cadastral (CPF/CNPJ), podendo influenciar na disponibilidade, valores (pagos ou gratuitos da instalação), valores do plano e condições do serviço. A contratação será confirmada após análise. Caso esteja de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
+        "⚠️ *Atenção*: Contratação sujeita à *análise técnica e consulta cadastral (CPF/CNPJ)*. Podendo influenciar na disponibilidade, valores da instalação (grátis ou paga), valor do plano e condições do serviço.\n\n✅ *A contratação será confirmada após a análise*. Se estiver de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
       await this.MensagensComuns(receivenumber, planoAviso);
 
       const planosDoSistema = await this.getPlanosDoSistema();
@@ -5063,7 +5078,7 @@ class WhatsPixController {
   ) {
     try {
       const planoAviso =
-        "⚠️Esta contratação estará sujeito à análise de viabilidade técnica ou consulta cadastral (CPF/CNPJ), podendo influenciar na disponibilidade, valores (pagos ou gratuitos da instalação), valores do plano e condições do serviço. A contratação será confirmada após análise. Caso esteja de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
+        "⚠️ *Atenção*: Contratação sujeita à *análise técnica e consulta cadastral (CPF/CNPJ)*. Podendo influenciar na disponibilidade, valores da instalação (grátis ou paga), valor do plano e condições do serviço.\n\n✅ *A contratação será confirmada após a análise*. Se estiver de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
       await this.MensagensComuns(receivenumber, planoAviso);
 
       await whatsappOutgoingQueue.add(
@@ -5125,7 +5140,8 @@ class WhatsPixController {
   ) {
     try {
       const planoAviso =
-        "⚠️Esta contratação estará sujeito à análise de viabilidade técnica ou consulta cadastral (CPF/CNPJ), podendo influenciar na disponibilidade, valores (pagos ou gratuitos da instalação), valores do plano e condições do serviço. A contratação será confirmada após análise. Caso esteja de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
+        "⚠️ *Atenção*: Contratação sujeita à *análise técnica e consulta cadastral (CPF/CNPJ)*. Podendo influenciar na disponibilidade, valores da instalação (grátis ou paga), valor do plano e condições do serviço.\n\n✅ *A contratação será confirmada após a análise*. Se estiver de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
+
       await this.MensagensComuns(receivenumber, planoAviso);
 
       await whatsappOutgoingQueue.add(
@@ -5870,7 +5886,7 @@ class WhatsPixController {
               ? 1
               : 0;
           novaSolicitacao.token_zapsign = session.tokenZapSign || null;
-          novaSolicitacao.dados = session.zapSignMetadata || null;
+          novaSolicitacao.dados = session.zapSignMetadata || session.dadosCompleto || null;
 
           await repo.save(novaSolicitacao);
           console.log(
