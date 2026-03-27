@@ -243,6 +243,17 @@ class WhatsPixController {
     this.getPlanosDoSistema = this.getPlanosDoSistema.bind(this);
     this.limparEndereco = this.limparEndereco.bind(this);
     this.Flow = this.Flow.bind(this);
+    this.normalizeName = this.normalizeName.bind(this);
+  }
+
+  normalizeName(name: string): string {
+    return (name || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z\s]/g, "")
+      .toUpperCase()
+      .trim()
+      .replace(/\s+/g, " ");
   }
 
   async saveSession(celular: string) {
@@ -1135,11 +1146,32 @@ class WhatsPixController {
               session.planoEscolhido = planoFlow;
               session.zapSignUrl = null;
 
-              // === Consult Center Debt Check ===
               const consultCenter = new ConsultCenterService();
               const consulta = await consultCenter.consultarDebitos(
                 dadosFlow.cpf,
               );
+
+              // === Nome Completo Check (Consult Center) ===
+              console.log(`[ConsultCenter] Validando nome para CPF: ${dadosFlow.cpf} | Nome API: ${consulta.nome || "NÃO RETORNADO"}`);
+              if (consulta.nome) {
+                const nomeFormulario = this.normalizeName(dadosFlow.nome);
+                const nomeApi = this.normalizeName(consulta.nome);
+
+                if (nomeFormulario !== nomeApi) {
+                  console.warn(`[ConsultCenter] DIVERGÊNCIA DE NOME! Form: ${nomeFormulario} | API: ${nomeApi}`);
+                  await this.MensagensComuns(
+                    celular,
+                    "⚠️ *Divergência de Dados!*\n\nO nome informado no formulário não coincide com o nome registrado para este CPF em nossa base de consulta.\n\n*Por favor, preencha o formulário novamente com o nome completo correto.*"
+                  );
+                  await this.MensagemFlow(celular, "Cadastro", "📋 Preencher novamente");
+                  break;
+                } else {
+                  console.log(`[ConsultCenter] Nomes conferem: ${nomeFormulario}`);
+                }
+              } else {
+                console.warn(`[ConsultCenter] Nome não retornado pela API para o CPF: ${dadosFlow.cpf}. Pulando validação de nome.`);
+              }
+
               const devePagar = consulta.devePagar;
               const valorInstalacaoFee = devePagar ? "350,00" : "0,00";
               session.instalacaoPaga = devePagar;
