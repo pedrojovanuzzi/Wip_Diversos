@@ -556,11 +556,22 @@ class WhatsPixController {
     }
 
     session.inactivityTimer = setTimeout(() => {
-      this.MensagensComuns(
-        celular,
-        "🤷🏻 Seu atendimento foi *finalizado* devido à inatividade!!\nEntre em contato novamente 👍",
-      );
-      this.deleteSession(celular);
+      if (session.service === "instalacao") {
+        this.MensagensComuns(
+          celular,
+          "🤷🏻 Seu atendimento foi *pausado* devido à inatividade!!\nNão se preocupe, salvamos seu progresso e entraremos em contato em breve! 👍",
+        );
+        // Não deletamos do banco, apenas removemos da memória para parar o timer
+        if (sessions[celular]) {
+          delete sessions[celular];
+        }
+      } else {
+        this.MensagensComuns(
+          celular,
+          "🤷🏻 Seu atendimento foi *finalizado* devido à inatividade!!\nEntre em contato novamente 👍",
+        );
+        this.deleteSession(celular);
+      }
     }, 900000); // 15 minutos de inatividade
   }
 
@@ -1146,90 +1157,13 @@ class WhatsPixController {
               session.planoEscolhido = planoFlow;
               session.zapSignUrl = null;
 
-              const consultCenter = new ConsultCenterService();
-              const consulta = await consultCenter.consultarDebitos(
-                dadosFlow.cpf,
+              // O código de consulta automática foi removido para ser feito manualmente via painel administrativo.
+              // Por enquanto, definimos como pendente de análise.
+              session.instalacaoPaga = false;
+              await this.MensagensComuns(
+                celular,
+                "⏳ *Recebemos sua solicitação!*\n\nNossa equipe fará uma breve análise técnica e cadastral. Em instantes, enviaremos o retorno aqui mesmo no WhatsApp. Por favor, aguarde! 🚀",
               );
-
-              // === Nome Completo Check (Consult Center) ===
-              console.log(
-                `[ConsultCenter] Validando nome para CPF: ${dadosFlow.cpf} | Nome API: ${consulta.nome || "NÃO RETORNADO"}`,
-              );
-              if (consulta.nome) {
-                const nomeFormulario = this.normalizeName(dadosFlow.nome);
-                const nomeApi = this.normalizeName(consulta.nome);
-
-                if (nomeFormulario !== nomeApi) {
-                  console.warn(
-                    `[ConsultCenter] DIVERGÊNCIA DE NOME! Form: ${nomeFormulario} | API: ${nomeApi}`,
-                  );
-                  await this.MensagensComuns(
-                    celular,
-                    "⚠️ *Divergência de Dados!*\n\nO nome informado no formulário não coincide com o nome registrado para este CPF em nossa base de consulta.\n\n*Por favor, preencha o formulário novamente com o nome completo correto.*",
-                  );
-                  await this.MensagemFlow(
-                    celular,
-                    "Cadastro",
-                    "📋 Preencher novamente",
-                  );
-                  break;
-                } else {
-                  console.log(
-                    `[ConsultCenter] Nomes conferem: ${nomeFormulario}`,
-                  );
-                }
-              } else {
-                console.warn(
-                  `[ConsultCenter] Nome não retornado pela API para o CPF: ${dadosFlow.cpf}. Pulando validação de nome.`,
-                );
-              }
-
-              const devePagar = consulta.devePagar;
-              const valorInstalacaoFee = devePagar ? "350,00" : "0,00";
-              session.instalacaoPaga = devePagar;
-
-              if (devePagar) {
-                await this.MensagensComuns(
-                  celular,
-                  `🔍 *Após análise*, informamos que no momento não foi liberada a instalação na modalidade *grátis*.
-💰Caso tenha interesse, em dar continuidade, a instalação pode ser realizada na forma *paga* 
-*Taxa de Instalação:* R$ 350,00`,
-                );
-
-                // Gerar lançamento de serviço no MKAuth para a taxa de instalação
-                const lancamento = await this.gerarLancamentoServico(
-                  session,
-                  "instalacao",
-                );
-                if (lancamento) {
-                  session.idFatura = lancamento.id;
-                  try {
-                    const pixController = new Pix();
-                    const pixData = await pixController.gerarPixServico({
-                      idLancamento: lancamento.id,
-                      valor: lancamento.valor,
-                      pppoe: lancamento.login,
-                      cpf: session.cpf || session.dadosCompleto?.cpf,
-                    });
-
-                    await this.MensagensComuns(
-                      celular,
-                      `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
-                    );
-                    await this.MensagensComuns(celular, pixData.qrcode);
-                  } catch (pixError) {
-                    console.error(
-                      "Erro ao gerar PIX para Instalação no Flow:",
-                      pixError,
-                    );
-                  }
-                }
-              } else {
-                await this.MensagensComuns(
-                  celular,
-                  `✅ *Parabéns!* Sua instalação será *Isenta* de taxa de adesão! 🚀`,
-                );
-              }
 
               // === Salvar no MKAuth ===
               const ClientesRepository =
@@ -1372,25 +1306,7 @@ class WhatsPixController {
 
                 console.log("Cliente salvo com sucesso no MKAuth:", addClient);
 
-                // === ZapSign Integration for Flow ===
-                try {
-                  const planosDoSistema = await this.getPlanosDoSistema();
-                  const planoEncontrado = planosDoSistema.find(
-                    (p) => p.title === planoFlow,
-                  );
-
-                  let planoNome = planoFlow;
-                  let planoValor = "0,00";
-
-                  if (
-                    planoEncontrado &&
-                    planoEncontrado.title.includes(" - R$ ")
-                  ) {
-                    const parts = planoEncontrado.title.split(" - R$ ");
-                    planoNome = parts[0];
-                    planoValor = parts[1];
-                  }
-
+                  // ZapSign será gerado posteriormente após a aprovação manual no painel.
                   const zapSignData = {
                     nome: dadosFlow.nome,
                     cpf: dadosFlow.cpf,
@@ -1402,43 +1318,14 @@ class WhatsPixController {
                     cidade: dadosFlow.cidade,
                     estado: dadosFlow.estado,
                     cep: dadosFlow.cep,
-                    plano: planoNome,
-                    valor: valorInstalacaoFee,
+                    plano: planoFlow,
+                    valor: "0,00", // Será definido na consulta manual
                     vencimento: `Dia ${dadosFlow.vencimento}`,
                     rg: dadosFlow.rg,
                     telefone_conversa: celular,
                   };
-
-                  // Armazena metadados para persistência (independente de ser pago ou grátis)
                   session.zapSignMetadata = zapSignData;
-
-                  if (!session.instalacaoPaga) {
-                    const zapResponse =
-                      await ZapSign.createContractInstalacao(zapSignData);
-                    const zapSignUrl = zapResponse.signers[0].sign_url;
-
-                    session.zapSignUrl = zapSignUrl;
-                    session.tokenZapSign = zapResponse.token;
-
-                    // Send notification template
-                    await this.enviarNotificacaoServico(celular);
-
-                    // Send link directly to client (LAST MESSAGE)
-                    await this.MensagensComuns(
-                      celular,
-                      `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
-                    );
-                  } else {
-                    console.log(
-                      "[Installation] ZapSign postergado para após o pagamento PIX.",
-                    );
-                  }
-                } catch (zapError) {
-                  console.error(
-                    "Error creating ZapSign document during Flow registration:",
-                    zapError,
-                  );
-                }
+                  console.log("[Installation] ZapSign postergado para aprovação manual no painel.");
               } catch (dbError) {
                 console.error("Erro ao salvar cliente no MKAuth:", dbError);
               }

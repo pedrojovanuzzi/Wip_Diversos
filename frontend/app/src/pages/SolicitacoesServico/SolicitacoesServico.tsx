@@ -24,6 +24,7 @@ const SolicitacoesServico = () => {
   const [endDate, setEndDate] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
+  const [loadingAction, setLoadingAction] = useState<number | null>(null);
   const { user } = useAuth();
 
   const fetchServices = async (pageNum = 1) => {
@@ -40,6 +41,44 @@ const SolicitacoesServico = () => {
       setPage(response.data.page);
     } catch (error) {
       console.error("Erro ao buscar serviços soliciados:", error);
+    }
+  };
+
+  const handleConsultarCpf = async (id: number) => {
+    if (!window.confirm("Deseja realizar a consulta de CPF agora?")) return;
+    setLoadingAction(id);
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_URL}/solicitacao-servico/consultar-cpf/${id}`,
+        {},
+        { headers: { Authorization: `Bearer ${user?.token}` } }
+      );
+      alert("Consulta finalizada com sucesso! O cliente receberá o retorno no WhatsApp.");
+      fetchServices(page);
+    } catch (error) {
+      console.error("Erro ao consultar CPF:", error);
+      alert("Erro ao realizar consulta.");
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleIgnorarConsulta = async (id: number) => {
+    if (!window.confirm("Deseja ignorar a consulta e aprovar como GRÁTIS?")) return;
+    setLoadingAction(id);
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_URL}/solicitacao-servico/ignorar-consulta/${id}`,
+        {},
+        { headers: { Authorization: `Bearer ${user?.token}` } }
+      );
+      alert("Solicitação aprovada como GRÁTIS! O contrato foi enviado ao cliente.");
+      fetchServices(page);
+    } catch (error) {
+      console.error("Erro ao ignorar consulta:", error);
+      alert("Erro ao processar.");
+    } finally {
+      setLoadingAction(null);
     }
   };
 
@@ -114,6 +153,7 @@ const SolicitacoesServico = () => {
                 <TableCell className="text-white font-bold">
                   Status de Assinatura
                 </TableCell>
+                <TableCell className="text-white font-bold">Ações</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -146,6 +186,30 @@ const SolicitacoesServico = () => {
                     >
                       {service.assinado ? "Assinado" : "Pendente"}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {service.servico === "Instalação" && !service.pago && !service.gratis && (
+                      <Box display="flex" gap={1}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          onClick={() => handleConsultarCpf(service.id)}
+                          disabled={loadingAction === service.id}
+                        >
+                          Consultar CPF
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="secondary"
+                          size="small"
+                          onClick={() => handleIgnorarConsulta(service.id)}
+                          disabled={loadingAction === service.id}
+                        >
+                          Ignorar
+                        </Button>
+                      </Box>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
