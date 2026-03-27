@@ -14,6 +14,7 @@ import Whatsapp from "./Whatsapp";
 import LocalDataSource from "../database/DataSource";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { whatsappOutgoingQueue } from "./WhatsConversationPath";
+import ZapSign from "./ZapSign";
 
 dotenv.config();
 
@@ -446,10 +447,49 @@ class Pix {
                   record_pppoe.obs.split("Serviço: ")[1]?.split(" -")[0] ||
                   "Contratado";
 
-                await Whatsapp.MensagensComuns(
-                  finalPhone,
-                  `✅ *Pagamento Confirmado!*\n\nOlá ${sis_cliente.nome}, recebemos o pagamento do serviço: *${servicoNome}*.\n\nNossa equipe entrará em contato em breve para dar prosseguimento ao atendimento. Obrigado pela confiança! 🚀`,
-                );
+                // === Lógica de ZapSign Postergado ===
+                let zapSignUrl = "";
+                try {
+                  const solicitacaoRepo = LocalDataSource.getRepository(SolicitacaoServico);
+                  const solicitacao = await solicitacaoRepo.findOne({
+                    where: { id_fatura: Number(record_pppoe.id) }
+                  });
+
+                  if (solicitacao && solicitacao.dados) {
+                    console.log(`[Webhook PIX] Gerando ZapSign postergado para: ${solicitacao.servico}`);
+                    let zapResponse;
+                    
+                    if (solicitacao.servico === "Instalação") {
+                      zapResponse = await ZapSign.createContractInstalacao(solicitacao.dados);
+                    } else if (solicitacao.servico === "Mudança de Endereço") {
+                      zapResponse = await ZapSign.createContractMudancaEndereco(solicitacao.dados);
+                    } else if (solicitacao.servico === "Mudança de Cômodo") {
+                      zapResponse = await ZapSign.createContractMudancaComodo(solicitacao.dados);
+                    }
+
+                    if (zapResponse) {
+                      zapSignUrl = zapResponse.signers[0].sign_url;
+                      solicitacao.token_zapsign = zapResponse.token;
+                      solicitacao.assinado = false;
+                      await solicitacaoRepo.save(solicitacao);
+                      console.log(`[Webhook PIX] ZapSign gerado com sucesso: ${zapSignUrl}`);
+                    }
+                  }
+                } catch (errZap) {
+                  console.error("[Webhook PIX] Erro ao gerar ZapSign postergado:", errZap);
+                }
+
+                if (zapSignUrl) {
+                  await Whatsapp.MensagensComuns(
+                    finalPhone,
+                    `✅ *Pagamento Confirmado!*\n\nOlá ${sis_cliente.nome}, recebemos o pagamento do serviço: *${servicoNome}*.\n\n📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+                  );
+                } else {
+                  await Whatsapp.MensagensComuns(
+                    finalPhone,
+                    `✅ *Pagamento Confirmado!*\n\nOlá ${sis_cliente.nome}, recebemos o pagamento do serviço: *${servicoNome}*.\n\nNossa equipe entrará em contato em breve para dar prosseguimento ao atendimento. Obrigado pela confiança! 🚀`,
+                  );
+                }
                 console.log(
                   `[Webhook PIX] Mensagem de sucesso enviada para ${finalPhone}`,
                 );

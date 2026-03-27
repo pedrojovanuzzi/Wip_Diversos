@@ -916,17 +916,28 @@ class WhatsPixController {
                     }
                   }
 
-                  // Removida geração de assinatura ZapSign para Mudança de Cômodo conforme nova regra
-                  // await this.gerarEEnviarLinkZapSignMudancaComodo(celular, session);
+                  // Re-enable ZapSign for paid Room Change and delay it
+                  try {
+                    const zapSignData = {
+                      nome: session.nome || "Não informado",
+                      cpf: session.cpf || "Não informado",
+                      email: session.email || "financeiro@wiptelecom.com.br",
+                      telefone: session.celularCliente || celular,
+                      endereco: session.endereco_comodo || "Não informado",
+                      valor: "60.00",
+                      rg: session.rg || "Não informado",
+                    };
+                    session.zapSignMetadata = zapSignData;
+                    console.log("[Room Change] ZapSign postergado para após o pagamento PIX.");
+                  } catch (zapError) {
+                    console.error("Erro ao preparar metadados ZapSign (Mudança de Cômodo):", zapError);
+                  }
 
                   session.msgDadosFinais = this.formatarResumo(
                     session,
                     "*🧱 Mudança de Cômodo*",
                     { forma_pagamento: session.formaPagamento },
                   );
-
-                  // Removida notificação redundante para Mudança de Cômodo
-                  // await this.enviarNotificacaoServico(celular);
 
                   fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                     let logs = [];
@@ -1367,21 +1378,29 @@ class WhatsPixController {
                     rg: dadosFlow.rg,
                   };
 
-                  const zapResponse =
-                    await ZapSign.createContractInstalacao(zapSignData);
-                  const zapSignUrl = zapResponse.signers[0].sign_url;
+                  if (!session.instalacaoPaga) {
+                    const zapResponse =
+                      await ZapSign.createContractInstalacao(zapSignData);
+                    const zapSignUrl = zapResponse.signers[0].sign_url;
 
-                  session.zapSignUrl = zapSignUrl;
-                  session.tokenZapSign = zapResponse.token;
+                    session.zapSignUrl = zapSignUrl;
+                    session.tokenZapSign = zapResponse.token;
 
-                  // Send notification template
-                  await this.enviarNotificacaoServico(celular);
+                    // Send notification template
+                    await this.enviarNotificacaoServico(celular);
 
-                  // Send link directly to client (LAST MESSAGE)
-                  await this.MensagensComuns(
-                    celular,
-                    `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
-                  );
+                    // Send link directly to client (LAST MESSAGE)
+                    await this.MensagensComuns(
+                      celular,
+                      `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
+                    );
+                  } else {
+                    // Armazena metadados para gerar após o pagamento
+                    session.zapSignMetadata = zapSignData;
+                    console.log(
+                      "[Installation] ZapSign postergado para após o pagamento PIX.",
+                    );
+                  }
                 } catch (zapError) {
                   console.error(
                     "Error creating ZapSign document during Flow registration:",
@@ -2632,8 +2651,7 @@ class WhatsPixController {
             if (texto === "Pagar com Pix") {
               session.formaPagamento = "Paga com Pix";
               try {
-                // 1. Gerar link ZapSign (Pago)
-                let zapSignUrl = "";
+                // 1. Preparar metadados ZapSign (Pago) - Postergar para após o pagamento PIX
                 try {
                   const zapSignData = {
                     nome: dadosFlow.nome || session.nome,
@@ -2648,16 +2666,13 @@ class WhatsPixController {
                     cidade: this.FormatarCidade(dadosFlow.cidade || "Franca"),
                     estado: dadosFlow.estado || "SP",
                     cep: dadosFlow.cep,
-                    valor: "60.00", // Valor para mudança paga
+                    valor: "60.00",
                     rg: session.rg || "Não informado",
                   };
-                  const zapResult =
-                    await ZapSign.createContractMudancaEndereco(zapSignData);
-                  zapSignUrl = zapResult.signers[0].sign_url;
-                  session.zapSignUrlMudanca = zapSignUrl;
-                  session.tokenZapSign = zapResult.token;
+                  session.zapSignMetadata = zapSignData;
+                  console.log("[Address Change] ZapSign postergado para após o pagamento PIX.");
                 } catch (zapError) {
-                  console.error("Erro ZapSign (Pix):", zapError);
+                  console.error("Erro ao preparar metadados ZapSign (Pix):", zapError);
                 }
 
                 // 2. Gerar Lançamento no MKAuth
@@ -2667,9 +2682,6 @@ class WhatsPixController {
                 );
                 if (lancamento) {
                   session.idFatura = lancamento.id;
-                }
-
-                if (lancamento) {
                   const pixController = new Pix();
                   const pixData = await pixController.gerarPixServico({
                     idLancamento: lancamento.id,
@@ -2685,13 +2697,6 @@ class WhatsPixController {
                   await this.MensagensComuns(celular, pixData.qrcode);
                 }
 
-                if (zapSignUrl) {
-                  await this.MensagensComuns(
-                    celular,
-                    `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos a sua solicitação! 🚀`,
-                  );
-                }
-
                 session.msgDadosFinais = this.formatarResumo(
                   session,
                   "*🔄 Mudança de Endereço*",
@@ -2699,8 +2704,7 @@ class WhatsPixController {
                     antigo_endereco: dadosFlow.endereco_antigo,
                     novo_endereco: `${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}`,
                     forma_pagamento: "Pix",
-                  },
-                  zapSignUrl,
+                  }
                 );
 
                 await this.Finalizar(session.msgDadosFinais, celular, sessions);
@@ -5835,8 +5839,9 @@ class WhatsPixController {
           // Determina se foi pago (Grátis = true, qualquer outro = false inicialmente)
           novaSolicitacao.pago = session.formaPagamento === "Grátis";
           novaSolicitacao.id_fatura = session.idFatura || null;
-          novaSolicitacao.gratis = session.formaPagamento === "Grátis" ? 1 : 0;
+          novaSolicitacao.gratis = session.formaPagamento === "Grátis" || session.formaPagamento === "Grátis (Fidelidade)" ? 1 : 0;
           novaSolicitacao.token_zapsign = session.tokenZapSign || null;
+          novaSolicitacao.dados = session.zapSignMetadata || null;
 
           await repo.save(novaSolicitacao);
           console.log(

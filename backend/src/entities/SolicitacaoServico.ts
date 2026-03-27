@@ -28,4 +28,7 @@ export class SolicitacaoServico {
 
     @Column({ type: 'varchar', length: 255, nullable: true })
     token_zapsign?: string;
+
+    @Column({ type: 'json', nullable: true })
+    dados?: any;
 }
