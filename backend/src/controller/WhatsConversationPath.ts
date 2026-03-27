@@ -948,6 +948,7 @@ class WhatsPixController {
                       endereco: session.endereco_comodo || "Não informado",
                       valor: "60.00",
                       rg: session.rg || "Não informado",
+                      login: session.login || "Não informado",
                       telefone_conversa: celular,
                     };
                     session.zapSignMetadata = zapSignData;
@@ -1160,177 +1161,35 @@ class WhatsPixController {
               // O código de consulta automática foi removido para ser feito manualmente via painel administrativo.
               // Por enquanto, definimos como pendente de análise.
               session.instalacaoPaga = false;
-              await this.MensagensComuns(
-                celular,
-                "⏳ *Recebemos sua solicitação!*\n\nNossa equipe fará uma breve análise técnica e cadastral. Em instantes, enviaremos o retorno aqui mesmo no WhatsApp. Por favor, aguarde! 🚀",
+              // === Cadastro no MKAuth postergado para após a assinatura ===
+              // A lógica que estava aqui foi movida para o webhook do ZapSign.
+
+              const zapSignData = {
+                nome: dadosFlow.nome,
+                cpf: dadosFlow.cpf,
+                email: dadosFlow.email,
+                telefone: dadosFlow.celular,
+                endereco: this.limparEndereco(dadosFlow.rua, true),
+                numero: dadosFlow.numero,
+                bairro: dadosFlow.bairro,
+                cidade: dadosFlow.cidade,
+                estado: dadosFlow.estado,
+                cep: dadosFlow.cep,
+                plano: planoFlow,
+                valor: "0,00", // Será definido na consulta manual
+                vencimento: `Dia ${dadosFlow.vencimento}`,
+                rg: dadosFlow.rg,
+                telefone_conversa: celular,
+              };
+              session.zapSignMetadata = zapSignData;
+              console.log(
+                "[Installation] ZapSign postergado para aprovação manual no painel. Cadastro no MKAuth será feito após assinatura.",
               );
 
-              // === Salvar no MKAuth ===
-              const ClientesRepository =
-                MkauthDataSource.getRepository(ClientesEntities);
-
-              let ibgeCode: string | null = null;
-              try {
-                const ufStr = (dadosFlow.estado || "").trim().toLowerCase();
-                const cityStr = (dadosFlow.cidade || "").trim().toLowerCase();
-                if (ufStr && cityStr) {
-                  const response = await axios.get(
-                    `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${ufStr}/municipios`,
-                  );
-                  const municipios = response.data;
-                  const nmNormalized = cityStr
-                    .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "")
-                    .replace(/[^\w\s]/gi, "")
-                    .trim();
-                  const munFind = municipios.find((m: any) => {
-                    const mNmNorm = m.nome
-                      .toLowerCase()
-                      .normalize("NFD")
-                      .replace(/[\u0300-\u036f]/g, "")
-                      .replace(/[^\w\s]/gi, "")
-                      .trim();
-                    return mNmNorm === nmNormalized;
-                  });
-                  if (munFind) {
-                    ibgeCode = munFind.id.toString();
-                  }
-                }
-              } catch (err) {
-                console.error("Erro ao buscar IBGE da API externa:");
-              }
-
-              try {
-                const findLogin = await ClientesRepository.findOne({
-                  where: {
-                    login:
-                      dadosFlow.login ||
-                      (dadosFlow.nome || "")
-                        .trim()
-                        .replace(/\s/g, "")
-                        .toUpperCase(),
-                  },
-                });
-
-                if (findLogin) {
-                  console.log("Login já existe:", findLogin);
-                  dadosFlow.nome = dadosFlow.nome + " " + findLogin.id;
-                  dadosFlow.login = dadosFlow.login + " " + findLogin.id;
-                }
-
-                const celularFormatado = (dadosFlow.celular || "").replace(
-                  /\D/g,
-                  "",
-                );
-                const celular2Formatado = (
-                  dadosFlow.celularSecundario || ""
-                ).replace(/\D/g, "");
-
-                const addClient = await ClientesRepository.save({
-                  nome: (dadosFlow.nome || "").toUpperCase(),
-                  login:
-                    dadosFlow.login ||
-                    (dadosFlow.nome || "")
-                      .trim()
-                      .replace(/\s/g, "")
-                      .toUpperCase(),
-                  rg: (dadosFlow.rg || "").trim().replace(/\s/g, ""),
-                  cpf_cnpj: (dadosFlow.cpf || "").trim().replace(/\s/g, ""),
-                  uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
-                  email: (dadosFlow.email || "").trim().replace(/\s/g, ""),
-                  cidade: this.FormatarCidade(
-                    this.limparEndereco(dadosFlow.cidade || ""),
-                  ),
-                  bairro: this.limparEndereco(dadosFlow.bairro || ""),
-                  estado: (dadosFlow.estado || "")
-                    .toUpperCase()
-                    .replace(/\s/g, "")
-                    .slice(0, 2),
-                  nascimento: (dadosFlow.dataNascimento || "").replace(
-                    /(\d{2})\/(\d{2})\/(\d{4})/,
-                    "$3-$2-$1",
-                  ),
-                  numero: this.limparEndereco(dadosFlow.numero || ""),
-                  endereco: this.limparEndereco(dadosFlow.rua || "", true),
-                  cep: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
-                  plano: planoFlow,
-                  pool_name: "LAN_PPPOE",
-                  plano15: "Plano_15",
-                  plano_bloqc: "Plano_bloqueado",
-                  vendedor: "SCM",
-                  conta: "3",
-                  comodato: "sim",
-                  cidade_ibge: ibgeCode || "3503406",
-                  fone: "(14)3296-1608",
-                  venc: (dadosFlow.vencimento || "")
-                    .trim()
-                    .replace(/\s/g, "")
-                    .replace(/\D/g, ""),
-                  celular:
-                    celularFormatado.length >= 4
-                      ? `(${celularFormatado.slice(0, 2)})${celularFormatado.slice(2)}`
-                      : celularFormatado,
-                  celular2:
-                    celular2Formatado.length >= 4
-                      ? `(${celular2Formatado.slice(0, 2)})${celular2Formatado.slice(2)}`
-                      : celular2Formatado,
-                  estado_res: (dadosFlow.estado || "")
-                    .toUpperCase()
-                    .replace(/\s/g, "")
-                    .slice(0, 2),
-                  bairro_res: this.limparEndereco(dadosFlow.bairro || ""),
-                  tipo: "pppoe",
-                  cidade_res: this.FormatarCidade(
-                    this.limparEndereco(dadosFlow.cidade || ""),
-                  ),
-                  cep_res: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
-                  numero_res: this.limparEndereco(dadosFlow.numero || ""),
-                  endereco_res: this.limparEndereco(dadosFlow.rua || "", true),
-                  tipo_cob: "titulo",
-                  mesref: "now",
-                  prilanc: "tot",
-                  pessoa:
-                    (dadosFlow.cpf || "").replace(/\D/g, "").length <= 11
-                      ? "fisica"
-                      : "juridica",
-                  dias_corte: 80,
-                  senha: moment().format("DDMMYYYY"),
-                  cadastro: moment().format("DD-MM-YYYY").split("-").join("/"),
-                  data_ip: moment().format("YYYY-MM-DD HH:mm:ss"),
-                  data_ins: moment().format("YYYY-MM-DD HH:mm:ss"),
-                });
-
-                await ClientesRepository.update(addClient.id, {
-                  termo: `${addClient.id}C/${moment().format("YYYY")}`,
-                });
-
-                console.log("Cliente salvo com sucesso no MKAuth:", addClient);
-
-                // ZapSign será gerado posteriormente após a aprovação manual no painel.
-                const zapSignData = {
-                  nome: dadosFlow.nome,
-                  cpf: dadosFlow.cpf,
-                  email: dadosFlow.email,
-                  telefone: dadosFlow.celular,
-                  endereco: this.limparEndereco(dadosFlow.rua, true),
-                  numero: dadosFlow.numero,
-                  bairro: dadosFlow.bairro,
-                  cidade: dadosFlow.cidade,
-                  estado: dadosFlow.estado,
-                  cep: dadosFlow.cep,
-                  plano: planoFlow,
-                  valor: "0,00", // Será definido na consulta manual
-                  vencimento: `Dia ${dadosFlow.vencimento}`,
-                  rg: dadosFlow.rg,
-                  telefone_conversa: celular,
-                };
-                session.zapSignMetadata = zapSignData;
-                console.log(
-                  "[Installation] ZapSign postergado para aprovação manual no painel.",
-                );
-              } catch (dbError) {
-                console.error("Erro ao salvar cliente no MKAuth:", dbError);
-              }
+              await this.MensagensComuns(
+                celular,
+                "⏳ *Recebemos sua solicitação!*\n\nNossa equipe fará uma breve análise técnica e cadastral. e enviaremos o retorno aqui mesmo no WhatsApp. Por favor, aguarde! 🚀\n ✅ *Informamos que requisições feitas após as 20h entrarão em análise e retornaremos assim que possível*.",
+              );
 
               const resumoCadastro =
                 `📋 *Novo Cadastro via Flow*\n\n` +
@@ -1633,173 +1492,7 @@ class WhatsPixController {
                   });
                 });
 
-                // E-mail enviado via formatarResumo
-
-                const ClientesRepository =
-                  MkauthDataSource.getRepository(ClientesEntities);
-
-                let ibgeCode: string | null = null;
-                try {
-                  const ufStr = (session.dadosCompleto.estado || "")
-                    .trim()
-                    .toLowerCase();
-                  const cityStr = (session.dadosCompleto.cidade || "")
-                    .trim()
-                    .toLowerCase();
-                  if (ufStr && cityStr) {
-                    const response = await axios.get(
-                      `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${ufStr}/municipios`,
-                    );
-                    const municipios = response.data;
-                    const nmNormalized = cityStr
-                      .normalize("NFD")
-                      .replace(/[\u0300-\u036f]/g, "")
-                      .replace(/[^\w\s]/gi, "")
-                      .trim();
-                    const munFind = municipios.find((m: any) => {
-                      const mNmNorm = m.nome
-                        .toLowerCase()
-                        .normalize("NFD")
-                        .replace(/[\u0300-\u036f]/g, "")
-                        .replace(/[^\w\s]/gi, "")
-                        .trim();
-                      return mNmNorm === nmNormalized;
-                    });
-                    if (munFind) {
-                      ibgeCode = munFind.id.toString();
-                    }
-                  }
-                } catch (err) {
-                  console.error("Erro ao buscar IBGE da API externa:");
-                }
-
-                try {
-                  const findLogin = await ClientesRepository.findOne({
-                    where: {
-                      login: (session.dadosCompleto.nome || "")
-                        .trim()
-                        .replace(/\s/g, "")
-                        .toUpperCase(),
-                    },
-                  });
-
-                  if (findLogin) {
-                    console.log("Login já existe:", findLogin);
-                    session.dadosCompleto.nome =
-                      session.dadosCompleto.nome + " " + findLogin.id;
-                  }
-
-                  const addClient = await ClientesRepository.save({
-                    nome: (session.dadosCompleto.nome || "").toUpperCase(),
-                    login: (session.dadosCompleto.nome || "")
-                      .trim()
-                      .replace(/\s/g, "")
-                      .toUpperCase(),
-                    rg: session.dadosCompleto.rg.trim().replace(/\s/g, ""),
-                    cpf_cnpj: session.dadosCompleto.cpf
-                      .trim()
-                      .replace(/\s/g, ""),
-                    uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
-                    email: session.dadosCompleto.email
-                      .trim()
-                      .replace(/\s/g, ""),
-                    cidade: this.FormatarCidade(
-                      this.limparEndereco(session.dadosCompleto.cidade),
-                    ),
-                    bairro: this.limparEndereco(session.dadosCompleto.bairro),
-                    estado: (session.dadosCompleto.estado || "")
-                      .toUpperCase()
-                      .replace(/\s/g, "")
-                      .slice(0, 2),
-                    nascimento: session.dadosCompleto.dataNascimento.replace(
-                      /(\d{2})\/(\d{2})\/(\d{4})/,
-                      "$3-$2-$1",
-                    ),
-                    numero: this.limparEndereco(session.dadosCompleto.numero),
-                    endereco: this.limparEndereco(
-                      session.dadosCompleto.rua,
-                      true,
-                    ),
-                    cep: `${session.dadosCompleto.cep
-                      .trim()
-                      .replace(/\s/g, "")
-                      .slice(0, 5)}-${session.dadosCompleto.cep
-                      .trim()
-                      .replace(/\s/g, "")
-                      .slice(5)}`,
-                    plano: session.planoEscolhido,
-                    pool_name: "LAN_PPPOE",
-                    plano15: "Plano_15",
-                    plano_bloqc: "Plano_bloqueado",
-                    vendedor: "SCM",
-                    conta: "3",
-                    comodato: "sim",
-                    cidade_ibge: ibgeCode || "3503406",
-                    fone: "(14)3296-1608",
-                    venc: (session.vencimentoEscolhido || "")
-                      .trim()
-                      .replace(/\s/g, "")
-                      .replace(/\D/g, ""),
-                    celular: `(${session.dadosCompleto.celular.slice(
-                      0,
-                      2,
-                    )})${session.dadosCompleto.celular.slice(2)}`,
-                    celular2: (() => {
-                      const celular2Formatado =
-                        session.dadosCompleto.celularSecundario
-                          .trim()
-                          .replace(/\D/g, "");
-                      return celular2Formatado.length === 11
-                        ? `(${celular2Formatado.slice(0, 2)})${celular2Formatado.slice(2)}`
-                        : celular2Formatado;
-                    })(),
-                    estado_res: (session.dadosCompleto.estado || "")
-                      .toUpperCase()
-                      .replace(/\s/g, "")
-                      .slice(0, 2),
-                    bairro_res: this.limparEndereco(
-                      session.dadosCompleto.bairro,
-                    ),
-                    cidade_res: this.limparEndereco(
-                      session.dadosCompleto.cidade,
-                    ),
-                    cep_res: `${session.dadosCompleto.cep
-                      .trim()
-                      .replace(/\s/g, "")
-                      .slice(0, 5)}-${session.dadosCompleto.cep
-                      .trim()
-                      .replace(/\s/g, "")
-                      .slice(5)}`,
-                    numero_res: this.limparEndereco(
-                      session.dadosCompleto.numero,
-                    ),
-                    endereco_res: this.limparEndereco(
-                      session.dadosCompleto.rua,
-                      true,
-                    ),
-                    tipo_cob: "titulo",
-                    mesref: "now",
-                    prilanc: "tot",
-                    pessoa:
-                      session.dadosCompleto.cpf.replace(/\D/g, "").length <= 11
-                        ? "fisica"
-                        : "juridica",
-                    dias_corte: 80,
-                    cadastro: moment()
-                      .format("DD-MM-YYYY")
-                      .split("-")
-                      .join("/"),
-                    data_ip: moment().format("YYYY-MM-DD HH:mm:ss"),
-                    data_ins: moment().format("YYYY-MM-DD HH:mm:ss"),
-                  });
-                  await ClientesRepository.update(addClient.id, {
-                    termo: `${addClient.id}C/${moment().format("YYYY")}`,
-                  });
-
-                  console.log("Cliente salvo com sucesso:", addClient);
-                } catch (dbError) {
-                  console.error("Erro ao salvar cliente no banco:", dbError);
-                }
+                // MKAuth registration removed from here, now handled by ZapSign webhook after signature.
 
                 console.log(
                   "Tentando enviar botão de finalização para:",
@@ -2589,6 +2282,7 @@ class WhatsPixController {
                     cep: dadosFlow.cep,
                     valor: "60.00",
                     rg: session.rg || "Não informado",
+                    login: session.login || "Não informado",
                     telefone_conversa: celular,
                   };
                   session.zapSignMetadata = zapSignData;
@@ -2664,6 +2358,8 @@ class WhatsPixController {
                     cep: dadosFlow.cep,
                     valor: "0.00",
                     rg: session.rg || "Não informado",
+                    login: session.login || "Não informado",
+                    telefone_conversa: celular,
                   };
                   const zapResult =
                     await ZapSign.createContractMudancaEndereco(zapSignData);
@@ -3797,6 +3493,8 @@ class WhatsPixController {
         endereco: session.endereco_comodo || "Não informado",
         valor: session.formaPagamento === "Grátis" ? "0" : "60",
         rg: session.rg || "Não informado",
+        login: session.login || "Não informado",
+        telefone_conversa: celular,
       };
 
       const zapResponse =

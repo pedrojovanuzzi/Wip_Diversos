@@ -8,6 +8,9 @@ import ZapSignTemplates from "../entities/APIMK/ZapSignTemplates";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { whatsappOutgoingQueue } from "./WhatsConversationPath";
 import Whatsapp from "./Whatsapp";
+import MkauthDataSource from "../database/MkauthSource";
+import { ClientesEntities } from "../entities/ClientesEntities";
+import { v4 as uuidv4 } from "uuid";
 
 dotenv.config();
 
@@ -71,7 +74,7 @@ interface ZapSignDataMudancaComodo {
 }
 
 class ZapSign {
-  async createContractInstalacao(params: ZapSignDataInstalacao) {
+  createContractInstalacao = async (params: ZapSignDataInstalacao) => {
     try {
       const {
         nome,
@@ -174,7 +177,9 @@ class ZapSign {
     }
   }
 
-  async createContractMudancaEndereco(params: ZapSignDataMudancaEndereco) {
+  createContractMudancaEndereco = async (
+    params: ZapSignDataMudancaEndereco,
+  ) => {
     try {
       const {
         nome,
@@ -276,7 +281,7 @@ class ZapSign {
     }
   }
 
-  async generatePdfContratacao(req: Request, res: Response) {
+  generatePdfContratacao = async (req: Request, res: Response) => {
     try {
       const result = await this.createContractInstalacao(req.body);
       res.status(200).json(result);
@@ -286,7 +291,7 @@ class ZapSign {
     }
   }
 
-  async generatePdfMudancaEndereco(req: Request, res: Response) {
+  generatePdfMudancaEndereco = async (req: Request, res: Response) => {
     try {
       const result = await this.createContractMudancaEndereco(req.body);
       res.status(200).json(result);
@@ -296,7 +301,7 @@ class ZapSign {
     }
   }
 
-  async createContractMudancaComodo(params: ZapSignDataMudancaComodo) {
+  createContractMudancaComodo = async (params: ZapSignDataMudancaComodo) => {
     try {
       const {
         nome,
@@ -371,7 +376,7 @@ class ZapSign {
     }
   }
 
-  async generatePdfMudancaComodo(req: Request, res: Response) {
+  generatePdfMudancaComodo = async (req: Request, res: Response) => {
     try {
       const result = await this.createContractMudancaComodo(req.body);
       res.status(200).json(result);
@@ -381,7 +386,7 @@ class ZapSign {
     }
   }
 
-  async webhook(req: Request, res: Response) {
+  webhook = async (req: Request, res: Response) => {
     try {
       const { event_type, token } = req.body;
       console.log(`[ZapSign Webhook] Evento recebido: ${event_type}`);
@@ -404,21 +409,34 @@ class ZapSign {
           try {
             let requesterPhone = "";
             if (solicitacao.dados && solicitacao.dados.telefone_conversa) {
-              const cleanReqPhone = solicitacao.dados.telefone_conversa.replace(/\D/g, "");
-              requesterPhone = cleanReqPhone.startsWith("55") ? cleanReqPhone : "55" + cleanReqPhone;
+              const cleanReqPhone = solicitacao.dados.telefone_conversa.replace(
+                /\D/g,
+                "",
+              );
+              requesterPhone = cleanReqPhone.startsWith("55")
+                ? cleanReqPhone
+                : "55" + cleanReqPhone;
             } else if (solicitacao.dados && solicitacao.dados.telefone) {
-              const cleanReqPhone = solicitacao.dados.telefone.replace(/\D/g, "");
-              requesterPhone = cleanReqPhone.startsWith("55") ? cleanReqPhone : "55" + cleanReqPhone;
+              const cleanReqPhone = solicitacao.dados.telefone.replace(
+                /\D/g,
+                "",
+              );
+              requesterPhone = cleanReqPhone.startsWith("55")
+                ? cleanReqPhone
+                : "55" + cleanReqPhone;
             }
 
             if (requesterPhone) {
               await Whatsapp.MensagensComuns(
                 requesterPhone,
-                `✅ *Assinatura Confirmada!*\n\nOlá ${solicitacao.dados?.nome || "Cliente"}, recebemos a sua assinatura para o serviço: *${solicitacao.servico || "Contratado"}*.\n\nAgradecemos a confiança! Em breve nossa equipe entrará em contato para agendamento. 🚀`
+                `✅ *Assinatura Confirmada!*\n\nOlá ${solicitacao.dados?.nome || "Cliente"}, recebemos a sua assinatura para o serviço: *${solicitacao.servico || "Contratado"}*.\n\nAgradecemos a confiança! Em breve nossa equipe entrará em contato para agendamento. 🚀`,
               );
             }
           } catch (errConv) {
-            console.error("[ZapSign Webhook] Erro ao notificar cliente:", errConv);
+            console.error(
+              "[ZapSign Webhook] Erro ao notificar cliente:",
+              errConv,
+            );
           }
 
           // Enviar notificação para o celular de teste do .env (Funcionário)
@@ -452,8 +470,52 @@ class ZapSign {
                 backoff: { type: "exponential", delay: 5000 },
               },
             );
-            console.log(
-              `[ZapSign Webhook] Notificação 'notificacao_assinatura' enviada para ${testPhone}`,
+          }
+
+          // === Integração com MKAuth após Assinatura ===
+          try {
+            const dados = solicitacao.dados;
+            if (dados) {
+              const servicoNormalizado = solicitacao.servico?.toLowerCase();
+              switch (servicoNormalizado) {
+                case "instalação":
+                case "instalacao":
+                  await this.registerClientInMkAuth(dados);
+                  console.log(
+                    `[ZapSign Webhook] Cliente ${dados.nome} cadastrado no MKAuth para Instalação.`,
+                  );
+                  break;
+                case "mudança de endereço":
+                case "mudanca_endereco":
+                  // Para mudança de endereço, atualizamos o cadastro existente
+                  // Tenta pegar o login dos dados ou do próprio registro da solicitação
+                  const login = dados.login || solicitacao.login_cliente;
+                  if (
+                    login &&
+                    login !== "Desconhecido" &&
+                    login !== "Não informado"
+                  ) {
+                    await this.updateClientAddressInMkAuth(login, dados);
+                    console.log(
+                      `[ZapSign Webhook] Endereço do cliente ${login} atualizado no MKAuth (Serviço: ${solicitacao.servico}).`,
+                    );
+                  } else {
+                    console.warn(
+                      `[ZapSign Webhook] Login não identificado para atualização de endereço: ${solicitacao.id}`,
+                    );
+                  }
+                  break;
+                default:
+                  console.log(
+                    `[ZapSign Webhook] Serviço '${solicitacao.servico}' não requer integração MKAuth específica no momento.`,
+                  );
+                  break;
+              }
+            }
+          } catch (mkError) {
+            console.error(
+              "[ZapSign Webhook] Erro ao integrar com MKAuth:",
+              mkError,
             );
           }
         } else {
@@ -467,6 +529,198 @@ class ZapSign {
     } catch (error) {
       console.error("[ZapSign Webhook] Erro ao processar:", error);
       res.status(500).send("Internal Server Error");
+    }
+  }
+
+  // === Métodos Auxiliares para MKAuth ===
+
+  private limparEndereco = (str: string, isStreet: boolean = false): string => {
+    if (!str) return "";
+    let clean = str
+      .replace(/\s+/g, " ")
+      .trim()
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    if (isStreet) {
+      clean = clean
+        .replace(/^(RUA|AVENIDA|AV|R\.|TRAVESSA|TRAV|PCA|PRACA)\s+/i, "")
+        .trim();
+    }
+    return clean;
+  }
+
+  private FormatarCidade = (cidade: string): string => {
+    if (!cidade) return "";
+    return cidade
+      .toLowerCase()
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }
+
+  private registerClientInMkAuth = async (dados: any) => {
+    const ClientesRepository = MkauthDataSource.getRepository(ClientesEntities);
+
+    // Busca código IBGE
+    let ibgeCode: string | null = null;
+    try {
+      const ufStr = (dados.estado || "").trim().toLowerCase();
+      const cityStr = (dados.cidade || "").trim().toLowerCase();
+      if (ufStr && cityStr) {
+        const response = await axios.get(
+          `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${ufStr}/municipios`,
+        );
+        const municipios = response.data;
+        const nmNormalized = cityStr
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^\w\s]/gi, "")
+          .trim();
+        const munFind = municipios.find((m: any) => {
+          const mNmNorm = m.nome
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^\w\s]/gi, "")
+            .trim();
+          return mNmNorm === nmNormalized;
+        });
+        if (munFind) {
+          ibgeCode = munFind.id.toString();
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao buscar IBGE da API externa:");
+    }
+
+    // Garante login único
+    let finalLogin =
+      dados.login || (dados.nome || "").trim().replace(/\s/g, "").toUpperCase();
+    const findLogin = await ClientesRepository.findOne({
+      where: { login: finalLogin },
+    });
+
+    if (findLogin) {
+      finalLogin = `${finalLogin}${Math.floor(Math.random() * 1000)}`;
+    }
+
+    const celularFormatado = (dados.telefone || dados.celular || "").replace(
+      /\D/g,
+      "",
+    );
+    const celular2Formatado = (dados.celularSecundario || "").replace(
+      /\D/g,
+      "",
+    );
+
+    const addClient = await ClientesRepository.save({
+      nome: (dados.nome || "").toUpperCase(),
+      login: finalLogin,
+      rg: (dados.rg || "").trim().replace(/\s/g, ""),
+      cpf_cnpj: (dados.cpf || "").trim().replace(/\s/g, ""),
+      uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
+      email: (dados.email || "").trim().replace(/\s/g, ""),
+      cidade: this.FormatarCidade(this.limparEndereco(dados.cidade || "")),
+      bairro: this.limparEndereco(dados.bairro || ""),
+      estado: (dados.estado || "").toUpperCase().replace(/\s/g, "").slice(0, 2),
+      nascimento: (dados.dataNascimento || "").replace(
+        /(\d{2})\/(\d{2})\/(\d{4})/,
+        "$3-$2-$1",
+      ),
+      numero: this.limparEndereco(dados.numero || ""),
+      endereco: this.limparEndereco(dados.endereco || dados.rua || "", true),
+      cep: dados.cep
+        ? `${dados.cep.replace(/\D/g, "").slice(0, 5)}-${dados.cep.replace(/\D/g, "").slice(5, 8)}`
+        : "",
+      plano: dados.plano,
+      pool_name: "LAN_PPPOE",
+      plano15: "Plano_15",
+      plano_bloqc: "Plano_bloqueado",
+      vendedor: "SCM",
+      conta: "3",
+      comodato: "sim",
+      cidade_ibge: ibgeCode || "3503406",
+      fone: "(14)3296-1608",
+      venc: (dados.vencimento || "").trim().replace(/\D/g, ""),
+      celular:
+        celularFormatado.length >= 10
+          ? `(${celularFormatado.slice(0, 2)})${celularFormatado.slice(2)}`
+          : celularFormatado,
+      celular2:
+        celular2Formatado.length >= 10
+          ? `(${celular2Formatado.slice(0, 2)})${celular2Formatado.slice(2)}`
+          : celular2Formatado,
+      estado_res: (dados.estado || "")
+        .toUpperCase()
+        .replace(/\s/g, "")
+        .slice(0, 2),
+      bairro_res: this.limparEndereco(dados.bairro || ""),
+      tipo: "pppoe",
+      cidade_res: this.FormatarCidade(this.limparEndereco(dados.cidade || "")),
+      cep_res: dados.cep
+        ? `${dados.cep.replace(/\D/g, "").slice(0, 5)}-${dados.cep.replace(/\D/g, "").slice(5, 8)}`
+        : "",
+      numero_res: this.limparEndereco(dados.numero || ""),
+      endereco_res: this.limparEndereco(
+        dados.endereco || dados.rua || "",
+        true,
+      ),
+      tipo_cob: "titulo",
+      mesref: "now",
+      prilanc: "tot",
+      pessoa:
+        (dados.cpf || "").replace(/\D/g, "").length <= 11
+          ? "fisica"
+          : "juridica",
+      dias_corte: 80,
+      senha: moment().format("DDMMYYYY"),
+      cadastro: moment().format("DD-MM-YYYY").split("-").join("/"),
+      data_ip: moment().format("YYYY-MM-DD HH:mm:ss"),
+      data_ins: moment().format("YYYY-MM-DD HH:mm:ss"),
+    });
+
+    await ClientesRepository.update(addClient.id, {
+      termo: `${addClient.id}C/${moment().format("YYYY")}`,
+    });
+  }
+
+  private updateClientAddressInMkAuth = async (login: string, dados: any) => {
+    const ClientesRepository = MkauthDataSource.getRepository(ClientesEntities);
+    const client = await ClientesRepository.findOne({
+      where: { login: login },
+    });
+
+    if (client) {
+      await ClientesRepository.update(client.id, {
+        endereco: this.limparEndereco(dados.rua || dados.endereco || "", true),
+        numero: this.limparEndereco(dados.numero || ""),
+        bairro: this.limparEndereco(dados.bairro || ""),
+        cidade: this.FormatarCidade(this.limparEndereco(dados.cidade || "")),
+        estado: (dados.estado || "")
+          .toUpperCase()
+          .replace(/\s/g, "")
+          .slice(0, 2),
+        cep: dados.cep
+          ? `${dados.cep.replace(/\D/g, "").slice(0, 5)}-${dados.cep.replace(/\D/g, "").slice(5, 8)}`
+          : client.cep,
+        endereco_res: this.limparEndereco(
+          dados.rua || dados.endereco || "",
+          true,
+        ),
+        numero_res: this.limparEndereco(dados.numero || ""),
+        bairro_res: this.limparEndereco(dados.bairro || ""),
+        cidade_res: this.FormatarCidade(
+          this.limparEndereco(dados.cidade || ""),
+        ),
+        estado_res: (dados.estado || "")
+          .toUpperCase()
+          .replace(/\s/g, "")
+          .slice(0, 2),
+        cep_res: dados.cep
+          ? `${dados.cep.replace(/\D/g, "").slice(0, 5)}-${dados.cep.replace(/\D/g, "").slice(5, 8)}`
+          : client.cep_res,
+      });
     }
   }
 }
