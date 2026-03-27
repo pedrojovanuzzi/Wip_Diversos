@@ -7,7 +7,7 @@ import moment from "moment-timezone";
 class SolicitacaoServicoController {
   public async list(req: Request, res: Response) {
     try {
-      const { startDate, endDate } = req.query;
+      const { startDate, endDate, page = 1, limit = 10 } = req.query;
 
       const repository = AppDataSource.getRepository(SolicitacaoServico);
       let where: any = {};
@@ -27,14 +27,26 @@ class SolicitacaoServicoController {
         );
       }
 
-      const list = await repository.find({
+      // Pagination
+      const pageNum = Number(page);
+      const limitNum = Number(limit);
+      const skip = (pageNum - 1) * limitNum;
+
+      const [list, count] = await repository.findAndCount({
         where,
         order: {
           data_solicitacao: "DESC",
         },
+        skip,
+        take: limitNum,
       });
 
-      res.status(200).json(list);
+      res.status(200).json({
+        data: list,
+        total: count,
+        page: pageNum,
+        totalPages: Math.ceil(count / limitNum),
+      });
     } catch (error) {
       console.error("Erro ao listar solicitações de serviço:", error);
       res.status(500).send("Erro interno do servidor.");

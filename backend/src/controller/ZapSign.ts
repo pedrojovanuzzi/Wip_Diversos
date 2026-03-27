@@ -37,6 +37,7 @@ interface ZapSignDataInstalacao {
   valor: string;
   vencimento: string;
   rg?: string;
+  telefone_conversa?: string;
 }
 
 interface ZapSignDataMudancaEndereco {
@@ -54,6 +55,7 @@ interface ZapSignDataMudancaEndereco {
   cep: string;
   valor: string;
   rg?: string;
+  telefone_conversa?: string;
 }
 
 interface ZapSignDataMudancaComodo {
@@ -64,6 +66,7 @@ interface ZapSignDataMudancaComodo {
   endereco: string;
   valor: string;
   rg?: string;
+  telefone_conversa?: string;
 }
 
 class ZapSign {
@@ -85,6 +88,7 @@ class ZapSign {
         valor,
         vencimento,
         rg = "Não informado",
+        telefone_conversa,
       } = params;
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
@@ -118,8 +122,8 @@ class ZapSign {
           { de: "{{provedornome}}", para: "Wip Telecom" },
           { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
           { de: "{{rgcliente}}", para: rg },
-          { de: "{{fonecliente}}", para: telefone },
-          { de: "{{celularcliente}}", para: telefone },
+          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
+          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
           {
             de: "{{enderecocliente}}",
             para: `${endereco}, ${numero} ${complemento}`,
@@ -186,6 +190,7 @@ class ZapSign {
         cep,
         valor,
         rg = "Não informado",
+        telefone_conversa,
       } = params;
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
@@ -219,8 +224,8 @@ class ZapSign {
           { de: "{{provedornome}}", para: "Wip Telecom" },
           { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
           { de: "{{rgcliente}}", para: rg },
-          { de: "{{fonecliente}}", para: telefone },
-          { de: "{{celularcliente}}", para: telefone },
+          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
+          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
           {
             de: "{{enderecocliente}}",
             para: `${rua}, ${numero} ${complemento}`,
@@ -300,6 +305,7 @@ class ZapSign {
         endereco,
         valor,
         rg = "Não informado",
+        telefone_conversa,
       } = params;
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
@@ -333,11 +339,12 @@ class ZapSign {
           { de: "{{provedornome}}", para: "Wip Telecom" },
           { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
           { de: "{{rgcliente}}", para: rg },
-          { de: "{{fonecliente}}", para: telefone },
-          { de: "{{celularcliente}}", para: telefone },
+          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
+          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
           { de: "{{enderecocliente}}", para: endereco },
           { de: "{{emailcliente}}", para: email },
           { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
+          { de: "{{valor}}", para: valor },
         ],
         signature_placement: "<<assinatura>>",
         rubrica_placement: "<<visto>>",

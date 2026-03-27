@@ -13,6 +13,7 @@ import {
   Button,
   Typography,
   Box,
+  Pagination,
 } from "@mui/material";
 import moment from "moment";
 import { useAuth } from "../../context/AuthContext";
@@ -21,26 +22,38 @@ const SolicitacoesServico = () => {
   const [services, setServices] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
   const { user } = useAuth();
 
-  const fetchServices = async () => {
+  const fetchServices = async (pageNum = 1) => {
     try {
       const response = await axios.get(
         `${process.env.REACT_APP_URL}/solicitacao-servico`,
         {
-          params: { startDate, endDate },
+          params: { startDate, endDate, page: pageNum, limit: 10 },
           headers: { Authorization: `Bearer ${user?.token}` },
         },
       );
-      setServices(response.data);
+      setServices(response.data.data);
+      setTotalPages(response.data.totalPages);
+      setPage(response.data.page);
     } catch (error) {
       console.error("Erro ao buscar serviços soliciados:", error);
     }
   };
 
   useEffect(() => {
-    fetchServices();
+    fetchServices(1);
   }, [user]);
+
+  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+    fetchServices(value);
+  };
+
+  const handleFilter = () => {
+    fetchServices(1);
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 sm:p-2">
@@ -80,7 +93,7 @@ const SolicitacoesServico = () => {
             InputLabelProps={{ shrink: true }}
             size="small"
           />
-          <Button variant="contained" color="success" onClick={fetchServices}>
+          <Button variant="contained" color="success" onClick={handleFilter}>
             Filtrar
           </Button>
         </Box>
@@ -146,6 +159,15 @@ const SolicitacoesServico = () => {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <Box display="flex" justifyContent="center" mt={4}>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={handlePageChange}
+            color="primary"
+          />
+        </Box>
       </Box>
     </div>
   );
