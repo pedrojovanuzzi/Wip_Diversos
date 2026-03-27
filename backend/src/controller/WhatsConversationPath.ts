@@ -1306,26 +1306,28 @@ class WhatsPixController {
 
                 console.log("Cliente salvo com sucesso no MKAuth:", addClient);
 
-                  // ZapSign será gerado posteriormente após a aprovação manual no painel.
-                  const zapSignData = {
-                    nome: dadosFlow.nome,
-                    cpf: dadosFlow.cpf,
-                    email: dadosFlow.email,
-                    telefone: dadosFlow.celular,
-                    endereco: this.limparEndereco(dadosFlow.rua, true),
-                    numero: dadosFlow.numero,
-                    bairro: dadosFlow.bairro,
-                    cidade: dadosFlow.cidade,
-                    estado: dadosFlow.estado,
-                    cep: dadosFlow.cep,
-                    plano: planoFlow,
-                    valor: "0,00", // Será definido na consulta manual
-                    vencimento: `Dia ${dadosFlow.vencimento}`,
-                    rg: dadosFlow.rg,
-                    telefone_conversa: celular,
-                  };
-                  session.zapSignMetadata = zapSignData;
-                  console.log("[Installation] ZapSign postergado para aprovação manual no painel.");
+                // ZapSign será gerado posteriormente após a aprovação manual no painel.
+                const zapSignData = {
+                  nome: dadosFlow.nome,
+                  cpf: dadosFlow.cpf,
+                  email: dadosFlow.email,
+                  telefone: dadosFlow.celular,
+                  endereco: this.limparEndereco(dadosFlow.rua, true),
+                  numero: dadosFlow.numero,
+                  bairro: dadosFlow.bairro,
+                  cidade: dadosFlow.cidade,
+                  estado: dadosFlow.estado,
+                  cep: dadosFlow.cep,
+                  plano: planoFlow,
+                  valor: "0,00", // Será definido na consulta manual
+                  vencimento: `Dia ${dadosFlow.vencimento}`,
+                  rg: dadosFlow.rg,
+                  telefone_conversa: celular,
+                };
+                session.zapSignMetadata = zapSignData;
+                console.log(
+                  "[Installation] ZapSign postergado para aprovação manual no painel.",
+                );
               } catch (dbError) {
                 console.error("Erro ao salvar cliente no MKAuth:", dbError);
               }
@@ -5773,7 +5775,8 @@ class WhatsPixController {
               ? 1
               : 0;
           novaSolicitacao.token_zapsign = session.tokenZapSign || null;
-          novaSolicitacao.dados = session.zapSignMetadata || session.dadosCompleto || null;
+          novaSolicitacao.dados =
+            session.zapSignMetadata || session.dadosCompleto || null;
 
           await repo.save(novaSolicitacao);
           console.log(
