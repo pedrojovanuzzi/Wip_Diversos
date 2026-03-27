@@ -449,6 +449,8 @@ class Pix {
 
                 // === Lógica de ZapSign Postergado ===
                 let zapSignUrl = "";
+                let requesterPhone = finalPhone; // Fallback to MKAuth phone
+
                 try {
                   const solicitacaoRepo = LocalDataSource.getRepository(SolicitacaoServico);
                   const solicitacao = await solicitacaoRepo.findOne({
@@ -457,8 +459,23 @@ class Pix {
 
                   if (solicitacao && solicitacao.dados) {
                     console.log(`[Webhook PIX] Gerando ZapSign postergado para: ${solicitacao.servico}`);
-                    let zapResponse;
                     
+                    // Use the phone number that actually requested the service
+                    if (solicitacao.dados.telefone_conversa) {
+                      const cleanReqPhone = solicitacao.dados.telefone_conversa.replace(/\D/g, "");
+                      requesterPhone = cleanReqPhone.startsWith("55") ? cleanReqPhone : "55" + cleanReqPhone;
+                    } else if (solicitacao.dados.telefone) {
+                      const cleanReqPhone = solicitacao.dados.telefone.replace(/\D/g, "");
+                      requesterPhone = cleanReqPhone.startsWith("55") ? cleanReqPhone : "55" + cleanReqPhone;
+                    }
+
+                    // Send immediate confirmation as requested
+                    await Whatsapp.MensagensComuns(
+                      requesterPhone,
+                      "✅ *Pagamento Confirmado!*\nEstaremos enviando o Link para assinatura em instantes... ⏳"
+                    );
+
+                    let zapResponse;
                     if (solicitacao.servico === "Instalação") {
                       zapResponse = await ZapSign.createContractInstalacao(solicitacao.dados);
                     } else if (solicitacao.servico === "Mudança de Endereço") {
@@ -481,12 +498,12 @@ class Pix {
 
                 if (zapSignUrl) {
                   await Whatsapp.MensagensComuns(
-                    finalPhone,
-                    `✅ *Pagamento Confirmado!*\n\nOlá ${sis_cliente.nome}, recebemos o pagamento do serviço: *${servicoNome}*.\n\n📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+                    requesterPhone,
+                    `✅ *Link Gerado!*\n\nOlá ${sis_cliente.nome}, aqui está o seu serviço: *${servicoNome}*.\n\n📄 *Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
                   );
                 } else {
                   await Whatsapp.MensagensComuns(
-                    finalPhone,
+                    requesterPhone,
                     `✅ *Pagamento Confirmado!*\n\nOlá ${sis_cliente.nome}, recebemos o pagamento do serviço: *${servicoNome}*.\n\nNossa equipe entrará em contato em breve para dar prosseguimento ao atendimento. Obrigado pela confiança! 🚀`,
                   );
                 }

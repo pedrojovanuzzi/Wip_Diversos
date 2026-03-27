@@ -926,6 +926,7 @@ class WhatsPixController {
                       endereco: session.endereco_comodo || "Não informado",
                       valor: "60.00",
                       rg: session.rg || "Não informado",
+                      telefone_conversa: celular,
                     };
                     session.zapSignMetadata = zapSignData;
                     console.log("[Room Change] ZapSign postergado para após o pagamento PIX.");
@@ -1376,6 +1377,7 @@ class WhatsPixController {
                     valor: valorInstalacaoFee,
                     vencimento: `Dia ${dadosFlow.vencimento}`,
                     rg: dadosFlow.rg,
+                    telefone_conversa: celular,
                   };
 
                   if (!session.instalacaoPaga) {
@@ -2668,6 +2670,7 @@ class WhatsPixController {
                     cep: dadosFlow.cep,
                     valor: "60.00",
                     rg: session.rg || "Não informado",
+                    telefone_conversa: celular,
                   };
                   session.zapSignMetadata = zapSignData;
                   console.log("[Address Change] ZapSign postergado para após o pagamento PIX.");
