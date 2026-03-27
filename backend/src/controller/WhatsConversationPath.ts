@@ -1130,7 +1130,9 @@ class WhatsPixController {
               if (devePagar) {
                 await this.MensagensComuns(
                   celular,
-                  `🔍 *Análise de Crédito:* Identificamos pendências que impossibilitam a instalação gratuita.\n💰 *Taxa de Instalação:* R$ 350,00`,
+                  `🔍 *Após análise*, informamos que no momento não foi liberada a instalação na modalidade *grátis*.
+💰Caso tenha interesse, em dar continuidade, a instalação pode ser realizada na forma *paga* 
+*Taxa de Instalação:* R$ 350,00`,
                 );
 
                 // Gerar lançamento de serviço no MKAuth para a taxa de instalação
