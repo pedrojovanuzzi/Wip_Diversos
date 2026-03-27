@@ -929,9 +929,14 @@ class WhatsPixController {
                       telefone_conversa: celular,
                     };
                     session.zapSignMetadata = zapSignData;
-                    console.log("[Room Change] ZapSign postergado para após o pagamento PIX.");
+                    console.log(
+                      "[Room Change] ZapSign postergado para após o pagamento PIX.",
+                    );
                   } catch (zapError) {
-                    console.error("Erro ao preparar metadados ZapSign (Mudança de Cômodo):", zapError);
+                    console.error(
+                      "Erro ao preparar metadados ZapSign (Mudança de Cômodo):",
+                      zapError,
+                    );
                   }
 
                   session.msgDadosFinais = this.formatarResumo(
@@ -1181,26 +1186,6 @@ class WhatsPixController {
                   `✅ *Parabéns!* Sua instalação será *Isenta* de taxa de adesão! 🚀`,
                 );
               }
-
-              await this.MensagensComuns(
-                celular,
-                `✅ *Cadastro recebido com sucesso!*\n\n` +
-                  `👤 *Nome:* ${dadosFlow.nome}\n` +
-                  `📄 *CPF:* ${dadosFlow.cpf}\n` +
-                  `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
-                  `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
-                  `📶 *Plano:* ${planoFlow}\n\n` +
-                  (devePagar
-                    ? `💰 O Financeiro aguarda o pagamento do PIX para agendar sua instalação!`
-                    : `💰 O Financeiro vai entrar em contato em breve para agendar sua instalação!`),
-              );
-
-              await this.MensagensComuns(
-                celular,
-                `🎉 *Agora falta pouco para finalizar sua contratação!*\n` +
-                  `📩 Enviaremos o *link* para assinatura dos demais *documentos* para formalização do contrato.\n` +
-                  `🙏 *Agradecemos sua preferência!*`,
-              );
 
               // === Salvar no MKAuth ===
               const ClientesRepository =
@@ -2673,9 +2658,14 @@ class WhatsPixController {
                     telefone_conversa: celular,
                   };
                   session.zapSignMetadata = zapSignData;
-                  console.log("[Address Change] ZapSign postergado para após o pagamento PIX.");
+                  console.log(
+                    "[Address Change] ZapSign postergado para após o pagamento PIX.",
+                  );
                 } catch (zapError) {
-                  console.error("Erro ao preparar metadados ZapSign (Pix):", zapError);
+                  console.error(
+                    "Erro ao preparar metadados ZapSign (Pix):",
+                    zapError,
+                  );
                 }
 
                 // 2. Gerar Lançamento no MKAuth
@@ -2707,7 +2697,7 @@ class WhatsPixController {
                     antigo_endereco: dadosFlow.endereco_antigo,
                     novo_endereco: `${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}`,
                     forma_pagamento: "Pix",
-                  }
+                  },
                 );
 
                 await this.Finalizar(session.msgDadosFinais, celular, sessions);
@@ -5842,7 +5832,11 @@ class WhatsPixController {
           // Determina se foi pago (Grátis = true, qualquer outro = false inicialmente)
           novaSolicitacao.pago = session.formaPagamento === "Grátis";
           novaSolicitacao.id_fatura = session.idFatura || null;
-          novaSolicitacao.gratis = session.formaPagamento === "Grátis" || session.formaPagamento === "Grátis (Fidelidade)" ? 1 : 0;
+          novaSolicitacao.gratis =
+            session.formaPagamento === "Grátis" ||
+            session.formaPagamento === "Grátis (Fidelidade)"
+              ? 1
+              : 0;
           novaSolicitacao.token_zapsign = session.tokenZapSign || null;
           novaSolicitacao.dados = session.zapSignMetadata || null;
 
