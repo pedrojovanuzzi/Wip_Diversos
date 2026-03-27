@@ -7,6 +7,7 @@ import AppDataSource from "../database/DataSource";
 import ZapSignTemplates from "../entities/APIMK/ZapSignTemplates";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { whatsappOutgoingQueue } from "./WhatsConversationPath";
+import Whatsapp from "./Whatsapp";
 
 dotenv.config();
 
@@ -399,7 +400,28 @@ class ZapSign {
             `[ZapSign Webhook] Solicitação ID ${solicitacao.id} marcada como assinada (Token: ${token}).`,
           );
 
-          // Enviar notificação para o celular de teste do .env
+          // Notificar o Cliente sobre a assinatura confirmada
+          try {
+            let requesterPhone = "";
+            if (solicitacao.dados && solicitacao.dados.telefone_conversa) {
+              const cleanReqPhone = solicitacao.dados.telefone_conversa.replace(/\D/g, "");
+              requesterPhone = cleanReqPhone.startsWith("55") ? cleanReqPhone : "55" + cleanReqPhone;
+            } else if (solicitacao.dados && solicitacao.dados.telefone) {
+              const cleanReqPhone = solicitacao.dados.telefone.replace(/\D/g, "");
+              requesterPhone = cleanReqPhone.startsWith("55") ? cleanReqPhone : "55" + cleanReqPhone;
+            }
+
+            if (requesterPhone) {
+              await Whatsapp.MensagensComuns(
+                requesterPhone,
+                `✅ *Assinatura Confirmada!*\n\nOlá ${solicitacao.dados?.nome || "Cliente"}, recebemos a sua assinatura para o serviço: *${solicitacao.servico || "Contratado"}*.\n\nAgradecemos a confiança! Em breve nossa equipe entrará em contato para agendamento. 🚀`
+              );
+            }
+          } catch (errConv) {
+            console.error("[ZapSign Webhook] Erro ao notificar cliente:", errConv);
+          }
+
+          // Enviar notificação para o celular de teste do .env (Funcionário)
           const testPhone = process.env.TEST_PHONE;
           if (testPhone) {
             await whatsappOutgoingQueue.add(
