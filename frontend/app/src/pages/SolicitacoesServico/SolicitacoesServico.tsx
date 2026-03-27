@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { NavBar } from "../../components/navbar/NavBar";
 import axios from "axios";
 import {
@@ -14,6 +14,10 @@ import {
   Typography,
   Box,
   Pagination,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
 } from "@mui/material";
 import moment from "moment";
 import { useAuth } from "../../context/AuthContext";
@@ -25,24 +29,39 @@ const SolicitacoesServico = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [loadingAction, setLoadingAction] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState("pendente");
   const { user } = useAuth();
 
-  const fetchServices = async (pageNum = 1) => {
-    try {
-      const response = await axios.get(
-        `${process.env.REACT_APP_URL}/solicitacao-servico`,
-        {
-          params: { startDate, endDate, page: pageNum, limit: 10 },
-          headers: { Authorization: `Bearer ${user?.token}` },
-        },
-      );
-      setServices(response.data.data);
-      setTotalPages(response.data.totalPages);
-      setPage(response.data.page);
-    } catch (error) {
-      console.error("Erro ao buscar serviços soliciados:", error);
-    }
-  };
+  const fetchServices = useCallback(
+    async (pageNum = 1) => {
+      try {
+        const response = await axios.get(
+          `${process.env.REACT_APP_URL}/solicitacao-servico`,
+          {
+            params: {
+              startDate,
+              endDate,
+              page: pageNum,
+              limit: 10,
+              finalizado:
+                statusFilter === "todos"
+                  ? "all"
+                  : statusFilter === "concluido"
+                    ? "true"
+                    : "false",
+            },
+            headers: { Authorization: `Bearer ${user?.token}` },
+          },
+        );
+        setServices(response.data.data);
+        setTotalPages(response.data.totalPages);
+        setPage(response.data.page);
+      } catch (error) {
+        console.error("Erro ao buscar serviços soliciados:", error);
+      }
+    },
+    [user, statusFilter, startDate, endDate],
+  );
 
   const handleConsultarCpf = async (id: number) => {
     if (!window.confirm("Deseja realizar a consulta de CPF agora?")) return;
@@ -51,9 +70,11 @@ const SolicitacoesServico = () => {
       await axios.post(
         `${process.env.REACT_APP_URL}/solicitacao-servico/consultar-cpf/${id}`,
         {},
-        { headers: { Authorization: `Bearer ${user?.token}` } }
+        { headers: { Authorization: `Bearer ${user?.token}` } },
       );
-      alert("Consulta finalizada com sucesso! O cliente receberá o retorno no WhatsApp.");
+      alert(
+        "Consulta finalizada com sucesso! O cliente receberá o retorno no WhatsApp.",
+      );
       fetchServices(page);
     } catch (error) {
       console.error("Erro ao consultar CPF:", error);
@@ -64,15 +85,18 @@ const SolicitacoesServico = () => {
   };
 
   const handleIgnorarConsulta = async (id: number) => {
-    if (!window.confirm("Deseja ignorar a consulta e aprovar como GRÁTIS?")) return;
+    if (!window.confirm("Deseja ignorar a consulta e aprovar como GRÁTIS?"))
+      return;
     setLoadingAction(id);
     try {
       await axios.post(
         `${process.env.REACT_APP_URL}/solicitacao-servico/ignorar-consulta/${id}`,
         {},
-        { headers: { Authorization: `Bearer ${user?.token}` } }
+        { headers: { Authorization: `Bearer ${user?.token}` } },
       );
-      alert("Solicitação aprovada como GRÁTIS! O contrato foi enviado ao cliente.");
+      alert(
+        "Solicitação aprovada como GRÁTIS! O contrato foi enviado ao cliente.",
+      );
       fetchServices(page);
     } catch (error) {
       console.error("Erro ao ignorar consulta:", error);
@@ -82,11 +106,38 @@ const SolicitacoesServico = () => {
     }
   };
 
+  const handleFinalizar = async (id: number) => {
+    const ticketId = window.prompt(
+      "Para finalizar este serviço, informe o ID do Chamado no MKAuth:",
+    );
+    if (!ticketId) return;
+
+    setLoadingAction(id);
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_URL}/solicitacao-servico/finalizar/${id}`,
+        { id_chamado: ticketId },
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+      );
+      alert("Serviço finalizado com sucesso!");
+      fetchServices(page);
+    } catch (error: any) {
+      console.error("Erro ao finalizar serviço:", error);
+      const msg = error.response?.data?.message || "Erro ao finalizar serviço.";
+      alert(msg);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
   useEffect(() => {
     fetchServices(1);
-  }, [user]);
+  }, [fetchServices]);
 
-  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+  const handlePageChange = (
+    event: React.ChangeEvent<unknown>,
+    value: number,
+  ) => {
     fetchServices(value);
   };
 
@@ -135,6 +186,18 @@ const SolicitacoesServico = () => {
           <Button variant="contained" color="success" onClick={handleFilter}>
             Filtrar
           </Button>
+          <FormControl size="small" style={{ minWidth: 150 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={statusFilter}
+              label="Status"
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <MenuItem value="pendente">Pendentes</MenuItem>
+              <MenuItem value="concluido">Concluídos</MenuItem>
+              <MenuItem value="todos">Todos</MenuItem>
+            </Select>
+          </FormControl>
         </Box>
 
         <TableContainer component={Paper} elevation={3}>
@@ -153,6 +216,7 @@ const SolicitacoesServico = () => {
                 <TableCell className="text-white font-bold">
                   Status de Assinatura
                 </TableCell>
+                <TableCell className="text-white font-bold">Status</TableCell>
                 <TableCell className="text-white font-bold">Ações</TableCell>
               </TableRow>
             </TableHead>
@@ -171,7 +235,11 @@ const SolicitacoesServico = () => {
                             : "bg-red-100 text-red-800"
                       }`}
                     >
-                      {service.gratis ? "Grátis" : service.pago ? "Pago" : "Pendente"}
+                      {service.gratis
+                        ? "Grátis"
+                        : service.pago
+                          ? "Pago"
+                          : "Pendente"}
                     </span>
                   </TableCell>
                   <TableCell>{service.login_cliente}</TableCell>
@@ -188,28 +256,54 @@ const SolicitacoesServico = () => {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {service.servico === "Instalação" && !service.pago && !service.gratis && (
-                      <Box display="flex" gap={1}>
+                    {service.finalizado ? (
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-500 text-white">
+                        Concluído
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                        Pendente
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Box display="flex" gap={1}>
+                      {service.servico === "Instalação" &&
+                        !service.pago &&
+                        !service.gratis && (
+                          <>
+                            <Button
+                              variant="contained"
+                              color="primary"
+                              size="small"
+                              onClick={() => handleConsultarCpf(service.id)}
+                              disabled={loadingAction === service.id}
+                            >
+                              Consultar CPF
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              color="secondary"
+                              size="small"
+                              onClick={() => handleIgnorarConsulta(service.id)}
+                              disabled={loadingAction === service.id}
+                            >
+                              Ignorar
+                            </Button>
+                          </>
+                        )}
+                      {!service.finalizado && (
                         <Button
                           variant="contained"
-                          color="primary"
+                          color="success"
                           size="small"
-                          onClick={() => handleConsultarCpf(service.id)}
+                          onClick={() => handleFinalizar(service.id)}
                           disabled={loadingAction === service.id}
                         >
-                          Consultar CPF
+                          Finalizar
                         </Button>
-                        <Button
-                          variant="outlined"
-                          color="secondary"
-                          size="small"
-                          onClick={() => handleIgnorarConsulta(service.id)}
-                          disabled={loadingAction === service.id}
-                        >
-                          Ignorar
-                        </Button>
-                      </Box>
-                    )}
+                      )}
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
