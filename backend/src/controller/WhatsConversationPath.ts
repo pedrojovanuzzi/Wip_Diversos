@@ -30,6 +30,7 @@ import ZapSign from "./ZapSign";
 import Pix from "./Pix";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { log } from "console";
+import { ConsultCenterService } from "../services/ConsultCenterService";
 
 dotenv.config();
 
@@ -287,11 +288,11 @@ class WhatsPixController {
   }
 
   async index(req: Request, res: Response) {
-    console.log("Webhook recebido");
-    console.log(req.body);
+    // console.log("Webhook recebido");
+    // console.log(req.body);
 
-    console.log(url);
-    console.log(token);
+    // console.log(url);
+    // console.log(token);
 
     try {
       const [insertPeople] = await findOrCreate(
@@ -1117,6 +1118,56 @@ class WhatsPixController {
               session.planoEscolhido = planoFlow;
               session.zapSignUrl = null;
 
+              // === Consult Center Debt Check ===
+              const consultCenter = new ConsultCenterService();
+              const consulta = await consultCenter.consultarDebitos(
+                dadosFlow.cpf,
+              );
+              const devePagar = consulta.devePagar;
+              const valorInstalacaoFee = devePagar ? "350,00" : "0,00";
+              session.instalacaoPaga = devePagar;
+
+              if (devePagar) {
+                await this.MensagensComuns(
+                  celular,
+                  `🔍 *Análise de Crédito:* Identificamos pendências que impossibilitam a instalação gratuita.\n💰 *Taxa de Instalação:* R$ 350,00`,
+                );
+
+                // Gerar lançamento de serviço no MKAuth para a taxa de instalação
+                const lancamento = await this.gerarLancamentoServico(
+                  session,
+                  "instalacao",
+                );
+                if (lancamento) {
+                  session.idFatura = lancamento.id;
+                  try {
+                    const pixController = new Pix();
+                    const pixData = await pixController.gerarPixServico({
+                      idLancamento: lancamento.id,
+                      valor: lancamento.valor,
+                      pppoe: lancamento.login,
+                      cpf: session.cpf || session.dadosCompleto?.cpf,
+                    });
+
+                    await this.MensagensComuns(
+                      celular,
+                      `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+                    );
+                    await this.MensagensComuns(celular, pixData.qrcode);
+                  } catch (pixError) {
+                    console.error(
+                      "Erro ao gerar PIX para Instalação no Flow:",
+                      pixError,
+                    );
+                  }
+                }
+              } else {
+                await this.MensagensComuns(
+                  celular,
+                  `✅ *Parabéns!* Sua instalação será *Isenta* de taxa de adesão! 🚀`,
+                );
+              }
+
               await this.MensagensComuns(
                 celular,
                 `✅ *Cadastro recebido com sucesso!*\n\n` +
@@ -1125,7 +1176,9 @@ class WhatsPixController {
                   `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
                   `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
                   `📶 *Plano:* ${planoFlow}\n\n` +
-                  `💰 O Financeiro vai entrar em contato em breve para finalizar o cadastro!`,
+                  (devePagar
+                    ? `💰 O Financeiro aguarda o pagamento do PIX para agendar sua instalação!`
+                    : `💰 O Financeiro vai entrar em contato em breve para agendar sua instalação!`),
               );
 
               await this.MensagensComuns(
@@ -1307,7 +1360,7 @@ class WhatsPixController {
                     estado: dadosFlow.estado,
                     cep: dadosFlow.cep,
                     plano: planoNome,
-                    valor: planoValor,
+                    valor: valorInstalacaoFee,
                     vencimento: `Dia ${dadosFlow.vencimento}`,
                     rg: dadosFlow.rg,
                   };
@@ -1349,7 +1402,8 @@ class WhatsPixController {
                 `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
                 `📮 *CEP:* ${dadosFlow.cep}\n` +
                 `📶 *Plano:* ${planoFlow}\n` +
-                `📅 *Vencimento:* Dia ${dadosFlow.vencimento}` +
+                `📅 *Vencimento:* Dia ${dadosFlow.vencimento}\n` +
+                `💰 *Instalação:* ${session.instalacaoPaga ? "PAGA (R$ 350,00)" : "GRÁTIS"}` +
                 (session.zapSignUrl
                   ? `\n\n📄 *Link de Assinatura:* ${session.zapSignUrl}`
                   : "");
@@ -1367,6 +1421,7 @@ class WhatsPixController {
                 `<p><b>CEP:</b> ${dadosFlow.cep}</p>` +
                 `<p><b>Plano Escolhido:</b> ${planoFlow}</p>` +
                 `<p><b>Vencimento:</b> Dia ${dadosFlow.vencimento}</p>` +
+                `<p><b>Instalação:</b> ${session.instalacaoPaga ? "PAGA (R$ 350,00)" : "GRÁTIS"}</p>` +
                 (session.zapSignUrl
                   ? `<p><b>Link ZapSign:</b> ${session.zapSignUrl}</p>`
                   : "");
