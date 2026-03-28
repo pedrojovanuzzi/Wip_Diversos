@@ -2,7 +2,7 @@ import { Queue } from "bullmq";
 import { url, token, redisOptions } from "../config";
 import ApiMkDataSource from "../../../database/API_MK";
 import Mensagens from "../../../entities/APIMK/Mensagens";
-import { conversation } from "./session.service";
+import { conversation, sessions, deleteSession } from "./session.service";
 
 export const whatsappOutgoingQueue = new Queue("whatsapp-outgoing", {
   connection: redisOptions,
@@ -371,8 +371,6 @@ export async function MensagensDeMidia(
 }
 
 export async function Finalizar(msg: any, celular: any) {
-  const { deleteSession } = await import("./session.service");
-  const { sessions } = await import("./session.service");
   try {
     await MensagensComuns(process.env.TEST_PHONE, msg);
     if (sessions[celular] && sessions[celular].inactivityTimer) {
