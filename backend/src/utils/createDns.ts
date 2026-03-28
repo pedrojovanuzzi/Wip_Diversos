@@ -47,8 +47,11 @@ async function ensureTable() {
 
   const client = getClient();
   await client.connect();
-  await client.query(ddl); // executa o comando DDL
-  await client.end();
+  try {
+    await client.query(ddl); // executa o comando DDL
+  } finally {
+    await client.end();
+  }
 }
 
 // =========================================
@@ -69,10 +72,28 @@ export async function extrairDominios(
 
   if (extensao === ".pdf") {
     // lê PDF inteiro
+    console.log("📄 Lendo arquivo PDF...");
     const buffer = fs.readFileSync(caminhoArquivo);
     const data = await pdf(buffer);
+    console.log(
+      `📝 PDF lido. Tamanho do texto extraído: ${data.text.length} caracteres.`,
+    );
+
+    if (data.text.length > 0) {
+      console.log("👀 Texto extraído completo:");
+      console.log("-----------------------------------------");
+      console.log(data.text);
+      console.log("-----------------------------------------");
+    } else {
+      console.warn(
+        "❌ Nenhum texto foi extraído do PDF. O arquivo pode estar vazio ou ser uma imagem (scanned).",
+      );
+    }
+
     const encontrados = data.text.match(PADRAO_DOMINIO) || [];
+    
     dominios.push(...encontrados);
+
   } else if (extensao === ".xlsx") {
     // lê Excel (todas as abas)
     const workbook = XLSX.readFile(caminhoArquivo);
@@ -95,11 +116,16 @@ export async function extrairDominios(
   }
 
   // normaliza: minúsculas, remove pontos extras e adiciona ponto final
+  console.log("⚙️ Normalizando domínios...");
   const normalizados = new Set(
     dominios.map((d) => d.toLowerCase().replace(/\.+$/, "") + "."),
   );
 
-  return Array.from(normalizados).sort();
+  const resultadoFinal = Array.from(normalizados).sort();
+  console.log(
+    `🚀 Total de domínios únicos após normalização: ${resultadoFinal.length}`,
+  );
+  return resultadoFinal;
 }
 
 // ======================================

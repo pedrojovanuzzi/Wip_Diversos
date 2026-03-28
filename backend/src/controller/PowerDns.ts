@@ -10,7 +10,8 @@ const PATH = path.join(__dirname, "..", "..", "uploads", "DnsPdf.pdf");
 
 class PowerDNS {
   public async inserirPdf(req: Request, res: Response) {
-    this.transformarPdf(req, res);
+    console.log("📥 Recebida requisição para inserir PDF.");
+    await this.transformarPdf(req, res);
   }
 
   public async inserirDominio(req: Request, res: Response): Promise<void> {
@@ -35,9 +36,28 @@ class PowerDNS {
   }
 
   private async transformarPdf(req: Request, res: Response) {
-    const dominiosExtraidos = await extrairDominios(PATH);
-    const response = await inserirDominios(dominiosExtraidos);
-    res.status(200).json({ message: response });
+    try {
+      const filePath = req.file?.path;
+      if (!filePath) {
+        res.status(400).json({ error: "Arquivo não encontrado no upload." });
+        return;
+      }
+
+      console.log(`📂 Iniciando extração de domínios do arquivo: ${filePath}`);
+      const dominiosExtraidos = await extrairDominios(filePath);
+      console.log(`🔍 Domínios extraídos: ${dominiosExtraidos.length}`);
+
+      if (dominiosExtraidos.length === 0) {
+        console.warn("⚠️ Nenhum domínio encontrado no arquivo.");
+      }
+
+      const response = await inserirDominios(dominiosExtraidos);
+      console.log("✅ Processamento concluído com sucesso.");
+      res.status(200).json({ message: response });
+    } catch (error) {
+      console.error("❌ Erro ao transformar arquivo:", error);
+      res.status(500).json({ error: "Erro interno ao transformar o arquivo." });
+    }
   }
 
   public async obterDominios(req: Request, res: Response): Promise<void> {
