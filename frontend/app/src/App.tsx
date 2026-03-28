@@ -49,6 +49,8 @@ import { MonthlyReport } from "./pages/TimeTracking/Reports/MonthlyReport";
 import { EnviarMensagem } from "./pages/Marketing/EnviarMensagem";
 import { GerenciarLicencas } from "./pages/Licencas/GerenciarLicencas";
 import { GraficoInstalacoes } from "./pages/Chamados/GraficoInstalacoes";
+import { ZapSignConfig } from "./pages/zapsign/ZapSignConfig";
+import SolicitacoesServico from "./pages/SolicitacoesServico/SolicitacoesServico";
 
 function App() {
   const { user, loading } = useAuth();
@@ -376,6 +378,16 @@ function App() {
             }
           />
           <Route
+            path="/solicitacoes-servico"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <SolicitacoesServico />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
             path="/Nfcom/Buscar"
             element={
               user?.token && user.permission >= 1 ? (
@@ -448,10 +460,30 @@ function App() {
             }
           />
           <Route
+            path="/ZapSignConfig"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <ZapSignConfig />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
             path="/grafico-instalacoes"
             element={
               user?.token && user.permission >= 2 ? (
                 <GraficoInstalacoes />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/zapsign-config"
+            element={
+              user?.token && user.permission >= 5 ? (
+                <ZapSignConfig />
               ) : (
                 <Navigate to="/auth/login" />
               )

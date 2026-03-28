@@ -26,7 +26,11 @@ import Sessions from "../entities/APIMK/Sessions";
 import AppDataSource from "../database/DataSource";
 import moment from "moment-timezone";
 import { Queue, Worker, Job } from "bullmq";
+import ZapSign from "./ZapSign";
+import Pix from "./Pix";
+import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { log } from "console";
+import { ConsultCenterService } from "../services/ConsultCenterService";
 
 dotenv.config();
 
@@ -88,11 +92,16 @@ const transporter = nodemailer.createTransport({
 });
 
 function mailOptions(msg: any) {
+  const htmlContent = msg
+    .toString()
+    .replace(/\n/g, "<br>")
+    .replace(/\*(.*?)\*/g, "<b>$1</b>");
+
   const mailOptions = {
     from: process.env.MAILGUNNER_USER,
     to: process.env.EMAIL_FINANCEIRO,
     subject: `🛠️ Serviço Solicitado 🛠️`,
-    html: msg,
+    html: htmlContent,
   };
   transporter.sendMail(mailOptions);
 }
@@ -177,8 +186,8 @@ const encryptFlowResponse = (
 ) => {
   // Flip the initialization vector
   const flipped_iv = [];
-  for (const pair of initialVectorBuffer.entries()) {
-    flipped_iv.push(~pair[1]);
+  for (let i = 0; i < initialVectorBuffer.length; i++) {
+    flipped_iv.push(~initialVectorBuffer[i]);
   }
   // Encrypt the response data
   const cipher = crypto.createCipheriv(
@@ -223,6 +232,10 @@ class WhatsPixController {
     this.iniciarCadastro = this.iniciarCadastro.bind(this);
     this.LGPD = this.LGPD.bind(this);
     this.iniciarMudancaComodo = this.iniciarMudancaComodo.bind(this);
+    this.finalizarMudancaComodo = this.finalizarMudancaComodo.bind(this);
+    this.gerarEEnviarLinkZapSignMudancaComodo =
+      this.gerarEEnviarLinkZapSignMudancaComodo.bind(this);
+    this.gerarLancamentoServico = this.gerarLancamentoServico.bind(this);
     this.Finalizar = this.Finalizar.bind(this);
     this.verify = this.verify.bind(this);
     this.saveSession = this.saveSession.bind(this);
@@ -230,6 +243,17 @@ class WhatsPixController {
     this.getPlanosDoSistema = this.getPlanosDoSistema.bind(this);
     this.limparEndereco = this.limparEndereco.bind(this);
     this.Flow = this.Flow.bind(this);
+    this.normalizeName = this.normalizeName.bind(this);
+  }
+
+  normalizeName(name: string): string {
+    return (name || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z\s]/g, "")
+      .toUpperCase()
+      .trim()
+      .replace(/\s+/g, " ");
   }
 
   async saveSession(celular: string) {
@@ -275,11 +299,11 @@ class WhatsPixController {
   }
 
   async index(req: Request, res: Response) {
-    console.log("Webhook recebido");
-    console.log(req.body);
+    // console.log("Webhook recebido");
+    // console.log(req.body);
 
-    console.log(url);
-    console.log(token);
+    // console.log(url);
+    // console.log(token);
 
     try {
       const [insertPeople] = await findOrCreate(
@@ -532,11 +556,22 @@ class WhatsPixController {
     }
 
     session.inactivityTimer = setTimeout(() => {
-      this.MensagensComuns(
-        celular,
-        "🤷🏻 Seu atendimento foi *finalizado* devido à inatividade!!\nEntre em contato novamente 👍",
-      );
-      this.deleteSession(celular);
+      if (session.service === "instalacao") {
+        this.MensagensComuns(
+          celular,
+          "🤷🏻 Seu atendimento foi *pausado* devido à inatividade!!\nNão se preocupe, salvamos seu progresso e entraremos em contato em breve! 👍",
+        );
+        // Não deletamos do banco, apenas removemos da memória para parar o timer
+        if (sessions[celular]) {
+          delete sessions[celular];
+        }
+      } else {
+        this.MensagensComuns(
+          celular,
+          "🤷🏻 Seu atendimento foi *finalizado* devido à inatividade!!\nEntre em contato novamente 👍",
+        );
+        this.deleteSession(celular);
+      }
     }, 900000); // 15 minutos de inatividade
   }
 
@@ -650,27 +685,6 @@ class WhatsPixController {
           await this.deleteSession(celular);
           return;
         }
-
-        // //Easter Egg
-        // if (texto === "G.O.A.T") {
-        //   await this.MensagensComuns(celular, "QuinhoRox");
-        //   return;
-        // }
-
-        // //Easter Egg
-        // if (texto === "T.O.D.D.Y") {
-        //   await this.MensagensComuns(celular, "Tem coisa que desanima");
-        //   return;
-        // }
-
-        // //Easter Egg
-        // if (texto === "Mamaezinha") {
-        //   await this.MensagensComuns(
-        //     celular,
-        //     "Coquinha Geladinha para limpar os dentinhos",
-        //   );
-        //   return;
-        // }
       } catch (error) {
         console.error("Erro ao inserir ou encontrar a pessoa:", error);
       }
@@ -697,6 +711,20 @@ class WhatsPixController {
               session.stage = "awaiting_cpf";
             } else if (texto == "2" || texto == "Serviços/Contratação") {
               const campos = {
+                // sections: [
+                //   {
+                //     title: "Serviços",
+                //     rows: [
+                //       { id: "option_1", title: "Instalação" },
+                //       { id: "option_2", title: "Mudança de Endereço" },
+                //       { id: "option_3", title: "Mudança de Cômodo" },
+                //       { id: "option_4", title: "Troca de Titularidade" },
+                //       { id: "option_5", title: "Alteração de Plano" },
+                //       { id: "option_6", title: "Renovação Contratual" },
+                //       { id: "option_7", title: "Wifi Estendido" },
+                //     ],
+                //   },
+                // ],
                 sections: [
                   {
                     title: "Serviços",
@@ -706,8 +734,8 @@ class WhatsPixController {
                       { id: "option_3", title: "Mudança de Cômodo" },
                       { id: "option_4", title: "Troca de Titularidade" },
                       { id: "option_5", title: "Alteração de Plano" },
-                      { id: "option_6", title: "Renovação Contratual" },
-                      { id: "option_7", title: "Wifi Estendido" },
+                      //{ id: "option_6", title: "Renovação Contratual" },
+                      // { id: "option_7", title: "Wifi Estendido" },
                     ],
                   },
                 ],
@@ -863,41 +891,82 @@ class WhatsPixController {
           } else {
             await this.MensagensComuns(
               celular,
-              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção dos Botoes",
+              "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
             );
           }
           break;
         case "choose_type_payment":
           try {
             if (this.verificaType(type)) {
-              if (
-                texto === "Pix" ||
-                texto === "Dinheiro" ||
-                texto === "Cartão"
-              ) {
-                if (session.service === "mudanca_endereco") {
+              if (texto === "Pix") {
+                if (session.service === "mudanca_comodo") {
                   const pagamento = texto;
                   session.formaPagamento = `Paga com ${pagamento}`;
-                  await this.MensagensComuns(
-                    celular,
-                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nAgora, por favor, preencha o formulário abaixo com os dados do seu *Novo Endereço*.",
+
+                  // Gerar lançamento de serviço no MKAuth
+                  const lancamento = await this.gerarLancamentoServico(
+                    session,
+                    "mudanca_comodo",
                   );
-                  await this.MensagemFlowEndereco(
-                    celular,
-                    "mudanca_endereco",
-                    "Preencher Formulário",
+                  if (lancamento) {
+                    session.idFatura = lancamento.id;
+                  }
+
+                  // Se for Pix, gerar o QR Code e enviar
+                  if (pagamento === "Pix" && lancamento) {
+                    try {
+                      const pixController = new Pix();
+                      const pixData = await pixController.gerarPixServico({
+                        idLancamento: lancamento.id,
+                        valor: lancamento.valor,
+                        pppoe: lancamento.login,
+                        cpf: session.cpf || session.dadosCompleto?.cpf,
+                      });
+
+                      await this.enviarNotificacaoServico(celular);
+
+                      await this.MensagensComuns(
+                        celular,
+                        `✨ *Aqui está seu PIX para pagamento da Mudança de Cômodo:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+                      );
+                      await this.MensagensComuns(celular, pixData.qrcode);
+                    } catch (pixError) {
+                      console.error(
+                        "Erro ao gerar PIX para Mudança de Cômodo:",
+                        pixError,
+                      );
+                    }
+                  }
+
+                  // Re-enable ZapSign for paid Room Change and delay it
+                  try {
+                    const zapSignData = {
+                      nome: session.nome || "Não informado",
+                      cpf: session.cpf || "Não informado",
+                      email: session.email || "financeiro@wiptelecom.com.br",
+                      telefone: session.celularCliente || celular,
+                      endereco: session.endereco_comodo || "Não informado",
+                      valor: "60.00",
+                      rg: session.rg || "Não informado",
+                      login: session.login || "Não informado",
+                      telefone_conversa: celular,
+                    };
+                    session.zapSignMetadata = zapSignData;
+                    console.log(
+                      "[Room Change] ZapSign postergado para após o pagamento PIX.",
+                    );
+                  } catch (zapError) {
+                    console.error(
+                      "Erro ao preparar metadados ZapSign (Mudança de Cômodo):",
+                      zapError,
+                    );
+                  }
+
+                  session.msgDadosFinais = this.formatarResumo(
+                    session,
+                    "*🧱 Mudança de Cômodo*",
+                    { forma_pagamento: session.formaPagamento },
                   );
-                  session.stage = "awaiting_mudanca_flow";
-                } else if (session.service === "mudanca_comodo") {
-                  const pagamento = texto;
-                  await this.MensagensComuns(
-                    celular,
-                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de cômodo*\n\n*Clique no Botão abaixo para finalizar*",
-                  );
-                  let dadosCliente = session.dadosCompleto
-                    ? JSON.stringify(session.dadosCompleto, null, 2)
-                    : "Dados não encontrados";
-                  session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*💰 Forma: Paga com ${pagamento}*\nDados do Cliente: ${dadosCliente}`;
 
                   fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                     let logs = [];
@@ -943,13 +1012,12 @@ class WhatsPixController {
                       console.log("Log atualizado com sucesso!");
                     });
                   });
-                  mailOptions(session.msgDadosFinais);
-                  await this.MensagemBotao(
+
+                  await this.Finalizar(
+                    session.msgDadosFinais,
                     celular,
-                    "Concluir Solicitação",
-                    "Finalizar",
+                    sessions,
                   );
-                  session.stage = "finalizar";
                 }
               } else {
                 await this.MensagensComuns(
@@ -1076,173 +1144,52 @@ class WhatsPixController {
                 celularSecundario: dadosFlow.celularSecundario || "",
                 email: dadosFlow.email,
                 cep: dadosFlow.cep,
-                rua: dadosFlow.rua,
-                numero: dadosFlow.numero,
-                bairro: dadosFlow.bairro,
-                cidade: dadosFlow.cidade,
-                estado: dadosFlow.estado,
+                rua: this.limparEndereco(dadosFlow.rua, true),
+                numero: this.limparEndereco(dadosFlow.numero),
+                bairro: this.limparEndereco(dadosFlow.bairro),
+                cidade: this.FormatarCidade(
+                  this.limparEndereco(dadosFlow.cidade),
+                ),
+                estado: this.limparEndereco(dadosFlow.estado),
+                login: dadosFlow.login,
               };
 
               const planoFlow = dadosFlow.plano || "";
               session.planoEscolhido = planoFlow;
+              session.zapSignUrl = null;
 
-              await this.MensagensComuns(
-                celular,
-                `✅ *Cadastro recebido com sucesso!*\n\n` +
-                  `👤 *Nome:* ${dadosFlow.nome}\n` +
-                  `📄 *CPF:* ${dadosFlow.cpf}\n` +
-                  `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
-                  `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
-                  `📶 *Plano:* ${planoFlow}\n\n` +
-                  `💰 O Financeiro vai entrar em contato em breve para finalizar o cadastro!`,
+              // O código de consulta automática foi removido para ser feito manualmente via painel administrativo.
+              // Por enquanto, definimos como pendente de análise.
+              session.instalacaoPaga = false;
+              // === Cadastro no MKAuth postergado para após a assinatura ===
+              // A lógica que estava aqui foi movida para o webhook do ZapSign.
+
+              const zapSignData = {
+                nome: dadosFlow.nome,
+                cpf: dadosFlow.cpf,
+                email: dadosFlow.email,
+                telefone: dadosFlow.celular,
+                endereco: this.limparEndereco(dadosFlow.rua, true),
+                numero: dadosFlow.numero,
+                bairro: dadosFlow.bairro,
+                cidade: dadosFlow.cidade,
+                estado: dadosFlow.estado,
+                cep: dadosFlow.cep,
+                plano: planoFlow,
+                valor: "0,00", // Será definido na consulta manual
+                vencimento: `Dia ${dadosFlow.vencimento}`,
+                rg: dadosFlow.rg,
+                telefone_conversa: celular,
+              };
+              session.zapSignMetadata = zapSignData;
+              console.log(
+                "[Installation] ZapSign postergado para aprovação manual no painel. Cadastro no MKAuth será feito após assinatura.",
               );
 
               await this.MensagensComuns(
                 celular,
-                `🎉 *Agora falta pouco para finalizar sua contratação!*\n` +
-                  `📩 Enviaremos o *link* para assinatura dos demais *documentos* para formalização do contrato.\n` +
-                  `🙏 *Agradecemos sua preferência!*`,
+                "⏳ *Recebemos sua solicitação!*\n\nNossa equipe fará uma breve análise técnica e cadastral. e enviaremos o retorno aqui mesmo no WhatsApp. Por favor, aguarde! 🚀\n ✅ *Informamos que requisições feitas após as 20h entrarão em análise e retornaremos assim que possível*.",
               );
-
-              // === Salvar no MKAuth ===
-              const ClientesRepository =
-                MkauthDataSource.getRepository(ClientesEntities);
-
-              let ibgeCode: string | null = null;
-              try {
-                const ufStr = (dadosFlow.estado || "").trim().toLowerCase();
-                const cityStr = (dadosFlow.cidade || "").trim().toLowerCase();
-                if (ufStr && cityStr) {
-                  const response = await axios.get(
-                    `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${ufStr}/municipios`,
-                  );
-                  const municipios = response.data;
-                  const nmNormalized = cityStr
-                    .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "")
-                    .replace(/[^\w\s]/gi, "")
-                    .trim();
-                  const munFind = municipios.find((m: any) => {
-                    const mNmNorm = m.nome
-                      .toLowerCase()
-                      .normalize("NFD")
-                      .replace(/[\u0300-\u036f]/g, "")
-                      .replace(/[^\w\s]/gi, "")
-                      .trim();
-                    return mNmNorm === nmNormalized;
-                  });
-                  if (munFind) {
-                    ibgeCode = munFind.id.toString();
-                  }
-                }
-              } catch (err) {
-                console.error("Erro ao buscar IBGE da API externa:");
-              }
-
-              try {
-                const findLogin = await ClientesRepository.findOne({
-                  where: {
-                    login:
-                      dadosFlow.login ||
-                      (dadosFlow.nome || "")
-                        .trim()
-                        .replace(/\s/g, "")
-                        .toUpperCase(),
-                  },
-                });
-
-                if (findLogin) {
-                  console.log("Login já existe:", findLogin);
-                  dadosFlow.nome = dadosFlow.nome + " " + findLogin.id;
-                  dadosFlow.login = dadosFlow.login + " " + findLogin.id;
-                }
-
-                const celularFormatado = (dadosFlow.celular || "").replace(
-                  /\D/g,
-                  "",
-                );
-                const celular2Formatado = (
-                  dadosFlow.celularSecundario || ""
-                ).replace(/\D/g, "");
-
-                const addClient = await ClientesRepository.save({
-                  nome: (dadosFlow.nome || "").toUpperCase(),
-                  login:
-                    dadosFlow.login ||
-                    (dadosFlow.nome || "")
-                      .trim()
-                      .replace(/\s/g, "")
-                      .toUpperCase(),
-                  rg: (dadosFlow.rg || "").trim().replace(/\s/g, ""),
-                  cpf_cnpj: (dadosFlow.cpf || "").trim().replace(/\s/g, ""),
-                  uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
-                  email: (dadosFlow.email || "").trim().replace(/\s/g, ""),
-                  cidade: this.limparEndereco(dadosFlow.cidade || ""),
-                  bairro: this.limparEndereco(dadosFlow.bairro || ""),
-                  estado: (dadosFlow.estado || "")
-                    .toUpperCase()
-                    .replace(/\s/g, "")
-                    .slice(0, 2),
-                  nascimento: (dadosFlow.dataNascimento || "").replace(
-                    /(\d{2})\/(\d{2})\/(\d{4})/,
-                    "$3-$2-$1",
-                  ),
-                  numero: this.limparEndereco(dadosFlow.numero || ""),
-                  endereco: this.limparEndereco(dadosFlow.rua || ""),
-                  cep: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
-                  plano: planoFlow,
-                  pool_name: "LAN_PPPOE",
-                  plano15: "Plano_15",
-                  plano_bloqc: "Plano_bloqueado",
-                  vendedor: "SCM",
-                  conta: "3",
-                  comodato: "sim",
-                  cidade_ibge: ibgeCode || "3503406",
-                  fone: "(14)3296-1608",
-                  venc: (dadosFlow.vencimento || "")
-                    .trim()
-                    .replace(/\s/g, "")
-                    .replace(/\D/g, ""),
-                  celular:
-                    celularFormatado.length >= 4
-                      ? `(${celularFormatado.slice(0, 2)})${celularFormatado.slice(2)}`
-                      : celularFormatado,
-                  celular2:
-                    celular2Formatado.length >= 4
-                      ? `(${celular2Formatado.slice(0, 2)})${celular2Formatado.slice(2)}`
-                      : celular2Formatado,
-                  estado_res: (dadosFlow.estado || "")
-                    .toUpperCase()
-                    .replace(/\s/g, "")
-                    .slice(0, 2),
-                  bairro_res: this.limparEndereco(dadosFlow.bairro || ""),
-                  tipo: "pppoe",
-                  cidade_res: this.limparEndereco(dadosFlow.cidade || ""),
-                  cep_res: `${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dadosFlow.cep || "").trim().replace(/\s/g, "").slice(5)}`,
-                  numero_res: this.limparEndereco(dadosFlow.numero || ""),
-                  endereco_res: this.limparEndereco(dadosFlow.rua || ""),
-                  tipo_cob: "titulo",
-                  mesref: "now",
-                  prilanc: "tot",
-                  pessoa:
-                    (dadosFlow.cpf || "").replace(/\D/g, "").length <= 11
-                      ? "fisica"
-                      : "juridica",
-                  dias_corte: 80,
-                  senha: moment().format("DDMMYYYY"),
-                  cadastro: moment().format("DD-MM-YYYY").split("-").join("/"),
-                  data_ip: moment().format("YYYY-MM-DD HH:mm:ss"),
-                  data_ins: moment().format("YYYY-MM-DD HH:mm:ss"),
-                });
-
-                await ClientesRepository.update(addClient.id, {
-                  termo: `${addClient.id}C/${moment().format("YYYY")}`,
-                });
-
-                console.log("Cliente salvo com sucesso no MKAuth:", addClient);
-              } catch (dbError) {
-                console.error("Erro ao salvar cliente no MKAuth:", dbError);
-              }
 
               const resumoCadastro =
                 `📋 *Novo Cadastro via Flow*\n\n` +
@@ -1256,7 +1203,11 @@ class WhatsPixController {
                 `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
                 `📮 *CEP:* ${dadosFlow.cep}\n` +
                 `📶 *Plano:* ${planoFlow}\n` +
-                `📅 *Vencimento:* Dia ${dadosFlow.vencimento}`;
+                `📅 *Vencimento:* Dia ${dadosFlow.vencimento}\n` +
+                `💰 *Instalação:* ${session.instalacaoPaga ? "PAGA (R$ 350,00)" : "GRÁTIS"}` +
+                (session.zapSignUrl
+                  ? `\n\n📄 *Link de Assinatura:* ${session.zapSignUrl}`
+                  : "");
 
               const resumoEmailHtml =
                 `<h3>Novo Cadastro via WhatsApp Flow</h3>` +
@@ -1270,7 +1221,11 @@ class WhatsPixController {
                 `<p><b>Cidade:</b> ${dadosFlow.cidade}/${dadosFlow.estado}</p>` +
                 `<p><b>CEP:</b> ${dadosFlow.cep}</p>` +
                 `<p><b>Plano Escolhido:</b> ${planoFlow}</p>` +
-                `<p><b>Vencimento:</b> Dia ${dadosFlow.vencimento}</p>`;
+                `<p><b>Vencimento:</b> Dia ${dadosFlow.vencimento}</p>` +
+                `<p><b>Instalação:</b> ${session.instalacaoPaga ? "PAGA (R$ 350,00)" : "GRÁTIS"}</p>` +
+                (session.zapSignUrl
+                  ? `<p><b>Link ZapSign:</b> ${session.zapSignUrl}</p>`
+                  : "");
 
               // Envia o e-mail para o setor financeiro
               mailOptions(resumoEmailHtml);
@@ -1308,6 +1263,16 @@ class WhatsPixController {
             }
 
             session.planoEscolhido = planoEscolhido;
+
+            // Extract price for ZapSign
+            if (planoEncontrado && planoEncontrado.title.includes(" - R$ ")) {
+              const parts = planoEncontrado.title.split(" - R$ ");
+              session.planoNome = parts[0];
+              session.planoValor = parts[1];
+            } else {
+              session.planoNome = planoEscolhido;
+              session.planoValor = "0,00";
+            }
 
             await this.MensagensComuns(
               celular,
@@ -1375,7 +1340,7 @@ class WhatsPixController {
               "Sim, li e aceito",
               "Não",
             );
-            session.stage = "final_register";
+            session.stage = "final_register_options";
           } else {
             await this.MensagensComuns(
               celular,
@@ -1383,18 +1348,107 @@ class WhatsPixController {
             );
           }
           break;
-        case "final_register":
+        case "final_register_options":
+          if (this.verificaType(type)) {
+            if (texto.toLowerCase() === "sim, li e aceito") {
+              await this.MensagemBotao(
+                celular,
+                "💰 *Como deseja realizar o pagamento da Taxa de Instalação (R$ 350,00)?*",
+                "Pix",
+              );
+              session.stage = "choose_payment_instalacao";
+            } else {
+              await this.MensagensComuns(
+                celular,
+                "Para prosseguir com a contratação, é necessário aceitar os termos. Caso tenha dúvidas, peça para falar com um atendente.",
+              );
+            }
+          }
+          break;
+        case "choose_payment_instalacao":
           try {
             if (this.verificaType(type)) {
-              if (texto.toLowerCase() === "sim, li e aceito") {
+              if (texto === "Pix") {
+                const pagamento = texto;
+                session.formaPagamento = `Paga com ${pagamento}`;
+
+                // Gerar lançamento de serviço no MKAuth (Instalação = R$ 350)
+                const lancamento = await this.gerarLancamentoServico(
+                  session,
+                  "instalacao",
+                );
+                if (lancamento) {
+                  session.idFatura = lancamento.id;
+                }
+
+                // Se for Pix, gerar o QR Code e enviar
+                if (pagamento === "Pix" && lancamento) {
+                  try {
+                    const pixController = new Pix();
+                    const pixData = await pixController.gerarPixServico({
+                      idLancamento: lancamento.id,
+                      valor: lancamento.valor,
+                      pppoe: lancamento.login,
+                      cpf: session.cpf || session.dadosCompleto?.cpf,
+                    });
+
+                    await this.MensagensComuns(
+                      celular,
+                      `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+                    );
+                    await this.MensagensComuns(celular, pixData.qrcode);
+                  } catch (pixError) {
+                    console.error(
+                      "Erro ao gerar PIX para Instalação:",
+                      pixError,
+                    );
+                  }
+                }
+
+                // Agora segue para a criação do contrato ZapSign (antigo final_register)
+                const zapSignData = {
+                  nome: session.dadosCompleto.nome,
+                  cpf: session.dadosCompleto.cpf,
+                  email: session.dadosCompleto.email,
+                  telefone: session.dadosCompleto.celular,
+                  endereco: this.limparEndereco(
+                    session.dadosCompleto.rua,
+                    true,
+                  ),
+                  numero: session.dadosCompleto.numero,
+                  bairro: session.dadosCompleto.bairro,
+                  cidade: session.dadosCompleto.cidade,
+                  estado: session.dadosCompleto.estado,
+                  cep: session.dadosCompleto.cep,
+                  plano: session.planoNome || session.planoEscolhido,
+                  valor: session.planoValor || "0,00",
+                  vencimento: session.vencimentoEscolhido,
+                  rg: session.dadosCompleto.rg,
+                };
+
+                const zapResponse =
+                  await ZapSign.createContractInstalacao(zapSignData);
+                console.log("ZapSign Document Created:", zapResponse.token);
+
+                session.zapSignUrl = zapResponse.signers[0].sign_url;
+                session.tokenZapSign = zapResponse.token;
+
+                session.msgDadosFinais = this.formatarResumo(
+                  session,
+                  "*🏠 Instalação Nova*",
+                  {
+                    plano_escolhido: session.planoEscolhido,
+                    vencimento: session.vencimentoEscolhido,
+                  },
+                  session.zapSignUrl,
+                );
+
+                await this.enviarNotificacaoServico(celular);
+
                 await this.MensagensComuns(
                   celular,
-                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Vamos realizar a *Consulta do seu CPF*. \nUm de nossos *atendentes* entrará em contato para finalizar a sua *contratação* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n*Clique no Botão abaixo para finalizar*",
+                  `📄 *Aqui está o seu Link de Assinatura:* ${session.zapSignUrl}\n\nPor favor, *Assine* o quanto antes para podermos agendar a sua instalação! 🚀`,
                 );
-                let dadosCliente = session.dadosCompleto
-                  ? JSON.stringify(session.dadosCompleto, null, 2)
-                  : "Dados não encontrados";
-                session.msgDadosFinais = `*🧑 Instalação Nova* \nPlano Escolhido: ${session.planoEscolhido}\nVencimento: ${session.vencimentoEscolhido}\nDados do Cliente: ${dadosCliente}`;
 
                 fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                   let logs = [];
@@ -1438,168 +1492,7 @@ class WhatsPixController {
                   });
                 });
 
-                mailOptions(session.msgDadosFinais);
-
-                const ClientesRepository =
-                  MkauthDataSource.getRepository(ClientesEntities);
-
-                let ibgeCode: string | null = null;
-                try {
-                  const ufStr = (session.dadosCompleto.estado || "")
-                    .trim()
-                    .toLowerCase();
-                  const cityStr = (session.dadosCompleto.cidade || "")
-                    .trim()
-                    .toLowerCase();
-                  if (ufStr && cityStr) {
-                    const response = await axios.get(
-                      `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${ufStr}/municipios`,
-                    );
-                    const municipios = response.data;
-                    const nmNormalized = cityStr
-                      .normalize("NFD")
-                      .replace(/[\u0300-\u036f]/g, "")
-                      .replace(/[^\w\s]/gi, "")
-                      .trim();
-                    const munFind = municipios.find((m: any) => {
-                      const mNmNorm = m.nome
-                        .toLowerCase()
-                        .normalize("NFD")
-                        .replace(/[\u0300-\u036f]/g, "")
-                        .replace(/[^\w\s]/gi, "")
-                        .trim();
-                      return mNmNorm === nmNormalized;
-                    });
-                    if (munFind) {
-                      ibgeCode = munFind.id.toString();
-                    }
-                  }
-                } catch (err) {
-                  console.error("Erro ao buscar IBGE da API externa:");
-                }
-
-                try {
-                  const findLogin = await ClientesRepository.findOne({
-                    where: {
-                      login: (session.dadosCompleto.nome || "")
-                        .trim()
-                        .replace(/\s/g, "")
-                        .toUpperCase(),
-                    },
-                  });
-
-                  if (findLogin) {
-                    console.log("Login já existe:", findLogin);
-                    session.dadosCompleto.nome =
-                      session.dadosCompleto.nome + " " + findLogin.id;
-                  }
-
-                  const addClient = await ClientesRepository.save({
-                    nome: (session.dadosCompleto.nome || "").toUpperCase(),
-                    login: (session.dadosCompleto.nome || "")
-                      .trim()
-                      .replace(/\s/g, "")
-                      .toUpperCase(),
-                    rg: session.dadosCompleto.rg.trim().replace(/\s/g, ""),
-                    cpf_cnpj: session.dadosCompleto.cpf
-                      .trim()
-                      .replace(/\s/g, ""),
-                    uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
-                    email: session.dadosCompleto.email
-                      .trim()
-                      .replace(/\s/g, ""),
-                    cidade: this.limparEndereco(session.dadosCompleto.cidade),
-                    bairro: this.limparEndereco(session.dadosCompleto.bairro),
-                    estado: (session.dadosCompleto.estado || "")
-                      .toUpperCase()
-                      .replace(/\s/g, "")
-                      .slice(0, 2),
-                    nascimento: session.dadosCompleto.dataNascimento.replace(
-                      /(\d{2})\/(\d{2})\/(\d{4})/,
-                      "$3-$2-$1",
-                    ),
-                    numero: this.limparEndereco(session.dadosCompleto.numero),
-                    endereco: this.limparEndereco(session.dadosCompleto.rua),
-                    cep: `${session.dadosCompleto.cep
-                      .trim()
-                      .replace(/\s/g, "")
-                      .slice(0, 5)}-${session.dadosCompleto.cep
-                      .trim()
-                      .replace(/\s/g, "")
-                      .slice(5)}`,
-                    plano: session.planoEscolhido,
-                    pool_name: "LAN_PPPOE",
-                    plano15: "Plano_15",
-                    plano_bloqc: "Plano_bloqueado",
-                    vendedor: "SCM",
-                    conta: "3",
-                    comodato: "sim",
-                    cidade_ibge: ibgeCode || "3503406",
-                    fone: "(14)3296-1608",
-                    venc: (session.vencimentoEscolhido || "")
-                      .trim()
-                      .replace(/\s/g, "")
-                      .replace(/\D/g, ""),
-                    celular: `(${session.dadosCompleto.celular.slice(
-                      0,
-                      2,
-                    )})${session.dadosCompleto.celular.slice(2)}`,
-                    celular2: (() => {
-                      const celular2Formatado =
-                        session.dadosCompleto.celularSecundario
-                          .trim()
-                          .replace(/\D/g, "");
-                      return celular2Formatado.length === 11
-                        ? `(${celular2Formatado.slice(0, 2)})${celular2Formatado.slice(2)}`
-                        : celular2Formatado;
-                    })(),
-                    estado_res: (session.dadosCompleto.estado || "")
-                      .toUpperCase()
-                      .replace(/\s/g, "")
-                      .slice(0, 2),
-                    bairro_res: this.limparEndereco(
-                      session.dadosCompleto.bairro,
-                    ),
-                    tipo: "pppoe",
-                    cidade_res: this.limparEndereco(
-                      session.dadosCompleto.cidade,
-                    ),
-                    cep_res: `${session.dadosCompleto.cep
-                      .trim()
-                      .replace(/\s/g, "")
-                      .slice(0, 5)}-${session.dadosCompleto.cep
-                      .trim()
-                      .replace(/\s/g, "")
-                      .slice(5)}`,
-                    numero_res: this.limparEndereco(
-                      session.dadosCompleto.numero,
-                    ),
-                    endereco_res: this.limparEndereco(
-                      session.dadosCompleto.rua,
-                    ),
-                    tipo_cob: "titulo",
-                    mesref: "now",
-                    prilanc: "tot",
-                    pessoa:
-                      session.dadosCompleto.cpf.replace(/\D/g, "").length <= 11
-                        ? "fisica"
-                        : "juridica",
-                    dias_corte: 80,
-                    cadastro: moment()
-                      .format("DD-MM-YYYY")
-                      .split("-")
-                      .join("/"),
-                    data_ip: moment().format("YYYY-MM-DD HH:mm:ss"),
-                    data_ins: moment().format("YYYY-MM-DD HH:mm:ss"),
-                  });
-                  await ClientesRepository.update(addClient.id, {
-                    termo: `${addClient.id}C/${moment().format("YYYY")}`,
-                  });
-
-                  console.log("Cliente salvo com sucesso:", addClient);
-                } catch (dbError) {
-                  console.error("Erro ao salvar cliente no banco:", dbError);
-                }
+                // MKAuth registration removed from here, now handled by ZapSign webhook after signature.
 
                 console.log(
                   "Tentando enviar botão de finalização para:",
@@ -1645,8 +1538,8 @@ class WhatsPixController {
                 "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione um Botão",
               );
             }
-          } catch (error) {
-            console.log(error);
+          } catch (zapError) {
+            console.error("Error in final_register processing:", zapError);
           }
           break;
 
@@ -1663,22 +1556,26 @@ class WhatsPixController {
                     celular,
                     "Escolha Forma de Pagamento",
                     "Pix",
-                    "Cartão",
-                    "Dinheiro",
                   );
                   session.stage = "choose_type_payment";
                 } else if (
                   texto.toLowerCase() === "grátis" ||
                   texto.toLowerCase() === "gratis"
                 ) {
-                  await this.MensagensComuns(
+                  session.formaPagamento = "Grátis";
+
+                  // Enviar link de assinatura ZapSign antes do resumo
+                  await this.gerarEEnviarLinkZapSignMudancaComodo(
                     celular,
-                    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *mudança de cômodo* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n*Clique no botão abaixo para finalizar*",
+                    session,
                   );
-                  let dadosCliente = session.dadosCompleto
-                    ? JSON.stringify(session.dadosCompleto, null, 2)
-                    : "Dados não encontrados";
-                  session.msgDadosFinais = `*🧱 Mudança de Cômodo* \n\n*🆓 Forma: Gratis*\nDados do Cliente: ${dadosCliente}`;
+
+                  session.msgDadosFinais = this.formatarResumo(
+                    session,
+                    "*🧱 Mudança de Cômodo*",
+                    { forma_pagamento: "Grátis" },
+                    session.zapSignUrl, // Agora o link vai no e-mail!
+                  );
 
                   fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                     let logs = [];
@@ -1724,14 +1621,12 @@ class WhatsPixController {
                       console.log("Log atualizado com sucesso!");
                     });
                   });
-                  mailOptions(session.msgDadosFinais);
-                  await this.MensagemBotao(
-                    celular,
-                    "Concluir Solicitação",
-                    "Finalizar",
-                  );
 
-                  session.stage = "finalizar";
+                  await this.Finalizar(
+                    session.msgDadosFinais,
+                    celular,
+                    sessions,
+                  );
                 } else {
                   await this.MensagensComuns(
                     celular,
@@ -1914,15 +1809,12 @@ class WhatsPixController {
         case "choose_type_titularidade":
           try {
             if (this.verificaType(type)) {
-              await this.MensagensComuns(
-                celular,
-                "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *Alteração de Titularidade* enviando o *link* para o cliente atual com o *Termo de Alteração de Titularidade* \n\ne ao Novo Cliente o *link* com os *Termos de Adesão, Alteração de Titularidade e Contrato de Permanência* a serem *assinados*.\n\n*Clique no Botão abaixo para finalizar*",
+              session.msgDadosFinais = this.formatarResumo(
+                session,
+                "*🎭 Troca de Titularidade*",
               );
 
-              let dadosCliente = session.dadosCompleto
-                ? JSON.stringify(session.dadosCompleto, null, 2)
-                : "Dados não encontrados";
-              session.msgDadosFinais = `*🎭 Troca de Titularidade*\n\nDados do Cliente: ${dadosCliente}`;
+              await this.enviarNotificacaoServico(celular);
 
               fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                 let logs = [];
@@ -1966,14 +1858,12 @@ class WhatsPixController {
                 });
               });
 
-              mailOptions(session.msgDadosFinais);
-              await this.MensagemBotao(
+              // E-mail enviado via formatarResumo
+              await this.MensagensComuns(
                 celular,
-                "Concluir Solicitação",
-                "Finalizar",
+                "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
               );
-
-              session.stage = "finalizar";
+              await this.Finalizar(session.msgDadosFinais, celular, sessions);
             } else {
               await this.MensagensComuns(
                 celular,
@@ -1991,10 +1881,13 @@ class WhatsPixController {
               celular,
               "✅️ Receberá em breve o *Termo de Adesão* e *Contrato de Permanência*  para assinatura online. Após a *confirmação*, daremos continuidade com a instalação do *Wi-Fi Estendido*.",
             );
-            let dadosCliente = session.dadosCompleto
-              ? JSON.stringify(session.dadosCompleto, null, 2)
-              : "Dados não encontrados";
-            session.msgDadosFinais = `*🔌 Wifi Estendido 100 Megas* \nDados do Cliente: ${dadosCliente}`;
+            session.msgDadosFinais = this.formatarResumo(
+              session,
+              "*📶 Wi-Fi Estendido 100 Megas*",
+              { mensalidade: "R$ 10,00" },
+            );
+
+            await this.enviarNotificacaoServico(celular);
 
             fs.readFile(logMsgFilePath, "utf8", (err, data) => {
               let logs = [];
@@ -2033,14 +1926,12 @@ class WhatsPixController {
               });
             });
 
-            mailOptions(session.msgDadosFinais);
-            await this.MensagemBotao(
+            // E-mail enviado via formatarResumo
+            await this.MensagensComuns(
               celular,
-              "Concluir Solicitação",
-              "Finalizar",
+              "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
             );
-
-            session.stage = "finalizar";
+            await this.Finalizar(session.msgDadosFinais, celular, sessions);
           } catch (error) {
             console.log(error);
           }
@@ -2052,10 +1943,13 @@ class WhatsPixController {
               celular,
               "✅️ Receberá em breve o *Termo de Adesão* e *Contrato de Permanência*  para assinatura online. Após a *confirmação*, daremos continuidade com a instalação do *Wi-Fi Estendido*.",
             );
-            let dadosCliente = session.dadosCompleto
-              ? JSON.stringify(session.dadosCompleto, null, 2)
-              : "Dados não encontrados";
-            session.msgDadosFinais = `*🔌 Wifi Estendido 100 Megas* \nDados do Cliente: ${dadosCliente}`;
+            session.msgDadosFinais = this.formatarResumo(
+              session,
+              "*📶 Wi-Fi Estendido 1Gbps*",
+              { mensalidade: "R$ 20,00" },
+            );
+
+            await this.enviarNotificacaoServico(celular);
 
             fs.readFile(logMsgFilePath, "utf8", (err, data) => {
               let logs = [];
@@ -2094,14 +1988,12 @@ class WhatsPixController {
               });
             });
 
-            mailOptions(session.msgDadosFinais);
-            await this.MensagemBotao(
+            // E-mail enviado via formatarResumo
+            await this.MensagensComuns(
               celular,
-              "Concluir Solicitação",
-              "Finalizar",
+              "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
             );
-
-            session.stage = "finalizar";
+            await this.Finalizar(session.msgDadosFinais, celular, sessions);
           } catch (error) {
             console.log(error);
           }
@@ -2293,14 +2185,11 @@ class WhatsPixController {
           break;
         case "finish_troca_plan":
           try {
-            await this.MensagensComuns(
-              celular,
-              "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Um de nossos *atendentes* entrará em contato para concluir a sua *Alteração de plano* enviando o *link* com os *Termos de Alteração de Plano, Termo de Adesão e Contrato de Permanência* a serem *assinados*\n\nClique no botão abaixo para finalizar",
+            session.msgDadosFinais = this.formatarResumo(
+              session,
+              "*🔌 Alteração de Plano*",
+              { plano_escolhido: session.planoEscolhido },
             );
-            let dadosCliente = session.dadosCompleto
-              ? JSON.stringify(session.dadosCompleto, null, 2)
-              : "Dados não encontrados";
-            session.msgDadosFinais = `*🔌 Alteração de Plano* \nPlano Escolhido: ${session.planoEscolhido}\nDados do Cliente: ${dadosCliente}`;
 
             fs.readFile(logMsgFilePath, "utf8", (err, data) => {
               let logs = [];
@@ -2339,14 +2228,11 @@ class WhatsPixController {
               });
             });
 
-            mailOptions(session.msgDadosFinais);
-            await this.MensagemBotao(
+            await this.MensagensComuns(
               celular,
-              "Concluir Solicitação",
-              "Finalizar",
+              "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
             );
-
-            session.stage = "finalizar";
+            await this.Finalizar(session.msgDadosFinais, celular, sessions);
           } catch (error) {
             console.log(error);
           }
@@ -2364,51 +2250,159 @@ class WhatsPixController {
             );
           }
           break;
-        case "choose_type_endereco":
-          try {
-            if (this.verificaType(type)) {
-              if (texto.toLowerCase() === "paga") {
-                await this.MensagemBotao(
-                  celular,
-                  "Escolha Forma de Pagamento",
-                  "Pix",
-                  "Cartão",
-                  "Dinheiro",
-                );
-                session.stage = "choose_type_payment";
-              } else if (
-                texto.toLowerCase() === "grátis" ||
-                texto.toLowerCase() === "gratis"
-              ) {
-                session.formaPagamento = "Grátis";
-                await this.MensagensComuns(
-                  celular,
-                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nAgora, por favor, preencha o formulário abaixo com os dados do seu *Novo Endereço*.",
-                );
-                await this.MensagemFlowEndereco(
-                  celular,
+        case "mudanca_finalize_with_payment":
+          if (this.verificaType(type)) {
+            const dadosFlow = session.dadosCadastro;
+            if (!dadosFlow) {
+              await this.MensagensComuns(
+                celular,
+                "⚠️ Ocorreu um erro ao recuperar seus dados. Por favor, tente preencher o formulário novamente.",
+              );
+              await this.finalizarMudancaEndereco(celular, session);
+              break;
+            }
+
+            if (texto === "Pagar com Pix") {
+              session.formaPagamento = "Paga com Pix";
+              try {
+                // 1. Preparar metadados ZapSign (Pago) - Postergar para após o pagamento PIX
+                try {
+                  const zapSignData = {
+                    nome: dadosFlow.nome || session.nome,
+                    cpf: dadosFlow.cpf || session.cpf,
+                    email: session.email || "financeiro@wiptelecom.com.br",
+                    telefone: celular,
+                    endereco_antigo: session.endereco_antigo || "Não informado",
+                    rua: this.limparEndereco(dadosFlow.rua, true),
+                    numero: dadosFlow.numero,
+                    complemento: dadosFlow.complemento || "",
+                    bairro: dadosFlow.novo_bairro,
+                    cidade: this.FormatarCidade(dadosFlow.cidade || "Franca"),
+                    estado: dadosFlow.estado || "SP",
+                    cep: dadosFlow.cep,
+                    valor: "60.00",
+                    rg: session.rg || "Não informado",
+                    login: session.login || "Não informado",
+                    telefone_conversa: celular,
+                  };
+                  session.zapSignMetadata = zapSignData;
+                  console.log(
+                    "[Address Change] ZapSign postergado para após o pagamento PIX.",
+                  );
+                } catch (zapError) {
+                  console.error(
+                    "Erro ao preparar metadados ZapSign (Pix):",
+                    zapError,
+                  );
+                }
+
+                // 2. Gerar Lançamento no MKAuth
+                const lancamento = await this.gerarLancamentoServico(
+                  session,
                   "mudanca_endereco",
-                  "Preencher Formulário",
                 );
-                session.stage = "awaiting_mudanca_flow";
-              } else {
+                if (lancamento) {
+                  session.idFatura = lancamento.id;
+                  const pixController = new Pix();
+                  const pixData = await pixController.gerarPixServico({
+                    idLancamento: lancamento.id,
+                    valor: lancamento.valor,
+                    pppoe: lancamento.login,
+                    cpf: session.cpf || session.dadosCompleto?.cpf,
+                  });
+
+                  await this.MensagensComuns(
+                    celular,
+                    `✨ *Aqui está seu PIX para pagamento da Mudança de Endereço de R$ ${lancamento.valor}:*\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+                  );
+                  await this.MensagensComuns(celular, pixData.qrcode);
+                }
+
+                session.msgDadosFinais = this.formatarResumo(
+                  session,
+                  "*🔄 Mudança de Endereço*",
+                  {
+                    antigo_endereco: dadosFlow.endereco_antigo,
+                    novo_endereco: `${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}`,
+                    forma_pagamento: "Pix",
+                  },
+                );
+
+                await this.Finalizar(session.msgDadosFinais, celular, sessions);
+              } catch (error) {
+                console.error("Erro finalizar mudança (Pix):", error);
                 await this.MensagensComuns(
                   celular,
-                  "Opção Invalída, Selecione a Opção da Lista",
+                  "⚠️ Ocorreu um erro ao finalizar sua solicitação. Um atendente entrará em contato em breve.",
                 );
+                await this.Finalizar(session.msgDadosFinais, celular, sessions);
+              }
+            } else if (texto === "Grátis (Fidelidade)") {
+              session.formaPagamento = "Grátis";
+              try {
+                // 1. Gerar link ZapSign (Grátis)
+                let zapSignUrl = "";
+                try {
+                  const zapSignData = {
+                    nome: dadosFlow.nome || session.nome,
+                    cpf: dadosFlow.cpf || session.cpf,
+                    email: session.email || "financeiro@wiptelecom.com.br",
+                    telefone: celular,
+                    endereco_antigo: session.endereco_antigo || "Não informado",
+                    rua: this.limparEndereco(dadosFlow.rua, true),
+                    numero: dadosFlow.numero,
+                    complemento: dadosFlow.complemento || "",
+                    bairro: dadosFlow.novo_bairro,
+                    cidade: this.FormatarCidade(dadosFlow.cidade || "Franca"),
+                    estado: dadosFlow.estado || "SP",
+                    cep: dadosFlow.cep,
+                    valor: "0.00",
+                    rg: session.rg || "Não informado",
+                    login: session.login || "Não informado",
+                    telefone_conversa: celular,
+                  };
+                  const zapResult =
+                    await ZapSign.createContractMudancaEndereco(zapSignData);
+                  zapSignUrl = zapResult.signers[0].sign_url;
+                  session.zapSignUrlMudanca = zapSignUrl;
+                  session.tokenZapSign = zapResult.token;
+                  session.zapSignMetadata = zapSignData; // Popula para persistência
+                } catch (zapError) {
+                  console.error("Erro ZapSign (Grátis):", zapError);
+                }
+
+                if (zapSignUrl) {
+                  await this.MensagensComuns(
+                    celular,
+                    `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos a sua solicitação! 🚀`,
+                  );
+                }
+
+                session.msgDadosFinais = this.formatarResumo(
+                  session,
+                  "*🔄 Mudança de Endereço*",
+                  {
+                    antigo_endereco: dadosFlow.endereco_antigo,
+                    novo_endereco: `${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}`,
+                    forma_pagamento: "Grátis (Fidelidade)",
+                  },
+                  zapSignUrl,
+                );
+
+                await this.Finalizar(session.msgDadosFinais, celular, sessions);
+              } catch (error) {
+                console.error("Erro finalizar mudança (Grátis):", error);
+                await this.Finalizar(session.msgDadosFinais, celular, sessions);
               }
             } else {
               await this.MensagensComuns(
                 celular,
-                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Selecione uma Opção da Lista",
+                "⚠️ Por favor, selecione uma das opções de pagamento acima para finalizar.",
               );
             }
-          } catch (error) {
-            console.log(error);
+            await this.enviarNotificacaoServico(celular);
           }
           break;
-
-        //Renovacão
         case "renovacao":
           await this.iniciarRenovacao(celular, texto, session, type);
           break;
@@ -2416,15 +2410,12 @@ class WhatsPixController {
           try {
             if (this.verificaType(type)) {
               if (texto.toLowerCase() === "sim concordo") {
-                await this.MensagensComuns(
-                  celular,
-                  "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Um de nossos *atendentes* entrará em contato para concluir a sua *Renovação* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n Clique em finalizar abaixo para terminar a conversa",
+                session.msgDadosFinais = this.formatarResumo(
+                  session,
+                  "*🆕 Renovação Contratual*",
                 );
 
-                let dadosCliente = session.dadosCompleto
-                  ? JSON.stringify(session.dadosCompleto, null, 2)
-                  : "Dados não encontrados";
-                session.msgDadosFinais = `*🆕 Renovação Contratual* \nDados do Cliente: ${dadosCliente}`;
+                await this.enviarNotificacaoServico(celular);
 
                 fs.readFile(logMsgFilePath, "utf8", (err, data) => {
                   let logs = [];
@@ -2468,14 +2459,12 @@ class WhatsPixController {
                   });
                 });
 
-                mailOptions(session.msgDadosFinais);
-                await this.MensagemBotao(
+                // E-mail enviado via formatarResumo
+                await this.MensagensComuns(
                   celular,
-                  "Concluir Solicitação",
-                  "Finalizar",
+                  "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
                 );
-
-                session.stage = "finalizar";
+                await this.Finalizar(session.msgDadosFinais, celular, sessions);
               } else if (
                 texto.toLowerCase() === "nao" ||
                 texto.toLowerCase() === "não"
@@ -2578,6 +2567,7 @@ class WhatsPixController {
                   celular,
                   `🔍 Cadastro encontrado! ${sis_cliente[0].login.toUpperCase()}`,
                 );
+                session.login = sis_cliente[0].login;
                 await this.enviarBoleto(
                   sis_cliente[0].login,
                   celular,
@@ -2631,11 +2621,15 @@ class WhatsPixController {
                 if (selectedIndex < options) {
                   const selectedClient = session.structuredData[selectedIndex];
                   console.log(selectedClient);
+
+                  // Salva o login selecionado na sessão para garantir o vínculo correto nos lançamentos
+                  session.login = selectedClient.login;
+
                   console.log(
-                    `Usuário selecionou o cliente com ID: ${selectedClient.id}`,
+                    `Usuário selecionou o cliente com ID: ${selectedClient.id}, Login: ${session.login}`,
                   );
                   await this.enviarBoleto(
-                    selectedClient.login,
+                    session.login,
                     celular,
                     selectedClient.endereco,
                     selectedClient.cpf,
@@ -2744,28 +2738,8 @@ class WhatsPixController {
             );
           }
           break;
-
-        //FinalizarServicos
         case "finalizar":
-          try {
-            if (this.verificaType(type)) {
-              if (texto.toLowerCase() === "finalizar") {
-                await this.Finalizar(session.msgDadosFinais, celular, sessions);
-              } else {
-                await this.MensagensComuns(
-                  celular,
-                  "Opção Invalída, Clique no Botão",
-                );
-              }
-            } else {
-              await this.MensagensComuns(
-                celular,
-                "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Clique no Botão",
-              );
-            }
-          } catch (error) {
-            console.log(error);
-          }
+          await this.Finalizar(session.msgDadosFinais, celular, sessions);
           break;
       }
     }
@@ -2912,17 +2886,17 @@ class WhatsPixController {
     await this.MensagemTermos(
       celular,
       "Termos Mudança de Endereço",
-      "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
+      "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e prossiga com o preenchimento do formulário.",
       "Ler Termos",
       "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_endereco",
     );
-    await this.MensagemBotao(
+
+    await this.MensagemFlowEndereco(
       celular,
-      "📝 Este serviço pode ser realizado de 2 formas: *Grátis* renovação contratual 12 meses ou *Paga* consulte o valor.",
-      "Grátis",
-      "Paga",
+      "mudanca_endereco",
+      "Preencher Formulário",
     );
-    session.stage = "choose_type_endereco";
+    session.stage = "awaiting_mudanca_flow";
 
     // Aqui você armazena todos os dados na sessão
     session.dadosCompleto = {
@@ -2979,6 +2953,9 @@ class WhatsPixController {
           endereco: true,
           login: true,
           numero: true,
+          email: true,
+          rg: true,
+          cpf_cnpj: true,
         },
         where: { cpf_cnpj: cpf, cli_ativado: "s" },
       });
@@ -2994,6 +2971,8 @@ class WhatsPixController {
             login: client.login,
             numero: client.numero,
             cpf: cpf,
+            email: client.email,
+            rg: client.rg,
           };
         });
 
@@ -3012,6 +2991,9 @@ class WhatsPixController {
       } else if (sis_cliente.length === 1) {
         session.login = sis_cliente[0].login;
         session.endereco_antigo = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
+        session.email = sis_cliente[0].email;
+        session.nome = sis_cliente[0].nome;
+        session.rg = sis_cliente[0].rg;
         session.mudancaStep = "flow";
         session.dadosCadastro = {};
 
@@ -3054,6 +3036,9 @@ class WhatsPixController {
         const selectedClient = session.structuredData[selectedIndex];
         session.login = selectedClient.login;
         session.endereco_antigo = `${selectedClient.endereco}, ${selectedClient.numero}`;
+        session.email = selectedClient.email;
+        session.nome = selectedClient.nome;
+        session.rg = selectedClient.rg;
         session.mudancaStep = "flow";
         session.dadosCadastro = {};
 
@@ -3089,56 +3074,57 @@ class WhatsPixController {
             console.error("Erro ao recarregar sessão:", e);
           }
 
+          // Fallback robusto: se o session.dadosCadastro estiver vazio (o webhook não chegou a tempo),
+          // tenta extrair diretamente do payload do nfm_reply
+          if (!dadosFlow || Object.keys(dadosFlow).length === 0) {
+            console.log(
+              "⚠️ session.dadosCadastro vazio. Tentando extrair do payload do nfm_reply...",
+            );
+            if (payload && (payload.nome || payload.rua || payload.cidade)) {
+              dadosFlow = {
+                login: session.login,
+                endereco_antigo: session.endereco_antigo,
+                nome: this.limparEndereco(payload.nome),
+                cpf: session.cpf || payload.cpf,
+                celular: payload.celular,
+                rua: this.limparEndereco(payload.rua, true),
+                numero: this.limparEndereco(payload.numero),
+                novo_bairro: this.limparEndereco(payload.novo_bairro),
+                cidade: this.FormatarCidade(
+                  this.limparEndereco(payload.cidade),
+                ),
+                estado: (payload.estado || "").toUpperCase().slice(0, 2),
+                cep: payload.cep || session.cep,
+              };
+              session.dadosCadastro = dadosFlow;
+            }
+          }
+
           // Check if it's properly populated
           if (dadosFlow && Object.keys(dadosFlow).length > 0) {
             const formaPagto = session.formaPagamento || "Não informada";
-            const resumoMudanca =
-              `🔄 *Nova Solicitação de Mudança de Endereço*\n\n` +
-              `👤 *Nome:* ${dadosFlow.nome}\n` +
-              `📄 *CPF:* ${dadosFlow.cpf}\n` +
-              `📱 *Celular:* ${dadosFlow.celular}\n` +
-              `🔑 *Login Escolhido:* ${dadosFlow.login}\n` +
-              `📍 *Antigo Endereço:* ${dadosFlow.endereco_antigo}\n` +
-              `🆕 *Novo Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}\n` +
-              `📮 *CEP:* ${dadosFlow.cep}\n` +
-              `💰 *Forma de Pagamento:* ${formaPagto}`;
 
-            const resumoEmailHtml =
-              `<h3>Solicitação de Mudança de Endereço</h3>` +
-              `<p><b>Nome:</b> ${dadosFlow.nome}</p>` +
-              `<p><b>CPF:</b> ${dadosFlow.cpf}</p>` +
-              `<p><b>Celular:</b> ${dadosFlow.celular}</p>` +
-              `<p><b>Login Escolhido:</b> ${dadosFlow.login}</p>` +
-              `<p><b>Antigo Endereço:</b> ${dadosFlow.endereco_antigo}</p>` +
-              `<p><b>Novo Endereço:</b> ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}</p>` +
-              `<p><b>CEP:</b> ${dadosFlow.cep}</p>` +
-              `<p><b>Forma de Pagamento:</b> ${formaPagto}</p>`;
+            // MOVIDO: A geração do link ZapSign agora ocorre no estágio mudanca_finalize_with_payment
+            // após o usuário escolher se quer pagar ou fidelidade.
 
-            try {
-              // @ts-ignore
-              if (typeof mailOptions === "function") {
-                // @ts-ignore
-                mailOptions(resumoEmailHtml);
-              }
-            } catch (e) {
-              console.error("Erro ao enviar email de mudança de endereço:", e);
-            }
+            session.msgDadosFinais = this.formatarResumo(
+              session,
+              "*🔄 Mudança de Endereço*",
+              {
+                antigo_endereco: dadosFlow.endereco_antigo,
+                novo_endereco: `${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.novo_bairro}, ${this.FormatarCidade(dadosFlow.cidade)}/${dadosFlow.estado?.toUpperCase()}`,
+              },
+            );
 
-            await this.Finalizar(resumoMudanca, celular, sessions);
+            // PERGUNTA A FORMA DE PAGAMENTO DEPOIS DO FLOW
+            await this.MensagemBotao(
+              celular,
+              "📝 Como deseja realizar o pagamento deste serviço?",
+              "Pagar com Pix",
+              "Grátis (Fidelidade)",
+            );
 
-            if (formaPagto === "Grátis") {
-              await this.MensagensComuns(
-                celular,
-                "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link de assinatura da Renovação Contratual com período de 12 meses*. Obrigado pela confiança!",
-              );
-            } else {
-              await this.MensagensComuns(
-                celular,
-                "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link com Termo de Alteração de Endereço*. Obrigado pela confiança!",
-              );
-            }
-
-            session.stage = "finalizar";
+            session.stage = "mudanca_finalize_with_payment";
             return;
           }
         }
@@ -3254,6 +3240,8 @@ class WhatsPixController {
     session: any,
     type: any,
   ) {
+    console.log("MudancaComodo Type: " + type);
+
     if (type !== "text" && type !== "interactive" && type !== undefined) {
       await this.MensagensComuns(
         celular,
@@ -3262,86 +3250,365 @@ class WhatsPixController {
       return;
     }
 
-    const perguntas = [
-      { campo: "nome", pergunta: "➡️ Digite seu *nome completo*:" },
-      { campo: "cpf", pergunta: "➡️ Digite seu *CPF/CNPJ*:" },
-      { campo: "celular", pergunta: "➡️ Digite seu *Celular* com *DDD*:" },
-    ];
-
-    // Se a sessão ainda não foi iniciada ou estamos começando, inicia o cadastro
-    if (!session.dadosCadastro || session.ultimaPergunta === null) {
-      console.log("Iniciando mudança...");
+    // Step 1: Pedir CPF
+    if (!session.mudancaComodoStep) {
+      console.log("Iniciando mudança de cômodo...");
+      session.mudancaComodoStep = "ask_cpf";
       await this.MensagensComuns(
         celular,
-        "🔤 Agora vamos coletar todos os *Dados* para realizar a mudança de cômodo e agendar a visita",
+        "Para iniciar a mudança de cômodo, por favor digite o seu *CPF/CNPJ*:",
       );
-      session.dadosCadastro = {}; // Inicializa os dados do cadastro
-      session.ultimaPergunta = perguntas[0].campo; // Começa com a primeira pergunta
-      await this.MensagensComuns(celular, perguntas[0].pergunta); // Envia a primeira pergunta
+      session.stage = "mudanca_comodo";
       return;
     }
 
-    // Se existe uma última pergunta, armazena a resposta
-    const ultimaPergunta = session.ultimaPergunta;
-    if (ultimaPergunta) {
-      // Valida o CPF antes de prosseguir
-      if (ultimaPergunta === "cpf") {
-        const cpfValido = await this.validarCPF(texto);
-        if (!cpfValido) {
-          await this.MensagensComuns(
-            celular,
-            "❌ *CPF* inválido. Por favor, insira um *CPF* válido.",
-          );
-          return; // Não avança para a próxima pergunta
-        }
+    // Step 2: Validar CPF e buscar cadastros
+    if (session.mudancaComodoStep === "ask_cpf") {
+      const cpf = texto.replace(/[^\d]+/g, "");
+      const cpfValido = await this.validarCPF(texto);
+
+      if (!cpfValido && cpf.length !== 14 && cpf.length !== 11) {
+        await this.MensagensComuns(
+          celular,
+          "❌ *CPF/CNPJ* inválido. Por favor, verifique e digite novamente.",
+        );
+        return;
       }
 
-      session.dadosCadastro[ultimaPergunta] = texto; // Armazena a resposta
-      console.log(`Resposta para ${ultimaPergunta}:`, texto);
-      console.log("Dados atualizados:", session.dadosCadastro);
+      session.cpf = cpf;
+
+      const sis_cliente = await MkauthDataSource.getRepository(
+        Sis_Cliente,
+      ).find({
+        select: {
+          id: true,
+          nome: true,
+          endereco: true,
+          login: true,
+          numero: true,
+          email: true,
+          rg: true,
+          cpf_cnpj: true,
+          celular: true,
+        },
+        where: { cpf_cnpj: cpf, cli_ativado: "s" },
+      });
+
+      if (sis_cliente.length > 1) {
+        // Múltiplos cadastros: listar para o cliente escolher
+        let currentIndex = 1;
+        let structuredData = sis_cliente.map((client) => {
+          return {
+            index: currentIndex++,
+            id: Number(client.id),
+            nome: client.nome,
+            endereco: client.endereco,
+            login: client.login,
+            numero: client.numero,
+            cpf: cpf,
+            email: client.email,
+            rg: client.rg,
+            celular: client.celular,
+          };
+        });
+
+        session.structuredDataComodo = structuredData;
+        session.mudancaComodoStep = "select_address";
+
+        let messageText =
+          "🔍 Encontramos mais de um *Cadastro!* Digite o *Número* para o qual deseja realizar a Mudança de Cômodo 👇🏻\n\n";
+        structuredData.forEach((client) => {
+          messageText += `*${client.index}* Nome: ${client.nome}, Endereço: ${client.endereco} N: ${client.numero}\n\n`;
+        });
+        messageText += "👉🏻 Caso queira cancelar digite *início*";
+
+        await this.MensagensComuns(celular, messageText);
+        return;
+      } else if (sis_cliente.length === 1) {
+        // Apenas 1 cadastro: pular a seleção
+        session.login = sis_cliente[0].login;
+        session.nome = sis_cliente[0].nome;
+        session.email = sis_cliente[0].email;
+        session.rg = sis_cliente[0].rg;
+        session.endereco_comodo = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
+        session.celularCliente = sis_cliente[0].celular;
+        session.mudancaComodoStep = "flow";
+        session.dadosCadastro = {};
+
+        // Enviar o Flow de observação
+        await this.finalizarMudancaComodo(celular, session);
+        return;
+      } else {
+        await this.MensagensComuns(
+          celular,
+          "🙁 Seu cadastro *não* foi *encontrado*, verifique se digitou corretamente o seu *CPF/CNPJ* ou digite *início* para voltar.",
+        );
+        return;
+      }
     }
 
-    // Encontra a próxima pergunta
-    const proximaPerguntaIndex =
-      perguntas.findIndex((q) => q.campo === ultimaPergunta) + 1;
+    // Step 3: Selecionar endereço (múltiplos cadastros)
+    if (session.mudancaComodoStep === "select_address") {
+      if (
+        texto.toLowerCase() === "inicio" ||
+        texto.toLowerCase() === "início"
+      ) {
+        await this.boasVindas(celular);
+        await this.MensagemBotao(
+          celular,
+          "Escolha um Botão",
+          "Boleto/Pix",
+          "Serviços/Contratação",
+          "Falar com Atendente",
+        );
+        session.stage = "options_start";
+        return;
+      }
 
-    if (proximaPerguntaIndex < perguntas.length) {
-      const proximaPergunta = perguntas[proximaPerguntaIndex].pergunta;
-      session.ultimaPergunta = perguntas[proximaPerguntaIndex].campo; // Atualiza para a próxima pergunta
-      console.log("Próxima pergunta:", proximaPergunta);
-      await this.MensagensComuns(celular, proximaPergunta); // Envia a próxima pergunta
-    } else {
-      console.log("Dados atualizados:", session.dadosCadastro);
-      await this.MensagemTermos(
-        celular,
-        "Finalizando....",
-        `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
-        "Ler o contrato",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
-      );
-      await this.MensagemTermos(
-        celular,
-        "Termos Mudança de Cômodo",
-        "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
-        "Ler Termos",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_comodo",
-      );
-      await this.MensagemBotao(
-        celular,
-        "📝 Este serviço pode ser realizado de 2 formas: *Grátis* renovação contratual 12 meses ou *Paga* consulte o valor.",
-        "Grátis",
-        "Paga",
-      );
-      session.stage = "choose_type_comodo";
+      const selectedIndex = parseInt(texto, 10) - 1;
 
-      // Aqui você armazena todos os dados na sessão
-      session.dadosCompleto = {
-        ...session.dadosCadastro, // Inclui todos os dados do cadastro
+      if (
+        !isNaN(selectedIndex) &&
+        selectedIndex >= 0 &&
+        selectedIndex < session.structuredDataComodo.length
+      ) {
+        const selectedClient = session.structuredDataComodo[selectedIndex];
+        session.login = selectedClient.login;
+        session.nome = selectedClient.nome;
+        session.email = selectedClient.email;
+        session.rg = selectedClient.rg;
+        session.endereco_comodo = `${selectedClient.endereco}, ${selectedClient.numero}`;
+        session.celularCliente = selectedClient.celular;
+        session.mudancaComodoStep = "flow";
+        session.dadosCadastro = {};
+
+        // Enviar o Flow de observação
+        await this.finalizarMudancaComodo(celular, session);
+        return;
+      } else {
+        await this.MensagensComuns(
+          celular,
+          "⚠️ Opção *inválida*, por favor digite o número correto da opção desejada.",
+        );
+        return;
+      }
+    }
+
+    // Step 4: Aguardando resposta do Flow (nfm_reply)
+    if (session.mudancaComodoStep === "flow") {
+      try {
+        const payload = JSON.parse(texto);
+        if (payload.flow_token) {
+          // Recarrega a sessão do banco para garantir que temos as atualizações
+          let dadosFlow = session.dadosCadastro;
+          try {
+            const dbSession = await ApiMkDataSource.getRepository(
+              Sessions,
+            ).findOne({ where: { celular } });
+            if (dbSession && dbSession.dados) {
+              dadosFlow = dbSession.dados.dadosCadastro;
+              session.dadosCadastro = dadosFlow;
+            }
+          } catch (e) {
+            console.error("Erro ao recarregar sessão (Cômodo):", e);
+          }
+
+          // Fallback: extrair do payload do nfm_reply
+          if (!dadosFlow || Object.keys(dadosFlow).length === 0) {
+            console.log(
+              "⚠️ session.dadosCadastro vazio (Cômodo). Tentando extrair do payload...",
+            );
+            if (payload && payload.nome) {
+              dadosFlow = {
+                observacao: payload.nome,
+              };
+              session.dadosCadastro = dadosFlow;
+            }
+          }
+
+          const observacao = dadosFlow?.observacao || "Sem observação";
+
+          // Armazena dados completos
+          session.dadosCompleto = {
+            nome: session.nome,
+            cpf: session.cpf,
+            login: session.login,
+            email: session.email,
+            rg: session.rg,
+            endereco: session.endereco_comodo,
+            celular: session.celularCliente,
+            observacao: observacao,
+          };
+
+          // Mostrar termos e opções grátis/paga
+          await this.MensagemTermos(
+            celular,
+            "Termos Mudança de Cômodo",
+            "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a forma que deseja",
+            "Ler Termos",
+            "https://wipdiversos.wiptelecomunicacoes.com.br/doc/mudanca_comodo",
+          );
+          await this.MensagemBotao(
+            celular,
+            "📝 Este serviço pode ser realizado de 2 formas: *Grátis* renovação contratual 12 meses ou *Paga* consulte o valor.",
+            "Grátis",
+            "Paga",
+          );
+          session.stage = "choose_type_comodo";
+
+          // Limpar dados temporários
+          session.dadosCadastro = null;
+          session.mudancaComodoStep = null;
+        }
+      } catch (e) {
+        // Se não for JSON, o usuário pode ter digitado algo inesperado
+        await this.MensagensComuns(
+          celular,
+          "📋 Por favor, preencha o *formulário* acima para continuar.",
+        );
+      }
+    }
+  }
+
+  async finalizarMudancaComodo(celular: any, session: any) {
+    await this.MensagensComuns(
+      celular,
+      "🔤 Agora vamos coletar os *dados* para realizar a mudança de cômodo e agendar a visita.",
+    );
+    await this.MensagemFlowMudancaComodo(
+      celular,
+      "mudanca_comodo",
+      "Preencher Formulário",
+    );
+    session.stage = "mudanca_comodo";
+  }
+
+  async gerarEEnviarLinkZapSignMudancaComodo(celular: any, session: any) {
+    try {
+      const zapSignData = {
+        nome: session.nome || "Não informado",
+        cpf: session.cpf || "Não informado",
+        email: session.email || "Não informado",
+        telefone: session.celularCliente || celular,
+        endereco: session.endereco_comodo || "Não informado",
+        valor: session.formaPagamento === "Grátis" ? "0" : "60",
+        rg: session.rg || "Não informado",
+        login: session.login || "Não informado",
+        telefone_conversa: celular,
       };
 
-      // Finaliza o cadastro
-      session.dadosCadastro = null;
-      session.ultimaPergunta = null;
+      const zapResponse =
+        await ZapSign.createContractMudancaComodo(zapSignData);
+      const zapSignUrl = zapResponse.signers[0].sign_url;
+
+      session.zapSignUrl = zapSignUrl;
+      session.tokenZapSign = zapResponse.token;
+      session.zapSignMetadata = zapSignData; // Popula para persistência
+
+      await this.MensagensComuns(
+        celular,
+        "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para enviar o link de assinatura da Renovação Contratual com período de 12 meses. Obrigado pela confiança!",
+      );
+
+      await this.MensagensComuns(
+        celular,
+        `📄 *Aqui está o seu Link de Assinatura para Mudança de Cômodo:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+      );
+    } catch (zapError) {
+      console.error(
+        "Error creating ZapSign document for Mudança de Cômodo:",
+        zapError,
+      );
+      await this.MensagensComuns(
+        celular,
+        "⚠️ Ocorreu um erro ao gerar seu link de assinatura. Um atendente entrará em contato em breve.",
+      );
+    }
+  }
+
+  async gerarLancamentoServico(session: any, tipoServico: string) {
+    try {
+      // Mapeamento de valores por tipo de serviço
+      const valoresServico: { [key: string]: number } = {
+        instalacao: process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 350,
+        mudanca_endereco: process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 200,
+        mudanca_comodo: process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 200,
+      };
+
+      const valor = valoresServico[tipoServico];
+      if (!valor) {
+        console.error(
+          `Tipo de serviço desconhecido para lançamento: ${tipoServico}`,
+        );
+        return;
+      }
+
+      // Identificar o login do cliente (prioriza o login da sessão, se disponível)
+      const cpf = session.cpf || session.dadosCompleto?.cpf;
+      const loginSessao = session.login;
+
+      const ClientesRepository =
+        MkauthDataSource.getRepository(ClientesEntities);
+
+      let cliente;
+
+      if (loginSessao) {
+        // Se temos o login na sessão, usamos ele diretamente (mais preciso)
+        cliente = await ClientesRepository.findOne({
+          where: { login: loginSessao, cli_ativado: "s" },
+        });
+      }
+
+      // Se não encontrou pelo login ou não tinha login, tenta pelo CPF (apenas ativos)
+      if (!cliente && cpf) {
+        cliente = await ClientesRepository.findOne({
+          where: { cpf_cnpj: cpf.trim().replace(/\s/g, ""), cli_ativado: "s" },
+        });
+      }
+
+      if (!cliente) {
+        console.error(
+          `Cliente (Ativo) com Login "${loginSessao || ""}" ou CPF "${cpf || ""}" não encontrado no MKAuth para gerar lançamento.`,
+        );
+        return;
+      }
+
+      const login = cliente.login;
+      const nomeServico =
+        tipoServico === "instalacao"
+          ? "Instalação"
+          : tipoServico === "mudanca_endereco"
+            ? "Mudança de Endereço"
+            : "Mudança de Cômodo";
+
+      // Gerar o lançamento no sis_lanc
+      const FaturasRepository = MkauthDataSource.getRepository(Record);
+      const novoLancamento = await FaturasRepository.save({
+        login: login,
+        nome: cliente.nome || login,
+        tipo: "servicos",
+        valor: valor.toFixed(2),
+        datavenc: new Date(),
+        processamento: new Date(),
+        status: "aberto",
+        recibo: `SRV-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+        obs: `Serviço: ${nomeServico} - Gerado automaticamente via WhatsApp Bot`,
+        valorger: "completo",
+        aviso: "nao",
+        imp: "nao",
+        tipocob: "fat",
+        cfop_lanc: "5307",
+        referencia: moment().format("MM/YYYY"),
+        uuid_lanc: uuidv4().slice(0, 16),
+      });
+
+      console.log(
+        `✅ Lançamento de serviço criado com sucesso! ID: ${novoLancamento.id}, Login: ${login}, Valor: R$ ${valor}, Serviço: ${nomeServico}`,
+      );
+      return novoLancamento;
+    } catch (error) {
+      console.error("❌ Erro ao gerar lançamento de serviço no MKAuth:", error);
+      return null;
     }
   }
 
@@ -3717,10 +3984,10 @@ class WhatsPixController {
 
     const dataHoje = new Date();
 
-    function resetTime(date: any) {
+    const resetTime = (date: any) => {
       date.setHours(0, 0, 0, 0);
       return date;
-    }
+    };
 
     let dataVencSemHora = resetTime(new Date(dataVenc));
     let dataHojeSemHora = resetTime(new Date(dataHoje));
@@ -3734,11 +4001,13 @@ class WhatsPixController {
       const date2 = new Date(dataHoje);
 
       // Função para calcular a diferença em dias
-      function differenceInDays(date1: any, date2: any) {
+      const differenceInDays = (date1: any, date2: any) => {
         const oneDay = 24 * 60 * 60 * 1000;
-        const diffDays = Math.floor(Math.abs((date1 - date2) / oneDay));
+        const diffDays = Math.floor(
+          Math.abs((date1.getTime() - date2.getTime()) / oneDay),
+        );
         return diffDays;
-      }
+      };
 
       const diffInDays = differenceInDays(date1, date2);
 
@@ -4331,6 +4600,10 @@ class WhatsPixController {
 
   async MensagemFlow(receivenumber: any, flowName: string, ctaText: string) {
     try {
+      const planoAviso =
+        "⚠️ *Atenção*: Contratação sujeita à *análise técnica e consulta cadastral (CPF/CNPJ)*. Podendo influenciar na disponibilidade, valores da instalação (grátis ou paga), valor do plano e condições do serviço.\n\n✅ *A contratação será confirmada após a análise*. Se estiver de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
+      await this.MensagensComuns(receivenumber, planoAviso);
+
       const planosDoSistema = await this.getPlanosDoSistema();
 
       await whatsappOutgoingQueue.add(
@@ -4391,6 +4664,10 @@ class WhatsPixController {
     ctaText: string,
   ) {
     try {
+      const planoAviso =
+        "⚠️ *Atenção*: Contratação sujeita à *análise técnica e consulta cadastral (CPF/CNPJ)*. Podendo influenciar na disponibilidade, valores da instalação (grátis ou paga), valor do plano e condições do serviço.\n\n✅ *A contratação será confirmada após a análise*. Se estiver de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
+      await this.MensagensComuns(receivenumber, planoAviso);
+
       await whatsappOutgoingQueue.add(
         "send-flow",
         {
@@ -4443,14 +4720,87 @@ class WhatsPixController {
     }
   }
 
-  limparEndereco(texto: string) {
-    return (texto || "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // remove acentos
-      .replace(/[^a-zA-Z0-9\s]/g, "") // remove tudo que não for letra, número ou espaço
+  async MensagemFlowMudancaComodo(
+    receivenumber: any,
+    flowName: string,
+    ctaText: string,
+  ) {
+    try {
+      const planoAviso =
+        "⚠️ *Atenção*: Contratação sujeita à *análise técnica e consulta cadastral (CPF/CNPJ)*. Podendo influenciar na disponibilidade, valores da instalação (grátis ou paga), valor do plano e condições do serviço.\n\n✅ *A contratação será confirmada após a análise*. Se estiver de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
+
+      await this.MensagensComuns(receivenumber, planoAviso);
+
+      await whatsappOutgoingQueue.add(
+        "send-flow",
+        {
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber,
+            type: "interactive",
+            interactive: {
+              type: "flow",
+              body: {
+                text: "Preencha o formulário abaixo para prosseguir com a mudança de cômodo.",
+              },
+              action: {
+                name: "flow",
+                parameters: {
+                  flow_message_version: "3",
+                  flow_name: flowName,
+                  flow_cta: ctaText,
+                  flow_token: `sessao_${receivenumber}_${Date.now()}`,
+                  flow_action: "navigate",
+                  flow_action_payload: {
+                    screen: "MUDANCA_COMODO",
+                  },
+                  mode: "published",
+                },
+              },
+            },
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
+        },
+      );
+
+      console.log(`Flow '${flowName}' enviado para ${receivenumber}`);
+    } catch (error: any) {
+      console.error("Erro ao enviar Flow de Mudança de Cômodo:", error.message);
+    }
+  }
+
+  limparEndereco(texto: string, removerNumeros = false) {
+    let limpo = (texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // remove acentos
+
+    if (removerNumeros) {
+      limpo = limpo.replace(/[^a-zA-Z\s]/g, ""); // remove tudo que não for letra ou espaço
+    } else {
+      limpo = limpo.replace(/[^a-zA-Z0-9\s]/g, ""); // remove tudo que não for letra, número ou espaço
+    }
+
+    return limpo
       .replace(/\s+/g, " ") // tira espaços duplicados
       .trim()
       .toUpperCase();
+  }
+
+  FormatarCidade(texto: string) {
+    if (!texto) return "";
+    return texto
+      .toLowerCase()
+      .replace(/(^\w|\s\w)/g, (m: string) => m.toUpperCase())
+      .trim();
   }
 
   async Flow(req: Request, res: Response): Promise<void> {
@@ -4536,9 +4886,11 @@ class WhatsPixController {
               nome: this.limparEndereco(data.nome),
               cpf: session.cpf || data.cpf, // fallback to data.cpf if flow still sends it
               celular: data.celular,
-              rua: this.limparEndereco(data.rua),
+              rua: this.limparEndereco(data.rua, true),
               numero: this.limparEndereco(data.numero),
               novo_bairro: this.limparEndereco(data.novo_bairro),
+              cidade: this.FormatarCidade(this.limparEndereco(data.cidade)),
+              estado: (data.estado || "").toUpperCase().slice(0, 2),
               cep: data.cep,
             };
 
@@ -4552,16 +4904,43 @@ class WhatsPixController {
             // O cliente finaliza no próprio Whatsapp e envia a resposta com o flow_token.
             // Lá em 'iniciarMudanca' trataremos o `nfm_reply`.
           }
-        } else {
-          // TODO: Aqui você implementa a lógica para salvar no Banco de Dados
+        } else if (screen === "MUDANCA_COMODO") {
+          const celular = flow_token.split("_")[1];
+
+          const dbSession = await ApiMkDataSource.getRepository(
+            Sessions,
+          ).findOne({ where: { celular } });
+          if (dbSession) {
+            sessions[celular] = {
+              stage: dbSession.stage,
+              ...dbSession.dados,
+            };
+          } else if (!sessions[celular]) {
+            sessions[celular] = { stage: "start" };
+          }
+
+          const session = sessions[celular];
+          if (session) {
+            session.dadosCadastro = {
+              ...(session.dadosCadastro || {}),
+              observacao: data.nome, // Mapeado como 'nome' no payload do Flow
+            };
+
+            try {
+              await this.saveSession(celular);
+            } catch (e) {
+              console.error(
+                "Erro ao salvar sessão do Webhook Flow (Cômodo)",
+                e,
+              );
+            }
+          }
         }
 
-        // Retorna o comando para fechar o Flow (ou ir para uma tela de Sucesso)
+        // Retornar tela de sucesso ao WhatsApp para qualquer data_exchange
         const successScreenData = {
-          screen: "SUCCESS", // Sua tela final no JSON
+          screen: "SUCCESS",
           data: {
-            // Este bloco extension_message_response é um padrão da Meta para
-            // finalizar o fluxo e devolver o controle para a conversa
             extension_message_response: {
               params: {
                 flow_token: flow_token,
@@ -4936,22 +5315,194 @@ class WhatsPixController {
     }
   }
 
-  async Finalizar(msg: any, celular: any, sessions: any) {
-    try {
-      await this.MensagensComuns(process.env.TEST_PHONE, msg);
-      if (sessions[celular] && sessions[celular].inactivityTimer) {
-        clearTimeout(sessions[celular].inactivityTimer);
-      }
-      this.deleteSession(celular);
+  formatarResumo(
+    session: any,
+    titulo: string,
+    extraDados: any = {},
+    zapSignUrl?: string,
+  ) {
+    const dados = session.dadosCompleto || {};
+    let resumo = `${titulo}\n\n`;
 
-      const insertMessage = await ApiMkDataSource.getRepository(Mensagens).save(
+    if (dados.nome) resumo += `👤 *Nome:* ${dados.nome}\n`;
+    if (dados.cpf) resumo += `📄 *CPF/CNPJ:* ${dados.cpf}\n`;
+    if (dados.login) resumo += `🔑 *Login:* ${dados.login}\n`;
+    if (dados.email) resumo += `📧 *E-mail:* ${dados.email}\n`;
+    if (dados.rg) resumo += `🆔 *RG:* ${dados.rg}\n`;
+    if (dados.endereco) resumo += `📍 *Endereço:* ${dados.endereco}\n`;
+    if (dados.celular) resumo += `📱 *Celular:* ${dados.celular}\n`;
+
+    // Dados extras específicos do serviço
+    for (const [key, value] of Object.entries(extraDados)) {
+      if (value) {
+        // Formata a chave para capitalizar e remover underscores
+        const label =
+          key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " ");
+        resumo += `🔹 *${label}:* ${value}\n`;
+      }
+    }
+
+    if (dados.observacao) resumo += `📝 *Observação:* ${dados.observacao}\n`;
+
+    if (zapSignUrl) {
+      resumo += `\n\n📄 *Link de Assinatura:* ${zapSignUrl}`;
+    }
+
+    // Centralizar envio de e-mail aqui (evita duplicidade)
+    try {
+      mailOptions(resumo);
+    } catch (e) {
+      console.error("Erro ao enviar e-mail via formatarResumo:", e);
+    }
+
+    return resumo;
+  }
+
+  async enviarNotificacaoServico(receivenumber: any) {
+    try {
+      await whatsappOutgoingQueue.add(
+        "send-template",
         {
-          conv_id: conversation.conv_id as number,
-          sender_id: conversation.receiver_id,
-          content: msg,
-          timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber,
+            type: "template",
+            template: {
+              name: "notificacao_servico",
+              language: {
+                code: "pt_BR",
+              },
+            },
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
         },
       );
+    } catch (error: any) {
+      console.error(
+        "Error queueing notificacao_servico template:",
+        error.message,
+      );
+    }
+  }
+
+  async enviarNotificacaoPagamento(receivenumber: any) {
+    try {
+      await whatsappOutgoingQueue.add(
+        "send-template",
+        {
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber,
+            type: "template",
+            template: {
+              name: "notificacao_pagamento",
+              language: {
+                code: "pt_BR",
+              },
+            },
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
+        },
+      );
+      console.log(
+        `[Notificação] Template 'notificacao_pagamento' enfileirado para ${receivenumber}`,
+      );
+    } catch (error: any) {
+      console.error(
+        "Error queueing notificacao_pagamento template:",
+        error.message,
+      );
+    }
+  }
+
+  async Finalizar(msg: any, celular: any, sessions: any) {
+    try {
+      const session = sessions[celular];
+      if (session) {
+        // --- Persistence Logic ---
+        try {
+          const repo = AppDataSource.getRepository(SolicitacaoServico);
+          const novaSolicitacao = new SolicitacaoServico();
+
+          // Mapeia identificador interno para nome amigável
+          const serviceMap: { [key: string]: string } = {
+            instalacao: "Instalação",
+            mudanca_endereco: "Mudança de Endereço",
+            mudanca_comodo: "Mudança de Cômodo",
+            troca_titularidade: "Troca de Titularidade",
+            troca_plano: "Alteração de Plano",
+            wifi_estendido: "Wifi Estendido",
+            renovação_contratual: "Renovação Contratual",
+          };
+
+          novaSolicitacao.servico =
+            serviceMap[session.service] || session.service || "Outro";
+          novaSolicitacao.login_cliente =
+            session.login || session.dadosCompleto?.login || "Desconhecido";
+          novaSolicitacao.data_solicitacao = new Date();
+          novaSolicitacao.assinado = false; // Inicialmente falso, será assinado via ZapSign
+
+          // Determina se foi pago (Grátis = true, qualquer outro = false inicialmente)
+          novaSolicitacao.pago = session.formaPagamento === "Grátis";
+          novaSolicitacao.id_fatura = session.idFatura || null;
+          novaSolicitacao.gratis =
+            session.formaPagamento === "Grátis" ||
+            session.formaPagamento === "Grátis (Fidelidade)"
+              ? 1
+              : 0;
+          novaSolicitacao.token_zapsign = session.tokenZapSign || null;
+          novaSolicitacao.dados =
+            session.zapSignMetadata || session.dadosCompleto || null;
+
+          await repo.save(novaSolicitacao);
+          console.log(
+            `[Persistence] Solicitação de ${novaSolicitacao.servico} salva para o login ${novaSolicitacao.login_cliente}`,
+          );
+        } catch (dbError) {
+          console.error("Erro ao persistir solicitação de serviço:", dbError);
+        }
+        // -------------------------
+
+        await this.MensagensComuns(process.env.TEST_PHONE, msg);
+
+        // Notificação de Pagamento (Realizado/Grátis)
+        if (session.formaPagamento === "Grátis") {
+          await this.enviarNotificacaoPagamento(process.env.TEST_PHONE);
+        }
+        if (session.inactivityTimer) {
+          clearTimeout(session.inactivityTimer);
+        }
+        this.deleteSession(celular);
+      }
+
+      await ApiMkDataSource.getRepository(Mensagens).save({
+        conv_id: conversation.conv_id as number,
+        sender_id: conversation.receiver_id,
+        content: msg,
+        timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
+      });
     } catch (error) {
       console.log("Error sending message:", error);
     }

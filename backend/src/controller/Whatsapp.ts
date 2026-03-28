@@ -9,9 +9,19 @@ import axios from "axios";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import MkauthSource from "../database/MkauthSource";
 
-const url = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
-const urlMedia = `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
-const token = process.env.CLOUD_API_ACCESS_TOKEN;
+const isSandbox = process.env.SERVIDOR_HOMOLOGACAO === "true";
+
+const url = isSandbox
+  ? `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID_TEST}/messages`
+  : `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
+
+const urlMedia = isSandbox
+  ? `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID_TEST}/media`
+  : `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/media`;
+
+const token = isSandbox
+  ? process.env.CLOUD_API_ACCESS_TOKEN_TEST
+  : process.env.CLOUD_API_ACCESS_TOKEN;
 
 class WhatsappController {
   getConversations = async () => {

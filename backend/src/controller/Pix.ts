@@ -10,11 +10,24 @@ import axios from "axios";
 import { Request, Response } from "express";
 import { Between, In, IsNull, Not, Repository } from "typeorm";
 import { isNotIn } from "class-validator";
+import Whatsapp from "./Whatsapp";
+import LocalDataSource from "../database/DataSource";
+import { SolicitacaoServico } from "../entities/SolicitacaoServico";
+import { whatsappOutgoingQueue } from "./WhatsConversationPath";
+import ZapSign from "./ZapSign";
 
 dotenv.config();
 
 const logFilePath = path.join(__dirname, "..", "..", "/log", "logPix.json");
 const isSandbox = process.env.SERVIDOR_HOMOLOGACAO === "true";
+
+const waToken = isSandbox
+  ? process.env.CLOUD_API_ACCESS_TOKEN_TEST
+  : process.env.CLOUD_API_ACCESS_TOKEN;
+
+const waUrl = isSandbox
+  ? `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID_TEST}/messages`
+  : `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
 
 const options = {
   sandbox: isSandbox,
@@ -334,14 +347,186 @@ class Pix {
         });
 
         if (sis_cliente) {
-          const remObsDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
-            .toISOString()
-            .replace("T", " ")
-            .replace("Z", "");
-          await this.clienteRepo.update(
-            { login: sis_cliente.login },
-            { observacao: "sim", rem_obs: remObsDate },
-          );
+          // Notificação de sucesso via WhatsApp para serviços
+          if (record_pppoe.tipo === "servicos") {
+            try {
+              // --- Sincronização Dashboard Local ---
+              try {
+                const localRepo =
+                  LocalDataSource.getRepository(SolicitacaoServico);
+                const servicoNome = record_pppoe.obs
+                  .split("Serviço: ")[1]
+                  ?.split(" -")[0];
+
+                // Busca prioritariamente pelo ID da fatura vinculada
+                let solicitacao = await localRepo.findOne({
+                  where: {
+                    id_fatura: Number(record_pppoe.id),
+                    pago: false,
+                  },
+                  order: { data_solicitacao: "DESC" },
+                });
+
+                // Fallback para o método anterior (login + serviço) se id_fatura não estiver preenchido
+                if (!solicitacao && servicoNome) {
+                  solicitacao = await localRepo.findOne({
+                    where: {
+                      login_cliente: record_pppoe.login,
+                      servico: servicoNome,
+                      pago: false,
+                    },
+                    order: { data_solicitacao: "DESC" },
+                  });
+                }
+
+                if (solicitacao) {
+                  await localRepo.update(solicitacao.id!, { pago: true });
+                  console.log(
+                    `[Dashboard Sync] Solicitação ${solicitacao.id} marcada como paga para login ${record_pppoe.login} (Fatura ID: ${record_pppoe.id})`,
+                  );
+                }
+              } catch (localDbError) {
+                console.error(
+                  "[Dashboard Sync] Erro ao sincronizar pagamento local:",
+                  localDbError,
+                );
+              }
+
+              // Enviar notificação para o celular de teste do .env
+              const testPhone = process.env.TEST_PHONE;
+              if (testPhone) {
+                try {
+                  await whatsappOutgoingQueue.add(
+                    "send-template",
+                    {
+                      url: waUrl,
+                      payload: {
+                        messaging_product: "whatsapp",
+                        recipient_type: "individual",
+                        to: testPhone,
+                        type: "template",
+                        template: {
+                          name: "notificacao_pagamento",
+                          language: {
+                            code: "pt_BR",
+                          },
+                        },
+                      },
+                      headers: {
+                        Authorization: `Bearer ${waToken}`,
+                        "Content-Type": "application/json",
+                      },
+                    },
+                    {
+                      removeOnComplete: true,
+                      removeOnFail: false,
+                      attempts: 3,
+                      backoff: { type: "exponential", delay: 5000 },
+                    },
+                  );
+                  console.log(
+                    `[Webhook PIX] Notificação 'notificacao_pagamento' enfileirada para ${testPhone}`,
+                  );
+                } catch (queueError) {
+                  console.error(
+                    "[Webhook PIX] Erro ao enfileirar notificação de pagamento:",
+                    queueError,
+                  );
+                }
+              }
+              // -------------------------------------
+
+              const telefone = sis_cliente.celular || sis_cliente.fone;
+              if (telefone) {
+                const cleanPhone = telefone.replace(/\D/g, "");
+                const finalPhone = cleanPhone.startsWith("55")
+                  ? cleanPhone
+                  : "55" + cleanPhone;
+
+                const servicoNome =
+                  record_pppoe.obs.split("Serviço: ")[1]?.split(" -")[0] ||
+                  "Contratado";
+
+                // === Lógica de ZapSign Postergado ===
+                let zapSignUrl = "";
+                let requesterPhone = finalPhone; // Fallback to MKAuth phone
+
+                try {
+                  const solicitacaoRepo = LocalDataSource.getRepository(SolicitacaoServico);
+                  const solicitacao = await solicitacaoRepo.findOne({
+                    where: { id_fatura: Number(record_pppoe.id) }
+                  });
+
+                  if (solicitacao && solicitacao.dados) {
+                    console.log(`[Webhook PIX] Gerando ZapSign postergado para: ${solicitacao.servico}`);
+                    
+                    // Use the phone number that actually requested the service
+                    if (solicitacao.dados.telefone_conversa) {
+                      const cleanReqPhone = solicitacao.dados.telefone_conversa.replace(/\D/g, "");
+                      requesterPhone = cleanReqPhone.startsWith("55") ? cleanReqPhone : "55" + cleanReqPhone;
+                    } else if (solicitacao.dados.telefone) {
+                      const cleanReqPhone = solicitacao.dados.telefone.replace(/\D/g, "");
+                      requesterPhone = cleanReqPhone.startsWith("55") ? cleanReqPhone : "55" + cleanReqPhone;
+                    }
+
+                    // Send immediate confirmation as requested
+                    await Whatsapp.MensagensComuns(
+                      requesterPhone,
+                      "✅ *Pagamento Confirmado!*\nEstaremos enviando o Link para assinatura em instantes... ⏳"
+                    );
+
+                    let zapResponse;
+                    if (solicitacao.servico === "Instalação") {
+                      zapResponse = await ZapSign.createContractInstalacao(solicitacao.dados);
+                    } else if (solicitacao.servico === "Mudança de Endereço") {
+                      zapResponse = await ZapSign.createContractMudancaEndereco(solicitacao.dados);
+                    } else if (solicitacao.servico === "Mudança de Cômodo") {
+                      zapResponse = await ZapSign.createContractMudancaComodo(solicitacao.dados);
+                    }
+
+                    if (zapResponse) {
+                      zapSignUrl = zapResponse.signers[0].sign_url;
+                      solicitacao.token_zapsign = zapResponse.token;
+                      solicitacao.assinado = false;
+                      await solicitacaoRepo.save(solicitacao);
+                      console.log(`[Webhook PIX] ZapSign gerado com sucesso: ${zapSignUrl}`);
+                    }
+                  }
+                } catch (errZap) {
+                  console.error("[Webhook PIX] Erro ao gerar ZapSign postergado:", errZap);
+                }
+
+                if (zapSignUrl) {
+                  await Whatsapp.MensagensComuns(
+                    requesterPhone,
+                    `✅ *Link Gerado!*\n\nOlá ${sis_cliente.nome}, aqui está o seu serviço: *${servicoNome}*.\n\n📄 *Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+                  );
+                } else {
+                  await Whatsapp.MensagensComuns(
+                    requesterPhone,
+                    `✅ *Pagamento Confirmado!*\n\nOlá ${sis_cliente.nome}, recebemos o pagamento do serviço: *${servicoNome}*.\n\nNossa equipe entrará em contato em breve para dar prosseguimento ao atendimento. Obrigado pela confiança! 🚀`,
+                  );
+                }
+                console.log(
+                  `[Webhook PIX] Mensagem de sucesso enviada para ${finalPhone}`,
+                );
+              }
+            } catch (waError) {
+              console.error(
+                "[Webhook PIX] Erro ao enviar mensagem de sucesso via WhatsApp:",
+                waError,
+              );
+            }
+          } else {
+            const remObsDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
+              .toISOString()
+              .replace("T", " ")
+              .replace("Z", "");
+            await this.clienteRepo.update(
+              { login: sis_cliente.login },
+              { observacao: "sim", rem_obs: remObsDate },
+            );
+          }
         }
 
         try {
@@ -797,6 +982,56 @@ class Pix {
     }
   };
 
+  /**
+   * Gera um PIX para um lançamento de serviço específico
+   */
+  gerarPixServico = async (params: {
+    idLancamento: number;
+    valor: string;
+    pppoe: string;
+    cpf: string;
+  }) => {
+    try {
+      const { idLancamento, valor, pppoe, cpf } = params;
+      const cleanCpf = cpf.replace(/\D/g, "");
+
+      const efipay = new EfiPay(options);
+      const loc = await efipay.pixCreateLocation([], { tipoCob: "cob" });
+      const qrlink = await efipay.pixGenerateQRCode({ id: loc.id });
+
+      const txid = crypto.randomBytes(16).toString("hex");
+      const efiParams = { txid };
+
+      const body = {
+        calendario: { expiracao: 3600 }, // Expira em 1 hora para serviços
+        devedor:
+          cleanCpf.length === 11
+            ? { cpf: cleanCpf, nome: pppoe }
+            : { cnpj: cleanCpf, nome: pppoe },
+        valor: { original: valor },
+        chave: chave_pix,
+        solicitacaoPagador: "Pagamento de Serviço",
+        infoAdicionais: [
+          { nome: "ID", valor: String(idLancamento) },
+          { nome: "VALOR", valor: valor },
+          { nome: "QR", valor: String(qrlink.linkVisualizacao) },
+        ],
+        loc: { id: loc.id },
+      };
+
+      await efipay.pixCreateCharge(efiParams, body);
+
+      return {
+        link: qrlink.linkVisualizacao,
+        qrcode: qrlink.qrcode, // Pix Copia e Cola
+        txid: txid,
+      };
+    } catch (error) {
+      console.error("❌ Erro ao gerar PIX de serviço:", error);
+      throw error;
+    }
+  };
+
   // Gera um Pix único somando as mensalidades vencidas do cliente
   gerarPixAll = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -835,7 +1070,8 @@ class Pix {
         [];
 
       // 🔹 Calcula o valor corrigido (com juros/desconto) para cada fatura
-      for (const [index, cliente] of clientes.entries()) {
+      for (let index = 0; index < clientes.length; index++) {
+        const cliente = clientes[index];
         let valorCorrigido = await this.aplicarJuros_Desconto(
           cliente.valor, // valor original da fatura
           pppoe, // login do cliente
