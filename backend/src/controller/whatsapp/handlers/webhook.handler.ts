@@ -217,7 +217,6 @@ export async function index(req: Request, res: Response) {
                       type,
                       manutencao,
                       messageId,
-                      session: { ...session },
                     },
                     {
                       removeOnComplete: true,

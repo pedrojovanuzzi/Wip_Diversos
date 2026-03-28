@@ -19,11 +19,13 @@ export function setConversation(conv: typeof conversation) {
 
 export async function saveSession(celular: string) {
   if (sessions[celular]) {
-    const { stage, inactivityTimer, ...dados } = sessions[celular];
+    const { stage, inactivityTimer, last_message_id, ...dados } =
+      sessions[celular];
     await ApiMkDataSource.getRepository(Sessions).save({
       celular,
       stage: stage || "",
       dados: dados || {},
+      last_message_id: last_message_id || null,
     });
   }
 }

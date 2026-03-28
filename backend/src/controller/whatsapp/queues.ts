@@ -17,6 +17,7 @@ export function initQueues() {
     async (job: Job) => {
       const { texto, celular, type, manutencao, messageId } = job.data;
       console.log(`[BullMQ] Processando webhook ID: ${messageId}`);
+      console.log(`[BullMQ] sessions[${celular}] stage ANTES = "${sessions[celular]?.stage}"`);
 
       if (!sessions[celular]) {
         const sessionDB = await ApiMkDataSource.getRepository(Sessions).findOne({
@@ -46,6 +47,7 @@ export function initQueues() {
       if (sessions[celular]) {
         sessions[celular].last_message_id = messageId;
       }
+      console.log(`[BullMQ] sessions[${celular}] stage DEPOIS = "${sessions[celular]?.stage}"`);
       await saveSession(celular);
     },
     { connection: redisOptions },
