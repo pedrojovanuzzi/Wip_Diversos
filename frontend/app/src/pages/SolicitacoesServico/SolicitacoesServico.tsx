@@ -18,6 +18,11 @@ import {
   MenuItem,
   InputLabel,
   FormControl,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
 } from "@mui/material";
 import moment from "moment";
 import { useAuth } from "../../context/AuthContext";
@@ -30,6 +35,10 @@ const SolicitacoesServico = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [loadingAction, setLoadingAction] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState("pendente");
+  const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [manualTarget, setManualTarget] = useState<any | null>(null);
+  const [manualCpf, setManualCpf] = useState("");
+  const [manualNome, setManualNome] = useState("");
   const { user } = useAuth();
 
   const fetchServices = useCallback(
@@ -67,18 +76,22 @@ const SolicitacoesServico = () => {
     if (!window.confirm("Deseja realizar a consulta de CPF agora?")) return;
     setLoadingAction(id);
     try {
-      await axios.post(
+      const response = await axios.post(
         `${process.env.REACT_APP_URL}/solicitacao-servico/consultar-cpf/${id}`,
         {},
         { headers: { Authorization: `Bearer ${user?.token}` } },
       );
       alert(
-        "Consulta finalizada com sucesso! O cliente receberá o retorno no WhatsApp.",
+        response.data?.message ||
+          "Consulta finalizada com sucesso! O cliente receberá o retorno no WhatsApp.",
       );
       fetchServices(page);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao consultar CPF:", error);
-      alert("Erro ao realizar consulta.");
+      const message =
+        error.response?.data?.message || "Erro ao realizar consulta.";
+      alert(message);
+      fetchServices(page);
     } finally {
       setLoadingAction(null);
     }
@@ -101,6 +114,67 @@ const SolicitacoesServico = () => {
     } catch (error) {
       console.error("Erro ao ignorar consulta:", error);
       alert("Erro ao processar.");
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleOpenManualConsulta = (service: any) => {
+    const dados = service.dados || {};
+    setManualTarget(service);
+    setManualCpf(dados.cpf || "");
+    setManualNome(dados.nome || "");
+    setManualDialogOpen(true);
+  };
+
+  const handleCloseManualConsulta = () => {
+    if (loadingAction) return;
+    setManualDialogOpen(false);
+    setManualTarget(null);
+    setManualCpf("");
+    setManualNome("");
+  };
+
+  const handleConsultarCpfManual = async () => {
+    if (!manualTarget) return;
+
+    if (!manualCpf.trim() || !manualNome.trim()) {
+      alert("Informe o CPF e o nome completo antes de continuar.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Cada consulta manual possui custo e deve ser usada apenas em caso de erro. Deseja continuar?",
+      )
+    ) {
+      return;
+    }
+
+    setLoadingAction(manualTarget.id);
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/solicitacao-servico/consultar-cpf-manual/${manualTarget.id}`,
+        {
+          cpf: manualCpf.trim(),
+          nome: manualNome.trim(),
+        },
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+      );
+
+      const devePagar = response.data?.devePagar;
+      alert(
+        devePagar
+          ? "Consulta manual concluída. O cliente foi avisado sobre a cobrança e receberá o PIX."
+          : "Consulta manual concluída. O cliente foi avisado e recebeu o link para assinatura.",
+      );
+      handleCloseManualConsulta();
+      fetchServices(page);
+    } catch (error: any) {
+      console.error("Erro ao consultar CPF manualmente:", error);
+      const message =
+        error.response?.data?.message || "Erro ao realizar consulta manual.";
+      alert(message);
     } finally {
       setLoadingAction(null);
     }
@@ -277,10 +351,28 @@ const SolicitacoesServico = () => {
                               color="primary"
                               size="small"
                               onClick={() => handleConsultarCpf(service.id)}
-                              disabled={loadingAction === service.id}
+                              disabled={
+                                loadingAction === service.id ||
+                                service.consulta_cpf_realizada ||
+                                service.consulta_cpf_tentada
+                              }
                             >
                               Consultar CPF
                             </Button>
+                            {service.consulta_cpf_tentada &&
+                              !service.consulta_cpf_realizada && (
+                                <Button
+                                  variant="outlined"
+                                  color="warning"
+                                  size="small"
+                                  onClick={() =>
+                                    handleOpenManualConsulta(service)
+                                  }
+                                  disabled={loadingAction === service.id}
+                                >
+                                  Consulta Manual
+                                </Button>
+                              )}
                             <Button
                               variant="outlined"
                               color="secondary"
@@ -326,6 +418,50 @@ const SolicitacoesServico = () => {
             color="primary"
           />
         </Box>
+
+        <Dialog
+          open={manualDialogOpen}
+          onClose={handleCloseManualConsulta}
+          fullWidth
+          maxWidth="sm"
+        >
+          <DialogTitle>Consulta Manual de CPF</DialogTitle>
+          <DialogContent>
+            <Box display="flex" flexDirection="column" gap={2} mt={1}>
+              <Alert severity="warning">
+                Cada consulta manual possui custo e deve ser usada apenas em
+                caso de erro na consulta normal.
+              </Alert>
+              <TextField
+                label="CPF"
+                value={manualCpf}
+                onChange={(e) => setManualCpf(e.target.value)}
+                fullWidth
+                size="small"
+              />
+              <TextField
+                label="Nome Completo"
+                value={manualNome}
+                onChange={(e) => setManualNome(e.target.value)}
+                fullWidth
+                size="small"
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseManualConsulta} disabled={!!loadingAction}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConsultarCpfManual}
+              variant="contained"
+              color="warning"
+              disabled={!!loadingAction}
+            >
+              Consultar Manualmente
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </div>
   );

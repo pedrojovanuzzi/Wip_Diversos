@@ -35,6 +35,7 @@ export class ConsultCenterService {
     totalDivida: number;
     devePagar: boolean;
     nome?: string;
+    erroConsulta?: boolean;
   }> {
     try {
       const cleanCpf = cpf.replace(/\D/g, "");
@@ -109,6 +110,7 @@ export class ConsultCenterService {
         totalDivida,
         devePagar,
         nome: nomeApi,
+        erroConsulta: false,
       };
     } catch (error: any) {
       console.error("[ConsultCenter] Erro ao consultar CPF:", {
@@ -124,6 +126,7 @@ export class ConsultCenterService {
         totalDivida: 0,
         devePagar: false,
         nome: undefined,
+        erroConsulta: true,
       };
     }
   }

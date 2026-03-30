@@ -35,6 +35,12 @@ export class SolicitacaoServico {
     @Column({ type: "boolean", default: false })
     finalizado?: boolean;
 
+    @Column({ type: "boolean", default: false })
+    consulta_cpf_realizada?: boolean;
+
+    @Column({ type: "boolean", default: false })
+    consulta_cpf_tentada?: boolean;
+
     @Column({ type: "varchar", length: 255, nullable: true })
     id_chamado?: string;
 }
