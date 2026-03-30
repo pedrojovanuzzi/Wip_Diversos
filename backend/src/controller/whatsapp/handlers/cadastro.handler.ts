@@ -205,6 +205,19 @@ export async function handleAwaitingFlowCadastro(
         return false;
       }
 
+      if (!dadosFlow.estado || !dadosFlow.cidade) {
+        try {
+          const resp = await axios.get(`https://viacep.com.br/ws/${cepLimpo}/json/`, { timeout: 5000 });
+          if (resp.data && !resp.data.erro) {
+            if (!dadosFlow.cidade) dadosFlow.cidade = resp.data.localidade || "";
+            if (!dadosFlow.estado) dadosFlow.estado = resp.data.uf || "";
+            if (!dadosFlow.bairro) dadosFlow.bairro = resp.data.bairro || "";
+          }
+        } catch (e) {
+          console.error("Erro ao buscar CEP no ViaCEP (instalação):", e);
+        }
+      }
+
       const cpfValido = validarCPF(dadosFlow.cpf || "");
       const rgValido = validarRG(dadosFlow.rg || "");
 

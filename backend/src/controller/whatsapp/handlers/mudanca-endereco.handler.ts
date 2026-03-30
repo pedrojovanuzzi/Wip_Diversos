@@ -353,9 +353,8 @@ export async function iniciarMudanca(
               );
               await MensagensComuns(
                 celular,
-                `✨ *Aqui está seu PIX para pagamento da Mudança de Endereço:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+                `✨ *Aqui está seu PIX para pagamento da Mudança de Endereço:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}`,
               );
-              await MensagensComuns(celular, pixData.qrcode);
             } catch (e) {
               console.error("Erro ao gerar PIX da mudança de endereço:", e);
               await MensagensComuns(

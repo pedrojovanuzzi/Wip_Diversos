@@ -6,7 +6,7 @@ import { ChamadosEntities } from "../entities/ChamadosEntities";
 import { Between, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
 import moment from "moment-timezone";
 import { ConsultCenterService } from "../services/ConsultCenterService";
-import whatsPixController from "./WhatsConversationPath";
+import { MensagensComuns, enviarNotificacaoServico, gerarLancamentoServico } from "./whatsapp/index";
 import Pix from "./Pix";
 import ZapSign from "./ZapSign";
 
@@ -141,13 +141,13 @@ class SolicitacaoServicoController {
         solicitacao.consulta_cpf_realizada = true;
         await repository.save(solicitacao);
 
-        await whatsPixController.MensagensComuns(
+        await MensagensComuns(
           celular,
           `🔍 *Após análise*, informamos que no momento não foi liberada a instalação na modalidade *grátis*.\n💰 Caso tenha interesse em dar continuidade, a instalação pode ser realizada na forma *paga*.\n*Taxa de Instalação:* R$ 350,00`,
         );
 
         // Gerar lançamento no MKAuth
-        const lancamento = await whatsPixController.gerarLancamentoServico(
+        const lancamento = await gerarLancamentoServico(
           { cpf: cpf, login: solicitacao.login_cliente },
           "instalacao",
         );
@@ -163,11 +163,10 @@ class SolicitacaoServicoController {
             cpf: cpf,
           });
 
-          await whatsPixController.MensagensComuns(
+          await MensagensComuns(
             celular,
-            `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+            `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}`,
           );
-          await whatsPixController.MensagensComuns(celular, pixData.qrcode);
         }
       } else {
         // Fluxo Grátis
@@ -181,14 +180,14 @@ class SolicitacaoServicoController {
         solicitacao.token_zapsign = zapResponse.token;
         await repository.save(solicitacao);
 
-        await whatsPixController.MensagensComuns(
+        await MensagensComuns(
           celular,
           `✅ *Parabéns!* Sua instalação será *Isenta* de taxa de adesão! 🚀`,
         );
 
-        await whatsPixController.enviarNotificacaoServico(celular);
+        await enviarNotificacaoServico(celular);
 
-        await whatsPixController.MensagensComuns(
+        await MensagensComuns(
           celular,
           `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
         );
@@ -263,12 +262,12 @@ class SolicitacaoServicoController {
         solicitacao.gratis = 0;
         await repository.save(solicitacao);
 
-        await whatsPixController.MensagensComuns(
+        await MensagensComuns(
           celular,
           `🔍 *Após análise*, informamos que no momento não foi liberada a instalação na modalidade *grátis*.\n💰 Caso tenha interesse em dar continuidade, a instalação pode ser realizada na forma *paga*.\n*Taxa de Instalação:* R$ 350,00`,
         );
 
-        const lancamento = await whatsPixController.gerarLancamentoServico(
+        const lancamento = await gerarLancamentoServico(
           { cpf: cpf, login: solicitacao.login_cliente },
           "instalacao",
         );
@@ -284,11 +283,10 @@ class SolicitacaoServicoController {
             cpf: cpf,
           });
 
-          await whatsPixController.MensagensComuns(
+          await MensagensComuns(
             celular,
-            `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+            `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}`,
           );
-          await whatsPixController.MensagensComuns(celular, pixData.qrcode);
         }
       } else {
         solicitacao.pago = true;
@@ -305,14 +303,14 @@ class SolicitacaoServicoController {
         solicitacao.token_zapsign = zapResponse.token;
         await repository.save(solicitacao);
 
-        await whatsPixController.MensagensComuns(
+        await MensagensComuns(
           celular,
           `✅ *Ótima notícia!* Sua instalação foi aprovada com *Isenção* de taxa! 🚀`,
         );
 
-        await whatsPixController.enviarNotificacaoServico(celular);
+        await enviarNotificacaoServico(celular);
 
-        await whatsPixController.MensagensComuns(
+        await MensagensComuns(
           celular,
           `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
         );
@@ -354,14 +352,14 @@ class SolicitacaoServicoController {
       solicitacao.token_zapsign = zapResponse.token;
       await repository.save(solicitacao);
 
-      await whatsPixController.MensagensComuns(
+      await MensagensComuns(
         celular,
         `✅ *Ótima notícia!* Sua instalação foi aprovada com *Isenção* de taxa! 🚀`,
       );
 
-      await whatsPixController.enviarNotificacaoServico(celular);
+      await enviarNotificacaoServico(celular);
 
-      await whatsPixController.MensagensComuns(
+      await MensagensComuns(
         celular,
         `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
       );

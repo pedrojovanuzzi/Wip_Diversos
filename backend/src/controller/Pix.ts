@@ -13,7 +13,7 @@ import { isNotIn } from "class-validator";
 import Whatsapp from "./Whatsapp";
 import LocalDataSource from "../database/DataSource";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
-import { whatsappOutgoingQueue } from "./WhatsConversationPath";
+import { whatsappOutgoingQueue } from "./whatsapp/index";
 import ZapSign from "./ZapSign";
 
 dotenv.config();

@@ -5,7 +5,10 @@ import EfiPay from "sdk-node-apis-efi";
 import SftpClient from "ssh2-sftp-client";
 import FormData from "form-data";
 import axios from "axios";
+import moment from "moment-timezone";
+import { v4 as uuidv4 } from "uuid";
 import { Faturas as Record } from "../../../entities/Faturas";
+import { ClientesEntities } from "../../../entities/ClientesEntities";
 import {
   ClientesEntities as Sis_Cliente,
 } from "../../../entities/ClientesEntities";
@@ -17,6 +20,84 @@ import {
   MensagensComuns,
   MensagensDeMidia,
 } from "./messaging.service";
+
+export async function gerarLancamentoServico(session: any, tipoServico: string) {
+  try {
+    const valoresServico: { [key: string]: number } = {
+      instalacao: process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 350,
+      mudanca_endereco: process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 200,
+      mudanca_comodo: process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 200,
+    };
+
+    const valor = valoresServico[tipoServico];
+    if (!valor) {
+      console.error(`Tipo de serviço desconhecido para lançamento: ${tipoServico}`);
+      return;
+    }
+
+    const cpf = session.cpf || session.dadosCompleto?.cpf;
+    const loginSessao = session.login;
+
+    const ClientesRepository = MkauthDataSource.getRepository(ClientesEntities);
+
+    let cliente;
+
+    if (loginSessao) {
+      cliente = await ClientesRepository.findOne({
+        where: { login: loginSessao, cli_ativado: "s" },
+      });
+    }
+
+    if (!cliente && cpf) {
+      cliente = await ClientesRepository.findOne({
+        where: { cpf_cnpj: cpf.trim().replace(/\s/g, ""), cli_ativado: "s" },
+      });
+    }
+
+    if (!cliente) {
+      console.error(
+        `Cliente (Ativo) com Login "${loginSessao || ""}" ou CPF "${cpf || ""}" não encontrado no MKAuth para gerar lançamento.`,
+      );
+      return;
+    }
+
+    const login = cliente.login;
+    const nomeServico =
+      tipoServico === "instalacao"
+        ? "Instalação"
+        : tipoServico === "mudanca_endereco"
+          ? "Mudança de Endereço"
+          : "Mudança de Cômodo";
+
+    const FaturasRepository = MkauthDataSource.getRepository(Record);
+    const novoLancamento = await FaturasRepository.save({
+      login: login,
+      nome: cliente.nome || login,
+      tipo: "servicos",
+      valor: valor.toFixed(2),
+      datavenc: new Date(),
+      processamento: new Date(),
+      status: "aberto",
+      recibo: `SRV-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+      obs: `Serviço: ${nomeServico} - Gerado automaticamente via WhatsApp Bot`,
+      valorger: "completo",
+      aviso: "nao",
+      imp: "nao",
+      tipocob: "fat",
+      cfop_lanc: "5307",
+      referencia: moment().format("MM/YYYY"),
+      uuid_lanc: uuidv4().slice(0, 16),
+    });
+
+    console.log(
+      `✅ Lançamento de serviço criado com sucesso! ID: ${novoLancamento.id}, Login: ${login}, Valor: R$ ${valor}, Serviço: ${nomeServico}`,
+    );
+    return novoLancamento;
+  } catch (error) {
+    console.error("❌ Erro ao gerar lançamento de serviço no MKAuth:", error);
+    return null;
+  }
+}
 
 export async function enviarMensagemVencimento(
   receivenumber: any,
@@ -300,6 +381,7 @@ export async function enviarBoleto(
   const formattedDate = new Intl.DateTimeFormat("pt-BR", options2).format(
     dataVenc,
   );
+  
 
   await enviarMensagemVencimento(
     celular,

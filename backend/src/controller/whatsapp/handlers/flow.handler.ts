@@ -1,12 +1,33 @@
 import { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
+import axios from "axios";
 import { decryptFlowRequest, encryptFlowResponse } from "../utils/crypto";
 import { limparEndereco } from "../utils/helpers";
 import { sessions, saveSession } from "../services/session.service";
 import { getPlanosDoSistema } from "../services/plano.service";
 import ApiMkDataSource from "../../../database/API_MK";
+import MkauthDataSource from "../../../database/MkauthSource";
 import Sessions from "../../../entities/APIMK/Sessions";
+import { ClientesEntities } from "../../../entities/ClientesEntities";
+
+async function buscarDadosCep(cep: string): Promise<{ cidade: string; estado: string; bairro: string }> {
+  try {
+    const cepLimpo = (cep || "").replace(/\D/g, "");
+    if (cepLimpo.length !== 8) return { cidade: "", estado: "", bairro: "" };
+    const resp = await axios.get(`https://viacep.com.br/ws/${cepLimpo}/json/`, { timeout: 5000 });
+    if (resp.data && !resp.data.erro) {
+      return {
+        cidade: resp.data.localidade || "",
+        estado: resp.data.uf || "",
+        bairro: resp.data.bairro || "",
+      };
+    }
+  } catch (e) {
+    console.error("Erro ao buscar CEP no ViaCEP:", e);
+  }
+  return { cidade: "", estado: "", bairro: "" };
+}
 
 export async function Flow(req: Request, res: Response): Promise<void> {
   try {
@@ -74,6 +95,22 @@ export async function Flow(req: Request, res: Response): Promise<void> {
         const session = sessions[celular];
 
         if (session) {
+          const dadosCep = await buscarDadosCep(data.cep);
+
+          let emailCliente = "";
+          let rgCliente = "";
+          try {
+            const cliente = await MkauthDataSource.getRepository(ClientesEntities).findOne({
+              where: { login: session.login, cli_ativado: "s" },
+            });
+            if (cliente) {
+              emailCliente = cliente.email || "";
+              rgCliente = cliente.rg || "";
+            }
+          } catch (e) {
+            console.error("Erro ao buscar cliente no MKAuth para mudança de endereço:", e);
+          }
+
           session.dadosCadastro = {
             login: session.login,
             endereco_antigo: session.endereco_antigo,
@@ -82,8 +119,13 @@ export async function Flow(req: Request, res: Response): Promise<void> {
             celular: data.celular,
             rua: limparEndereco(data.rua),
             numero: limparEndereco(data.numero),
+            bairro: limparEndereco(data.novo_bairro),
             novo_bairro: limparEndereco(data.novo_bairro),
             cep: data.cep,
+            cidade: dadosCep.cidade,
+            estado: dadosCep.estado,
+            email: emailCliente,
+            rg: rgCliente,
           };
 
           try {

@@ -468,9 +468,8 @@ export async function iniciarMudancaComodo(
             );
             await MensagensComuns(
               celular,
-              `✨ *Aqui está seu PIX para pagamento da Mudança de Cômodo:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
+              `✨ *Aqui está seu PIX para pagamento da Mudança de Cômodo:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}`,
             );
-            await MensagensComuns(celular, pixData.qrcode);
           } catch (e) {
             console.error("Erro ao gerar PIX da mudança de cômodo:", e);
             await MensagensComuns(

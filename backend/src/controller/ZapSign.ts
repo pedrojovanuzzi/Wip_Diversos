@@ -6,7 +6,7 @@ import ApiMkDataSource from "../database/API_MK";
 import AppDataSource from "../database/DataSource";
 import ZapSignTemplates from "../entities/APIMK/ZapSignTemplates";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
-import { whatsappOutgoingQueue } from "./WhatsConversationPath";
+import { whatsappOutgoingQueue } from "./whatsapp/index";
 import Whatsapp from "./Whatsapp";
 import MkauthDataSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";

@@ -5,7 +5,6 @@ import {
   whatsappOutgoingQueue,
 } from "./services/messaging.service";
 
-// Objeto compatível com a interface anterior (WhatsConversationPath default export)
 const whatsPixController = {
   index,
   verify,
@@ -13,5 +12,7 @@ const whatsPixController = {
 };
 
 export { whatsappIncomingQueue, whatsappOutgoingQueue };
+export { MensagensComuns, enviarNotificacaoServico } from "./services/messaging.service";
+export { gerarLancamentoServico } from "./services/payment.service";
 export { initQueues } from "./queues";
 export default whatsPixController;
