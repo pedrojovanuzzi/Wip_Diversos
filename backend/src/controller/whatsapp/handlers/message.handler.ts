@@ -888,17 +888,37 @@ export async function handleMessage(
       break;
 
     case "awaiting_payment_confirmation":
-      await MensagensComuns(
-        celular,
-        "⏳ Sua solicitação está em andamento. Assim que o pagamento for confirmado, enviaremos o link para assinatura aqui nesta conversa.",
-      );
+      if (
+        verificaType(type) &&
+        (texto.toLowerCase() === "inicio" || texto.toLowerCase() === "início")
+      ) {
+        await boasVindas(celular);
+        await MensagemBotao(
+          celular,
+          "Escolha a Opção",
+          "Boleto/Pix",
+          "Serviços/Contratação",
+          "Falar com Atendente",
+        );
+        session.stage = "options_start";
+      }
       break;
 
     case "awaiting_signature_link":
-      await MensagensComuns(
-        celular,
-        "⏳ Sua solicitação está em andamento. Em breve enviaremos o link para assinatura aqui nesta conversa.",
-      );
+      if (
+        verificaType(type) &&
+        (texto.toLowerCase() === "inicio" || texto.toLowerCase() === "início")
+      ) {
+        await boasVindas(celular);
+        await MensagemBotao(
+          celular,
+          "Escolha a Opção",
+          "Boleto/Pix",
+          "Serviços/Contratação",
+          "Falar com Atendente",
+        );
+        session.stage = "options_start";
+      }
       break;
   }
 
