@@ -10,6 +10,7 @@ import { Faturas as Record } from "../../../entities/Faturas";
 import Sessions from "../../../entities/APIMK/Sessions";
 import { SolicitacaoServico } from "../../../entities/SolicitacaoServico";
 import Pix from "../../Pix";
+import ZapSign from "../../ZapSign";
 import moment from "moment-timezone";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -186,7 +187,7 @@ async function salvarSolicitacaoMudancaComodo(
     valor: session.formaPagamento === "Paga com Pix" ? "200.00" : "0.00",
   };
 
-  await repo.save(novaSolicitacao);
+  return await repo.save(novaSolicitacao);
 }
 
 // --- Mudança de Cômodo ---
@@ -438,8 +439,9 @@ export async function iniciarMudancaComodo(
           }
         }
 
+        let solicitacaoSalva: SolicitacaoServico | null = null;
         try {
-          await salvarSolicitacaoMudancaComodo(
+          solicitacaoSalva = await salvarSolicitacaoMudancaComodo(
             session,
             dadosSolicitacao,
             celular,
@@ -478,11 +480,42 @@ export async function iniciarMudancaComodo(
           }
           session.stage = "awaiting_payment_confirmation";
         } else {
-          await MensagensComuns(
-            celular,
-            "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para enviar o link com Termo de Mudança de Cômodo. Obrigado pela confiança!",
-          );
-          session.stage = "awaiting_signature_link";
+          try {
+            const payloadZap = {
+              ...(solicitacaoSalva?.dados || dadosSolicitacao),
+              valor: "0.00",
+            };
+            const zapResponse =
+              await ZapSign.createContractMudancaComodo(payloadZap as any);
+            const zapSignUrl = zapResponse.signers[0].sign_url;
+
+            if (solicitacaoSalva) {
+              solicitacaoSalva.token_zapsign = zapResponse.token;
+              await AppDataSource.getRepository(SolicitacaoServico).save(
+                solicitacaoSalva,
+              );
+            }
+
+            await MensagensComuns(
+              celular,
+              "✅ Recebemos a sua solicitação!\nAqui está o link com Termo de Mudança de Cômodo para assinatura. Obrigado pela confiança!",
+            );
+            await MensagensComuns(
+              celular,
+              `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+            );
+            session.stage = "awaiting_signature_link";
+          } catch (e) {
+            console.error(
+              "Erro ao gerar link de assinatura da mudança de cômodo grátis:",
+              e,
+            );
+            await MensagensComuns(
+              celular,
+              "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para enviar o link com Termo de Mudança de Cômodo. Obrigado pela confiança!",
+            );
+            session.stage = "awaiting_signature_link";
+          }
         }
 
         session.mudancaComodoStep = null;
