@@ -20,16 +20,24 @@ const defaultJobOptions = {
 };
 
 async function saveOutgoingMessage(content: string) {
-  if (!conversation.conv_id) {
+  if (
+    conversation?.conv_id === null ||
+    conversation?.conv_id === undefined ||
+    typeof conversation.conv_id !== "number"
+  ) {
     return;
   }
 
-  await ApiMkDataSource.getRepository(Mensagens).save({
-    conv_id: conversation.conv_id as number,
-    sender_id: conversation.receiver_id,
-    content,
-    timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
-  });
+  try {
+    await ApiMkDataSource.getRepository(Mensagens).save({
+      conv_id: conversation.conv_id,
+      sender_id: conversation.receiver_id,
+      content,
+      timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
+    });
+  } catch (error) {
+    console.error("Erro ao salvar mensagem de saída no histórico:", error);
+  }
 }
 
 function authHeaders() {
