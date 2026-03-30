@@ -21,6 +21,7 @@ import {
   MensagemFlowEndereco,
   MensagemFlowTrocaPlano,
   MensagemFlowMudancaComodo,
+  enviarNotificacaoServico,
   Finalizar,
   boasVindas,
 } from "../services/messaging.service";
@@ -187,6 +188,36 @@ async function salvarSolicitacaoMudancaComodo(
     rg: session.rg || "Não informado",
     forma_pagamento: session.formaPagamento || "Não informada",
     valor: session.formaPagamento === "Paga com Pix" ? "200.00" : "0.00",
+  };
+
+  return await repo.save(novaSolicitacao);
+}
+
+async function salvarSolicitacaoAlteracaoPlano(
+  session: any,
+  celularConversa: string,
+) {
+  const repo = AppDataSource.getRepository(SolicitacaoServico);
+  const novaSolicitacao = new SolicitacaoServico();
+
+  novaSolicitacao.servico = "Alteração de Plano";
+  novaSolicitacao.login_cliente = session.login || "Desconhecido";
+  novaSolicitacao.data_solicitacao = new Date();
+  novaSolicitacao.assinado = false;
+  novaSolicitacao.pago = true;
+  novaSolicitacao.gratis = 1;
+  novaSolicitacao.dados = {
+    nome: session.nome || "Não informado",
+    cpf: session.cpf || "Não informado",
+    email: session.email || "financeiro@wiptelecom.com.br",
+    telefone: session.celularCliente || celularConversa,
+    telefone_conversa: celularConversa,
+    login: session.login || "Não informado",
+    endereco: session.endereco_troca_plano || "Não informado",
+    rg: session.rg || "Não informado",
+    plano: session.planoEscolhido || "Não informado",
+    observacao: session.observacaoTrocaPlano || "",
+    valor: "0.00",
   };
 
   return await repo.save(novaSolicitacao);
@@ -1149,13 +1180,77 @@ export async function handleAwaitingTrocaPlanoFlow(
 
     session.planoEscolhido = planoEscolhido;
     session.observacaoTrocaPlano = payload.observacao || "";
-    session.stage = "finish_troca_plan";
+    session.trocaPlanoStep = null;
 
-    await MensagemBotao(
-      celular,
-      "Clique em *Concluir* para Terminar a *Alteração de Plano*",
-      "Concluir",
-    );
+    const resumoAlteracaoPlano =
+      `📶 *Nova Solicitação de Alteração de Plano*\n\n` +
+      `👤 *Nome:* ${session.nome || "Não informado"}\n` +
+      `📄 *CPF:* ${session.cpf || "Não informado"}\n` +
+      `📱 *Celular:* ${session.celularCliente || celular}\n` +
+      `📧 *Email:* ${session.email || "Não informado"}\n` +
+      `🔑 *Login:* ${session.login || "Não informado"}\n` +
+      `📍 *Endereço:* ${session.endereco_troca_plano || "Não informado"}\n` +
+      `🪪 *RG:* ${session.rg || "Não informado"}\n` +
+      `🛜 *Plano Solicitado:* ${session.planoEscolhido}\n` +
+      `📝 *Observação:* ${session.observacaoTrocaPlano || "Sem observação"}`;
+
+    let solicitacaoSalva: SolicitacaoServico | null = null;
+    try {
+      solicitacaoSalva = await salvarSolicitacaoAlteracaoPlano(session, celular);
+    } catch (error) {
+      console.error("Erro ao salvar solicitação de alteração de plano:", error);
+    }
+
+    await Finalizar(resumoAlteracaoPlano, celular, true);
+    if (process.env.TEST_PHONE) {
+      await enviarNotificacaoServico(process.env.TEST_PHONE);
+    }
+
+    try {
+      const payloadZap = {
+        ...(solicitacaoSalva?.dados || {}),
+        nome: session.nome || "Não informado",
+        cpf: session.cpf || "Não informado",
+        email: session.email || "financeiro@wiptelecom.com.br",
+        telefone: session.celularCliente || celular,
+        telefone_conversa: celular,
+        endereco: session.endereco_troca_plano || "Não informado",
+        rg: session.rg || "Não informado",
+        plano: session.planoEscolhido,
+        valor: "0.00",
+      };
+
+      const zapResponse =
+        await ZapSign.createContractAlteracaoPlano(payloadZap as any);
+      const zapSignUrl = zapResponse.signers[0].sign_url;
+
+      if (solicitacaoSalva) {
+        solicitacaoSalva.token_zapsign = zapResponse.token;
+        await AppDataSource.getRepository(SolicitacaoServico).save(
+          solicitacaoSalva,
+        );
+      }
+
+      await MensagensComuns(
+        celular,
+        "✅ Recebemos a sua solicitação!\nAqui está o link com Termo de Alteração de Plano para assinatura. Obrigado pela confiança!",
+      );
+      await MensagensComuns(
+        celular,
+        `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+      );
+      session.stage = "awaiting_signature_link";
+    } catch (error) {
+      console.error(
+        "Erro ao gerar link de assinatura da alteração de plano:",
+        error,
+      );
+      await MensagensComuns(
+        celular,
+        "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para enviar o link com Termo de Alteração de Plano. Obrigado pela confiança!",
+      );
+      session.stage = "awaiting_signature_link";
+    }
     return;
   } catch (error) {
     await MensagensComuns(

@@ -74,6 +74,18 @@ interface ZapSignDataMudancaComodo {
   telefone_conversa?: string;
 }
 
+interface ZapSignDataAlteracaoPlano {
+  nome: string;
+  cpf: string;
+  email: string;
+  telefone: string;
+  endereco: string;
+  plano: string;
+  valor: string;
+  rg?: string;
+  telefone_conversa?: string;
+}
+
 class ZapSign {
   createContractInstalacao = async (params: ZapSignDataInstalacao) => {
     try {
@@ -507,6 +519,24 @@ class ZapSign {
                     );
                   }
                   break;
+                case "alteração de plano":
+                case "alteracao de plano":
+                  const loginPlano = dados.login || solicitacao.login_cliente;
+                  if (
+                    loginPlano &&
+                    loginPlano !== "Desconhecido" &&
+                    loginPlano !== "Não informado"
+                  ) {
+                    await this.updateClientPlanInMkAuth(loginPlano, dados);
+                    console.log(
+                      `[ZapSign Webhook] Plano do cliente ${loginPlano} atualizado no MKAuth (Serviço: ${solicitacao.servico}).`,
+                    );
+                  } else {
+                    console.warn(
+                      `[ZapSign Webhook] Login não identificado para atualização de plano: ${solicitacao.id}`,
+                    );
+                  }
+                  break;
                 default:
                   console.log(
                     `[ZapSign Webhook] Serviço '${solicitacao.servico}' não requer integração MKAuth específica no momento.`,
@@ -551,6 +581,84 @@ class ZapSign {
         .trim();
     }
     return clean;
+  }
+
+  createContractAlteracaoPlano = async (
+    params: ZapSignDataAlteracaoPlano,
+  ) => {
+    try {
+      const {
+        nome,
+        cpf,
+        email,
+        telefone,
+        endereco,
+        plano,
+        valor,
+        rg = "Não informado",
+        telefone_conversa,
+      } = params;
+
+      const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
+      const template = await templateRepo.findOne({
+        where: { nome_servico: "Alteração de Plano", tipo: "gratis" },
+      });
+
+      if (!template || !template.token_id) {
+        throw new Error(
+          "Token do template 'Alteração de Plano' não encontrado no banco de dados.",
+        );
+      }
+
+      const data = {
+        template_id: template.token_id,
+        signer_name: nome,
+        send_automatic_email: false,
+        send_automatic_whatsapp: false,
+        lang: "pt-br",
+        external_id: null,
+        data: [
+          { de: "{{nomecliente}}", para: nome },
+          { de: "{{termo}}", para: "Alteração de Plano" },
+          { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
+          { de: "{{cpfcliente}}", para: cpf },
+          { de: "{{provedornome}}", para: "Wip Telecom" },
+          { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
+          { de: "{{rgcliente}}", para: rg },
+          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
+          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
+          { de: "{{enderecocliente}}", para: endereco },
+          { de: "{{emailcliente}}", para: email },
+          { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
+          { de: "{{planodeacesso}}", para: plano },
+          { de: "{{velocidadeplano}}", para: "Conforme solicitado" },
+          { de: "{{valor}}", para: valor || "0.00" },
+          { de: "{{descontocliente}}", para: "0,00" },
+          { de: "{{diavencimento}}", para: "N/A" },
+          { de: "{{equipamento}}", para: "Equipamento existente" },
+        ],
+        signature_placement: "<<assinatura>>",
+        rubrica_placement: "<<visto>>",
+      };
+
+      const response = await axios.post(
+        homologacao
+          ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
+          : "https://api.zapsign.com.br/api/v1/models/create-doc/",
+        data,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.ZAPSIGN_TOKEN}`,
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Error in createContractAlteracaoPlano:", error);
+      throw error;
+    }
   }
 
   private FormatarCidade = (cidade: string): string => {
@@ -707,6 +815,19 @@ class ZapSign {
         cep: dados.cep
           ? `${dados.cep.replace(/\D/g, "").slice(0, 5)}-${dados.cep.replace(/\D/g, "").slice(5, 8)}`
           : client.cep,
+      });
+    }
+  }
+
+  private updateClientPlanInMkAuth = async (login: string, dados: any) => {
+    const ClientesRepository = MkauthDataSource.getRepository(ClientesEntities);
+    const client = await ClientesRepository.findOne({
+      where: { login },
+    });
+
+    if (client) {
+      await ClientesRepository.update(client.id, {
+        plano: dados.plano || client.plano,
       });
     }
   }
