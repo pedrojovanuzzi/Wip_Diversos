@@ -131,6 +131,10 @@ export async function iniciarMudanca(
       texto.toLowerCase() === "inicio" ||
       texto.toLowerCase() === "início"
     ) {
+      session.mudancaStep = undefined;
+      session.structuredData = undefined;
+      session.login = undefined;
+      session.endereco_antigo = undefined;
       await boasVindas(celular);
       await MensagemBotao(
         celular,
@@ -140,6 +144,15 @@ export async function iniciarMudanca(
         "Falar com Atendente",
       );
       session.stage = "options_start";
+      return;
+    }
+
+    if (!session.structuredData || session.structuredData.length === 0) {
+      session.mudancaStep = "ask_cpf";
+      await MensagensComuns(
+        celular,
+        "⚠️ Sessão expirada. Para iniciar a mudança de endereço, por favor digite novamente o seu *CPF/CNPJ*:",
+      );
       return;
     }
 

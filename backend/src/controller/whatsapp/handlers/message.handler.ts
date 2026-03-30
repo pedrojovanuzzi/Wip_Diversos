@@ -192,6 +192,19 @@ export async function handleMessage(
   const msgRobo =
     "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, ";
 
+  // Correção defensiva: se o stage ficou preso em "awaiting_service" mas o serviço já
+  // foi selecionado (LGPD exibida), corrige o stage para "lgpd_request"
+  if (
+    session.stage === "awaiting_service" &&
+    session.service &&
+    verificaType(type) &&
+    (texto.toLowerCase() === "sim aceito" ||
+      texto.toLowerCase() === "não" ||
+      texto.toLowerCase() === "nao")
+  ) {
+    session.stage = "lgpd_request";
+  }
+
   switch (session.stage) {
     case "":
       await boasVindas(celular);
@@ -234,12 +247,20 @@ export async function handleMessage(
           );
           session.stage = "awaiting_service";
         } else if (texto == "3" || texto == "Falar com Atendente") {
-          await MensagensComuns(
-            celular,
-            "Caso queira falar com um *Atendente*, acesse esse Link das 8 às 20h 👍🏻 https://wa.me/message/C3QNNVFXJWK5A1",
-          );
-          await MensagemBotao(celular, "Ainda Precisa de Ajuda?", "Sim", "Não");
-          session.stage = "end_talk";
+          if (
+            session.mudancaStep === "select_address" &&
+            session.structuredData?.length > 0
+          ) {
+            session.stage = "mudanca_endereco";
+            await iniciarMudanca(celular, texto, session, type);
+          } else {
+            await MensagensComuns(
+              celular,
+              "Caso queira falar com um *Atendente*, acesse esse Link das 8 às 20h 👍🏻 https://wa.me/message/C3QNNVFXJWK5A1",
+            );
+            await MensagemBotao(celular, "Ainda Precisa de Ajuda?", "Sim", "Não");
+            session.stage = "end_talk";
+          }
         } else {
           await MensagensComuns(
             celular,
