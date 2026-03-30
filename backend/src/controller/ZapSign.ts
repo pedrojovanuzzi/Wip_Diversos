@@ -11,6 +11,7 @@ import Whatsapp from "./Whatsapp";
 import MkauthDataSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { v4 as uuidv4 } from "uuid";
+import { deleteSession } from "./whatsapp/services/session.service";
 
 dotenv.config();
 
@@ -431,6 +432,7 @@ class ZapSign {
                 requesterPhone,
                 `✅ *Assinatura Confirmada!*\n\nOlá ${solicitacao.dados?.nome || "Cliente"}, recebemos a sua assinatura para o serviço: *${solicitacao.servico || "Contratado"}*.\n\nAgradecemos a confiança! Em breve nossa equipe entrará em contato para agendamento. 🚀`,
               );
+              await deleteSession(requesterPhone);
             }
           } catch (errConv) {
             console.error(

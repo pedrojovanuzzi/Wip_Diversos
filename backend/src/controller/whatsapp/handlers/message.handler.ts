@@ -886,6 +886,20 @@ export async function handleMessage(
         console.log(error);
       }
       break;
+
+    case "awaiting_payment_confirmation":
+      await MensagensComuns(
+        celular,
+        "⏳ Sua solicitação está em andamento. Assim que o pagamento for confirmado, enviaremos o link para assinatura aqui nesta conversa.",
+      );
+      break;
+
+    case "awaiting_signature_link":
+      await MensagensComuns(
+        celular,
+        "⏳ Sua solicitação está em andamento. Em breve enviaremos o link para assinatura aqui nesta conversa.",
+      );
+      break;
   }
 
   console.log(`Nova sessão para ${celular}:`, session);

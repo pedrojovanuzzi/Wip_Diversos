@@ -329,7 +329,7 @@ export async function iniciarMudanca(
             console.error("Erro ao salvar solicitação de mudança de endereço:", e);
           }
 
-          await Finalizar(resumoMudanca, celular);
+          await Finalizar(resumoMudanca, celular, true);
 
           if (formaPagto === "Paga com Pix" && lancamento) {
             try {
@@ -357,14 +357,15 @@ export async function iniciarMudanca(
                 "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para concluir o envio da cobrança e do Termo de Alteração de Endereço. Obrigado pela confiança!",
               );
             }
+            session.stage = "awaiting_payment_confirmation";
           } else {
             await MensagensComuns(
               celular,
               "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para enviar o link com Termo de Alteração de Endereço. Obrigado pela confiança!",
             );
+            session.stage = "awaiting_signature_link";
           }
 
-          session.stage = "finalizar";
           return;
         }
       }

@@ -430,13 +430,15 @@ export async function MensagensDeMidia(
   }
 }
 
-export async function Finalizar(msg: any, celular: any) {
+export async function Finalizar(msg: any, celular: any, keepSession = false) {
   try {
     await MensagensComuns(process.env.TEST_PHONE, msg);
-    if (sessions[celular] && sessions[celular].inactivityTimer) {
-      clearTimeout(sessions[celular].inactivityTimer);
+    if (!keepSession) {
+      if (sessions[celular] && sessions[celular].inactivityTimer) {
+        clearTimeout(sessions[celular].inactivityTimer);
+      }
+      deleteSession(celular);
     }
-    deleteSession(celular);
 
     await saveOutgoingMessage(msg);
   } catch (error) {

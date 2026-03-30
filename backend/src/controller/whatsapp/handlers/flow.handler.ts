@@ -94,6 +94,38 @@ export async function Flow(req: Request, res: Response): Promise<void> {
         }
       }
 
+      if (screen === "MUDANCA_COMODO") {
+        const celular = flow_token.split("_")[1];
+
+        const dbSession = await ApiMkDataSource.getRepository(
+          Sessions,
+        ).findOne({ where: { celular } });
+        if (dbSession) {
+          sessions[celular] = {
+            stage: dbSession.stage,
+            ...dbSession.dados,
+          };
+        } else if (!sessions[celular]) {
+          sessions[celular] = { stage: "start" };
+        }
+
+        const session = sessions[celular];
+
+        if (session) {
+          session.dadosCadastro = {
+            observacao: limparEndereco(
+              data.observacao || data.nome || data.descricao || "",
+            ),
+          };
+
+          try {
+            await saveSession(celular);
+          } catch (e) {
+            console.error("Erro ao salvar sessão do Webhook Flow (Cômodo)", e);
+          }
+        }
+      }
+
       const successScreenData = {
         screen: "SUCCESS",
         data: {
