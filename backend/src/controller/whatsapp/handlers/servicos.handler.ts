@@ -646,7 +646,7 @@ export async function handleChooseTypePayment(
   texto: any,
   session: any,
 ) {
-  if (texto === "Pix" || texto === "Dinheiro" || texto === "Cartão") {
+  if (texto === "Pix") {
     if (session.service === "mudanca_endereco") {
       if (texto !== "Pix") {
         await MensagensComuns(
@@ -704,8 +704,6 @@ export async function handleChooseTypeComodo(
       celular,
       "Escolha Forma de Pagamento",
       "Pix",
-      "Cartão",
-      "Dinheiro",
     );
     session.stage = "choose_type_payment";
   } else if (
