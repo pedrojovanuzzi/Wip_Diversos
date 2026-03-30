@@ -9,6 +9,7 @@ import { validarCPF } from "../utils/validation";
 import { sendServiceEmail } from "../services/email.service";
 import { sessions, saveSession } from "../services/session.service";
 import Pix from "../../Pix";
+import ZapSign from "../../ZapSign";
 import moment from "moment-timezone";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -93,7 +94,7 @@ async function salvarSolicitacaoMudancaEndereco(
     telefone_conversa: celularConversa || dadosFlow.celular || session.celular || null,
   };
 
-  await repo.save(novaSolicitacao);
+  return await repo.save(novaSolicitacao);
 }
 
 export async function finalizarMudancaEndereco(
@@ -323,8 +324,13 @@ export async function iniciarMudanca(
             }
           }
 
+          let solicitacaoSalva: SolicitacaoServico | null = null;
           try {
-            await salvarSolicitacaoMudancaEndereco(session, dadosFlow, celular);
+            solicitacaoSalva = await salvarSolicitacaoMudancaEndereco(
+              session,
+              dadosFlow,
+              celular,
+            );
           } catch (e) {
             console.error("Erro ao salvar solicitação de mudança de endereço:", e);
           }
@@ -359,11 +365,42 @@ export async function iniciarMudanca(
             }
             session.stage = "awaiting_payment_confirmation";
           } else {
-            await MensagensComuns(
-              celular,
-              "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para enviar o link com Termo de Alteração de Endereço. Obrigado pela confiança!",
-            );
-            session.stage = "awaiting_signature_link";
+            try {
+              const payloadZap = {
+                ...(solicitacaoSalva?.dados || dadosFlow),
+                valor: "0.00",
+              };
+              const zapResponse =
+                await ZapSign.createContractMudancaEndereco(payloadZap as any);
+              const zapSignUrl = zapResponse.signers[0].sign_url;
+
+              if (solicitacaoSalva) {
+                solicitacaoSalva.token_zapsign = zapResponse.token;
+                await AppDataSource.getRepository(SolicitacaoServico).save(
+                  solicitacaoSalva,
+                );
+              }
+
+              await MensagensComuns(
+                celular,
+                "✅ Recebemos a sua solicitação!\nAqui está o link com Termo de Alteração de Endereço para assinatura. Obrigado pela confiança!",
+              );
+              await MensagensComuns(
+                celular,
+                `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+              );
+              session.stage = "awaiting_signature_link";
+            } catch (e) {
+              console.error(
+                "Erro ao gerar link de assinatura da mudança de endereço grátis:",
+                e,
+              );
+              await MensagensComuns(
+                celular,
+                "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para enviar o link com Termo de Alteração de Endereço. Obrigado pela confiança!",
+              );
+              session.stage = "awaiting_signature_link";
+            }
           }
 
           return;

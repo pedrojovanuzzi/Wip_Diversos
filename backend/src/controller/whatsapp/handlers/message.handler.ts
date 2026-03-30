@@ -283,13 +283,13 @@ export async function handleMessage(
           session.stage = "lgpd_request";
           session.service = "instalacao";
         } else if (t === "mudança de endereço" || t === "mudanca de endereco") {
-          await LGPD(celular);
-          session.stage = "lgpd_request";
           session.service = "mudanca_endereco";
+          session.stage = "mudanca_endereco";
+          await iniciarMudanca(celular, texto, session, type);
         } else if (t === "mudança de cômodo" || t === "mudanca de comodo") {
-          await LGPD(celular);
-          session.stage = "lgpd_request";
           session.service = "mudanca_comodo";
+          session.stage = "mudanca_comodo";
+          await iniciarMudancaComodo(celular, texto, session, type);
         } else if (t === "troca de titularidade") {
           await LGPD(celular);
           session.stage = "lgpd_request";

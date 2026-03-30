@@ -39,6 +39,8 @@ const SolicitacoesServico = () => {
   const [manualTarget, setManualTarget] = useState<any | null>(null);
   const [manualCpf, setManualCpf] = useState("");
   const [manualNome, setManualNome] = useState("");
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [detailsTarget, setDetailsTarget] = useState<any | null>(null);
   const { user } = useAuth();
 
   const fetchServices = useCallback(
@@ -178,6 +180,16 @@ const SolicitacoesServico = () => {
     } finally {
       setLoadingAction(null);
     }
+  };
+
+  const handleOpenDetails = (service: any) => {
+    setDetailsTarget(service);
+    setDetailsDialogOpen(true);
+  };
+
+  const handleCloseDetails = () => {
+    setDetailsDialogOpen(false);
+    setDetailsTarget(null);
   };
 
   const handleFinalizar = async (id: number) => {
@@ -342,6 +354,13 @@ const SolicitacoesServico = () => {
                   </TableCell>
                   <TableCell>
                     <Box display="flex" gap={1}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => handleOpenDetails(service)}
+                      >
+                        Informações
+                      </Button>
                       {service.servico === "Instalação" &&
                         !service.pago &&
                         !service.gratis && (
@@ -460,6 +479,64 @@ const SolicitacoesServico = () => {
             >
               Consultar Manualmente
             </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={detailsDialogOpen}
+          onClose={handleCloseDetails}
+          fullWidth
+          maxWidth="md"
+        >
+          <DialogTitle>Dados da Solicitação</DialogTitle>
+          <DialogContent>
+            <Box display="flex" flexDirection="column" gap={1} mt={1}>
+              <Typography variant="body2">
+                <strong>Serviço:</strong> {detailsTarget?.servico || "-"}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Cliente:</strong> {detailsTarget?.login_cliente || "-"}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Data:</strong>{" "}
+                {detailsTarget?.data_solicitacao
+                  ? moment(detailsTarget.data_solicitacao).format(
+                      "DD/MM/YYYY HH:mm",
+                    )
+                  : "-"}
+              </Typography>
+
+              <Box
+                mt={1}
+                p={2}
+                border="1px solid #e5e7eb"
+                borderRadius={2}
+                bgcolor="#f8fafc"
+              >
+                {detailsTarget?.dados &&
+                Object.keys(detailsTarget.dados).length > 0 ? (
+                  Object.entries(detailsTarget.dados).map(([key, value]) => (
+                    <Typography
+                      key={key}
+                      variant="body2"
+                      style={{ marginBottom: 8, wordBreak: "break-word" }}
+                    >
+                      <strong>{key.replace(/_/g, " ")}:</strong>{" "}
+                      {value === null || value === undefined || value === ""
+                        ? "-"
+                        : String(value)}
+                    </Typography>
+                  ))
+                ) : (
+                  <Typography variant="body2">
+                    Nenhum dado adicional enviado pelo cliente.
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDetails}>Fechar</Button>
           </DialogActions>
         </Dialog>
       </Box>
