@@ -1,8 +1,10 @@
 import axios from "axios";
 import moment from "moment-timezone";
 import { v4 as uuidv4 } from "uuid";
+import AppDataSource from "../../../database/DataSource";
 import { ClientesEntities } from "../../../entities/ClientesEntities";
 import MkauthDataSource from "../../../database/MkauthSource";
+import { SolicitacaoServico } from "../../../entities/SolicitacaoServico";
 import { validarCPF, validarRG, verificaType } from "../utils/validation";
 import { limparEndereco } from "../utils/helpers";
 import { writeMessageLog } from "../utils/logging";
@@ -244,26 +246,11 @@ export async function handleAwaitingFlowCadastro(
 
       await MensagensComuns(
         celular,
-        `✅ *Cadastro recebido com sucesso!*\n\n` +
-          `👤 *Nome:* ${dadosFlow.nome}\n` +
-          `📄 *CPF:* ${dadosFlow.cpf}\n` +
-          `📍 *Endereço:* ${dadosFlow.rua}, ${dadosFlow.numero} - ${dadosFlow.bairro}\n` +
-          `🏙️ *Cidade:* ${dadosFlow.cidade}/${dadosFlow.estado}\n` +
-          `📶 *Plano:* ${planoFlow}\n\n` +
-          `💰 O Financeiro vai entrar em contato em breve para finalizar o cadastro!`,
+        "✅ Recebemos a sua solicitação!\nNossa equipe vai analisar o CPF informado e continuar os próximos passos da instalação. Obrigado pela confiança!",
       );
-
-      await MensagensComuns(
-        celular,
-        `🎉 *Agora falta pouco para finalizar sua contratação!*\n` +
-          `📩 Enviaremos o *link* para assinatura dos demais *documentos* para formalização do contrato.\n` +
-          `🙏 *Agradecemos sua preferência!*`,
-      );
-
-      await saveClienteToMkAuth(dadosFlow, planoFlow);
 
       const resumoEmailHtml =
-        `<h3>Novo Cadastro via WhatsApp Flow</h3>` +
+        `<h3>Nova Solicitação de Instalação via WhatsApp Flow</h3>` +
         `<p><b>Nome:</b> ${dadosFlow.nome}</p>` +
         `<p><b>CPF:</b> ${dadosFlow.cpf}</p>` +
         `<p><b>RG/IE:</b> ${dadosFlow.rg}</p>` +
@@ -279,7 +266,7 @@ export async function handleAwaitingFlowCadastro(
       sendServiceEmail(resumoEmailHtml);
 
       const resumoCadastro =
-        `📋 *Novo Cadastro via Flow*\n\n` +
+        `📋 *Nova Solicitação de Instalação*\n\n` +
         `👤 *Nome:* ${dadosFlow.nome}\n` +
         `📄 *CPF:* ${dadosFlow.cpf}\n` +
         `🪪 *RG/IE:* ${dadosFlow.rg}\n` +
@@ -292,8 +279,24 @@ export async function handleAwaitingFlowCadastro(
         `📶 *Plano:* ${planoFlow}\n` +
         `📅 *Vencimento:* Dia ${dadosFlow.vencimento}`;
 
-      await Finalizar(resumoCadastro, celular);
-      session.stage = "end";
+      const repo = AppDataSource.getRepository(SolicitacaoServico);
+      const novaSolicitacao = new SolicitacaoServico();
+      novaSolicitacao.servico = "Instalação";
+      novaSolicitacao.login_cliente = dadosFlow.login || "Desconhecido";
+      novaSolicitacao.data_solicitacao = new Date();
+      novaSolicitacao.assinado = false;
+      novaSolicitacao.pago = false;
+      novaSolicitacao.gratis = 0;
+      novaSolicitacao.dados = {
+        ...dadosFlow,
+        plano: planoFlow,
+        vencimento: dadosFlow.vencimento,
+        telefone_conversa: celular,
+      };
+      await repo.save(novaSolicitacao);
+
+      await Finalizar(resumoCadastro, celular, true);
+      session.stage = "awaiting_manual_review";
       return true;
     }
   } catch (e) {
@@ -401,7 +404,7 @@ export async function handleFinalRegister(
   if (texto.toLowerCase() === "sim, li e aceito") {
     await MensagensComuns(
       celular,
-      "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Vamos realizar a *Consulta do seu CPF*. \nUm de nossos *atendentes* entrará em contato para finalizar a sua *contratação* enviando o *link* com os *Termos de Adesão e Contrato de Permanência* a serem *assinados*\n\n*Clique no Botão abaixo para finalizar*",
+      "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nSua solicitação será enviada para análise da equipe, que poderá *consultar o CPF* ou *ignorar a consulta* para seguir com a instalação.",
     );
     let dadosCliente = session.dadosCompleto
       ? JSON.stringify(session.dadosCompleto, null, 2)
@@ -414,11 +417,25 @@ export async function handleFinalRegister(
     });
 
     sendServiceEmail(session.msgDadosFinais);
+    const repo = AppDataSource.getRepository(SolicitacaoServico);
+    const novaSolicitacao = new SolicitacaoServico();
+    novaSolicitacao.servico = "Instalação";
+    novaSolicitacao.login_cliente =
+      session.dadosCompleto?.login || "Desconhecido";
+    novaSolicitacao.data_solicitacao = new Date();
+    novaSolicitacao.assinado = false;
+    novaSolicitacao.pago = false;
+    novaSolicitacao.gratis = 0;
+    novaSolicitacao.dados = {
+      ...session.dadosCompleto,
+      plano: session.planoEscolhido,
+      vencimento: session.vencimentoEscolhido,
+      telefone_conversa: celular,
+    };
+    await repo.save(novaSolicitacao);
 
-    await saveClienteToMkAuth(session.dadosCompleto, session.planoEscolhido, session.vencimentoEscolhido);
-
-    await MensagemBotao(celular, "Concluir Solicitação", "Finalizar");
-    session.stage = "finalizar";
+    await Finalizar(session.msgDadosFinais, celular, true);
+    session.stage = "awaiting_manual_review";
   } else if (
     texto.toLowerCase() === "não" ||
     texto.toLowerCase() === "nao"

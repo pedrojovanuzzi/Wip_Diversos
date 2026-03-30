@@ -920,6 +920,23 @@ export async function handleMessage(
         session.stage = "options_start";
       }
       break;
+
+    case "awaiting_manual_review":
+      if (
+        verificaType(type) &&
+        (texto.toLowerCase() === "inicio" || texto.toLowerCase() === "início")
+      ) {
+        await boasVindas(celular);
+        await MensagemBotao(
+          celular,
+          "Escolha a Opção",
+          "Boleto/Pix",
+          "Serviços/Contratação",
+          "Falar com Atendente",
+        );
+        session.stage = "options_start";
+      }
+      break;
   }
 
   console.log(`Nova sessão para ${celular}:`, session);
