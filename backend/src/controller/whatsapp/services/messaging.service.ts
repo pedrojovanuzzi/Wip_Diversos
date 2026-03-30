@@ -20,6 +20,10 @@ const defaultJobOptions = {
 };
 
 async function saveOutgoingMessage(content: string) {
+  if (!conversation.conv_id) {
+    return;
+  }
+
   await ApiMkDataSource.getRepository(Mensagens).save({
     conv_id: conversation.conv_id as number,
     sender_id: conversation.receiver_id,
@@ -57,6 +61,34 @@ export async function MensagensComuns(recipient_number: any, msg: any) {
     await saveOutgoingMessage(msg);
   } catch (error) {
     console.error("Error queueing message:", error);
+  }
+}
+
+export async function enviarNotificacaoServico(recipient_number: any) {
+  try {
+    await whatsappOutgoingQueue.add(
+      "send-template",
+      {
+        url,
+        payload: {
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: recipient_number,
+          type: "template",
+          template: {
+            name: "notificacao_servico",
+            language: { code: "pt_BR" },
+          },
+        },
+        headers: authHeaders(),
+      },
+      defaultJobOptions,
+    );
+  } catch (error: any) {
+    console.error(
+      "Error queueing notificacao_servico template:",
+      error.message,
+    );
   }
 }
 
