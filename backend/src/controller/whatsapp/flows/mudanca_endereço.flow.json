@@ -1,0 +1,198 @@
+{
+  "version": "7.3",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "MUDANCA_ENDERECO": [
+      "SUCCESS"
+    ],
+    "SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "MUDANCA_ENDERECO",
+      "title": "Mudança de Endereço",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "flow_path",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Dados para Mudança"
+              },
+              {
+                "type": "TextBody",
+                "text": "Por gentileza, preencha os dados abaixo com o seu novo endereço."
+              },
+              {
+                "type": "TextInput",
+                "name": "nome",
+                "label": "Nome Completo",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "name": "cpf",
+                "label": "CPF/CNPJ",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "name": "celular",
+                "label": "Celular com DDD",
+                "required": true,
+                "input-type": "phone"
+              },
+              {
+                "type": "TextInput",
+                "name": "rua",
+                "label": "Novo Endereço (Rua)",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "name": "numero",
+                "label": "Número (ou S/N)",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "name": "novo_bairro",
+                "label": "Novo Bairro",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "name": "cep",
+                "label": "CEP",
+                "required": true,
+                "input-type": "number"
+              },
+              {
+                "type": "TextInput",
+                "name": "cidade",
+                "label": "Cidade",
+                "required": true,
+                "input-type": "text"
+              },
+               {
+                "type": "Dropdown",
+                "name": "estado",
+                "label": "Estado",
+                "required": true,
+                "data-source": [
+                  { "id": "AC", "title": "Acre" },
+                  { "id": "AL", "title": "Alagoas" },
+                  { "id": "AP", "title": "Amapá" },
+                  { "id": "AM", "title": "Amazonas" },
+                  { "id": "BA", "title": "Bahia" },
+                  { "id": "CE", "title": "Ceará" },
+                  { "id": "DF", "title": "Distrito Federal" },
+                  { "id": "ES", "title": "Espírito Santo" },
+                  { "id": "GO", "title": "Goiás" },
+                  { "id": "MA", "title": "Maranhão" },
+                  { "id": "MT", "title": "Mato Grosso" },
+                  { "id": "MS", "title": "Mato Grosso do Sul" },
+                  { "id": "MG", "title": "Minas Gerais" },
+                  { "id": "PA", "title": "Pará" },
+                  { "id": "PB", "title": "Paraíba" },
+                  { "id": "PR", "title": "Paraná" },
+                  { "id": "PE", "title": "Pernambuco" },
+                  { "id": "PI", "title": "Piauí" },
+                  { "id": "RJ", "title": "Rio de Janeiro" },
+                  { "id": "RN", "title": "Rio Grande do Norte" },
+                  { "id": "RS", "title": "Rio Grande do Sul" },
+                  { "id": "RO", "title": "Rondônia" },
+                  { "id": "RR", "title": "Roraima" },
+                  { "id": "SC", "title": "Santa Catarina" },
+                  { "id": "SP", "title": "São Paulo" },
+                  { "id": "SE", "title": "Sergipe" },
+                  { "id": "TO", "title": "Tocantins" }
+                ]
+              },
+              {
+                "type": "Footer",
+                "label": "Enviar Dados",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+  "action": "submit_mudanca_endereco",
+  "nome": "${form.nome}",
+  "cpf": "${form.cpf}",
+  "celular": "${form.celular}",
+  "rua": "${form.rua}",
+  "numero": "${form.numero}",
+  "novo_bairro": "${form.novo_bairro}",
+  "cep": "${form.cep}",
+  "cidade": "${form.cidade}", 
+  "estado": "${form.estado}" 
+}
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESS",
+      "title": "Sucesso",
+      "terminal": true,
+      "data": {
+        "extension_message_response": {
+          "type": "object",
+          "properties": {
+            "params": {
+              "type": "object",
+              "properties": {
+                "flow_token": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "__example__": {
+            "params": {
+              "flow_token": "sessao_123456"
+            }
+          }
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Dados Recebidos!"
+          },
+          {
+            "type": "TextBody",
+            "text": "Recebemos seus dados. Por favor, feche esta janela para continuar o atendimento."
+          },
+          {
+            "type": "Footer",
+            "label": "Finalizar",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "extension_message_response": {
+                  "params": {
+                    "flow_token": "${data.extension_message_response.params.flow_token}"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -63,6 +63,18 @@ export async function Flow(req: Request, res: Response): Promise<void> {
 
     if (action === "INIT") {
       const planosDoSistema = await getPlanosDoSistema();
+      if (screen === "ALTERACAO_PLANO") {
+        const screenData = {
+          screen: "ALTERACAO_PLANO",
+          data: { planos_do_sistema: planosDoSistema },
+        };
+
+        res.send(
+          encryptFlowResponse(screenData, aesKeyBuffer, initialVectorBuffer),
+        );
+        return;
+      }
+
       const screenData = {
         screen: "CADASTRO_COMPLETO",
         data: { planos_do_sistema: planosDoSistema },
@@ -171,6 +183,37 @@ export async function Flow(req: Request, res: Response): Promise<void> {
             await saveSession(celular);
           } catch (e) {
             console.error("Erro ao salvar sessão do Webhook Flow (Cômodo)", e);
+          }
+        }
+      }
+
+      if (screen === "ALTERACAO_PLANO") {
+        const celular = flow_token.split("_")[1];
+
+        const dbSession = await ApiMkDataSource.getRepository(
+          Sessions,
+        ).findOne({ where: { celular } });
+        if (dbSession) {
+          sessions[celular] = {
+            stage: dbSession.stage,
+            ...dbSession.dados,
+          };
+        } else if (!sessions[celular]) {
+          sessions[celular] = { stage: "start" };
+        }
+
+        const session = sessions[celular];
+
+        if (session) {
+          session.dadosCadastro = {
+            ...(session.dadosCadastro || {}),
+            plano: data.plano || "",
+          };
+
+          try {
+            await saveSession(celular);
+          } catch (e) {
+            console.error("Erro ao salvar sessão do Webhook Flow (Troca de Plano)", e);
           }
         }
       }

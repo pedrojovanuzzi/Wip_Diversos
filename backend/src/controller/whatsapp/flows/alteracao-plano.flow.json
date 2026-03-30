@@ -1,0 +1,81 @@
+{
+  "version": "7.3",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "ALTERACAO_PLANO": []
+  },
+  "screens": [
+    {
+      "id": "ALTERACAO_PLANO",
+      "title": "Alteracao de Plano",
+      "data": {
+        "planos_do_sistema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            {
+              "id": "_FIBRA_400MEGA",
+              "title": "Fibra Urbano: 400 MEGA - R$ 89,90"
+            },
+            {
+              "id": "_FIBRA_500MEGA",
+              "title": "Fibra Urbano: 500 MEGA - R$ 99,90"
+            },
+            {
+              "id": "_RADIO20M",
+              "title": "Radio: 20 MEGA - R$ 89,90"
+            }
+          ]
+        }
+      },
+      "terminal": true,
+      "success": true,
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_alteracao_plano",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Solicitacao de Alteracao de Plano"
+              },
+              {
+                "type": "TextBody",
+                "text": "Escolha abaixo o plano desejado para enviar a sua solicitacao."
+              },
+              {
+                "type": "Dropdown",
+                "name": "plano_escolhido",
+                "label": "Escolha o plano",
+                "required": true,
+                "data-source": "${data.planos_do_sistema}"
+              },
+              {
+                "type": "Footer",
+                "label": "Enviar Solicitacao",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "plano": "${form.plano_escolhido}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
