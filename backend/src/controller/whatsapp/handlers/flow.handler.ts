@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import axios from "axios";
 import { decryptFlowRequest, encryptFlowResponse } from "../utils/crypto";
-import { limparEndereco } from "../utils/helpers";
+import { limparEndereco, limparNomeRua } from "../utils/helpers";
 import { sessions, saveSession } from "../services/session.service";
 import { getPlanosDoSistema } from "../services/plano.service";
 import ApiMkDataSource from "../../../database/API_MK";
@@ -124,7 +124,7 @@ export async function Flow(req: Request, res: Response): Promise<void> {
             nome: limparEndereco(data.nome),
             cpf: session.cpf || data.cpf,
             celular: data.celular,
-            rua: limparEndereco(data.rua),
+            rua: limparNomeRua(data.rua),
             numero: limparEndereco(data.numero),
             bairro: limparEndereco(data.novo_bairro),
             novo_bairro: limparEndereco(data.novo_bairro),

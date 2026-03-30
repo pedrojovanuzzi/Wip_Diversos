@@ -6,7 +6,7 @@ import { ClientesEntities } from "../../../entities/ClientesEntities";
 import MkauthDataSource from "../../../database/MkauthSource";
 import { SolicitacaoServico } from "../../../entities/SolicitacaoServico";
 import { validarCPF, validarRG, verificaType } from "../utils/validation";
-import { limparEndereco } from "../utils/helpers";
+import { limparEndereco, limparNomeRua } from "../utils/helpers";
 import { writeMessageLog } from "../utils/logging";
 import { sendServiceEmail } from "../services/email.service";
 import { sessions, deleteSession } from "../services/session.service";
@@ -217,6 +217,8 @@ export async function handleAwaitingFlowCadastro(
           console.error("Erro ao buscar CEP no ViaCEP (instalação):", e);
         }
       }
+
+      dadosFlow.rua = limparNomeRua(dadosFlow.rua || "");
 
       const cpfValido = validarCPF(dadosFlow.cpf || "");
       const rgValido = validarRG(dadosFlow.rg || "");
@@ -544,7 +546,7 @@ async function saveClienteToMkAuth(dados: any, plano: string, vencimento?: strin
         "$3-$2-$1",
       ),
       numero: limparEndereco(dados.numero || ""),
-      endereco: limparEndereco(dados.rua || ""),
+      endereco: limparNomeRua(dados.rua || ""),
       cep: `${(dados.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dados.cep || "").trim().replace(/\s/g, "").slice(5)}`,
       plano: plano,
       pool_name: "LAN_PPPOE",
@@ -572,7 +574,7 @@ async function saveClienteToMkAuth(dados: any, plano: string, vencimento?: strin
       cidade_res: limparEndereco(dados.cidade || ""),
       cep_res: `${(dados.cep || "").trim().replace(/\s/g, "").slice(0, 5)}-${(dados.cep || "").trim().replace(/\s/g, "").slice(5)}`,
       numero_res: limparEndereco(dados.numero || ""),
-      endereco_res: limparEndereco(dados.rua || ""),
+      endereco_res: limparNomeRua(dados.rua || ""),
       tipo_cob: "titulo",
       mesref: "now",
       prilanc: "tot",

@@ -546,7 +546,8 @@ class ZapSign {
       .replace(/[\u0300-\u036f]/g, "");
     if (isStreet) {
       clean = clean
-        .replace(/^(RUA|AVENIDA|AV|R\.|TRAVESSA|TRAV|PCA|PRACA)\s+/i, "")
+        .replace(/[^A-Z\s]/g, " ")
+        .replace(/\s+/g, " ")
         .trim();
     }
     return clean;
@@ -706,22 +707,6 @@ class ZapSign {
         cep: dados.cep
           ? `${dados.cep.replace(/\D/g, "").slice(0, 5)}-${dados.cep.replace(/\D/g, "").slice(5, 8)}`
           : client.cep,
-        endereco_res: this.limparEndereco(
-          dados.rua || dados.endereco || "",
-          true,
-        ),
-        numero_res: this.limparEndereco(dados.numero || ""),
-        bairro_res: this.limparEndereco(dados.bairro || ""),
-        cidade_res: this.FormatarCidade(
-          this.limparEndereco(dados.cidade || ""),
-        ),
-        estado_res: (dados.estado || "")
-          .toUpperCase()
-          .replace(/\s/g, "")
-          .slice(0, 2),
-        cep_res: dados.cep
-          ? `${dados.cep.replace(/\D/g, "").slice(0, 5)}-${dados.cep.replace(/\D/g, "").slice(5, 8)}`
-          : client.cep_res,
       });
     }
   }

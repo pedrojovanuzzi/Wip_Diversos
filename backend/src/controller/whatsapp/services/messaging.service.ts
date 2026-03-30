@@ -324,7 +324,11 @@ export async function MensagemFlow(
         },
         headers: authHeaders(),
       },
-      defaultJobOptions,
+      {
+        removeOnComplete: true,
+        removeOnFail: false,
+        attempts: 1,
+      },
     );
 
     console.log(`Flow '${flowName}' enviado para ${receivenumber}`);

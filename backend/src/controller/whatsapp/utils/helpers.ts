@@ -28,3 +28,13 @@ export function limparEndereco(texto: string) {
     .trim()
     .toUpperCase();
 }
+
+export function limparNomeRua(texto: string) {
+  return (texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
