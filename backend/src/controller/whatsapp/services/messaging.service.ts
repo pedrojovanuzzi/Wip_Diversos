@@ -341,6 +341,66 @@ export async function MensagemFlowEndereco(
   }
 }
 
+ export async function MensagemFlowMudancaComodo(
+    receivenumber: any,
+    flowName: string,
+    ctaText: string,
+  ) {
+    try {
+      const planoAviso =
+        "⚠️ *Atenção*: Contratação sujeita à *análise técnica e consulta cadastral (CPF/CNPJ)*. Podendo influenciar na disponibilidade, valores da instalação (grátis ou paga), valor do plano e condições do serviço.\n\n✅ *A contratação será confirmada após a análise*. Se estiver de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
+
+      // await this.MensagensComuns(receivenumber, planoAviso);
+
+      await whatsappOutgoingQueue.add(
+        "send-flow",
+        {
+          url,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: receivenumber,
+            type: "interactive",
+            interactive: {
+              type: "flow",
+              body: {
+                text: "Preencha o formulário abaixo para prosseguir com a mudança de cômodo.",
+              },
+              action: {
+                name: "flow",
+                parameters: {
+                  flow_message_version: "3",
+                  flow_name: flowName,
+                  flow_cta: ctaText,
+                  flow_token: `sessao_${receivenumber}_${Date.now()}`,
+                  flow_action: "navigate",
+                  flow_action_payload: {
+                    screen: "MUDANCA_COMODO",
+                  },
+                  mode: "published",
+                },
+              },
+            },
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
+        },
+      );
+
+      console.log(`Flow '${flowName}' enviado para ${receivenumber}`);
+    } catch (error: any) {
+      console.error("Erro ao enviar Flow de Mudança de Cômodo:", error.message);
+    }
+  }
+
 export async function MensagensDeMidia(
   receivenumber: any,
   type: any,
