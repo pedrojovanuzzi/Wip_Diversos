@@ -52,6 +52,7 @@ import {
   handleChooseWifiEst,
   handleWifiEstFinalize,
   handleChooseTypeTrocaPlano,
+  handleAwaitingTrocaPlanoFlow,
   handleSelectPlanTroca,
   handlePlanTrocaFinal,
   handleFinishTrocaPlan,
@@ -233,7 +234,7 @@ export async function handleMessage(
                   { id: "option_2", title: "Mudança de Endereço" },
                   { id: "option_3", title: "Mudança de Cômodo" },
                   // { id: "option_4", title: "Troca de Titularidade" },
-                  // { id: "option_5", title: "Alteração de Plano" },
+                  { id: "option_5", title: "Alteração de Plano" },
                   // { id: "option_6", title: "Renovação Contratual" },
                   // { id: "option_7", title: "Wifi Estendido" },
                 ],
@@ -566,6 +567,10 @@ export async function handleMessage(
           msgRobo + "Selecione uma Opção dos Botoes",
         );
       }
+      break;
+
+    case "awaiting_troca_plano_flow":
+      await handleAwaitingTrocaPlanoFlow(celular, texto, session);
       break;
 
     case "plan_troca_final":

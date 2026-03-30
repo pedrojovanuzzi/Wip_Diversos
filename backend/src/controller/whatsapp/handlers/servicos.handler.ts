@@ -19,10 +19,12 @@ import {
   MensagemTermos,
   MensagemLista,
   MensagemFlowEndereco,
+  MensagemFlowTrocaPlano,
   MensagemFlowMudancaComodo,
   Finalizar,
   boasVindas,
 } from "../services/messaging.service";
+import { getPlanosDoSistema } from "../services/plano.service";
 
 // --- Coleta de dados genérica ---
 interface Pergunta {
@@ -590,21 +592,98 @@ export async function iniciarTrocaPlano(
   session: any,
   type: any,
 ) {
-  await coletarDados(
-    celular,
-    texto,
-    session,
-    type,
-    perguntasBasicas,
-    "🔤 Pronto, agora vamos coletar todos os *Dados* para realizar a Alteração de Plano",
-    async () => {
-      await MensagemTermos(
+  if (type !== "text" && type !== "interactive" && type !== undefined) {
+    await MensagensComuns(
+      celular,
+      "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite",
+    );
+    return;
+  }
+
+  if (!session.trocaPlanoStep) {
+    session.trocaPlanoStep = "ask_cpf";
+    await MensagensComuns(
+      celular,
+      "Para iniciar a alteração de plano, por favor digite o seu *CPF/CNPJ*:",
+    );
+    session.stage = "troca_plano";
+    return;
+  }
+
+  if (session.trocaPlanoStep === "ask_cpf") {
+    const cpf = texto.replace(/[^\d]+/g, "");
+    const cpfValido = validarCPF(texto);
+
+    if (!cpfValido && cpf.length !== 14 && cpf.length !== 11) {
+      await MensagensComuns(
         celular,
-        "Finalizando....",
-        `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
-        "Ler o contrato",
-        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
+        "❌ *CPF/CNPJ* inválido. Por favor, verifique e digite novamente.",
       );
+      return;
+    }
+
+    session.cpf = cpf;
+    const sis_cliente = await MkauthDataSource.getRepository(Sis_Cliente).find({
+      select: {
+        id: true,
+        nome: true,
+        endereco: true,
+        login: true,
+        numero: true,
+        email: true,
+        rg: true,
+        cpf_cnpj: true,
+        celular: true,
+      },
+      where: { cpf_cnpj: cpf, cli_ativado: "s" },
+    });
+
+    if (sis_cliente.length > 1) {
+      let currentIndex = 1;
+      const structuredData = sis_cliente.map((client) => ({
+        index: currentIndex++,
+        id: Number(client.id),
+        nome: client.nome,
+        endereco: client.endereco,
+        login: client.login,
+        numero: client.numero,
+        cpf,
+        email: client.email,
+        rg: client.rg,
+        celular: client.celular,
+      }));
+
+      session.structuredDataTrocaPlano = structuredData;
+      session.trocaPlanoStep = "select_address";
+
+      let messageText =
+        "🔍 Encontramos mais de um *Cadastro!* Digite o *Número* para o qual deseja realizar a Alteração de Plano 👇🏻\n\n";
+      structuredData.forEach((client) => {
+        messageText += `*${client.index}* Nome: ${client.nome}, Endereço: ${client.endereco} N: ${client.numero}\n\n`;
+      });
+      messageText += "👉🏻 Caso queira cancelar digite *início*";
+
+      await MensagensComuns(celular, messageText);
+      return;
+    }
+
+    if (sis_cliente.length === 1) {
+      session.login = sis_cliente[0].login;
+      session.nome = sis_cliente[0].nome;
+      session.email = sis_cliente[0].email;
+      session.rg = sis_cliente[0].rg;
+      session.endereco_troca_plano = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
+      session.celularCliente = sis_cliente[0].celular;
+      session.dadosCompleto = {
+        nome: sis_cliente[0].nome,
+        cpf,
+        email: sis_cliente[0].email,
+        rg: sis_cliente[0].rg,
+        celular: sis_cliente[0].celular,
+        login: sis_cliente[0].login,
+        endereco: `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`,
+      };
+
       await MensagemTermos(
         celular,
         "Termos Alteração de Plano",
@@ -619,8 +698,82 @@ export async function iniciarTrocaPlano(
         "Não",
       );
       session.stage = "choose_type_troca_plano";
-    },
-  );
+      return;
+    }
+
+    await MensagensComuns(
+      celular,
+      "🙁 Seu cadastro *não* foi *encontrado*, verifique se digitou corretamente o seu *CPF/CNPJ* ou digite *início* para voltar.",
+    );
+    return;
+  }
+
+  if (session.trocaPlanoStep === "select_address") {
+    if (
+      texto.toLowerCase() === "inicio" ||
+      texto.toLowerCase() === "início"
+    ) {
+      session.trocaPlanoStep = undefined;
+      session.structuredDataTrocaPlano = undefined;
+      session.login = undefined;
+      await boasVindas(celular);
+      await MensagemBotao(
+        celular,
+        "Escolha um Botão",
+        "Boleto/Pix",
+        "Serviços/Contratação",
+        "Falar com Atendente",
+      );
+      session.stage = "options_start";
+      return;
+    }
+
+    const selectedIndex = parseInt(texto, 10) - 1;
+
+    if (
+      !isNaN(selectedIndex) &&
+      selectedIndex >= 0 &&
+      selectedIndex < session.structuredDataTrocaPlano.length
+    ) {
+      const selectedClient = session.structuredDataTrocaPlano[selectedIndex];
+      session.login = selectedClient.login;
+      session.nome = selectedClient.nome;
+      session.email = selectedClient.email;
+      session.rg = selectedClient.rg;
+      session.endereco_troca_plano = `${selectedClient.endereco}, ${selectedClient.numero}`;
+      session.celularCliente = selectedClient.celular;
+      session.dadosCompleto = {
+        nome: selectedClient.nome,
+        cpf: session.cpf,
+        email: selectedClient.email,
+        rg: selectedClient.rg,
+        celular: selectedClient.celular,
+        login: selectedClient.login,
+        endereco: `${selectedClient.endereco}, ${selectedClient.numero}`,
+      };
+
+      await MensagemTermos(
+        celular,
+        "Termos Alteração de Plano",
+        "📄 Para dar *continuidade*, é preciso que *leia* o *Termo abaixo* e escolha a opção que deseja",
+        "Ler Termos",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/altera_plano",
+      );
+      await MensagemBotao(
+        celular,
+        "Escolha a Opção",
+        "Sim Concordo",
+        "Não",
+      );
+      session.stage = "choose_type_troca_plano";
+      return;
+    }
+
+    await MensagensComuns(
+      celular,
+      "⚠️ Opção *inválida*, por favor digite o número correto da opção desejada.",
+    );
+  }
 }
 
 // --- Renovação Contratual ---
@@ -950,13 +1103,18 @@ export async function handleChooseTypeTrocaPlano(
   session: any,
 ) {
   if (texto.toLowerCase() === "sim concordo") {
-    await MensagemBotao(
+    const planosDoSistema = await getPlanosDoSistema();
+    await MensagensComuns(
       celular,
-      "Escolha qual seu *Tipo* de *Tecnologia*: \n(Caso tenha dúvida, pergunte para nossos atendentes)",
-      "Fibra",
-      "Rádio",
+      "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nAgora, escolha no formulário abaixo o novo plano desejado.",
     );
-    session.stage = "select_plan_troca";
+    await MensagemFlowTrocaPlano(
+      celular,
+      "alteracao_plano",
+      "Escolher Plano",
+      planosDoSistema,
+    );
+    session.stage = "awaiting_troca_plano_flow";
   } else if (
     texto.toLowerCase() === "nao" ||
     texto.toLowerCase() === "não"
@@ -969,6 +1127,41 @@ export async function handleChooseTypeTrocaPlano(
     delete sessions[celular];
   } else {
     await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
+  }
+}
+
+export async function handleAwaitingTrocaPlanoFlow(
+  celular: any,
+  texto: any,
+  session: any,
+) {
+  try {
+    const payload = JSON.parse(texto);
+    const planoEscolhido = payload.plano || payload.plano_escolhido;
+
+    if (!planoEscolhido) {
+      await MensagensComuns(
+        celular,
+        "📋 Por favor, escolha um plano no formulário enviado acima para continuar.",
+      );
+      return;
+    }
+
+    session.planoEscolhido = planoEscolhido;
+    session.observacaoTrocaPlano = payload.observacao || "";
+    session.stage = "finish_troca_plan";
+
+    await MensagemBotao(
+      celular,
+      "Clique em *Concluir* para Terminar a *Alteração de Plano*",
+      "Concluir",
+    );
+    return;
+  } catch (error) {
+    await MensagensComuns(
+      celular,
+      "📋 Por favor, preencha o formulário de alteração de plano clicando no botão enviado acima.",
+    );
   }
 }
 
