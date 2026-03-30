@@ -95,8 +95,6 @@ export async function Flow(req: Request, res: Response): Promise<void> {
         const session = sessions[celular];
 
         if (session) {
-          const dadosCep = await buscarDadosCep(data.cep);
-
           let emailCliente = "";
           let rgCliente = "";
           try {
@@ -111,6 +109,15 @@ export async function Flow(req: Request, res: Response): Promise<void> {
             console.error("Erro ao buscar cliente no MKAuth para mudança de endereço:", e);
           }
 
+          // Fallback de cidade/estado via ViaCEP apenas se o formulário não enviou esses campos
+          let cidadeForm = (data.cidade || "").trim();
+          let estadoForm = (data.estado || "").trim();
+          if (!cidadeForm || !estadoForm) {
+            const dadosCep = await buscarDadosCep(data.cep);
+            if (!cidadeForm) cidadeForm = dadosCep.cidade;
+            if (!estadoForm) estadoForm = dadosCep.estado;
+          }
+
           session.dadosCadastro = {
             login: session.login,
             endereco_antigo: session.endereco_antigo,
@@ -122,8 +129,8 @@ export async function Flow(req: Request, res: Response): Promise<void> {
             bairro: limparEndereco(data.novo_bairro),
             novo_bairro: limparEndereco(data.novo_bairro),
             cep: data.cep,
-            cidade: dadosCep.cidade,
-            estado: dadosCep.estado,
+            cidade: cidadeForm,
+            estado: estadoForm,
             email: emailCliente,
             rg: rgCliente,
           };
