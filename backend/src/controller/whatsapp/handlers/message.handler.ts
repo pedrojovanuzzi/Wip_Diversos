@@ -935,6 +935,11 @@ export async function handleMessage(
           "Falar com Atendente",
         );
         session.stage = "options_start";
+      } else if (verificaType(type)) {
+        await MensagensComuns(
+          celular,
+          "🔎 Estamos analisando o CPF informado. Por favor, aguarde mais um momento que continuaremos o atendimento por aqui.",
+        );
       }
       break;
   }

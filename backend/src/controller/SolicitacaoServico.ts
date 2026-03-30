@@ -11,6 +11,16 @@ import Pix from "./Pix";
 import ZapSign from "./ZapSign";
 
 class SolicitacaoServicoController {
+  private isConsultaCpfConcluida(solicitacao: SolicitacaoServico): boolean {
+    return Boolean(
+      solicitacao.consulta_cpf_realizada &&
+        (solicitacao.gratis === 1 ||
+          solicitacao.pago === true ||
+          solicitacao.id_fatura ||
+          solicitacao.token_zapsign),
+    );
+  }
+
   public list = async (req: Request, res: Response) => {
     try {
       const {
@@ -97,7 +107,7 @@ class SolicitacaoServicoController {
         return;
       }
 
-      if (solicitacao.consulta_cpf_realizada) {
+      if (this.isConsultaCpfConcluida(solicitacao)) {
         res.status(409).json({
           message: "A consulta de CPF já foi realizada para esta solicitação.",
         });
@@ -225,7 +235,7 @@ class SolicitacaoServicoController {
         return;
       }
 
-      if (solicitacao.consulta_cpf_realizada) {
+      if (this.isConsultaCpfConcluida(solicitacao)) {
         res.status(409).json({
           message: "A consulta de CPF já foi realizada para esta solicitação.",
         });
@@ -243,9 +253,6 @@ class SolicitacaoServicoController {
       const dados = (solicitacao.dados || {}) as any;
       const celular = dados.telefone_conversa;
 
-      solicitacao.consulta_cpf_realizada = true;
-      await repository.save(solicitacao);
-
       const consultCenter = new ConsultCenterService();
       const consulta = await consultCenter.consultarDebitos(cpf);
 
@@ -260,6 +267,7 @@ class SolicitacaoServicoController {
       if (consulta.devePagar) {
         solicitacao.pago = false;
         solicitacao.gratis = 0;
+        solicitacao.consulta_cpf_realizada = true;
         await repository.save(solicitacao);
 
         await MensagensComuns(
@@ -291,6 +299,7 @@ class SolicitacaoServicoController {
       } else {
         solicitacao.pago = true;
         solicitacao.gratis = 1;
+        solicitacao.consulta_cpf_realizada = true;
 
         const payloadZap = {
           ...dados,

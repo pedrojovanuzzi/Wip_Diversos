@@ -177,6 +177,7 @@ const SolicitacoesServico = () => {
       const message =
         error.response?.data?.message || "Erro ao realizar consulta manual.";
       alert(message);
+      fetchServices(page);
     } finally {
       setLoadingAction(null);
     }
@@ -365,21 +366,18 @@ const SolicitacoesServico = () => {
                         !service.pago &&
                         !service.gratis && (
                           <>
-                            <Button
-                              variant="contained"
-                              color="primary"
-                              size="small"
-                              onClick={() => handleConsultarCpf(service.id)}
-                              disabled={
-                                loadingAction === service.id ||
-                                service.consulta_cpf_realizada ||
-                                service.consulta_cpf_tentada
-                              }
-                            >
-                              Consultar CPF
-                            </Button>
-                            {service.consulta_cpf_tentada &&
-                              !service.consulta_cpf_realizada && (
+                            {!service.consulta_cpf_realizada && (
+                              <Button
+                                variant="contained"
+                                color="primary"
+                                size="small"
+                                onClick={() => handleConsultarCpf(service.id)}
+                                disabled={loadingAction === service.id}
+                              >
+                                Consultar CPF
+                              </Button>
+                            )}
+                            {service.consulta_cpf_realizada && (
                                 <Button
                                   variant="outlined"
                                   color="warning"
