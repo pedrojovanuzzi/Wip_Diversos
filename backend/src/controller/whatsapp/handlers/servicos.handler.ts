@@ -2,12 +2,6 @@ import { validarCPF, verificaType } from "../utils/validation";
 import { writeMessageLog } from "../utils/logging";
 import { sendServiceEmail } from "../services/email.service";
 import { sessions, deleteSession } from "../services/session.service";
-import MkauthDataSource from "../../../database/MkauthSource";
-import { Faturas as Record } from "../../../entities/Faturas";
-import { ClientesEntities } from "../../../entities/ClientesEntities";
-import Pix from "../../Pix";
-import moment from "moment-timezone";
-import { v4 as uuidv4 } from "uuid";
 import {
   MensagensComuns,
   MensagemBotao,
@@ -285,51 +279,6 @@ export function logAndEmailFinalize(session: any) {
   sendServiceEmail(session.msgDadosFinais);
 }
 
-async function gerarLancamentoServicoMudancaEndereco(session: any) {
-  const valor = process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 200;
-  const cpf = (session.cpf || session.dadosCompleto?.cpf || "").trim();
-  const loginSessao = session.login;
-
-  const clientesRepository = MkauthDataSource.getRepository(ClientesEntities);
-
-  let cliente: ClientesEntities | null = null;
-  if (loginSessao) {
-    cliente = await clientesRepository.findOne({
-      where: { login: loginSessao, cli_ativado: "s" },
-    });
-  }
-
-  if (!cliente && cpf) {
-    cliente = await clientesRepository.findOne({
-      where: { cpf_cnpj: cpf.replace(/\s/g, ""), cli_ativado: "s" },
-    });
-  }
-
-  if (!cliente) {
-    return null;
-  }
-
-  const faturasRepository = MkauthDataSource.getRepository(Record);
-  return await faturasRepository.save({
-    login: cliente.login,
-    nome: cliente.nome || cliente.login,
-    tipo: "servicos",
-    valor: valor.toFixed(2),
-    datavenc: new Date(),
-    processamento: new Date(),
-    status: "aberto",
-    recibo: `SRV-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
-    obs: "Serviço: Mudança de Endereço - Gerado automaticamente via WhatsApp Bot",
-    valorger: "completo",
-    aviso: "nao",
-    imp: "nao",
-    tipocob: "fat",
-    cfop_lanc: "5307",
-    referencia: moment().format("MM/YYYY"),
-    uuid_lanc: uuidv4().slice(0, 16),
-  });
-}
-
 export async function handleChooseTypePayment(
   celular: any,
   texto: any,
@@ -346,31 +295,6 @@ export async function handleChooseTypePayment(
       }
 
       session.formaPagamento = "Paga com Pix";
-
-      const lancamento = await gerarLancamentoServicoMudancaEndereco(session);
-      if (!lancamento) {
-        await MensagensComuns(
-          celular,
-          "⚠️ Não foi possível gerar o lançamento deste serviço agora. Um atendente entrará em contato em breve.",
-        );
-        return;
-      }
-
-      session.idFatura = lancamento.id;
-
-      const pixController = new Pix();
-      const pixData = await pixController.gerarPixServico({
-        idLancamento: lancamento.id,
-        valor: lancamento.valor,
-        pppoe: lancamento.login,
-        cpf: session.cpf || session.dadosCompleto?.cpf,
-      });
-
-      await MensagensComuns(
-        celular,
-        `✨ *Aqui está seu PIX para pagamento da Mudança de Endereço:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}\n\n👇 *Pix Copia e Cola:*`,
-      );
-      await MensagensComuns(celular, pixData.qrcode);
 
       await MensagensComuns(
         celular,

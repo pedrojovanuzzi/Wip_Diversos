@@ -469,12 +469,6 @@ class Pix {
                       requesterPhone = cleanReqPhone.startsWith("55") ? cleanReqPhone : "55" + cleanReqPhone;
                     }
 
-                    // Send immediate confirmation as requested
-                    await Whatsapp.MensagensComuns(
-                      requesterPhone,
-                      "✅ *Pagamento Confirmado!*\nEstaremos enviando o Link para assinatura em instantes... ⏳"
-                    );
-
                     let zapResponse;
                     if (solicitacao.servico === "Instalação") {
                       zapResponse = await ZapSign.createContractInstalacao(solicitacao.dados);
@@ -499,7 +493,7 @@ class Pix {
                 if (zapSignUrl) {
                   await Whatsapp.MensagensComuns(
                     requesterPhone,
-                    `✅ *Link Gerado!*\n\nOlá ${sis_cliente.nome}, aqui está o seu serviço: *${servicoNome}*.\n\n📄 *Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+                    `✅ *Pagamento Confirmado!*\n\nOlá ${sis_cliente.nome}, recebemos o pagamento do serviço: *${servicoNome}*.\n\n📄 *Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
                   );
                 } else {
                   await Whatsapp.MensagensComuns(
