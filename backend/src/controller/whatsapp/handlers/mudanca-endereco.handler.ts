@@ -1,7 +1,9 @@
 import ApiMkDataSource from "../../../database/API_MK";
 import MkauthDataSource from "../../../database/MkauthSource";
+import AppDataSource from "../../../database/DataSource";
 import { ClientesEntities as Sis_Cliente } from "../../../entities/ClientesEntities";
 import Sessions from "../../../entities/APIMK/Sessions";
+import { SolicitacaoServico } from "../../../entities/SolicitacaoServico";
 import { validarCPF } from "../utils/validation";
 import { sendServiceEmail } from "../services/email.service";
 import { sessions, saveSession } from "../services/session.service";
@@ -13,6 +15,32 @@ import {
   Finalizar,
   boasVindas,
 } from "../services/messaging.service";
+
+async function salvarSolicitacaoMudancaEndereco(session: any, dadosFlow: any) {
+  const repo = AppDataSource.getRepository(SolicitacaoServico);
+  const novaSolicitacao = new SolicitacaoServico();
+
+  novaSolicitacao.servico = "Mudança de Endereço";
+  novaSolicitacao.login_cliente = session.login || dadosFlow.login || "Desconhecido";
+  novaSolicitacao.data_solicitacao = new Date();
+  novaSolicitacao.assinado = false;
+  novaSolicitacao.pago = session.formaPagamento === "Paga com Pix";
+  novaSolicitacao.id_fatura = session.idFatura || null;
+  novaSolicitacao.gratis =
+    session.formaPagamento === "Grátis" ||
+    session.formaPagamento === "Grátis (Fidelidade)"
+      ? 1
+      : 0;
+  novaSolicitacao.dados = {
+    ...dadosFlow,
+    login: session.login || dadosFlow.login,
+    endereco_antigo: session.endereco_antigo || dadosFlow.endereco_antigo,
+    forma_pagamento: session.formaPagamento || "Não informada",
+    telefone_conversa: dadosFlow.celular || session.celular || null,
+  };
+
+  await repo.save(novaSolicitacao);
+}
 
 export async function finalizarMudancaEndereco(
   celular: string,
@@ -226,19 +254,17 @@ export async function iniciarMudanca(
             console.error("Erro ao enviar email de mudança de endereço:", e);
           }
 
-          await Finalizar(resumoMudanca, celular);
-
-          if (formaPagto === "Grátis") {
-            await MensagensComuns(
-              celular,
-              "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link de assinatura da Renovação Contratual com período de 12 meses*. Obrigado pela confiança!",
-            );
-          } else {
-            await MensagensComuns(
-              celular,
-              "✅ *Recebemos a sua solicitação!*\nEntraremos em contato em breve para enviar o *link com Termo de Alteração de Endereço*. Obrigado pela confiança!",
-            );
+          try {
+            await salvarSolicitacaoMudancaEndereco(session, dadosFlow);
+          } catch (e) {
+            console.error("Erro ao salvar solicitação de mudança de endereço:", e);
           }
+
+          await Finalizar(resumoMudanca, celular);
+          await MensagensComuns(
+            celular,
+            "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para enviar o link com Termo de Alteração de Endereço. Obrigado pela confiança!",
+          );
 
           session.stage = "finalizar";
           return;
