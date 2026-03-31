@@ -417,7 +417,24 @@ class ZapSign {
       const { event_type, token } = req.body;
       console.log(`[ZapSign Webhook] Evento recebido: ${event_type}`);
 
-      if (event_type === "doc_signed" || event_type === "all_signed") {
+      if (event_type === "doc_signed") {
+        // doc_signed: apenas notifica o novo titular na troca de titularidade (primeira assinatura)
+        const repo = AppDataSource.getRepository(SolicitacaoServico);
+        const solicitacao = await repo.findOne({ where: { token_zapsign: token } });
+        if (solicitacao) {
+          const servicoNorm = solicitacao.servico?.toLowerCase();
+          if (
+            (servicoNorm === "troca de titularidade titular" || servicoNorm === "troca_titularidade_titular") &&
+            !solicitacao.dados?.titular_assinou
+          ) {
+            solicitacao.dados = { ...solicitacao.dados, titular_assinou: true };
+            await repo.save(solicitacao);
+            await this.notificarNovoTitular(solicitacao);
+          }
+        }
+      }
+
+      if (event_type === "all_signed") {
         const repo = AppDataSource.getRepository(SolicitacaoServico);
 
         const solicitacao = await repo.findOne({
@@ -552,7 +569,7 @@ class ZapSign {
                   break;
                 case "troca de titularidade titular":
                 case "troca_titularidade_titular":
-                  await this.notificarNovoTitular(solicitacao);
+                  // notificarNovoTitular é chamado no doc_signed (primeira assinatura)
                   break;
                 default:
                   console.log(
@@ -603,6 +620,7 @@ class ZapSign {
         stage: "awaiting_novo_titular_autorizacao",
         service: "troca_titularidade",
         celular_titular: celularTitular,
+        sign_url_novo_titular: dados.sign_url_novo_titular || null,
         dadosTitularidadeContato: {
           nome: nomeNovoTitular,
           celular_origem: celularTitular,
@@ -831,12 +849,13 @@ class ZapSign {
       );
 
       const docToken = response.data.token;
+      let secondSigner: any = null;
 
       if (nome_novo_titular && celular_novo_titular && docToken) {
         const phoneRaw = String(celular_novo_titular).replace(/\D/g, "");
         const phoneNumber = phoneRaw.startsWith("55") ? phoneRaw.slice(2) : phoneRaw;
 
-        await axios.post(
+        const addSignerResponse = await axios.post(
           homologacao
             ? `https://sandbox.api.zapsign.com.br/api/v1/docs/${docToken}/add-signer/`
             : `https://api.zapsign.com.br/api/v1/docs/${docToken}/add-signer/`,
@@ -854,9 +873,10 @@ class ZapSign {
             },
           },
         );
+        secondSigner = addSignerResponse.data;
       }
 
-      return response.data;
+      return { ...response.data, second_signer: secondSigner };
     } catch (error) {
       console.error("Error in createContractTrocaTitularidadeTitular:", error);
       throw error;

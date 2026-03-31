@@ -1192,17 +1192,18 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
 
       const zapResponse = await ZapSign.createContractTrocaTitularidadeTitular(payloadZap as any);
       const zapSignUrl = zapResponse.signers[0].sign_url;
+      const signUrlNovoTitular = zapResponse.second_signer?.sign_url || null;
 
       const repo = AppDataSource.getRepository(SolicitacaoServico);
       const novaSolicitacao = new SolicitacaoServico();
       novaSolicitacao.servico = "Troca de Titularidade Titular";
-      novaSolicitacao.login_cliente = session.login || "Desconhecido";
+      novaSolicitacao.login_cliente = session.login || session.dadosCompleto?.login || "Desconhecido";
       novaSolicitacao.data_solicitacao = new Date();
       novaSolicitacao.assinado = false;
       novaSolicitacao.pago = false;
-      novaSolicitacao.gratis = 0;
+      novaSolicitacao.gratis = 1;
       novaSolicitacao.token_zapsign = zapResponse.token;
-      novaSolicitacao.dados = { ...payloadZap };
+      novaSolicitacao.dados = { ...payloadZap, sign_url_novo_titular: signUrlNovoTitular };
       await repo.save(novaSolicitacao);
 
       await MensagensComuns(
@@ -1320,19 +1321,8 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
     };
 
     try {
-      const payloadZapTitularidade = {
-        nome: dadosFlow.nome,
-        cpf: dadosFlow.cpf || "Não informado",
-        email: dadosFlow.email || "financeiro@wiptelecom.com.br",
-        telefone: dadosFlow.celular || celular,
-        telefone_conversa: celular,
-        endereco: `${dadosFlow.rua || ""}, ${dadosFlow.numero || ""}`,
-        rg: dadosFlow.rg || "Não informado",
-      };
-      const zapTitularidade = await ZapSign.createContractTrocaTitularidadeNovoTitular(
-        payloadZapTitularidade as any,
-      );
-      const urlTitularidade = zapTitularidade.signers[0].sign_url;
+      // Reutiliza o sign_url do 2º signatário do documento já criado pelo titular
+      const urlTitularidade = session.sign_url_novo_titular || null;
 
       const payloadZapCadastro = {
         nome: dadosFlow.nome,
@@ -1358,12 +1348,12 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
       const repo = AppDataSource.getRepository(SolicitacaoServico);
       const novaSolicitacao = new SolicitacaoServico();
       novaSolicitacao.servico = "Troca de Titularidade Novo Titular";
-      novaSolicitacao.login_cliente = dadosFlow.login || "Desconhecido";
+      novaSolicitacao.login_cliente = dadosFlow.nome || dadosFlow.login || "Novo Titular";
       novaSolicitacao.data_solicitacao = new Date();
       novaSolicitacao.assinado = false;
       novaSolicitacao.pago = false;
-      novaSolicitacao.gratis = 0;
-      novaSolicitacao.token_zapsign = zapTitularidade.token;
+      novaSolicitacao.gratis = 1;
+      novaSolicitacao.token_zapsign = zapCadastro.token;
       novaSolicitacao.dados = { ...dadosFlow, telefone_conversa: celular };
       await repo.save(novaSolicitacao);
 
