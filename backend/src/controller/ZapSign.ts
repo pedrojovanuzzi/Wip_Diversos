@@ -97,6 +97,15 @@ interface ZapSignDataTrocaTitularidade {
   nome_novo_titular?: string;
   celular_novo_titular?: string;
   celular_destino?: string;
+  // Dados completos do novo titular (para preencher os campos {{...2}})
+  cpf_novo_titular?: string;
+  rg_novo_titular?: string;
+  email_novo_titular?: string;
+  endereco_novo_titular?: string;
+  numero_novo_titular?: string;
+  bairro_novo_titular?: string;
+  celular2_novo_titular?: string;
+  login_novo_titular?: string;
 }
 
 class ZapSign {
@@ -795,6 +804,14 @@ class ZapSign {
         telefone_conversa,
         nome_novo_titular = "",
         celular_novo_titular = "",
+        cpf_novo_titular = "",
+        rg_novo_titular = "",
+        email_novo_titular = "",
+        endereco_novo_titular = "",
+        numero_novo_titular = "",
+        bairro_novo_titular = "",
+        celular2_novo_titular = "",
+        login_novo_titular = "",
       } = params;
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
@@ -830,6 +847,17 @@ class ZapSign {
           { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
           { de: "{{novotitular}}", para: nome_novo_titular },
           { de: "{{celularnovotitular}}", para: celular_novo_titular },
+          { de: "{{termo2}}", para: "Troca de Titularidade" },
+          { de: "{{logincliente2}}", para: login_novo_titular },
+          { de: "{{nomecliente2}}", para: nome_novo_titular },
+          { de: "{{cpfcliente2}}", para: cpf_novo_titular },
+          { de: "{{rgcliente2}}", para: rg_novo_titular },
+          { de: "{{enderecoresclient2}}", para: endereco_novo_titular },
+          { de: "{{numerorescliente2}}", para: numero_novo_titular },
+          { de: "{{bairrocliente2}}", para: bairro_novo_titular },
+          { de: "{{celularcliente2}}", para: celular_novo_titular },
+          { de: "{{celular2cliente2}}", para: celular2_novo_titular },
+          { de: "{{emailcliente2}}", para: email_novo_titular },
         ],
         signature_placement: "<<assinatura>>",
         rubrica_placement: "<<visto>>",

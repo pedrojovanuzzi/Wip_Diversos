@@ -1176,60 +1176,60 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
       celular_destino: celularDestino,
     };
 
-    try {
-      const payloadZap = {
-        nome: session.dadosCompleto?.nome || session.nome || "Não informado",
-        cpf: session.dadosCompleto?.cpf || session.cpf || "Não informado",
-        email: session.dadosCompleto?.email || session.email || "financeiro@wiptelecom.com.br",
-        telefone: session.dadosCompleto?.celular || session.celularCliente || celular,
-        telefone_conversa: celular,
-        endereco: session.dadosCompleto?.endereco || "Não informado",
-        rg: session.dadosCompleto?.rg || session.rg || "Não informado",
-        nome_novo_titular: nome,
-        celular_novo_titular: celularDestino,
+    // Dados do titular para usar depois na criação do documento
+    const dadosTitular = {
+      nome: session.dadosCompleto?.nome || session.nome || "Não informado",
+      cpf: session.dadosCompleto?.cpf || session.cpf || "Não informado",
+      email: session.dadosCompleto?.email || session.email || "financeiro@wiptelecom.com.br",
+      telefone: session.dadosCompleto?.celular || session.celularCliente || celular,
+      telefone_conversa: celular,
+      endereco: session.dadosCompleto?.endereco || "Não informado",
+      rg: session.dadosCompleto?.rg || session.rg || "Não informado",
+      nome_novo_titular: nome,
+      celular_novo_titular: celularDestino,
+      celular_destino: celularDestino,
+    };
+
+    // Salva a solicitação sem token (doc será criado após o novo titular preencher os dados)
+    const repo = AppDataSource.getRepository(SolicitacaoServico);
+    const novaSolicitacao = new SolicitacaoServico();
+    novaSolicitacao.servico = "Troca de Titularidade Titular";
+    novaSolicitacao.login_cliente = session.login || session.dadosCompleto?.login || "Desconhecido";
+    novaSolicitacao.data_solicitacao = new Date();
+    novaSolicitacao.assinado = false;
+    novaSolicitacao.pago = false;
+    novaSolicitacao.gratis = 1;
+    novaSolicitacao.token_zapsign = undefined;
+    novaSolicitacao.dados = { ...dadosTitular };
+    await repo.save(novaSolicitacao);
+
+    // Configura sessão do novo titular com todos os dados do titular
+    sessions[celularDestino] = {
+      ...(sessions[celularDestino] || {}),
+      stage: "awaiting_novo_titular_autorizacao",
+      service: "troca_titularidade",
+      celular_titular: celular,
+      dados_titular: dadosTitular,
+      solicitacao_id_titular: novaSolicitacao.id,
+      dadosTitularidadeContato: {
+        nome,
+        celular_origem: celular,
         celular_destino: celularDestino,
-      };
+      },
+    };
+    await saveSession(celularDestino);
 
-      const zapResponse = await ZapSign.createContractTrocaTitularidadeTitular(payloadZap as any);
-      const zapSignUrl = zapResponse.signers[0].sign_url;
-      const signUrlNovoTitular = zapResponse.second_signer?.sign_url || null;
+    // Notifica o novo titular
+    await MensagensComuns(
+      celularDestino,
+      `Olá, *${nome}*! 👋\n\nO cliente *${dadosTitular.nome}* está solicitando uma *Troca de Titularidade* do contrato de internet para o seu nome.\n\nVocê *aceita* receber os links de assinatura para concluir a transferência?\n\nResponda *SIM* para aceitar ou *NÃO* para recusar.`,
+    );
 
-      const repo = AppDataSource.getRepository(SolicitacaoServico);
-      const novaSolicitacao = new SolicitacaoServico();
-      novaSolicitacao.servico = "Troca de Titularidade Titular";
-      novaSolicitacao.login_cliente = session.login || session.dadosCompleto?.login || "Desconhecido";
-      novaSolicitacao.data_solicitacao = new Date();
-      novaSolicitacao.assinado = false;
-      novaSolicitacao.pago = false;
-      novaSolicitacao.gratis = 1;
-      novaSolicitacao.token_zapsign = zapResponse.token;
-      novaSolicitacao.dados = { ...payloadZap, sign_url_novo_titular: signUrlNovoTitular };
-      await repo.save(novaSolicitacao);
-
-      await MensagensComuns(
-        celular,
-        "✅ Perfeito! Aqui está o *Termo de Troca de Titularidade* para você assinar:",
-      );
-      await MensagensComuns(
-        celular,
-        `📄 *Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *assine* para prosseguirmos! Após a assinatura, entraremos em contato com o novo titular para autorização. 🚀`,
-      );
-      session.stage = "awaiting_signature_link";
-    } catch (zapError) {
-      console.error("[ZapSign] Erro ao criar contrato de troca de titularidade:", zapError);
-      const msgDados = `*🎭 Troca de Titularidade*\n\nTitular: ${session.dadosCompleto?.nome}\nCPF: ${session.dadosCompleto?.cpf}\nNovo Titular: ${nome}\nCelular: ${celularDestino}`;
-      logAndEmailFinalize({ msgDadosFinais: msgDados });
-      try {
-        await criarChamadoMkauth("TROCA DE TITULARIDADE", session, msgDados);
-      } catch (e) {
-        console.error("[Chamado] Erro ao criar chamado:", e);
-      }
-      await MensagensComuns(
-        celular,
-        "✅ Sua solicitação foi registrada! Nossa equipe entrará em contato para enviar os links de assinatura em breve.",
-      );
-      session.stage = "awaiting_manual_review";
-    }
+    await MensagensComuns(
+      celular,
+      `✅ Perfeito! Enviamos uma mensagem para *${nome}* solicitando autorização.\n\nAguarde a confirmação do novo titular para prosseguirmos. 🚀`,
+    );
+    session.stage = "awaiting_novo_titular_acceptance";
     return;
   } catch (error) {
     await MensagemFlowTrocaTitularidadeContato(
@@ -1321,9 +1321,40 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
     };
 
     try {
-      // Reutiliza o sign_url do 2º signatário do documento já criado pelo titular
-      const urlTitularidade = session.sign_url_novo_titular || null;
+      const dadosTitular = session.dados_titular || {};
+      const celularTitular = session.celular_titular || dadosTitular.telefone_conversa;
 
+      // Cria o documento de Troca de Titularidade com dados de AMBOS
+      const payloadZapTitularidade = {
+        ...dadosTitular,
+        nome_novo_titular: dadosFlow.nome,
+        celular_novo_titular: String(dadosFlow.celular || celular),
+        celular_destino: celular,
+        cpf_novo_titular: String(dadosFlow.cpf || ""),
+        rg_novo_titular: String(dadosFlow.rg || ""),
+        email_novo_titular: dadosFlow.email || "",
+        endereco_novo_titular: dadosFlow.rua || "",
+        numero_novo_titular: String(dadosFlow.numero || ""),
+        bairro_novo_titular: dadosFlow.bairro || "",
+        celular2_novo_titular: String(dadosFlow.celularSecundario || ""),
+        login_novo_titular: dadosFlow.login || "",
+      };
+      const zapTitularidade = await ZapSign.createContractTrocaTitularidadeTitular(payloadZapTitularidade as any);
+      const urlTitularAssinatura = zapTitularidade.signers[0].sign_url;
+      const urlNovoTitularTitularidade = zapTitularidade.second_signer?.sign_url || null;
+
+      // Atualiza a SolicitacaoServico do titular com o token do documento criado
+      const repo = AppDataSource.getRepository(SolicitacaoServico);
+      if (session.solicitacao_id_titular) {
+        const solicitacaoTitular = await repo.findOne({ where: { id: session.solicitacao_id_titular } });
+        if (solicitacaoTitular) {
+          solicitacaoTitular.token_zapsign = zapTitularidade.token;
+          solicitacaoTitular.dados = { ...solicitacaoTitular.dados, nome_novo_titular: dadosFlow.nome };
+          await repo.save(solicitacaoTitular);
+        }
+      }
+
+      // Cria o Termo de Cadastro (Adesão) para o novo titular
       const payloadZapCadastro = {
         nome: dadosFlow.nome,
         cpf: dadosFlow.cpf || "Não informado",
@@ -1345,10 +1376,10 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
       const zapCadastro = await ZapSign.createContractInstalacao(payloadZapCadastro as any);
       const urlCadastro = zapCadastro.signers[0].sign_url;
 
-      const repo = AppDataSource.getRepository(SolicitacaoServico);
+      // Salva SolicitacaoServico do novo titular (Adesão)
       const novaSolicitacao = new SolicitacaoServico();
       novaSolicitacao.servico = "Troca de Titularidade Novo Titular";
-      novaSolicitacao.login_cliente = dadosFlow.nome || dadosFlow.login || "Novo Titular";
+      novaSolicitacao.login_cliente = dadosFlow.nome || "Novo Titular";
       novaSolicitacao.data_solicitacao = new Date();
       novaSolicitacao.assinado = false;
       novaSolicitacao.pago = false;
@@ -1365,8 +1396,17 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
         console.error("[Chamado] Erro ao criar chamado:", e);
       }
 
+      // Envia link para o TITULAR assinar
+      if (celularTitular) {
+        await MensagensComuns(celularTitular, "✅ O novo titular preencheu os dados! Aqui está o seu link para assinar o *Termo de Troca de Titularidade*:");
+        await MensagensComuns(celularTitular, `📄 *Termo de Troca de Titularidade:*\n${urlTitularAssinatura}`);
+      }
+
+      // Envia links para o NOVO TITULAR assinar ambos
       await MensagensComuns(celular, "✅ Perfeito! Aqui estão os links para assinatura dos documentos:");
-      await MensagensComuns(celular, `📄 *Termo de Troca de Titularidade:*\n${urlTitularidade}`);
+      if (urlNovoTitularTitularidade) {
+        await MensagensComuns(celular, `📄 *Termo de Troca de Titularidade:*\n${urlNovoTitularTitularidade}`);
+      }
       await MensagensComuns(
         celular,
         `📄 *Termo de Cadastro (Adesão):*\n${urlCadastro}\n\nPor favor, assine *ambos* os documentos para formalizar a sua contratação! 🚀`,
