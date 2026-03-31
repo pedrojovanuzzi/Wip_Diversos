@@ -19,34 +19,34 @@
             "children": [
               {
                 "type": "TextHeading",
-                "text": "Contato para Retorno"
+                "text": "Contato da Solicitacao"
               },
               {
                 "type": "TextBody",
-                "text": "Informe o nome completo e o celular da pessoa com quem devemos entrar em contato sobre a troca de titularidade."
+                "text": "Informe os dados para retornarmos sobre a troca de titularidade."
               },
               {
                 "type": "TextInput",
                 "name": "nome",
-                "label": "Nome completo do contato",
+                "label": "Nome completo",
                 "required": true,
                 "input-type": "text"
               },
               {
                 "type": "TextInput",
-                "name": "celular_destino",
-                "label": "Celular do contato (com DDD)",
+                "name": "celular",
+                "label": "Celular (com DDD)",
                 "required": true,
                 "input-type": "number"
               },
               {
                 "type": "Footer",
-                "label": "Enviar Dados",
+                "label": "Enviar Contato",
                 "on-click-action": {
                   "name": "complete",
                   "payload": {
                     "nome": "${form.nome}",
-                    "celular_destino": "${form.celular_destino}"
+                    "celular": "${form.celular}"
                   }
                 }
               }
