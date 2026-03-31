@@ -1137,13 +1137,21 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
 ) {
   try {
     const payload = JSON.parse(texto);
+    console.log("[TrocaTitularidadeContato] payload recebido:", JSON.stringify(payload));
+
     const nome = (payload.nome || "").trim();
-    const celularDestino = normalizarCelularWhatsapp(
-      payload.celular_destino || payload.celular || "",
-    );
+    const rawCelular = String(payload.celular_destino || payload.celular || "");
+    const celularDestino = normalizarCelularWhatsapp(rawCelular);
+
+    console.log("[TrocaTitularidadeContato] nome:", nome, "| celularDestino:", celularDestino);
 
     const partesNome = nome.split(/\s+/).filter(Boolean);
     if (partesNome.length < 2) {
+      console.log("[TrocaTitularidadeContato] Falhou: nome com menos de 2 partes:", nome);
+      await MensagensComuns(
+        celular,
+        "⚠️ Por favor, informe o *nome completo* (nome e sobrenome) do novo titular.",
+      );
       await MensagemFlowTrocaTitularidadeContato(
         celular,
         FLOW_TROCA_TITULARIDADE_CONTATO,
@@ -1153,6 +1161,7 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
     }
 
     if (celularDestino.length < 12) {
+      console.log("[TrocaTitularidadeContato] Falhou: celular inválido, length:", celularDestino.length);
       await MensagemFlowTrocaTitularidadeContato(
         celular,
         FLOW_TROCA_TITULARIDADE_CONTATO,

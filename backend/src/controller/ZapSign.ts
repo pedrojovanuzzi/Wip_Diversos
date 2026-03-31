@@ -821,6 +821,30 @@ class ZapSign {
         },
       );
 
+      const docToken = response.data.token;
+
+      if (nome_novo_titular && celular_novo_titular && docToken) {
+        const phoneRaw = String(celular_novo_titular).replace(/\D/g, "");
+        const phoneNumber = phoneRaw.startsWith("55") ? phoneRaw.slice(2) : phoneRaw;
+
+        await axios.post(
+          homologacao
+            ? `https://sandbox.api.zapsign.com.br/api/v1/docs/${docToken}/add-signer/`
+            : `https://api.zapsign.com.br/api/v1/docs/${docToken}/add-signer/`,
+          {
+            name: nome_novo_titular,
+            phone_country: "55",
+            phone_number: phoneNumber,
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${process.env.ZAPSIGN_TOKEN}`,
+            },
+          },
+        );
+      }
+
       return response.data;
     } catch (error) {
       console.error("Error in createContractTrocaTitularidadeTitular:", error);
