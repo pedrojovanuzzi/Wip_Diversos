@@ -415,6 +415,13 @@ class SolicitacaoServicoController {
         return;
       }
 
+      if (solicitacao.id_chamado && solicitacao.id_chamado !== id_chamado) {
+        res.status(403).json({
+          message: `Chamado inválido. Esta solicitação só pode ser finalizada com o chamado ${solicitacao.id_chamado}.`,
+        });
+        return;
+      }
+
       solicitacao.finalizado = true;
       solicitacao.id_chamado = id_chamado;
 
