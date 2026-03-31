@@ -75,6 +75,30 @@ export async function Flow(req: Request, res: Response): Promise<void> {
         return;
       }
 
+      if (screen === "TROCA_TITULARIDADE_CONTATO") {
+        const screenData = {
+          screen: "TROCA_TITULARIDADE_CONTATO",
+          data: {},
+        };
+
+        res.send(
+          encryptFlowResponse(screenData, aesKeyBuffer, initialVectorBuffer),
+        );
+        return;
+      }
+
+      if (screen === "TROCA_TITULARIDADE_CONTRATACAO") {
+        const screenData = {
+          screen: "TROCA_TITULARIDADE_CONTRATACAO",
+          data: { planos_do_sistema: planosDoSistema },
+        };
+
+        res.send(
+          encryptFlowResponse(screenData, aesKeyBuffer, initialVectorBuffer),
+        );
+        return;
+      }
+
       const screenData = {
         screen: "CADASTRO_COMPLETO",
         data: { planos_do_sistema: planosDoSistema },

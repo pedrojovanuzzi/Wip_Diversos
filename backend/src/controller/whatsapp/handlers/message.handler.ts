@@ -47,6 +47,8 @@ import {
   handleChooseTypeEndereco,
   handleTrocaTitularidade,
   handleTitularidadeConcordo,
+  handleAwaitingTrocaTitularidadeContatoFlow,
+  handleAwaitingTrocaTitularidadeContratacaoFlow,
   handleChooseTypeTitularidade,
   handleChooseEst,
   handleChooseWifiEst,
@@ -233,7 +235,7 @@ export async function handleMessage(
                   { id: "option_1", title: "Instalação" },
                   { id: "option_2", title: "Mudança de Endereço" },
                   { id: "option_3", title: "Mudança de Cômodo" },
-                  // { id: "option_4", title: "Troca de Titularidade" },
+                  { id: "option_4", title: "Troca de Titularidade" },
                   { id: "option_5", title: "Alteração de Plano" },
                   // { id: "option_6", title: "Renovação Contratual" },
                   // { id: "option_7", title: "Wifi Estendido" },
@@ -499,6 +501,18 @@ export async function handleMessage(
 
     case "handle_titularidade_2":
       await iniciarMudancaTitularidade(celular, texto, session, type);
+      break;
+
+    case "awaiting_troca_titularidade_contato_flow":
+      await handleAwaitingTrocaTitularidadeContatoFlow(celular, texto, session);
+      break;
+
+    case "awaiting_troca_titularidade_contratacao_flow":
+      await handleAwaitingTrocaTitularidadeContratacaoFlow(
+        celular,
+        texto,
+        session,
+      );
       break;
 
     case "choose_wifi_est":

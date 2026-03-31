@@ -1,0 +1,141 @@
+{
+  "version": "7.3",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "TROCA_TITULARIDADE_CONTRATACAO": []
+  },
+  "screens": [
+    {
+      "id": "TROCA_TITULARIDADE_CONTRATACAO",
+      "title": "Troca de Titularidade Contratacao",
+      "data": {
+        "planos_do_sistema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            { "id": "_FIBRA_400MEGA", "title": "Fibra Urbano: 400 MEGA - R$ 89,90" },
+            { "id": "_FIBRA_500MEGA", "title": "Fibra Urbano: 500 MEGA - R$ 99,90" },
+            { "id": "_FIBRA_600MEGA", "title": "Fibra Urbano: 600 MEGA - R$ 109,90" },
+            { "id": "_FIBRA_700MEGA", "title": "Fibra Urbano: 700 MEGA - R$ 129,90" },
+            { "id": "_FIBRA_800MEGA", "title": "Fibra Urbano: 800 MEGA - R$ 159,90" },
+            { "id": "_FIBRA_RURAL_340M", "title": "Fibra Rural: 340 MEGA - R$ 159,90" },
+            { "id": "_FIBRA_RURAL_500M", "title": "Fibra Rural: 500 MEGA - R$ 199,90" },
+            { "id": "_Radio20M", "title": "Rádio: 20 MEGA - R$ 89,90" },
+            { "id": "_Radio30M", "title": "Rádio: 30 MEGA - R$ 119,90" }
+          ]
+        }
+      },
+      "terminal": true,
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_cadastro",
+            "children": [
+              { "type": "TextHeading", "text": "Ficha de Cadastro" },
+              { "type": "TextSubheading", "text": "👤 Dados Pessoais" },
+              { "type": "TextInput", "name": "nome", "label": "Nome completo", "required": true, "input-type": "text" },
+              { "type": "TextInput", "name": "cpf", "label": "CPF ou CNPJ", "required": true, "input-type": "number" },
+              { "type": "TextInput", "name": "rg", "label": "RG ou IE", "required": true, "input-type": "text" },
+              { "type": "DatePicker", "name": "dataNascimento", "label": "Data de Nascimento", "required": true },
+              { "type": "TextInput", "name": "celular", "label": "Celular (com DDD)", "required": true, "input-type": "number" },
+              { "type": "TextInput", "name": "celularSecundario", "label": "Celular Secundário", "required": false, "input-type": "number" },
+              { "type": "TextInput", "name": "email", "label": "E-mail", "required": true, "input-type": "email" },
+              { "type": "TextSubheading", "text": "📍 Endereço" },
+              { "type": "TextInput", "name": "cep", "label": "CEP", "required": true, "input-type": "number" },
+              { "type": "TextInput", "name": "rua", "label": "Rua", "required": true, "input-type": "text" },
+              { "type": "TextInput", "name": "numero", "label": "Número", "required": true, "input-type": "text" },
+              { "type": "TextInput", "name": "bairro", "label": "Bairro", "required": true, "input-type": "text" },
+              { "type": "TextInput", "name": "cidade", "label": "Cidade", "required": true, "input-type": "text" },
+              {
+                "type": "Dropdown",
+                "name": "estado",
+                "label": "Estado",
+                "required": true,
+                "data-source": [
+                  { "id": "AC", "title": "Acre" },
+                  { "id": "AL", "title": "Alagoas" },
+                  { "id": "AP", "title": "Amapá" },
+                  { "id": "AM", "title": "Amazonas" },
+                  { "id": "BA", "title": "Bahia" },
+                  { "id": "CE", "title": "Ceará" },
+                  { "id": "DF", "title": "Distrito Federal" },
+                  { "id": "ES", "title": "Espírito Santo" },
+                  { "id": "GO", "title": "Goiás" },
+                  { "id": "MA", "title": "Maranhão" },
+                  { "id": "MT", "title": "Mato Grosso" },
+                  { "id": "MS", "title": "Mato Grosso do Sul" },
+                  { "id": "MG", "title": "Minas Gerais" },
+                  { "id": "PA", "title": "Pará" },
+                  { "id": "PB", "title": "Paraíba" },
+                  { "id": "PR", "title": "Paraná" },
+                  { "id": "PE", "title": "Pernambuco" },
+                  { "id": "PI", "title": "Piauí" },
+                  { "id": "RJ", "title": "Rio de Janeiro" },
+                  { "id": "RN", "title": "Rio Grande do Norte" },
+                  { "id": "RS", "title": "Rio Grande do Sul" },
+                  { "id": "RO", "title": "Rondônia" },
+                  { "id": "RR", "title": "Roraima" },
+                  { "id": "SC", "title": "Santa Catarina" },
+                  { "id": "SP", "title": "São Paulo" },
+                  { "id": "SE", "title": "Sergipe" },
+                  { "id": "TO", "title": "Tocantins" }
+                ]
+              },
+              { "type": "TextSubheading", "text": "🛜 Plano de Internet" },
+              { "type": "Dropdown", "label": "Escolha o plano", "name": "plano_escolhido", "required": true, "data-source": "${data.planos_do_sistema}" },
+              { "type": "TextSubheading", "text": "📅 Vencimento" },
+              {
+                "type": "Dropdown",
+                "label": "Dia do vencimento",
+                "name": "vencimento",
+                "required": true,
+                "data-source": [
+                  { "id": "5", "title": "Dia 05" },
+                  { "id": "10", "title": "Dia 10" },
+                  { "id": "15", "title": "Dia 15" },
+                  { "id": "20", "title": "Dia 20" }
+                ]
+              },
+              {
+                "type": "Footer",
+                "label": "Enviar Cadastro",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "nome": "${form.nome}",
+                    "cpf": "${form.cpf}",
+                    "rg": "${form.rg}",
+                    "dataNascimento": "${form.dataNascimento}",
+                    "celular": "${form.celular}",
+                    "celularSecundario": "${form.celularSecundario}",
+                    "email": "${form.email}",
+                    "cep": "${form.cep}",
+                    "rua": "${form.rua}",
+                    "numero": "${form.numero}",
+                    "bairro": "${form.bairro}",
+                    "cidade": "${form.cidade}",
+                    "estado": "${form.estado}",
+                    "plano": "${form.plano_escolhido}",
+                    "vencimento": "${form.vencimento}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

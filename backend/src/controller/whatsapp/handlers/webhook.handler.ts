@@ -88,7 +88,7 @@ export async function index(req: Request, res: Response) {
 
                 if (processedMessages.has(messageId)) {
                   console.log(`Mensagem duplicada ignorada: ${messageId}`);
-                  return;
+                  continue;
                 }
 
                 processedMessages.add(messageId);
@@ -98,7 +98,7 @@ export async function index(req: Request, res: Response) {
                 );
 
                 if (!celular || !type) {
-                  return;
+                  continue;
                 }
 
                 if (!sessions[celular]) {
@@ -111,7 +111,7 @@ export async function index(req: Request, res: Response) {
                   if (sessionDB) {
                     if (sessionDB.last_message_id === messageId) {
                       console.log(`Mensagem já processada: ${messageId}`);
-                      return;
+                      continue;
                     }
                     sessions[celular] = {
                       stage: sessionDB.stage,
@@ -210,6 +210,7 @@ export async function index(req: Request, res: Response) {
                       messageId,
                     },
                     {
+                      jobId: messageId,
                       removeOnComplete: true,
                       removeOnFail: false,
                       attempts: 1,

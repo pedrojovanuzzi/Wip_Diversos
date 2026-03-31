@@ -63,10 +63,14 @@ export function initQueues() {
       try {
         await axios.post(url, payload, { headers });
       } catch (err: any) {
+        const apiError = err.response?.data;
         console.error(
           `[BullMQ] Erro ao enviar mensagem:`,
-          err.response?.data || err.message,
+          apiError || err.message,
         );
+        if (apiError) {
+          throw new Error(JSON.stringify(apiError));
+        }
         throw err;
       }
     },
@@ -81,8 +85,50 @@ export function initQueues() {
     console.error(`[BullMQ:incoming] Job ${job?.id} falhou:`, err.message);
   });
 
-  outgoingWorker.on("failed", (job, err) => {
+  outgoingWorker.on("failed", async (job, err) => {
     console.error(`[BullMQ:outgoing] Job ${job?.id} falhou:`, err.message);
+
+    const to = job?.data?.payload?.to;
+    const url = job?.data?.url;
+    const headers = job?.data?.headers;
+    const isFlowMessage = job?.data?.payload?.interactive?.type === "flow";
+
+    if (!to || !url || !headers || !isFlowMessage) {
+      return;
+    }
+
+    const errorMessage = String(err.message || "");
+    const invalidFlow =
+      errorMessage.includes("flow_name") &&
+      errorMessage.includes("is invalid");
+
+    if (!invalidFlow) {
+      return;
+    }
+
+    await whatsappOutgoingQueue.add(
+      "send-message",
+      {
+        url,
+        payload: {
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to,
+          type: "text",
+          text: {
+            preview_url: false,
+            body:
+              "⚠️ Não consegui abrir o formulário agora. Um atendente continuará com você por aqui para seguir com a troca de titularidade.",
+          },
+        },
+        headers,
+      },
+      {
+        removeOnComplete: true,
+        removeOnFail: false,
+        attempts: 1,
+      },
+    );
   });
 
   // Limpa jobs falhados antigos na inicialização

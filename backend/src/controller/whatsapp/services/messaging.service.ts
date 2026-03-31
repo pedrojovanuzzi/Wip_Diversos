@@ -438,6 +438,128 @@ export async function MensagemFlowTrocaPlano(
   }
 }
 
+export async function MensagemFlowTrocaTitularidadeContato(
+  receivenumber: any,
+  flowName: string,
+  ctaText: string,
+) {
+  const flowRef = String(flowName || "").trim();
+  const flowIdentifier = /^\d+$/.test(flowRef)
+    ? { flow_id: flowRef }
+    : { flow_name: flowRef };
+
+  try {
+    await whatsappOutgoingQueue.add(
+      "send-flow",
+      {
+        url,
+        payload: {
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: receivenumber,
+          type: "interactive",
+          interactive: {
+            type: "flow",
+            body: {
+              text: "Preencha o nome completo e o celular da pessoa com quem devemos entrar em contato sobre a troca de titularidade.",
+            },
+            action: {
+              name: "flow",
+              parameters: {
+                flow_message_version: "3",
+                ...flowIdentifier,
+                flow_cta: ctaText,
+                flow_token: `sessao_${receivenumber}_${Date.now()}`,
+                flow_action: "navigate",
+                flow_action_payload: {
+                  screen: "TROCA_TITULARIDADE_CONTATO",
+                },
+                mode: "published",
+              },
+            },
+          },
+        },
+        headers: authHeaders(),
+      },
+      {
+        removeOnComplete: true,
+        removeOnFail: false,
+        attempts: 1,
+      },
+    );
+
+    console.log(`Flow '${flowName}' de contato enviado para ${receivenumber}`);
+  } catch (error: any) {
+    console.error(
+      "Erro ao enviar Flow de Contato da Troca de Titularidade:",
+      error.message,
+    );
+  }
+}
+
+export async function MensagemFlowTrocaTitularidadeContratacao(
+  receivenumber: any,
+  flowName: string,
+  ctaText: string,
+  planosDoSistema: any[] = [],
+) {
+  const flowRef = String(flowName || "").trim();
+  const flowIdentifier = /^\d+$/.test(flowRef)
+    ? { flow_id: flowRef }
+    : { flow_name: flowRef };
+
+  try {
+    await whatsappOutgoingQueue.add(
+      "send-flow",
+      {
+        url,
+        payload: {
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: receivenumber,
+          type: "interactive",
+          interactive: {
+            type: "flow",
+            body: {
+              text: "Preencha os dados para contratação da troca de titularidade.",
+            },
+            action: {
+              name: "flow",
+              parameters: {
+                flow_message_version: "3",
+                ...flowIdentifier,
+                flow_cta: ctaText,
+                flow_token: `sessao_${receivenumber}_${Date.now()}`,
+                flow_action: "navigate",
+                flow_action_payload: {
+                  screen: "TROCA_TITULARIDADE_CONTRATACAO",
+                  data: { planos_do_sistema: planosDoSistema },
+                },
+                mode: "published",
+              },
+            },
+          },
+        },
+        headers: authHeaders(),
+      },
+      {
+        removeOnComplete: true,
+        removeOnFail: false,
+        attempts: 1,
+      },
+    );
+
+    console.log(
+      `Flow '${flowName}' de contratação enviado para ${receivenumber}`,
+    );
+  } catch (error: any) {
+    console.error(
+      "Erro ao enviar Flow de Contratação da Troca de Titularidade:",
+      error.message,
+    );
+  }
+}
+
  export async function MensagemFlowMudancaComodo(
     receivenumber: any,
     flowName: string,

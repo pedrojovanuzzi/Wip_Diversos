@@ -1,7 +1,7 @@
 import { validarCPF, verificaType } from "../utils/validation";
 import { writeMessageLog } from "../utils/logging";
 import { sendServiceEmail } from "../services/email.service";
-import { sessions, deleteSession } from "../services/session.service";
+import { sessions, deleteSession, saveSession } from "../services/session.service";
 import ApiMkDataSource from "../../../database/API_MK";
 import MkauthDataSource from "../../../database/MkauthSource";
 import AppDataSource from "../../../database/DataSource";
@@ -20,6 +20,8 @@ import {
   MensagemLista,
   MensagemFlowEndereco,
   MensagemFlowTrocaPlano,
+  MensagemFlowTrocaTitularidadeContato,
+  MensagemFlowTrocaTitularidadeContratacao,
   MensagemFlowMudancaComodo,
   enviarNotificacaoServico,
   Finalizar,
@@ -28,10 +30,31 @@ import {
 import { getPlanosDoSistema } from "../services/plano.service";
 import { criarChamadoMkauth } from "../services/chamado.service";
 
+const FLOW_TROCA_TITULARIDADE_CONTATO =
+  process.env.WA_FLOW_TROCA_TITULARIDADE_CONTATO ||
+  process.env.WA_FLOW_TROCA_TITULARIDADE_CONTATO_ID ||
+  "TROCA_TITULARIDADE_CONTATO";
+
+const FLOW_TROCA_TITULARIDADE_CONTRATACAO =
+  process.env.WA_FLOW_TROCA_TITULARIDADE_CONTRATACAO ||
+  process.env.WA_FLOW_TROCA_TITULARIDADE_CONTRATACAO_ID ||
+  "TROCA_TITULARIDADE_CONTRATACAO";
+
 // --- Coleta de dados genérica ---
 interface Pergunta {
   campo: string;
   pergunta: string;
+}
+
+function normalizarCelularWhatsapp(celular: string): string {
+  const somenteNumeros = (celular || "").replace(/\D/g, "");
+  if (somenteNumeros.startsWith("55") && somenteNumeros.length >= 12) {
+    return somenteNumeros;
+  }
+  if (somenteNumeros.length === 10 || somenteNumeros.length === 11) {
+    return `55${somenteNumeros}`;
+  }
+  return somenteNumeros;
 }
 
 async function coletarDados(
@@ -990,13 +1013,6 @@ export async function handleTrocaTitularidade(
   if (texto.toLowerCase() === "sim") {
     await MensagemTermos(
       celular,
-      "Finalizando....",
-      `*Em breve, enviaremos o link para assinatura dos demais documentos, para formalização do contrato.*\nEnquanto isso, leia o contrato de SCM, padrão entre o provedor e todos os clientes, devidamente registrado em cartório.`,
-      "Ler o contrato",
-      "https://wipdiversos.wiptelecomunicacoes.com.br/doc/contrato",
-    );
-    await MensagemTermos(
-      celular,
       "Termos Troca de Titularidade",
       "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a opção que deseja.",
       "Ler Termos",
@@ -1026,8 +1042,13 @@ export async function handleTitularidadeConcordo(
   type: any,
 ) {
   if (texto.toLowerCase() === "concordo") {
-    await iniciarMudancaTitularidade(celular, texto, session, type);
-    session.stage = "handle_titularidade_2";
+    session.stage = "awaiting_troca_titularidade_contato_flow";
+    await saveSession(celular);
+    await MensagemFlowTrocaTitularidadeContato(
+      celular,
+      FLOW_TROCA_TITULARIDADE_CONTATO,
+      "📱 Informar Contato",
+    );
   } else if (
     texto.toLowerCase() === "não concordo" ||
     texto.toLowerCase() === "nao concordo"
@@ -1040,6 +1061,108 @@ export async function handleTitularidadeConcordo(
     delete sessions[celular];
   } else {
     await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
+  }
+}
+
+export async function handleAwaitingTrocaTitularidadeContatoFlow(
+  celular: any,
+  texto: any,
+  session: any,
+) {
+  try {
+    const payload = JSON.parse(texto);
+    const nome = (payload.nome || "").trim();
+    const celularDestino = normalizarCelularWhatsapp(
+      payload.celular_destino || payload.celular || "",
+    );
+
+    const partesNome = nome.split(/\s+/).filter(Boolean);
+    if (partesNome.length < 2) {
+      await MensagemFlowTrocaTitularidadeContato(
+        celular,
+        FLOW_TROCA_TITULARIDADE_CONTATO,
+        "📱 Preencher novamente",
+      );
+      return;
+    }
+
+    if (celularDestino.length < 12) {
+      await MensagemFlowTrocaTitularidadeContato(
+        celular,
+        FLOW_TROCA_TITULARIDADE_CONTATO,
+        "📱 Preencher novamente",
+      );
+      return;
+    }
+
+    session.dadosTitularidadeContato = {
+      nome,
+      celular_origem: celular,
+      celular_destino: celularDestino,
+    };
+
+    const planosDoSistema = await getPlanosDoSistema();
+
+    sessions[celularDestino] = {
+      ...(sessions[celularDestino] || {}),
+      stage: "awaiting_troca_titularidade_contratacao_flow",
+      service: "troca_titularidade",
+      dadosTitularidadeContato: {
+        nome,
+        celular_origem: celular,
+        celular_destino: celularDestino,
+      },
+    };
+    await saveSession(celularDestino);
+
+    await MensagemFlowTrocaTitularidadeContratacao(
+      celularDestino,
+      FLOW_TROCA_TITULARIDADE_CONTRATACAO,
+      "📋 Preencher Contratação",
+      planosDoSistema,
+    );
+    await MensagensComuns(
+      celular,
+      `✅ Formulário enviado para o número *${celularDestino}*.\nQuando ele for preenchido, seguimos com a contratação da titularidade.`,
+    );
+    session.stage = "awaiting_manual_review";
+    return;
+  } catch (error) {
+    await MensagemFlowTrocaTitularidadeContato(
+      celular,
+      FLOW_TROCA_TITULARIDADE_CONTATO,
+      "📱 Informar Contato",
+    );
+  }
+}
+
+export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
+  celular: any,
+  texto: any,
+  session: any,
+) {
+  try {
+    const dadosFlow = JSON.parse(texto);
+    if (!dadosFlow || !dadosFlow.nome) {
+      await MensagensComuns(
+        celular,
+        "📋 Preencha o formulário de *troca de titularidade contratação* para continuar.",
+      );
+      return;
+    }
+
+    session.dadosCompleto = {
+      ...dadosFlow,
+      contato_solicitacao: session.dadosTitularidadeContato || {},
+    };
+
+    await handleChooseTypeTitularidade(celular, session);
+    return;
+  } catch (error) {
+    await MensagensComuns(
+      celular,
+      "📋 Por favor, preencha o formulário de *troca de titularidade contratação* para continuar.",
+    );
   }
 }
 
