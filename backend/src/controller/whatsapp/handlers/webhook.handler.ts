@@ -88,7 +88,6 @@ export async function index(req: Request, res: Response) {
 
                 if (processedMessages.has(messageId)) {
                   console.log(`Mensagem duplicada ignorada: ${messageId}`);
-                  res.sendStatus(200);
                   return;
                 }
 
@@ -99,7 +98,6 @@ export async function index(req: Request, res: Response) {
                 );
 
                 if (!celular || !type) {
-                  res.sendStatus(200);
                   return;
                 }
 
@@ -113,7 +111,6 @@ export async function index(req: Request, res: Response) {
                   if (sessionDB) {
                     if (sessionDB.last_message_id === messageId) {
                       console.log(`Mensagem já processada: ${messageId}`);
-                      res.sendStatus(200);
                       return;
                     }
                     sessions[celular] = {
@@ -226,9 +223,7 @@ export async function index(req: Request, res: Response) {
       }
     }
 
-    res.sendStatus(200);
   } catch (error) {
     console.error(error);
-    res.sendStatus(200);
   }
 }
