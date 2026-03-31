@@ -11,6 +11,7 @@ import { writeMessageLog } from "../utils/logging";
 import { sendServiceEmail } from "../services/email.service";
 import { sessions, deleteSession } from "../services/session.service";
 import { getPlanosDoSistema } from "../services/plano.service";
+import { criarChamadoMkauth } from "../services/chamado.service";
 import {
   MensagensComuns,
   MensagemBotao,
@@ -310,6 +311,17 @@ export async function handleAwaitingFlowCadastro(
         telefone_conversa: celular,
       };
       await repo.save(novaSolicitacao);
+
+      try {
+        const sessionChamado = {
+          nome: dadosFlow.nome,
+          login: dadosFlow.login || "",
+          email: dadosFlow.email || "",
+        };
+        await criarChamadoMkauth("INSTALACAO", sessionChamado, resumoCadastro, novaSolicitacao);
+      } catch (e) {
+        console.error("[Chamado] Erro ao criar chamado de instalação:", e);
+      }
 
       await Finalizar(resumoCadastro, celular, true);
       if (process.env.TEST_PHONE) {

@@ -7,6 +7,7 @@ import Sessions from "../../../entities/APIMK/Sessions";
 import { SolicitacaoServico } from "../../../entities/SolicitacaoServico";
 import { validarCPF } from "../utils/validation";
 import { sendServiceEmail } from "../services/email.service";
+import { criarChamadoMkauth } from "../services/chamado.service";
 import { sessions, saveSession } from "../services/session.service";
 import Pix from "../../Pix";
 import ZapSign from "../../ZapSign";
@@ -333,6 +334,12 @@ export async function iniciarMudanca(
             );
           } catch (e) {
             console.error("Erro ao salvar solicitação de mudança de endereço:", e);
+          }
+
+          try {
+            await criarChamadoMkauth("MUDANCA DE ENDERECO", session, resumoMudanca, solicitacaoSalva);
+          } catch (e) {
+            console.error("[Chamado] Erro ao criar chamado de mudança de endereço:", e);
           }
 
           await Finalizar(resumoMudanca, celular, true);

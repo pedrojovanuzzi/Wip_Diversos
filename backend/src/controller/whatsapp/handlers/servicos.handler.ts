@@ -26,6 +26,7 @@ import {
   boasVindas,
 } from "../services/messaging.service";
 import { getPlanosDoSistema } from "../services/plano.service";
+import { criarChamadoMkauth } from "../services/chamado.service";
 
 // --- Coleta de dados genérica ---
 interface Pergunta {
@@ -481,6 +482,12 @@ export async function iniciarMudancaComodo(
           );
         } catch (e) {
           console.error("Erro ao salvar solicitação de mudança de cômodo:", e);
+        }
+
+        try {
+          await criarChamadoMkauth("MUDANCA DE COMODO", session, resumoMudanca, solicitacaoSalva);
+        } catch (e) {
+          console.error("[Chamado] Erro ao criar chamado de mudança de cômodo:", e);
         }
 
         await Finalizar(resumoMudanca, celular, true);
@@ -1049,6 +1056,11 @@ export async function handleChooseTypeTitularidade(
     : "Dados não encontrados";
   session.msgDadosFinais = `*🎭 Troca de Titularidade*\n\nDados do Cliente: ${dadosCliente}`;
   logAndEmailFinalize(session);
+  try {
+    await criarChamadoMkauth("TROCA DE TITULARIDADE", session, session.msgDadosFinais);
+  } catch (e) {
+    console.error("[Chamado] Erro ao criar chamado de troca de titularidade:", e);
+  }
   await MensagemBotao(celular, "Concluir Solicitação", "Finalizar");
   session.stage = "finalizar";
 }
@@ -1124,6 +1136,11 @@ export async function handleWifiEstFinalize(
     : "Dados não encontrados";
   session.msgDadosFinais = `*🔌 ${label}* \nDados do Cliente: ${dadosCliente}`;
   logAndEmailFinalize(session);
+  try {
+    await criarChamadoMkauth("WIFI ESTENDIDO", session, session.msgDadosFinais);
+  } catch (e) {
+    console.error("[Chamado] Erro ao criar chamado de wifi estendido:", e);
+  }
   await MensagemBotao(celular, "Concluir Solicitação", "Finalizar");
   session.stage = "finalizar";
 }
@@ -1199,6 +1216,12 @@ export async function handleAwaitingTrocaPlanoFlow(
       solicitacaoSalva = await salvarSolicitacaoAlteracaoPlano(session, celular);
     } catch (error) {
       console.error("Erro ao salvar solicitação de alteração de plano:", error);
+    }
+
+    try {
+      await criarChamadoMkauth("ALTERACAO DE PLANO", session, resumoAlteracaoPlano, solicitacaoSalva);
+    } catch (e) {
+      console.error("[Chamado] Erro ao criar chamado de alteração de plano:", e);
     }
 
     await Finalizar(resumoAlteracaoPlano, celular, true);
@@ -1352,6 +1375,11 @@ export async function handleFinishTrocaPlan(
     : "Dados não encontrados";
   session.msgDadosFinais = `*🔌 Alteração de Plano* \nPlano Escolhido: ${session.planoEscolhido}\nDados do Cliente: ${dadosCliente}`;
   logAndEmailFinalize(session);
+  try {
+    await criarChamadoMkauth("ALTERACAO DE PLANO", session, session.msgDadosFinais);
+  } catch (e) {
+    console.error("[Chamado] Erro ao criar chamado de alteração de plano:", e);
+  }
   await MensagemBotao(celular, "Concluir Solicitação", "Finalizar");
   session.stage = "finalizar";
 }
@@ -1371,6 +1399,11 @@ export async function handleChooseTypeRenovacao(
       : "Dados não encontrados";
     session.msgDadosFinais = `*🆕 Renovação Contratual* \nDados do Cliente: ${dadosCliente}`;
     logAndEmailFinalize(session);
+    try {
+      await criarChamadoMkauth("RENOVACAO CONTRATUAL", session, session.msgDadosFinais);
+    } catch (e) {
+      console.error("[Chamado] Erro ao criar chamado de renovação contratual:", e);
+    }
     await MensagemBotao(celular, "Concluir Solicitação", "Finalizar");
     session.stage = "finalizar";
   } else if (
