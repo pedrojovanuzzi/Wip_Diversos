@@ -34,35 +34,13 @@ export async function verify(req: Request, res: Response) {
 }
 
 export async function index(req: Request, res: Response) {
-  console.log("Webhook recebido");
-  console.log(req.body);
+  // Responde 200 imediatamente para evitar retries do Meta por timeout
+  res.sendStatus(200);
 
   try {
-    const [insertPeople] = await findOrCreate(
-      ApiMkDataSource.getRepository(PeopleConversation),
-      {
-        where: { telefone: process.env.SENDER_NUMBER },
-        defaults: { nome: "Você", telefone: process.env.SENDER_NUMBER },
-      },
-    );
-
-    const [insertConversation] = await findOrCreate(
-      ApiMkDataSource.getRepository(Conversations),
-      {
-        where: { id: 1 },
-        defaults: { nome: "Você" },
-      },
-    );
-
     const body = req.body;
 
-    if (body.reqbody) {
-      res.sendStatus(200);
-      return;
-    }
-
-    if (!body.entry) {
-      res.sendStatus(200);
+    if (body.reqbody || !body.entry) {
       return;
     }
 
@@ -71,13 +49,11 @@ export async function index(req: Request, res: Response) {
 
       if (entryId === process.env.WHATS_BUSSINES_TESTID && !isSandbox) {
         console.log("Mensagem de teste ignorada em produção");
-        res.sendStatus(200);
         return;
       }
 
       if (entryId !== process.env.WHATS_BUSSINES_TESTID && isSandbox) {
         console.log("Mensagem de produção ignorada em sandbox");
-        res.sendStatus(200);
         return;
       }
 
@@ -87,6 +63,24 @@ export async function index(req: Request, res: Response) {
             const value = change.value;
 
             if (value && value.messages) {
+              console.log("Webhook recebido - mensagem(ns) detectada(s)");
+
+              await findOrCreate(
+                ApiMkDataSource.getRepository(PeopleConversation),
+                {
+                  where: { telefone: process.env.SENDER_NUMBER },
+                  defaults: { nome: "Você", telefone: process.env.SENDER_NUMBER },
+                },
+              );
+
+              await findOrCreate(
+                ApiMkDataSource.getRepository(Conversations),
+                {
+                  where: { id: 1 },
+                  defaults: { nome: "Você" },
+                },
+              );
+
               for (const message of value.messages) {
                 const celular = message.from;
                 const type = message.type;
