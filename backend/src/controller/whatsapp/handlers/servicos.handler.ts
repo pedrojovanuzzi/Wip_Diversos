@@ -122,19 +122,6 @@ const perguntasBasicas: Pergunta[] = [
   { campo: "celular", pergunta: "➡️ Digite seu *Celular* com *DDD*:" },
 ];
 
-const perguntasTitularidade: Pergunta[] = [
-  { campo: "nome", pergunta: "➡️ Digite seu *nome completo*:" },
-  { campo: "cpf", pergunta: "➡️ Digite seu *CPF/CNPJ:" },
-  { campo: "celular", pergunta: "➡️ Digite seu *Celular* com *DDD*:" },
-  {
-    campo: "nome_novo_titular",
-    pergunta: "➡️ Digite o *Nome Completo* do *Novo Titular*:",
-  },
-  {
-    campo: "celular_novo_titular",
-    pergunta: "➡️ Digite o *Celular do Novo Titular* com *DDD*:",
-  },
-];
 
 async function gerarLancamentoServicoMudancaComodo(session: any) {
   const valor = process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 200;
@@ -621,29 +608,167 @@ export async function iniciarWifiEstendido(
   );
 }
 
-// --- Mudança de Titularidade ---
-export async function iniciarMudancaTitularidade(
+// --- Troca de Titularidade ---
+async function selecionarCadastroTitularidade(celular: any, session: any, cliente: any) {
+  session.login = cliente.login;
+  session.nome = cliente.nome;
+  session.email = cliente.email;
+  session.rg = cliente.rg;
+  session.celularCliente = cliente.celular;
+  session.dadosCompleto = {
+    nome: cliente.nome,
+    cpf: session.cpf,
+    email: cliente.email,
+    rg: cliente.rg,
+    celular: cliente.celular,
+    login: cliente.login,
+    endereco: `${cliente.endereco}, ${cliente.numero}`,
+  };
+  await MensagemTermos(
+    celular,
+    "Termos Troca de Titularidade",
+    "📄 Para dar *continuidade*, leia o *Termo de Troca de Titularidade* abaixo e em seguida informe os dados de contato da pessoa que receberá a titularidade.",
+    "Ler Termos",
+    "https://wipdiversos.wiptelecomunicacoes.com.br/doc/troca_de_titularidade",
+  );
+  await saveSession(celular);
+  await MensagemFlowTrocaTitularidadeContato(
+    celular,
+    FLOW_TROCA_TITULARIDADE_CONTATO,
+    "📱 Informar Contato",
+  );
+  session.stage = "awaiting_troca_titularidade_contato_flow";
+}
+
+export async function iniciarTrocaTitularidade(
   celular: any,
   texto: any,
   session: any,
   type: any,
 ) {
-  await coletarDados(
-    celular,
-    texto,
-    session,
-    type,
-    perguntasTitularidade,
-    "🔤 Agora vamos coletar todos os *Dados* para realizar a troca de titularidade",
-    async () => {
-      session.stage = "choose_type_titularidade";
+  if (type !== "text" && type !== "interactive" && type !== undefined) {
+    await MensagensComuns(
+      celular,
+      "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite",
+    );
+    return;
+  }
+
+  if (!session.trocaTitularidadeStep) {
+    session.trocaTitularidadeStep = "ask_cpf";
+    await MensagensComuns(
+      celular,
+      "Para iniciar a troca de titularidade, por favor digite o seu *CPF/CNPJ* (do titular atual):",
+    );
+    session.stage = "troca_titularidade";
+    return;
+  }
+
+  if (session.trocaTitularidadeStep === "ask_cpf") {
+    const cpf = texto.replace(/[^\d]+/g, "");
+    const cpfValido = validarCPF(texto);
+
+    if (!cpfValido && cpf.length !== 14 && cpf.length !== 11) {
+      await MensagensComuns(
+        celular,
+        "❌ *CPF/CNPJ* inválido. Por favor, verifique e digite novamente.",
+      );
+      return;
+    }
+
+    session.cpf = cpf;
+    const sis_cliente = await MkauthDataSource.getRepository(Sis_Cliente).find({
+      select: {
+        id: true,
+        nome: true,
+        endereco: true,
+        login: true,
+        numero: true,
+        email: true,
+        rg: true,
+        cpf_cnpj: true,
+        celular: true,
+      },
+      where: { cpf_cnpj: cpf, cli_ativado: "s" },
+    });
+
+    if (sis_cliente.length > 1) {
+      let currentIndex = 1;
+      const structuredData = sis_cliente.map((client) => ({
+        index: currentIndex++,
+        id: Number(client.id),
+        nome: client.nome,
+        endereco: client.endereco,
+        login: client.login,
+        numero: client.numero,
+        cpf,
+        email: client.email,
+        rg: client.rg,
+        celular: client.celular,
+      }));
+
+      session.structuredDataTitularidade = structuredData;
+      session.trocaTitularidadeStep = "select_cadastro";
+
+      let messageText =
+        "🔍 Encontramos mais de um *Cadastro!* Digite o *Número* para o qual deseja realizar a Troca de Titularidade 👇🏻\n\n";
+      structuredData.forEach((client) => {
+        messageText += `*${client.index}* Nome: ${client.nome}, Endereço: ${client.endereco} N: ${client.numero}\n\n`;
+      });
+      messageText += "👉🏻 Caso queira cancelar digite *início*";
+
+      await MensagensComuns(celular, messageText);
+      return;
+    }
+
+    if (sis_cliente.length === 1) {
+      await selecionarCadastroTitularidade(celular, session, sis_cliente[0]);
+      return;
+    }
+
+    await MensagensComuns(
+      celular,
+      "🙁 Seu cadastro *não* foi *encontrado*, verifique se digitou corretamente o seu *CPF/CNPJ* ou digite *início* para voltar.",
+    );
+    return;
+  }
+
+  if (session.trocaTitularidadeStep === "select_cadastro") {
+    if (
+      texto.toLowerCase() === "inicio" ||
+      texto.toLowerCase() === "início"
+    ) {
+      session.trocaTitularidadeStep = undefined;
+      session.structuredDataTitularidade = undefined;
+      await boasVindas(celular);
       await MensagemBotao(
         celular,
-        "Aperte Em *Continuar* para Concluir a Troca de *Titularidade*",
-        "Continuar",
+        "Escolha um Botão",
+        "Boleto/Pix",
+        "Serviços/Contratação",
+        "Falar com Atendente",
       );
-    },
-  );
+      session.stage = "options_start";
+      return;
+    }
+
+    const selectedIndex = parseInt(texto, 10) - 1;
+
+    if (
+      !isNaN(selectedIndex) &&
+      selectedIndex >= 0 &&
+      selectedIndex < session.structuredDataTitularidade.length
+    ) {
+      const selectedClient = session.structuredDataTitularidade[selectedIndex];
+      await selecionarCadastroTitularidade(celular, session, selectedClient);
+      return;
+    }
+
+    await MensagensComuns(
+      celular,
+      "⚠️ Opção *inválida*, por favor digite o número correto da opção desejada.",
+    );
+  }
 }
 
 // --- Troca de Plano ---
@@ -1005,65 +1130,6 @@ export async function handleChooseTypeEndereco(
   }
 }
 
-export async function handleTrocaTitularidade(
-  celular: any,
-  texto: any,
-  session: any,
-) {
-  if (texto.toLowerCase() === "sim") {
-    await MensagemTermos(
-      celular,
-      "Termos Troca de Titularidade",
-      "📄 Para dar *continuidade*, é preciso que *leia* o *Termo* abaixo e escolha a opção que deseja.",
-      "Ler Termos",
-      "https://wipdiversos.wiptelecomunicacoes.com.br/doc/troca_de_titularidade",
-    );
-    await MensagemBotao(celular, "Escolha a Opção", "Concordo", "Não Concordo");
-    session.stage = "handle_titularidade";
-  } else if (
-    texto.toLowerCase() === "não" ||
-    texto.toLowerCase() === "nao"
-  ) {
-    await MensagensComuns(
-      celular,
-      "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não ser o *Titular do Cadastro!!!*",
-    );
-    clearTimeout(sessions[celular].inactivityTimer);
-    delete sessions[celular];
-  } else {
-    await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
-  }
-}
-
-export async function handleTitularidadeConcordo(
-  celular: any,
-  texto: any,
-  session: any,
-  type: any,
-) {
-  if (texto.toLowerCase() === "concordo") {
-    session.stage = "awaiting_troca_titularidade_contato_flow";
-    await saveSession(celular);
-    await MensagemFlowTrocaTitularidadeContato(
-      celular,
-      FLOW_TROCA_TITULARIDADE_CONTATO,
-      "📱 Informar Contato",
-    );
-  } else if (
-    texto.toLowerCase() === "não concordo" ||
-    texto.toLowerCase() === "nao concordo"
-  ) {
-    await MensagensComuns(
-      celular,
-      "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
-    );
-    clearTimeout(sessions[celular].inactivityTimer);
-    delete sessions[celular];
-  } else {
-    await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
-  }
-}
-
 export async function handleAwaitingTrocaTitularidadeContatoFlow(
   celular: any,
   texto: any,
@@ -1101,37 +1167,125 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
       celular_destino: celularDestino,
     };
 
-    const planosDoSistema = await getPlanosDoSistema();
-
-    sessions[celularDestino] = {
-      ...(sessions[celularDestino] || {}),
-      stage: "awaiting_troca_titularidade_contratacao_flow",
-      service: "troca_titularidade",
-      dadosTitularidadeContato: {
-        nome,
-        celular_origem: celular,
+    try {
+      const payloadZap = {
+        nome: session.dadosCompleto?.nome || session.nome || "Não informado",
+        cpf: session.dadosCompleto?.cpf || session.cpf || "Não informado",
+        email: session.dadosCompleto?.email || session.email || "financeiro@wiptelecom.com.br",
+        telefone: session.dadosCompleto?.celular || session.celularCliente || celular,
+        telefone_conversa: celular,
+        endereco: session.dadosCompleto?.endereco || "Não informado",
+        rg: session.dadosCompleto?.rg || session.rg || "Não informado",
+        nome_novo_titular: nome,
+        celular_novo_titular: celularDestino,
         celular_destino: celularDestino,
-      },
-    };
-    await saveSession(celularDestino);
+      };
 
-    await MensagemFlowTrocaTitularidadeContratacao(
-      celularDestino,
-      FLOW_TROCA_TITULARIDADE_CONTRATACAO,
-      "📋 Preencher Contratação",
-      planosDoSistema,
-    );
-    await MensagensComuns(
-      celular,
-      `✅ Formulário enviado para o número *${celularDestino}*.\nQuando ele for preenchido, seguimos com a contratação da titularidade.`,
-    );
-    session.stage = "awaiting_manual_review";
+      const zapResponse = await ZapSign.createContractTrocaTitularidadeTitular(payloadZap as any);
+      const zapSignUrl = zapResponse.signers[0].sign_url;
+
+      const repo = AppDataSource.getRepository(SolicitacaoServico);
+      const novaSolicitacao = new SolicitacaoServico();
+      novaSolicitacao.servico = "Troca de Titularidade Titular";
+      novaSolicitacao.login_cliente = session.login || "Desconhecido";
+      novaSolicitacao.data_solicitacao = new Date();
+      novaSolicitacao.assinado = false;
+      novaSolicitacao.pago = false;
+      novaSolicitacao.gratis = 0;
+      novaSolicitacao.token_zapsign = zapResponse.token;
+      novaSolicitacao.dados = { ...payloadZap };
+      await repo.save(novaSolicitacao);
+
+      await MensagensComuns(
+        celular,
+        "✅ Perfeito! Aqui está o *Termo de Troca de Titularidade* para você assinar:",
+      );
+      await MensagensComuns(
+        celular,
+        `📄 *Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *assine* para prosseguirmos! Após a assinatura, entraremos em contato com o novo titular para autorização. 🚀`,
+      );
+      session.stage = "awaiting_signature_link";
+    } catch (zapError) {
+      console.error("[ZapSign] Erro ao criar contrato de troca de titularidade:", zapError);
+      const msgDados = `*🎭 Troca de Titularidade*\n\nTitular: ${session.dadosCompleto?.nome}\nCPF: ${session.dadosCompleto?.cpf}\nNovo Titular: ${nome}\nCelular: ${celularDestino}`;
+      logAndEmailFinalize({ msgDadosFinais: msgDados });
+      try {
+        await criarChamadoMkauth("TROCA DE TITULARIDADE", session, msgDados);
+      } catch (e) {
+        console.error("[Chamado] Erro ao criar chamado:", e);
+      }
+      await MensagensComuns(
+        celular,
+        "✅ Sua solicitação foi registrada! Nossa equipe entrará em contato para enviar os links de assinatura em breve.",
+      );
+      session.stage = "awaiting_manual_review";
+    }
     return;
   } catch (error) {
     await MensagemFlowTrocaTitularidadeContato(
       celular,
       FLOW_TROCA_TITULARIDADE_CONTATO,
       "📱 Informar Contato",
+    );
+  }
+}
+
+export async function handleNovoTitularAutorizacao(
+  celular: any,
+  texto: any,
+  session: any,
+) {
+  const celularTitular = session.celular_titular;
+  const t = texto.toLowerCase();
+
+  if (t === "sim") {
+    const planosDoSistema = await getPlanosDoSistema();
+    await MensagensComuns(
+      celular,
+      "✅ Ótimo! Por favor, preencha o formulário abaixo com os seus dados para gerarmos os documentos de assinatura.",
+    );
+    await MensagemFlowTrocaTitularidadeContratacao(
+      celular,
+      FLOW_TROCA_TITULARIDADE_CONTRATACAO,
+      "📋 Preencher Dados",
+      planosDoSistema,
+    );
+    await saveSession(celular);
+    session.stage = "awaiting_troca_titularidade_contratacao_flow";
+
+    if (celularTitular) {
+      await MensagensComuns(
+        celularTitular,
+        "✅ O novo titular *autorizou* o recebimento dos links de assinatura! Estamos aguardando o preenchimento dos dados.",
+      );
+    }
+  } else if (t === "não" || t === "nao") {
+    await MensagensComuns(
+      celular,
+      "Certo, sua escolha foi registrada. O processo de troca de titularidade foi *cancelado*. Obrigado!",
+    );
+
+    if (celularTitular) {
+      await MensagensComuns(
+        celularTitular,
+        `🚫 Infelizmente o *novo titular* (${session.dadosTitularidadeContato?.nome || "indicado"}) *não autorizou* o recebimento dos links de assinatura.\n\nO processo de Troca de Titularidade foi encerrado. Entre em contato conosco para mais informações.`,
+      );
+      if (sessions[celularTitular]) {
+        clearTimeout(sessions[celularTitular].inactivityTimer);
+        delete sessions[celularTitular];
+      }
+      await deleteSession(celularTitular);
+    }
+
+    if (sessions[celular]) {
+      clearTimeout(sessions[celular].inactivityTimer);
+      delete sessions[celular];
+    }
+    await deleteSession(celular);
+  } else {
+    await MensagensComuns(
+      celular,
+      "Por favor, responda *Sim* ou *Não* para continuar.",
     );
   }
 }
@@ -1146,7 +1300,7 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
     if (!dadosFlow || !dadosFlow.nome) {
       await MensagensComuns(
         celular,
-        "📋 Preencha o formulário de *troca de titularidade contratação* para continuar.",
+        "📋 Preencha o formulário de *troca de titularidade* para continuar.",
       );
       return;
     }
@@ -1156,36 +1310,91 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
       contato_solicitacao: session.dadosTitularidadeContato || {},
     };
 
-    await handleChooseTypeTitularidade(celular, session);
+    try {
+      const payloadZapTitularidade = {
+        nome: dadosFlow.nome,
+        cpf: dadosFlow.cpf || "Não informado",
+        email: dadosFlow.email || "financeiro@wiptelecom.com.br",
+        telefone: dadosFlow.celular || celular,
+        telefone_conversa: celular,
+        endereco: `${dadosFlow.rua || ""}, ${dadosFlow.numero || ""}`,
+        rg: dadosFlow.rg || "Não informado",
+      };
+      const zapTitularidade = await ZapSign.createContractTrocaTitularidadeNovoTitular(
+        payloadZapTitularidade as any,
+      );
+      const urlTitularidade = zapTitularidade.signers[0].sign_url;
+
+      const payloadZapCadastro = {
+        nome: dadosFlow.nome,
+        cpf: dadosFlow.cpf || "Não informado",
+        email: dadosFlow.email || "financeiro@wiptelecom.com.br",
+        telefone: dadosFlow.celular || celular,
+        telefone_conversa: celular,
+        endereco: dadosFlow.rua || "",
+        numero: dadosFlow.numero || "",
+        complemento: dadosFlow.complemento || "",
+        bairro: dadosFlow.bairro || "",
+        cidade: dadosFlow.cidade || "",
+        estado: dadosFlow.estado || "",
+        cep: dadosFlow.cep || "",
+        plano: dadosFlow.plano_escolhido || dadosFlow.plano || "A definir",
+        valor: "0.00",
+        vencimento: dadosFlow.vencimento || "5",
+        rg: dadosFlow.rg || "Não informado",
+      };
+      const zapCadastro = await ZapSign.createContractInstalacao(payloadZapCadastro as any);
+      const urlCadastro = zapCadastro.signers[0].sign_url;
+
+      const repo = AppDataSource.getRepository(SolicitacaoServico);
+      const novaSolicitacao = new SolicitacaoServico();
+      novaSolicitacao.servico = "Troca de Titularidade Novo Titular";
+      novaSolicitacao.login_cliente = dadosFlow.login || "Desconhecido";
+      novaSolicitacao.data_solicitacao = new Date();
+      novaSolicitacao.assinado = false;
+      novaSolicitacao.pago = false;
+      novaSolicitacao.gratis = 0;
+      novaSolicitacao.token_zapsign = zapTitularidade.token;
+      novaSolicitacao.dados = { ...dadosFlow, telefone_conversa: celular };
+      await repo.save(novaSolicitacao);
+
+      const msgDados = `*🎭 Troca de Titularidade - Novo Titular*\n\nNovo Titular: ${dadosFlow.nome}\nCPF: ${dadosFlow.cpf}\nCelular: ${celular}`;
+      logAndEmailFinalize({ msgDadosFinais: msgDados });
+      try {
+        await criarChamadoMkauth("TROCA DE TITULARIDADE", session, msgDados);
+      } catch (e) {
+        console.error("[Chamado] Erro ao criar chamado:", e);
+      }
+
+      await MensagensComuns(celular, "✅ Perfeito! Aqui estão os links para assinatura dos documentos:");
+      await MensagensComuns(celular, `📄 *Termo de Troca de Titularidade:*\n${urlTitularidade}`);
+      await MensagensComuns(
+        celular,
+        `📄 *Termo de Cadastro (Adesão):*\n${urlCadastro}\n\nPor favor, assine *ambos* os documentos para formalizar a sua contratação! 🚀`,
+      );
+      session.stage = "awaiting_signature_link";
+    } catch (zapError) {
+      console.error("[ZapSign] Erro ao criar contratos para novo titular:", zapError);
+      const msgDados = `*🎭 Troca de Titularidade - Novo Titular*\n\nDados: ${JSON.stringify(dadosFlow, null, 2)}`;
+      logAndEmailFinalize({ msgDadosFinais: msgDados });
+      try {
+        await criarChamadoMkauth("TROCA DE TITULARIDADE", session, msgDados);
+      } catch (e) {
+        console.error("[Chamado] Erro ao criar chamado:", e);
+      }
+      await MensagensComuns(
+        celular,
+        "✅ Seus dados foram recebidos! Nossa equipe enviará os links de assinatura em breve. Obrigado pela confiança!",
+      );
+      session.stage = "awaiting_manual_review";
+    }
     return;
   } catch (error) {
     await MensagensComuns(
       celular,
-      "📋 Por favor, preencha o formulário de *troca de titularidade contratação* para continuar.",
+      "📋 Por favor, preencha o formulário de *troca de titularidade* para continuar.",
     );
   }
-}
-
-export async function handleChooseTypeTitularidade(
-  celular: any,
-  session: any,
-) {
-  await MensagensComuns(
-    celular,
-    "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nUm de nossos *atendentes* entrará em contato para concluir a sua *Alteração de Titularidade* enviando o *link* para o cliente atual com o *Termo de Alteração de Titularidade* \n\ne ao Novo Cliente o *link* com os *Termos de Adesão, Alteração de Titularidade e Contrato de Permanência* a serem *assinados*.\n\n*Clique no Botão abaixo para finalizar*",
-  );
-  let dadosCliente = session.dadosCompleto
-    ? JSON.stringify(session.dadosCompleto, null, 2)
-    : "Dados não encontrados";
-  session.msgDadosFinais = `*🎭 Troca de Titularidade*\n\nDados do Cliente: ${dadosCliente}`;
-  logAndEmailFinalize(session);
-  try {
-    await criarChamadoMkauth("TROCA DE TITULARIDADE", session, session.msgDadosFinais);
-  } catch (e) {
-    console.error("[Chamado] Erro ao criar chamado de troca de titularidade:", e);
-  }
-  await MensagemBotao(celular, "Concluir Solicitação", "Finalizar");
-  session.stage = "finalizar";
 }
 
 export async function handleChooseEst(

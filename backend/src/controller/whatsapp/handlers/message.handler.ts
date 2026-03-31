@@ -39,17 +39,15 @@ import {
 import {
   iniciarMudancaComodo,
   iniciarWifiEstendido,
-  iniciarMudancaTitularidade,
+  iniciarTrocaTitularidade,
   iniciarTrocaPlano,
   iniciarRenovacao,
   handleChooseTypePayment,
   handleChooseTypeComodo,
   handleChooseTypeEndereco,
-  handleTrocaTitularidade,
-  handleTitularidadeConcordo,
   handleAwaitingTrocaTitularidadeContatoFlow,
   handleAwaitingTrocaTitularidadeContratacaoFlow,
-  handleChooseTypeTitularidade,
+  handleNovoTitularAutorizacao,
   handleChooseEst,
   handleChooseWifiEst,
   handleWifiEstFinalize,
@@ -348,12 +346,7 @@ export async function handleMessage(
             await iniciarMudancaComodo(celular, texto, session, type);
           } else if (session.service === "troca_titularidade") {
             session.stage = "troca_titularidade";
-            await MensagemBotao(
-              celular,
-              "Você é o Titular do Cadastro?",
-              "Sim",
-              "Não",
-            );
+            await iniciarTrocaTitularidade(celular, texto, session, type);
           } else if (session.service === "troca_plano") {
             session.stage = "troca_plano";
             await iniciarTrocaPlano(celular, texto, session, type);
@@ -463,25 +456,7 @@ export async function handleMessage(
       break;
 
     case "troca_titularidade":
-      if (verificaType(type)) {
-        await handleTrocaTitularidade(celular, texto, session);
-      } else {
-        await MensagensComuns(
-          celular,
-          msgRobo + "Selecione uma Opção dos Botoes",
-        );
-      }
-      break;
-
-    case "handle_titularidade":
-      if (verificaType(type)) {
-        await handleTitularidadeConcordo(celular, texto, session, type);
-      } else {
-        await MensagensComuns(
-          celular,
-          msgRobo + "Selecione uma Opção dos Botoes",
-        );
-      }
+      await iniciarTrocaTitularidade(celular, texto, session, type);
       break;
 
     case "wifi_est":
@@ -499,8 +474,15 @@ export async function handleMessage(
       }
       break;
 
-    case "handle_titularidade_2":
-      await iniciarMudancaTitularidade(celular, texto, session, type);
+    case "awaiting_novo_titular_autorizacao":
+      if (verificaType(type)) {
+        await handleNovoTitularAutorizacao(celular, texto, session);
+      } else {
+        await MensagensComuns(
+          celular,
+          msgRobo + "Selecione uma Opção dos Botoes",
+        );
+      }
       break;
 
     case "awaiting_troca_titularidade_contato_flow":
@@ -523,21 +505,6 @@ export async function handleMessage(
           celular,
           msgRobo + "Selecione uma Opção dos Botoes",
         );
-      }
-      break;
-
-    case "choose_type_titularidade":
-      try {
-        if (verificaType(type)) {
-          await handleChooseTypeTitularidade(celular, session);
-        } else {
-          await MensagensComuns(
-            celular,
-            msgRobo + "Selecione uma Opção dos Botoes",
-          );
-        }
-      } catch (error) {
-        console.log(error);
       }
       break;
 

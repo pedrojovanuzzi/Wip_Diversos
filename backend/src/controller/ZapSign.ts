@@ -11,7 +11,7 @@ import Whatsapp from "./Whatsapp";
 import MkauthDataSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { v4 as uuidv4 } from "uuid";
-import { deleteSession } from "./whatsapp/services/session.service";
+import { sessions, saveSession, deleteSession } from "./whatsapp/services/session.service";
 
 dotenv.config();
 
@@ -84,6 +84,19 @@ interface ZapSignDataAlteracaoPlano {
   valor: string;
   rg?: string;
   telefone_conversa?: string;
+}
+
+interface ZapSignDataTrocaTitularidade {
+  nome: string;
+  cpf: string;
+  email: string;
+  telefone: string;
+  endereco: string;
+  rg?: string;
+  telefone_conversa?: string;
+  nome_novo_titular?: string;
+  celular_novo_titular?: string;
+  celular_destino?: string;
 }
 
 class ZapSign {
@@ -537,6 +550,10 @@ class ZapSign {
                     );
                   }
                   break;
+                case "troca de titularidade titular":
+                case "troca_titularidade_titular":
+                  await this.notificarNovoTitular(solicitacao);
+                  break;
                 default:
                   console.log(
                     `[ZapSign Webhook] Serviço '${solicitacao.servico}' não requer integração MKAuth específica no momento.`,
@@ -561,6 +578,84 @@ class ZapSign {
     } catch (error) {
       console.error("[ZapSign Webhook] Erro ao processar:", error);
       res.status(500).send("Internal Server Error");
+    }
+  }
+
+  // === Métodos Auxiliares para Troca de Titularidade ===
+
+  private notificarNovoTitular = async (solicitacao: SolicitacaoServico) => {
+    try {
+      const dados = solicitacao.dados;
+      if (!dados) return;
+
+      const celularDestino = dados.celular_destino;
+      const celularTitular = dados.telefone_conversa;
+      const nomeNovoTitular = dados.nome_novo_titular || "novo titular";
+      const nomeTitular = dados.nome || "Titular";
+
+      if (!celularDestino) {
+        console.warn("[ZapSign] celular_destino não encontrado na solicitação de troca de titularidade");
+        return;
+      }
+
+      sessions[celularDestino] = {
+        ...(sessions[celularDestino] || {}),
+        stage: "awaiting_novo_titular_autorizacao",
+        service: "troca_titularidade",
+        celular_titular: celularTitular,
+        dadosTitularidadeContato: {
+          nome: nomeNovoTitular,
+          celular_origem: celularTitular,
+          celular_destino: celularDestino,
+        },
+      };
+      await saveSession(celularDestino);
+
+      await whatsappOutgoingQueue.add(
+        "send-template",
+        {
+          url: waUrl,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: celularDestino,
+            type: "template",
+            template: {
+              name: "aceita_titularidade",
+              language: { code: "pt_BR" },
+              components: [
+                {
+                  type: "body",
+                  parameters: [
+                    { type: "text", text: nomeTitular },
+                  ],
+                },
+              ],
+            },
+          },
+          headers: {
+            Authorization: `Bearer ${waToken}`,
+            "Content-Type": "application/json",
+          },
+        },
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
+        },
+      );
+
+      if (celularTitular) {
+        await Whatsapp.MensagensComuns(
+          celularTitular,
+          `✅ *Assinatura confirmada!* Enviamos uma mensagem para o novo titular solicitando autorização para o recebimento dos links de assinatura. Aguarde a resposta! 🚀`,
+        );
+      }
+
+      console.log(`[ZapSign] Notificação enviada para novo titular ${celularDestino}`);
+    } catch (error) {
+      console.error("[ZapSign] Erro ao notificar novo titular:", error);
     }
   }
 
@@ -657,6 +752,153 @@ class ZapSign {
       return response.data;
     } catch (error) {
       console.error("Error in createContractAlteracaoPlano:", error);
+      throw error;
+    }
+  }
+
+  createContractTrocaTitularidadeTitular = async (params: ZapSignDataTrocaTitularidade) => {
+    try {
+      const {
+        nome,
+        cpf,
+        email,
+        telefone,
+        endereco,
+        rg = "Não informado",
+        telefone_conversa,
+        nome_novo_titular = "",
+        celular_novo_titular = "",
+      } = params;
+
+      const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
+      const template = await templateRepo.findOne({
+        where: { nome_servico: "Troca de Titularidade", tipo: "gratis" },
+      });
+
+      if (!template || !template.token_id) {
+        throw new Error(
+          "Token do template 'Troca de Titularidade' não encontrado no banco de dados.",
+        );
+      }
+
+      const data = {
+        template_id: template.token_id,
+        signer_name: nome,
+        send_automatic_email: false,
+        send_automatic_whatsapp: false,
+        lang: "pt-br",
+        external_id: null,
+        data: [
+          { de: "{{nomecliente}}", para: nome },
+          { de: "{{termo}}", para: "Troca de Titularidade" },
+          { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
+          { de: "{{cpfcliente}}", para: cpf },
+          { de: "{{provedornome}}", para: "Wip Telecom" },
+          { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
+          { de: "{{rgcliente}}", para: rg },
+          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
+          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
+          { de: "{{enderecocliente}}", para: endereco },
+          { de: "{{emailcliente}}", para: email },
+          { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
+          { de: "{{novotitular}}", para: nome_novo_titular },
+          { de: "{{celularnovotitular}}", para: celular_novo_titular },
+        ],
+        signature_placement: "<<assinatura>>",
+        rubrica_placement: "<<visto>>",
+      };
+
+      const response = await axios.post(
+        homologacao
+          ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
+          : "https://api.zapsign.com.br/api/v1/models/create-doc/",
+        data,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.ZAPSIGN_TOKEN}`,
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Error in createContractTrocaTitularidadeTitular:", error);
+      throw error;
+    }
+  }
+
+  createContractTrocaTitularidadeNovoTitular = async (params: ZapSignDataTrocaTitularidade) => {
+    try {
+      const {
+        nome,
+        cpf,
+        email,
+        telefone,
+        endereco,
+        rg = "Não informado",
+        telefone_conversa,
+      } = params;
+
+      const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
+      // Try dedicated new-owner template first, fall back to general one
+      const template =
+        (await templateRepo.findOne({
+          where: { nome_servico: "Troca de Titularidade Novo Titular", tipo: "gratis" },
+        })) ||
+        (await templateRepo.findOne({
+          where: { nome_servico: "Troca de Titularidade", tipo: "gratis" },
+        }));
+
+      if (!template || !template.token_id) {
+        throw new Error(
+          "Token do template 'Troca de Titularidade' não encontrado no banco de dados.",
+        );
+      }
+
+      const data = {
+        template_id: template.token_id,
+        signer_name: nome,
+        send_automatic_email: false,
+        send_automatic_whatsapp: false,
+        lang: "pt-br",
+        external_id: null,
+        data: [
+          { de: "{{nomecliente}}", para: nome },
+          { de: "{{termo}}", para: "Troca de Titularidade" },
+          { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
+          { de: "{{cpfcliente}}", para: cpf },
+          { de: "{{provedornome}}", para: "Wip Telecom" },
+          { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
+          { de: "{{rgcliente}}", para: rg },
+          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
+          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
+          { de: "{{enderecocliente}}", para: endereco },
+          { de: "{{emailcliente}}", para: email },
+          { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
+          { de: "{{novotitular}}", para: "" },
+          { de: "{{celularnovotitular}}", para: "" },
+        ],
+        signature_placement: "<<assinatura>>",
+        rubrica_placement: "<<visto>>",
+      };
+
+      const response = await axios.post(
+        homologacao
+          ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
+          : "https://api.zapsign.com.br/api/v1/models/create-doc/",
+        data,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.ZAPSIGN_TOKEN}`,
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Error in createContractTrocaTitularidadeNovoTitular:", error);
       throw error;
     }
   }
