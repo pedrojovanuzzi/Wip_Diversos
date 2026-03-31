@@ -835,6 +835,8 @@ class ZapSign {
             name: nome_novo_titular,
             phone_country: "55",
             phone_number: phoneNumber,
+            signature_placement: "<<assinatura2>>",
+            rubrica_placement: "<<visto2>>",
           },
           {
             headers: {
