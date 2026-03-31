@@ -194,6 +194,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   title="Pix"
                   description="Gestão de pagamentos via Pix"
                 />
+                <NavItem
+                  to="/solicitacoes-servico"
+                  icon={
+                    <FaList className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Serviços Solicitados"
+                  description="Ver solicitações de serviços"
+                />
               </>
             )}
             {permission >= 5 && (
@@ -317,14 +325,7 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   title="Gráfico Instalações"
                   description="Acompanhe instalações mensais"
                 />
-                <NavItem
-                  to="/solicitacoes-servico"
-                  icon={
-                    <FaList className="text-white size-8 transition-all hover:text-green-400" />
-                  }
-                  title="Serviços Solicitados"
-                  description="Ver solicitações de serviços"
-                />
+                
               </>
             )}
             {permission === 1 && (
