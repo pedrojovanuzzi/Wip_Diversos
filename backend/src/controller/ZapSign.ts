@@ -611,39 +611,48 @@ class ZapSign {
       };
       await saveSession(celularDestino);
 
-      await whatsappOutgoingQueue.add(
-        "send-template",
-        {
-          url: waUrl,
-          payload: {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: celularDestino,
-            type: "template",
-            template: {
-              name: "aceita_titularidade",
-              language: { code: "pt_BR" },
-              components: [
-                {
-                  type: "body",
-                  parameters: [
-                    { type: "text", text: nomeTitular },
-                  ],
-                },
-              ],
-            },
-          },
-          headers: {
-            Authorization: `Bearer ${waToken}`,
-            "Content-Type": "application/json",
-          },
-        },
-        {
-          removeOnComplete: true,
-          removeOnFail: false,
-          attempts: 3,
-          backoff: { type: "exponential", delay: 5000 },
-        },
+      // TODO: reativar quando o template aceita_titularidade for aprovado no WhatsApp
+      // await whatsappOutgoingQueue.add(
+      //   "send-template",
+      //   {
+      //     url: waUrl,
+      //     payload: {
+      //       messaging_product: "whatsapp",
+      //       recipient_type: "individual",
+      //       to: celularDestino,
+      //       type: "template",
+      //       template: {
+      //         name: "aceita_titularidade",
+      //         language: { code: "pt_BR" },
+      //         components: [
+      //           {
+      //             type: "body",
+      //             parameters: [
+      //               { type: "text", text: nomeTitular },
+      //             ],
+      //           },
+      //         ],
+      //       },
+      //     },
+      //     headers: {
+      //       Authorization: `Bearer ${waToken}`,
+      //       "Content-Type": "application/json",
+      //     },
+      //   },
+      //   {
+      //     removeOnComplete: true,
+      //     removeOnFail: false,
+      //     attempts: 3,
+      //     backoff: { type: "exponential", delay: 5000 },
+      //   },
+      // );
+
+      await Whatsapp.MensagensComuns(
+        celularDestino,
+        `Olá, *${nomeNovoTitular}*! 👋\n\n` +
+        `O cliente *${nomeTitular}* está solicitando uma *Troca de Titularidade* do contrato de internet para o seu nome.\n\n` +
+        `Você *aceita* receber os links de assinatura para concluir a transferência?\n\n` +
+        `Responda *SIM* para aceitar ou *NÃO* para recusar.`,
       );
 
       if (celularTitular) {
