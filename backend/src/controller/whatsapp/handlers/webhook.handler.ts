@@ -40,7 +40,7 @@ export async function verify(req: Request, res: Response) {
 
 export async function index(req: Request, res: Response) {
   // Responde 200 imediatamente para evitar retries do Meta por timeout
-  res.sendStatus(200);
+  res.status(200);
 
   try {
     const body = req.body;
@@ -49,8 +49,13 @@ export async function index(req: Request, res: Response) {
       return;
     }
 
+    
+
     if (body.entry) {
       const entryId = body.entry?.[0]?.id;
+
+    console.log("[Webhook] entry[0].changes:", JSON.stringify(body.entry[0].changes, null, 2));
+
 
       if (entryId === process.env.WHATS_BUSSINES_TESTID && !isSandbox) {
         console.log("Mensagem de teste ignorada em produção");
