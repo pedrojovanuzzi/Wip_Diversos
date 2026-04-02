@@ -8,11 +8,15 @@ import ApiMkDataSource from "../../../database/API_MK";
 import PeopleConversation from "../../../entities/APIMK/People_Conversations";
 import Conversations from "../../../entities/APIMK/Conversations";
 import Sessions from "../../../entities/APIMK/Sessions";
-import { isSandbox, logFilePath, manutencao } from "../config";
+import { isSandbox, logFilePath, manutencao, redisOptions } from "../config";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
+import Redis from "ioredis";
 
-const processedMessages = new Map<string, number>(); // messageId → timestamp
+// Deduplicação persistente: sobrevive a restarts do servidor.
+// TTL de 24h cobre toda a janela de retry do Meta.
+const redisDedup = new Redis(redisOptions);
+const DEDUP_KEY = (id: string) => `wa:msg:dedup:${id}`;
 
 export async function verify(req: Request, res: Response) {
   const mode = req.query["hub.mode"];
@@ -87,19 +91,13 @@ export async function index(req: Request, res: Response) {
                 const type = message.type;
                 const messageId = message.id;
 
-                // Deduplicação: TTL de 24h para cobrir a janela de retry do Meta
-                const now = Date.now();
-                const TTL_24H = 24 * 60 * 60 * 1000;
-                if (processedMessages.has(messageId)) {
-                  console.log(`Mensagem duplicada ignorada: ${messageId}`);
+                // Deduplicação persistente via Redis — sobrevive a restarts.
+                // SET NX EX: só grava se a chave não existe, TTL 24h.
+                const dedupSet = await redisDedup.set(DEDUP_KEY(messageId), "1", "EX", 86400, "NX");
+                if (dedupSet === null) {
+                  // Chave já existia → mensagem já foi processada (retry do Meta)
+                  console.log(`Mensagem duplicada ignorada (Redis): ${messageId}`);
                   continue;
-                }
-                processedMessages.set(messageId, now);
-                // Limpa entradas expiradas periodicamente ao invés de setTimeout por mensagem
-                if (processedMessages.size > 500) {
-                  for (const [id, ts] of processedMessages) {
-                    if (now - ts > TTL_24H) processedMessages.delete(id);
-                  }
                 }
 
                 if (!celular || !type) {
