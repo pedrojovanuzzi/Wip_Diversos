@@ -638,53 +638,12 @@ class ZapSign {
         return;
       }
 
-      // Não reseta a sessão do novo titular — ele já passou pelo fluxo de autorização
-      // e já recebeu os links de assinatura. Envia template de lembrete para assinar.
-      const phoneRaw = String(celularDestino).replace(/\D/g, "");
-      const phoneTo = phoneRaw.startsWith("55") ? phoneRaw : "55" + phoneRaw;
-      await whatsappOutgoingQueue.add(
-        "send-template",
-        {
-          url: waUrl,
-          payload: {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: phoneTo,
-            type: "template",
-            template: {
-              name: "aceita_titularidade",
-              language: { code: "pt_BR" },
-              components: [
-                {
-                  type: "body",
-                  parameters: [
-                    { type: "text", parameter_name: "titular", text: nomeNovoTitular },
-                  ],
-                },
-              ],
-            },
-          },
-          headers: {
-            Authorization: `Bearer ${waToken}`,
-            "Content-Type": "application/json",
-          },
-        },
-        {
-          removeOnComplete: true,
-          removeOnFail: false,
-          attempts: 3,
-          backoff: { type: "exponential", delay: 5000 },
-        },
-      );
-
       if (celularTitular) {
         await Whatsapp.MensagensComuns(
           celularTitular,
-          `✅ *Assinatura confirmada!* O novo titular foi notificado para assinar o documento. 🚀`,
+          `✅ *Assinatura confirmada!* Aguardando a assinatura do novo titular. 🚀`,
         );
       }
-
-      console.log(`[ZapSign] Notificação enviada para novo titular ${celularDestino}`);
     } catch (error) {
       console.error("[ZapSign] Erro ao notificar novo titular:", error);
     }
