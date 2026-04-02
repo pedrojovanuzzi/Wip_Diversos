@@ -26,7 +26,9 @@ import {
   enviarNotificacaoServico,
   Finalizar,
   boasVindas,
+  whatsappOutgoingQueue,
 } from "../services/messaging.service";
+import { url as waUrl, token as waToken } from "../config";
 import { getPlanosDoSistema } from "../services/plano.service";
 import { criarChamadoMkauth } from "../services/chamado.service";
 
@@ -1219,10 +1221,42 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
     };
     await saveSession(celularDestino);
 
-    // Notifica o novo titular
-    await MensagensComuns(
-      celularDestino,
-      `Olá, *${nome}*! 👋\n\nO cliente *${dadosTitular.nome}* está solicitando uma *Troca de Titularidade* do contrato de internet para o seu nome.\n\nVocê *aceita* receber os links de assinatura para concluir a transferência?\n\nResponda *SIM* para aceitar ou *NÃO* para recusar.`,
+    // Notifica o novo titular via template aceita_titularidade
+    const phoneRaw = String(celularDestino).replace(/\D/g, "");
+    const phoneTo = phoneRaw.startsWith("55") ? phoneRaw : "55" + phoneRaw;
+    await whatsappOutgoingQueue.add(
+      "send-template",
+      {
+        url: waUrl,
+        payload: {
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: phoneTo,
+          type: "template",
+          template: {
+            name: "aceita_titularidade",
+            language: { code: "pt_BR" },
+            components: [
+              {
+                type: "body",
+                parameters: [
+                  { type: "text", parameter_name: "titular", text: nome },
+                ],
+              },
+            ],
+          },
+        },
+        headers: {
+          Authorization: `Bearer ${waToken}`,
+          "Content-Type": "application/json",
+        },
+      },
+      {
+        removeOnComplete: true,
+        removeOnFail: false,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 5000 },
+      },
     );
 
     await MensagensComuns(
@@ -1349,7 +1383,11 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
         const solicitacaoTitular = await repo.findOne({ where: { id: session.solicitacao_id_titular } });
         if (solicitacaoTitular) {
           solicitacaoTitular.token_zapsign = zapTitularidade.token;
-          solicitacaoTitular.dados = { ...solicitacaoTitular.dados, nome_novo_titular: dadosFlow.nome };
+          solicitacaoTitular.dados = {
+            ...solicitacaoTitular.dados,
+            nome_novo_titular: dadosFlow.nome,
+            sign_url_novo_titular: urlNovoTitularTitularidade,
+          };
           await repo.save(solicitacaoTitular);
         }
       }

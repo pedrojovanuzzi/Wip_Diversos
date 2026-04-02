@@ -142,6 +142,8 @@ export async function index(req: Request, res: Response) {
                   }
                 } else if (type === "text") {
                   mensagemCorpo = message.text?.body || "";
+                } else if (type === "button") {
+                  mensagemCorpo = message.button?.text || message.button?.payload || "";
                 }
 
                 if (mensagemCorpo || type) {

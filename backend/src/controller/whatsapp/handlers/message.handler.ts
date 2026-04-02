@@ -485,6 +485,15 @@ export async function handleMessage(
       }
       break;
 
+    case "awaiting_novo_titular_acceptance":
+      if (verificaType(type)) {
+        await MensagensComuns(
+          celular,
+          "⏳ Aguardando o novo titular preencher os dados. Por favor, aguarde...",
+        );
+      }
+      break;
+
     case "awaiting_troca_titularidade_contato_flow":
       await handleAwaitingTrocaTitularidadeContatoFlow(celular, texto, session);
       break;

@@ -73,7 +73,7 @@ export function validarRG(rg: any): boolean {
 }
 
 export function verificaType(type: any): boolean {
-  if (type == "text" || type == "interactive") {
+  if (type == "text" || type == "interactive" || type == "button") {
     console.log("TYPE: " + type);
     return true;
   } else {

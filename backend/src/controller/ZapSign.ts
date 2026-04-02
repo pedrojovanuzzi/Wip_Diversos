@@ -423,18 +423,29 @@ class ZapSign {
 
   webhook = async (req: Request, res: Response) => {
     try {
-      const { event_type, token } = req.body;
-      console.log(`[ZapSign Webhook] Evento recebido: ${event_type}`);
+      console.log("[ZapSign Webhook] Body completo:", JSON.stringify(req.body));
+      const { event_type } = req.body;
+      const token: string = req.body.token || req.body.document?.token;
+      console.log(`[ZapSign Webhook] Evento: ${event_type} | Token: ${token}`);
+
+      // ZapSign pode enviar "doc_signed" como último evento mesmo quando todos assinaram.
+      // Detectamos isso verificando se o status do documento é "signed".
+      const docFullySigned =
+        req.body.status === "signed" &&
+        Array.isArray(req.body.signers) &&
+        req.body.signers.every((s: any) => s.status === "signed");
 
       if (event_type === "doc_signed") {
-        // doc_signed: apenas notifica o novo titular na troca de titularidade (primeira assinatura)
         const repo = AppDataSource.getRepository(SolicitacaoServico);
         const solicitacao = await repo.findOne({ where: { token_zapsign: token } });
         if (solicitacao) {
           const servicoNorm = solicitacao.servico?.toLowerCase();
+          // Notifica novo titular apenas na primeira assinatura (quando ainda faltam signatários)
           if (
             (servicoNorm === "troca de titularidade titular" || servicoNorm === "troca_titularidade_titular") &&
-            !solicitacao.dados?.titular_assinou
+            !solicitacao.dados?.titular_assinou &&
+            !docFullySigned &&
+            !solicitacao.assinado
           ) {
             solicitacao.dados = { ...solicitacao.dados, titular_assinou: true };
             await repo.save(solicitacao);
@@ -443,12 +454,15 @@ class ZapSign {
         }
       }
 
-      if (event_type === "all_signed") {
+      if (event_type === "all_signed" || docFullySigned) {
+        console.log(`[ZapSign Webhook] Processando assinatura completa para token: ${token}`);
         const repo = AppDataSource.getRepository(SolicitacaoServico);
 
         const solicitacao = await repo.findOne({
           where: { token_zapsign: token },
         });
+
+        console.log(`[ZapSign Webhook] Solicitação encontrada: ${solicitacao ? `ID ${solicitacao.id} (${solicitacao.servico})` : "NÃO ENCONTRADA"}`);
 
         if (solicitacao) {
           solicitacao.assinado = true;
@@ -624,68 +638,49 @@ class ZapSign {
         return;
       }
 
-      sessions[celularDestino] = {
-        ...(sessions[celularDestino] || {}),
-        stage: "awaiting_novo_titular_autorizacao",
-        service: "troca_titularidade",
-        celular_titular: celularTitular,
-        sign_url_novo_titular: dados.sign_url_novo_titular || null,
-        dadosTitularidadeContato: {
-          nome: nomeNovoTitular,
-          celular_origem: celularTitular,
-          celular_destino: celularDestino,
+      // Não reseta a sessão do novo titular — ele já passou pelo fluxo de autorização
+      // e já recebeu os links de assinatura. Envia template de lembrete para assinar.
+      const phoneRaw = String(celularDestino).replace(/\D/g, "");
+      const phoneTo = phoneRaw.startsWith("55") ? phoneRaw : "55" + phoneRaw;
+      await whatsappOutgoingQueue.add(
+        "send-template",
+        {
+          url: waUrl,
+          payload: {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: phoneTo,
+            type: "template",
+            template: {
+              name: "aceita_titularidade",
+              language: { code: "pt_BR" },
+              components: [
+                {
+                  type: "body",
+                  parameters: [
+                    { type: "text", parameter_name: "titular", text: nomeNovoTitular },
+                  ],
+                },
+              ],
+            },
+          },
+          headers: {
+            Authorization: `Bearer ${waToken}`,
+            "Content-Type": "application/json",
+          },
         },
-      };
-      await saveSession(celularDestino);
-
-      // TODO: reativar quando o template aceita_titularidade for aprovado no WhatsApp
-      // await whatsappOutgoingQueue.add(
-      //   "send-template",
-      //   {
-      //     url: waUrl,
-      //     payload: {
-      //       messaging_product: "whatsapp",
-      //       recipient_type: "individual",
-      //       to: celularDestino,
-      //       type: "template",
-      //       template: {
-      //         name: "aceita_titularidade",
-      //         language: { code: "pt_BR" },
-      //         components: [
-      //           {
-      //             type: "body",
-      //             parameters: [
-      //               { type: "text", text: nomeTitular },
-      //             ],
-      //           },
-      //         ],
-      //       },
-      //     },
-      //     headers: {
-      //       Authorization: `Bearer ${waToken}`,
-      //       "Content-Type": "application/json",
-      //     },
-      //   },
-      //   {
-      //     removeOnComplete: true,
-      //     removeOnFail: false,
-      //     attempts: 3,
-      //     backoff: { type: "exponential", delay: 5000 },
-      //   },
-      // );
-
-      await Whatsapp.MensagensComuns(
-        celularDestino,
-        `Olá, *${nomeNovoTitular}*! 👋\n\n` +
-        `O cliente *${nomeTitular}* está solicitando uma *Troca de Titularidade* do contrato de internet para o seu nome.\n\n` +
-        `Você *aceita* receber os links de assinatura para concluir a transferência?\n\n` +
-        `Responda *SIM* para aceitar ou *NÃO* para recusar.`,
+        {
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
+        },
       );
 
       if (celularTitular) {
         await Whatsapp.MensagensComuns(
           celularTitular,
-          `✅ *Assinatura confirmada!* Enviamos uma mensagem para o novo titular solicitando autorização para o recebimento dos links de assinatura. Aguarde a resposta! 🚀`,
+          `✅ *Assinatura confirmada!* O novo titular foi notificado para assinar o documento. 🚀`,
         );
       }
 
