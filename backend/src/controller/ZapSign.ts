@@ -12,6 +12,7 @@ import MkauthDataSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { v4 as uuidv4 } from "uuid";
 import { sessions, saveSession, deleteSession } from "./whatsapp/services/session.service";
+import { criarChamadoMkauth } from "./whatsapp/services/chamado.service";
 
 dotenv.config();
 
@@ -495,7 +496,7 @@ class ZapSign {
             if (requesterPhone) {
               await Whatsapp.MensagensComuns(
                 requesterPhone,
-                `✅ *Assinatura Confirmada!*\n\nOlá ${solicitacao.dados?.nome || "Cliente"}, recebemos a sua assinatura para o serviço: *${solicitacao.servico || "Contratado"}*.\n\nAgradecemos a confiança! Em breve nossa equipe entrará em contato para agendamento. 🚀`,
+                `✅ *Assinatura Confirmada!*\n\nOlá ${solicitacao.dados?.nome || "Cliente"}, recebemos a sua assinatura para o serviço: *${solicitacao.servico || "Contratado"}*.\n\nAgradecemos a confiança! Em breve nossa equipe entrará em contato para confirmação do serviço. 🚀`,
               );
               await deleteSession(requesterPhone);
             }
@@ -593,6 +594,10 @@ class ZapSign {
                 case "troca de titularidade titular":
                 case "troca_titularidade_titular":
                   // notificarNovoTitular é chamado no doc_signed (primeira assinatura)
+                  await this.verificarEFinalizarTrocaTitularidade(solicitacao, repo);
+                  break;
+                case "troca de titularidade novo titular":
+                  await this.verificarEFinalizarTrocaTitularidade(solicitacao, repo);
                   break;
                 default:
                   console.log(
@@ -646,6 +651,96 @@ class ZapSign {
       }
     } catch (error) {
       console.error("[ZapSign] Erro ao notificar novo titular:", error);
+    }
+  }
+
+  private verificarEFinalizarTrocaTitularidade = async (
+    solicitacaoAssinada: SolicitacaoServico,
+    repo: ReturnType<typeof AppDataSource.getRepository<SolicitacaoServico>>,
+  ) => {
+    try {
+      const isNovoTitular = (solicitacaoAssinada.servico || "").toLowerCase().includes("novo titular");
+
+      let solicitacaoTitular: SolicitacaoServico | null = null;
+      let solicitacaoNovoTitular: SolicitacaoServico | null = null;
+
+      if (isNovoTitular) {
+        solicitacaoNovoTitular = solicitacaoAssinada;
+        const idTitular = solicitacaoAssinada.dados?.solicitacao_id_titular;
+        if (idTitular) {
+          solicitacaoTitular = await repo.findOne({ where: { id: idTitular } });
+        }
+      } else {
+        solicitacaoTitular = solicitacaoAssinada;
+        const idNovoTitular = solicitacaoAssinada.dados?.solicitacao_id_novo_titular;
+        if (idNovoTitular) {
+          solicitacaoNovoTitular = await repo.findOne({ where: { id: idNovoTitular } });
+        }
+      }
+
+      if (!solicitacaoTitular || !solicitacaoNovoTitular) {
+        console.log("[TrocaTitularidade] Aguardando a outra solicitação ser localizada.");
+        return;
+      }
+
+      if (!solicitacaoTitular.assinado || !solicitacaoNovoTitular.assinado) {
+        console.log("[TrocaTitularidade] Aguardando ambas as assinaturas.");
+        return;
+      }
+
+      if (solicitacaoTitular.dados?.troca_finalizada) {
+        console.log("[TrocaTitularidade] Troca já processada, ignorando.");
+        return;
+      }
+
+      // Marca como processado para evitar execução dupla
+      solicitacaoTitular.dados = { ...solicitacaoTitular.dados, troca_finalizada: true };
+      await repo.save(solicitacaoTitular);
+
+      const dadosTitular = solicitacaoTitular.dados;
+      const dadosNovoTitular = solicitacaoNovoTitular.dados;
+
+      // 1. Criar chamado no cadastro do titular original (pelo CPF)
+      try {
+        const cpfOriginal = (dadosTitular?.cpf || "").replace(/\D/g, "");
+        if (cpfOriginal) {
+          const clienteOriginal = await MkauthDataSource.getRepository(ClientesEntities).findOne({
+            where: { cpf_cnpj: cpfOriginal },
+          });
+
+          const sessionFake = {
+            login: clienteOriginal?.login || dadosTitular?.login || "",
+            nome: clienteOriginal?.nome || dadosTitular?.nome || "",
+            email: clienteOriginal?.email || dadosTitular?.email || "",
+          };
+
+          const mensagemChamado =
+            `Troca de titularidade realizada em ${moment().format("DD/MM/YYYY HH:mm")}. ` +
+            `Contrato assinado pelo titular e novo titular.\n\n` +
+            `Dados do novo titular:\n` +
+            `Nome: ${dadosNovoTitular?.nome || "Não informado"}\n` +
+            `CPF: ${dadosNovoTitular?.cpf || "Não informado"}\n` +
+            `E-mail: ${dadosNovoTitular?.email || "Não informado"}\n` +
+            `Celular: ${dadosNovoTitular?.celular || dadosNovoTitular?.telefone_conversa || "Não informado"}`;
+
+          await criarChamadoMkauth("TROCA DE TITULARIDADE", sessionFake, mensagemChamado, solicitacaoTitular);
+          console.log(`[TrocaTitularidade] Chamado criado para CPF ${cpfOriginal}.`);
+        } else {
+          console.warn("[TrocaTitularidade] CPF do titular original não encontrado nos dados.");
+        }
+      } catch (e) {
+        console.error("[TrocaTitularidade] Erro ao criar chamado para titular:", e);
+      }
+
+      // 2. Criar novo cadastro no MkAuth para o novo titular
+      try {
+        await this.registerClientInMkAuth(dadosNovoTitular);
+        console.log(`[TrocaTitularidade] Novo titular ${dadosNovoTitular?.nome} cadastrado no MKAuth.`);
+      } catch (e) {
+        console.error("[TrocaTitularidade] Erro ao cadastrar novo titular no MKAuth:", e);
+      }
+    } catch (error) {
+      console.error("[TrocaTitularidade] Erro ao processar finalização da troca:", error);
     }
   }
 

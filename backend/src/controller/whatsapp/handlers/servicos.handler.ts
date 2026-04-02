@@ -1423,8 +1423,17 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
       novaSolicitacao.pago = false;
       novaSolicitacao.gratis = 1;
       novaSolicitacao.token_zapsign = zapCadastro.token;
-      novaSolicitacao.dados = { ...dadosFlow, telefone_conversa: celular };
+      novaSolicitacao.dados = { ...dadosFlow, telefone_conversa: celular, solicitacao_id_titular: session.solicitacao_id_titular || null };
       await repo.save(novaSolicitacao);
+
+      // Atualiza a solicitação do titular com o ID da solicitação do novo titular para link bidirecional
+      if (session.solicitacao_id_titular && novaSolicitacao.id) {
+        const solTitularLink = await repo.findOne({ where: { id: session.solicitacao_id_titular } });
+        if (solTitularLink) {
+          solTitularLink.dados = { ...solTitularLink.dados, solicitacao_id_novo_titular: novaSolicitacao.id };
+          await repo.save(solTitularLink);
+        }
+      }
 
       const msgDados = `*🎭 Troca de Titularidade - Novo Titular*\n\nNovo Titular: ${dadosFlow.nome}\nCPF: ${dadosFlow.cpf}\nCelular: ${celular}`;
       logAndEmailFinalize({ msgDadosFinais: msgDados });
