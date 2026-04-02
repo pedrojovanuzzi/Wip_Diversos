@@ -11,7 +11,7 @@ import Sessions from "../../../entities/APIMK/Sessions";
 import { isSandbox, logFilePath, manutencao } from "../config";
 import fs from "fs";
 
-const processedMessages = new Set<string>();
+const processedMessages = new Map<string, number>(); // messageId → timestamp
 
 export async function verify(req: Request, res: Response) {
   const mode = req.query["hub.mode"];
@@ -86,22 +86,32 @@ export async function index(req: Request, res: Response) {
                 const type = message.type;
                 const messageId = message.id;
 
+                // Deduplicação: TTL de 24h para cobrir a janela de retry do Meta
+                const now = Date.now();
+                const TTL_24H = 24 * 60 * 60 * 1000;
                 if (processedMessages.has(messageId)) {
                   console.log(`Mensagem duplicada ignorada: ${messageId}`);
                   continue;
                 }
-
-                processedMessages.add(messageId);
-                setTimeout(
-                  () => processedMessages.delete(messageId),
-                  5 * 60 * 1000,
-                );
+                processedMessages.set(messageId, now);
+                // Limpa entradas expiradas periodicamente ao invés de setTimeout por mensagem
+                if (processedMessages.size > 500) {
+                  for (const [id, ts] of processedMessages) {
+                    if (now - ts > TTL_24H) processedMessages.delete(id);
+                  }
+                }
 
                 if (!celular || !type) {
                   continue;
                 }
 
-                if (!sessions[celular]) {
+                // Checa last_message_id tanto na sessão em memória quanto no banco (primeiro acesso)
+                if (sessions[celular]) {
+                  if (sessions[celular].last_message_id === messageId) {
+                    console.log(`Mensagem já processada (sessão ativa): ${messageId}`);
+                    continue;
+                  }
+                } else {
                   sessions[celular] = { stage: "" };
 
                   const sessionDB = await ApiMkDataSource.getRepository(
@@ -110,7 +120,7 @@ export async function index(req: Request, res: Response) {
 
                   if (sessionDB) {
                     if (sessionDB.last_message_id === messageId) {
-                      console.log(`Mensagem já processada: ${messageId}`);
+                      console.log(`Mensagem já processada (banco): ${messageId}`);
                       continue;
                     }
                     sessions[celular] = {
@@ -134,9 +144,21 @@ export async function index(req: Request, res: Response) {
                   }
 
                   if (interactive.type === "nfm_reply") {
-                    const responseJson =
-                      interactive.nfm_reply?.response_json;
+                    const responseJson = interactive.nfm_reply?.response_json;
                     if (responseJson) {
+                      // Se o nfm_reply contém APENAS flow_token, o usuário fechou o Flow
+                      // sem enviar — não é uma submissão, deve ser ignorado.
+                      try {
+                        const parsed = JSON.parse(responseJson);
+                        const keys = Object.keys(parsed);
+                        if (keys.length === 1 && keys[0] === "flow_token") {
+                          console.log(`[Webhook] Flow descartado sem envio (flow_token only): ${celular}`);
+                          continue;
+                        }
+                      } catch (_) {
+                        // não é JSON válido — ignora silenciosamente
+                        continue;
+                      }
                       mensagemCorpo = responseJson;
                     }
                   }

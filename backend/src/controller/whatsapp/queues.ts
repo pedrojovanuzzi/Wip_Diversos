@@ -58,14 +58,15 @@ export function initQueues() {
     "whatsapp-outgoing",
     async (job: Job) => {
       const { url, payload, headers } = job.data;
-      console.log(`[BullMQ] Enviando mensagem para ${payload?.to || "mídia"}`);
+      console.log(`[BullMQ] Enviando mensagem para ${payload?.to || "mídia"} (job: ${job.name})`);
 
       try {
         await axios.post(url, payload, { headers });
       } catch (err: any) {
         const apiError = err.response?.data;
+        const status = err.response?.status;
         console.error(
-          `[BullMQ] Erro ao enviar mensagem:`,
+          `[BullMQ] Erro ao enviar mensagem (HTTP ${status ?? "sem resposta"}):`,
           apiError || err.message,
         );
         if (apiError) {
@@ -76,7 +77,8 @@ export function initQueues() {
     },
     {
       connection: redisOptions,
-      limiter: { max: 10, duration: 1000 },
+      // 20 msgs/s: reduz atraso perceptível em fluxos que enviam 3-4 mensagens seguidas
+      limiter: { max: 20, duration: 1000 },
     },
   );
 

@@ -12,11 +12,12 @@ export const whatsappIncomingQueue = new Queue("whatsapp-incoming", {
   connection: redisOptions,
 });
 
+// attempts: 1 — evita reenvio duplicado quando a API processa mas retorna timeout de rede.
+// Mensagens de WhatsApp não são idempotentes: retry bem-sucedido = duplicata para o usuário.
 const defaultJobOptions = {
   removeOnComplete: true,
   removeOnFail: false,
-  attempts: 3,
-  backoff: { type: "exponential" as const, delay: 5000 },
+  attempts: 1,
 };
 
 async function saveOutgoingMessage(content: string) {
