@@ -10,6 +10,7 @@ import Conversations from "../../../entities/APIMK/Conversations";
 import Sessions from "../../../entities/APIMK/Sessions";
 import { isSandbox, logFilePath, manutencao } from "../config";
 import fs from "fs";
+import { v4 as uuidv4 } from "uuid";
 
 const processedMessages = new Map<string, number>(); // messageId → timestamp
 
@@ -111,8 +112,13 @@ export async function index(req: Request, res: Response) {
                     console.log(`Mensagem já processada (sessão ativa): ${messageId}`);
                     continue;
                   }
+                  // Garante que sessões antigas em memória também tenham conversationId
+                  if (!sessions[celular].conversationId) {
+                    sessions[celular].conversationId = uuidv4();
+                  }
                 } else {
-                  sessions[celular] = { stage: "" };
+                  const newConversationId = uuidv4();
+                  sessions[celular] = { stage: "", conversationId: newConversationId };
 
                   const sessionDB = await ApiMkDataSource.getRepository(
                     Sessions,
@@ -126,6 +132,8 @@ export async function index(req: Request, res: Response) {
                     sessions[celular] = {
                       stage: sessionDB.stage,
                       ...sessionDB.dados,
+                      // Preserva o conversationId salvo no banco; se não houver, usa o gerado acima
+                      conversationId: sessionDB.dados?.conversationId || newConversationId,
                     };
                   }
                 }
@@ -232,6 +240,7 @@ export async function index(req: Request, res: Response) {
                       type,
                       manutencao,
                       messageId,
+                      conversationId: sessions[celular]?.conversationId,
                     },
                     {
                       jobId: messageId,

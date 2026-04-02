@@ -15,7 +15,7 @@ export function initQueues() {
   incomingWorker = new Worker(
     "whatsapp-incoming",
     async (job: Job) => {
-      const { texto, celular, type, manutencao, messageId } = job.data;
+      const { texto, celular, type, manutencao, messageId, conversationId } = job.data;
       console.log(`[BullMQ] Processando webhook ID: ${messageId}`);
       console.log(`[BullMQ] sessions[${celular}] stage ANTES = "${sessions[celular]?.stage}"`);
 
@@ -32,6 +32,16 @@ export function initQueues() {
           sessions[celular] = { stage: "" };
         }
       }
+
+      // Valida conversationId: descarta jobs de conversas já encerradas/resetadas.
+      // Se o job carrega um conversationId que não bate com a sessão atual,
+      // a sessão foi resetada enquanto o job estava na fila — descarta.
+      if (conversationId && sessions[celular]?.conversationId &&
+          sessions[celular].conversationId !== conversationId) {
+        console.log(`[BullMQ] Job descartado — conversa encerrada (job: ${conversationId}, sessão: ${sessions[celular].conversationId})`);
+        return;
+      }
+
       const session = sessions[celular];
 
       try {

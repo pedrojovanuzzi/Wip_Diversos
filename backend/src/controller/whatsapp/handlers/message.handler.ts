@@ -66,6 +66,10 @@ export function resetInactivityTimer(celular: any, session: any) {
   }
 
   session.inactivityTimer = setTimeout(() => {
+    // Guard: só dispara se esta for ainda a sessão ativa para este número.
+    // Se a sessão foi deletada e recriada (nova entrada em sessions[]), o objeto
+    // mudou e o timer antigo não deve agir.
+    if (sessions[celular] !== session) return;
     MensagensComuns(
       celular,
       "🤷🏻 Seu atendimento foi *finalizado* devido à inatividade!!\nEntre em contato novamente 👍",
