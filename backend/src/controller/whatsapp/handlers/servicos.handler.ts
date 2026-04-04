@@ -1240,7 +1240,7 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
               {
                 type: "body",
                 parameters: [
-                  { type: "text", parameter_name: "titular", text: nome },
+                  { type: "text", parameter_name: "titular", text: session.dadosCompleto?.nome || session.nome || "Titular" },
                 ],
               },
             ],
