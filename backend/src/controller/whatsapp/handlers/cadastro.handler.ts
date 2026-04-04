@@ -12,7 +12,6 @@ import { sendServiceEmail } from "../services/email.service";
 import { sessions, deleteSession } from "../services/session.service";
 import { getPlanosDoSistema } from "../services/plano.service";
 import { criarChamadoMkauth } from "../services/chamado.service";
-import { gerarLancamentoInstalacaoPaga } from "../services/payment.service";
 import {
   MensagensComuns,
   MensagemBotao,
@@ -279,7 +278,8 @@ export async function handleAwaitingFlowCadastro(
         `<p><b>Cidade:</b> ${dadosFlow.cidade}/${dadosFlow.estado}</p>` +
         `<p><b>CEP:</b> ${dadosFlow.cep}</p>` +
         `<p><b>Plano Escolhido:</b> ${planoFlow}</p>` +
-        `<p><b>Vencimento:</b> Dia ${dadosFlow.vencimento}</p>`;
+        `<p><b>Vencimento:</b> Dia ${dadosFlow.vencimento}</p>` +
+        `<p><b>Forma de Pagamento:</b> ${dadosFlow.formaPagamento || "Não informada"}</p>`;
 
       sendServiceEmail(resumoEmailHtml);
 
@@ -297,34 +297,21 @@ export async function handleAwaitingFlowCadastro(
         `📶 *Plano:* ${planoFlow}\n` +
         `📅 *Vencimento:* Dia ${dadosFlow.vencimento}`;
 
-      const instalacaoPaga =
-        dadosFlow.formaPagamento === "Paga" ||
-        dadosFlow.formaPagamento === "Paga com Pix";
-
       const repo = AppDataSource.getRepository(SolicitacaoServico);
       const novaSolicitacao = new SolicitacaoServico();
       novaSolicitacao.servico = "Instalação";
       novaSolicitacao.login_cliente = dadosFlow.login || "Desconhecido";
       novaSolicitacao.data_solicitacao = new Date();
       novaSolicitacao.assinado = false;
-      novaSolicitacao.pago = instalacaoPaga;
-      novaSolicitacao.gratis = instalacaoPaga ? 0 : 1;
+      novaSolicitacao.pago = false;
+      novaSolicitacao.gratis = 0;
       novaSolicitacao.dados = {
         ...dadosFlow,
         plano: planoFlow,
         vencimento: dadosFlow.vencimento,
-        forma_pagamento: dadosFlow.formaPagamento || "Grátis",
         telefone_conversa: celular,
       };
       await repo.save(novaSolicitacao);
-
-      if (instalacaoPaga && dadosFlow.login) {
-        try {
-          await gerarLancamentoInstalacaoPaga(dadosFlow.login, dadosFlow.nome);
-        } catch (e) {
-          console.error("[MKAuth] Erro ao gerar lançamento de instalação paga:", e);
-        }
-      }
 
       try {
         const sessionChamado = {
@@ -463,10 +450,6 @@ export async function handleFinalRegister(
 
     sendServiceEmail(session.msgDadosFinais);
 
-    const instalacaoPaga =
-      session.formaPagamento === "Paga" ||
-      session.formaPagamento === "Paga com Pix";
-
     const repo = AppDataSource.getRepository(SolicitacaoServico);
     const novaSolicitacao = new SolicitacaoServico();
     novaSolicitacao.servico = "Instalação";
@@ -474,27 +457,15 @@ export async function handleFinalRegister(
       session.dadosCompleto?.login || "Desconhecido";
     novaSolicitacao.data_solicitacao = new Date();
     novaSolicitacao.assinado = false;
-    novaSolicitacao.pago = instalacaoPaga;
-    novaSolicitacao.gratis = instalacaoPaga ? 0 : 1;
+    novaSolicitacao.pago = false;
+    novaSolicitacao.gratis = 0;
     novaSolicitacao.dados = {
       ...session.dadosCompleto,
       plano: session.planoEscolhido,
       vencimento: session.vencimentoEscolhido,
-      forma_pagamento: session.formaPagamento || "Grátis",
       telefone_conversa: celular,
     };
     await repo.save(novaSolicitacao);
-
-    if (instalacaoPaga && session.dadosCompleto?.login) {
-      try {
-        await gerarLancamentoInstalacaoPaga(
-          session.dadosCompleto.login,
-          session.dadosCompleto.nome,
-        );
-      } catch (e) {
-        console.error("[MKAuth] Erro ao gerar lançamento de instalação paga:", e);
-      }
-    }
 
     await Finalizar(session.msgDadosFinais, celular, true);
     if (process.env.TEST_PHONE) {

@@ -31,9 +31,10 @@ export async function gerarLancamentoInstalacaoPaga(login: string, nome: string)
     const FaturasRepository = MkauthDataSource.getRepository(Record);
     const agora = new Date();
 
+    const nomeParaSalvar = (nome || login).slice(0, 16);
     const novoLancamento = await FaturasRepository.save({
       login,
-      nome: nome || login,
+      nome: nomeParaSalvar,
       tipo: "servicos",
       valor: valor.toFixed(2),
       valorpag: valor.toFixed(2),
