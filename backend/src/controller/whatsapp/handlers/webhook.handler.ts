@@ -39,8 +39,10 @@ export async function verify(req: Request, res: Response) {
 }
 
 export async function index(req: Request, res: Response) {
-  // Responde 200 imediatamente para evitar retries do Meta por timeout
-  res.status(200);
+  // Responde 200 imediatamente para evitar retries do Meta por timeout.
+  // IMPORTANTE: res.sendStatus envia o body "OK" e fecha a resposta de fato.
+  // Apenas res.status(200) não envia nada — o Meta aguarda o timeout e retenta.
+  res.sendStatus(200);
 
   try {
     const body = req.body;
@@ -72,6 +74,11 @@ export async function index(req: Request, res: Response) {
           for (const change of entry.changes) {
             const value = change.value;
 
+            // Ignora eventos de status (delivered, read, sent, failed) — não são mensagens de entrada
+            if (value && value.statuses && !value.messages) {
+              continue;
+            }
+
             if (value && value.messages) {
               console.log("Webhook recebido - mensagem(ns) detectada(s)");
 
@@ -95,6 +102,12 @@ export async function index(req: Request, res: Response) {
                 const celular = message.from;
                 const type = message.type;
                 const messageId = message.id;
+
+                // Ignora mensagens enviadas pelo próprio bot (echo de saída)
+                if (celular === process.env.SENDER_NUMBER) {
+                  console.log(`[Webhook] Echo do próprio bot ignorado: ${messageId}`);
+                  continue;
+                }
 
                 // Deduplicação persistente via Redis — sobrevive a restarts.
                 // SET NX EX: só grava se a chave não existe, TTL 24h.
