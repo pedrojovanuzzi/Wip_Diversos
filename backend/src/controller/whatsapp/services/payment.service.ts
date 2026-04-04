@@ -21,6 +21,46 @@ import {
   MensagensDeMidia,
 } from "./messaging.service";
 
+// Cria lançamento de instalação paga diretamente com status 'pago'.
+// Usado quando o cliente já pagou via Pix antes de fazer o cadastro.
+// O login ainda não existe em MKAuth — o lançamento fica pré-registrado
+// para ser vinculado quando o staff criar o cliente.
+export async function gerarLancamentoInstalacaoPaga(login: string, nome: string) {
+  try {
+    const valor = process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 350;
+    const FaturasRepository = MkauthDataSource.getRepository(Record);
+    const agora = new Date();
+
+    const novoLancamento = await FaturasRepository.save({
+      login,
+      nome: nome || login,
+      tipo: "servicos",
+      valor: valor.toFixed(2),
+      valorpag: valor.toFixed(2),
+      datavenc: agora,
+      datapag: agora,
+      processamento: agora,
+      status: "pago",
+      formapag: "Pix",
+      recibo: `SRV-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+      obs: "Serviço: Instalação Paga via Pix - Gerado automaticamente via WhatsApp Bot",
+      valorger: "completo",
+      aviso: "nao",
+      imp: "nao",
+      tipocob: "fat",
+      cfop_lanc: "5307",
+      referencia: moment().format("MM/YYYY"),
+      uuid_lanc: uuidv4().slice(0, 16),
+    });
+
+    console.log(`✅ Lançamento de instalação paga criado! ID: ${novoLancamento.id}, Login: ${login}, Valor: R$ ${valor}`);
+    return novoLancamento;
+  } catch (error) {
+    console.error("❌ Erro ao gerar lançamento de instalação paga no MKAuth:", error);
+    return null;
+  }
+}
+
 export async function gerarLancamentoServico(session: any, tipoServico: string) {
   try {
     const valoresServico: { [key: string]: number } = {

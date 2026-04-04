@@ -195,7 +195,7 @@ class SolicitacaoServicoController {
           `✅ *Parabéns!* Sua instalação será *Isenta* de taxa de adesão! 🚀`,
         );
 
-        await enviarNotificacaoServico(celular);
+        if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
 
         await MensagensComuns(
           celular,
@@ -317,7 +317,7 @@ class SolicitacaoServicoController {
           `✅ *Ótima notícia!* Sua instalação foi aprovada com *Isenção* de taxa! 🚀`,
         );
 
-        await enviarNotificacaoServico(celular);
+        if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
 
         await MensagensComuns(
           celular,
@@ -366,7 +366,7 @@ class SolicitacaoServicoController {
         `✅ *Ótima notícia!* Sua instalação foi aprovada com *Isenção* de taxa! 🚀`,
       );
 
-      await enviarNotificacaoServico(celular);
+      if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
 
       await MensagensComuns(
         celular,

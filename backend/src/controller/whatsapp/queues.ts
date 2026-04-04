@@ -1,11 +1,18 @@
 import { Worker, Job } from "bullmq";
 import axios from "axios";
+import Redis from "ioredis";
 import { redisOptions } from "./config";
 import { sessions, saveSession } from "./services/session.service";
 import { whatsappIncomingQueue, whatsappOutgoingQueue } from "./services/messaging.service";
 import { handleMessage } from "./handlers/message.handler";
 import ApiMkDataSource from "../../database/API_MK";
 import Sessions from "../../entities/APIMK/Sessions";
+
+// Chave Redis para marcar mensagens JÁ processadas pelo worker.
+// Diferente da chave de dedup do webhook (que marca quando foi recebida).
+// Evita reprocessamento de jobs "stale" após restart do servidor.
+const redisDedupWorker = new Redis(redisOptions);
+const PROCESSED_KEY = (id: string) => `wa:msg:processed:${id}`;
 
 let incomingWorker: Worker;
 let outgoingWorker: Worker;
@@ -17,6 +24,14 @@ export function initQueues() {
     async (job: Job) => {
       const { texto, celular, type, manutencao, messageId, conversationId } = job.data;
       console.log(`[BullMQ] Processando webhook ID: ${messageId}`);
+
+      // Dedup de processamento: descarta jobs stale que sobreviveram a um restart.
+      const alreadyProcessed = await redisDedupWorker.exists(PROCESSED_KEY(messageId));
+      if (alreadyProcessed) {
+        console.log(`[BullMQ] Job descartado — já processado anteriormente: ${messageId}`);
+        return;
+      }
+
       console.log(`[BullMQ] sessions[${celular}] stage ANTES = "${sessions[celular]?.stage}"`);
 
       if (!sessions[celular]) {
@@ -43,6 +58,9 @@ export function initQueues() {
       }
 
       const session = sessions[celular];
+
+      // Marca como processado (TTL 24h, igual ao dedup do webhook)
+      await redisDedupWorker.set(PROCESSED_KEY(messageId), "1", "EX", 86400);
 
       try {
         await handleMessage(session, texto, celular, type, manutencao);

@@ -246,7 +246,10 @@ export async function Flow(req: Request, res: Response): Promise<void> {
         screen: "SUCCESS",
         data: {
           extension_message_response: {
-            params: { flow_token: flow_token },
+            // "submitted: true" distingue submissão real de fechamento sem envio.
+            // Quando o usuário fecha sem enviar, o nfm_reply tem apenas {flow_token}.
+            // Com este parâmetro extra, o webhook consegue identificar submissões reais.
+            params: { flow_token: flow_token, submitted: "true" },
           },
         },
       };
