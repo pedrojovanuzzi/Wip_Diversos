@@ -633,13 +633,13 @@ async function selecionarCadastroTitularidade(celular: any, session: any, client
     "Ler Termos",
     "https://wipdiversos.wiptelecomunicacoes.com.br/doc/troca_de_titularidade",
   );
+  session.stage = "awaiting_troca_titularidade_contato_flow";
   await saveSession(celular);
   await MensagemFlowTrocaTitularidadeContato(
     celular,
     FLOW_TROCA_TITULARIDADE_CONTATO,
     "📱 Informar Contato",
   );
-  session.stage = "awaiting_troca_titularidade_contato_flow";
 }
 
 export async function iniciarTrocaTitularidade(
@@ -1264,6 +1264,7 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
       `✅ Perfeito! Enviamos uma mensagem para *${nome}* solicitando autorização.\n\nAguarde a confirmação do novo titular para prosseguirmos. 🚀`,
     );
     session.stage = "awaiting_novo_titular_acceptance";
+    await saveSession(celular);
     return;
   } catch (error) {
     await MensagemFlowTrocaTitularidadeContato(
