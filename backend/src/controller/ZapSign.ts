@@ -32,7 +32,8 @@ interface ZapSignDataInstalacao {
   cpf: string;
   email: string;
   telefone: string;
-  endereco: string;
+  endereco?: string;
+  rua?: string; // alias para endereco — vindo do Flow de instalação
   numero: string;
   complemento?: string;
   bairro: string;
@@ -117,7 +118,8 @@ class ZapSign {
         cpf,
         email,
         telefone,
-        endereco,
+        endereco: enderecoProp,
+        rua,
         numero,
         complemento = "",
         bairro,
@@ -130,6 +132,7 @@ class ZapSign {
         rg = "Não informado",
         telefone_conversa,
       } = params;
+      const endereco = enderecoProp || rua || "";
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
       const tipo =

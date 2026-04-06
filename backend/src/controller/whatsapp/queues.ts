@@ -32,21 +32,29 @@ export function initQueues() {
         return;
       }
 
-      console.log(`[BullMQ] sessions[${celular}] stage ANTES = "${sessions[celular]?.stage}"`);
+      // Sempre recarrega do banco para evitar estado stale em memória.
+      // O timer de inatividade (em memória) e o conversationId são preservados.
+      const existingTimer = sessions[celular]?.inactivityTimer;
+      const existingConversationId = sessions[celular]?.conversationId;
 
-      if (!sessions[celular]) {
-        const sessionDB = await ApiMkDataSource.getRepository(Sessions).findOne({
-          where: { celular },
-        });
-        if (sessionDB) {
-          sessions[celular] = {
-            stage: sessionDB.stage,
-            ...sessionDB.dados,
-          };
-        } else {
-          sessions[celular] = { stage: "" };
-        }
+      const sessionDB = await ApiMkDataSource.getRepository(Sessions).findOne({
+        where: { celular },
+      });
+      if (sessionDB) {
+        sessions[celular] = {
+          stage: sessionDB.stage,
+          ...sessionDB.dados,
+          inactivityTimer: existingTimer,
+          conversationId: sessionDB.dados?.conversationId || existingConversationId,
+        };
+      } else {
+        sessions[celular] = {
+          stage: "",
+          inactivityTimer: existingTimer,
+          conversationId: existingConversationId,
+        };
       }
+      console.log(`[BullMQ] sessions[${celular}] stage ANTES = "${sessions[celular]?.stage}"`);
 
       // Valida conversationId: descarta jobs de conversas já encerradas/resetadas.
       // Se o job carrega um conversationId que não bate com a sessão atual,

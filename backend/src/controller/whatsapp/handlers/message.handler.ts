@@ -369,9 +369,6 @@ export async function handleMessage(
             celular,
             "🥹 *Infelizmente* não poderei mais dar \ncontinuidade ao seu atendimento, *respeitando* a sua vontade.\n🫡Estaremos sempre aqui a sua *disposição*!",
           );
-          if (sessions[celular] && sessions[celular].inactivityTimer) {
-            clearTimeout(sessions[celular].inactivityTimer);
-          }
           deleteSession(celular);
         } else {
           await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
@@ -848,9 +845,6 @@ export async function handleMessage(
           celular,
           "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
         );
-        if (sessions[celular] && sessions[celular].inactivityTimer) {
-          clearTimeout(sessions[celular].inactivityTimer);
-        }
         deleteSession(celular);
         console.log(
           "Clientes Utilizando o Bot no momento: " +

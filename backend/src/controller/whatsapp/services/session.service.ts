@@ -32,6 +32,9 @@ export async function saveSession(celular: string) {
 
 export async function deleteSession(celular: string) {
   if (sessions[celular]) {
+    if (sessions[celular].inactivityTimer) {
+      clearTimeout(sessions[celular].inactivityTimer);
+    }
     delete sessions[celular];
   }
   await ApiMkDataSource.getRepository(Sessions).delete({ celular });

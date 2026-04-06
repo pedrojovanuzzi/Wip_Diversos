@@ -134,7 +134,9 @@ export async function index(req: Request, res: Response) {
                   }
                 } else {
                   const newConversationId = uuidv4();
-                  sessions[celular] = { stage: "", conversationId: newConversationId };
+                  // inactivityTimer só existe se sessions[celular] já existia — preservar
+                  const existingTimer = sessions[celular]?.inactivityTimer;
+                  sessions[celular] = { stage: "", conversationId: newConversationId, inactivityTimer: existingTimer };
 
                   const sessionDB = await ApiMkDataSource.getRepository(
                     Sessions,
@@ -150,6 +152,7 @@ export async function index(req: Request, res: Response) {
                       ...sessionDB.dados,
                       // Preserva o conversationId salvo no banco; se não houver, usa o gerado acima
                       conversationId: sessionDB.dados?.conversationId || newConversationId,
+                      inactivityTimer: existingTimer,
                     };
                   }
                 }

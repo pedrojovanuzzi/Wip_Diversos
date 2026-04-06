@@ -1316,17 +1316,9 @@ export async function handleNovoTitularAutorizacao(
         celularTitular,
         `🚫 Infelizmente o *novo titular* (${session.dadosTitularidadeContato?.nome || "indicado"}) *não autorizou* o recebimento dos links de assinatura.\n\nO processo de Troca de Titularidade foi encerrado. Entre em contato conosco para mais informações.`,
       );
-      if (sessions[celularTitular]) {
-        clearTimeout(sessions[celularTitular].inactivityTimer);
-        delete sessions[celularTitular];
-      }
       await deleteSession(celularTitular);
     }
 
-    if (sessions[celular]) {
-      clearTimeout(sessions[celular].inactivityTimer);
-      delete sessions[celular];
-    }
     await deleteSession(celular);
   } else {
     await MensagensComuns(
@@ -1510,8 +1502,7 @@ export async function handleChooseEst(
       celular,
       "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
     );
-    clearTimeout(sessions[celular].inactivityTimer);
-    delete sessions[celular];
+    await deleteSession(celular);
   } else {
     await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
   }
@@ -1591,8 +1582,7 @@ export async function handleChooseTypeTrocaPlano(
       celular,
       "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
     );
-    clearTimeout(sessions[celular].inactivityTimer);
-    delete sessions[celular];
+    await deleteSession(celular);
   } else {
     await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
   }
@@ -1834,10 +1824,7 @@ export async function handleChooseTypeRenovacao(
       celular,
       "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
     );
-    setTimeout(() => {
-      clearTimeout(sessions[celular].inactivityTimer);
-      delete sessions[celular];
-    }, 5000);
+    setTimeout(() => { deleteSession(celular); }, 5000);
   } else {
     await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
   }

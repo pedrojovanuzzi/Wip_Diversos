@@ -123,6 +123,7 @@ export async function Flow(req: Request, res: Response): Promise<void> {
           sessions[celular] = {
             stage: dbSession.stage,
             ...dbSession.dados,
+            inactivityTimer: sessions[celular]?.inactivityTimer,
           };
         } else if (!sessions[celular]) {
           sessions[celular] = { stage: "start" };
@@ -189,6 +190,7 @@ export async function Flow(req: Request, res: Response): Promise<void> {
           sessions[celular] = {
             stage: dbSession.stage,
             ...dbSession.dados,
+            inactivityTimer: sessions[celular]?.inactivityTimer,
           };
         } else if (!sessions[celular]) {
           sessions[celular] = { stage: "start" };
@@ -221,6 +223,7 @@ export async function Flow(req: Request, res: Response): Promise<void> {
           sessions[celular] = {
             stage: dbSession.stage,
             ...dbSession.dados,
+            inactivityTimer: sessions[celular]?.inactivityTimer,
           };
         } else if (!sessions[celular]) {
           sessions[celular] = { stage: "start" };

@@ -184,8 +184,8 @@ class SolicitacaoServicoController {
         solicitacao.gratis = 1;
         solicitacao.consulta_cpf_realizada = true;
 
-        // Criar contrato ZapSign
-        const zapResponse = await ZapSign.createContractInstalacao(dados);
+        // Criar contrato ZapSign — grátis: força valor "0,00" para selecionar template correto
+        const zapResponse = await ZapSign.createContractInstalacao({ ...dados, valor: "0,00" });
         const zapSignUrl = zapResponse.signers[0].sign_url;
         solicitacao.token_zapsign = zapResponse.token;
         await repository.save(solicitacao);
@@ -305,6 +305,7 @@ class SolicitacaoServicoController {
           ...dados,
           cpf,
           nome,
+          valor: "0,00", // grátis: força template correto
         };
 
         const zapResponse = await ZapSign.createContractInstalacao(payloadZap);
@@ -355,8 +356,8 @@ class SolicitacaoServicoController {
       solicitacao.pago = true;
       solicitacao.gratis = 1;
 
-      // Criar contrato ZapSign
-      const zapResponse = await ZapSign.createContractInstalacao(dados);
+      // Criar contrato ZapSign — grátis: força valor "0,00" para selecionar template correto
+      const zapResponse = await ZapSign.createContractInstalacao({ ...dados, valor: "0,00" });
       const zapSignUrl = zapResponse.signers[0].sign_url;
       solicitacao.token_zapsign = zapResponse.token;
       await repository.save(solicitacao);
