@@ -552,6 +552,28 @@ class ZapSign {
                   console.log(
                     `[ZapSign Webhook] Cliente ${dados.nome} cadastrado no MKAuth para Instalação.`,
                   );
+                  try {
+                    const msgChamado =
+                      `Cliente solicitou novo cadastro via WhatsApp e assinou o contrato.\n\n` +
+                      `👤 Nome: ${dados.nome || "-"}\n` +
+                      `📄 CPF: ${dados.cpf || "-"}\n` +
+                      `🪪 RG/IE: ${dados.rg || "-"}\n` +
+                      `📱 Celular: ${dados.celular || "-"}\n` +
+                      `📧 E-mail: ${dados.email || "-"}\n` +
+                      `📍 Endereço: ${dados.rua || "-"}, ${dados.numero || "-"} - ${dados.bairro || "-"}\n` +
+                      `🏙️ Cidade: ${dados.cidade || "-"}/${dados.estado || "-"}\n` +
+                      `📮 CEP: ${dados.cep || "-"}\n` +
+                      `📶 Plano: ${dados.plano || "-"}\n` +
+                      `📅 Vencimento: Dia ${dados.vencimento || "-"}`;
+                    await criarChamadoMkauth(
+                      "INSTALACAO",
+                      { nome: dados.nome, login: dados.login || solicitacao.login_cliente, email: dados.email || "" },
+                      msgChamado,
+                      solicitacao,
+                    );
+                  } catch (eChamado) {
+                    console.error("[ZapSign Webhook] Erro ao criar chamado de instalação:", eChamado);
+                  }
                   break;
                 case "mudança de endereço":
                 case "mudanca_endereco":
