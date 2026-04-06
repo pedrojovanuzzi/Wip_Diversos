@@ -1622,6 +1622,24 @@ export async function handleAwaitingTrocaPlanoFlow(
       `🛜 *Plano Solicitado:* ${session.planoEscolhido}\n` +
       `📝 *Observação:* ${session.observacaoTrocaPlano || "Sem observação"}`;
 
+    const resumoEmailHtml =
+      `<h3>Solicitação de Alteração de Plano</h3>` +
+      `<p><b>Nome:</b> ${session.nome || "Não informado"}</p>` +
+      `<p><b>CPF:</b> ${session.cpf || "Não informado"}</p>` +
+      `<p><b>Celular:</b> ${session.celularCliente || celular}</p>` +
+      `<p><b>Email:</b> ${session.email || "Não informado"}</p>` +
+      `<p><b>Login:</b> ${session.login || "Não informado"}</p>` +
+      `<p><b>Endereço:</b> ${session.endereco_troca_plano || "Não informado"}</p>` +
+      `<p><b>RG:</b> ${session.rg || "Não informado"}</p>` +
+      `<p><b>Plano Solicitado:</b> ${planoEscolhido}</p>` +
+      `<p><b>Observação:</b> ${session.observacaoTrocaPlano || "Sem observação"}</p>`;
+
+    try {
+      sendServiceEmail(resumoEmailHtml);
+    } catch (e) {
+      console.error("Erro ao enviar email de alteração de plano:", e);
+    }
+
     let solicitacaoSalva: SolicitacaoServico | null = null;
     try {
       solicitacaoSalva = await salvarSolicitacaoAlteracaoPlano(session, celular);
