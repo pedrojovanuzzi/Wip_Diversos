@@ -12,6 +12,7 @@ import { sendServiceEmail } from "../services/email.service";
 import { sessions, deleteSession } from "../services/session.service";
 import { getPlanosDoSistema } from "../services/plano.service";
 import { criarChamadoMkauth } from "../services/chamado.service";
+import { verificarDebitosClienteDesativado } from "../services/debitoAnterior.service";
 import {
   MensagensComuns,
   MensagemBotao,
@@ -297,6 +298,8 @@ export async function handleAwaitingFlowCadastro(
         `📶 *Plano:* ${planoFlow}\n` +
         `📅 *Vencimento:* Dia ${dadosFlow.vencimento}`;
 
+      const debitoAnterior = await verificarDebitosClienteDesativado(dadosFlow.cpf || "");
+
       const repo = AppDataSource.getRepository(SolicitacaoServico);
       const novaSolicitacao = new SolicitacaoServico();
       novaSolicitacao.servico = "Instalação";
@@ -310,6 +313,7 @@ export async function handleAwaitingFlowCadastro(
         plano: planoFlow,
         vencimento: dadosFlow.vencimento,
         telefone_conversa: celular,
+        ...(debitoAnterior.temDebito && { alertaDebitoAnterior: debitoAnterior }),
       };
       await repo.save(novaSolicitacao);
 

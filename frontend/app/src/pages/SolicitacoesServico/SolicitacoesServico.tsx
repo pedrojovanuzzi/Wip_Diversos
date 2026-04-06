@@ -23,6 +23,7 @@ import {
   DialogContent,
   DialogActions,
   Alert,
+  Chip,
 } from "@mui/material";
 import moment from "moment";
 import { useAuth } from "../../context/AuthContext";
@@ -41,6 +42,8 @@ const SolicitacoesServico = () => {
   const [manualNome, setManualNome] = useState("");
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [detailsTarget, setDetailsTarget] = useState<any | null>(null);
+  const [alertaDebitoOpen, setAlertaDebitoOpen] = useState(false);
+  const [alertaDebitoService, setAlertaDebitoService] = useState<any | null>(null);
   const { user } = useAuth();
 
   const fetchServices = useCallback(
@@ -184,13 +187,26 @@ const SolicitacoesServico = () => {
   };
 
   const handleOpenDetails = (service: any) => {
-    setDetailsTarget(service);
-    setDetailsDialogOpen(true);
+    const debito = service.dados?.alertaDebitoAnterior;
+    if (debito?.temDebito) {
+      setAlertaDebitoService(service);
+      setAlertaDebitoOpen(true);
+    } else {
+      setDetailsTarget(service);
+      setDetailsDialogOpen(true);
+    }
   };
 
   const handleCloseDetails = () => {
     setDetailsDialogOpen(false);
     setDetailsTarget(null);
+  };
+
+  const handleCloseAlertaDebito = () => {
+    setAlertaDebitoOpen(false);
+    setDetailsTarget(alertaDebitoService);
+    setDetailsDialogOpen(true);
+    setAlertaDebitoService(null);
   };
 
   const handleFinalizar = async (id: number) => {
@@ -310,7 +326,17 @@ const SolicitacoesServico = () => {
             <TableBody>
               {services.map((service: any) => (
                 <TableRow key={service.id} hover>
-                  <TableCell>{service.id}</TableCell>
+                  <TableCell>
+                    {service.id}
+                    {service.dados?.alertaDebitoAnterior?.temDebito && (
+                      <Chip
+                        label="⚠️ Débito anterior"
+                        color="error"
+                        size="small"
+                        sx={{ ml: 1, fontSize: "0.7rem" }}
+                      />
+                    )}
+                  </TableCell>
                   <TableCell>{service.servico}</TableCell>
                   <TableCell>
                     <span
