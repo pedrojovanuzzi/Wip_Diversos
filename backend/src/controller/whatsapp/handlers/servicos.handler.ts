@@ -1294,10 +1294,11 @@ export async function handleNovoTitularAutorizacao(
       "📋 Preencher Dados",
       planosDoSistema,
     );
-    await saveSession(celular);
     session.stage = "awaiting_troca_titularidade_contratacao_flow";
+    await saveSession(celular);
 
-    if (celularTitular) {
+    if (celularTitular && !session.autorizacaoEnviada) {
+      session.autorizacaoEnviada = true;
       await MensagensComuns(
         celularTitular,
         "✅ O novo titular *autorizou* o recebimento dos links de assinatura! Estamos aguardando o preenchimento dos dados.",

@@ -494,10 +494,12 @@ class ZapSign {
             }
 
             if (requesterPhone) {
-              await Whatsapp.MensagensComuns(
-                requesterPhone,
-                `✅ *Assinatura Confirmada!*\n\nOlá ${solicitacao.dados?.nome || "Cliente"}, recebemos a sua assinatura para o serviço: *${solicitacao.servico || "Contratado"}*.\n\nAgradecemos a confiança! Em breve nossa equipe entrará em contato para confirmação do serviço. 🚀`,
-              );
+              const servicoNorm = (solicitacao.servico || "").toLowerCase();
+              const isTitular = servicoNorm.includes("titularidade titular") && !servicoNorm.includes("novo titular");
+              const msgAssinatura = isTitular
+                ? `✅ *Assinatura Confirmada!*\n\nOlá ${solicitacao.dados?.nome || "Cliente"}, recebemos a sua assinatura para o serviço: *${solicitacao.servico || "Contratado"}*.\n\nTudo certo, daremos continuidade do serviço com o novo titular, obrigado! 🙏🏻`
+                : `✅ *Assinatura Confirmada!*\n\nOlá ${solicitacao.dados?.nome || "Cliente"}, recebemos a sua assinatura para o serviço: *${solicitacao.servico || "Contratado"}*.\n\nAgradecemos a confiança! Em breve nossa equipe entrará em contato para confirmação do serviço. 🚀`;
+              await Whatsapp.MensagensComuns(requesterPhone, msgAssinatura);
               await deleteSession(requesterPhone);
             }
           } catch (errConv) {
@@ -548,10 +550,8 @@ class ZapSign {
               switch (servicoNormalizado) {
                 case "instalação":
                 case "instalacao":
-                  await this.registerClientInMkAuth(dados);
-                  console.log(
-                    `[ZapSign Webhook] Cliente ${dados.nome} cadastrado no MKAuth para Instalação.`,
-                  );
+                  const loginCriado = await this.registerClientInMkAuth(dados);
+                  console.log(`[ZapSign Webhook] Cliente ${dados.nome} cadastrado no MKAuth para Instalação. Login: ${loginCriado}`);
                   try {
                     const msgChamado =
                       `Cliente solicitou novo cadastro via WhatsApp e assinou o contrato.\n\n` +
@@ -567,7 +567,7 @@ class ZapSign {
                       `📅 Vencimento: Dia ${dados.vencimento || "-"}`;
                     await criarChamadoMkauth(
                       "INSTALACAO",
-                      { nome: dados.nome, login: dados.login || solicitacao.login_cliente, email: dados.email || "" },
+                      { nome: dados.nome, login: loginCriado, email: dados.email || "" },
                       msgChamado,
                       solicitacao,
                     );
@@ -650,30 +650,8 @@ class ZapSign {
 
   // === Métodos Auxiliares para Troca de Titularidade ===
 
-  private notificarNovoTitular = async (solicitacao: SolicitacaoServico) => {
-    try {
-      const dados = solicitacao.dados;
-      if (!dados) return;
-
-      const celularDestino = dados.celular_destino;
-      const celularTitular = dados.telefone_conversa;
-      const nomeNovoTitular = dados.nome_novo_titular || "novo titular";
-      const nomeTitular = dados.nome || "Titular";
-
-      if (!celularDestino) {
-        console.warn("[ZapSign] celular_destino não encontrado na solicitação de troca de titularidade");
-        return;
-      }
-
-      if (celularTitular) {
-        await Whatsapp.MensagensComuns(
-          celularTitular,
-          `✅ *Assinatura confirmada!* Aguardando a assinatura do novo titular. 🚀`,
-        );
-      }
-    } catch (error) {
-      console.error("[ZapSign] Erro ao notificar novo titular:", error);
-    }
+  private notificarNovoTitular = async (_solicitacao: SolicitacaoServico) => {
+    // Notificação de "aguardando assinatura do novo titular" removida a pedido
   }
 
   private verificarEFinalizarTrocaTitularidade = async (
@@ -754,12 +732,34 @@ class ZapSign {
         console.error("[TrocaTitularidade] Erro ao criar chamado para titular:", e);
       }
 
-      // 2. Criar novo cadastro no MkAuth para o novo titular
+      // 2. Criar novo cadastro no MkAuth para o novo titular e abrir chamado de instalação
       try {
-        await this.registerClientInMkAuth(dadosNovoTitular);
-        console.log(`[TrocaTitularidade] Novo titular ${dadosNovoTitular?.nome} cadastrado no MKAuth.`);
+        const loginNovoTitular = await this.registerClientInMkAuth(dadosNovoTitular);
+        console.log(`[TrocaTitularidade] Novo titular ${dadosNovoTitular?.nome} cadastrado no MKAuth. Login: ${loginNovoTitular}`);
+
+        const msgNovoTitular =
+          `Instalação originada por troca de titularidade. Contrato assinado em ${moment().format("DD/MM/YYYY HH:mm")}.\n\n` +
+          `👤 Nome: ${dadosNovoTitular?.nome || "-"}\n` +
+          `📄 CPF: ${dadosNovoTitular?.cpf || "-"}\n` +
+          `🪪 RG/IE: ${dadosNovoTitular?.rg || "-"}\n` +
+          `📱 Celular: ${dadosNovoTitular?.celular || dadosNovoTitular?.telefone_conversa || "-"}\n` +
+          `📧 E-mail: ${dadosNovoTitular?.email || "-"}\n` +
+          `📍 Endereço: ${dadosNovoTitular?.rua || "-"}, ${dadosNovoTitular?.numero || "-"} - ${dadosNovoTitular?.bairro || "-"}\n` +
+          `🏙️ Cidade: ${dadosNovoTitular?.cidade || "-"}/${dadosNovoTitular?.estado || "-"}\n` +
+          `📮 CEP: ${dadosNovoTitular?.cep || "-"}\n` +
+          `📶 Plano: ${dadosNovoTitular?.plano || "-"}\n` +
+          `📅 Vencimento: Dia ${dadosNovoTitular?.vencimento || "-"}\n\n` +
+          `Titular anterior: ${dadosTitular?.nome || "-"} (CPF: ${dadosTitular?.cpf || "-"})`;
+
+        await criarChamadoMkauth(
+          "INSTALACAO",
+          { nome: dadosNovoTitular?.nome || "", login: loginNovoTitular, email: dadosNovoTitular?.email || "" },
+          msgNovoTitular,
+          solicitacaoNovoTitular,
+        );
+        console.log(`[TrocaTitularidade] Chamado de instalação criado para novo titular ${dadosNovoTitular?.nome}.`);
       } catch (e) {
-        console.error("[TrocaTitularidade] Erro ao cadastrar novo titular no MKAuth:", e);
+        console.error("[TrocaTitularidade] Erro ao cadastrar novo titular ou criar chamado:", e);
       }
     } catch (error) {
       console.error("[TrocaTitularidade] Erro ao processar finalização da troca:", error);
@@ -1066,7 +1066,7 @@ class ZapSign {
       .join(" ");
   }
 
-  private registerClientInMkAuth = async (dados: any) => {
+  private registerClientInMkAuth = async (dados: any): Promise<string> => {
     const ClientesRepository = MkauthDataSource.getRepository(ClientesEntities);
 
     // Busca código IBGE
@@ -1190,6 +1190,8 @@ class ZapSign {
     await ClientesRepository.update(addClient.id, {
       termo: `${addClient.id}C/${moment().format("YYYY")}`,
     });
+
+    return finalLogin;
   }
 
   private updateClientAddressInMkAuth = async (login: string, dados: any) => {
