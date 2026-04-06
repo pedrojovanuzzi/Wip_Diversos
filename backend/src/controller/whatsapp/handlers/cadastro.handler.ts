@@ -9,7 +9,6 @@ import { validarCPF, validarRG, verificaType } from "../utils/validation";
 import { limparEndereco, limparNomeRua } from "../utils/helpers";
 import { writeMessageLog } from "../utils/logging";
 import { sendServiceEmail } from "../services/email.service";
-import { sessions, deleteSession } from "../services/session.service";
 import { getPlanosDoSistema } from "../services/plano.service";
 
 import { verificarDebitosClienteDesativado } from "../services/debitoAnterior.service";
@@ -473,12 +472,7 @@ export async function handleFinalRegister(
       celular,
       "🥹 *Infelizmente* não poderei mais dar \ncontinuidade ao seu atendimento, *respeitando* a sua vontade.\n🫡Estaremos sempre aqui a sua *disposição*!",
     );
-    setTimeout(() => {
-      if (sessions[celular] && sessions[celular].inactivityTimer) {
-        clearTimeout(sessions[celular].inactivityTimer);
-      }
-      deleteSession(celular);
-    }, 5000);
+    session._deleted = true;
   } else {
     await MensagensComuns(
       celular,

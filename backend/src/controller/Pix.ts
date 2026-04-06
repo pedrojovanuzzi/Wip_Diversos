@@ -474,9 +474,8 @@ class Pix {
                       zapResponse = await ZapSign.createContractInstalacao(solicitacao.dados);
                     } else if (solicitacao.servico === "Mudança de Endereço") {
                       zapResponse = await ZapSign.createContractMudancaEndereco(solicitacao.dados);
-                    } else if (solicitacao.servico === "Mudança de Cômodo") {
-                      zapResponse = await ZapSign.createContractMudancaComodo(solicitacao.dados);
                     }
+                    // Mudança de Cômodo paga não tem assinatura — apenas pagamento.
 
                     if (zapResponse) {
                       zapSignUrl = zapResponse.signers[0].sign_url;

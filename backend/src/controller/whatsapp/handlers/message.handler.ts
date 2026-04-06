@@ -4,7 +4,6 @@ import { findOrCreate } from "../utils/helpers";
 import { writeLog } from "../utils/logging";
 import { sendServiceEmail } from "../services/email.service";
 import {
-  sessions,
   deleteSession,
   getActiveSessionsCount,
   conversation,
@@ -60,23 +59,6 @@ import {
 } from "./servicos.handler";
 import { iniciarMudanca } from "./mudanca-endereco.handler";
 
-export function resetInactivityTimer(celular: any, session: any) {
-  if (session.inactivityTimer) {
-    clearTimeout(session.inactivityTimer);
-  }
-
-  session.inactivityTimer = setTimeout(() => {
-    // Guard: só dispara se esta for ainda a sessão ativa para este número.
-    // Se a sessão foi deletada e recriada (nova entrada em sessions[]), o objeto
-    // mudou e o timer antigo não deve agir.
-    if (sessions[celular] !== session) return;
-    MensagensComuns(
-      celular,
-      "🤷🏻 Seu atendimento foi *finalizado* devido à inatividade!!\nEntre em contato novamente 👍",
-    );
-    deleteSession(celular);
-  }, 900000);
-}
 
 async function LGPD(celular: any) {
   const { MensagemTermos, MensagemBotao } = await import(
@@ -117,8 +99,6 @@ export async function handleMessage(
     );
     return;
   }
-
-  resetInactivityTimer(celular, session);
 
   console.log(`[HANDLE_MESSAGE] Stage: ${session.stage}, Texto: ${texto}`);
 
@@ -187,7 +167,7 @@ export async function handleMessage(
         celular,
         "Sessão resetada com sucesso! Você pode iniciar uma nova conversa agora.",
       );
-      await deleteSession(celular);
+      session._deleted = true;
       return;
     }
   } catch (error) {
@@ -369,7 +349,7 @@ export async function handleMessage(
             celular,
             "🥹 *Infelizmente* não poderei mais dar \ncontinuidade ao seu atendimento, *respeitando* a sua vontade.\n🫡Estaremos sempre aqui a sua *disposição*!",
           );
-          deleteSession(celular);
+          session._deleted = true;
         } else {
           await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
         }
@@ -716,8 +696,7 @@ export async function handleMessage(
           );
           session.stage = "awaiting_cpf";
         }
-        resetInactivityTimer(celular, session);
-      } else {
+        } else {
         await MensagensComuns(
           celular,
           msgRobo + "*Digite* seu *CPF/CNPJ*!!",
@@ -783,8 +762,7 @@ export async function handleMessage(
             );
             session.stage = "awaiting_selection";
           }
-          resetInactivityTimer(celular, session);
-        }
+            }
       } else {
         await MensagensComuns(
           celular,
@@ -814,8 +792,7 @@ export async function handleMessage(
             session.endHandled = true;
             session.stage = "end_talk";
           }
-          resetInactivityTimer(celular, session);
-        }
+            }
       } else {
         await MensagensComuns(
           celular,
@@ -845,11 +822,10 @@ export async function handleMessage(
           celular,
           "*Wip Telecom*\n*Obrigado*, fiquei muito feliz de ter você por aqui! \nConte Sempre Comigo 😉",
         );
-        deleteSession(celular);
-        console.log(
-          "Clientes Utilizando o Bot no momento: " +
-            getActiveSessionsCount(),
-        );
+        session._deleted = true;
+        getActiveSessionsCount().then((count) => {
+          console.log("Clientes Utilizando o Bot no momento: " + count);
+        });
       } else {
         await MensagensComuns(
           celular,
@@ -862,7 +838,7 @@ export async function handleMessage(
       try {
         if (verificaType(type)) {
           if (texto.toLowerCase() === "finalizar") {
-            await Finalizar(session.msgDadosFinais, celular);
+            await Finalizar(session.msgDadosFinais, celular, false, session);
           } else {
             await MensagensComuns(
               celular,

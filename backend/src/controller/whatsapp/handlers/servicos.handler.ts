@@ -1,7 +1,7 @@
 import { validarCPF, verificaType } from "../utils/validation";
 import { writeMessageLog } from "../utils/logging";
 import { sendServiceEmail } from "../services/email.service";
-import { sessions, deleteSession, saveSession } from "../services/session.service";
+import { deleteSession, saveSession } from "../services/session.service";
 import ApiMkDataSource from "../../../database/API_MK";
 import MkauthDataSource from "../../../database/MkauthSource";
 import AppDataSource from "../../../database/DataSource";
@@ -516,7 +516,7 @@ export async function iniciarMudancaComodo(
 
             await MensagensComuns(
               celular,
-              "✅ Recebemos a sua solicitação!\nAgora, finalize o pagamento para que possamos enviar o link com Termo de Mudança de Cômodo para assinatura. Obrigado pela confiança!",
+              "✅ Solicitação registrada! Assim que o pagamento for confirmado, nossa equipe irá agendar a sua Mudança de Cômodo. Obrigado pela confiança! 👍",
             );
             await MensagensComuns(
               celular,
@@ -526,10 +526,12 @@ export async function iniciarMudancaComodo(
             console.error("Erro ao gerar PIX da mudança de cômodo:", e);
             await MensagensComuns(
               celular,
-              "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para concluir o envio da cobrança e do Termo de Mudança de Cômodo. Obrigado pela confiança!",
+              "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para concluir o envio da cobrança. Obrigado pela confiança!",
             );
           }
-          session.stage = "awaiting_payment_confirmation";
+          // Sessão encerrada: o pagamento será confirmado pelo webhook do Pix,
+          // não há mais interação esperada do usuário aqui.
+          session._deleted = true;
         } else {
           try {
             const payloadZap = {
@@ -634,7 +636,7 @@ async function selecionarCadastroTitularidade(celular: any, session: any, client
     "https://wipdiversos.wiptelecomunicacoes.com.br/doc/troca_de_titularidade",
   );
   session.stage = "awaiting_troca_titularidade_contato_flow";
-  await saveSession(celular);
+  await saveSession(celular, session);
   await MensagemFlowTrocaTitularidadeContato(
     celular,
     FLOW_TROCA_TITULARIDADE_CONTATO,
@@ -1205,9 +1207,8 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
     novaSolicitacao.dados = { ...dadosTitular };
     await repo.save(novaSolicitacao);
 
-    // Configura sessão do novo titular com todos os dados do titular
-    sessions[celularDestino] = {
-      ...(sessions[celularDestino] || {}),
+    // Configura sessão do novo titular diretamente no banco
+    const sessionDestino = {
       stage: "awaiting_novo_titular_autorizacao",
       service: "troca_titularidade",
       celular_titular: celular,
@@ -1219,7 +1220,7 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
         celular_destino: celularDestino,
       },
     };
-    await saveSession(celularDestino);
+    await saveSession(celularDestino, sessionDestino);
 
     // Notifica o novo titular via template aceita_titularidade
     const phoneRaw = String(celularDestino).replace(/\D/g, "");
@@ -1264,7 +1265,7 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
       `✅ Perfeito! Enviamos uma mensagem para *${nome}* solicitando autorização.\n\nAguarde a confirmação do novo titular para prosseguirmos. 🚀`,
     );
     session.stage = "awaiting_novo_titular_acceptance";
-    await saveSession(celular);
+    await saveSession(celular, session);
     return;
   } catch (error) {
     await MensagemFlowTrocaTitularidadeContato(
@@ -1296,7 +1297,7 @@ export async function handleNovoTitularAutorizacao(
       planosDoSistema,
     );
     session.stage = "awaiting_troca_titularidade_contratacao_flow";
-    await saveSession(celular);
+    await saveSession(celular, session);
 
     if (celularTitular && !session.autorizacaoEnviada) {
       session.autorizacaoEnviada = true;
@@ -1319,7 +1320,7 @@ export async function handleNovoTitularAutorizacao(
       await deleteSession(celularTitular);
     }
 
-    await deleteSession(celular);
+    session._deleted = true;
   } else {
     await MensagensComuns(
       celular,
@@ -1502,7 +1503,7 @@ export async function handleChooseEst(
       celular,
       "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
     );
-    await deleteSession(celular);
+    session._deleted = true;
   } else {
     await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
   }
@@ -1582,7 +1583,7 @@ export async function handleChooseTypeTrocaPlano(
       celular,
       "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
     );
-    await deleteSession(celular);
+    session._deleted = true;
   } else {
     await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
   }
@@ -1824,7 +1825,7 @@ export async function handleChooseTypeRenovacao(
       celular,
       "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
     );
-    setTimeout(() => { deleteSession(celular); }, 5000);
+    session._deleted = true;
   } else {
     await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
   }

@@ -654,10 +654,11 @@ export async function MensagensDeMidia(
   }
 }
 
-export async function Finalizar(msg: any, celular: any, keepSession = false) {
+export async function Finalizar(msg: any, celular: any, keepSession = false, session?: any) {
   try {
     await MensagensComuns(process.env.TEST_PHONE, msg);
     if (!keepSession) {
+      if (session) session._deleted = true;
       deleteSession(celular);
     }
 

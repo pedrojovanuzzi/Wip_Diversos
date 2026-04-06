@@ -1,8 +1,6 @@
 import ApiMkDataSource from "../../../database/API_MK";
 import Sessions from "../../../entities/APIMK/Sessions";
 
-export const sessions: { [key: string]: any } = {};
-
 export let conversation: {
   conv_id: number | null;
   sender_id: number | null;
@@ -17,30 +15,30 @@ export function setConversation(conv: typeof conversation) {
   conversation = conv;
 }
 
-export async function saveSession(celular: string) {
-  if (sessions[celular]) {
-    const { stage, inactivityTimer, last_message_id, ...dados } =
-      sessions[celular];
-    await ApiMkDataSource.getRepository(Sessions).save({
-      celular,
-      stage: stage || "",
-      dados: dados || {},
-      last_message_id: last_message_id || null,
-    });
+// Salva a sessão diretamente no banco. messageId só é atualizado quando fornecido (não null).
+export async function saveSession(celular: string, sessionData: any, messageId: string | null = null) {
+  const { stage, _deleted, inactivityTimer, ...dados } = sessionData;
+  const repo = ApiMkDataSource.getRepository(Sessions);
+
+  const updateData: any = {
+    stage: stage || "",
+    dados: dados || {},
+  };
+  if (messageId !== null) {
+    updateData.last_message_id = messageId;
+  }
+
+  const result = await repo.update({ celular }, updateData);
+  if (result.affected === 0) {
+    await repo.save({ celular, ...updateData });
   }
 }
 
 export async function deleteSession(celular: string) {
-  if (sessions[celular]) {
-    if (sessions[celular].inactivityTimer) {
-      clearTimeout(sessions[celular].inactivityTimer);
-    }
-    delete sessions[celular];
-  }
   await ApiMkDataSource.getRepository(Sessions).delete({ celular });
   console.log(`Sessão removida do banco para ${celular}`);
 }
 
-export function getActiveSessionsCount() {
-  return Object.keys(sessions).length;
+export async function getActiveSessionsCount() {
+  return await ApiMkDataSource.getRepository(Sessions).count();
 }

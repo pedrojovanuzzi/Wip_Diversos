@@ -8,7 +8,6 @@ import { SolicitacaoServico } from "../../../entities/SolicitacaoServico";
 import { validarCPF } from "../utils/validation";
 import { sendServiceEmail } from "../services/email.service";
 import { criarChamadoMkauth } from "../services/chamado.service";
-import { sessions, saveSession } from "../services/session.service";
 import Pix from "../../Pix";
 import ZapSign from "../../ZapSign";
 import moment from "moment-timezone";

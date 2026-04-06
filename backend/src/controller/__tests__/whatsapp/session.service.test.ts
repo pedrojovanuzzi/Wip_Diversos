@@ -1,23 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockSave, mockDelete, mockFindOne } = vi.hoisted(() => ({
+const { mockUpdate, mockSave, mockDelete, mockCount } = vi.hoisted(() => ({
+  mockUpdate: vi.fn(),
   mockSave: vi.fn(),
   mockDelete: vi.fn(),
-  mockFindOne: vi.fn(),
+  mockCount: vi.fn(),
 }));
 
 vi.mock("../../../database/API_MK", () => ({
   default: {
     getRepository: vi.fn().mockReturnValue({
+      update: mockUpdate,
       save: mockSave,
       delete: mockDelete,
-      findOne: mockFindOne,
+      count: mockCount,
     }),
   },
 }));
 
 import {
-  sessions,
   conversation,
   setConversation,
   saveSession,
@@ -28,21 +29,6 @@ import {
 describe("session.service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    for (const key of Object.keys(sessions)) {
-      delete sessions[key];
-    }
-  });
-
-  describe("getActiveSessionsCount", () => {
-    it("retorna 0 quando não há sessões", () => {
-      expect(getActiveSessionsCount()).toBe(0);
-    });
-
-    it("retorna a quantidade correta de sessões ativas", () => {
-      sessions["5511999990001"] = { stage: "options_start" };
-      sessions["5511999990002"] = { stage: "awaiting_cpf" };
-      expect(getActiveSessionsCount()).toBe(2);
-    });
   });
 
   describe("setConversation", () => {
@@ -53,51 +39,82 @@ describe("session.service", () => {
     });
   });
 
+  describe("getActiveSessionsCount", () => {
+    it("retorna a contagem do banco", async () => {
+      mockCount.mockResolvedValue(3);
+      const count = await getActiveSessionsCount();
+      expect(count).toBe(3);
+      expect(mockCount).toHaveBeenCalled();
+    });
+  });
+
   describe("saveSession", () => {
-    it("persiste a sessão omitindo stage, inactivityTimer e last_message_id dos dados", async () => {
-      const timer = setTimeout(() => {}, 10000);
-      sessions["5511999990001"] = {
+    it("atualiza registro existente com messageId", async () => {
+      mockUpdate.mockResolvedValue({ affected: 1 });
+
+      await saveSession("5511999990001", {
         stage: "awaiting_cpf",
-        inactivityTimer: timer,
-        last_message_id: "msg-123",
+        inactivityTimer: setTimeout(() => {}, 10000),
         cpf: "12345678901",
         nome: "Cliente Teste",
-      };
+      }, "msg-123");
 
-      mockSave.mockResolvedValue({});
-      await saveSession("5511999990001");
-
-      expect(mockSave).toHaveBeenCalledWith({
-        celular: "5511999990001",
-        stage: "awaiting_cpf",
-        dados: { cpf: "12345678901", nome: "Cliente Teste" },
-        last_message_id: "msg-123",
-      });
-
-      clearTimeout(timer);
+      expect(mockUpdate).toHaveBeenCalledWith(
+        { celular: "5511999990001" },
+        {
+          stage: "awaiting_cpf",
+          dados: { cpf: "12345678901", nome: "Cliente Teste" },
+          last_message_id: "msg-123",
+        },
+      );
+      expect(mockSave).not.toHaveBeenCalled();
     });
 
-    it("não chama o banco se a sessão não existe", async () => {
-      await saveSession("5599999000000");
-      expect(mockSave).not.toHaveBeenCalled();
+    it("insere novo registro quando update não encontra linha", async () => {
+      mockUpdate.mockResolvedValue({ affected: 0 });
+      mockSave.mockResolvedValue({});
+
+      await saveSession("5599999000000", { stage: "options_start" });
+
+      expect(mockSave).toHaveBeenCalledWith({
+        celular: "5599999000000",
+        stage: "options_start",
+        dados: {},
+      });
+    });
+
+    it("não inclui last_message_id quando messageId é null", async () => {
+      mockUpdate.mockResolvedValue({ affected: 1 });
+
+      await saveSession("5511999990001", { stage: "awaiting_cpf", cpf: "111" }, null);
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        { celular: "5511999990001" },
+        { stage: "awaiting_cpf", dados: { cpf: "111" } },
+      );
+    });
+
+    it("exclui _deleted e inactivityTimer dos dados salvos", async () => {
+      mockUpdate.mockResolvedValue({ affected: 1 });
+
+      await saveSession("5511999990001", {
+        stage: "end",
+        _deleted: true,
+        inactivityTimer: setTimeout(() => {}, 0),
+        cpf: "111",
+      });
+
+      const updateData = mockUpdate.mock.calls[0][1];
+      expect(updateData.dados).not.toHaveProperty("_deleted");
+      expect(updateData.dados).not.toHaveProperty("inactivityTimer");
     });
   });
 
   describe("deleteSession", () => {
-    it("remove a sessão da memória e do banco", async () => {
-      sessions["5511999990001"] = { stage: "options_start" };
+    it("remove a sessão do banco", async () => {
       mockDelete.mockResolvedValue({});
-
       await deleteSession("5511999990001");
-
-      expect(sessions["5511999990001"]).toBeUndefined();
       expect(mockDelete).toHaveBeenCalledWith({ celular: "5511999990001" });
-    });
-
-    it("chama o banco mesmo se a sessão não estava na memória", async () => {
-      mockDelete.mockResolvedValue({});
-      await deleteSession("5599999000000");
-      expect(mockDelete).toHaveBeenCalledWith({ celular: "5599999000000" });
     });
   });
 });

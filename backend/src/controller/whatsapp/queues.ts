@@ -1,28 +1,34 @@
-import { Worker, Job } from "bullmq";
+import { Worker, Queue, Job } from "bullmq";
 import axios from "axios";
 import Redis from "ioredis";
 import { redisOptions } from "./config";
-import { sessions, saveSession } from "./services/session.service";
+import { saveSession, deleteSession } from "./services/session.service";
 import { whatsappIncomingQueue, whatsappOutgoingQueue } from "./services/messaging.service";
 import { handleMessage } from "./handlers/message.handler";
 import ApiMkDataSource from "../../database/API_MK";
 import Sessions from "../../entities/APIMK/Sessions";
+import { MensagensComuns } from "./services/messaging.service";
 
 // Chave Redis para marcar mensagens JÁ processadas pelo worker.
-// Diferente da chave de dedup do webhook (que marca quando foi recebida).
 // Evita reprocessamento de jobs "stale" após restart do servidor.
 const redisDedupWorker = new Redis(redisOptions);
 const PROCESSED_KEY = (id: string) => `wa:msg:processed:${id}`;
 
+// Fila de inatividade: jobs atrasados de 15 min por usuário
+export const whatsappInactivityQueue = new Queue("whatsapp-inactivity", {
+  connection: redisOptions,
+});
+
 let incomingWorker: Worker;
 let outgoingWorker: Worker;
+let inactivityWorker: Worker;
 
 export function initQueues() {
   // --- Incoming Message Worker ---
   incomingWorker = new Worker(
     "whatsapp-incoming",
     async (job: Job) => {
-      const { texto, celular, type, manutencao, messageId, conversationId } = job.data;
+      const { texto, celular, type, manutencao, messageId } = job.data;
       console.log(`[BullMQ] Processando webhook ID: ${messageId}`);
 
       // Dedup de processamento: descarta jobs stale que sobreviveram a um restart.
@@ -32,46 +38,41 @@ export function initQueues() {
         return;
       }
 
-      // Sempre recarrega do banco para evitar estado stale em memória.
-      // O timer de inatividade (em memória) e o conversationId são preservados.
-      const existingTimer = sessions[celular]?.inactivityTimer;
-      const existingConversationId = sessions[celular]?.conversationId;
-
+      // 1. Busca a sessão EXCLUSIVAMENTE do banco de dados (sem estado global).
       const sessionDB = await ApiMkDataSource.getRepository(Sessions).findOne({
         where: { celular },
       });
+
+      // 2. Cria um contexto ISOLADO e LOCAL — nenhuma outra requisição tem acesso a ele.
+      let sessionContext: any;
       if (sessionDB) {
-        sessions[celular] = {
+        if (sessionDB.last_message_id === messageId) {
+          console.log(`[BullMQ] Job descartado — last_message_id já registrado: ${messageId}`);
+          return;
+        }
+        sessionContext = {
           stage: sessionDB.stage,
           ...sessionDB.dados,
-          inactivityTimer: existingTimer,
-          conversationId: sessionDB.dados?.conversationId || existingConversationId,
         };
       } else {
-        sessions[celular] = {
-          stage: "",
-          inactivityTimer: existingTimer,
-          conversationId: existingConversationId,
-        };
-      }
-      console.log(`[BullMQ] sessions[${celular}] stage ANTES = "${sessions[celular]?.stage}"`);
-
-      // Valida conversationId: descarta jobs de conversas já encerradas/resetadas.
-      // Se o job carrega um conversationId que não bate com a sessão atual,
-      // a sessão foi resetada enquanto o job estava na fila — descarta.
-      if (conversationId && sessions[celular]?.conversationId &&
-          sessions[celular].conversationId !== conversationId) {
-        console.log(`[BullMQ] Job descartado — conversa encerrada (job: ${conversationId}, sessão: ${sessions[celular].conversationId})`);
-        return;
+        sessionContext = { stage: "" };
       }
 
-      const session = sessions[celular];
+      console.log(`[BullMQ] sessionContext[${celular}] stage ANTES = "${sessionContext.stage}"`);
 
-      // Marca como processado (TTL 24h, igual ao dedup do webhook)
+      // Marca como processado antes de executar (TTL 24h, igual ao dedup do webhook)
       await redisDedupWorker.set(PROCESSED_KEY(messageId), "1", "EX", 86400);
 
+      // Cancela timer de inatividade anterior e reagenda para 15 min a partir de agora
+      const inactivityJobId = `inactivity:${celular}`;
       try {
-        await handleMessage(session, texto, celular, type, manutencao);
+        const existingJob = await whatsappInactivityQueue.getJob(inactivityJobId);
+        if (existingJob) await existingJob.remove();
+      } catch (_) {}
+
+      try {
+        // 3. Passa o contexto isolado para a lógica de negócio
+        await handleMessage(sessionContext, texto, celular, type, manutencao);
       } catch (err: any) {
         console.error(
           `[BullMQ] Erro ao processar mensagem ${messageId}:`,
@@ -80,11 +81,40 @@ export function initQueues() {
         throw err;
       }
 
-      if (sessions[celular]) {
-        sessions[celular].last_message_id = messageId;
+      console.log(`[BullMQ] sessionContext[${celular}] stage DEPOIS = "${sessionContext.stage}"`);
+
+      // 4. Salva ou deleta conforme o que aconteceu dentro do handleMessage
+      if (sessionContext._deleted) {
+        await deleteSession(celular);
+      } else {
+        await saveSession(celular, sessionContext, messageId);
+        // Reagenda inatividade de 15 min para este usuário
+        await whatsappInactivityQueue.add(
+          "session-timeout",
+          { celular },
+          {
+            jobId: inactivityJobId,
+            delay: 900000,
+            removeOnComplete: true,
+            removeOnFail: true,
+          },
+        );
       }
-      console.log(`[BullMQ] sessions[${celular}] stage DEPOIS = "${sessions[celular]?.stage}"`);
-      await saveSession(celular);
+    },
+    { connection: redisOptions },
+  );
+
+  // --- Inactivity Worker ---
+  inactivityWorker = new Worker(
+    "whatsapp-inactivity",
+    async (job: Job) => {
+      const { celular } = job.data;
+      console.log(`[BullMQ:inactivity] Encerrando sessão por inatividade: ${celular}`);
+      await MensagensComuns(
+        celular,
+        "🤷🏻 Seu atendimento foi *finalizado* devido à inatividade!!\nEntre em contato novamente 👍",
+      );
+      await deleteSession(celular);
     },
     { connection: redisOptions },
   );
@@ -121,6 +151,10 @@ export function initQueues() {
   // --- Worker Event Listeners ---
   incomingWorker.on("failed", (job, err) => {
     console.error(`[BullMQ:incoming] Job ${job?.id} falhou:`, err.message);
+  });
+
+  inactivityWorker.on("failed", (job, err) => {
+    console.error(`[BullMQ:inactivity] Job ${job?.id} falhou:`, err.message);
   });
 
   outgoingWorker.on("failed", async (job, err) => {

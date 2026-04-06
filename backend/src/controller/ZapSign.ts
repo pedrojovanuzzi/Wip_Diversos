@@ -11,7 +11,7 @@ import Whatsapp from "./Whatsapp";
 import MkauthDataSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { v4 as uuidv4 } from "uuid";
-import { sessions, saveSession, deleteSession } from "./whatsapp/services/session.service";
+import { deleteSession } from "./whatsapp/services/session.service";
 import { criarChamadoMkauth } from "./whatsapp/services/chamado.service";
 
 dotenv.config();

@@ -4,7 +4,7 @@ import fs from "fs";
 import axios from "axios";
 import { decryptFlowRequest, encryptFlowResponse } from "../utils/crypto";
 import { limparEndereco, limparNomeRua } from "../utils/helpers";
-import { sessions, saveSession } from "../services/session.service";
+import { saveSession } from "../services/session.service";
 import { getPlanosDoSistema } from "../services/plano.service";
 import ApiMkDataSource from "../../../database/API_MK";
 import MkauthDataSource from "../../../database/MkauthSource";
@@ -116,20 +116,10 @@ export async function Flow(req: Request, res: Response): Promise<void> {
       if (screen === "MUDANCA_ENDERECO") {
         const celular = flow_token.split("_")[1];
 
-        const dbSession = await ApiMkDataSource.getRepository(
-          Sessions,
-        ).findOne({ where: { celular } });
-        if (dbSession) {
-          sessions[celular] = {
-            stage: dbSession.stage,
-            ...dbSession.dados,
-            inactivityTimer: sessions[celular]?.inactivityTimer,
-          };
-        } else if (!sessions[celular]) {
-          sessions[celular] = { stage: "start" };
-        }
-
-        const session = sessions[celular];
+        const dbSession = await ApiMkDataSource.getRepository(Sessions).findOne({ where: { celular } });
+        const session: any = dbSession
+          ? { stage: dbSession.stage, ...dbSession.dados }
+          : { stage: "start" };
 
         if (session) {
           let emailCliente = "";
@@ -173,7 +163,7 @@ export async function Flow(req: Request, res: Response): Promise<void> {
           };
 
           try {
-            await saveSession(celular);
+            await saveSession(celular, session);
           } catch (e) {
             console.error("Erro ao salvar sessão do Webhook Flow", e);
           }
@@ -183,20 +173,10 @@ export async function Flow(req: Request, res: Response): Promise<void> {
       if (screen === "MUDANCA_COMODO") {
         const celular = flow_token.split("_")[1];
 
-        const dbSession = await ApiMkDataSource.getRepository(
-          Sessions,
-        ).findOne({ where: { celular } });
-        if (dbSession) {
-          sessions[celular] = {
-            stage: dbSession.stage,
-            ...dbSession.dados,
-            inactivityTimer: sessions[celular]?.inactivityTimer,
-          };
-        } else if (!sessions[celular]) {
-          sessions[celular] = { stage: "start" };
-        }
-
-        const session = sessions[celular];
+        const dbSession = await ApiMkDataSource.getRepository(Sessions).findOne({ where: { celular } });
+        const session: any = dbSession
+          ? { stage: dbSession.stage, ...dbSession.dados }
+          : { stage: "start" };
 
         if (session) {
           session.dadosCadastro = {
@@ -206,7 +186,7 @@ export async function Flow(req: Request, res: Response): Promise<void> {
           };
 
           try {
-            await saveSession(celular);
+            await saveSession(celular, session);
           } catch (e) {
             console.error("Erro ao salvar sessão do Webhook Flow (Cômodo)", e);
           }
@@ -216,20 +196,10 @@ export async function Flow(req: Request, res: Response): Promise<void> {
       if (screen === "ALTERACAO_PLANO") {
         const celular = flow_token.split("_")[1];
 
-        const dbSession = await ApiMkDataSource.getRepository(
-          Sessions,
-        ).findOne({ where: { celular } });
-        if (dbSession) {
-          sessions[celular] = {
-            stage: dbSession.stage,
-            ...dbSession.dados,
-            inactivityTimer: sessions[celular]?.inactivityTimer,
-          };
-        } else if (!sessions[celular]) {
-          sessions[celular] = { stage: "start" };
-        }
-
-        const session = sessions[celular];
+        const dbSession = await ApiMkDataSource.getRepository(Sessions).findOne({ where: { celular } });
+        const session: any = dbSession
+          ? { stage: dbSession.stage, ...dbSession.dados }
+          : { stage: "start" };
 
         if (session) {
           session.dadosCadastro = {
@@ -238,7 +208,7 @@ export async function Flow(req: Request, res: Response): Promise<void> {
           };
 
           try {
-            await saveSession(celular);
+            await saveSession(celular, session);
           } catch (e) {
             console.error("Erro ao salvar sessão do Webhook Flow (Troca de Plano)", e);
           }

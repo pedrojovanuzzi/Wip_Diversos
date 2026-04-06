@@ -362,11 +362,19 @@ const SolicitacoesServico = () => {
                     )}
                   </TableCell>
                   <TableCell>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold ${service.assinado ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}
-                    >
-                      {service.assinado ? "Assinado" : "Pendente"}
-                    </span>
+                    {!service.token_zapsign ? (
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-500 text-white">
+                        Sem Assinatura
+                      </span>
+                    ) : service.assinado ? (
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                        Assinado
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                        Pendente
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {service.finalizado ? (

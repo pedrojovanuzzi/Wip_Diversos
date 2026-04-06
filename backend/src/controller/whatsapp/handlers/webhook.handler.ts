@@ -2,15 +2,12 @@ import { Request, Response } from "express";
 import { token } from "../config";
 import { findOrCreate } from "../utils/helpers";
 import { writeLog } from "../utils/logging";
-import { sessions, saveSession, deleteSession } from "../services/session.service";
 import { whatsappIncomingQueue } from "../services/messaging.service";
 import ApiMkDataSource from "../../../database/API_MK";
 import PeopleConversation from "../../../entities/APIMK/People_Conversations";
 import Conversations from "../../../entities/APIMK/Conversations";
-import Sessions from "../../../entities/APIMK/Sessions";
 import { isSandbox, logFilePath, manutencao, redisOptions } from "../config";
 import fs from "fs";
-import { v4 as uuidv4 } from "uuid";
 import Redis from "ioredis";
 
 // Deduplicação persistente: sobrevive a restarts do servidor.
@@ -40,8 +37,6 @@ export async function verify(req: Request, res: Response) {
 
 export async function index(req: Request, res: Response) {
   // Responde 200 imediatamente para evitar retries do Meta por timeout.
-  // IMPORTANTE: res.sendStatus envia o body "OK" e fecha a resposta de fato.
-  // Apenas res.status(200) não envia nada — o Meta aguarda o timeout e retenta.
   res.sendStatus(200);
 
   try {
@@ -51,13 +46,10 @@ export async function index(req: Request, res: Response) {
       return;
     }
 
-    
-
     if (body.entry) {
       const entryId = body.entry?.[0]?.id;
 
-    console.log("[Webhook] entry[0].changes:", JSON.stringify(body.entry[0].changes, null, 2));
-
+      console.log("[Webhook] entry[0].changes:", JSON.stringify(body.entry[0].changes, null, 2));
 
       if (entryId === process.env.WHATS_BUSSINES_TESTID && !isSandbox) {
         console.log("Mensagem de teste ignorada em produção");
@@ -74,7 +66,7 @@ export async function index(req: Request, res: Response) {
           for (const change of entry.changes) {
             const value = change.value;
 
-            // Ignora eventos de status (delivered, read, sent, failed) — não são mensagens de entrada
+            // Ignora eventos de status (delivered, read, sent, failed)
             if (value && value.statuses && !value.messages) {
               continue;
             }
@@ -110,51 +102,14 @@ export async function index(req: Request, res: Response) {
                 }
 
                 // Deduplicação persistente via Redis — sobrevive a restarts.
-                // SET NX EX: só grava se a chave não existe, TTL 24h.
                 const dedupSet = await redisDedup.set(DEDUP_KEY(messageId), "1", "EX", 86400, "NX");
                 if (dedupSet === null) {
-                  // Chave já existia → mensagem já foi processada (retry do Meta)
                   console.log(`Mensagem duplicada ignorada (Redis): ${messageId}`);
                   continue;
                 }
 
                 if (!celular || !type) {
                   continue;
-                }
-
-                // Checa last_message_id tanto na sessão em memória quanto no banco (primeiro acesso)
-                if (sessions[celular]) {
-                  if (sessions[celular].last_message_id === messageId) {
-                    console.log(`Mensagem já processada (sessão ativa): ${messageId}`);
-                    continue;
-                  }
-                  // Garante que sessões antigas em memória também tenham conversationId
-                  if (!sessions[celular].conversationId) {
-                    sessions[celular].conversationId = uuidv4();
-                  }
-                } else {
-                  const newConversationId = uuidv4();
-                  // inactivityTimer só existe se sessions[celular] já existia — preservar
-                  const existingTimer = sessions[celular]?.inactivityTimer;
-                  sessions[celular] = { stage: "", conversationId: newConversationId, inactivityTimer: existingTimer };
-
-                  const sessionDB = await ApiMkDataSource.getRepository(
-                    Sessions,
-                  ).findOne({ where: { celular } });
-
-                  if (sessionDB) {
-                    if (sessionDB.last_message_id === messageId) {
-                      console.log(`Mensagem já processada (banco): ${messageId}`);
-                      continue;
-                    }
-                    sessions[celular] = {
-                      stage: sessionDB.stage,
-                      ...sessionDB.dados,
-                      // Preserva o conversationId salvo no banco; se não houver, usa o gerado acima
-                      conversationId: sessionDB.dados?.conversationId || newConversationId,
-                      inactivityTimer: existingTimer,
-                    };
-                  }
                 }
 
                 let mensagemCorpo = "";
@@ -173,8 +128,6 @@ export async function index(req: Request, res: Response) {
                   if (interactive.type === "nfm_reply") {
                     const responseJson = interactive.nfm_reply?.response_json;
                     if (responseJson) {
-                      // Se o nfm_reply contém APENAS flow_token, o usuário fechou o Flow
-                      // sem enviar — não é uma submissão, deve ser ignorado.
                       try {
                         const parsed = JSON.parse(responseJson);
                         const keys = Object.keys(parsed);
@@ -183,7 +136,6 @@ export async function index(req: Request, res: Response) {
                           continue;
                         }
                       } catch (_) {
-                        // não é JSON válido — ignora silenciosamente
                         continue;
                       }
                       mensagemCorpo = responseJson;
@@ -197,7 +149,6 @@ export async function index(req: Request, res: Response) {
 
                 if (mensagemCorpo || type) {
                   const texto = mensagemCorpo;
-                  const session = sessions[celular];
 
                   if (type === "undefined" || type === undefined) {
                     break;
@@ -207,60 +158,36 @@ export async function index(req: Request, res: Response) {
                   fs.readFile(logFilePath, "utf8", (err, data) => {
                     let logs: any[] = [];
                     if (err && err.code === "ENOENT") {
-                      console.log(
-                        "Arquivo de log não encontrado, criando um novo.",
-                      );
+                      console.log("Arquivo de log não encontrado, criando um novo.");
                     } else if (err) {
                       console.error("Erro ao ler o arquivo de log:", err);
                       return;
                     } else {
                       try {
                         logs = JSON.parse(data);
-                        if (!Array.isArray(logs)) {
-                          logs = [];
-                        }
+                        if (!Array.isArray(logs)) logs = [];
                       } catch (parseErr) {
-                        console.error(
-                          "Erro ao analisar o arquivo de log:",
-                          parseErr,
-                        );
+                        console.error("Erro ao analisar o arquivo de log:", parseErr);
                         logs = [];
                       }
                     }
 
-                    const log = {
-                      celular: celular,
-                      type: type,
-                      texto: texto,
+                    logs.push({
+                      celular,
+                      type,
+                      texto,
                       timestamp: new Date().toISOString(),
-                    };
+                    });
 
-                    logs.push(log);
-
-                    const jsonString = JSON.stringify(logs, null, 2);
-
-                    fs.writeFile(logFilePath, jsonString, "utf8", (err) => {
-                      if (err) {
-                        console.error(
-                          "Erro ao escrever no arquivo de log:",
-                          err,
-                        );
-                        return;
-                      }
-                      console.log("Log atualizado com sucesso!");
+                    fs.writeFile(logFilePath, JSON.stringify(logs, null, 2), "utf8", (err) => {
+                      if (err) console.error("Erro ao escrever no arquivo de log:", err);
+                      else console.log("Log atualizado com sucesso!");
                     });
                   });
 
                   await whatsappIncomingQueue.add(
                     "process-message",
-                    {
-                      texto,
-                      celular,
-                      type,
-                      manutencao,
-                      messageId,
-                      conversationId: sessions[celular]?.conversationId,
-                    },
+                    { texto, celular, type, manutencao, messageId },
                     {
                       jobId: messageId,
                       removeOnComplete: true,
