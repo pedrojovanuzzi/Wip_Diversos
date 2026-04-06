@@ -285,6 +285,9 @@ export async function MensagemLista(
   }
 }
 
+const AVISO_FLOW =
+  "⚠️ Esta contratação estará sujeito à análise de viabilidade técnica ou consulta cadastral (CPF/CNPJ), podendo influenciar na disponibilidade, valores (pagos ou gratuitos da instalação), valores do plano e condições do serviço. A contratação será confirmada após análise. Caso esteja de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
+
 export async function MensagemFlow(
   receivenumber: any,
   flowName: string,
@@ -292,6 +295,7 @@ export async function MensagemFlow(
   planosDoSistema: any[] = [],
 ) {
   try {
+    await MensagensComuns(receivenumber, AVISO_FLOW);
     await whatsappOutgoingQueue.add(
       "send-flow",
       {
@@ -344,6 +348,7 @@ export async function MensagemFlowEndereco(
   ctaText: string,
 ) {
   try {
+    await MensagensComuns(receivenumber, AVISO_FLOW);
     await whatsappOutgoingQueue.add(
       "send-flow",
       {
@@ -393,6 +398,7 @@ export async function MensagemFlowTrocaPlano(
   planosDoSistema: any[] = [],
 ) {
   try {
+    await MensagensComuns(receivenumber, AVISO_FLOW);
     await whatsappOutgoingQueue.add(
       "send-flow",
       {
@@ -450,6 +456,7 @@ export async function MensagemFlowTrocaTitularidadeContato(
     : { flow_name: flowRef };
 
   try {
+    await MensagensComuns(receivenumber, AVISO_FLOW);
     await whatsappOutgoingQueue.add(
       "send-flow",
       {
@@ -510,6 +517,7 @@ export async function MensagemFlowTrocaTitularidadeContratacao(
     : { flow_name: flowRef };
 
   try {
+    await MensagensComuns(receivenumber, AVISO_FLOW);
     await whatsappOutgoingQueue.add(
       "send-flow",
       {
@@ -567,11 +575,7 @@ export async function MensagemFlowTrocaTitularidadeContratacao(
     ctaText: string,
   ) {
     try {
-      const planoAviso =
-        "⚠️ *Atenção*: Contratação sujeita à *análise técnica e consulta cadastral (CPF/CNPJ)*. Podendo influenciar na disponibilidade, valores da instalação (grátis ou paga), valor do plano e condições do serviço.\n\n✅ *A contratação será confirmada após a análise*. Se estiver de acordo, prossiga com o preenchimento do formulário abaixo👇🏻";
-
-      // await this.MensagensComuns(receivenumber, planoAviso);
-
+      await MensagensComuns(receivenumber, AVISO_FLOW);
       await whatsappOutgoingQueue.add(
         "send-flow",
         {

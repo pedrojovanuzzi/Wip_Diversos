@@ -263,7 +263,7 @@ export async function handleAwaitingFlowCadastro(
 
       await MensagensComuns(
         celular,
-        "✅ Recebemos a sua solicitação!\nNossa equipe vai analisar o CPF informado e continuar os próximos passos da instalação. Obrigado pela confiança!",
+        "✅ Recebemos a sua solicitação!\nNossa equipe vai *analisar o CPF informado* e continuar os próximos passos da instalação. Obrigado pela confiança!",
       );
 
       const resumoEmailHtml =
