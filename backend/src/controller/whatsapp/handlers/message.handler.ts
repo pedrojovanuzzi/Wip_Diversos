@@ -217,7 +217,7 @@ export async function handleMessage(
                   { id: "option_1", title: "Instalação" },
                   { id: "option_2", title: "Mudança de Endereço" },
                   { id: "option_3", title: "Mudança de Cômodo" },
-                  { id: "option_4", title: "Troca de Titularidade" },
+                  { id: "option_4", title: "Alteração Titularidade" },
                   { id: "option_5", title: "Alteração de Plano" },
                   // { id: "option_6", title: "Renovação Contratual" },
                   // { id: "option_7", title: "Wifi Estendido" },
@@ -275,7 +275,7 @@ export async function handleMessage(
           session.service = "mudanca_comodo";
           session.stage = "mudanca_comodo";
           await iniciarMudancaComodo(celular, texto, session, type);
-        } else if (t === "troca de titularidade") {
+        } else if (t === "alteração titularidade") {
           await LGPD(celular);
           session.stage = "lgpd_request";
           session.service = "troca_titularidade";

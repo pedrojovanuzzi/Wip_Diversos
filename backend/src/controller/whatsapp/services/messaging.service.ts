@@ -469,7 +469,7 @@ export async function MensagemFlowTrocaTitularidadeContato(
           interactive: {
             type: "flow",
             body: {
-              text: "Preencha o nome completo e o celular da pessoa com quem devemos entrar em contato sobre a troca de titularidade.",
+              text: "Preencha o nome completo e o celular da pessoa com quem devemos entrar em contato sobre a alteração de titularidade.",
             },
             action: {
               name: "flow",
@@ -499,7 +499,7 @@ export async function MensagemFlowTrocaTitularidadeContato(
     console.log(`Flow '${flowName}' de contato enviado para ${receivenumber}`);
   } catch (error: any) {
     console.error(
-      "Erro ao enviar Flow de Contato da Troca de Titularidade:",
+      "Erro ao enviar Flow de Contato da Alteração de Titularidade:",
       error.message,
     );
   }
@@ -530,7 +530,7 @@ export async function MensagemFlowTrocaTitularidadeContratacao(
           interactive: {
             type: "flow",
             body: {
-              text: "Preencha os dados para contratação da troca de titularidade.",
+              text: "Preencha os dados para contratação da alteração de titularidade.",
             },
             action: {
               name: "flow",
@@ -563,7 +563,7 @@ export async function MensagemFlowTrocaTitularidadeContratacao(
     );
   } catch (error: any) {
     console.error(
-      "Erro ao enviar Flow de Contratação da Troca de Titularidade:",
+      "Erro ao enviar Flow de Contratação da Alteração de Titularidade:",
       error.message,
     );
   }

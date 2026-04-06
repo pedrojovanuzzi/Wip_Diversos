@@ -446,7 +446,7 @@ class ZapSign {
           const servicoNorm = solicitacao.servico?.toLowerCase();
           // Notifica novo titular apenas na primeira assinatura (quando ainda faltam signatários)
           if (
-            (servicoNorm === "troca de titularidade titular" || servicoNorm === "troca_titularidade_titular") &&
+            (servicoNorm === "alteração de titularidade titular" || servicoNorm === "troca de titularidade titular" || servicoNorm === "troca_titularidade_titular") &&
             !solicitacao.dados?.titular_assinou &&
             !docFullySigned &&
             !solicitacao.assinado
@@ -616,12 +616,14 @@ class ZapSign {
                     );
                   }
                   break;
-                case "troca de titularidade titular":
-                case "troca_titularidade_titular":
+                case "alteração de titularidade titular":
+                case "troca de titularidade titular":   // legado
+                case "troca_titularidade_titular":       // legado
                   // notificarNovoTitular é chamado no doc_signed (primeira assinatura)
                   await this.verificarEFinalizarTrocaTitularidade(solicitacao, repo);
                   break;
-                case "troca de titularidade novo titular":
+                case "alteração de titularidade novo titular":
+                case "troca de titularidade novo titular":  // legado
                   await this.verificarEFinalizarTrocaTitularidade(solicitacao, repo);
                   break;
                 default:
@@ -651,7 +653,7 @@ class ZapSign {
     }
   }
 
-  // === Métodos Auxiliares para Troca de Titularidade ===
+  // === Métodos Auxiliares para Alteração de Titularidade ===
 
   private notificarNovoTitular = async (_solicitacao: SolicitacaoServico) => {
     // Notificação de "aguardando assinatura do novo titular" removida a pedido
@@ -682,17 +684,17 @@ class ZapSign {
       }
 
       if (!solicitacaoTitular || !solicitacaoNovoTitular) {
-        console.log("[TrocaTitularidade] Aguardando a outra solicitação ser localizada.");
+        console.log("[AlteraçãoTitularidade] Aguardando a outra solicitação ser localizada.");
         return;
       }
 
       if (!solicitacaoTitular.assinado || !solicitacaoNovoTitular.assinado) {
-        console.log("[TrocaTitularidade] Aguardando ambas as assinaturas.");
+        console.log("[AlteraçãoTitularidade] Aguardando ambas as assinaturas.");
         return;
       }
 
       if (solicitacaoTitular.dados?.troca_finalizada) {
-        console.log("[TrocaTitularidade] Troca já processada, ignorando.");
+        console.log("[AlteraçãoTitularidade] Troca já processada, ignorando.");
         return;
       }
 
@@ -726,22 +728,22 @@ class ZapSign {
             `E-mail: ${dadosNovoTitular?.email || "Não informado"}\n` +
             `Celular: ${dadosNovoTitular?.celular || dadosNovoTitular?.telefone_conversa || "Não informado"}`;
 
-          await criarChamadoMkauth("TROCA DE TITULARIDADE", sessionFake, mensagemChamado, solicitacaoTitular);
-          console.log(`[TrocaTitularidade] Chamado criado para CPF ${cpfOriginal}.`);
+          await criarChamadoMkauth("ALTERAÇÃO DE TITULARIDADE", sessionFake, mensagemChamado, solicitacaoTitular);
+          console.log(`[AlteraçãoTitularidade] Chamado criado para CPF ${cpfOriginal}.`);
         } else {
-          console.warn("[TrocaTitularidade] CPF do titular original não encontrado nos dados.");
+          console.warn("[AlteraçãoTitularidade] CPF do titular original não encontrado nos dados.");
         }
       } catch (e) {
-        console.error("[TrocaTitularidade] Erro ao criar chamado para titular:", e);
+        console.error("[AlteraçãoTitularidade] Erro ao criar chamado para titular:", e);
       }
 
       // 2. Criar novo cadastro no MkAuth para o novo titular e abrir chamado de instalação
       try {
         const loginNovoTitular = await this.registerClientInMkAuth(dadosNovoTitular);
-        console.log(`[TrocaTitularidade] Novo titular ${dadosNovoTitular?.nome} cadastrado no MKAuth. Login: ${loginNovoTitular}`);
+        console.log(`[AlteraçãoTitularidade] Novo titular ${dadosNovoTitular?.nome} cadastrado no MKAuth. Login: ${loginNovoTitular}`);
 
         const msgNovoTitular =
-          `Instalação originada por troca de titularidade. Contrato assinado em ${moment().format("DD/MM/YYYY HH:mm")}.\n\n` +
+          `Instalação originada por alteração de titularidade. Contrato assinado em ${moment().format("DD/MM/YYYY HH:mm")}.\n\n` +
           `👤 Nome: ${dadosNovoTitular?.nome || "-"}\n` +
           `📄 CPF: ${dadosNovoTitular?.cpf || "-"}\n` +
           `🪪 RG/IE: ${dadosNovoTitular?.rg || "-"}\n` +
@@ -760,12 +762,12 @@ class ZapSign {
           msgNovoTitular,
           solicitacaoNovoTitular,
         );
-        console.log(`[TrocaTitularidade] Chamado de instalação criado para novo titular ${dadosNovoTitular?.nome}.`);
+        console.log(`[AlteraçãoTitularidade] Chamado de instalação criado para novo titular ${dadosNovoTitular?.nome}.`);
       } catch (e) {
-        console.error("[TrocaTitularidade] Erro ao cadastrar novo titular ou criar chamado:", e);
+        console.error("[AlteraçãoTitularidade] Erro ao cadastrar novo titular ou criar chamado:", e);
       }
     } catch (error) {
-      console.error("[TrocaTitularidade] Erro ao processar finalização da troca:", error);
+      console.error("[AlteraçãoTitularidade] Erro ao processar finalização da troca:", error);
     }
   }
 
@@ -895,7 +897,7 @@ class ZapSign {
 
       if (!template || !template.token_id) {
         throw new Error(
-          "Token do template 'Troca de Titularidade' não encontrado no banco de dados.",
+          "Token do template 'Alteração de Titularidade' não encontrado no banco de dados.",
         );
       }
 
@@ -908,7 +910,7 @@ class ZapSign {
         external_id: null,
         data: [
           { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: "Troca de Titularidade" },
+          { de: "{{termo}}", para: "Alteração de Titularidade" },
           { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
           { de: "{{cpfcliente}}", para: cpf },
           { de: "{{provedornome}}", para: "Wip Telecom" },
@@ -921,7 +923,7 @@ class ZapSign {
           { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
           { de: "{{novotitular}}", para: nome_novo_titular },
           { de: "{{celularnovotitular}}", para: celular_novo_titular },
-          { de: "{{termo2}}", para: "Troca de Titularidade" },
+          { de: "{{termo2}}", para: "Alteração de Titularidade" },
           { de: "{{logincliente2}}", para: login_novo_titular },
           { de: "{{nomecliente2}}", para: nome_novo_titular },
           { de: "{{cpfcliente2}}", para: cpf_novo_titular },
@@ -1009,7 +1011,7 @@ class ZapSign {
 
       if (!template || !template.token_id) {
         throw new Error(
-          "Token do template 'Troca de Titularidade' não encontrado no banco de dados.",
+          "Token do template 'Alteração de Titularidade' não encontrado no banco de dados.",
         );
       }
 
@@ -1022,7 +1024,7 @@ class ZapSign {
         external_id: null,
         data: [
           { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: "Troca de Titularidade" },
+          { de: "{{termo}}", para: "Alteração de Titularidade" },
           { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
           { de: "{{cpfcliente}}", para: cpf },
           { de: "{{provedornome}}", para: "Wip Telecom" },

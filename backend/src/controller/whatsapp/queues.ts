@@ -64,7 +64,7 @@ export function initQueues() {
       await redisDedupWorker.set(PROCESSED_KEY(messageId), "1", "EX", 86400);
 
       // Cancela timer de inatividade anterior e reagenda para 15 min a partir de agora
-      const inactivityJobId = `inactivity:${celular}`;
+      const inactivityJobId = `inactivity-${celular}`;
       try {
         const existingJob = await whatsappInactivityQueue.getJob(inactivityJobId);
         if (existingJob) await existingJob.remove();
@@ -190,7 +190,7 @@ export function initQueues() {
           text: {
             preview_url: false,
             body:
-              "⚠️ Não consegui abrir o formulário agora. Um atendente continuará com você por aqui para seguir com a troca de titularidade.",
+              "⚠️ Não consegui abrir o formulário agora. Um atendente continuará com você por aqui para seguir com a alteração de titularidade.",
           },
         },
         headers,
