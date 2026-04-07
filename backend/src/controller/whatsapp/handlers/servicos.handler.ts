@@ -6,6 +6,7 @@ import ApiMkDataSource from "../../../database/API_MK";
 import MkauthDataSource from "../../../database/MkauthSource";
 import AppDataSource from "../../../database/DataSource";
 import { ClientesEntities as Sis_Cliente } from "../../../entities/ClientesEntities";
+import { SisPlano } from "../../../entities/SisPlano";
 import { Faturas as Record } from "../../../entities/Faturas";
 import Sessions from "../../../entities/APIMK/Sessions";
 import { SolicitacaoServico } from "../../../entities/SolicitacaoServico";
@@ -227,6 +228,12 @@ async function salvarSolicitacaoAlteracaoPlano(
     telefone_conversa: celularConversa,
     login: session.login || "Não informado",
     endereco: session.endereco_troca_plano || "Não informado",
+    numero: session.numero_troca_plano || "",
+    bairro: session.bairro_troca_plano || "",
+    cidade: session.cidade_troca_plano || "",
+    estado: session.estado_troca_plano || "",
+    cep: session.cep_troca_plano || "",
+    vencimento: session.venc_troca_plano || "",
     rg: session.rg || "Não informado",
     plano: session.planoEscolhido || "Não informado",
     observacao: session.observacaoTrocaPlano || "",
@@ -820,6 +827,11 @@ export async function iniciarTrocaPlano(
         endereco: true,
         login: true,
         numero: true,
+        bairro: true,
+        cidade: true,
+        estado: true,
+        cep: true,
+        venc: true,
         email: true,
         rg: true,
         cpf_cnpj: true,
@@ -837,6 +849,11 @@ export async function iniciarTrocaPlano(
         endereco: client.endereco,
         login: client.login,
         numero: client.numero,
+        bairro: client.bairro,
+        cidade: client.cidade,
+        estado: client.estado,
+        cep: client.cep,
+        venc: client.venc,
         cpf,
         email: client.email,
         rg: client.rg,
@@ -862,7 +879,13 @@ export async function iniciarTrocaPlano(
       session.nome = sis_cliente[0].nome;
       session.email = sis_cliente[0].email;
       session.rg = sis_cliente[0].rg;
-      session.endereco_troca_plano = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
+      session.endereco_troca_plano = sis_cliente[0].endereco || "";
+      session.numero_troca_plano = sis_cliente[0].numero || "";
+      session.bairro_troca_plano = sis_cliente[0].bairro || "";
+      session.cidade_troca_plano = sis_cliente[0].cidade || "";
+      session.estado_troca_plano = sis_cliente[0].estado || "";
+      session.cep_troca_plano = sis_cliente[0].cep || "";
+      session.venc_troca_plano = sis_cliente[0].venc || "";
       session.celularCliente = sis_cliente[0].celular;
       session.dadosCompleto = {
         nome: sis_cliente[0].nome,
@@ -930,7 +953,13 @@ export async function iniciarTrocaPlano(
       session.nome = selectedClient.nome;
       session.email = selectedClient.email;
       session.rg = selectedClient.rg;
-      session.endereco_troca_plano = `${selectedClient.endereco}, ${selectedClient.numero}`;
+      session.endereco_troca_plano = selectedClient.endereco || "";
+      session.numero_troca_plano = selectedClient.numero || "";
+      session.bairro_troca_plano = selectedClient.bairro || "";
+      session.cidade_troca_plano = selectedClient.cidade || "";
+      session.estado_troca_plano = selectedClient.estado || "";
+      session.cep_troca_plano = selectedClient.cep || "";
+      session.venc_troca_plano = selectedClient.venc || "";
       session.celularCliente = selectedClient.celular;
       session.dadosCompleto = {
         nome: selectedClient.nome,
@@ -1659,6 +1688,13 @@ export async function handleAwaitingTrocaPlanoFlow(
     }
 
     try {
+      const planoRecord = session.planoEscolhido
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({
+            where: { nome: session.planoEscolhido },
+          })
+        : null;
+      const valorPlano = planoRecord?.valor || "0.00";
+
       const payloadZap = {
         ...(solicitacaoSalva?.dados || {}),
         nome: session.nome || "Não informado",
@@ -1666,10 +1702,17 @@ export async function handleAwaitingTrocaPlanoFlow(
         email: session.email || "financeiro@wiptelecom.com.br",
         telefone: session.celularCliente || celular,
         telefone_conversa: celular,
+        login: session.login || "Não informado",
         endereco: session.endereco_troca_plano || "Não informado",
+        numero: session.numero_troca_plano || "",
+        bairro: session.bairro_troca_plano || "",
+        cidade: session.cidade_troca_plano || "",
+        estado: session.estado_troca_plano || "",
+        cep: session.cep_troca_plano || "",
+        vencimento: session.venc_troca_plano || "",
         rg: session.rg || "Não informado",
         plano: session.planoEscolhido,
-        valor: "0.00",
+        valor: valorPlano,
       };
 
       const zapResponse =

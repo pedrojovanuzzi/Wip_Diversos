@@ -81,8 +81,15 @@ interface ZapSignDataAlteracaoPlano {
   email: string;
   telefone: string;
   endereco: string;
+  numero?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
+  cep?: string;
+  vencimento?: string;
   plano: string;
   valor: string;
+  login?: string;
   rg?: string;
   telefone_conversa?: string;
 }
@@ -799,8 +806,15 @@ class ZapSign {
         email,
         telefone,
         endereco,
+        numero = "",
+        bairro = "",
+        cidade = "",
+        estado = "",
+        cep = "",
+        vencimento = "",
         plano,
         valor,
+        login = "Não informado",
         rg = "Não informado",
         telefone_conversa,
       } = params;
@@ -825,6 +839,7 @@ class ZapSign {
         external_id: null,
         data: [
           { de: "{{nomecliente}}", para: nome },
+          { de: "{{logincliente}}", para: login },
           { de: "{{termo}}", para: "Alteração de Plano" },
           { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
           { de: "{{cpfcliente}}", para: cpf },
@@ -833,14 +848,25 @@ class ZapSign {
           { de: "{{rgcliente}}", para: rg },
           { de: "{{fonecliente}}", para: telefone_conversa || telefone },
           { de: "{{celularcliente}}", para: telefone_conversa || telefone },
-          { de: "{{enderecocliente}}", para: endereco },
+          { de: "{{celular2cliente}}", para: telefone },
+          { de: "{{enderecocliente}}", para: `${endereco}, ${numero}` },
+          { de: "{{bairrocliente}}", para: bairro },
+          { de: "{{cidadecliente}}", para: cidade },
+          { de: "{{estadocliente}}", para: estado },
+          { de: "{{cepcliente}}", para: cep },
+          { de: "{{enderecorescliente}}", para: `${endereco}, ${numero}` },
+          { de: "{{numerorescliente}}", para: numero },
+          { de: "{{bairrorescliente}}", para: bairro },
+          { de: "{{cidaderescliente}}", para: cidade },
+          { de: "{{estadorescliente}}", para: estado },
+          { de: "{{ceprescliente}}", para: cep },
           { de: "{{emailcliente}}", para: email },
           { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
           { de: "{{planodeacesso}}", para: plano },
           { de: "{{velocidadeplano}}", para: "Conforme solicitado" },
           { de: "{{valor}}", para: valor || "0.00" },
           { de: "{{descontocliente}}", para: "0,00" },
-          { de: "{{diavencimento}}", para: "N/A" },
+          { de: "{{diavencimento}}", para: vencimento || "N/A" },
           { de: "{{equipamento}}", para: "Equipamento existente" },
         ],
         signature_placement: "<<assinatura>>",
