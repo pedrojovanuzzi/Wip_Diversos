@@ -9,6 +9,7 @@ import Conversations from "../entities/APIMK/Conversations";
 import Messages from "../entities/APIMK/Mensagens";
 import PeopleConversations from "../entities/APIMK/People_Conversations";
 import Sessions from "../entities/APIMK/Sessions";
+import ZapSignTemplates from "../entities/APIMK/ZapSignTemplates";
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ const AppDataSource = new DataSource({
     Messages,
     PeopleConversations,
     Sessions,
+    ZapSignTemplates,
   ],
   migrations: [path.join(__dirname, "../migration/*.ts")],
 });

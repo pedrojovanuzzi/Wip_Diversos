@@ -1,5 +1,5 @@
 import { Router } from "express";
-import Whatsapp from "../controller/WhatsConversationPath";
+import Whatsapp from "../controller/whatsapp/index";
 
 const router: Router = Router();
 

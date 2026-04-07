@@ -53,9 +53,6 @@ export class ChamadosEntities {
     @Column({ type: 'int', nullable: true })
     login_atend?: number;
 
-    @Column({ type: 'varchar', length: 63, default: 'full_users' })
-    login_atend_string?: string;
-
     @Column({ type: 'longtext', nullable: true })
     motivo_fechar?: string;
 }

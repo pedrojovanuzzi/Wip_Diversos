@@ -14,4 +14,7 @@ backend/soap_cancel_request.xml
 backend/src/controller/log.json
 backend/private.pem
 backend/public.pem
+backend/src/zapsign_id/contratacao.ts
+backend/src/zapsign_id/mudanca_endereco.ts
 backend/log/logPix.json
+.claude

@@ -1,0 +1,88 @@
+{
+  "version": "7.3",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "MUDANCA_COMODO": [
+      "SUCCESS"
+    ],
+    "SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "MUDANCA_COMODO",
+      "title": "Mudança de Comodo",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "flow_path",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Dados para o Serviço"
+              },
+              {
+                "type": "TextBody",
+                "text": "Por gentileza, relate a baixo como vai ser a mudança, Ex: do quarto para a sala, da sala para o quarto."
+              },
+              {
+                "type": "TextInput",
+                "name": "observacao",
+                "label": "Observação",
+                "required": true,
+                "input-type": "text",
+                "max-chars": 200
+              },
+              {
+                "type": "Footer",
+                "label": "Enviar Dados",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "action": "submit_mudanca_comodo",
+                    "nome": "${form.observacao}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESS",
+      "title": "Sucesso",
+      "terminal": true,
+
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Dados Recebidos!"
+          },
+          {
+            "type": "TextBody",
+            "text": "Recebemos seus dados. Por favor, feche esta janela para continuar o atendimento."
+          },
+          {
+            "type": "Footer",
+            "label": "Finalizar",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "extension_message_response": {
+                  "params": {
+                    "flow_token": "${data.extension_message_response.params.flow_token}"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

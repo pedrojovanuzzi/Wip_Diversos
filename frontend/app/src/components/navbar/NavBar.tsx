@@ -22,6 +22,8 @@ import {
   FaMapMarkedAlt,
   FaDesktop,
   FaChartLine,
+  FaFilePdf,
+  FaList,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -192,10 +194,26 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   title="Pix"
                   description="Gestão de pagamentos via Pix"
                 />
+                <NavItem
+                  to="/solicitacoes-servico"
+                  icon={
+                    <FaList className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Serviços Solicitados"
+                  description="Ver solicitações de serviços"
+                />
               </>
             )}
             {permission >= 5 && (
               <>
+                <NavItem
+                  to="/zapsign-config"
+                  icon={
+                    <FaFilePdf className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Config ZapSign"
+                  description="Configurar templates ZapSign"
+                />
                 <NavItem
                   to="/Create"
                   icon={
@@ -307,6 +325,7 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   title="Gráfico Instalações"
                   description="Acompanhe instalações mensais"
                 />
+                
               </>
             )}
             {permission === 1 && (

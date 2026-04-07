@@ -1,0 +1,59 @@
+{
+  "version": "7.3",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "TROCA_TITULARIDADE_CONTATO": []
+  },
+  "screens": [
+    {
+      "id": "TROCA_TITULARIDADE_CONTATO",
+      "title": "Troca de Titularidade Contato",
+      "terminal": true,
+      "success": true,
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_troca_titularidade_contato",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Contato da Solicitacao"
+              },
+              {
+                "type": "TextBody",
+                "text": "Informe os dados para retornarmos sobre a troca de titularidade."
+              },
+              {
+                "type": "TextInput",
+                "name": "nome",
+                "label": "Nome completo",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "name": "celular",
+                "label": "Celular (com DDD)",
+                "required": true,
+                "input-type": "number"
+              },
+              {
+                "type": "Footer",
+                "label": "Enviar Contato",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "nome": "${form.nome}",
+                    "celular": "${form.celular}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
