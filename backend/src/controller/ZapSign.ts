@@ -16,8 +16,7 @@ import { criarChamadoMkauth } from "./whatsapp/services/chamado.service";
 
 dotenv.config();
 
-const homologacao = process.env.SERVIDOR_HOMOLOGACAO;
-const isSandbox = homologacao === "true";
+const isSandbox = process.env.SERVIDOR_HOMOLOGACAO === "true";
 
 const waToken = isSandbox
   ? process.env.CLOUD_API_ACCESS_TOKEN_TEST
@@ -197,7 +196,7 @@ class ZapSign {
       };
 
       const response = await axios.post(
-        homologacao
+        isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
         data,
@@ -301,7 +300,7 @@ class ZapSign {
       };
 
       const response = await axios.post(
-        homologacao
+        isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
         data,
@@ -396,7 +395,7 @@ class ZapSign {
       };
 
       const response = await axios.post(
-        homologacao
+        isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
         data,
@@ -849,7 +848,7 @@ class ZapSign {
       };
 
       const response = await axios.post(
-        homologacao
+        isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
         data,
@@ -940,7 +939,7 @@ class ZapSign {
       };
 
       const response = await axios.post(
-        homologacao
+        isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
         data,
@@ -960,7 +959,7 @@ class ZapSign {
         const phoneNumber = phoneRaw.startsWith("55") ? phoneRaw.slice(2) : phoneRaw;
 
         const addSignerResponse = await axios.post(
-          homologacao
+          isSandbox
             ? `https://sandbox.api.zapsign.com.br/api/v1/docs/${docToken}/add-signer/`
             : `https://api.zapsign.com.br/api/v1/docs/${docToken}/add-signer/`,
           {
@@ -1043,7 +1042,7 @@ class ZapSign {
       };
 
       const response = await axios.post(
-        homologacao
+        isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
         data,
