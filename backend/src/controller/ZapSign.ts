@@ -42,6 +42,7 @@ interface ZapSignDataInstalacao {
   plano: string;
   valor: string;
   vencimento: string;
+  contrato?: string;
   rg?: string;
   telefone_conversa?: string;
 }
@@ -60,6 +61,7 @@ interface ZapSignDataMudancaEndereco {
   estado: string;
   cep: string;
   valor: string;
+  contrato?: string;
   rg?: string;
   telefone_conversa?: string;
 }
@@ -71,6 +73,7 @@ interface ZapSignDataMudancaComodo {
   telefone: string;
   endereco: string;
   valor: string;
+  contrato?: string;
   rg?: string;
   telefone_conversa?: string;
 }
@@ -90,6 +93,7 @@ interface ZapSignDataAlteracaoPlano {
   plano: string;
   valor: string;
   login?: string;
+  contrato?: string;
   rg?: string;
   telefone_conversa?: string;
 }
@@ -114,6 +118,7 @@ interface ZapSignDataTrocaTitularidade {
   bairro_novo_titular?: string;
   celular2_novo_titular?: string;
   login_novo_titular?: string;
+  contrato?: string;
 }
 
 class ZapSign {
@@ -135,6 +140,7 @@ class ZapSign {
         plano,
         valor,
         vencimento,
+        contrato = "",
         rg = "Não informado",
         telefone_conversa,
       } = params;
@@ -165,7 +171,7 @@ class ZapSign {
         external_id: null,
         data: [
           { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: "Adesão" },
+          { de: "{{termo}}", para: contrato || "Adesão" },
           { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
           { de: "{{cpfcliente}}", para: cpf },
           { de: "{{provedornome}}", para: "Wip Telecom" },
@@ -240,6 +246,7 @@ class ZapSign {
         estado,
         cep,
         valor,
+        contrato = "",
         rg = "Não informado",
         telefone_conversa,
       } = params;
@@ -269,7 +276,7 @@ class ZapSign {
         external_id: null,
         data: [
           { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: "Mudança de Endereço" },
+          { de: "{{termo}}", para: contrato || "Mudança de Endereço" },
           { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
           { de: "{{cpfcliente}}", para: cpf },
           { de: "{{provedornome}}", para: "Wip Telecom" },
@@ -355,6 +362,7 @@ class ZapSign {
         telefone,
         endereco,
         valor,
+        contrato = "",
         rg = "Não informado",
         telefone_conversa,
       } = params;
@@ -384,7 +392,7 @@ class ZapSign {
         external_id: null,
         data: [
           { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: "Mudança de Cômodo" },
+          { de: "{{termo}}", para: contrato || "Mudança de Cômodo" },
           { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
           { de: "{{cpfcliente}}", para: cpf },
           { de: "{{provedornome}}", para: "Wip Telecom" },
@@ -815,6 +823,7 @@ class ZapSign {
         plano,
         valor,
         login = "Não informado",
+        contrato = "",
         rg = "Não informado",
         telefone_conversa,
       } = params;
@@ -840,7 +849,7 @@ class ZapSign {
         data: [
           { de: "{{nomecliente}}", para: nome },
           { de: "{{logincliente}}", para: login },
-          { de: "{{termo}}", para: "Alteração de Plano" },
+          { de: "{{termo}}", para: contrato || "Alteração de Plano" },
           { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
           { de: "{{cpfcliente}}", para: cpf },
           { de: "{{provedornome}}", para: "Wip Telecom" },
@@ -913,6 +922,7 @@ class ZapSign {
         bairro_novo_titular = "",
         celular2_novo_titular = "",
         login_novo_titular = "",
+        contrato = "",
       } = params;
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
@@ -935,7 +945,7 @@ class ZapSign {
         external_id: null,
         data: [
           { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: "Alteração de Titularidade" },
+          { de: "{{termo}}", para: contrato || "Alteração de Titularidade" },
           { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
           { de: "{{cpfcliente}}", para: cpf },
           { de: "{{provedornome}}", para: "Wip Telecom" },
@@ -1020,6 +1030,7 @@ class ZapSign {
         email,
         telefone,
         endereco,
+        contrato = "",
         rg = "Não informado",
         telefone_conversa,
       } = params;
@@ -1049,7 +1060,7 @@ class ZapSign {
         external_id: null,
         data: [
           { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: "Alteração de Titularidade" },
+          { de: "{{termo}}", para: contrato || "Alteração de Titularidade" },
           { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
           { de: "{{cpfcliente}}", para: cpf },
           { de: "{{provedornome}}", para: "Wip Telecom" },

@@ -234,6 +234,7 @@ async function salvarSolicitacaoAlteracaoPlano(
     estado: session.estado_troca_plano || "",
     cep: session.cep_troca_plano || "",
     vencimento: session.venc_troca_plano || "",
+    contrato: session.contrato_cliente || "",
     rg: session.rg || "Não informado",
     plano: session.planoEscolhido || "Não informado",
     observacao: session.observacaoTrocaPlano || "",
@@ -288,6 +289,7 @@ export async function iniciarMudancaComodo(
         endereco: true,
         login: true,
         numero: true,
+        termo: true,
         email: true,
         rg: true,
         cpf_cnpj: true,
@@ -305,6 +307,7 @@ export async function iniciarMudancaComodo(
         endereco: client.endereco,
         login: client.login,
         numero: client.numero,
+        termo: client.termo,
         cpf,
         email: client.email,
         rg: client.rg,
@@ -331,6 +334,7 @@ export async function iniciarMudancaComodo(
       session.email = sis_cliente[0].email;
       session.rg = sis_cliente[0].rg;
       session.endereco_comodo = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
+      session.contrato_cliente = sis_cliente[0].termo || "";
       session.celularCliente = sis_cliente[0].celular;
       session.dadosCompleto = {};
 
@@ -392,6 +396,7 @@ export async function iniciarMudancaComodo(
       session.email = selectedClient.email;
       session.rg = selectedClient.rg;
       session.endereco_comodo = `${selectedClient.endereco}, ${selectedClient.numero}`;
+      session.contrato_cliente = selectedClient.termo || "";
       session.celularCliente = selectedClient.celular;
       session.dadosCompleto = {};
 
@@ -451,6 +456,7 @@ export async function iniciarMudancaComodo(
           rg: session.rg,
           endereco: session.endereco_comodo,
           celular: session.celularCliente,
+          contrato: session.contrato_cliente || "",
           observacao: dadosFlow?.observacao || "Sem observação",
         };
 
@@ -625,6 +631,7 @@ async function selecionarCadastroTitularidade(celular: any, session: any, client
   session.nome = cliente.nome;
   session.email = cliente.email;
   session.rg = cliente.rg;
+  session.contrato_cliente = cliente.termo || "";
   session.celularCliente = cliente.celular;
   session.dadosCompleto = {
     nome: cliente.nome,
@@ -695,6 +702,7 @@ export async function iniciarTrocaTitularidade(
         endereco: true,
         login: true,
         numero: true,
+        termo: true,
         email: true,
         rg: true,
         cpf_cnpj: true,
@@ -712,6 +720,7 @@ export async function iniciarTrocaTitularidade(
         endereco: client.endereco,
         login: client.login,
         numero: client.numero,
+        termo: client.termo,
         cpf,
         email: client.email,
         rg: client.rg,
@@ -832,6 +841,7 @@ export async function iniciarTrocaPlano(
         estado: true,
         cep: true,
         venc: true,
+        termo: true,
         email: true,
         rg: true,
         cpf_cnpj: true,
@@ -854,6 +864,7 @@ export async function iniciarTrocaPlano(
         estado: client.estado,
         cep: client.cep,
         venc: client.venc,
+        termo: client.termo,
         cpf,
         email: client.email,
         rg: client.rg,
@@ -886,6 +897,7 @@ export async function iniciarTrocaPlano(
       session.estado_troca_plano = sis_cliente[0].estado || "";
       session.cep_troca_plano = sis_cliente[0].cep || "";
       session.venc_troca_plano = sis_cliente[0].venc || "";
+      session.contrato_cliente = sis_cliente[0].termo || "";
       session.celularCliente = sis_cliente[0].celular;
       session.dadosCompleto = {
         nome: sis_cliente[0].nome,
@@ -960,6 +972,7 @@ export async function iniciarTrocaPlano(
       session.estado_troca_plano = selectedClient.estado || "";
       session.cep_troca_plano = selectedClient.cep || "";
       session.venc_troca_plano = selectedClient.venc || "";
+      session.contrato_cliente = selectedClient.termo || "";
       session.celularCliente = selectedClient.celular;
       session.dadosCompleto = {
         nome: selectedClient.nome,
@@ -1396,6 +1409,7 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
         bairro_novo_titular: dadosFlow.bairro || "",
         celular2_novo_titular: String(dadosFlow.celularSecundario || ""),
         login_novo_titular: dadosFlow.login || "",
+        contrato: session.contrato_cliente || "",
       };
       const zapTitularidade = await ZapSign.createContractTrocaTitularidadeTitular(payloadZapTitularidade as any);
       const urlTitularAssinatura = zapTitularidade.signers[0].sign_url;
@@ -1710,6 +1724,7 @@ export async function handleAwaitingTrocaPlanoFlow(
         estado: session.estado_troca_plano || "",
         cep: session.cep_troca_plano || "",
         vencimento: session.venc_troca_plano || "",
+        contrato: session.contrato_cliente || "",
         rg: session.rg || "Não informado",
         plano: session.planoEscolhido,
         valor: valorPlano,
