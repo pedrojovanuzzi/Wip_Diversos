@@ -911,6 +911,19 @@ export async function handleMessage(
         );
       }
       break;
+
+    default:
+      console.error(`[HANDLE_MESSAGE] Stage não reconhecido: "${session.stage}" para ${celular} — resetando sessão`);
+      await boasVindas(celular);
+      await MensagemBotao(
+        celular,
+        "Escolha a Opção",
+        "Boleto/Pix",
+        "Serviços/Contratação",
+        "Falar com Atendente",
+      );
+      session.stage = "options_start";
+      break;
   }
 
   console.log(`Nova sessão para ${celular}:`, session);

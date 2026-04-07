@@ -14,6 +14,20 @@ import { MensagensComuns } from "./services/messaging.service";
 const redisDedupWorker = new Redis(redisOptions);
 const PROCESSED_KEY = (id: string) => `wa:msg:processed:${id}`;
 
+// Lock por usuário: garante que apenas um job por celular processa por vez,
+// mesmo com múltiplas instâncias do servidor rodando.
+const LOCK_KEY = (celular: string) => `wa:lock:${celular}`;
+const LOCK_TTL_SEC = 30;
+
+async function acquireLock(celular: string): Promise<boolean> {
+  const result = await redisDedupWorker.set(LOCK_KEY(celular), "1", "EX", LOCK_TTL_SEC, "NX");
+  return result === "OK";
+}
+
+async function releaseLock(celular: string): Promise<void> {
+  await redisDedupWorker.del(LOCK_KEY(celular));
+}
+
 // Fila de inatividade: jobs atrasados de 15 min por usuário
 export const whatsappInactivityQueue = new Queue("whatsapp-inactivity", {
   connection: redisOptions,
@@ -60,6 +74,18 @@ export function initQueues() {
 
       console.log(`[BullMQ] sessionContext[${celular}] stage ANTES = "${sessionContext.stage}"`);
 
+      // Adquire lock por usuário para evitar race condition com múltiplas instâncias.
+      // Tenta por até 5 segundos antes de prosseguir sem lock (evita perda de mensagens).
+      let lockAcquired = false;
+      for (let i = 0; i < 10; i++) {
+        lockAcquired = await acquireLock(celular);
+        if (lockAcquired) break;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      if (!lockAcquired) {
+        console.warn(`[BullMQ] Lock não adquirido para ${celular} após 5s — prosseguindo sem lock`);
+      }
+
       // Marca como processado antes de executar (TTL 24h, igual ao dedup do webhook)
       await redisDedupWorker.set(PROCESSED_KEY(messageId), "1", "EX", 86400);
 
@@ -78,27 +104,36 @@ export function initQueues() {
           `[BullMQ] Erro ao processar mensagem ${messageId}:`,
           err.message,
         );
+        if (lockAcquired) await releaseLock(celular);
         throw err;
       }
 
       console.log(`[BullMQ] sessionContext[${celular}] stage DEPOIS = "${sessionContext.stage}"`);
 
       // 4. Salva ou deleta conforme o que aconteceu dentro do handleMessage
-      if (sessionContext._deleted) {
-        await deleteSession(celular);
-      } else {
-        await saveSession(celular, sessionContext, messageId);
-        // Reagenda inatividade de 15 min para este usuário
-        await whatsappInactivityQueue.add(
-          "session-timeout",
-          { celular },
-          {
-            jobId: inactivityJobId,
-            delay: 900000,
-            removeOnComplete: true,
-            removeOnFail: true,
-          },
-        );
+      try {
+        if (sessionContext._deleted) {
+          await deleteSession(celular);
+        } else {
+          await saveSession(celular, sessionContext, messageId);
+          // Reagenda inatividade de 15 min para este usuário
+          await whatsappInactivityQueue.add(
+            "session-timeout",
+            { celular },
+            {
+              jobId: inactivityJobId,
+              delay: 900000,
+              removeOnComplete: true,
+              removeOnFail: true,
+            },
+          );
+        }
+      } catch (saveErr: any) {
+        console.error(`[BullMQ] Erro ao salvar sessão para ${celular} (stage: ${sessionContext.stage}):`, saveErr.message);
+        // Não re-lança: a mensagem já foi tratada e as respostas já estão na fila de saída.
+        // Perder o save é melhor do que perder a mensagem ou duplicar o processamento.
+      } finally {
+        if (lockAcquired) await releaseLock(celular);
       }
     },
     { connection: redisOptions },
