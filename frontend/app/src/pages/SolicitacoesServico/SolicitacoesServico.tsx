@@ -44,6 +44,9 @@ const SolicitacoesServico = () => {
   const [detailsTarget, setDetailsTarget] = useState<any | null>(null);
   const [alertaDebitoOpen, setAlertaDebitoOpen] = useState(false);
   const [alertaDebitoService, setAlertaDebitoService] = useState<any | null>(null);
+  const [instalacaoPagaOpen, setInstalacaoPagaOpen] = useState(false);
+  const [instalacaoPagaTarget, setInstalacaoPagaTarget] = useState<any | null>(null);
+  const [instalacaoPagaValor, setInstalacaoPagaValor] = useState("");
   const { user } = useAuth();
 
   const fetchServices = useCallback(
@@ -227,6 +230,46 @@ const SolicitacoesServico = () => {
     } catch (error: any) {
       console.error("Erro ao finalizar serviço:", error);
       const msg = error.response?.data?.message || "Erro ao finalizar serviço.";
+      alert(msg);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleOpenInstalacaoPaga = (service: any) => {
+    setInstalacaoPagaTarget(service);
+    setInstalacaoPagaValor("");
+    setInstalacaoPagaOpen(true);
+  };
+
+  const handleCloseInstalacaoPaga = () => {
+    if (loadingAction) return;
+    setInstalacaoPagaOpen(false);
+    setInstalacaoPagaTarget(null);
+    setInstalacaoPagaValor("");
+  };
+
+  const handleConfirmarInstalacaoPaga = async () => {
+    if (!instalacaoPagaTarget) return;
+    const valorNum = parseFloat(instalacaoPagaValor.replace(",", "."));
+    if (!instalacaoPagaValor || isNaN(valorNum) || valorNum <= 0) {
+      alert("Informe um valor válido para a taxa de instalação.");
+      return;
+    }
+
+    setLoadingAction(instalacaoPagaTarget.id);
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_URL}/solicitacao-servico/instalacao-paga/${instalacaoPagaTarget.id}`,
+        { valor: instalacaoPagaValor },
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+      );
+      alert("PIX de instalação enviado ao cliente com sucesso!");
+      handleCloseInstalacaoPaga();
+      fetchServices(page);
+    } catch (error: any) {
+      console.error("Erro ao processar instalação paga:", error);
+      const msg = error.response?.data?.message || "Erro ao processar instalação paga.";
       alert(msg);
     } finally {
       setLoadingAction(null);
@@ -447,6 +490,15 @@ const SolicitacoesServico = () => {
                             >
                               Ignorar
                             </Button>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              sx={{ bgcolor: "#f59e0b", "&:hover": { bgcolor: "#d97706" } }}
+                              onClick={() => handleOpenInstalacaoPaga(service)}
+                              disabled={loadingAction === service.id}
+                            >
+                              Instalação Paga
+                            </Button>
                           </>
                         )}
                       {!service.finalizado && (
@@ -583,6 +635,45 @@ const SolicitacoesServico = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseDetails}>Fechar</Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={instalacaoPagaOpen}
+          onClose={handleCloseInstalacaoPaga}
+          fullWidth
+          maxWidth="xs"
+        >
+          <DialogTitle>Instalação Paga</DialogTitle>
+          <DialogContent>
+            <Box display="flex" flexDirection="column" gap={2} mt={1}>
+              <Alert severity="info">
+                Informe o valor da taxa de instalação. O cliente receberá uma mensagem explicando a cobrança e um PIX para pagamento. O contrato será gerado automaticamente após a confirmação do pagamento.
+              </Alert>
+              <TextField
+                label="Valor da Taxa (R$)"
+                value={instalacaoPagaValor}
+                onChange={(e) => setInstalacaoPagaValor(e.target.value)}
+                placeholder="Ex: 350.00"
+                fullWidth
+                size="small"
+                type="number"
+                inputProps={{ min: 0, step: "0.01" }}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseInstalacaoPaga} disabled={!!loadingAction}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmarInstalacaoPaga}
+              variant="contained"
+              sx={{ bgcolor: "#f59e0b", "&:hover": { bgcolor: "#d97706" } }}
+              disabled={!!loadingAction}
+            >
+              Enviar PIX ao Cliente
+            </Button>
           </DialogActions>
         </Dialog>
       </Box>

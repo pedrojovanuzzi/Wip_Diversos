@@ -7,6 +7,8 @@ import { Between, In, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
 import moment from "moment-timezone";
 import { ConsultCenterService } from "../services/ConsultCenterService";
 import { MensagensComuns, enviarNotificacaoServico, gerarLancamentoServico } from "./whatsapp/index";
+import { Faturas } from "../entities/Faturas";
+import { v4 as uuidv4 } from "uuid";
 import Pix from "./Pix";
 import ZapSign from "./ZapSign";
 
@@ -394,6 +396,90 @@ class SolicitacaoServicoController {
     } catch (error) {
       console.error("Erro ao ignorar consulta:", error);
       res.status(500).json({ message: "Erro interno ao processar" });
+    }
+  };
+
+  public instalacaoPaga = async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { valor } = req.body;
+
+    if (!valor) {
+      res.status(400).json({ message: "O valor da instalação é obrigatório." });
+      return;
+    }
+
+    try {
+      const repository = AppDataSource.getRepository(SolicitacaoServico);
+      const solicitacao = await repository.findOne({ where: { id: Number(id) } });
+
+      if (!solicitacao) {
+        res.status(404).json({ message: "Solicitação não encontrada." });
+        return;
+      }
+
+      const dados = (solicitacao.dados || {}) as any;
+      const celular = dados.telefone_conversa;
+      const cpf = (dados.cpf || "").replace(/\D/g, "");
+      const loginCliente = solicitacao.login_cliente || dados.login || "novo_cliente";
+      const nomeCliente = dados.nome || loginCliente;
+      const valorFormatado = parseFloat(String(valor).replace(",", ".")).toFixed(2);
+
+      // Criar lançamento diretamente com o login do cliente
+      // Não busca por CPF para evitar encontrar outro cliente com o mesmo CPF.
+      // O cliente pode ainda não existir no MKAuth (novo cadastro pendente).
+      const faturasRepo = MkauthSource.getRepository(Faturas);
+      const novoLancamento = await faturasRepo.save({
+        login: loginCliente,
+        nome: nomeCliente.slice(0, 16),
+        tipo: "servicos",
+        valor: valorFormatado,
+        datavenc: new Date(),
+        processamento: new Date(),
+        status: "aberto",
+        recibo: `SRV-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+        obs: `Serviço: Instalação Paga (taxa regional) - R$ ${valorFormatado} - Gerado via painel`,
+        valorger: "completo",
+        aviso: "nao",
+        imp: "nao",
+        tipocob: "fat",
+        cfop_lanc: "5307",
+        referencia: moment().format("MM/YYYY"),
+        uuid_lanc: uuidv4().slice(0, 16),
+      });
+
+      // Atualizar solicitação com id_fatura e valor nos dados (para o PIX criar o contrato correto)
+      solicitacao.id_fatura = novoLancamento.id;
+      solicitacao.pago = false;
+      solicitacao.gratis = 0;
+      solicitacao.dados = { ...dados, valor: valorFormatado };
+      await repository.save(solicitacao);
+
+      // Gerar PIX usando o login do cliente e CPF informado no cadastro
+      const pixController = new Pix();
+      const pixData = await pixController.gerarPixServico({
+        idLancamento: novoLancamento.id,
+        valor: valorFormatado,
+        pppoe: loginCliente,
+        cpf: cpf,
+      });
+
+      // Enviar mensagens ao cliente
+      await MensagensComuns(
+        celular,
+        `📋 *Olá ${dados.nome || ""}!* Após análise da sua solicitação de instalação, identificamos que a sua região possui *dificuldade de acesso*, o que gera uma taxa adicional.\n\n💰 *Taxa de Instalação:* R$ ${valorFormatado}\n\nCaso tenha interesse em prosseguir, realize o pagamento via PIX abaixo e o contrato será enviado automaticamente após a confirmação.`,
+      );
+
+      await MensagensComuns(
+        celular,
+        `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${valorFormatado}\n\n🔗 *Link para QR Code:* ${pixData.link}`,
+      );
+
+      if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Erro ao processar instalação paga:", error);
+      res.status(500).json({ message: "Erro interno ao processar instalação paga." });
     }
   };
 

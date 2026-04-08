@@ -304,6 +304,9 @@ class Pix {
       }
 
       const status = pix.status;
+      console.log(`[Webhook PIX] status=${status} | txid=${txid}`);
+      console.log(`[Webhook PIX] infoAdicionais=${JSON.stringify(pix.infoAdicionais)}`);
+
       if (status !== "CONCLUIDA") {
         res.status(200).json({ message: "PIX ainda não concluído", status });
         return;
@@ -328,6 +331,8 @@ class Pix {
         });
       }
 
+      console.log(`[Webhook PIX] updates gerados: ${JSON.stringify(updates)}`);
+
       for (const update of updates) {
         await this.recordRepo.update(update.idValor, {
           status: "pago",
@@ -342,184 +347,137 @@ class Pix {
         });
         if (!record_pppoe) continue;
 
+        // --- Processamento de serviços (independente de o cliente existir no MKAuth) ---
+        console.log(`[Webhook PIX] tipo=${record_pppoe.tipo} | login=${record_pppoe.login} | id=${record_pppoe.id}`);
+        if (record_pppoe.tipo === "servicos") {
+          try {
+            const localRepo = LocalDataSource.getRepository(SolicitacaoServico);
+            const servicoNome = record_pppoe.obs.split("Serviço: ")[1]?.split(" -")[0];
+            console.log(`[Webhook PIX] servicoNome extraído: "${servicoNome}"`);
+
+            // Busca prioritariamente pelo ID da fatura vinculada
+            let solicitacao = await localRepo.findOne({
+              where: { id_fatura: Number(record_pppoe.id), pago: false },
+              order: { data_solicitacao: "DESC" },
+            });
+            console.log(`[Webhook PIX] solicitacao por id_fatura=${record_pppoe.id}: ${solicitacao ? `id=${solicitacao.id}` : "não encontrada"}`);
+
+            // Fallback pelo login + serviço
+            if (!solicitacao && servicoNome) {
+              solicitacao = await localRepo.findOne({
+                where: { login_cliente: record_pppoe.login, servico: servicoNome, pago: false },
+                order: { data_solicitacao: "DESC" },
+              });
+              console.log(`[Webhook PIX] solicitacao por login+serviço: ${solicitacao ? `id=${solicitacao.id}` : "não encontrada"}`);
+            }
+
+            if (solicitacao) {
+              solicitacao.pago = true;
+              await localRepo.save(solicitacao);
+              console.log(`[Dashboard Sync] Solicitação ${solicitacao.id} marcada como paga (Fatura ID: ${record_pppoe.id})`);
+            }
+
+            // Notificação para TEST_PHONE
+            const testPhone = process.env.TEST_PHONE;
+            if (testPhone) {
+              try {
+                await whatsappOutgoingQueue.add(
+                  "send-template",
+                  {
+                    url: waUrl,
+                    payload: {
+                      messaging_product: "whatsapp",
+                      recipient_type: "individual",
+                      to: testPhone,
+                      type: "template",
+                      template: { name: "notificacao_pagamento", language: { code: "pt_BR" } },
+                    },
+                    headers: { Authorization: `Bearer ${waToken}`, "Content-Type": "application/json" },
+                  },
+                  { removeOnComplete: true, removeOnFail: false, attempts: 3, backoff: { type: "exponential", delay: 5000 } },
+                );
+              } catch (queueError) {
+                console.error("[Webhook PIX] Erro ao enfileirar notificação:", queueError);
+              }
+            }
+
+            // Determina o telefone do cliente a partir da solicitação (funciona mesmo sem MKAuth)
+            let requesterPhone = "";
+            if (solicitacao?.dados?.telefone_conversa) {
+              const clean = solicitacao.dados.telefone_conversa.replace(/\D/g, "");
+              requesterPhone = clean.startsWith("55") ? clean : "55" + clean;
+            } else if (solicitacao?.dados?.telefone) {
+              const clean = solicitacao.dados.telefone.replace(/\D/g, "");
+              requesterPhone = clean.startsWith("55") ? clean : "55" + clean;
+            }
+
+            // Fallback para telefone do MKAuth se disponível
+            if (!requesterPhone) {
+              const sis_clienteFallback = await this.clienteRepo.findOne({ where: { login: record_pppoe.login } });
+              const tel = sis_clienteFallback?.celular || sis_clienteFallback?.fone || "";
+              if (tel) {
+                const clean = tel.replace(/\D/g, "");
+                requesterPhone = clean.startsWith("55") ? clean : "55" + clean;
+              }
+            }
+
+            // Cria ZapSign se houver solicitação com dados
+            let zapSignUrl = "";
+            if (solicitacao?.dados) {
+              try {
+                let zapResponse;
+                if (solicitacao.servico === "Instalação") {
+                  zapResponse = await ZapSign.createContractInstalacao(solicitacao.dados);
+                } else if (solicitacao.servico === "Mudança de Endereço") {
+                  zapResponse = await ZapSign.createContractMudancaEndereco(solicitacao.dados);
+                }
+                if (zapResponse) {
+                  zapSignUrl = zapResponse.signers[0].sign_url;
+                  solicitacao.token_zapsign = zapResponse.token;
+                  solicitacao.assinado = false;
+                  await localRepo.save(solicitacao);
+                  console.log(`[Webhook PIX] ZapSign gerado: ${zapSignUrl}`);
+                }
+              } catch (errZap) {
+                console.error("[Webhook PIX] Erro ao gerar ZapSign:", errZap);
+              }
+            }
+
+            // Envia WhatsApp ao cliente
+            if (requesterPhone) {
+              const nomeCliente = solicitacao?.dados?.nome || record_pppoe.login;
+              const nomeServico = servicoNome || "Contratado";
+              if (zapSignUrl) {
+                await Whatsapp.MensagensComuns(
+                  requesterPhone,
+                  `✅ *Pagamento Confirmado!*\n\nOlá ${nomeCliente}, recebemos o pagamento do serviço: *${nomeServico}*.\n\n📄 *Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+                );
+              } else {
+                await Whatsapp.MensagensComuns(
+                  requesterPhone,
+                  `✅ *Pagamento Confirmado!*\n\nOlá ${nomeCliente}, recebemos o pagamento do serviço: *${nomeServico}*.\n\nNossa equipe entrará em contato em breve para dar prosseguimento. Obrigado pela confiança! 🚀`,
+                );
+              }
+            }
+          } catch (waError) {
+            console.error("[Webhook PIX] Erro ao processar serviço:", waError);
+          }
+        }
+
+        // --- Processamento de mensalidade (requer cliente no MKAuth) ---
         const sis_cliente = await this.clienteRepo.findOne({
           where: { login: record_pppoe.login },
         });
 
-        if (sis_cliente) {
-          // Notificação de sucesso via WhatsApp para serviços
-          if (record_pppoe.tipo === "servicos") {
-            try {
-              // --- Sincronização Dashboard Local ---
-              try {
-                const localRepo =
-                  LocalDataSource.getRepository(SolicitacaoServico);
-                const servicoNome = record_pppoe.obs
-                  .split("Serviço: ")[1]
-                  ?.split(" -")[0];
-
-                // Busca prioritariamente pelo ID da fatura vinculada
-                let solicitacao = await localRepo.findOne({
-                  where: {
-                    id_fatura: Number(record_pppoe.id),
-                    pago: false,
-                  },
-                  order: { data_solicitacao: "DESC" },
-                });
-
-                // Fallback para o método anterior (login + serviço) se id_fatura não estiver preenchido
-                if (!solicitacao && servicoNome) {
-                  solicitacao = await localRepo.findOne({
-                    where: {
-                      login_cliente: record_pppoe.login,
-                      servico: servicoNome,
-                      pago: false,
-                    },
-                    order: { data_solicitacao: "DESC" },
-                  });
-                }
-
-                if (solicitacao) {
-                  await localRepo.update(solicitacao.id!, { pago: true });
-                  console.log(
-                    `[Dashboard Sync] Solicitação ${solicitacao.id} marcada como paga para login ${record_pppoe.login} (Fatura ID: ${record_pppoe.id})`,
-                  );
-                }
-              } catch (localDbError) {
-                console.error(
-                  "[Dashboard Sync] Erro ao sincronizar pagamento local:",
-                  localDbError,
-                );
-              }
-
-              // Enviar notificação para o celular de teste do .env
-              const testPhone = process.env.TEST_PHONE;
-              if (testPhone) {
-                try {
-                  await whatsappOutgoingQueue.add(
-                    "send-template",
-                    {
-                      url: waUrl,
-                      payload: {
-                        messaging_product: "whatsapp",
-                        recipient_type: "individual",
-                        to: testPhone,
-                        type: "template",
-                        template: {
-                          name: "notificacao_pagamento",
-                          language: {
-                            code: "pt_BR",
-                          },
-                        },
-                      },
-                      headers: {
-                        Authorization: `Bearer ${waToken}`,
-                        "Content-Type": "application/json",
-                      },
-                    },
-                    {
-                      removeOnComplete: true,
-                      removeOnFail: false,
-                      attempts: 3,
-                      backoff: { type: "exponential", delay: 5000 },
-                    },
-                  );
-                  console.log(
-                    `[Webhook PIX] Notificação 'notificacao_pagamento' enfileirada para ${testPhone}`,
-                  );
-                } catch (queueError) {
-                  console.error(
-                    "[Webhook PIX] Erro ao enfileirar notificação de pagamento:",
-                    queueError,
-                  );
-                }
-              }
-              // -------------------------------------
-
-              const telefone = sis_cliente.celular || sis_cliente.fone;
-              if (telefone) {
-                const cleanPhone = telefone.replace(/\D/g, "");
-                const finalPhone = cleanPhone.startsWith("55")
-                  ? cleanPhone
-                  : "55" + cleanPhone;
-
-                const servicoNome =
-                  record_pppoe.obs.split("Serviço: ")[1]?.split(" -")[0] ||
-                  "Contratado";
-
-                // === Lógica de ZapSign Postergado ===
-                let zapSignUrl = "";
-                let requesterPhone = finalPhone; // Fallback to MKAuth phone
-
-                try {
-                  const solicitacaoRepo = LocalDataSource.getRepository(SolicitacaoServico);
-                  const solicitacao = await solicitacaoRepo.findOne({
-                    where: { id_fatura: Number(record_pppoe.id) }
-                  });
-
-                  if (solicitacao && solicitacao.dados) {
-                    console.log(`[Webhook PIX] Gerando ZapSign postergado para: ${solicitacao.servico}`);
-                    
-                    // Use the phone number that actually requested the service
-                    if (solicitacao.dados.telefone_conversa) {
-                      const cleanReqPhone = solicitacao.dados.telefone_conversa.replace(/\D/g, "");
-                      requesterPhone = cleanReqPhone.startsWith("55") ? cleanReqPhone : "55" + cleanReqPhone;
-                    } else if (solicitacao.dados.telefone) {
-                      const cleanReqPhone = solicitacao.dados.telefone.replace(/\D/g, "");
-                      requesterPhone = cleanReqPhone.startsWith("55") ? cleanReqPhone : "55" + cleanReqPhone;
-                    }
-
-                    let zapResponse;
-                    if (solicitacao.servico === "Instalação") {
-                      zapResponse = await ZapSign.createContractInstalacao(solicitacao.dados);
-                    } else if (solicitacao.servico === "Mudança de Endereço") {
-                      zapResponse = await ZapSign.createContractMudancaEndereco(solicitacao.dados);
-                    }
-                    // Mudança de Cômodo paga não tem assinatura — apenas pagamento.
-
-                    if (zapResponse) {
-                      zapSignUrl = zapResponse.signers[0].sign_url;
-                      solicitacao.token_zapsign = zapResponse.token;
-                      solicitacao.assinado = false;
-                      await solicitacaoRepo.save(solicitacao);
-                      console.log(`[Webhook PIX] ZapSign gerado com sucesso: ${zapSignUrl}`);
-                    }
-                  }
-                } catch (errZap) {
-                  console.error("[Webhook PIX] Erro ao gerar ZapSign postergado:", errZap);
-                }
-
-                if (zapSignUrl) {
-                  await Whatsapp.MensagensComuns(
-                    requesterPhone,
-                    `✅ *Pagamento Confirmado!*\n\nOlá ${sis_cliente.nome}, recebemos o pagamento do serviço: *${servicoNome}*.\n\n📄 *Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
-                  );
-                } else {
-                  await Whatsapp.MensagensComuns(
-                    requesterPhone,
-                    `✅ *Pagamento Confirmado!*\n\nOlá ${sis_cliente.nome}, recebemos o pagamento do serviço: *${servicoNome}*.\n\nNossa equipe entrará em contato em breve para dar prosseguimento ao atendimento. Obrigado pela confiança! 🚀`,
-                  );
-                }
-                console.log(
-                  `[Webhook PIX] Mensagem de sucesso enviada para ${finalPhone}`,
-                );
-              }
-            } catch (waError) {
-              console.error(
-                "[Webhook PIX] Erro ao enviar mensagem de sucesso via WhatsApp:",
-                waError,
-              );
-            }
-          } else {
-            const remObsDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
-              .toISOString()
-              .replace("T", " ")
-              .replace("Z", "");
-            await this.clienteRepo.update(
-              { login: sis_cliente.login },
-              { observacao: "sim", rem_obs: remObsDate },
-            );
-          }
+        if (sis_cliente && record_pppoe.tipo !== "servicos") {
+          const remObsDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
+            .toISOString()
+            .replace("T", " ")
+            .replace("Z", "");
+          await this.clienteRepo.update(
+            { login: sis_cliente.login },
+            { observacao: "sim", rem_obs: remObsDate },
+          );
         }
 
         try {
