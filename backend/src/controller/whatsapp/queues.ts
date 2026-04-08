@@ -144,6 +144,17 @@ export function initQueues() {
     "whatsapp-inactivity",
     async (job: Job) => {
       const { celular } = job.data;
+
+      // Verifica se a sessão ainda existe — evita mensagem duplicada caso dois jobs
+      // tenham sido agendados para o mesmo usuário antes do dedup entrar em ação.
+      const sessionStillActive = await ApiMkDataSource.getRepository(Sessions).findOne({
+        where: { celular },
+      });
+      if (!sessionStillActive) {
+        console.log(`[BullMQ:inactivity] Sessão já encerrada para ${celular}, ignorando.`);
+        return;
+      }
+
       console.log(`[BullMQ:inactivity] Encerrando sessão por inatividade: ${celular}`);
       await MensagensComuns(
         celular,

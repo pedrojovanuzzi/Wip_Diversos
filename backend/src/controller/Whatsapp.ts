@@ -48,7 +48,7 @@ class WhatsappController {
       const selectMensagens = API_MK.getRepository(Mensagens);
       const mensagens = await selectMensagens.find({
         select: ["id", "conv_id", "sender_id", "content"],
-        order: { conv_id: "ASC", sender_id: "ASC" },
+        order: { timestamp: "ASC", id: "ASC" },
       });
 
       const userByConvId = new Map();
@@ -170,7 +170,7 @@ class WhatsappController {
       const mensagens = await selectMensagens.find({
         where: convIds.length ? { conv_id: In(convIds) } : undefined,
         select: ["id", "conv_id", "sender_id", "content", "timestamp"],
-        order: { conv_id: "ASC", sender_id: "ASC" },
+        order: { timestamp: "ASC", id: "ASC" },
       });
 
       const messagesByConvId = new Map();
