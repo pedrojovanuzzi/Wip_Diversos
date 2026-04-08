@@ -166,13 +166,16 @@ export function initQueues() {
       } catch (err: any) {
         const apiError = err.response?.data;
         const status = err.response?.status;
-        console.error(
-          `[BullMQ] Erro ao enviar mensagem (HTTP ${status ?? "sem resposta"}):`,
-          apiError || err.message,
-        );
         if (apiError) {
+          console.error(
+            `[BullMQ] Erro ao enviar mensagem (HTTP ${status}):`,
+            apiError,
+          );
           throw new Error(JSON.stringify(apiError));
         }
+        console.error(
+          `[BullMQ] Erro ao enviar mensagem (sem resposta HTTP) — código: ${err.code ?? "desconhecido"}, mensagem: ${err.message}`,
+        );
         throw err;
       }
     },
