@@ -97,6 +97,27 @@ export default class ZapSignTemplatesController {
         }
       };
 
+      // Deleta o template anterior no ZapSign para não acumular templates
+      if (template.token_id) {
+        const deleteUrl = homologacao === "true"
+          ? `https://sandbox.api.zapsign.com.br/api/v1/templates/${template.token_id}/`
+          : `https://api.zapsign.com.br/api/v1/templates/${template.token_id}/`;
+        try {
+          const deleteResponse = await axios.delete(deleteUrl, {
+            headers: {
+              Authorization: `Bearer ${process.env.ZAPSIGN_TOKEN}`,
+            },
+          });
+          console.log(`Template anterior deletado no ZapSign (${template.token_id}): status ${deleteResponse.status}`);
+        } catch (deleteErr: any) {
+          console.warn(
+            `Não foi possível deletar template anterior (${template.token_id}) — URL: ${deleteUrl} — Erro:`,
+            deleteErr?.response?.status,
+            deleteErr?.response?.data || deleteErr.message,
+          );
+        }
+      }
+
       console.log(`Atualizando template no ZapSign para: ${template.nome_servico} (${template.tipo})`);
 
       const zapResponse = await axios.post(zapSignUrl, zapSignData, {
