@@ -162,10 +162,7 @@ class ZapSign {
       const planoRecord = plano
         ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: plano } })
         : null;
-      let valorFinal = valor;
-      if (!valorFinal || valorFinal === "0.00" || valorFinal === "0,00" || valorFinal === "0") {
-        valorFinal = planoRecord?.valor || valorFinal || "0,00";
-      }
+      const valorFinal = valor || "0,00";
       const valorPlanoFinal = valor_plano || planoRecord?.valor || "";
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
