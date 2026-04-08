@@ -203,6 +203,13 @@ async function salvarSolicitacaoMudancaComodo(
     forma_pagamento: session.formaPagamento || "Não informada",
     valor: session.formaPagamento === "Paga com Pix" ? "200.00" : "0.00",
     valor_plano: session.valor_plano_atual || "",
+    bairro: session.bairro || "",
+    cidade: session.cidade || "",
+    estado: session.estado || "",
+    cep: session.cep || "",
+    plano: session.plano_comodo || "",
+    vencimento: session.vencimento || "",
+    termo: session.contrato_cliente || "",
   };
 
   return await repo.save(novaSolicitacao);
@@ -297,6 +304,11 @@ export async function iniciarMudancaComodo(
         cpf_cnpj: true,
         celular: true,
         plano: true,
+        bairro: true,
+        cidade: true,
+        estado: true,
+        cep: true,
+        venc: true,
       },
       where: { cpf_cnpj: cpf, cli_ativado: "s" },
     });
@@ -316,6 +328,11 @@ export async function iniciarMudancaComodo(
         email: client.email,
         rg: client.rg,
         celular: client.celular,
+        bairro: client.bairro,
+        cidade: client.cidade,
+        estado: client.estado,
+        cep: client.cep,
+        venc: client.venc,
       }));
 
       session.structuredDataComodo = structuredData;
@@ -340,6 +357,12 @@ export async function iniciarMudancaComodo(
       session.endereco_comodo = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
       session.contrato_cliente = sis_cliente[0].termo || "";
       session.celularCliente = sis_cliente[0].celular;
+      session.bairro = sis_cliente[0].bairro || "";
+      session.cidade = sis_cliente[0].cidade || "";
+      session.estado = sis_cliente[0].estado || "";
+      session.cep = sis_cliente[0].cep || "";
+      session.vencimento = sis_cliente[0].venc || "";
+      session.plano_comodo = sis_cliente[0].plano || "";
       const _planoComodoSingle = sis_cliente[0].plano
         ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: sis_cliente[0].plano } })
         : null;
@@ -406,6 +429,12 @@ export async function iniciarMudancaComodo(
       session.endereco_comodo = `${selectedClient.endereco}, ${selectedClient.numero}`;
       session.contrato_cliente = selectedClient.termo || "";
       session.celularCliente = selectedClient.celular;
+      session.bairro = selectedClient.bairro || "";
+      session.cidade = selectedClient.cidade || "";
+      session.estado = selectedClient.estado || "";
+      session.cep = selectedClient.cep || "";
+      session.vencimento = selectedClient.venc || "";
+      session.plano_comodo = selectedClient.plano || "";
       const _planoComodoSelected = selectedClient.plano
         ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: selectedClient.plano } })
         : null;
@@ -469,6 +498,13 @@ export async function iniciarMudancaComodo(
           endereco: session.endereco_comodo,
           celular: session.celularCliente,
           termo: session.contrato_cliente || "",
+          bairro: session.bairro || "",
+          cidade: session.cidade || "",
+          estado: session.estado || "",
+          cep: session.cep || "",
+          vencimento: session.vencimento || "",
+          plano: session.plano_comodo || "",
+          valor_plano: session.valor_plano_atual || "",
           observacao: dadosFlow?.observacao || "Sem observação",
         };
 
@@ -657,6 +693,12 @@ async function selecionarCadastroTitularidade(celular: any, session: any, client
     celular: cliente.celular,
     login: cliente.login,
     endereco: `${cliente.endereco}, ${cliente.numero}`,
+    bairro: cliente.bairro || "",
+    cidade: cliente.cidade || "",
+    estado: cliente.estado || "",
+    cep: cliente.cep || "",
+    plano: cliente.plano || "",
+    vencimento: cliente.venc || "",
   };
   await MensagemTermos(
     celular,
@@ -724,6 +766,11 @@ export async function iniciarTrocaTitularidade(
         cpf_cnpj: true,
         celular: true,
         plano: true,
+        bairro: true,
+        cidade: true,
+        estado: true,
+        cep: true,
+        venc: true,
       },
       where: { cpf_cnpj: cpf, cli_ativado: "s" },
     });
@@ -743,6 +790,11 @@ export async function iniciarTrocaTitularidade(
         email: client.email,
         rg: client.rg,
         celular: client.celular,
+        bairro: client.bairro || "",
+        cidade: client.cidade || "",
+        estado: client.estado || "",
+        cep: client.cep || "",
+        venc: client.venc || "",
       }));
 
       session.structuredDataTitularidade = structuredData;
@@ -1261,6 +1313,12 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
       rg: session.dadosCompleto?.rg || session.rg || "Não informado",
       termo: session.contrato_cliente || "",
       valor_plano: session.valor_plano_atual || "",
+      bairro: session.dadosCompleto?.bairro || "",
+      cidade: session.dadosCompleto?.cidade || "",
+      estado: session.dadosCompleto?.estado || "",
+      cep: session.dadosCompleto?.cep || "",
+      plano: session.dadosCompleto?.plano || "",
+      vencimento: session.dadosCompleto?.vencimento || "",
       nome_novo_titular: nome,
       celular_novo_titular: celularDestino,
       celular_destino: celularDestino,

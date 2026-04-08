@@ -26,6 +26,119 @@ const formatVelocidade = (velup?: number | null, veldown?: number | null): strin
   return `Upload: ${up} / Download: ${down}`;
 };
 
+const CNPJ_PROVEDOR = process.env.CPF_CNPJ || "";
+const formatCnpj = (raw: string): string => {
+  const d = raw.replace(/\D/g, "");
+  if (d.length === 14)
+    return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+  if (d.length === 11)
+    return d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+  return raw;
+};
+
+/**
+ * Filtro universal de variáveis para documentos ZapSign.
+ * Recebe qualquer params (dados do cliente + contexto) e retorna
+ * o array {de, para}[] preenchendo TODAS as variáveis possíveis.
+ * Variáveis sem valor ficam como string vazia.
+ */
+async function buildUniversalZapSignData(params: Record<string, any>): Promise<Array<{de: string; para: string}>> {
+  const s = (key: string, ...fallbacks: string[]): string => {
+    let val = params[key];
+    if (val !== undefined && val !== null && String(val).trim() !== "") return String(val);
+    for (const fb of fallbacks) {
+      val = params[fb];
+      if (val !== undefined && val !== null && String(val).trim() !== "") return String(val);
+    }
+    return "";
+  };
+
+  // Resolve plano → SisPlano (velup, veldown, valor)
+  const planoNome = s("plano");
+  const planoRecord = planoNome
+    ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: planoNome } })
+    : null;
+
+  // Gera termo se vazio: último sis_cliente ID + 1 → "{id}C/{ano}"
+  let termo = s("termo");
+  if (!termo) {
+    const [lastCliente] = await MkauthDataSource.getRepository(ClientesEntities).find({
+      select: { id: true },
+      order: { id: "DESC" },
+      take: 1,
+    });
+    const nextId = (lastCliente?.id ?? 0) + 1;
+    termo = `${nextId}C/${new Date().getFullYear()}`;
+  }
+
+  const telefone = s("telefone_conversa", "telefone", "celular");
+  const endereco = s("endereco", "rua");
+  const numero = s("numero");
+  const complemento = s("complemento");
+  const enderecoCompleto = [endereco, numero, complemento].filter(Boolean).join(", ");
+  const valorPlano = s("valor_plano") || planoRecord?.valor || "";
+  const velocidade = formatVelocidade(planoRecord?.velup, planoRecord?.veldown);
+  const uploadStr = planoRecord?.velup ? `${planoRecord.velup} Kbps` : "";
+  const downloadStr = planoRecord?.veldown ? `${planoRecord.veldown} Kbps` : "";
+
+  return [
+    // --- Dados do provedor ---
+    { de: "{{provedornome}}", para: "Wip Telecom" },
+    { de: "{{provedorcnpj}}", para: formatCnpj(CNPJ_PROVEDOR) },
+    { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
+    // --- Dados do documento ---
+    { de: "{{termo}}", para: termo },
+    { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
+    // --- Dados do cliente ---
+    { de: "{{nomecliente}}", para: s("nome") },
+    { de: "{{cpfcliente}}", para: s("cpf") },
+    { de: "{{rgcliente}}", para: s("rg") || "Não informado" },
+    { de: "{{emailcliente}}", para: s("email") },
+    { de: "{{fonecliente}}", para: telefone },
+    { de: "{{celularcliente}}", para: telefone },
+    { de: "{{celular2cliente}}", para: s("celular2", "celularSecundario") },
+    { de: "{{logincliente}}", para: s("login") },
+    // --- Endereço de instalação ---
+    { de: "{{enderecocliente}}", para: enderecoCompleto },
+    { de: "{{bairrocliente}}", para: s("bairro") },
+    { de: "{{cidadecliente}}", para: s("cidade") },
+    { de: "{{estadocliente}}", para: s("estado") },
+    { de: "{{cepcliente}}", para: s("cep") },
+    // --- Endereço residencial (espelha instalação se não informado) ---
+    { de: "{{enderecorescliente}}", para: enderecoCompleto },
+    { de: "{{numerorescliente}}", para: numero },
+    { de: "{{bairrorescliente}}", para: s("bairro") },
+    { de: "{{cidaderescliente}}", para: s("cidade") },
+    { de: "{{estadorescliente}}", para: s("estado") },
+    { de: "{{ceprescliente}}", para: s("cep") },
+    // --- Plano e valores ---
+    { de: "{{planodeacesso}}", para: planoNome },
+    { de: "{{velocidadeplano}}", para: velocidade },
+    { de: "{{upload}}", para: uploadStr },
+    { de: "{{download}}", para: downloadStr },
+    { de: "{{mensalidade}}", para: valorPlano },
+    { de: "{{valor}}", para: s("valor") || "0,00" },
+    { de: "{{valor_plano}}", para: valorPlano },
+    { de: "{{descontocliente}}", para: s("desconto") || "0,00" },
+    { de: "{{diavencimento}}", para: s("vencimento", "venc") },
+    { de: "{{equipamento}}", para: s("equipamento") || "Roteador em Comodato" },
+    // --- Troca de titularidade (segundo titular) ---
+    { de: "{{novotitular}}", para: s("nome_novo_titular") },
+    { de: "{{celularnovotitular}}", para: s("celular_novo_titular") },
+    { de: "{{termo2}}", para: s("termo2") },
+    { de: "{{logincliente2}}", para: s("login_novo_titular") },
+    { de: "{{nomecliente2}}", para: s("nome_novo_titular") },
+    { de: "{{cpfcliente2}}", para: s("cpf_novo_titular") },
+    { de: "{{rgcliente2}}", para: s("rg_novo_titular") || "Não informado" },
+    { de: "{{enderecoresclient2}}", para: s("endereco_novo_titular") },
+    { de: "{{numerorescliente2}}", para: s("numero_novo_titular") },
+    { de: "{{bairrocliente2}}", para: s("bairro_novo_titular") },
+    { de: "{{celularcliente2}}", para: s("celular_novo_titular") },
+    { de: "{{celular2cliente2}}", para: s("celular2_novo_titular") },
+    { de: "{{emailcliente2}}", para: s("email_novo_titular") },
+  ];
+}
+
 const waToken = isSandbox
   ? process.env.CLOUD_API_ACCESS_TOKEN_TEST
   : process.env.CLOUD_API_ACCESS_TOKEN;
@@ -34,216 +147,38 @@ const waUrl = isSandbox
   ? `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID_TEST}/messages`
   : `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
 
-interface ZapSignDataInstalacao {
-  nome: string;
-  cpf: string;
-  email: string;
-  telefone: string;
-  endereco?: string;
-  rua?: string; // alias para endereco — vindo do Flow de instalação
-  numero: string;
-  complemento?: string;
-  bairro: string;
-  cidade: string;
-  estado: string;
-  cep: string;
-  plano: string;
-  valor: string;
-  vencimento: string;
-  termo?: string;
-  valor_plano?: string;
-  rg?: string;
-  telefone_conversa?: string;
-}
-
-interface ZapSignDataMudancaEndereco {
-  nome: string;
-  cpf: string;
-  email: string;
-  telefone: string;
-  endereco_antigo: string;
-  rua: string;
-  numero: string;
-  complemento?: string;
-  bairro: string;
-  cidade: string;
-  estado: string;
-  cep: string;
-  valor: string;
-  termo?: string;
-  valor_plano?: string;
-  rg?: string;
-  telefone_conversa?: string;
-}
-
-interface ZapSignDataMudancaComodo {
-  nome: string;
-  cpf: string;
-  email: string;
-  telefone: string;
-  endereco: string;
-  valor: string;
-  termo?: string;
-  rg?: string;
-  telefone_conversa?: string;
-}
-
-interface ZapSignDataAlteracaoPlano {
-  nome: string;
-  cpf: string;
-  email: string;
-  telefone: string;
-  endereco: string;
-  numero?: string;
-  bairro?: string;
-  cidade?: string;
-  estado?: string;
-  cep?: string;
-  vencimento?: string;
-  plano: string;
-  valor: string;
-  login?: string;
-  termo?: string;
-  valor_plano?: string;
-  rg?: string;
-  telefone_conversa?: string;
-}
-
-interface ZapSignDataTrocaTitularidade {
-  nome: string;
-  cpf: string;
-  email: string;
-  telefone: string;
-  endereco: string;
-  rg?: string;
-  telefone_conversa?: string;
-  nome_novo_titular?: string;
-  celular_novo_titular?: string;
-  celular_destino?: string;
-  // Dados completos do novo titular (para preencher os campos {{...2}})
-  cpf_novo_titular?: string;
-  rg_novo_titular?: string;
-  email_novo_titular?: string;
-  endereco_novo_titular?: string;
-  numero_novo_titular?: string;
-  bairro_novo_titular?: string;
-  celular2_novo_titular?: string;
-  login_novo_titular?: string;
-  termo?: string;
-}
+// Todas as funções createContract* aceitam Record<string, any> e usam
+// buildUniversalZapSignData() para resolver as variáveis do documento.
 
 class ZapSign {
-  createContractInstalacao = async (params: ZapSignDataInstalacao) => {
+  createContractInstalacao = async (params: Record<string, any>) => {
     try {
-      const {
-        nome,
-        cpf,
-        email,
-        telefone,
-        endereco: enderecoProp,
-        rua,
-        numero,
-        complemento = "",
-        bairro,
-        cidade,
-        estado,
-        cep,
-        plano,
-        valor,
-        vencimento,
-        termo = "",
-        valor_plano = "",
-        rg = "Não informado",
-        telefone_conversa,
-      } = params;
-      const endereco = enderecoProp || rua || "";
-
-      // Resolve valor do plano se não informado
-      const planoRecord = plano
-        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: plano } })
-        : null;
-      const valorFinal = valor || "0,00";
-      const valorPlanoFinal = valor_plano || planoRecord?.valor || "";
-
-      const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
+      const valor = params.valor || "0,00";
       const tipo =
-        valorFinal === "0,00" || valorFinal === "0" || valorFinal === "0.00"
-          ? "gratis"
-          : "pago";
+        valor === "0,00" || valor === "0" || valor === "0.00" ? "gratis" : "pago";
 
-      const template = await templateRepo.findOne({
-        where: { nome_servico: "Instalação", tipo: tipo },
+      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+        where: { nome_servico: "Instalação", tipo },
       });
+      if (!template?.token_id) throw new Error("Token do template 'Instalação' não encontrado.");
 
-      if (!template || !template.token_id) {
-        throw new Error(
-          "Token do template 'Instalação' não encontrado no banco de dados.",
-        );
-      }
-
-      let termoFinal = termo;
-      if (!termoFinal) {
-        const [lastCliente] = await MkauthDataSource.getRepository(ClientesEntities).find({
-          select: { id: true },
-          order: { id: "DESC" },
-          take: 1,
-        });
-        const nextId = (lastCliente?.id ?? 0) + 1;
-        termoFinal = `${nextId}C/${new Date().getFullYear()}`;
-      }
-
-      const data = {
-        template_id: template.token_id,
-        signer_name: nome,
-        send_automatic_email: false,
-        send_automatic_whatsapp: false,
-        lang: "pt-br",
-        external_id: null,
-        data: [
-          { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: termoFinal },
-          { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
-          { de: "{{cpfcliente}}", para: cpf },
-          { de: "{{provedornome}}", para: "Wip Telecom" },
-          { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
-          { de: "{{rgcliente}}", para: rg },
-          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
-          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
-          {
-            de: "{{enderecocliente}}",
-            para: `${endereco}, ${numero} ${complemento}`,
-          },
-          { de: "{{bairrocliente}}", para: bairro },
-          { de: "{{cidadecliente}}", para: cidade },
-          { de: "{{estadocliente}}", para: estado },
-          { de: "{{cepcliente}}", para: cep },
-          {
-            de: "{{enderecorescliente}}",
-            para: `${endereco}, ${numero} ${complemento}`,
-          },
-          { de: "{{emailcliente}}", para: email },
-          { de: "{{bairrorescliente}}", para: bairro },
-          { de: "{{cidaderescliente}}", para: cidade },
-          { de: "{{estadorescliente}}", para: estado },
-          { de: "{{ceprescliente}}", para: cep },
-          { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
-          { de: "{{planodeacesso}}", para: plano },
-          { de: "{{velocidadeplano}}", para: formatVelocidade(planoRecord?.velup, planoRecord?.veldown) },
-          { de: "{{valor}}", para: valorFinal },
-          { de: "{{descontocliente}}", para: "0,00" },
-          { de: "{{diavencimento}}", para: vencimento },
-          { de: "{{equipamento}}", para: "Roteador em Comodato" },
-          { de: "{{valor_plano}}", para: valorPlanoFinal },
-        ],
-        signature_placement: "<<assinatura>>",
-        rubrica_placement: "<<visto>>",
-      };
+      const zapData = await buildUniversalZapSignData(params);
 
       const response = await axios.post(
         isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
-        data,
+        {
+          template_id: template.token_id,
+          signer_name: params.nome || "",
+          send_automatic_email: false,
+          send_automatic_whatsapp: false,
+          lang: "pt-br",
+          external_id: null,
+          data: zapData,
+          signature_placement: "<<assinatura>>",
+          rubrica_placement: "<<visto>>",
+        },
         {
           headers: {
             "Content-Type": "application/json",
@@ -259,111 +194,41 @@ class ZapSign {
     }
   }
 
-  createContractInstalacaoDificuldadeAcesso = async (params: ZapSignDataInstalacao) => {
+  createContractInstalacaoDificuldadeAcesso = async (params: Record<string, any>) => {
     try {
-      const {
-        nome,
-        cpf,
-        email,
-        telefone,
-        endereco: enderecoProp,
-        rua,
-        numero,
-        complemento = "",
-        bairro,
-        cidade,
-        estado,
-        cep,
-        plano,
-        valor,
-        vencimento,
-        termo = "",
-        valor_plano = "",
-        rg = "Não informado",
-        telefone_conversa,
-      } = params;
-      const endereco = enderecoProp || rua || "";
-
-      const planoRecord = plano
-        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: plano } })
-        : null;
-      const valorPlanoFinal = valor_plano || planoRecord?.valor || "";
-
-      const valorInstalacao = parseFloat(String(valor || "0").replace(",", "."));
-      const valorMulta = 600;
-      const valorTotal = valorInstalacao + valorMulta;
-
-      const formatBRL = (v: number) =>
-        v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
       const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
         where: { nome_servico: "Instalação", tipo: "dificuldade_acesso" },
       });
+      if (!template?.token_id) throw new Error("Token do template 'Instalação' (dificuldade_acesso) não encontrado.");
 
-      if (!template || !template.token_id) {
-        throw new Error("Token do template 'Instalação' (dificuldade_acesso) não encontrado no banco de dados.");
-      }
+      const valorInstalacao = parseFloat(String(params.valor || "0").replace(",", "."));
+      const valorMulta = 600;
+      const valorTotal = valorInstalacao + valorMulta;
+      const fmt = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-      let termoFinal = termo;
-      if (!termoFinal) {
-        const [lastCliente] = await MkauthDataSource.getRepository(ClientesEntities).find({
-          select: { id: true },
-          order: { id: "DESC" },
-          take: 1,
-        });
-        const nextId = (lastCliente?.id ?? 0) + 1;
-        termoFinal = `${nextId}C/${new Date().getFullYear()}`;
-      }
-
-      const data = {
-        template_id: template.token_id,
-        signer_name: nome,
-        send_automatic_email: false,
-        send_automatic_whatsapp: false,
-        lang: "pt-br",
-        external_id: null,
-        data: [
-          { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: termoFinal },
-          { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
-          { de: "{{cpfcliente}}", para: cpf },
-          { de: "{{provedornome}}", para: "Wip Telecom" },
-          { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
-          { de: "{{rgcliente}}", para: rg },
-          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
-          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
-          { de: "{{enderecocliente}}", para: `${endereco}, ${numero} ${complemento}` },
-          { de: "{{bairrocliente}}", para: bairro },
-          { de: "{{cidadecliente}}", para: cidade },
-          { de: "{{estadocliente}}", para: estado },
-          { de: "{{cepcliente}}", para: cep },
-          { de: "{{enderecorescliente}}", para: `${endereco}, ${numero} ${complemento}` },
-          { de: "{{emailcliente}}", para: email },
-          { de: "{{bairrorescliente}}", para: bairro },
-          { de: "{{cidaderescliente}}", para: cidade },
-          { de: "{{estadorescliente}}", para: estado },
-          { de: "{{ceprescliente}}", para: cep },
-          { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
-          { de: "{{planodeacesso}}", para: plano },
-          { de: "{{velocidadeplano}}", para: formatVelocidade(planoRecord?.velup, planoRecord?.veldown) },
-          { de: "{{valor}}", para: formatBRL(valorInstalacao) },
-          { de: "{{valor_instalacao}}", para: formatBRL(valorInstalacao) },
-          { de: "{{valor_multa}}", para: formatBRL(valorMulta) },
-          { de: "{{valor_multa_mais_instalacao}}", para: formatBRL(valorTotal) },
-          { de: "{{valor_plano}}", para: valorPlanoFinal },
-          { de: "{{descontocliente}}", para: "0,00" },
-          { de: "{{diavencimento}}", para: vencimento || "N/A" },
-          { de: "{{equipamento}}", para: "Roteador em Comodato" },
-        ],
-        signature_placement: "<<assinatura>>",
-        rubrica_placement: "<<visto>>",
-      };
+      const zapData = await buildUniversalZapSignData(params);
+      // Adiciona variáveis específicas de dificuldade de acesso
+      zapData.push(
+        { de: "{{valor_instalacao}}", para: fmt(valorInstalacao) },
+        { de: "{{valor_multa}}", para: fmt(valorMulta) },
+        { de: "{{valor_multa_mais_instalacao}}", para: fmt(valorTotal) },
+      );
 
       const response = await axios.post(
         isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
-        data,
+        {
+          template_id: template.token_id,
+          signer_name: params.nome || "",
+          send_automatic_email: false,
+          send_automatic_whatsapp: false,
+          lang: "pt-br",
+          external_id: null,
+          data: zapData,
+          signature_placement: "<<assinatura>>",
+          rubrica_placement: "<<visto>>",
+        },
         {
           headers: {
             "Content-Type": "application/json",
@@ -379,98 +244,34 @@ class ZapSign {
     }
   }
 
-  createContractMudancaEndereco = async (
-    params: ZapSignDataMudancaEndereco,
-  ) => {
+  createContractMudancaEndereco = async (params: Record<string, any>) => {
     try {
-      const {
-        nome,
-        cpf,
-        email,
-        telefone,
-        endereco_antigo,
-        rua,
-        numero,
-        complemento = "",
-        bairro,
-        cidade,
-        estado,
-        cep,
-        valor,
-        termo = "",
-        valor_plano = "",
-        rg = "Não informado",
-        telefone_conversa,
-      } = params;
-
-      const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
+      const valor = params.valor || "0,00";
       const tipo =
-        valor === "0,00" || valor === "0" || valor === "0.00"
-          ? "gratis"
-          : "pago";
+        valor === "0,00" || valor === "0" || valor === "0.00" ? "gratis" : "pago";
 
-      const template = await templateRepo.findOne({
-        where: { nome_servico: "Mudança de Endereço", tipo: tipo },
+      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+        where: { nome_servico: "Mudança de Endereço", tipo },
       });
+      if (!template?.token_id) throw new Error("Token do template 'Mudança de Endereço' não encontrado.");
 
-      if (!template || !template.token_id) {
-        throw new Error(
-          "Token do template 'Mudança de Endereço' não encontrado no banco de dados.",
-        );
-      }
-
-      const data = {
-        template_id: template.token_id,
-        signer_name: nome,
-        send_automatic_email: false,
-        send_automatic_whatsapp: false,
-        lang: "pt-br",
-        external_id: null,
-        data: [
-          { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: termo },
-          { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
-          { de: "{{cpfcliente}}", para: cpf },
-          { de: "{{provedornome}}", para: "Wip Telecom" },
-          { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
-          { de: "{{rgcliente}}", para: rg },
-          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
-          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
-          {
-            de: "{{enderecocliente}}",
-            para: `${rua}, ${numero} ${complemento}`,
-          },
-          { de: "{{bairrocliente}}", para: bairro },
-          { de: "{{cidadecliente}}", para: cidade },
-          { de: "{{estadocliente}}", para: estado },
-          { de: "{{cepcliente}}", para: cep },
-          {
-            de: "{{enderecorescliente}}",
-            para: `${rua}, ${numero} ${complemento}`,
-          },
-          { de: "{{emailcliente}}", para: email },
-          { de: "{{bairrorescliente}}", para: bairro },
-          { de: "{{cidaderescliente}}", para: cidade },
-          { de: "{{estadorescliente}}", para: estado },
-          { de: "{{ceprescliente}}", para: cep },
-          { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
-          { de: "{{planodeacesso}}", para: "Upgrade de Endereço" },
-          { de: "{{velocidadeplano}}", para: "Consultar Viabilidade" },
-          { de: "{{valor}}", para: valor },
-          { de: "{{descontocliente}}", para: "0,00" },
-          { de: "{{diavencimento}}", para: "N/A" },
-          { de: "{{equipamento}}", para: "Roteador existente" },
-          { de: "{{valor_plano}}", para: valor_plano },
-        ],
-        signature_placement: "<<assinatura>>",
-        rubrica_placement: "<<visto>>",
-      };
+      const zapData = await buildUniversalZapSignData(params);
 
       const response = await axios.post(
         isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
-        data,
+        {
+          template_id: template.token_id,
+          signer_name: params.nome || "",
+          send_automatic_email: false,
+          send_automatic_whatsapp: false,
+          lang: "pt-br",
+          external_id: null,
+          data: zapData,
+          signature_placement: "<<assinatura>>",
+          rubrica_placement: "<<visto>>",
+        },
         {
           headers: {
             "Content-Type": "application/json",
@@ -506,67 +307,34 @@ class ZapSign {
     }
   }
 
-  createContractMudancaComodo = async (params: ZapSignDataMudancaComodo) => {
+  createContractMudancaComodo = async (params: Record<string, any>) => {
     try {
-      const {
-        nome,
-        cpf,
-        email,
-        telefone,
-        endereco,
-        valor,
-        termo = "",
-        rg = "Não informado",
-        telefone_conversa,
-      } = params;
-
-      const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
+      const valor = params.valor || "0,00";
       const tipo =
-        valor === "0,00" || valor === "0" || valor === "0.00"
-          ? "gratis"
-          : "pago";
+        valor === "0,00" || valor === "0" || valor === "0.00" ? "gratis" : "pago";
 
-      const template = await templateRepo.findOne({
-        where: { nome_servico: "Mudança de Cômodo", tipo: tipo },
+      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+        where: { nome_servico: "Mudança de Cômodo", tipo },
       });
+      if (!template?.token_id) throw new Error("Token do template 'Mudança de Cômodo' não encontrado.");
 
-      if (!template || !template.token_id) {
-        throw new Error(
-          "Token do template 'Mudança de Cômodo' não encontrado no banco de dados.",
-        );
-      }
-
-      const data = {
-        template_id: template.token_id,
-        signer_name: nome,
-        send_automatic_email: false,
-        send_automatic_whatsapp: false,
-        lang: "pt-br",
-        external_id: null,
-        data: [
-          { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: termo },
-          { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
-          { de: "{{cpfcliente}}", para: cpf },
-          { de: "{{provedornome}}", para: "Wip Telecom" },
-          { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
-          { de: "{{rgcliente}}", para: rg },
-          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
-          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
-          { de: "{{enderecocliente}}", para: endereco },
-          { de: "{{emailcliente}}", para: email },
-          { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
-          { de: "{{valor}}", para: valor },
-        ],
-        signature_placement: "<<assinatura>>",
-        rubrica_placement: "<<visto>>",
-      };
+      const zapData = await buildUniversalZapSignData(params);
 
       const response = await axios.post(
         isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
-        data,
+        {
+          template_id: template.token_id,
+          signer_name: params.nome || "",
+          send_automatic_email: false,
+          send_automatic_whatsapp: false,
+          lang: "pt-br",
+          external_id: null,
+          data: zapData,
+          signature_placement: "<<assinatura>>",
+          rubrica_placement: "<<visto>>",
+        },
         {
           headers: {
             "Content-Type": "application/json",
@@ -957,95 +725,30 @@ class ZapSign {
     return clean;
   }
 
-  createContractAlteracaoPlano = async (
-    params: ZapSignDataAlteracaoPlano,
-  ) => {
+  createContractAlteracaoPlano = async (params: Record<string, any>) => {
     try {
-      const {
-        nome,
-        cpf,
-        email,
-        telefone,
-        endereco,
-        numero = "",
-        bairro = "",
-        cidade = "",
-        estado = "",
-        cep = "",
-        vencimento = "",
-        plano,
-        valor,
-        login = "Não informado",
-        termo = "",
-        valor_plano = "",
-        rg = "Não informado",
-        telefone_conversa,
-      } = params;
-
-      const planoRecord = plano
-        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: plano } })
-        : null;
-
-      const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
-      const template = await templateRepo.findOne({
+      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
         where: { nome_servico: "Alteração de Plano", tipo: "gratis" },
       });
+      if (!template?.token_id) throw new Error("Token do template 'Alteração de Plano' não encontrado.");
 
-      if (!template || !template.token_id) {
-        throw new Error(
-          "Token do template 'Alteração de Plano' não encontrado no banco de dados.",
-        );
-      }
-
-      const data = {
-        template_id: template.token_id,
-        signer_name: nome,
-        send_automatic_email: false,
-        send_automatic_whatsapp: false,
-        lang: "pt-br",
-        external_id: null,
-        data: [
-          { de: "{{nomecliente}}", para: nome },
-          { de: "{{logincliente}}", para: login },
-          { de: "{{termo}}", para: termo },
-          { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
-          { de: "{{cpfcliente}}", para: cpf },
-          { de: "{{provedornome}}", para: "Wip Telecom" },
-          { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
-          { de: "{{rgcliente}}", para: rg },
-          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
-          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
-          { de: "{{celular2cliente}}", para: telefone },
-          { de: "{{enderecocliente}}", para: `${endereco}, ${numero}` },
-          { de: "{{bairrocliente}}", para: bairro },
-          { de: "{{cidadecliente}}", para: cidade },
-          { de: "{{estadocliente}}", para: estado },
-          { de: "{{cepcliente}}", para: cep },
-          { de: "{{enderecorescliente}}", para: `${endereco}, ${numero}` },
-          { de: "{{numerorescliente}}", para: numero },
-          { de: "{{bairrorescliente}}", para: bairro },
-          { de: "{{cidaderescliente}}", para: cidade },
-          { de: "{{estadorescliente}}", para: estado },
-          { de: "{{ceprescliente}}", para: cep },
-          { de: "{{emailcliente}}", para: email },
-          { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
-          { de: "{{planodeacesso}}", para: plano },
-          { de: "{{velocidadeplano}}", para: formatVelocidade(planoRecord?.velup, planoRecord?.veldown) },
-          { de: "{{valor}}", para: valor || "0.00" },
-          { de: "{{descontocliente}}", para: "0,00" },
-          { de: "{{diavencimento}}", para: vencimento || "N/A" },
-          { de: "{{equipamento}}", para: "Equipamento existente" },
-          { de: "{{valor_plano}}", para: valor_plano },
-        ],
-        signature_placement: "<<assinatura>>",
-        rubrica_placement: "<<visto>>",
-      };
+      const zapData = await buildUniversalZapSignData(params);
 
       const response = await axios.post(
         isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
-        data,
+        {
+          template_id: template.token_id,
+          signer_name: params.nome || "",
+          send_automatic_email: false,
+          send_automatic_whatsapp: false,
+          lang: "pt-br",
+          external_id: null,
+          data: zapData,
+          signature_placement: "<<assinatura>>",
+          rubrica_placement: "<<visto>>",
+        },
         {
           headers: {
             "Content-Type": "application/json",
@@ -1061,83 +764,33 @@ class ZapSign {
     }
   }
 
-  createContractTrocaTitularidadeTitular = async (params: ZapSignDataTrocaTitularidade) => {
+  createContractTrocaTitularidadeTitular = async (params: Record<string, any>) => {
     try {
-      const {
-        nome,
-        cpf,
-        email,
-        telefone,
-        endereco,
-        rg = "Não informado",
-        telefone_conversa,
-        nome_novo_titular = "",
-        celular_novo_titular = "",
-        cpf_novo_titular = "",
-        rg_novo_titular = "",
-        email_novo_titular = "",
-        endereco_novo_titular = "",
-        numero_novo_titular = "",
-        bairro_novo_titular = "",
-        celular2_novo_titular = "",
-        login_novo_titular = "",
-        termo = "",
-      } = params;
-
-      const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
-      const template = await templateRepo.findOne({
+      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
         where: { nome_servico: "Troca de Titularidade", tipo: "gratis" },
       });
+      if (!template?.token_id) throw new Error("Token do template 'Troca de Titularidade' não encontrado.");
 
-      if (!template || !template.token_id) {
-        throw new Error(
-          "Token do template 'Alteração de Titularidade' não encontrado no banco de dados.",
-        );
-      }
-
-      const data = {
-        template_id: template.token_id,
-        signer_name: nome,
-        send_automatic_email: false,
-        send_automatic_whatsapp: false,
-        lang: "pt-br",
-        external_id: null,
-        data: [
-          { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: termo },
-          { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
-          { de: "{{cpfcliente}}", para: cpf },
-          { de: "{{provedornome}}", para: "Wip Telecom" },
-          { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
-          { de: "{{rgcliente}}", para: rg },
-          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
-          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
-          { de: "{{enderecocliente}}", para: endereco },
-          { de: "{{emailcliente}}", para: email },
-          { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
-          { de: "{{novotitular}}", para: nome_novo_titular },
-          { de: "{{celularnovotitular}}", para: celular_novo_titular },
-          { de: "{{termo2}}", para: "Alteração de Titularidade" },
-          { de: "{{logincliente2}}", para: login_novo_titular },
-          { de: "{{nomecliente2}}", para: nome_novo_titular },
-          { de: "{{cpfcliente2}}", para: cpf_novo_titular },
-          { de: "{{rgcliente2}}", para: rg_novo_titular },
-          { de: "{{enderecoresclient2}}", para: endereco_novo_titular },
-          { de: "{{numerorescliente2}}", para: numero_novo_titular },
-          { de: "{{bairrocliente2}}", para: bairro_novo_titular },
-          { de: "{{celularcliente2}}", para: celular_novo_titular },
-          { de: "{{celular2cliente2}}", para: celular2_novo_titular },
-          { de: "{{emailcliente2}}", para: email_novo_titular },
-        ],
-        signature_placement: "<<assinatura>>",
-        rubrica_placement: "<<visto>>",
-      };
+      const zapData = await buildUniversalZapSignData({
+        ...params,
+        termo2: "Alteração de Titularidade",
+      });
 
       const response = await axios.post(
         isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
-        data,
+        {
+          template_id: template.token_id,
+          signer_name: params.nome || "",
+          send_automatic_email: false,
+          send_automatic_whatsapp: false,
+          lang: "pt-br",
+          external_id: null,
+          data: zapData,
+          signature_placement: "<<assinatura>>",
+          rubrica_placement: "<<visto>>",
+        },
         {
           headers: {
             "Content-Type": "application/json",
@@ -1146,11 +799,14 @@ class ZapSign {
         },
       );
 
+      // Adiciona segundo signatário (novo titular)
       const docToken = response.data.token;
       let secondSigner: any = null;
+      const nomeNovo = params.nome_novo_titular || "";
+      const celularNovo = params.celular_novo_titular || "";
 
-      if (nome_novo_titular && celular_novo_titular && docToken) {
-        const phoneRaw = String(celular_novo_titular).replace(/\D/g, "");
+      if (nomeNovo && celularNovo && docToken) {
+        const phoneRaw = String(celularNovo).replace(/\D/g, "");
         const phoneNumber = phoneRaw.startsWith("55") ? phoneRaw.slice(2) : phoneRaw;
 
         const addSignerResponse = await axios.post(
@@ -1158,7 +814,7 @@ class ZapSign {
             ? `https://sandbox.api.zapsign.com.br/api/v1/docs/${docToken}/add-signer/`
             : `https://api.zapsign.com.br/api/v1/docs/${docToken}/add-signer/`,
           {
-            name: nome_novo_titular,
+            name: nomeNovo,
             phone_country: "55",
             phone_number: phoneNumber,
             signature_placement: "<<assinatura2>>",
@@ -1181,21 +837,9 @@ class ZapSign {
     }
   }
 
-  createContractTrocaTitularidadeNovoTitular = async (params: ZapSignDataTrocaTitularidade) => {
+  createContractTrocaTitularidadeNovoTitular = async (params: Record<string, any>) => {
     try {
-      const {
-        nome,
-        cpf,
-        email,
-        telefone,
-        endereco,
-        termo = "",
-        rg = "Não informado",
-        telefone_conversa,
-      } = params;
-
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
-      // Try dedicated new-owner template first, fall back to general one
       const template =
         (await templateRepo.findOne({
           where: { nome_servico: "Troca de Titularidade Novo Titular", tipo: "gratis" },
@@ -1203,45 +847,25 @@ class ZapSign {
         (await templateRepo.findOne({
           where: { nome_servico: "Troca de Titularidade", tipo: "gratis" },
         }));
+      if (!template?.token_id) throw new Error("Token do template 'Troca de Titularidade Novo Titular' não encontrado.");
 
-      if (!template || !template.token_id) {
-        throw new Error(
-          "Token do template 'Alteração de Titularidade' não encontrado no banco de dados.",
-        );
-      }
-
-      const data = {
-        template_id: template.token_id,
-        signer_name: nome,
-        send_automatic_email: false,
-        send_automatic_whatsapp: false,
-        lang: "pt-br",
-        external_id: null,
-        data: [
-          { de: "{{nomecliente}}", para: nome },
-          { de: "{{termo}}", para: termo },
-          { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
-          { de: "{{cpfcliente}}", para: cpf },
-          { de: "{{provedornome}}", para: "Wip Telecom" },
-          { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
-          { de: "{{rgcliente}}", para: rg },
-          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
-          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
-          { de: "{{enderecocliente}}", para: endereco },
-          { de: "{{emailcliente}}", para: email },
-          { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
-          { de: "{{novotitular}}", para: "" },
-          { de: "{{celularnovotitular}}", para: "" },
-        ],
-        signature_placement: "<<assinatura>>",
-        rubrica_placement: "<<visto>>",
-      };
+      const zapData = await buildUniversalZapSignData(params);
 
       const response = await axios.post(
         isSandbox
           ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
           : "https://api.zapsign.com.br/api/v1/models/create-doc/",
-        data,
+        {
+          template_id: template.token_id,
+          signer_name: params.nome || "",
+          send_automatic_email: false,
+          send_automatic_whatsapp: false,
+          lang: "pt-br",
+          external_id: null,
+          data: zapData,
+          signature_placement: "<<assinatura>>",
+          rubrica_placement: "<<visto>>",
+        },
         {
           headers: {
             "Content-Type": "application/json",
