@@ -211,6 +211,8 @@ class ZapSign {
       zapData.push(
         { de: "{{valor_instalacao}}", para: fmt(valorInstalacao) },
         { de: "{{valor_multa}}", para: fmt(valorMulta) },
+        { de: "{{multa}}", para: fmt(valorMulta) },
+        { de: "{{desconto_fidelidade}}", para: fmt(valorMulta) },
         { de: "{{valor_multa_mais_instalacao}}", para: fmt(valorTotal) },
       );
 
@@ -357,6 +359,149 @@ class ZapSign {
     } catch (error) {
       console.error("Error generating Mudança Cômodo PDF:", error);
       res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  }
+
+  /**
+   * Busca dados do cliente pelo login e gera todos os documentos de uma vez (somente localhost).
+   */
+  gerarTodosDocumentosTeste = async (req: Request, res: Response) => {
+    try {
+      const { login } = req.body;
+      if (!login) {
+        res.status(400).json({ error: "Login é obrigatório" });
+        return;
+      }
+
+      const cliente = await MkauthDataSource.getRepository(ClientesEntities).findOne({
+        where: { login },
+      });
+      if (!cliente) {
+        res.status(404).json({ error: `Cliente com login "${login}" não encontrado` });
+        return;
+      }
+
+      const planoRecord = cliente.plano
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: cliente.plano } })
+        : null;
+
+      const params: Record<string, any> = {
+        nome: cliente.nome,
+        cpf: cliente.cpf_cnpj,
+        rg: cliente.rg || "",
+        email: cliente.email || "financeiro@wiptelecom.com.br",
+        telefone: cliente.celular || cliente.fone || "",
+        celular: cliente.celular || "",
+        login: cliente.login,
+        endereco: cliente.endereco,
+        rua: cliente.endereco,
+        numero: cliente.numero,
+        complemento: cliente.complemento || "",
+        bairro: cliente.bairro,
+        cidade: cliente.cidade,
+        estado: cliente.estado,
+        cep: cliente.cep,
+        plano: cliente.plano,
+        valor_plano: planoRecord?.valor || "0,00",
+        vencimento: cliente.venc,
+        termo: cliente.termo || "",
+        equipamento: "Roteador em Comodato",
+        // Dados fictícios para troca de titularidade
+        nome_novo_titular: "NOVO TITULAR TESTE",
+        cpf_novo_titular: "000.000.000-00",
+        rg_novo_titular: "00.000.000-0",
+        email_novo_titular: "novotitular@teste.com",
+        celular_novo_titular: "14999999999",
+        endereco_novo_titular: cliente.endereco,
+        numero_novo_titular: cliente.numero,
+        bairro_novo_titular: cliente.bairro,
+      };
+
+      const resultados: Record<string, any> = {};
+      const erros: Record<string, string> = {};
+
+      // 1. Instalação Grátis
+      try {
+        resultados["Instalação (grátis)"] = await this.createContractInstalacao({ ...params, valor: "0.00" });
+      } catch (e: any) { erros["Instalação (grátis)"] = e.message; }
+
+      // 2. Instalação Paga
+      try {
+        resultados["Instalação (pago)"] = await this.createContractInstalacao({ ...params, valor: "200.00" });
+      } catch (e: any) { erros["Instalação (pago)"] = e.message; }
+
+      // 3. Instalação Dificuldade de Acesso
+      try {
+        resultados["Instalação (dificuldade_acesso)"] = await this.createContractInstalacaoDificuldadeAcesso({ ...params, valor: "200.00" });
+      } catch (e: any) { erros["Instalação (dificuldade_acesso)"] = e.message; }
+
+      // 4. Mudança de Endereço Grátis
+      try {
+        resultados["Mudança de Endereço (grátis)"] = await this.createContractMudancaEndereco({ ...params, valor: "0.00" });
+      } catch (e: any) { erros["Mudança de Endereço (grátis)"] = e.message; }
+
+      // 5. Mudança de Endereço Paga
+      try {
+        resultados["Mudança de Endereço (pago)"] = await this.createContractMudancaEndereco({ ...params, valor: "200.00" });
+      } catch (e: any) { erros["Mudança de Endereço (pago)"] = e.message; }
+
+      // 6. Mudança de Cômodo Grátis
+      try {
+        resultados["Mudança de Cômodo (grátis)"] = await this.createContractMudancaComodo({ ...params, valor: "0.00" });
+      } catch (e: any) { erros["Mudança de Cômodo (grátis)"] = e.message; }
+
+      // 7. Mudança de Cômodo Paga
+      try {
+        resultados["Mudança de Cômodo (pago)"] = await this.createContractMudancaComodo({ ...params, valor: "200.00" });
+      } catch (e: any) { erros["Mudança de Cômodo (pago)"] = e.message; }
+
+      // 8. Alteração de Plano
+      try {
+        resultados["Alteração de Plano"] = await this.createContractAlteracaoPlano(params);
+      } catch (e: any) { erros["Alteração de Plano"] = e.message; }
+
+      // 9. Troca de Titularidade (Titular)
+      try {
+        resultados["Troca de Titularidade (titular)"] = await this.createContractTrocaTitularidadeTitular(params);
+      } catch (e: any) { erros["Troca de Titularidade (titular)"] = e.message; }
+
+      // 10. Troca de Titularidade (Novo Titular)
+      try {
+        resultados["Troca de Titularidade (novo titular)"] = await this.createContractTrocaTitularidadeNovoTitular(params);
+      } catch (e: any) { erros["Troca de Titularidade (novo titular)"] = e.message; }
+
+      const docs = Object.entries(resultados).map(([servico, data]) => ({
+        servico,
+        sign_url: data?.signers?.[0]?.sign_url || null,
+        token: data?.token || null,
+        second_signer_url: data?.second_signer?.sign_url || null,
+      }));
+
+      res.status(200).json({ cliente: { login: cliente.login, nome: cliente.nome }, docs, erros });
+    } catch (error: any) {
+      console.error("Error in gerarTodosDocumentosTeste:", error);
+      res.status(500).json({ error: error.message || "Erro ao gerar documentos de teste" });
+    }
+  }
+
+  /**
+   * Busca dados do cliente pelo login (somente localhost).
+   */
+  buscarClientePorLogin = async (req: Request, res: Response) => {
+    try {
+      const { login } = req.params;
+      const cliente = await MkauthDataSource.getRepository(ClientesEntities).findOne({
+        select: { id: true, nome: true, login: true, cpf_cnpj: true, rg: true, email: true, celular: true, endereco: true, numero: true, complemento: true, bairro: true, cidade: true, estado: true, cep: true, plano: true, venc: true, termo: true },
+        where: { login },
+      });
+      if (!cliente) {
+        res.status(404).json({ error: "Cliente não encontrado" });
+        return;
+      }
+      res.status(200).json(cliente);
+    } catch (error: any) {
+      console.error("Error in buscarClientePorLogin:", error);
+      res.status(500).json({ error: error.message });
     }
   }
 

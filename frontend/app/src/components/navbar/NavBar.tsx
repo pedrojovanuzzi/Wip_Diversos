@@ -30,6 +30,7 @@ import { IoMdAnalytics } from "react-icons/io";
 import { FaPlugCirclePlus } from "react-icons/fa6";
 import { ImExit } from "react-icons/im";
 import { FaPix } from "react-icons/fa6";
+import { FaFlask } from "react-icons/fa";
 
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -214,6 +215,16 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   title="Config ZapSign"
                   description="Configurar templates ZapSign"
                 />
+                {(window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && (
+                  <NavItem
+                    to="/zapsign-teste"
+                    icon={
+                      <FaFlask className="text-white size-8 transition-all hover:text-amber-400" />
+                    }
+                    title="Teste Docs"
+                    description="Testar geração de documentos"
+                  />
+                )}
                 <NavItem
                   to="/Create"
                   icon={

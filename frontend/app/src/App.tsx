@@ -51,6 +51,7 @@ import { EnviarMensagem } from "./pages/Marketing/EnviarMensagem";
 import { GerenciarLicencas } from "./pages/Licencas/GerenciarLicencas";
 import { GraficoInstalacoes } from "./pages/Chamados/GraficoInstalacoes";
 import { ZapSignConfig } from "./pages/zapsign/ZapSignConfig";
+import { ZapSignTeste } from "./pages/zapsign/ZapSignTeste";
 import SolicitacoesServico from "./pages/SolicitacoesServico/SolicitacoesServico";
 
 const isLocalhost =
@@ -535,6 +536,18 @@ function App() {
               )
             }
           />
+          {isLocalhost && (
+            <Route
+              path="/zapsign-teste"
+              element={
+                user?.token ? (
+                  <ZapSignTeste />
+                ) : (
+                  <Navigate to="/auth/login" />
+                )
+              }
+            />
+          )}
         </Routes>
       </div>
     </BrowserRouter>

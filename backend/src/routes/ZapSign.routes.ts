@@ -19,4 +19,8 @@ router.post(
 
 router.post("/webhook", ZapSign.webhook);
 
+// Rotas de teste (somente localhost/homologação)
+router.get("/test/cliente/:login", AuthGuard, ZapSign.buscarClientePorLogin);
+router.post("/test/gerar-todos", AuthGuard, ZapSign.gerarTodosDocumentosTeste);
+
 export default router;
