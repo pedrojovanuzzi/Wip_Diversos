@@ -47,6 +47,13 @@ export const ZapSignConfig = () => {
     fetchTemplates();
   }, [fetchTemplates]);
 
+  // Reseta tipo para "pago" se mudar para serviço que não é Instalação e o tipo era dificuldade_acesso
+  useEffect(() => {
+    if (selectedServiceName !== "Instalação" && selectedTipo === "dificuldade_acesso") {
+      setSelectedTipo("pago");
+    }
+  }, [selectedServiceName, selectedTipo]);
+
   // Atualiza o ID selecionado quando o nome ou tipo mudam
   useEffect(() => {
     if (selectedServiceName && selectedTipo) {
@@ -80,6 +87,23 @@ export const ZapSignConfig = () => {
       setFileBase64(base64String);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleCriarTemplate = async () => {
+    setLoading(true);
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_URL}/zapsign-templates`,
+        { nome_servico: selectedServiceName, tipo: selectedTipo },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      showSuccess("Template criado! Agora faça o upload do DOCX.");
+      fetchTemplates();
+    } catch (error: any) {
+      showError(error.response?.data?.error || "Erro ao criar template.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -159,7 +183,7 @@ export const ZapSignConfig = () => {
                     <div className="flex p-1.5 bg-gray-100 rounded-2xl border border-gray-200">
                       <button
                         onClick={() => setSelectedTipo("pago")}
-                        className={`flex-1 py-3 px-6 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${
+                        className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${
                           selectedTipo === "pago"
                             ? "bg-white text-indigo-600 shadow-lg scale-[1.02]"
                             : "text-gray-400 hover:text-gray-600"
@@ -169,7 +193,7 @@ export const ZapSignConfig = () => {
                       </button>
                       <button
                         onClick={() => setSelectedTipo("gratis")}
-                        className={`flex-1 py-3 px-6 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${
+                        className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${
                           selectedTipo === "gratis"
                             ? "bg-white text-green-600 shadow-lg scale-[1.02]"
                             : "text-gray-400 hover:text-gray-600"
@@ -177,9 +201,36 @@ export const ZapSignConfig = () => {
                       >
                         Grátis
                       </button>
+                      {selectedServiceName === "Instalação" && (
+                        <button
+                          onClick={() => setSelectedTipo("dificuldade_acesso")}
+                          className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${
+                            selectedTipo === "dificuldade_acesso"
+                              ? "bg-white text-orange-600 shadow-lg scale-[1.02]"
+                              : "text-gray-400 hover:text-gray-600"
+                          }`}
+                        >
+                          Dif. Acesso
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
+
+                {selectedServiceName && selectedTipo && !selectedServiceId && (
+                  <div className="p-6 bg-orange-50 rounded-2xl border border-orange-200">
+                    <p className="text-orange-700 text-xs font-bold mb-3">
+                      Template não encontrado para "{selectedServiceName}" — {selectedTipo}. Clique para criar.
+                    </p>
+                    <button
+                      onClick={handleCriarTemplate}
+                      disabled={loading}
+                      className="w-full py-3 rounded-xl bg-orange-500 text-white text-xs font-black uppercase tracking-wider hover:bg-orange-600 transition-all disabled:opacity-50"
+                    >
+                      {loading ? "Criando..." : "Criar Template"}
+                    </button>
+                  </div>
+                )}
 
                 {selectedServiceId && (
                   <div className="p-6 bg-indigo-50 rounded-2xl border border-indigo-100 animate-in fade-in slide-in-from-bottom-4 duration-500">

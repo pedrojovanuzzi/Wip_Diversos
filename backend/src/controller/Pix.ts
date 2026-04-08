@@ -426,7 +426,9 @@ class Pix {
             if (solicitacao?.dados) {
               try {
                 let zapResponse;
-                if (solicitacao.servico === "Instalação") {
+                if (solicitacao.servico === "Instalação" && solicitacao.dados.dificuldade_acesso) {
+                  zapResponse = await ZapSign.createContractInstalacaoDificuldadeAcesso(solicitacao.dados);
+                } else if (solicitacao.servico === "Instalação") {
                   zapResponse = await ZapSign.createContractInstalacao(solicitacao.dados);
                 } else if (solicitacao.servico === "Mudança de Endereço") {
                   zapResponse = await ZapSign.createContractMudancaEndereco(solicitacao.dados);

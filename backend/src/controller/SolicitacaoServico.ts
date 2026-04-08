@@ -451,7 +451,7 @@ class SolicitacaoServicoController {
       solicitacao.id_fatura = novoLancamento.id;
       solicitacao.pago = false;
       solicitacao.gratis = 0;
-      solicitacao.dados = { ...dados, valor: valorFormatado };
+      solicitacao.dados = { ...dados, valor: valorFormatado, dificuldade_acesso: true };
       await repository.save(solicitacao);
 
       // Gerar PIX usando o login do cliente e CPF informado no cadastro

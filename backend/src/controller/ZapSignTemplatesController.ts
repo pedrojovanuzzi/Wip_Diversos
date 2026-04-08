@@ -28,6 +28,31 @@ export default class ZapSignTemplatesController {
     }
   }
 
+  async criar(req: Request, res: Response) {
+    const { nome_servico, tipo } = req.body;
+
+    if (!nome_servico || !tipo) {
+      return res.status(400).json({ error: "nome_servico e tipo são obrigatórios" });
+    }
+
+    try {
+      const repo = ApiMkDataSource.getRepository(ZapSignTemplates);
+
+      const existing = await repo.findOne({ where: { nome_servico, tipo } });
+      if (existing) {
+        return res.status(409).json({ error: "Template já existe para esse serviço e tipo." });
+      }
+
+      const novo = repo.create({ nome_servico, tipo, token_id: "", base64_docx: "" });
+      await repo.save(novo);
+
+      return res.status(201).json({ id: novo.id, nome_servico: novo.nome_servico, tipo: novo.tipo });
+    } catch (error) {
+      console.error("Erro ao criar template ZapSign:", error);
+      return res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  }
+
   async atualizar(req: Request, res: Response) {
     const { id } = req.params;
     const { base64_docx } = req.body;

@@ -255,6 +255,126 @@ class ZapSign {
     }
   }
 
+  createContractInstalacaoDificuldadeAcesso = async (params: ZapSignDataInstalacao) => {
+    try {
+      const {
+        nome,
+        cpf,
+        email,
+        telefone,
+        endereco: enderecoProp,
+        rua,
+        numero,
+        complemento = "",
+        bairro,
+        cidade,
+        estado,
+        cep,
+        plano,
+        valor,
+        vencimento,
+        termo = "",
+        valor_plano = "",
+        rg = "Não informado",
+        telefone_conversa,
+      } = params;
+      const endereco = enderecoProp || rua || "";
+
+      const planoRecord = plano
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: plano } })
+        : null;
+      const valorPlanoFinal = valor_plano || planoRecord?.valor || "";
+
+      const valorInstalacao = parseFloat(String(valor || "0").replace(",", "."));
+      const valorMulta = 600;
+      const valorTotal = valorInstalacao + valorMulta;
+
+      const formatBRL = (v: number) =>
+        v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+        where: { nome_servico: "Instalação", tipo: "dificuldade_acesso" },
+      });
+
+      if (!template || !template.token_id) {
+        throw new Error("Token do template 'Instalação' (dificuldade_acesso) não encontrado no banco de dados.");
+      }
+
+      let termoFinal = termo;
+      if (!termoFinal) {
+        const [lastCliente] = await MkauthDataSource.getRepository(ClientesEntities).find({
+          select: { id: true },
+          order: { id: "DESC" },
+          take: 1,
+        });
+        const nextId = (lastCliente?.id ?? 0) + 1;
+        termoFinal = `${nextId}C/${new Date().getFullYear()}`;
+      }
+
+      const data = {
+        template_id: template.token_id,
+        signer_name: nome,
+        send_automatic_email: false,
+        send_automatic_whatsapp: false,
+        lang: "pt-br",
+        external_id: null,
+        data: [
+          { de: "{{nomecliente}}", para: nome },
+          { de: "{{termo}}", para: termoFinal },
+          { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
+          { de: "{{cpfcliente}}", para: cpf },
+          { de: "{{provedornome}}", para: "Wip Telecom" },
+          { de: "{{provedorcnpj}}", para: "10.000.000/0001-00" },
+          { de: "{{rgcliente}}", para: rg },
+          { de: "{{fonecliente}}", para: telefone_conversa || telefone },
+          { de: "{{celularcliente}}", para: telefone_conversa || telefone },
+          { de: "{{enderecocliente}}", para: `${endereco}, ${numero} ${complemento}` },
+          { de: "{{bairrocliente}}", para: bairro },
+          { de: "{{cidadecliente}}", para: cidade },
+          { de: "{{estadocliente}}", para: estado },
+          { de: "{{cepcliente}}", para: cep },
+          { de: "{{enderecorescliente}}", para: `${endereco}, ${numero} ${complemento}` },
+          { de: "{{emailcliente}}", para: email },
+          { de: "{{bairrorescliente}}", para: bairro },
+          { de: "{{cidaderescliente}}", para: cidade },
+          { de: "{{estadorescliente}}", para: estado },
+          { de: "{{ceprescliente}}", para: cep },
+          { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
+          { de: "{{planodeacesso}}", para: plano },
+          { de: "{{velocidadeplano}}", para: plano },
+          { de: "{{valor}}", para: formatBRL(valorInstalacao) },
+          { de: "{{valor_instalacao}}", para: formatBRL(valorInstalacao) },
+          { de: "{{valor_multa}}", para: formatBRL(valorMulta) },
+          { de: "{{valor_multa_mais_instalacao}}", para: formatBRL(valorTotal) },
+          { de: "{{valor_plano}}", para: valorPlanoFinal },
+          { de: "{{descontocliente}}", para: "0,00" },
+          { de: "{{diavencimento}}", para: vencimento || "N/A" },
+          { de: "{{equipamento}}", para: "Roteador em Comodato" },
+        ],
+        signature_placement: "<<assinatura>>",
+        rubrica_placement: "<<visto>>",
+      };
+
+      const response = await axios.post(
+        isSandbox
+          ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
+          : "https://api.zapsign.com.br/api/v1/models/create-doc/",
+        data,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.ZAPSIGN_TOKEN}`,
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Error in createContractInstalacaoDificuldadeAcesso:", error);
+      throw error;
+    }
+  }
+
   createContractMudancaEndereco = async (
     params: ZapSignDataMudancaEndereco,
   ) => {

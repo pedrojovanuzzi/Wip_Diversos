@@ -660,6 +660,11 @@ const SolicitacoesServico = () => {
                 type="number"
                 inputProps={{ min: 0, step: "0.01" }}
               />
+              {instalacaoPagaValor && !isNaN(parseFloat(instalacaoPagaValor)) && parseFloat(instalacaoPagaValor) > 0 && (
+                <Alert severity="warning">
+                  Multa dificuldade de acesso: R$ 600,00 + Taxa: R$ {parseFloat(instalacaoPagaValor).toFixed(2)} = <strong>Total: R$ {(600 + parseFloat(instalacaoPagaValor)).toFixed(2)}</strong>
+                </Alert>
+              )}
             </Box>
           </DialogContent>
           <DialogActions>
