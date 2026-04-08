@@ -1478,7 +1478,7 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
         valor: "0.00",
         vencimento: dadosFlow.vencimento || "5",
         rg: dadosFlow.rg || "Não informado",
-        termo: dadosTitular.termo || "",
+        termo: "",
       };
       const zapCadastro = await ZapSign.createContractInstalacao(payloadZapCadastro as any);
       const urlCadastro = zapCadastro.signers[0].sign_url;

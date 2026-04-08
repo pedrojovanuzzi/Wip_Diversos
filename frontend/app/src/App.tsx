@@ -1,3 +1,4 @@
+import React from "react";
 import "./App.css";
 import { HomePage } from "./pages/home/HomePage";
 import { AuthPage } from "./pages/auth/AuthPage";
@@ -52,6 +53,50 @@ import { GraficoInstalacoes } from "./pages/Chamados/GraficoInstalacoes";
 import { ZapSignConfig } from "./pages/zapsign/ZapSignConfig";
 import SolicitacoesServico from "./pages/SolicitacoesServico/SolicitacoesServico";
 
+const isLocalhost =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
+
+function LocalhostBanner() {
+  React.useEffect(() => {
+    if (!isLocalhost) return;
+    // Muda o favicon para um SVG laranja
+    const link: HTMLLinkElement =
+      document.querySelector("link[rel='icon']") || document.createElement("link");
+    link.rel = "icon";
+    link.type = "image/svg+xml";
+    link.href =
+      "data:image/svg+xml," +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23f59e0b"/><text x="50" y="68" text-anchor="middle" font-size="50" font-weight="bold" fill="white">D</text></svg>'
+      );
+    document.head.appendChild(link);
+    document.title = "[DEV] Wip Diversos";
+  }, []);
+
+  if (!isLocalhost) return null;
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 99999,
+        background: "#f59e0b",
+        color: "#000",
+        textAlign: "center",
+        padding: "2px 0",
+        fontSize: "12px",
+        fontWeight: 700,
+        letterSpacing: "1px",
+      }}
+    >
+      LOCALHOST — AMBIENTE DE DESENVOLVIMENTO
+    </div>
+  );
+}
+
 function App() {
   const { user, loading } = useAuth();
 
@@ -81,7 +126,8 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="App">
+      <LocalhostBanner />
+      <div className="App" style={isLocalhost ? { paddingTop: "22px" } : undefined}>
         <Routes>
           <Route
             path="/"
