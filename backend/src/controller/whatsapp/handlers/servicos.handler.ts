@@ -202,6 +202,7 @@ async function salvarSolicitacaoMudancaComodo(
     rg: session.rg || "Não informado",
     forma_pagamento: session.formaPagamento || "Não informada",
     valor: session.formaPagamento === "Paga com Pix" ? "200.00" : "0.00",
+    valor_plano: session.valor_plano_atual || "",
   };
 
   return await repo.save(novaSolicitacao);
@@ -239,6 +240,7 @@ async function salvarSolicitacaoAlteracaoPlano(
     plano: session.planoEscolhido || "Não informado",
     observacao: session.observacaoTrocaPlano || "",
     valor: "0.00",
+    valor_plano: session.valor_plano_atual || "",
   };
 
   return await repo.save(novaSolicitacao);
@@ -294,6 +296,7 @@ export async function iniciarMudancaComodo(
         rg: true,
         cpf_cnpj: true,
         celular: true,
+        plano: true,
       },
       where: { cpf_cnpj: cpf, cli_ativado: "s" },
     });
@@ -308,6 +311,7 @@ export async function iniciarMudancaComodo(
         login: client.login,
         numero: client.numero,
         termo: client.termo,
+        plano: client.plano,
         cpf,
         email: client.email,
         rg: client.rg,
@@ -336,6 +340,10 @@ export async function iniciarMudancaComodo(
       session.endereco_comodo = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
       session.contrato_cliente = sis_cliente[0].termo || "";
       session.celularCliente = sis_cliente[0].celular;
+      const _planoComodoSingle = sis_cliente[0].plano
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: sis_cliente[0].plano } })
+        : null;
+      session.valor_plano_atual = _planoComodoSingle?.valor || "0,00";
       session.dadosCompleto = {};
 
       await MensagemTermos(
@@ -398,6 +406,10 @@ export async function iniciarMudancaComodo(
       session.endereco_comodo = `${selectedClient.endereco}, ${selectedClient.numero}`;
       session.contrato_cliente = selectedClient.termo || "";
       session.celularCliente = selectedClient.celular;
+      const _planoComodoSelected = selectedClient.plano
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: selectedClient.plano } })
+        : null;
+      session.valor_plano_atual = _planoComodoSelected?.valor || "0,00";
       session.dadosCompleto = {};
 
       await MensagemTermos(
@@ -633,6 +645,10 @@ async function selecionarCadastroTitularidade(celular: any, session: any, client
   session.rg = cliente.rg;
   session.contrato_cliente = cliente.termo || "";
   session.celularCliente = cliente.celular;
+  const _planoTitularidade = cliente.plano
+    ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: cliente.plano } })
+    : null;
+  session.valor_plano_atual = _planoTitularidade?.valor || "0,00";
   session.dadosCompleto = {
     nome: cliente.nome,
     cpf: session.cpf,
@@ -707,6 +723,7 @@ export async function iniciarTrocaTitularidade(
         rg: true,
         cpf_cnpj: true,
         celular: true,
+        plano: true,
       },
       where: { cpf_cnpj: cpf, cli_ativado: "s" },
     });
@@ -721,6 +738,7 @@ export async function iniciarTrocaTitularidade(
         login: client.login,
         numero: client.numero,
         termo: client.termo,
+        plano: client.plano,
         cpf,
         email: client.email,
         rg: client.rg,
@@ -846,6 +864,7 @@ export async function iniciarTrocaPlano(
         rg: true,
         cpf_cnpj: true,
         celular: true,
+        plano: true,
       },
       where: { cpf_cnpj: cpf, cli_ativado: "s" },
     });
@@ -865,6 +884,7 @@ export async function iniciarTrocaPlano(
         cep: client.cep,
         venc: client.venc,
         termo: client.termo,
+        plano: client.plano,
         cpf,
         email: client.email,
         rg: client.rg,
@@ -899,6 +919,10 @@ export async function iniciarTrocaPlano(
       session.venc_troca_plano = sis_cliente[0].venc || "";
       session.contrato_cliente = sis_cliente[0].termo || "";
       session.celularCliente = sis_cliente[0].celular;
+      const _planoTrocaSingle = sis_cliente[0].plano
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: sis_cliente[0].plano } })
+        : null;
+      session.valor_plano_atual = _planoTrocaSingle?.valor || "0,00";
       session.dadosCompleto = {
         nome: sis_cliente[0].nome,
         cpf,
@@ -974,6 +998,10 @@ export async function iniciarTrocaPlano(
       session.venc_troca_plano = selectedClient.venc || "";
       session.contrato_cliente = selectedClient.termo || "";
       session.celularCliente = selectedClient.celular;
+      const _planoTrocaSelected = selectedClient.plano
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: selectedClient.plano } })
+        : null;
+      session.valor_plano_atual = _planoTrocaSelected?.valor || "0,00";
       session.dadosCompleto = {
         nome: selectedClient.nome,
         cpf: session.cpf,
@@ -1232,6 +1260,7 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
       endereco: session.dadosCompleto?.endereco || "Não informado",
       rg: session.dadosCompleto?.rg || session.rg || "Não informado",
       termo: session.contrato_cliente || "",
+      valor_plano: session.valor_plano_atual || "",
       nome_novo_titular: nome,
       celular_novo_titular: celularDestino,
       celular_destino: celularDestino,

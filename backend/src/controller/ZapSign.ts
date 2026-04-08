@@ -44,6 +44,7 @@ interface ZapSignDataInstalacao {
   valor: string;
   vencimento: string;
   termo?: string;
+  valor_plano?: string;
   rg?: string;
   telefone_conversa?: string;
 }
@@ -63,6 +64,7 @@ interface ZapSignDataMudancaEndereco {
   cep: string;
   valor: string;
   termo?: string;
+  valor_plano?: string;
   rg?: string;
   telefone_conversa?: string;
 }
@@ -95,6 +97,7 @@ interface ZapSignDataAlteracaoPlano {
   valor: string;
   login?: string;
   termo?: string;
+  valor_plano?: string;
   rg?: string;
   telefone_conversa?: string;
 }
@@ -142,19 +145,21 @@ class ZapSign {
         valor,
         vencimento,
         termo = "",
+        valor_plano = "",
         rg = "Não informado",
         telefone_conversa,
       } = params;
       const endereco = enderecoProp || rua || "";
 
       // Resolve valor do plano se não informado
+      const planoRecord = plano
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: plano } })
+        : null;
       let valorFinal = valor;
       if (!valorFinal || valorFinal === "0.00" || valorFinal === "0,00" || valorFinal === "0") {
-        const planoRecord = plano
-          ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: plano } })
-          : null;
         valorFinal = planoRecord?.valor || valorFinal || "0,00";
       }
+      const valorPlanoFinal = valor_plano || planoRecord?.valor || "";
 
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
       const tipo =
@@ -219,11 +224,12 @@ class ZapSign {
           { de: "{{ceprescliente}}", para: cep },
           { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
           { de: "{{planodeacesso}}", para: plano },
-          { de: "{{velocidadeplano}}", para: "Consultar Viabilidade" },
+          { de: "{{velocidadeplano}}", para: plano },
           { de: "{{valor}}", para: valorFinal },
           { de: "{{descontocliente}}", para: "0,00" },
           { de: "{{diavencimento}}", para: vencimento },
           { de: "{{equipamento}}", para: "Roteador em Comodato" },
+          { de: "{{valor_plano}}", para: valorPlanoFinal },
         ],
         signature_placement: "<<assinatura>>",
         rubrica_placement: "<<visto>>",
@@ -268,6 +274,7 @@ class ZapSign {
         cep,
         valor,
         termo = "",
+        valor_plano = "",
         rg = "Não informado",
         telefone_conversa,
       } = params;
@@ -329,6 +336,7 @@ class ZapSign {
           { de: "{{descontocliente}}", para: "0,00" },
           { de: "{{diavencimento}}", para: "N/A" },
           { de: "{{equipamento}}", para: "Roteador existente" },
+          { de: "{{valor_plano}}", para: valor_plano },
         ],
         signature_placement: "<<assinatura>>",
         rubrica_placement: "<<visto>>",
@@ -845,6 +853,7 @@ class ZapSign {
         valor,
         login = "Não informado",
         termo = "",
+        valor_plano = "",
         rg = "Não informado",
         telefone_conversa,
       } = params;
@@ -898,6 +907,7 @@ class ZapSign {
           { de: "{{descontocliente}}", para: "0,00" },
           { de: "{{diavencimento}}", para: vencimento || "N/A" },
           { de: "{{equipamento}}", para: "Equipamento existente" },
+          { de: "{{valor_plano}}", para: valor_plano },
         ],
         signature_placement: "<<assinatura>>",
         rubrica_placement: "<<visto>>",
