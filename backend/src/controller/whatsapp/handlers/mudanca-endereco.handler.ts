@@ -165,7 +165,7 @@ export async function iniciarMudanca(
     session.cpf = cpf;
 
     const sis_cliente = await MkauthDataSource.getRepository(Sis_Cliente).find({
-      select: { id: true, nome: true, endereco: true, login: true, numero: true },
+      select: { id: true, nome: true, endereco: true, login: true, numero: true, termo: true },
       where: { cpf_cnpj: cpf, cli_ativado: "s" },
     });
 
@@ -178,6 +178,7 @@ export async function iniciarMudanca(
         endereco: client.endereco,
         login: client.login,
         numero: client.numero,
+        termo: client.termo,
         cpf: cpf,
       }));
 
@@ -196,6 +197,7 @@ export async function iniciarMudanca(
     } else if (sis_cliente.length === 1) {
       session.login = sis_cliente[0].login;
       session.endereco_antigo = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
+      session.contrato_cliente = sis_cliente[0].termo || "";
       session.mudancaStep = "flow";
       session.dadosCadastro = {};
       await finalizarMudancaEndereco(celular, session);
@@ -249,6 +251,7 @@ export async function iniciarMudanca(
       const selectedClient = session.structuredData[selectedIndex];
       session.login = selectedClient.login;
       session.endereco_antigo = `${selectedClient.endereco}, ${selectedClient.numero}`;
+      session.contrato_cliente = selectedClient.termo || "";
       session.mudancaStep = "flow";
       session.dadosCadastro = {};
       await finalizarMudancaEndereco(celular, session);
@@ -373,6 +376,7 @@ export async function iniciarMudanca(
             try {
               const payloadZap = {
                 ...(solicitacaoSalva?.dados || dadosFlow),
+                termo: session.contrato_cliente || "",
                 valor: "0.00",
               };
               const zapResponse =

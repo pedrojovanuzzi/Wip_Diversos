@@ -234,7 +234,7 @@ async function salvarSolicitacaoAlteracaoPlano(
     estado: session.estado_troca_plano || "",
     cep: session.cep_troca_plano || "",
     vencimento: session.venc_troca_plano || "",
-    contrato: session.contrato_cliente || "",
+    termo: session.contrato_cliente || "",
     rg: session.rg || "Não informado",
     plano: session.planoEscolhido || "Não informado",
     observacao: session.observacaoTrocaPlano || "",
@@ -456,7 +456,7 @@ export async function iniciarMudancaComodo(
           rg: session.rg,
           endereco: session.endereco_comodo,
           celular: session.celularCliente,
-          contrato: session.contrato_cliente || "",
+          termo: session.contrato_cliente || "",
           observacao: dadosFlow?.observacao || "Sem observação",
         };
 
@@ -1231,6 +1231,7 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
       telefone_conversa: celular,
       endereco: session.dadosCompleto?.endereco || "Não informado",
       rg: session.dadosCompleto?.rg || session.rg || "Não informado",
+      termo: session.contrato_cliente || "",
       nome_novo_titular: nome,
       celular_novo_titular: celularDestino,
       celular_destino: celularDestino,
@@ -1409,7 +1410,7 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
         bairro_novo_titular: dadosFlow.bairro || "",
         celular2_novo_titular: String(dadosFlow.celularSecundario || ""),
         login_novo_titular: dadosFlow.login || "",
-        contrato: session.contrato_cliente || "",
+        termo: dadosTitular.termo || session.contrato_cliente || "",
       };
       const zapTitularidade = await ZapSign.createContractTrocaTitularidadeTitular(payloadZapTitularidade as any);
       const urlTitularAssinatura = zapTitularidade.signers[0].sign_url;
@@ -1448,6 +1449,7 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
         valor: "0.00",
         vencimento: dadosFlow.vencimento || "5",
         rg: dadosFlow.rg || "Não informado",
+        termo: dadosTitular.termo || "",
       };
       const zapCadastro = await ZapSign.createContractInstalacao(payloadZapCadastro as any);
       const urlCadastro = zapCadastro.signers[0].sign_url;
@@ -1724,7 +1726,7 @@ export async function handleAwaitingTrocaPlanoFlow(
         estado: session.estado_troca_plano || "",
         cep: session.cep_troca_plano || "",
         vencimento: session.venc_troca_plano || "",
-        contrato: session.contrato_cliente || "",
+        termo: session.contrato_cliente || "",
         rg: session.rg || "Não informado",
         plano: session.planoEscolhido,
         valor: valorPlano,
