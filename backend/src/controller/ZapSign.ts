@@ -19,6 +19,13 @@ dotenv.config();
 
 const isSandbox = process.env.SERVIDOR_HOMOLOGACAO === "true";
 
+const formatVelocidade = (velup?: number | null, veldown?: number | null): string => {
+  if (!velup && !veldown) return "Consultar Viabilidade";
+  const up = velup ? `${velup} Kbps` : "N/A";
+  const down = veldown ? `${veldown} Kbps` : "N/A";
+  return `Upload: ${up} / Download: ${down}`;
+};
+
 const waToken = isSandbox
   ? process.env.CLOUD_API_ACCESS_TOKEN_TEST
   : process.env.CLOUD_API_ACCESS_TOKEN;
@@ -224,7 +231,7 @@ class ZapSign {
           { de: "{{ceprescliente}}", para: cep },
           { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
           { de: "{{planodeacesso}}", para: plano },
-          { de: "{{velocidadeplano}}", para: plano },
+          { de: "{{velocidadeplano}}", para: formatVelocidade(planoRecord?.velup, planoRecord?.veldown) },
           { de: "{{valor}}", para: valorFinal },
           { de: "{{descontocliente}}", para: "0,00" },
           { de: "{{diavencimento}}", para: vencimento },
@@ -341,7 +348,7 @@ class ZapSign {
           { de: "{{ceprescliente}}", para: cep },
           { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
           { de: "{{planodeacesso}}", para: plano },
-          { de: "{{velocidadeplano}}", para: plano },
+          { de: "{{velocidadeplano}}", para: formatVelocidade(planoRecord?.velup, planoRecord?.veldown) },
           { de: "{{valor}}", para: formatBRL(valorInstalacao) },
           { de: "{{valor_instalacao}}", para: formatBRL(valorInstalacao) },
           { de: "{{valor_multa}}", para: formatBRL(valorMulta) },
@@ -978,6 +985,10 @@ class ZapSign {
         telefone_conversa,
       } = params;
 
+      const planoRecord = plano
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: plano } })
+        : null;
+
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
       const template = await templateRepo.findOne({
         where: { nome_servico: "Alteração de Plano", tipo: "gratis" },
@@ -1022,7 +1033,7 @@ class ZapSign {
           { de: "{{emailcliente}}", para: email },
           { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
           { de: "{{planodeacesso}}", para: plano },
-          { de: "{{velocidadeplano}}", para: "Conforme solicitado" },
+          { de: "{{velocidadeplano}}", para: formatVelocidade(planoRecord?.velup, planoRecord?.veldown) },
           { de: "{{valor}}", para: valor || "0.00" },
           { de: "{{descontocliente}}", para: "0,00" },
           { de: "{{diavencimento}}", para: vencimento || "N/A" },
