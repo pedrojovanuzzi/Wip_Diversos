@@ -3,7 +3,7 @@ import AppDataSource from "../database/DataSource";
 import MkauthSource from "../database/MkauthSource";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { ChamadosEntities } from "../entities/ChamadosEntities";
-import { Between, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
+import { Between, In, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
 import moment from "moment-timezone";
 import { ConsultCenterService } from "../services/ConsultCenterService";
 import { MensagensComuns, enviarNotificacaoServico, gerarLancamentoServico } from "./whatsapp/index";
@@ -82,8 +82,24 @@ class SolicitacaoServicoController {
         take: limitNum,
       });
 
+      // Enrich with chamado status from MKAuth
+      const chamadoIds = list.map((s) => s.id_chamado).filter(Boolean) as string[];
+      let chamadoStatusMap: Record<string, string> = {};
+      if (chamadoIds.length > 0) {
+        const chamados = await MkauthSource.getRepository(ChamadosEntities).find({
+          select: { chamado: true, status: true },
+          where: { chamado: In(chamadoIds) },
+        });
+        chamadoStatusMap = Object.fromEntries(chamados.map((c) => [c.chamado!, c.status || "aberto"]));
+      }
+
+      const enrichedList = list.map((s) => ({
+        ...s,
+        status_chamado: s.id_chamado ? (chamadoStatusMap[s.id_chamado] ?? null) : null,
+      }));
+
       res.status(200).json({
-        data: list,
+        data: enrichedList,
         total: count,
         page: pageNum,
         totalPages: Math.ceil(count / limitNum),
@@ -427,6 +443,10 @@ class SolicitacaoServicoController {
       solicitacao.id_chamado = id_chamado;
 
       await repository.save(solicitacao);
+
+      // Fecha o chamado no MKAuth
+      chamadoExistente.status = "fechado";
+      await mkRepository.save(chamadoExistente);
 
       res.status(200).json({
         success: true,

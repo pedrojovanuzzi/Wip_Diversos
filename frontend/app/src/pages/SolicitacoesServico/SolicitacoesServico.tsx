@@ -363,9 +363,15 @@ const SolicitacoesServico = () => {
                   </TableCell>
                   <TableCell>
                     {!service.token_zapsign ? (
-                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-500 text-white">
-                        Sem Assinatura
-                      </span>
+                      service.servico === "Mudança de Cômodo" ? (
+                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-500 text-white">
+                          Sem Assinatura
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                          Pendente
+                        </span>
+                      )
                     ) : service.assinado ? (
                       <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                         Assinado
@@ -377,13 +383,21 @@ const SolicitacoesServico = () => {
                     )}
                   </TableCell>
                   <TableCell>
-                    {service.finalizado ? (
-                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-500 text-white">
-                        Concluído
+                    {!service.id_chamado ? (
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                        Sem chamado
+                      </span>
+                    ) : service.status_chamado === "fechado" ? (
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                        Fechado
+                      </span>
+                    ) : service.status_chamado === "aberto" ? (
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                        Aberto
                       </span>
                     ) : (
-                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
-                        Pendente
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                        {service.status_chamado}
                       </span>
                     )}
                   </TableCell>

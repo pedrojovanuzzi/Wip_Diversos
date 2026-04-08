@@ -174,9 +174,10 @@ class ZapSign {
 
       let termoFinal = termo;
       if (!termoFinal) {
-        const lastCliente = await MkauthDataSource.getRepository(ClientesEntities).findOne({
+        const [lastCliente] = await MkauthDataSource.getRepository(ClientesEntities).find({
           select: { id: true },
           order: { id: "DESC" },
+          take: 1,
         });
         const nextId = (lastCliente?.id ?? 0) + 1;
         termoFinal = `${nextId}C/${new Date().getFullYear()}`;
