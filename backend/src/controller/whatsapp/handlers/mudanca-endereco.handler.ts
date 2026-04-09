@@ -90,6 +90,20 @@ async function salvarSolicitacaoMudancaEndereco(
     ...dadosFlow,
     login: session.login || dadosFlow.login,
     endereco_antigo: session.endereco_antigo || dadosFlow.endereco_antigo,
+    // Endereço atual do cliente (para o documento)
+    endereco: session.endereco_atual || "",
+    numero: session.numero_atual || "",
+    bairro: session.bairro_atual || "",
+    cidade: session.cidade_atual || "",
+    estado: session.estado_atual || "",
+    cep: session.cep_atual || "",
+    // Novo endereço (do flow) com prefixo novo_
+    novo_rua: dadosFlow.rua || "",
+    novo_numero: dadosFlow.numero || "",
+    novo_bairro: dadosFlow.novo_bairro || "",
+    novo_cidade: dadosFlow.cidade || "",
+    novo_estado: dadosFlow.estado || "",
+    novo_cep: dadosFlow.cep || "",
     forma_pagamento: session.formaPagamento || "Não informada",
     valor: session.formaPagamento === "Paga com Pix" ? "200.00" : "0.00",
     valor_plano: session.valor_plano_atual || "",
@@ -170,7 +184,7 @@ export async function iniciarMudanca(
     session.cpf = cpf;
 
     const sis_cliente = await MkauthDataSource.getRepository(Sis_Cliente).find({
-      select: { id: true, nome: true, endereco: true, login: true, numero: true, termo: true, plano: true, venc: true },
+      select: { id: true, nome: true, endereco: true, login: true, numero: true, bairro: true, cidade: true, estado: true, cep: true, termo: true, plano: true, venc: true },
       where: { cpf_cnpj: cpf, cli_ativado: "s" },
     });
 
@@ -183,6 +197,10 @@ export async function iniciarMudanca(
         endereco: client.endereco,
         login: client.login,
         numero: client.numero,
+        bairro: client.bairro,
+        cidade: client.cidade,
+        estado: client.estado,
+        cep: client.cep,
         termo: client.termo,
         plano: client.plano,
         venc: client.venc,
@@ -204,6 +222,12 @@ export async function iniciarMudanca(
     } else if (sis_cliente.length === 1) {
       session.login = sis_cliente[0].login;
       session.endereco_antigo = `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`;
+      session.endereco_atual = sis_cliente[0].endereco || "";
+      session.numero_atual = sis_cliente[0].numero || "";
+      session.bairro_atual = sis_cliente[0].bairro || "";
+      session.cidade_atual = sis_cliente[0].cidade || "";
+      session.estado_atual = sis_cliente[0].estado || "";
+      session.cep_atual = sis_cliente[0].cep || "";
       session.contrato_cliente = sis_cliente[0].termo || "";
       session.plano_mudanca = sis_cliente[0].plano || "";
       session.vencimento_mudanca = sis_cliente[0].venc || "";
@@ -266,6 +290,12 @@ export async function iniciarMudanca(
       const selectedClient = session.structuredData[selectedIndex];
       session.login = selectedClient.login;
       session.endereco_antigo = `${selectedClient.endereco}, ${selectedClient.numero}`;
+      session.endereco_atual = selectedClient.endereco || "";
+      session.numero_atual = selectedClient.numero || "";
+      session.bairro_atual = selectedClient.bairro || "";
+      session.cidade_atual = selectedClient.cidade || "";
+      session.estado_atual = selectedClient.estado || "";
+      session.cep_atual = selectedClient.cep || "";
       session.contrato_cliente = selectedClient.termo || "";
       session.plano_mudanca = selectedClient.plano || "";
       session.vencimento_mudanca = selectedClient.venc || "";

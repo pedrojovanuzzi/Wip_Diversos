@@ -132,10 +132,16 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
     { de: "{{rgcliente2}}", para: s("rg_novo_titular") || "Não informado" },
     { de: "{{enderecoresclient2}}", para: s("endereco_novo_titular") },
     { de: "{{numerorescliente2}}", para: s("numero_novo_titular") },
-    { de: "{{bairrocliente2}}", para: s("bairro_novo_titular") },
     { de: "{{celularcliente2}}", para: s("celular_novo_titular") },
     { de: "{{celular2cliente2}}", para: s("celular2_novo_titular") },
     { de: "{{emailcliente2}}", para: s("email_novo_titular") },
+    // --- Novo endereço (Mudança de Endereço) ---
+    { de: "{{enderecocliente2}}", para: s("novo_endereco", "novo_rua") },
+    { de: "{{numerocliente2}}", para: s("novo_numero") },
+    { de: "{{bairrocliente2}}", para: s("novo_bairro", "bairro_novo_titular") },
+    { de: "{{cidadecliente2}}", para: s("novo_cidade") },
+    { de: "{{estadocliente2}}", para: s("novo_estado") },
+    { de: "{{cepcliente2}}", para: s("novo_cep") },
   ];
 }
 
@@ -415,6 +421,13 @@ class ZapSign {
         endereco_novo_titular: cliente.endereco,
         numero_novo_titular: cliente.numero,
         bairro_novo_titular: cliente.bairro,
+        // Dados fictícios para mudança de endereço
+        novo_rua: "Rua Teste Novo Endereço",
+        novo_numero: "999",
+        novo_bairro: "Bairro Novo Teste",
+        novo_cidade: "Cidade Nova Teste",
+        novo_estado: "SP",
+        novo_cep: "17000-000",
       };
 
       const resultados: Record<string, any> = {};
