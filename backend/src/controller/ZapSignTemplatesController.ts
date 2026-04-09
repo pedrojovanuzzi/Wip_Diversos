@@ -82,7 +82,7 @@ export default class ZapSignTemplatesController {
         : "https://api.zapsign.com.br/api/v1/templates/create";
 
       const zapSignData = {
-        name: `Template - ${template.nome_servico}`,
+        name: `Template - ${template.nome_servico} ${template.tipo}`,
         base64_docx: finalBase64,
         lang: "pt-br",
         observers: ["financeiro@wiptelecom.com.br"],
