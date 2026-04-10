@@ -53,6 +53,7 @@ import { GraficoInstalacoes } from "./pages/Chamados/GraficoInstalacoes";
 import { ZapSignConfig } from "./pages/zapsign/ZapSignConfig";
 import { ZapSignTeste } from "./pages/zapsign/ZapSignTeste";
 import SolicitacoesServico from "./pages/SolicitacoesServico/SolicitacoesServico";
+import { WhatsappTeste } from "./pages/whatsapp/WhatsappTeste";
 
 const isLocalhost =
   window.location.hostname === "localhost" ||
@@ -542,6 +543,18 @@ function App() {
               element={
                 user?.token ? (
                   <ZapSignTeste />
+                ) : (
+                  <Navigate to="/auth/login" />
+                )
+              }
+            />
+          )}
+          {isLocalhost && (
+            <Route
+              path="/whatsapp-teste"
+              element={
+                user?.token ? (
+                  <WhatsappTeste />
                 ) : (
                   <Navigate to="/auth/login" />
                 )

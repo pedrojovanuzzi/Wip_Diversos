@@ -3,7 +3,8 @@ import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
-import { FaSearch, FaFileSignature, FaExternalLinkAlt, FaCheckCircle, FaTimesCircle, FaSpinner } from "react-icons/fa";
+import { FaSearch, FaFileSignature, FaExternalLinkAlt, FaCheckCircle, FaTimesCircle, FaSpinner, FaWhatsapp } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 interface ClienteInfo {
   login: string;
@@ -47,6 +48,7 @@ export const ZapSignTeste = () => {
   const { user } = useAuth();
   const token = user?.token;
   const { showError, showSuccess } = useNotification();
+  const navigate = useNavigate();
 
   const buscarCliente = async () => {
     if (!login.trim()) {
@@ -93,6 +95,29 @@ export const ZapSignTeste = () => {
       <NavBar />
       <div className="flex-grow p-4 sm:p-8">
         <div className="max-w-5xl mx-auto space-y-6">
+          {/* Navigation */}
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div className="bg-gray-800 p-4 text-white">
+              <h2 className="text-sm font-black uppercase tracking-widest">Ambiente de Testes</h2>
+            </div>
+            <div className="p-4 flex gap-3">
+              <button
+                className="flex items-center gap-2 px-5 py-3 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition-all"
+                disabled
+              >
+                <FaFileSignature />
+                Documentos ZapSign
+              </button>
+              <button
+                onClick={() => navigate("/whatsapp-teste")}
+                className="flex items-center gap-2 px-5 py-3 bg-green-600 text-white rounded-xl font-bold text-sm hover:bg-green-700 transition-all"
+              >
+                <FaWhatsapp />
+                Fluxos WhatsApp
+              </button>
+            </div>
+          </div>
+
           {/* Header */}
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="bg-amber-500 p-6 text-white flex items-center gap-3">
