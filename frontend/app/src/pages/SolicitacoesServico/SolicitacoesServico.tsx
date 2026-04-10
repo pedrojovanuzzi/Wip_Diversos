@@ -362,6 +362,7 @@ const SolicitacoesServico = () => {
                 <TableCell className="text-white font-bold">
                   Status de Assinatura
                 </TableCell>
+                <TableCell className="text-white font-bold">Consulta CPF</TableCell>
                 <TableCell className="text-white font-bold">Status</TableCell>
                 <TableCell className="text-white font-bold">Ações</TableCell>
               </TableRow>
@@ -422,6 +423,32 @@ const SolicitacoesServico = () => {
                     ) : (
                       <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
                         Pendente
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {service.dados?.consultaConsultCenter ? (
+                      <Box>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            service.dados.consultaConsultCenter.devePagar
+                              ? "bg-red-100 text-red-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
+                          {service.dados.consultaConsultCenter.devePagar
+                            ? `Dívida: R$ ${Number(service.dados.consultaConsultCenter.totalDivida).toFixed(2)}`
+                            : "Sem restrição"}
+                        </span>
+                        {service.dados.consultaConsultCenter.nome && (
+                          <Typography variant="caption" display="block" sx={{ mt: 0.5, color: "text.secondary" }}>
+                            {service.dados.consultaConsultCenter.nome}
+                          </Typography>
+                        )}
+                      </Box>
+                    ) : (
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                        Não consultado
                       </span>
                     )}
                   </TableCell>
@@ -518,7 +545,7 @@ const SolicitacoesServico = () => {
               ))}
               {services.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={9} align="center">
                     Nenhum serviço solicitado encontrado.
                   </TableCell>
                 </TableRow>

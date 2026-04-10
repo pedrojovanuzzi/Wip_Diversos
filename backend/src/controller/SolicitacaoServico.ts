@@ -162,6 +162,17 @@ class SolicitacaoServicoController {
         return;
       }
 
+      // Salva resultado da consulta nos dados da solicitação
+      solicitacao.dados = {
+        ...dados,
+        consultaConsultCenter: {
+          nome: consulta.nome || null,
+          totalDivida: consulta.totalDivida,
+          devePagar: consulta.devePagar,
+          dataConsulta: new Date().toISOString(),
+        },
+      };
+
       if (consulta.devePagar) {
         // Fluxo Pago
         solicitacao.pago = false;
@@ -281,6 +292,18 @@ class SolicitacaoServicoController {
         });
         return;
       }
+
+      // Salva resultado da consulta manual nos dados da solicitação
+      solicitacao.dados = {
+        ...dados,
+        consultaConsultCenter: {
+          nome: consulta.nome || nome || null,
+          totalDivida: consulta.totalDivida,
+          devePagar: consulta.devePagar,
+          dataConsulta: new Date().toISOString(),
+          manual: true,
+        },
+      };
 
       if (consulta.devePagar) {
         solicitacao.pago = false;
