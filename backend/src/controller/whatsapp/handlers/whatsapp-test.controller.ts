@@ -46,61 +46,78 @@ function getFlows(cliente: ClienteData | null): FlowDefinition[] {
         { input: "", type: "text", label: "Início da conversa" },
         { input: "Boleto/Pix", type: "interactive", label: "Seleciona Boleto/Pix" },
         { input: cpf, type: "interactive", label: `Informa CPF (${cpf})` },
+        { input: "1", type: "interactive", label: "Seleciona primeiro cadastro" },
         { input: "continuar", type: "interactive", label: "Continuar" },
         { input: "Não", type: "interactive", label: "Encerra atendimento" },
       ],
     },
     {
       name: "Instalação",
-      description: "Fluxo de nova instalação (até formulário)",
+      description: "Fluxo de nova instalação (até formulário de cadastro)",
       requiresLogin: false,
       steps: [
         { input: "", type: "text", label: "Início da conversa" },
         { input: "Serviços/Contratação", type: "interactive", label: "Seleciona Serviços" },
         { input: "Instalação", type: "interactive", label: "Seleciona Instalação" },
         { input: "Sim Aceito", type: "interactive", label: "Aceita LGPD" },
+        // Próximo passo seria o envio do formulário Flow (JSON) — para no aguardo do preenchimento
       ],
     },
     {
       name: "Mudança de Endereço",
-      description: "Fluxo de mudança de endereço",
-      requiresLogin: false,
+      description: "Fluxo completo de mudança de endereço (até escolha de pagamento)",
+      requiresLogin: true,
       steps: [
         { input: "", type: "text", label: "Início da conversa" },
         { input: "Serviços/Contratação", type: "interactive", label: "Seleciona Serviços" },
         { input: "Mudança de Endereço", type: "interactive", label: "Seleciona Mudança de Endereço" },
+        { input: cpf, type: "interactive", label: `Informa CPF (${cpf})` },
+        { input: "1", type: "interactive", label: "Seleciona primeiro cadastro" },
+        { input: "Grátis", type: "interactive", label: "Escolhe forma gratuita (fidelidade)" },
+        // Próximo passo seria o envio do formulário Flow de endereço — para no aguardo do preenchimento
       ],
     },
     {
       name: "Mudança de Cômodo",
-      description: "Fluxo de mudança de cômodo",
-      requiresLogin: false,
+      description: "Fluxo completo de mudança de cômodo (até escolha de pagamento)",
+      requiresLogin: true,
       steps: [
         { input: "", type: "text", label: "Início da conversa" },
         { input: "Serviços/Contratação", type: "interactive", label: "Seleciona Serviços" },
         { input: "Mudança de Cômodo", type: "interactive", label: "Seleciona Mudança de Cômodo" },
+        { input: cpf, type: "interactive", label: `Informa CPF (${cpf})` },
+        { input: "1", type: "interactive", label: "Seleciona primeiro cadastro" },
+        { input: "Grátis", type: "interactive", label: "Escolhe forma gratuita (fidelidade)" },
+        // Próximo passo seria o envio do formulário Flow de cômodo — para no aguardo do preenchimento
       ],
     },
     {
       name: "Alteração Titularidade",
-      description: "Fluxo de troca de titularidade (até LGPD)",
-      requiresLogin: false,
+      description: "Fluxo completo de troca de titularidade (até formulário de contato)",
+      requiresLogin: true,
       steps: [
         { input: "", type: "text", label: "Início da conversa" },
         { input: "Serviços/Contratação", type: "interactive", label: "Seleciona Serviços" },
         { input: "Alteração Titularidade", type: "interactive", label: "Seleciona Titularidade" },
         { input: "Sim Aceito", type: "interactive", label: "Aceita LGPD" },
+        { input: cpf, type: "interactive", label: `Informa CPF titular atual (${cpf})` },
+        { input: "1", type: "interactive", label: "Seleciona primeiro cadastro" },
+        // Próximo passo seria o envio do formulário Flow de contato do novo titular — para no aguardo do preenchimento
       ],
     },
     {
       name: "Alteração de Plano",
-      description: "Fluxo de troca de plano (até LGPD)",
-      requiresLogin: false,
+      description: "Fluxo completo de troca de plano (até formulário de seleção de plano)",
+      requiresLogin: true,
       steps: [
         { input: "", type: "text", label: "Início da conversa" },
         { input: "Serviços/Contratação", type: "interactive", label: "Seleciona Serviços" },
         { input: "Alteração de Plano", type: "interactive", label: "Seleciona Troca de Plano" },
         { input: "Sim Aceito", type: "interactive", label: "Aceita LGPD" },
+        { input: cpf, type: "interactive", label: `Informa CPF (${cpf})` },
+        { input: "1", type: "interactive", label: "Seleciona primeiro cadastro" },
+        { input: "Sim Concordo", type: "interactive", label: "Aceita termos de alteração de plano" },
+        // Próximo passo seria o envio do formulário Flow de seleção de plano — para no aguardo do preenchimento
       ],
     },
     {
@@ -116,12 +133,12 @@ function getFlows(cliente: ClienteData | null): FlowDefinition[] {
     },
     {
       name: "Falar com Atendente",
-      description: "Fluxo de encaminhamento para atendente",
+      description: "Fluxo de encaminhamento para atendente e encerramento",
       requiresLogin: false,
       steps: [
         { input: "", type: "text", label: "Início da conversa" },
         { input: "Falar com Atendente", type: "interactive", label: "Seleciona Atendente" },
-        { input: "Não", type: "interactive", label: "Encerra" },
+        { input: "Não", type: "interactive", label: "Encerra atendimento" },
       ],
     },
     {
@@ -129,8 +146,7 @@ function getFlows(cliente: ClienteData | null): FlowDefinition[] {
       description: "Testa o comando de resetar sessão",
       requiresLogin: false,
       steps: [
-        { input: "", type: "text", label: "Início da conversa" },
-        { input: "resetar", type: "interactive", label: "Reseta sessão" },
+        { input: "resetar", type: "text", label: "Reseta sessão" },
       ],
     },
   ];
