@@ -215,7 +215,7 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   title="Config ZapSign"
                   description="Configurar templates ZapSign"
                 />
-                {(window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && (
+                {((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && permission >= 5) && (
                   <NavItem
                     to="/zapsign-teste"
                     icon={

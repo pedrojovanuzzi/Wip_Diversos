@@ -3,6 +3,8 @@ import { whatsappOutgoingQueue } from "../services/messaging.service";
 import { handleMessage } from "./message.handler";
 import MkauthDataSource from "../../../database/MkauthSource";
 import { ClientesEntities } from "../../../entities/ClientesEntities";
+import ApiMkDataSource from "../../../database/API_MK";
+import Sessions from "../../../entities/APIMK/Sessions";
 
 interface FlowStep {
   input: string;
@@ -34,8 +36,53 @@ interface ClienteData {
   venc: string;
 }
 
+function buildFlowJson(data: Record<string, string>): string {
+  return JSON.stringify({ flow_token: "test_token", ...data });
+}
+
 function getFlows(cliente: ClienteData | null): FlowDefinition[] {
   const cpf = cliente?.cpf_cnpj || "00000000000";
+  const nome = cliente?.nome || "TESTE SIMULADOR";
+  const celular = cliente?.celular || "14999999999";
+  const email = cliente?.email || "teste@teste.com";
+  const rg = cliente?.rg || "000000000";
+  const endereco = cliente?.endereco || "RUA TESTE";
+  const numero = cliente?.numero || "100";
+  const bairro = cliente?.bairro || "CENTRO";
+  const cidade = cliente?.cidade || "AVAI";
+  const estado = cliente?.estado || "SP";
+  const cep = cliente?.cep || "17680000";
+  const plano = cliente?.plano || "PLANO_100MB";
+  const venc = cliente?.venc || "10";
+
+  const flowCadastroJson = buildFlowJson({
+    nome, cpf, rg, celular, email,
+    dataNascimento: "01/01/1990",
+    celularSecundario: celular,
+    rua: endereco, numero, bairro, cidade, estado, cep,
+    plano, vencimento: venc, formaPagamento: "Pix",
+  });
+
+  const flowEnderecoJson = buildFlowJson({
+    nome, cpf, celular, login: cliente?.login || "TESTE",
+    endereco_antigo: `${endereco}, ${numero}`,
+    rua: "RUA NOVA TESTE", numero: "200", novo_bairro: "JARDIM NOVO",
+    cidade, estado, cep: "17680001",
+  });
+
+  const flowComodoJson = buildFlowJson({
+    observacao: "Mudança do quarto para a sala",
+  });
+
+  const flowTitularidadeContatoJson = buildFlowJson({
+    nome: "NOVO TITULAR TESTE",
+    celular_destino: "5514999998888",
+  });
+
+  const flowTrocaPlanoJson = buildFlowJson({
+    plano: "PLANO_200MB",
+    observacao: "Desejo aumentar a velocidade",
+  });
 
   return [
     {
@@ -53,19 +100,19 @@ function getFlows(cliente: ClienteData | null): FlowDefinition[] {
     },
     {
       name: "Instalação",
-      description: "Fluxo de nova instalação (até formulário de cadastro)",
-      requiresLogin: false,
+      description: "Fluxo completo de nova instalação (com envio do formulário)",
+      requiresLogin: true,
       steps: [
         { input: "", type: "text", label: "Início da conversa" },
         { input: "Serviços/Contratação", type: "interactive", label: "Seleciona Serviços" },
         { input: "Instalação", type: "interactive", label: "Seleciona Instalação" },
         { input: "Sim Aceito", type: "interactive", label: "Aceita LGPD" },
-        // Próximo passo seria o envio do formulário Flow (JSON) — para no aguardo do preenchimento
+        { input: flowCadastroJson, type: "text", label: "Envia formulário de cadastro (Flow JSON)" },
       ],
     },
     {
       name: "Mudança de Endereço",
-      description: "Fluxo completo de mudança de endereço (até escolha de pagamento)",
+      description: "Fluxo completo de mudança de endereço (com envio do formulário)",
       requiresLogin: true,
       steps: [
         { input: "", type: "text", label: "Início da conversa" },
@@ -74,12 +121,12 @@ function getFlows(cliente: ClienteData | null): FlowDefinition[] {
         { input: cpf, type: "interactive", label: `Informa CPF (${cpf})` },
         { input: "1", type: "interactive", label: "Seleciona primeiro cadastro" },
         { input: "Grátis", type: "interactive", label: "Escolhe forma gratuita (fidelidade)" },
-        // Próximo passo seria o envio do formulário Flow de endereço — para no aguardo do preenchimento
+        { input: flowEnderecoJson, type: "text", label: "Envia formulário de novo endereço (Flow JSON)" },
       ],
     },
     {
       name: "Mudança de Cômodo",
-      description: "Fluxo completo de mudança de cômodo (até escolha de pagamento)",
+      description: "Fluxo completo de mudança de cômodo (com envio do formulário)",
       requiresLogin: true,
       steps: [
         { input: "", type: "text", label: "Início da conversa" },
@@ -88,12 +135,12 @@ function getFlows(cliente: ClienteData | null): FlowDefinition[] {
         { input: cpf, type: "interactive", label: `Informa CPF (${cpf})` },
         { input: "1", type: "interactive", label: "Seleciona primeiro cadastro" },
         { input: "Grátis", type: "interactive", label: "Escolhe forma gratuita (fidelidade)" },
-        // Próximo passo seria o envio do formulário Flow de cômodo — para no aguardo do preenchimento
+        { input: flowComodoJson, type: "text", label: "Envia formulário de mudança de cômodo (Flow JSON)" },
       ],
     },
     {
       name: "Alteração Titularidade",
-      description: "Fluxo completo de troca de titularidade (até formulário de contato)",
+      description: "Fluxo completo de troca de titularidade (com envio do contato)",
       requiresLogin: true,
       steps: [
         { input: "", type: "text", label: "Início da conversa" },
@@ -102,12 +149,12 @@ function getFlows(cliente: ClienteData | null): FlowDefinition[] {
         { input: "Sim Aceito", type: "interactive", label: "Aceita LGPD" },
         { input: cpf, type: "interactive", label: `Informa CPF titular atual (${cpf})` },
         { input: "1", type: "interactive", label: "Seleciona primeiro cadastro" },
-        // Próximo passo seria o envio do formulário Flow de contato do novo titular — para no aguardo do preenchimento
+        { input: flowTitularidadeContatoJson, type: "text", label: "Envia contato do novo titular (Flow JSON)" },
       ],
     },
     {
       name: "Alteração de Plano",
-      description: "Fluxo completo de troca de plano (até formulário de seleção de plano)",
+      description: "Fluxo completo de troca de plano (com envio do formulário)",
       requiresLogin: true,
       steps: [
         { input: "", type: "text", label: "Início da conversa" },
@@ -117,7 +164,7 @@ function getFlows(cliente: ClienteData | null): FlowDefinition[] {
         { input: cpf, type: "interactive", label: `Informa CPF (${cpf})` },
         { input: "1", type: "interactive", label: "Seleciona primeiro cadastro" },
         { input: "Sim Concordo", type: "interactive", label: "Aceita termos de alteração de plano" },
-        // Próximo passo seria o envio do formulário Flow de seleção de plano — para no aguardo do preenchimento
+        { input: flowTrocaPlanoJson, type: "text", label: "Envia seleção de plano (Flow JSON)" },
       ],
     },
     {
@@ -293,12 +340,29 @@ export async function simulateFlow(req: Request, res: Response) {
       captured.push(extractMessageContent(name, data));
     };
 
+    // Monkey-patch Sessions.findOne para não sobrescrever dadosCadastro com dados do banco
+    const sessionsRepo = ApiMkDataSource.getRepository(Sessions);
+    const originalFindOne = sessionsRepo.findOne.bind(sessionsRepo);
+    sessionsRepo.findOne = (async () => null) as any;
+
     try {
       const session: any = { stage: "" };
 
       for (let i = 0; i < flow.steps.length; i++) {
         const step = flow.steps[i];
         captured.length = 0;
+
+        // Se o input é um JSON de Flow, pré-popula session.dadosCadastro
+        // simulando o que o webhook do WhatsApp Flow faz no fluxo real
+        try {
+          const parsed = JSON.parse(step.input);
+          if (parsed.flow_token) {
+            const { flow_token, ...flowData } = parsed;
+            session.dadosCadastro = flowData;
+          }
+        } catch {
+          // Não é JSON, segue normalmente
+        }
 
         try {
           await handleMessage(
@@ -333,6 +397,7 @@ export async function simulateFlow(req: Request, res: Response) {
       }
     } finally {
       (whatsappOutgoingQueue as any).add = originalAdd;
+      sessionsRepo.findOne = originalFindOne;
     }
 
     res.json({
