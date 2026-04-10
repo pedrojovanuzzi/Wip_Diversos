@@ -229,7 +229,8 @@ export async function simulateFlow(req: Request, res: Response) {
     if (login) {
       cliente = await fetchCliente(login);
       if (!cliente) {
-        return res.status(404).json({ error: `Cliente "${login}" não encontrado no MKAuth.` });
+        res.status(404).json({ error: `Cliente "${login}" não encontrado no MKAuth.` });
+        return;
       }
     }
 
@@ -237,18 +238,21 @@ export async function simulateFlow(req: Request, res: Response) {
 
     // If no flowName, return available flows
     if (!flowName) {
-      return res.json({
+      res.json({
         flows: flows.map((f) => ({ name: f.name, description: f.description, requiresLogin: f.requiresLogin })),
       });
+      return;
     }
 
     const flow = flows.find((f) => f.name === flowName);
     if (!flow) {
-      return res.status(400).json({ error: `Fluxo "${flowName}" não encontrado.` });
+      res.status(400).json({ error: `Fluxo "${flowName}" não encontrado.` });
+      return;
     }
 
     if (flow.requiresLogin && !cliente) {
-      return res.status(400).json({ error: `O fluxo "${flowName}" requer um login válido.` });
+      res.status(400).json({ error: `O fluxo "${flowName}" requer um login válido.` });
+      return;
     }
 
     const testPhone = "5500000000000";
@@ -340,7 +344,8 @@ export async function buscarCliente(req: Request, res: Response) {
     const { login } = req.params;
     const cliente = await fetchCliente(login);
     if (!cliente) {
-      return res.status(404).json({ error: "Cliente não encontrado." });
+      res.status(404).json({ error: "Cliente não encontrado." });
+      return;
     }
     res.json(cliente);
   } catch (err: any) {
