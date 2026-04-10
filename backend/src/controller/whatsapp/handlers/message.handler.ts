@@ -170,6 +170,19 @@ export async function handleMessage(
       session._deleted = true;
       return;
     }
+
+    if (texto && texto.toLowerCase() === "inicio") {
+      await boasVindas(celular);
+      await MensagemBotao(
+        celular,
+        "Escolha a Opção",
+        "Boleto/Pix",
+        "Serviços/Contratação",
+        "Falar com Atendente",
+      );
+      session.stage = "options_start";
+      return;
+    }
   } catch (error) {
     console.error("Erro ao inserir ou encontrar a pessoa:", error);
   }
