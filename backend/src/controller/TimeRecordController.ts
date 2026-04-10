@@ -161,12 +161,12 @@ class TimeRecordController {
           : scale === "Integral"
             ? 0
             : scale === "4h"
-              ? 240
-              : 480; // 12*60 or 0 or 4*60 or 8*60
+              ? 528
+              : 528; // 12*60 or 0 or 8h48m
       const TOLERANCE = 10;
 
-      // Se passar da tolerância (ex: 8h10m), paga TUDO (os 10m + excedente).
-      // Se não passar (ex: 8h10m cravados), paga ZERO.
+      // Se passar da tolerância (ex: 8h48m para 5x2), paga TUDO.
+      // Se não passar, paga ZERO.
       if (workedMinutes > thresholdMinutes + TOLERANCE) {
         // +10 min tolerance checked
         const extraMinutes = workedMinutes - thresholdMinutes; // Count from threshold (e.g. 0)

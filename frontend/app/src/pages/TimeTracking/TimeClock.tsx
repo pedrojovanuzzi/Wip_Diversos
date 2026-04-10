@@ -306,7 +306,7 @@ export const TimeClock = () => {
                     : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                Escala 4h
+                5x2
               </button>
             ) : (
               <button
@@ -317,7 +317,7 @@ export const TimeClock = () => {
                     : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                Escala 8h
+                5x2
               </button>
             )}
             <button
@@ -328,7 +328,7 @@ export const TimeClock = () => {
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              Escala 12h
+              12x36
             </button>
             <button
               onClick={() => setScale("Integral")}
