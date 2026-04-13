@@ -1201,17 +1201,23 @@ class ZapSign {
     });
 
     if (client) {
+      // Mudança de Endereço: campos novo_* têm o endereço de destino.
+      // Fallback para os campos principais (fluxos antigos/outros serviços).
+      const novoRua = dados.novo_rua || dados.rua || dados.endereco || "";
+      const novoNumero = dados.novo_numero || dados.numero || "";
+      const novoBairro = dados.novo_bairro || dados.bairro || "";
+      const novoCidade = dados.novo_cidade || dados.cidade || "";
+      const novoEstado = dados.novo_estado || dados.estado || "";
+      const novoCep = dados.novo_cep || dados.cep || "";
+
       await ClientesRepository.update(client.id, {
-        endereco: this.limparEndereco(dados.rua || dados.endereco || "", true),
-        numero: this.limparEndereco(dados.numero || ""),
-        bairro: this.limparEndereco(dados.bairro || ""),
-        cidade: this.FormatarCidade(this.limparEndereco(dados.cidade || "")),
-        estado: (dados.estado || "")
-          .toUpperCase()
-          .replace(/\s/g, "")
-          .slice(0, 2),
-        cep: dados.cep
-          ? `${dados.cep.replace(/\D/g, "").slice(0, 5)}-${dados.cep.replace(/\D/g, "").slice(5, 8)}`
+        endereco: this.limparEndereco(novoRua, true),
+        numero: this.limparEndereco(novoNumero),
+        bairro: this.limparEndereco(novoBairro),
+        cidade: this.FormatarCidade(this.limparEndereco(novoCidade)),
+        estado: novoEstado.toUpperCase().replace(/\s/g, "").slice(0, 2),
+        cep: novoCep
+          ? `${novoCep.replace(/\D/g, "").slice(0, 5)}-${novoCep.replace(/\D/g, "").slice(5, 8)}`
           : client.cep,
       });
     }

@@ -90,14 +90,15 @@ async function salvarSolicitacaoMudancaEndereco(
     ...dadosFlow,
     login: session.login || dadosFlow.login,
     endereco_antigo: session.endereco_antigo || dadosFlow.endereco_antigo,
-    // Endereço atual do cliente (para o documento)
+    // Endereço atual do cliente — preenche {{*cliente}} / {{*rescliente}} no termo
     endereco: session.endereco_atual || "",
+    rua: session.endereco_atual || "",
     numero: session.numero_atual || "",
     bairro: session.bairro_atual || "",
     cidade: session.cidade_atual || "",
     estado: session.estado_atual || "",
     cep: session.cep_atual || "",
-    // Novo endereço (do flow) com prefixo novo_
+    // Novo endereço (do flow) — preenche {{*cliente2}} no termo e atualiza o cadastro pós-assinatura
     novo_rua: dadosFlow.rua || "",
     novo_numero: dadosFlow.numero || "",
     novo_bairro: dadosFlow.novo_bairro || "",
