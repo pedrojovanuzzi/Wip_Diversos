@@ -153,6 +153,34 @@ const CriarFichaTecnica: React.FC = () => {
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
   const [buscandoSinal, setBuscandoSinal] = useState(false);
+  const [buscandoChamado, setBuscandoChamado] = useState(false);
+
+  const buscarChamadoPorLogin = async (pppoeAlvo: string) => {
+    const login = (pppoeAlvo || "").trim();
+    if (!login) {
+      setChamadoNumber("");
+      return;
+    }
+    setBuscandoChamado(true);
+    try {
+      const response = await axios.get(
+        `${process.env.REACT_APP_URL}/chamados-ficha/by-login/${encodeURIComponent(login)}`,
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+      );
+      setChamadoNumber(String(response.data?.chamado ?? ""));
+      if (response.data?.nome && !cliente) {
+        setCliente(upper(String(response.data.nome)));
+      }
+    } catch (err: any) {
+      setChamadoNumber("");
+      const msg =
+        err?.response?.data?.errors?.[0]?.msg ||
+        "Nenhum chamado ABERTO encontrado no MKAUTH para este PPPoE.";
+      setErro(msg);
+    } finally {
+      setBuscandoChamado(false);
+    }
+  };
 
   const extrairRxPower = (texto: string): string => {
     if (!texto) return "0";
@@ -444,7 +472,15 @@ const CriarFichaTecnica: React.FC = () => {
                 fullWidth
                 label="Número do chamado"
                 value={chamadoNumber}
-                onChange={(e) => setChamadoNumber(e.target.value)}
+                placeholder="Preenchido ao informar o PPPoE"
+                InputProps={{
+                  readOnly: true,
+                  endAdornment: buscandoChamado ? (
+                    <InputAdornment position="end">
+                      <CircularProgress size={18} />
+                    </InputAdornment>
+                  ) : undefined,
+                }}
                 required
               />
             </Grid>
@@ -480,7 +516,11 @@ const CriarFichaTecnica: React.FC = () => {
                 label="Usuário (PPPoE)"
                 value={usuario}
                 onChange={(e) => setUsuario(upper(e.target.value))}
-                onBlur={(e) => buscarSinalOnu(e.target.value)}
+                onBlur={(e) => {
+                  const v = e.target.value;
+                  buscarSinalOnu(v);
+                  buscarChamadoPorLogin(v);
+                }}
                 required
               />
             </Grid>

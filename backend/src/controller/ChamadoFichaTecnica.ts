@@ -288,6 +288,43 @@ class ChamadoFichaTecnicaController {
     }
   };
 
+  public buscarChamadoPorLogin = async (req: Request, res: Response) => {
+    try {
+      const login = String(req.params.login || "").trim();
+      if (!login) {
+        res.status(400).json({ errors: [{ msg: "Login é obrigatório." }] });
+        return;
+      }
+
+      const chamadosRepo = MkauthSource.getRepository(ChamadosEntities);
+      const ultimoChamado = await chamadosRepo.findOne({
+        where: { login, status: "aberto" },
+        order: { abertura: "DESC" },
+      });
+
+      if (!ultimoChamado || !ultimoChamado.chamado) {
+        res.status(404).json({
+          errors: [
+            {
+              msg: `Nenhum chamado ABERTO encontrado no MKAUTH para o login ${login}.`,
+            },
+          ],
+        });
+        return;
+      }
+
+      res.status(200).json({
+        chamado: ultimoChamado.chamado,
+        nome: ultimoChamado.nome ?? null,
+      });
+    } catch (error) {
+      console.error("[ChamadoFichaTecnica.buscarChamadoPorLogin]", error);
+      res
+        .status(500)
+        .json({ errors: [{ msg: "Erro ao buscar chamado no MKAUTH." }] });
+    }
+  };
+
   public ressincronizar = async (req: Request, res: Response) => {
     try {
       const id = Number(req.params.id);
