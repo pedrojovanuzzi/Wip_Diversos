@@ -247,7 +247,58 @@ class Backup {
       }
     }
 
+    if (attachments.length > 0) {
+      this.agendarLimpezaLocal(attachments.map((a) => a.path));
+    }
+
     return attachments;
+  }
+
+  private agendarLimpezaLocal(filePaths: string[]) {
+    const DOZE_HORAS_MS = 12 * 60 * 60 * 1000;
+    console.log(
+      `🗑️ Limpeza local agendada para daqui a 12h (${filePaths.length} arquivo(s)).`
+    );
+
+    setTimeout(() => {
+      const parentDirs = new Set<string>();
+
+      for (const filePath of filePaths) {
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.rmSync(filePath, { force: true });
+            console.log(`🧹 Backup local removido: ${filePath}`);
+          }
+          parentDirs.add(path.dirname(filePath));
+        } catch (err) {
+          console.error(`❌ Falha ao remover ${filePath}:`, err);
+        }
+      }
+
+      const backupsRoot = path.resolve(__dirname, "..", "backups");
+      for (const dir of parentDirs) {
+        this.removerDiretoriosVaziosAte(dir, backupsRoot);
+      }
+    }, DOZE_HORAS_MS).unref?.();
+  }
+
+  private removerDiretoriosVaziosAte(dir: string, stopAt: string) {
+    let current = dir;
+    while (
+      current.startsWith(stopAt) &&
+      current !== stopAt &&
+      fs.existsSync(current)
+    ) {
+      try {
+        if (fs.readdirSync(current).length > 0) break;
+        fs.rmdirSync(current);
+        console.log(`🧹 Diretório vazio removido: ${current}`);
+        current = path.dirname(current);
+      } catch (err) {
+        console.error(`❌ Falha ao remover diretório ${current}:`, err);
+        break;
+      }
+    }
   }
 
   // Método público chamado pelo CRON ou agendador
