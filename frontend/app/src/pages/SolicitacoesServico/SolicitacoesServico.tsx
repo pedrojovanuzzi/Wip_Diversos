@@ -604,7 +604,7 @@ const SolicitacoesServico = () => {
                             </Button>
                           </>
                         )}
-                      {!service.finalizado && !service.cancelado && !service.id_chamado && (
+                      {!service.finalizado && !service.cancelado && (
                         <Button
                           variant="contained"
                           size="small"

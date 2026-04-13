@@ -578,13 +578,7 @@ class SolicitacaoServicoController {
         return;
       }
 
-      if (solicitacao.id_chamado) {
-        res.status(409).json({
-          message: `Esta solicitação já possui o chamado ${solicitacao.id_chamado}.`,
-        });
-        return;
-      }
-
+      const jaTemChamado = Boolean(solicitacao.id_chamado);
       const dados = (solicitacao.dados || {}) as any;
       const servicoNorm = (solicitacao.servico || "").toLowerCase();
 
@@ -650,22 +644,25 @@ class SolicitacaoServicoController {
         `📶 Plano: ${dados.plano || "-"}\n` +
         `📅 Vencimento: Dia ${dados.vencimento || "-"}`;
 
-      const chamadoId = await criarChamadoMkauth(
-        assunto,
-        {
-          nome: dados.nome || "",
-          login: loginCliente || "",
-          email: dados.email || "",
-        },
-        mensagemChamado,
-        solicitacao,
-      );
+      let chamadoId: string | null = solicitacao.id_chamado || null;
+      if (!jaTemChamado) {
+        chamadoId = await criarChamadoMkauth(
+          assunto,
+          {
+            nome: dados.nome || "",
+            login: loginCliente || "",
+            email: dados.email || "",
+          },
+          mensagemChamado,
+          solicitacao,
+        );
 
-      if (!chamadoId) {
-        res.status(500).json({
-          message: "Não foi possível criar o chamado no MKAuth.",
-        });
-        return;
+        if (!chamadoId) {
+          res.status(500).json({
+            message: "Não foi possível criar o chamado no MKAuth.",
+          });
+          return;
+        }
       }
 
       solicitacao.dados = {
@@ -674,17 +671,26 @@ class SolicitacaoServicoController {
           data: new Date().toISOString(),
           usuario: req.user?.login || null,
           login_gerado: deveCriarCadastro ? loginCliente : undefined,
+          chamado_existente: jaTemChamado || undefined,
         },
       };
       await repository.save(solicitacao);
+
+      const partes: string[] = [];
+      if (deveCriarCadastro) partes.push("Cadastro criado");
+      if (!jaTemChamado) partes.push("chamado criado");
+      if (jaTemChamado && !deveCriarCadastro)
+        partes.push("nenhuma ação necessária: solicitação marcada como dispensada de assinatura");
+      const mensagemFinal =
+        partes.length > 0
+          ? `${partes.join(" e ")} com sucesso (sem assinatura).`
+          : "Solicitação marcada como dispensada de assinatura.";
 
       res.status(200).json({
         success: true,
         id_chamado: chamadoId,
         login_cliente: loginCliente || null,
-        message: deveCriarCadastro
-          ? "Cadastro e chamado criados com sucesso (sem assinatura)."
-          : "Chamado criado com sucesso (sem assinatura).",
+        message: mensagemFinal,
       });
     } catch (error: any) {
       console.error("Erro ao criar sem assinatura:", error);
