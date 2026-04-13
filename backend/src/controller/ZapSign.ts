@@ -646,6 +646,12 @@ class ZapSign {
               switch (servicoNormalizado) {
                 case "instalação":
                 case "instalacao":
+                  if (dados.criadoSemAssinatura) {
+                    console.log(
+                      `[ZapSign Webhook] Solicitação ${solicitacao.id} já foi criada manualmente sem assinatura. Ignorando cadastro/chamado duplicado.`,
+                    );
+                    break;
+                  }
                   const loginCriado = await this.registerClientInMkAuth(dados);
                   console.log(`[ZapSign Webhook] Cliente ${dados.nome} cadastrado no MKAuth para Instalação. Login: ${loginCriado}`);
                   try {
@@ -800,6 +806,11 @@ class ZapSign {
 
       // 1. Criar chamado no cadastro do titular original (pelo CPF)
       try {
+        if (dadosTitular?.criadoSemAssinatura) {
+          console.log(
+            `[AlteraçãoTitularidade] Titular ${solicitacaoTitular.id} já teve chamado criado manualmente sem assinatura. Ignorando duplicação.`,
+          );
+        } else {
         const cpfOriginal = (dadosTitular?.cpf || "").replace(/\D/g, "");
         if (cpfOriginal) {
           const clienteOriginal = await MkauthDataSource.getRepository(ClientesEntities).findOne({
@@ -826,12 +837,19 @@ class ZapSign {
         } else {
           console.warn("[AlteraçãoTitularidade] CPF do titular original não encontrado nos dados.");
         }
+        }
       } catch (e) {
         console.error("[AlteraçãoTitularidade] Erro ao criar chamado para titular:", e);
       }
 
       // 2. Criar novo cadastro no MkAuth para o novo titular e abrir chamado de instalação
       try {
+        if (dadosNovoTitular?.criadoSemAssinatura) {
+          console.log(
+            `[AlteraçãoTitularidade] Novo titular ${solicitacaoNovoTitular.id} já teve cadastro/chamado criado manualmente sem assinatura. Ignorando duplicação.`,
+          );
+          return;
+        }
         const loginNovoTitular = await this.registerClientInMkAuth(dadosNovoTitular);
         console.log(`[AlteraçãoTitularidade] Novo titular ${dadosNovoTitular?.nome} cadastrado no MKAuth. Login: ${loginNovoTitular}`);
 
