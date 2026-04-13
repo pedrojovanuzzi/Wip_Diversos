@@ -26,6 +26,7 @@ import Licenca from "./routes/Licenca.Routes";
 import ZapSignRoutes from "./routes/ZapSign.routes";
 import ZapSignTemplatesRoutes from "./routes/ZapSignTemplates.routes";
 import SolicitacaoServicoRouter from "./routes/SolicitacaoServico.routes";
+import ChamadoFichaTecnicaRouter from "./routes/ChamadoFichaTecnica.routes";
 import WhatsappTestRoutes from "./routes/WhatsappTest.routes";
 
 // Controllers (for scheduled tasks)
@@ -77,6 +78,7 @@ export class App {
     this.server.use("/api/zapsign", ZapSignRoutes);
     this.server.use("/api/zapsign-templates", ZapSignTemplatesRoutes);
     this.server.use("/api/solicitacao-servico", SolicitacaoServicoRouter);
+    this.server.use("/api/chamados-ficha", ChamadoFichaTecnicaRouter);
     this.server.use("/api/whatsapp-test", WhatsappTestRoutes);
   }
 

@@ -19,6 +19,7 @@ import {
   FaClock,
   FaUsers,
   FaClipboardList,
+  FaToolbox,
   FaMapMarkedAlt,
   FaDesktop,
   FaChartLine,
@@ -202,6 +203,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   }
                   title="Serviços Solicitados"
                   description="Ver solicitações de serviços"
+                />
+                <NavItem
+                  to="/chamados/ficha-tecnica"
+                  icon={
+                    <FaToolbox className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Ficha Técnica"
+                  description="Fichas técnicas de chamados em campo"
                 />
               </>
             )}

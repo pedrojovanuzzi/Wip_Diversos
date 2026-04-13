@@ -53,6 +53,8 @@ import { GraficoInstalacoes } from "./pages/Chamados/GraficoInstalacoes";
 import { ZapSignConfig } from "./pages/zapsign/ZapSignConfig";
 import { ZapSignTeste } from "./pages/zapsign/ZapSignTeste";
 import SolicitacoesServico from "./pages/SolicitacoesServico/SolicitacoesServico";
+import ListarFichasTecnicas from "./pages/ChamadosFichaTecnica/ListarFichasTecnicas";
+import CriarFichaTecnica from "./pages/ChamadosFichaTecnica/CriarFichaTecnica";
 import { WhatsappTeste } from "./pages/whatsapp/WhatsappTeste";
 
 const isLocalhost =
@@ -430,6 +432,26 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <SolicitacoesServico />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/chamados/ficha-tecnica"
+            element={
+              user?.token ? (
+                <ListarFichasTecnicas />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/chamados/ficha-tecnica/nova"
+            element={
+              user?.token ? (
+                <CriarFichaTecnica />
               ) : (
                 <Navigate to="/auth/login" />
               )

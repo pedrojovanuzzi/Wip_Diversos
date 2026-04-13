@@ -15,6 +15,7 @@ import { MonthlyReportSignature } from "../entities/MonthlyReportSignature";
 import { NFE } from "../entities/NFE";
 import { LicencaEntity } from "../entities/LicencaEntities";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
+import { ChamadoFichaTecnica } from "../entities/ChamadoFichaTecnica";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -41,6 +42,7 @@ const AppDataSource = new DataSource({
     NFE,
     LicencaEntity,
     SolicitacaoServico,
+    ChamadoFichaTecnica,
   ],
   migrations: [path.join(__dirname, "../migration/*.{ts,js}")],
 });
