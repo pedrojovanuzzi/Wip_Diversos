@@ -176,6 +176,47 @@ export async function inserirDominios(dominios: string[]) {
 }
 
 // ======================================
+// Remoção em lote no PostgreSQL
+// ======================================
+export async function removerDominios(dominios: string[]) {
+  if (dominios.length === 0) {
+    console.log("⚠️ Nenhum domínio para remover.");
+    return;
+  }
+
+  await ensureTable();
+
+  const client = getClient();
+  await client.connect();
+
+  try {
+    const sql = `DELETE FROM ${TABLE_NAME} WHERE domain = $1`;
+
+    let removidos = 0;
+    for (const d of dominios) {
+      const res = await client.query(sql, [d]);
+      if (res.rowCount && res.rowCount > 0) removidos++;
+    }
+
+    const naoEncontrados = dominios.length - removidos;
+
+    const resumo = `
+📋 Resumo da operação:
+🗑️ ${removidos} domínios removidos.
+⏭️ ${naoEncontrados} domínios não encontrados na lista.
+  `;
+
+    console.log(resumo);
+    return resumo;
+  } catch (e) {
+    console.error("❌ Falha ao remover domínios:", e);
+    throw e;
+  } finally {
+    await client.end();
+  }
+}
+
+// ======================================
 // Listagem de Domínios
 // ======================================
 export async function listarDominios(): Promise<string[]> {

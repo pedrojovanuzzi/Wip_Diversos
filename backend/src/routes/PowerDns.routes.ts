@@ -29,6 +29,12 @@ router.post(
   powerdns.inserirPdf.bind(powerdns),
 );
 router.post(
+  "/removerPdf",
+  AuthGuard,
+  upload.single("file"),
+  powerdns.removerPdf.bind(powerdns),
+);
+router.post(
   "/inserirDominio",
   AuthGuard,
   powerdns.inserirDominio.bind(powerdns),

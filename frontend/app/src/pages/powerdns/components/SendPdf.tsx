@@ -2,9 +2,10 @@ import React from "react"
 
 interface SendPdfProps{
   onClick?: () => void;
+  label?: string;
 }
 
-export default function SendPdf({onClick} : SendPdfProps) {
+export default function SendPdf({onClick, label = "Criar Nova Regra PowerDns"} : SendPdfProps) {
   return (
     <button
       type="button"
@@ -25,7 +26,7 @@ export default function SendPdf({onClick} : SendPdfProps) {
           strokeLinejoin="round"
         />
       </svg>
-      <span className="mt-2 block text-sm font-semibold text-gray-900">Criar Nova Regra PowerDns</span>
+      <span className="mt-2 block text-sm font-semibold text-gray-900">{label}</span>
     </button>
   )
 }

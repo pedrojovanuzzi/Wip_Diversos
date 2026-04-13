@@ -10,6 +10,7 @@ export const PowerDns = () => {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error" | "">("");
   const [dominioText, setDominioText] = useState("");
+  const [fileMode, setFileMode] = useState<"inserir" | "remover">("inserir");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   async function handleFile(file: File) {
@@ -18,9 +19,11 @@ export const PowerDns = () => {
     setMessage("");
     setMessageType("");
 
+    const endpoint = fileMode === "inserir" ? "inserirPdf" : "removerPdf";
+
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_URL}/PowerDns/inserirPdf`,
+        `${process.env.REACT_APP_URL}/PowerDns/${endpoint}`,
         formData,
         {
           headers: {
@@ -125,8 +128,37 @@ export const PowerDns = () => {
         {/* Envio por Lote (Arquivo) */}
         <div className="bg-white p-6 rounded-lg shadow-md flex flex-col items-center w-full max-w-md">
           <h2 className="text-lg font-semibold mb-4 text-gray-700">
-            Adicionar domínios por arquivo
+            {fileMode === "inserir"
+              ? "Adicionar domínios por arquivo"
+              : "Remover domínios por arquivo"}
           </h2>
+
+          {/* Toggle Adicionar / Remover */}
+          <div className="flex w-full mb-4 rounded-md overflow-hidden border border-gray-300">
+            <button
+              type="button"
+              onClick={() => setFileMode("inserir")}
+              className={`flex-1 py-2 text-sm font-semibold transition-colors ${
+                fileMode === "inserir"
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              Adicionar
+            </button>
+            <button
+              type="button"
+              onClick={() => setFileMode("remover")}
+              className={`flex-1 py-2 text-sm font-semibold transition-colors ${
+                fileMode === "remover"
+                  ? "bg-red-600 text-white"
+                  : "bg-white text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              Remover
+            </button>
+          </div>
+
           {/* Input escondido */}
           <input
             type="file"
@@ -135,13 +167,30 @@ export const PowerDns = () => {
             style={{ display: "none" }}
             onChange={(e) => {
               if (e.target.files && e.target.files[0]) {
+                if (fileMode === "remover") {
+                  const ok = window.confirm(
+                    "Tem certeza que deseja REMOVER da lista todos os domínios extraídos deste arquivo?",
+                  );
+                  if (!ok) {
+                    e.target.value = "";
+                    return;
+                  }
+                }
                 handleFile(e.target.files[0]);
+                e.target.value = "";
               }
             }}
           />
 
           {/* Botão que abre o seletor */}
-          <SendPdf onClick={() => inputRef.current?.click()} />
+          <SendPdf
+            onClick={() => inputRef.current?.click()}
+            label={
+              fileMode === "inserir"
+                ? "Criar Nova Regra PowerDns"
+                : "Remover Regras PowerDns"
+            }
+          />
         </div>
 
         {/* Envio de domínio único por Texto */}

@@ -3,6 +3,7 @@ import {
   extrairDominios,
   inserirDominios,
   listarDominios,
+  removerDominios,
 } from "../utils/createDns";
 import path from "path";
 
@@ -11,7 +12,12 @@ const PATH = path.join(__dirname, "..", "..", "uploads", "DnsPdf.pdf");
 class PowerDNS {
   public async inserirPdf(req: Request, res: Response) {
     console.log("📥 Recebida requisição para inserir PDF.");
-    await this.transformarPdf(req, res);
+    await this.processarPdf(req, res, "inserir");
+  }
+
+  public async removerPdf(req: Request, res: Response) {
+    console.log("📥 Recebida requisição para remover domínios do PDF.");
+    await this.processarPdf(req, res, "remover");
   }
 
   public async inserirDominio(req: Request, res: Response): Promise<void> {
@@ -35,7 +41,11 @@ class PowerDNS {
     }
   }
 
-  private async transformarPdf(req: Request, res: Response) {
+  private async processarPdf(
+    req: Request,
+    res: Response,
+    modo: "inserir" | "remover",
+  ) {
     try {
       const filePath = req.file?.path;
       if (!filePath) {
@@ -49,9 +59,17 @@ class PowerDNS {
 
       if (dominiosExtraidos.length === 0) {
         console.warn("⚠️ Nenhum domínio encontrado no arquivo.");
+        res
+          .status(400)
+          .json({ error: "Nenhum domínio encontrado no arquivo." });
+        return;
       }
 
-      const response = await inserirDominios(dominiosExtraidos);
+      const response =
+        modo === "inserir"
+          ? await inserirDominios(dominiosExtraidos)
+          : await removerDominios(dominiosExtraidos);
+
       console.log("✅ Processamento concluído com sucesso.");
       res.status(200).json({ message: response });
     } catch (error) {
