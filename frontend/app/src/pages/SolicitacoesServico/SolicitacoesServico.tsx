@@ -65,7 +65,9 @@ const SolicitacoesServico = () => {
                   ? "all"
                   : statusFilter === "concluido"
                     ? "true"
-                    : "false",
+                    : statusFilter === "cancelado"
+                      ? "cancelado"
+                      : "false",
             },
             headers: { Authorization: `Bearer ${user?.token}` },
           },
@@ -212,6 +214,71 @@ const SolicitacoesServico = () => {
     setAlertaDebitoService(null);
   };
 
+  const handleCancelar = async (id: number) => {
+    const motivo = window.prompt(
+      "Informe o motivo do cancelamento (opcional). Confirme para cancelar a solicitação:",
+      "",
+    );
+    if (motivo === null) return;
+    if (!window.confirm("Tem certeza que deseja CANCELAR esta solicitação?")) return;
+
+    setLoadingAction(id);
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_URL}/solicitacao-servico/cancelar/${id}`,
+        { motivo },
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+      );
+      alert("Solicitação cancelada com sucesso.");
+      fetchServices(page);
+    } catch (error: any) {
+      console.error("Erro ao cancelar solicitação:", error);
+      const msg = error.response?.data?.message || "Erro ao cancelar solicitação.";
+      alert(msg);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleCriarSemAssinatura = async (id: number, servico: string) => {
+    const servicoNorm = (servico || "").toLowerCase();
+    const ehInstalacao =
+      servicoNorm === "instalação" || servicoNorm === "instalacao";
+    const ehNovoTitular =
+      servicoNorm.includes("titularidade") && servicoNorm.includes("novo titular");
+    const criaCadastro = ehInstalacao || ehNovoTitular;
+
+    const mensagem = criaCadastro
+      ? "Deseja criar o chamado e o cadastro SEM aguardar a assinatura do contrato?"
+      : "Deseja criar apenas o chamado SEM aguardar a assinatura do contrato?";
+
+    if (!window.confirm(mensagem)) {
+      return;
+    }
+
+    setLoadingAction(id);
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/solicitacao-servico/criar-sem-assinatura/${id}`,
+        {},
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+      );
+      alert(
+        response.data?.message ||
+          "Chamado e cadastro criados com sucesso (sem assinatura).",
+      );
+      fetchServices(page);
+    } catch (error: any) {
+      console.error("Erro ao criar sem assinatura:", error);
+      const msg =
+        error.response?.data?.message ||
+        "Erro ao criar chamado/cadastro sem assinatura.";
+      alert(msg);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
   const handleFinalizar = async (id: number) => {
     const ticketId = window.prompt(
       "Para finalizar este serviço, informe o ID do Chamado no MKAuth:",
@@ -341,6 +408,7 @@ const SolicitacoesServico = () => {
             >
               <MenuItem value="pendente">Pendentes</MenuItem>
               <MenuItem value="concluido">Concluídos</MenuItem>
+              <MenuItem value="cancelado">Cancelados</MenuItem>
               <MenuItem value="todos">Todos</MenuItem>
             </Select>
           </FormControl>
@@ -375,6 +443,14 @@ const SolicitacoesServico = () => {
                     {service.dados?.alertaDebitoAnterior?.temDebito && (
                       <Chip
                         label="⚠️ Débito anterior"
+                        color="error"
+                        size="small"
+                        sx={{ ml: 1, fontSize: "0.7rem" }}
+                      />
+                    )}
+                    {service.cancelado && (
+                      <Chip
+                        label="Cancelado"
                         color="error"
                         size="small"
                         sx={{ ml: 1, fontSize: "0.7rem" }}
@@ -528,7 +604,21 @@ const SolicitacoesServico = () => {
                             </Button>
                           </>
                         )}
-                      {!service.finalizado && (
+                      {!service.finalizado && !service.cancelado && !service.id_chamado && (
+                        <Button
+                          variant="contained"
+                          size="small"
+                          sx={{
+                            bgcolor: "#7c3aed",
+                            "&:hover": { bgcolor: "#6d28d9" },
+                          }}
+                          onClick={() => handleCriarSemAssinatura(service.id, service.servico)}
+                          disabled={loadingAction === service.id}
+                        >
+                          Criar Sem Assinatura
+                        </Button>
+                      )}
+                      {!service.finalizado && !service.cancelado && (
                         <Button
                           variant="contained"
                           color="success"
@@ -537,6 +627,17 @@ const SolicitacoesServico = () => {
                           disabled={loadingAction === service.id}
                         >
                           Finalizar
+                        </Button>
+                      )}
+                      {!service.cancelado && (user?.permission || 0) >= 5 && (
+                        <Button
+                          variant="contained"
+                          color="error"
+                          size="small"
+                          onClick={() => handleCancelar(service.id)}
+                          disabled={loadingAction === service.id}
+                        >
+                          Cancelar
                         </Button>
                       )}
                     </Box>

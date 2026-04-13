@@ -47,7 +47,7 @@
               { "type": "TextSubheading", "text": "👤 Dados Pessoais" },
               { "type": "TextInput", "name": "nome", "label": "Nome completo", "required": true, "input-type": "text" },
               { "type": "TextInput", "name": "cpf", "label": "CPF ou CNPJ", "required": true, "input-type": "number" },
-              { "type": "TextInput", "name": "rg", "label": "RG ou IE", "required": true, "input-type": "text" },
+              { "type": "TextInput", "name": "rg", "label": "RG ou IE (opcional)", "required": false, "input-type": "text" },
               { "type": "DatePicker", "name": "dataNascimento", "label": "Data de Nascimento", "required": true },
               { "type": "TextInput", "name": "celular", "label": "Celular (com DDD)", "required": true, "input-type": "number" },
               { "type": "TextInput", "name": "celularSecundario", "label": "Celular Secundário", "required": false, "input-type": "number" },

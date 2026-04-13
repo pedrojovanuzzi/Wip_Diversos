@@ -8,9 +8,11 @@ import moment from "moment-timezone";
 import { ConsultCenterService } from "../services/ConsultCenterService";
 import { MensagensComuns, enviarNotificacaoServico, gerarLancamentoServico } from "./whatsapp/index";
 import { Faturas } from "../entities/Faturas";
+import { ClientesEntities } from "../entities/ClientesEntities";
 import { v4 as uuidv4 } from "uuid";
 import Pix from "./Pix";
 import ZapSign from "./ZapSign";
+import { criarChamadoMkauth } from "./whatsapp/services/chamado.service";
 
 class SolicitacaoServicoController {
   private isConsultaCpfConcluida(solicitacao: SolicitacaoServico): boolean {
@@ -59,14 +61,19 @@ class SolicitacaoServicoController {
         );
       }
 
-      // Filtro de Finalizado
-      if (finalizado === "true" || finalizado === "1") {
+      // Filtro de Finalizado / Cancelado
+      if (finalizado === "cancelado") {
+        where.cancelado = true;
+      } else if (finalizado === "true" || finalizado === "1") {
         where.finalizado = true;
+        where.cancelado = false;
       } else if (finalizado === "false" || finalizado === "0") {
         where.finalizado = false;
+        where.cancelado = false;
       } else if (finalizado === undefined || finalizado === null) {
         // Padrão apenas se não vier o parâmetro (ex: acesso direto à API)
         where.finalizado = false;
+        where.cancelado = false;
       }
       // Se finalizado for "all" ou qualquer outro valor não mapeado, não aplicamos filtro
 
@@ -503,6 +510,187 @@ class SolicitacaoServicoController {
     } catch (error) {
       console.error("Erro ao processar instalação paga:", error);
       res.status(500).json({ message: "Erro interno ao processar instalação paga." });
+    }
+  };
+
+  public cancelar = async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { motivo } = req.body || {};
+
+    try {
+      const repository = AppDataSource.getRepository(SolicitacaoServico);
+      const solicitacao = await repository.findOne({
+        where: { id: Number(id) },
+      });
+
+      if (!solicitacao) {
+        res.status(404).json({ message: "Solicitação não encontrada." });
+        return;
+      }
+
+      if (solicitacao.cancelado) {
+        res.status(409).json({ message: "Solicitação já está cancelada." });
+        return;
+      }
+
+      const dadosAtuais = (solicitacao.dados || {}) as any;
+      solicitacao.cancelado = true;
+      solicitacao.finalizado = true;
+      solicitacao.dados = {
+        ...dadosAtuais,
+        cancelamento: {
+          data: new Date().toISOString(),
+          usuario: req.user?.login || null,
+          motivo: motivo || null,
+        },
+      };
+      await repository.save(solicitacao);
+
+      res.status(200).json({
+        success: true,
+        message: "Solicitação cancelada com sucesso.",
+      });
+    } catch (error) {
+      console.error("Erro ao cancelar solicitação:", error);
+      res.status(500).json({ message: "Erro interno ao cancelar solicitação." });
+    }
+  };
+
+  public criarSemAssinatura = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
+    const { id } = req.params;
+
+    try {
+      const repository = AppDataSource.getRepository(SolicitacaoServico);
+      const solicitacao = await repository.findOne({
+        where: { id: Number(id) },
+      });
+
+      if (!solicitacao) {
+        res.status(404).json({ message: "Solicitação não encontrada." });
+        return;
+      }
+
+      if (solicitacao.cancelado) {
+        res.status(409).json({ message: "Solicitação cancelada não pode ser processada." });
+        return;
+      }
+
+      if (solicitacao.id_chamado) {
+        res.status(409).json({
+          message: `Esta solicitação já possui o chamado ${solicitacao.id_chamado}.`,
+        });
+        return;
+      }
+
+      const dados = (solicitacao.dados || {}) as any;
+      const servicoNorm = (solicitacao.servico || "").toLowerCase();
+
+      let loginCliente = solicitacao.login_cliente || dados.login || "";
+      const ehInstalacao =
+        servicoNorm === "instalação" || servicoNorm === "instalacao";
+      // Para troca/alteração de titularidade, apenas a solicitação do "novo titular"
+      // gera um cadastro novo. A do titular original apenas abre chamado no cadastro existente.
+      const ehTitularidade = servicoNorm.includes("titularidade");
+      const ehNovoTitular = ehTitularidade && servicoNorm.includes("novo titular");
+      const ehTitularAntigo = ehTitularidade && !ehNovoTitular;
+      const deveCriarCadastro = ehInstalacao || ehNovoTitular;
+
+      if (deveCriarCadastro) {
+        loginCliente = await ZapSign.registerClientInMkAuth(dados);
+        solicitacao.login_cliente = loginCliente;
+      } else if (ehTitularAntigo) {
+        // Titular antigo: não criamos cadastro. Se o login_cliente estiver
+        // indefinido/Desconhecido, buscamos no MKAuth pelo CPF para abrir
+        // o chamado diretamente no cadastro existente.
+        const loginInvalido =
+          !loginCliente ||
+          loginCliente === "Desconhecido" ||
+          loginCliente === "Não informado";
+        if (loginInvalido) {
+          const cpfLimpo = (dados.cpf || "").toString().replace(/\D/g, "");
+          if (cpfLimpo) {
+            const clienteExistente = await MkauthSource
+              .getRepository(ClientesEntities)
+              .findOne({ where: { cpf_cnpj: cpfLimpo } });
+            if (clienteExistente?.login) {
+              loginCliente = clienteExistente.login;
+              solicitacao.login_cliente = loginCliente;
+            }
+          }
+        }
+
+        if (!loginCliente || loginCliente === "Desconhecido") {
+          res.status(400).json({
+            message:
+              "Não foi possível identificar o cadastro do titular original no MKAuth. Verifique o CPF nos dados da solicitação.",
+          });
+          return;
+        }
+      }
+
+      const assunto = (solicitacao.servico || "SERVIÇO")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase();
+
+      const mensagemChamado =
+        `Chamado criado manualmente pelo painel (sem assinatura de contrato).\n\n` +
+        `Serviço: ${solicitacao.servico || "-"}\n` +
+        `👤 Nome: ${dados.nome || "-"}\n` +
+        `📄 CPF: ${dados.cpf || "-"}\n` +
+        `🪪 RG/IE: ${dados.rg || "-"}\n` +
+        `📱 Celular: ${dados.celular || dados.telefone_conversa || "-"}\n` +
+        `📧 E-mail: ${dados.email || "-"}\n` +
+        `📍 Endereço: ${dados.rua || dados.endereco || "-"}, ${dados.numero || "-"} - ${dados.bairro || "-"}\n` +
+        `🏙️ Cidade: ${dados.cidade || "-"}/${dados.estado || "-"}\n` +
+        `📮 CEP: ${dados.cep || "-"}\n` +
+        `📶 Plano: ${dados.plano || "-"}\n` +
+        `📅 Vencimento: Dia ${dados.vencimento || "-"}`;
+
+      const chamadoId = await criarChamadoMkauth(
+        assunto,
+        {
+          nome: dados.nome || "",
+          login: loginCliente || "",
+          email: dados.email || "",
+        },
+        mensagemChamado,
+        solicitacao,
+      );
+
+      if (!chamadoId) {
+        res.status(500).json({
+          message: "Não foi possível criar o chamado no MKAuth.",
+        });
+        return;
+      }
+
+      solicitacao.dados = {
+        ...dados,
+        criadoSemAssinatura: {
+          data: new Date().toISOString(),
+          usuario: req.user?.login || null,
+          login_gerado: deveCriarCadastro ? loginCliente : undefined,
+        },
+      };
+      await repository.save(solicitacao);
+
+      res.status(200).json({
+        success: true,
+        id_chamado: chamadoId,
+        login_cliente: loginCliente || null,
+        message: deveCriarCadastro
+          ? "Cadastro e chamado criados com sucesso (sem assinatura)."
+          : "Chamado criado com sucesso (sem assinatura).",
+      });
+    } catch (error: any) {
+      console.error("Erro ao criar sem assinatura:", error);
+      res.status(500).json({
+        message: error?.message || "Erro interno ao criar chamado/cadastro sem assinatura.",
+      });
     }
   };
 

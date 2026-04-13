@@ -43,4 +43,7 @@ export class SolicitacaoServico {
 
     @Column({ type: "varchar", length: 255, nullable: true })
     id_chamado?: string;
+
+    @Column({ type: "boolean", default: false })
+    cancelado?: boolean;
 }

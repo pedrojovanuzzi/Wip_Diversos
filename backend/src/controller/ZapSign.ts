@@ -1048,7 +1048,7 @@ class ZapSign {
       .join(" ");
   }
 
-  private registerClientInMkAuth = async (dados: any): Promise<string> => {
+  public registerClientInMkAuth = async (dados: any): Promise<string> => {
     const ClientesRepository = MkauthDataSource.getRepository(ClientesEntities);
 
     // Busca código IBGE

@@ -38,7 +38,7 @@ export async function iniciarCadastro(
 
   const perguntas = [
     { campo: "nome", pergunta: "➡️ Digite seu *nome completo*:" },
-    { campo: "rg", pergunta: "➡️ Digite seu *RG/IE*:" },
+    { campo: "rg", pergunta: "➡️ Digite seu *RG/IE* (opcional — envie *pular* para deixar em branco):" },
     { campo: "cpf", pergunta: "➡️ Digite seu *CPF/CNPJ*:" },
     {
       campo: "dataNascimento",
@@ -90,11 +90,14 @@ export async function iniciarCadastro(
     }
 
     if (ultimaPergunta === "rg") {
-      const RgValido = validarRG(texto);
-      if (!RgValido) {
+      const respostaRg = String(texto || "").trim();
+      const pulou = respostaRg === "" || /^(pular|nao|não|n|-)$/i.test(respostaRg);
+      if (pulou) {
+        texto = "";
+      } else if (!validarRG(respostaRg)) {
         await MensagensComuns(
           celular,
-          "❌ *RG* inválido. Por favor, insira um *RG* válido.",
+          "❌ *RG* inválido. Por favor, insira um *RG* válido ou digite *pular* para deixar em branco.",
         );
         return;
       }
@@ -222,7 +225,8 @@ export async function handleAwaitingFlowCadastro(
       dadosFlow.rua = limparNomeRua(dadosFlow.rua || "");
 
       const cpfValido = validarCPF(dadosFlow.cpf || "");
-      const rgValido = validarRG(dadosFlow.rg || "");
+      const rgInformado = (dadosFlow.rg || "").toString().trim();
+      const rgValido = rgInformado === "" ? true : validarRG(rgInformado);
 
       if (!cpfValido || !rgValido) {
         let msgErro = "⚠️ *Atenção!*\n\n";

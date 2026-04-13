@@ -10,5 +10,7 @@ router.post("/consultar-cpf-manual/:id", AuthGuard, (req, res) => SolicitacaoSer
 router.post("/ignorar-consulta/:id", AuthGuard, (req, res) => SolicitacaoServicoController.ignorarConsulta(req, res));
 router.post("/instalacao-paga/:id", AuthGuard, (req, res) => SolicitacaoServicoController.instalacaoPaga(req, res));
 router.post("/finalizar/:id", AuthGuard, (req, res) => SolicitacaoServicoController.finalizar(req, res));
+router.post("/cancelar/:id", AuthGuard, (req, res) => SolicitacaoServicoController.cancelar(req, res));
+router.post("/criar-sem-assinatura/:id", AuthGuard, (req, res) => SolicitacaoServicoController.criarSemAssinatura(req, res));
 
 export default router;
