@@ -36,6 +36,35 @@ class SolicitacaoServicoController {
       } = req.query;
 
       const repository = AppDataSource.getRepository(SolicitacaoServico);
+
+      // Sincroniza: marca como finalizado qualquer solicitação pendente cujo
+      // chamado já esteja fechado no MKAuth, para não poluir a aba "Pendentes".
+      const pendentesComChamado = await repository.find({
+        where: { finalizado: false, cancelado: false },
+        select: ["id", "id_chamado"],
+      });
+      const pendentesChamadoIds = pendentesComChamado
+        .map((p) => p.id_chamado)
+        .filter((c): c is string => Boolean(c));
+      if (pendentesChamadoIds.length > 0) {
+        const fechados = await MkauthSource.getRepository(ChamadosEntities).find({
+          select: { chamado: true },
+          where: { chamado: In(pendentesChamadoIds), status: "fechado" },
+        });
+        const fechadosSet = new Set(
+          fechados.map((f) => f.chamado).filter(Boolean) as string[],
+        );
+        const idsParaFinalizar = pendentesComChamado
+          .filter((p) => p.id_chamado && fechadosSet.has(p.id_chamado))
+          .map((p) => p.id);
+        if (idsParaFinalizar.length > 0) {
+          await repository.update(
+            { id: In(idsParaFinalizar) },
+            { finalizado: true },
+          );
+        }
+      }
+
       let where: any = {};
 
       if (startDate && endDate) {
