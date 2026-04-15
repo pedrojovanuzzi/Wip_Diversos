@@ -22,6 +22,9 @@ export class ChamadoFichaTecnica {
   @Column({ type: "varchar", length: 255, nullable: true })
   senha_wifi?: string;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  nome_wifi?: string;
+
   @Column({ type: "int", nullable: true })
   nota?: number;
 

@@ -122,6 +122,7 @@ const CriarFichaTecnica: React.FC = () => {
   const [chamadoNumber, setChamadoNumber] = useState("");
   const [cliente, setCliente] = useState("");
   const [usuario, setUsuario] = useState("");
+  const [nomeWifi, setNomeWifi] = useState("");
   const [senhaWifi, setSenhaWifi] = useState("");
   const [nota, setNota] = useState<number | "">("");
   const [tecExterno, setTecExterno] = useState("NENHUM");
@@ -363,6 +364,7 @@ const CriarFichaTecnica: React.FC = () => {
       chamado_number: chamadoNumber,
       cliente: upper(cliente),
       usuario: upper(usuario),
+      nome_wifi: upper(nomeWifi),
       senha_wifi: upper(senhaWifi),
       nota: Number(nota),
       tec_externo: tecExterno,
@@ -510,7 +512,7 @@ const CriarFichaTecnica: React.FC = () => {
                 required
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2}>
               <TextField
                 fullWidth
                 label="Usuário (PPPoE)"
@@ -524,7 +526,15 @@ const CriarFichaTecnica: React.FC = () => {
                 required
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2}>
+              <TextField
+                fullWidth
+                label="Nome do Wi-Fi"
+                value={nomeWifi}
+                onChange={(e) => setNomeWifi(upper(e.target.value))}
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
               <TextField
                 fullWidth
                 label="Senha Wifi"

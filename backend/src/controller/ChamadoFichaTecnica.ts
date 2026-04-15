@@ -22,6 +22,7 @@ function montarMensagemFinalizacao(f: ChamadoFichaTecnica): string {
   partes.push(`TECNICO EXTERNO:${f.tec_externo ?? "NENHUM"}`);
   partes.push(`TECNICO INTERNO:${f.tec_interno ?? "NENHUM"}`);
   partes.push(`USUARIO ${f.usuario}`);
+  partes.push(`NOME DO WIFI ${f.nome_wifi ?? ""}`);
   partes.push(`SENHA ${f.senha_wifi ?? ""}`);
   partes.push(`NOTA ${f.nota ?? ""}`);
   partes.push(`QUEM ASSINOU:${f.responsavel_nome ?? ""}`);
