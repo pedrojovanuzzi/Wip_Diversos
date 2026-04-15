@@ -26,7 +26,7 @@ export default function Nfcom() {
   const [reducao, setReducao] = useState("");
   const [isReducaoActive, setIsReducaoActive] = useState(false);
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
-    []
+    [],
   );
   const [dateFilter, setDateFilter] = useState<{
     start: string;
@@ -101,13 +101,13 @@ export default function Nfcom() {
             "Content-Type": "application/json",
           },
           timeout: 3600000,
-        }
+        },
       );
 
       console.log("Resposta da API:", resposta.data);
       addJob(resposta.data.job, "emissao");
       showSuccess(
-        "Solicitação de emissão enviada! Processando em segundo plano."
+        "Solicitação de emissão enviada! Processando em segundo plano.",
       );
     } catch (erro) {
       console.error("Erro ao emitir NFCom:", erro);
@@ -146,7 +146,7 @@ export default function Nfcom() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
       console.log("Certificado enviado:", resposta.data);
       showSuccess("Certificado enviado com sucesso!");
@@ -180,7 +180,7 @@ export default function Nfcom() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
       console.log("Clientes encontrados:", resposta.data);
       setClientes(resposta.data);
@@ -192,7 +192,7 @@ export default function Nfcom() {
         erro.response.status === 500
       ) {
         showError(
-          "Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde."
+          "Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde.",
         );
       } else if (axios.isAxiosError(erro) && erro.response) {
         showError(`Erro: ${erro.response.data.error || "Algo deu errado."}`);
@@ -281,7 +281,7 @@ export default function Nfcom() {
                         className="cursor-pointer"
                         type="checkbox"
                         checked={clientesSelecionados.includes(
-                          cliente.fatura.titulo
+                          cliente.fatura.titulo,
                         )}
                         onChange={() =>
                           handleCheckboxChange(cliente.fatura.titulo)
@@ -355,13 +355,11 @@ export default function Nfcom() {
                 e.target.value
                   .normalize("NFD")
                   .replace(/[\u0300-\u036f]/g, "")
-                  .replace(/[^a-zA-Z0-9,.]/g, "") // Permite números e separadores (vírgula/ponto)
+                  .replace(/[^a-zA-Z0-9,.]/g, ""), // Permite números e separadores (vírgula/ponto)
               );
             }}
             placeholder={
-              isReducaoActive
-                ? "Redução Ex: 40% (ou 0.4)"
-                : "Redução Desativada: 1.0"
+              isReducaoActive ? "Redução Ex: 40%" : "Redução Desativada: 1.0"
             }
             className={`ring-2 ring-gray-500 p-2 rounded ${
               !isReducaoActive ? "bg-gray-200 cursor-not-allowed" : ""
@@ -369,6 +367,46 @@ export default function Nfcom() {
             disabled={!isReducaoActive} // Desabilita o input se a redução não estiver ativa
           />
         </div>
+
+        {isReducaoActive &&
+          (() => {
+            const exemplo = 89.9;
+            const reducaoNum = Number(
+              reducao.replace(",", ".").replace("%", ""),
+            );
+            const fracao = Number.isFinite(reducaoNum) ? reducaoNum / 100 : 0;
+            const valorFinal = exemplo * (1 - fracao);
+            const percentEfetivo = fracao * 100;
+            return (
+              <div className="flex justify-center mb-5">
+                <div className="text-sm text-gray-700 bg-yellow-50 ring-1 ring-yellow-300 rounded p-3 text-center">
+                  <div>
+                    Pré-visualização para uma nota de <strong>R$ 89,90</strong>:
+                  </div>
+                  <div>
+                    Redução aplicada:{" "}
+                    <strong>
+                      {percentEfetivo.toLocaleString("pt-BR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 4,
+                      })}
+                      %
+                    </strong>
+                  </div>
+                  <div>
+                    Valor final:{" "}
+                    <strong className="text-green-600">
+                      R${" "}
+                      {valorFinal.toLocaleString("pt-BR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
         {permissions! >= 5 && (
           <div className="flex justify-center items-center gap-5 mb-5">
