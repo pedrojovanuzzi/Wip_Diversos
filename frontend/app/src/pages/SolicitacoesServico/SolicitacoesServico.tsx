@@ -24,6 +24,7 @@ import {
   DialogActions,
   Alert,
   Chip,
+  Tooltip,
 } from "@mui/material";
 import moment from "moment";
 import { useAuth } from "../../context/AuthContext";
@@ -559,96 +560,126 @@ const SolicitacoesServico = () => {
                   </TableCell>
                   <TableCell>
                     <Box display="flex" gap={1}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => handleOpenDetails(service)}
-                      >
-                        Informações
-                      </Button>
+                      <Tooltip title="Visualizar todos os dados enviados pelo cliente nesta solicitação" arrow>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleOpenDetails(service)}
+                        >
+                          Informações
+                        </Button>
+                      </Tooltip>
                       {service.servico === "Instalação" &&
                         !service.pago &&
                         !service.gratis && (
                           <>
                             {!service.consulta_cpf_realizada && (
-                              <Button
-                                variant="contained"
-                                color="primary"
-                                size="small"
-                                onClick={() => handleConsultarCpf(service.id)}
-                                disabled={loadingAction === service.id}
-                              >
-                                Consultar CPF
-                              </Button>
+                              <Tooltip title="Realizar consulta automática do CPF do cliente para verificar restrições" arrow>
+                                <span>
+                                  <Button
+                                    variant="contained"
+                                    color="primary"
+                                    size="small"
+                                    onClick={() => handleConsultarCpf(service.id)}
+                                    disabled={loadingAction === service.id}
+                                  >
+                                    Consultar CPF
+                                  </Button>
+                                </span>
+                              </Tooltip>
                             )}
                             {service.consulta_cpf_realizada && (
+                                <Tooltip title="Consultar CPF manualmente informando os dados. Cada consulta possui custo, use apenas em caso de erro" arrow>
+                                  <span>
+                                    <Button
+                                      variant="outlined"
+                                      color="warning"
+                                      size="small"
+                                      onClick={() =>
+                                        handleOpenManualConsulta(service)
+                                      }
+                                      disabled={loadingAction === service.id}
+                                    >
+                                      Consulta Manual
+                                    </Button>
+                                  </span>
+                                </Tooltip>
+                              )}
+                            <Tooltip title="Ignorar a consulta de CPF e aprovar a solicitação como instalação GRÁTIS" arrow>
+                              <span>
                                 <Button
                                   variant="outlined"
-                                  color="warning"
+                                  color="secondary"
                                   size="small"
-                                  onClick={() =>
-                                    handleOpenManualConsulta(service)
-                                  }
+                                  onClick={() => handleIgnorarConsulta(service.id)}
                                   disabled={loadingAction === service.id}
                                 >
-                                  Consulta Manual
+                                  Ignorar
                                 </Button>
-                              )}
-                            <Button
-                              variant="outlined"
-                              color="secondary"
-                              size="small"
-                              onClick={() => handleIgnorarConsulta(service.id)}
-                              disabled={loadingAction === service.id}
-                            >
-                              Ignorar
-                            </Button>
-                            <Button
-                              variant="contained"
-                              size="small"
-                              sx={{ bgcolor: "#f59e0b", "&:hover": { bgcolor: "#d97706" } }}
-                              onClick={() => handleOpenInstalacaoPaga(service)}
-                              disabled={loadingAction === service.id}
-                            >
-                              Instalação Paga
-                            </Button>
+                              </span>
+                            </Tooltip>
+                            <Tooltip title="Definir valor da taxa de instalação e enviar PIX de cobrança ao cliente" arrow>
+                              <span>
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  sx={{ bgcolor: "#f59e0b", "&:hover": { bgcolor: "#d97706" } }}
+                                  onClick={() => handleOpenInstalacaoPaga(service)}
+                                  disabled={loadingAction === service.id}
+                                >
+                                  Instalação Paga
+                                </Button>
+                              </span>
+                            </Tooltip>
                           </>
                         )}
                       {!service.finalizado && !service.cancelado && (
-                        <Button
-                          variant="contained"
-                          size="small"
-                          sx={{
-                            bgcolor: "#7c3aed",
-                            "&:hover": { bgcolor: "#6d28d9" },
-                          }}
-                          onClick={() => handleCriarSemAssinatura(service.id, service.servico)}
-                          disabled={loadingAction === service.id}
-                        >
-                          Criar Sem Assinatura
-                        </Button>
+                        <Tooltip title="Criar o chamado e cadastro imediatamente, sem aguardar a assinatura do contrato pelo cliente" arrow>
+                          <span>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              sx={{
+                                bgcolor: "#7c3aed",
+                                "&:hover": { bgcolor: "#6d28d9" },
+                              }}
+                              onClick={() => handleCriarSemAssinatura(service.id, service.servico)}
+                              disabled={loadingAction === service.id}
+                            >
+                              Criar Sem Assinatura
+                            </Button>
+                          </span>
+                        </Tooltip>
                       )}
                       {!service.finalizado && !service.cancelado && (
-                        <Button
-                          variant="contained"
-                          color="success"
-                          size="small"
-                          onClick={() => handleFinalizar(service.id)}
-                          disabled={loadingAction === service.id}
-                        >
-                          Finalizar
-                        </Button>
+                        <Tooltip title="Finalizar esta solicitação informando o ID do chamado no MKAuth" arrow>
+                          <span>
+                            <Button
+                              variant="contained"
+                              color="success"
+                              size="small"
+                              onClick={() => handleFinalizar(service.id)}
+                              disabled={loadingAction === service.id}
+                            >
+                              Finalizar
+                            </Button>
+                          </span>
+                        </Tooltip>
                       )}
                       {!service.cancelado && (user?.permission || 0) >= 5 && (
-                        <Button
-                          variant="contained"
-                          color="error"
-                          size="small"
-                          onClick={() => handleCancelar(service.id)}
-                          disabled={loadingAction === service.id}
-                        >
-                          Cancelar
-                        </Button>
+                        <Tooltip title="Cancelar esta solicitação de serviço. Será solicitado um motivo" arrow>
+                          <span>
+                            <Button
+                              variant="contained"
+                              color="error"
+                              size="small"
+                              onClick={() => handleCancelar(service.id)}
+                              disabled={loadingAction === service.id}
+                            >
+                              Cancelar
+                            </Button>
+                          </span>
+                        </Tooltip>
                       )}
                     </Box>
                   </TableCell>
