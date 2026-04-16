@@ -36,6 +36,7 @@ const SolicitacoesServico = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [loadingAction, setLoadingAction] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState("pendente");
+  const [search, setSearch] = useState("");
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [manualTarget, setManualTarget] = useState<any | null>(null);
   const [manualCpf, setManualCpf] = useState("");
@@ -68,6 +69,7 @@ const SolicitacoesServico = () => {
                     : statusFilter === "cancelado"
                       ? "cancelado"
                       : "false",
+              search: search.trim() || undefined,
             },
             headers: { Authorization: `Bearer ${user?.token}` },
           },
@@ -79,7 +81,7 @@ const SolicitacoesServico = () => {
         console.error("Erro ao buscar serviços soliciados:", error);
       }
     },
-    [user, statusFilter, startDate, endDate],
+    [user, statusFilter, startDate, endDate, search],
   );
 
   const handleConsultarCpf = async (id: number) => {
@@ -380,6 +382,14 @@ const SolicitacoesServico = () => {
           borderRadius={2}
           boxShadow={1}
         >
+          <TextField
+            label="Buscar por Nome ou CPF"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            size="small"
+            placeholder="Nome ou CPF..."
+            sx={{ minWidth: 220 }}
+          />
           <TextField
             label="Data Início"
             type="date"

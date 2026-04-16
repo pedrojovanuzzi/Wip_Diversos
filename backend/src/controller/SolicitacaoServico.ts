@@ -3,7 +3,7 @@ import AppDataSource from "../database/DataSource";
 import MkauthSource from "../database/MkauthSource";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { ChamadosEntities } from "../entities/ChamadosEntities";
-import { Between, In, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
+import { In } from "typeorm";
 import moment from "moment-timezone";
 import { ConsultCenterService } from "../services/ConsultCenterService";
 import { MensagensComuns, enviarNotificacaoServico, gerarLancamentoServico } from "./whatsapp/index";
@@ -33,6 +33,7 @@ class SolicitacaoServicoController {
         page = 1,
         limit = 10,
         finalizado,
+        search,
       } = req.query;
 
       const repository = AppDataSource.getRepository(SolicitacaoServico);
@@ -65,60 +66,57 @@ class SolicitacaoServicoController {
         }
       }
 
-      let where: any = {};
-
-      if (startDate && endDate) {
-        where.data_solicitacao = Between(
-          moment(startDate as string)
-            .startOf("day")
-            .toDate(),
-          moment(endDate as string)
-            .endOf("day")
-            .toDate(),
-        );
-      } else if (startDate) {
-        where.data_solicitacao = MoreThanOrEqual(
-          moment(startDate as string)
-            .startOf("day")
-            .toDate(),
-        );
-      } else if (endDate) {
-        where.data_solicitacao = LessThanOrEqual(
-          moment(endDate as string)
-            .endOf("day")
-            .toDate(),
-        );
-      }
-
-      // Filtro de Finalizado / Cancelado
-      if (finalizado === "cancelado") {
-        where.cancelado = true;
-      } else if (finalizado === "true" || finalizado === "1") {
-        where.finalizado = true;
-        where.cancelado = false;
-      } else if (finalizado === "false" || finalizado === "0") {
-        where.finalizado = false;
-        where.cancelado = false;
-      } else if (finalizado === undefined || finalizado === null) {
-        // Padrão apenas se não vier o parâmetro (ex: acesso direto à API)
-        where.finalizado = false;
-        where.cancelado = false;
-      }
-      // Se finalizado for "all" ou qualquer outro valor não mapeado, não aplicamos filtro
-
       // Pagination
       const pageNum = Number(page);
       const limitNum = Number(limit);
       const skip = (pageNum - 1) * limitNum;
 
-      const [list, count] = await repository.findAndCount({
-        where,
-        order: {
-          data_solicitacao: "DESC",
-        },
-        skip,
-        take: limitNum,
-      });
+      const qb = repository.createQueryBuilder("s");
+
+      // Filtro de datas
+      if (startDate && endDate) {
+        qb.andWhere("s.data_solicitacao BETWEEN :start AND :end", {
+          start: moment(startDate as string).startOf("day").toDate(),
+          end: moment(endDate as string).endOf("day").toDate(),
+        });
+      } else if (startDate) {
+        qb.andWhere("s.data_solicitacao >= :start", {
+          start: moment(startDate as string).startOf("day").toDate(),
+        });
+      } else if (endDate) {
+        qb.andWhere("s.data_solicitacao <= :end", {
+          end: moment(endDate as string).endOf("day").toDate(),
+        });
+      }
+
+      // Filtro de Finalizado / Cancelado
+      if (finalizado === "cancelado") {
+        qb.andWhere("s.cancelado = :cancelado", { cancelado: true });
+      } else if (finalizado === "true" || finalizado === "1") {
+        qb.andWhere("s.finalizado = :finalizado", { finalizado: true });
+        qb.andWhere("s.cancelado = :cancelado", { cancelado: false });
+      } else if (finalizado === "false" || finalizado === "0") {
+        qb.andWhere("s.finalizado = :finalizado", { finalizado: false });
+        qb.andWhere("s.cancelado = :cancelado", { cancelado: false });
+      } else if (finalizado === undefined || finalizado === null) {
+        qb.andWhere("s.finalizado = :finalizado", { finalizado: false });
+        qb.andWhere("s.cancelado = :cancelado", { cancelado: false });
+      }
+      // Se finalizado for "all" ou qualquer outro valor não mapeado, não aplicamos filtro
+
+      // Busca por nome ou CPF
+      if (search && typeof search === "string" && search.trim()) {
+        const termo = `%${search.trim()}%`;
+        qb.andWhere(
+          "(s.login_cliente LIKE :termo OR JSON_UNQUOTE(JSON_EXTRACT(s.dados, '$.cpf')) LIKE :termo OR JSON_UNQUOTE(JSON_EXTRACT(s.dados, '$.nome')) LIKE :termo)",
+          { termo },
+        );
+      }
+
+      qb.orderBy("s.data_solicitacao", "DESC");
+      qb.skip(skip).take(limitNum);
+
+      const [list, count] = await qb.getManyAndCount();
 
       // Enrich with chamado status from MKAuth
       const chamadoIds = list.map((s) => s.id_chamado).filter(Boolean) as string[];
