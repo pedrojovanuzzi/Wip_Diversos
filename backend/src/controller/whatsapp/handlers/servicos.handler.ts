@@ -1817,6 +1817,7 @@ export async function handleAwaitingTrocaPlanoFlow(
         rg: session.rg || "Não informado",
         plano: session.planoEscolhido,
         valor: valorPlano,
+        valor_plano: valorPlano,
       };
 
       const zapResponse =

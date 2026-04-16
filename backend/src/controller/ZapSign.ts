@@ -76,6 +76,7 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
   const numero = s("numero");
   const complemento = s("complemento");
   const enderecoCompleto = [endereco, numero, complemento].filter(Boolean).join(", ");
+  const enderecoSemNumero = [endereco, complemento].filter(Boolean).join(", ");
   const valorPlano = s("valor_plano") || planoRecord?.valor || "";
   const velocidade = formatVelocidade(planoRecord?.velup, planoRecord?.veldown);
   const uploadStr = planoRecord?.velup ? `${planoRecord.velup} Kbps` : "";
@@ -105,7 +106,7 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
     { de: "{{estadocliente}}", para: s("estado") },
     { de: "{{cepcliente}}", para: s("cep") },
     // --- Endereço residencial (espelha instalação se não informado) ---
-    { de: "{{enderecorescliente}}", para: enderecoCompleto },
+    { de: "{{enderecorescliente}}", para: enderecoSemNumero },
     { de: "{{numerorescliente}}", para: numero },
     { de: "{{bairrorescliente}}", para: s("bairro") },
     { de: "{{cidaderescliente}}", para: s("cidade") },
