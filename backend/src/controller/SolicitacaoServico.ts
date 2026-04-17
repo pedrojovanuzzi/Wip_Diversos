@@ -872,9 +872,13 @@ class SolicitacaoServicoController {
           })
           .getOne();
 
+        console.log(`[EnviarAssinatura] People encontrado: ${people ? `ID ${people.id}, tel: ${people.telefone}` : "NAO ENCONTRADO para " + celular}`);
+
         if (people) {
           const convUser = await ApiMkDataSource.getRepository(ConversationsUsers)
             .findOne({ where: { user_id: people.id } });
+
+          console.log(`[EnviarAssinatura] ConvUser: ${convUser ? `conv_id: ${convUser.conv_id}` : "NAO ENCONTRADO para user_id " + people.id}`);
 
           if (convUser) {
             await ApiMkDataSource.getRepository(Mensagens).save({
@@ -883,6 +887,7 @@ class SolicitacaoServicoController {
               content: msgAssinatura,
               timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
             });
+            console.log(`[EnviarAssinatura] Mensagem salva no histórico (conv_id: ${convUser.conv_id})`);
           }
         }
       } catch (errMsg) {
