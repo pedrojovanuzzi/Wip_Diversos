@@ -14,6 +14,10 @@ import { v4 as uuidv4 } from "uuid";
 import Pix from "./Pix";
 import ZapSign from "./ZapSign";
 import { criarChamadoMkauth } from "./whatsapp/services/chamado.service";
+import ApiMkDataSource from "../database/API_MK";
+import Mensagens from "../entities/APIMK/Mensagens";
+import PeopleConversations from "../entities/APIMK/People_Conversations";
+import ConversationsUsers from "../entities/APIMK/Conversation_Users";
 
 class SolicitacaoServicoController {
   private isConsultaCpfConcluida(solicitacao: SolicitacaoServico): boolean {
@@ -855,10 +859,35 @@ class SolicitacaoServicoController {
       await repository.save(solicitacao);
 
       // Envia o link de assinatura ao cliente via WhatsApp
-      await MensagensComuns(
-        celular,
-        `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
-      );
+      const msgAssinatura = `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`;
+      await MensagensComuns(celular, msgAssinatura);
+
+      // Salva a mensagem no histórico de conversas
+      try {
+        const people = await ApiMkDataSource.getRepository(PeopleConversations)
+          .createQueryBuilder("p")
+          .where("REPLACE(p.telefone, '+', '') = :cel OR p.telefone = :celPlus", {
+            cel: celular,
+            celPlus: `+${celular}`,
+          })
+          .getOne();
+
+        if (people) {
+          const convUser = await ApiMkDataSource.getRepository(ConversationsUsers)
+            .findOne({ where: { user_id: people.id } });
+
+          if (convUser) {
+            await ApiMkDataSource.getRepository(Mensagens).save({
+              conv_id: convUser.conv_id,
+              sender_id: 1,
+              content: msgAssinatura,
+              timestamp: new Date(Date.now() + 3 * 60 * 60 * 1000),
+            });
+          }
+        }
+      } catch (errMsg) {
+        console.error("[EnviarAssinatura] Erro ao salvar mensagem no histórico:", errMsg);
+      }
 
       if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
 
