@@ -286,19 +286,26 @@ const SolicitacoesServico = () => {
     }
   };
 
-  const handleEnviarAssinatura = async (id: number) => {
-    if (
-      !window.confirm(
-        "Deseja gerar o contrato, enviar a assinatura ao cliente e criar o cadastro (se aplicável)?",
-      )
-    )
-      return;
+  const handleEnviarAssinatura = async (id: number, servico: string) => {
+    if (!window.confirm("Deseja gerar o contrato e enviar o link de assinatura ao cliente?")) return;
+
+    const servicoNorm = (servico || "").toLowerCase();
+    const ehInstalacao = servicoNorm === "instalação" || servicoNorm === "instalacao";
+    const ehNovoTitular = servicoNorm.includes("titularidade") && servicoNorm.includes("novo titular");
+    const podeCriarCadastro = ehInstalacao || ehNovoTitular;
+
+    let criarCadastro = false;
+    if (podeCriarCadastro) {
+      criarCadastro = window.confirm(
+        "Este serviço permite criar o cadastro do cliente no MKAuth.\n\nDeseja criar o cadastro junto com o envio da assinatura?",
+      );
+    }
 
     setLoadingAction(id);
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_URL}/solicitacao-servico/enviar-assinatura/${id}`,
-        {},
+        { criarCadastro },
         { headers: { Authorization: `Bearer ${user?.token}` } },
       );
       alert(response.data?.message || "Contrato enviado com sucesso!");
@@ -654,7 +661,7 @@ const SolicitacoesServico = () => {
                           >
                             {!service.finalizado && !service.assinado && (
                               <Tooltip title="Gerar contrato, enviar link de assinatura ao cliente e criar cadastro (caso o bot não tenha enviado)" arrow placement="left">
-                                <MenuItem onClick={() => { setMenuAnchor(null); setMenuServiceId(null); handleEnviarAssinatura(service.id); }}>
+                                <MenuItem onClick={() => { setMenuAnchor(null); setMenuServiceId(null); handleEnviarAssinatura(service.id, service.servico); }}>
                                   <ListItemText>Enviar Assinatura</ListItemText>
                                 </MenuItem>
                               </Tooltip>
