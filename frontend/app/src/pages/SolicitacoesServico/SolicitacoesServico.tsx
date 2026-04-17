@@ -282,6 +282,33 @@ const SolicitacoesServico = () => {
     }
   };
 
+  const handleEnviarAssinatura = async (id: number) => {
+    if (
+      !window.confirm(
+        "Deseja gerar o contrato, enviar a assinatura ao cliente e criar o cadastro (se aplicável)?",
+      )
+    )
+      return;
+
+    setLoadingAction(id);
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/solicitacao-servico/enviar-assinatura/${id}`,
+        {},
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+      );
+      alert(response.data?.message || "Contrato enviado com sucesso!");
+      fetchServices(page);
+    } catch (error: any) {
+      console.error("Erro ao enviar assinatura:", error);
+      const msg =
+        error.response?.data?.message || "Erro ao enviar assinatura.";
+      alert(msg);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
   const handleFinalizar = async (id: number) => {
     const ticketId = window.prompt(
       "Para finalizar este serviço, informe o ID do Chamado no MKAuth:",
@@ -633,6 +660,24 @@ const SolicitacoesServico = () => {
                             </Tooltip>
                           </>
                         )}
+                      {!service.finalizado && !service.cancelado && !service.token_zapsign && service.servico !== "Mudança de Cômodo" && (
+                        <Tooltip title="Gerar contrato, enviar link de assinatura ao cliente e criar cadastro (caso o bot não tenha enviado)" arrow>
+                          <span>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              sx={{
+                                bgcolor: "#0891b2",
+                                "&:hover": { bgcolor: "#0e7490" },
+                              }}
+                              onClick={() => handleEnviarAssinatura(service.id)}
+                              disabled={loadingAction === service.id}
+                            >
+                              Enviar Assinatura
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      )}
                       {!service.finalizado && !service.cancelado && (
                         <Tooltip title="Criar o chamado e cadastro imediatamente, sem aguardar a assinatura do contrato pelo cliente" arrow>
                           <span>

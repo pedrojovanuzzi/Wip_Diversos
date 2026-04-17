@@ -727,6 +727,138 @@ class SolicitacaoServicoController {
     }
   };
 
+  public enviarAssinatura = async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+
+    try {
+      const repository = AppDataSource.getRepository(SolicitacaoServico);
+      const solicitacao = await repository.findOne({ where: { id: Number(id) } });
+
+      if (!solicitacao) {
+        res.status(404).json({ message: "Solicitação não encontrada." });
+        return;
+      }
+
+      if (solicitacao.cancelado) {
+        res.status(409).json({ message: "Solicitação cancelada não pode ser processada." });
+        return;
+      }
+
+      if (solicitacao.token_zapsign) {
+        res.status(409).json({ message: "O contrato já foi gerado para esta solicitação." });
+        return;
+      }
+
+      const dados = (solicitacao.dados || {}) as any;
+      const celular = dados.telefone_conversa;
+      const servicoNorm = (solicitacao.servico || "").toLowerCase();
+
+      if (!celular) {
+        res.status(400).json({ message: "Telefone do cliente não encontrado nos dados da solicitação." });
+        return;
+      }
+
+      let zapResponse: any;
+      let loginCriado: string | null = null;
+
+      // Determina o tipo de contrato e se precisa criar cadastro
+      const ehInstalacao = servicoNorm === "instalação" || servicoNorm === "instalacao";
+      const ehTitularidade = servicoNorm.includes("titularidade");
+      const ehNovoTitular = ehTitularidade && servicoNorm.includes("novo titular");
+      const deveCriarCadastro = ehInstalacao || ehNovoTitular;
+
+      // Cria cadastro no MKAuth se necessário
+      if (deveCriarCadastro) {
+        loginCriado = await ZapSign.registerClientInMkAuth(dados);
+        solicitacao.login_cliente = loginCriado;
+      }
+
+      // Gera o contrato ZapSign conforme o tipo de serviço
+      if (ehInstalacao) {
+        const valor = dados.valor || "0,00";
+        const temDificuldadeAcesso = dados.dificuldade_acesso === true;
+        if (temDificuldadeAcesso && valor !== "0,00" && valor !== "0" && valor !== "0.00") {
+          zapResponse = await ZapSign.createContractInstalacaoDificuldadeAcesso(dados);
+        } else {
+          zapResponse = await ZapSign.createContractInstalacao(dados);
+        }
+      } else if (servicoNorm === "mudança de endereço" || servicoNorm === "mudanca_endereco") {
+        zapResponse = await ZapSign.createContractMudancaEndereco(dados);
+      } else if (servicoNorm === "mudança de cômodo" || servicoNorm === "mudanca_comodo") {
+        zapResponse = await ZapSign.createContractMudancaComodo(dados);
+      } else if (servicoNorm === "alteração de plano" || servicoNorm === "alteracao de plano") {
+        zapResponse = await ZapSign.createContractAlteracaoPlano(dados);
+      } else if (ehTitularidade && !ehNovoTitular) {
+        zapResponse = await ZapSign.createContractTrocaTitularidadeTitular(dados);
+      } else if (ehNovoTitular) {
+        zapResponse = await ZapSign.createContractTrocaTitularidadeNovoTitular(dados);
+      } else {
+        res.status(400).json({ message: `Tipo de serviço "${solicitacao.servico}" não possui modelo de contrato configurado.` });
+        return;
+      }
+
+      const zapSignUrl = zapResponse.signers[0].sign_url;
+      solicitacao.token_zapsign = zapResponse.token;
+
+      // Cria chamado se criou cadastro
+      if (deveCriarCadastro && loginCriado) {
+        const assunto = ehInstalacao ? "INSTALACAO" : "INSTALACAO";
+        const mensagemChamado =
+          `Contrato enviado manualmente pelo painel.\n\n` +
+          `Serviço: ${solicitacao.servico || "-"}\n` +
+          `👤 Nome: ${dados.nome || "-"}\n` +
+          `📄 CPF: ${dados.cpf || "-"}\n` +
+          `🪪 RG/IE: ${dados.rg || "-"}\n` +
+          `📱 Celular: ${dados.celular || dados.telefone_conversa || "-"}\n` +
+          `📧 E-mail: ${dados.email || "-"}\n` +
+          `📍 Endereço: ${dados.rua || dados.endereco || "-"}, ${dados.numero || "-"} - ${dados.bairro || "-"}\n` +
+          `🏙️ Cidade: ${dados.cidade || "-"}/${dados.estado || "-"}\n` +
+          `📮 CEP: ${dados.cep || "-"}\n` +
+          `📶 Plano: ${dados.plano || "-"}\n` +
+          `📅 Vencimento: Dia ${dados.vencimento || "-"}`;
+
+        await criarChamadoMkauth(
+          assunto,
+          { nome: dados.nome || "", login: loginCriado, email: dados.email || "" },
+          mensagemChamado,
+          solicitacao,
+        );
+      }
+
+      solicitacao.dados = {
+        ...dados,
+        enviadoManualmente: {
+          data: new Date().toISOString(),
+          usuario: req.user?.login || null,
+          login_gerado: deveCriarCadastro ? loginCriado : undefined,
+        },
+      };
+      await repository.save(solicitacao);
+
+      // Envia o link de assinatura ao cliente via WhatsApp
+      await MensagensComuns(
+        celular,
+        `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
+      );
+
+      if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
+
+      const partes: string[] = ["Contrato gerado e enviado ao cliente"];
+      if (deveCriarCadastro) partes.push("cadastro criado no MKAuth");
+
+      res.status(200).json({
+        success: true,
+        message: `${partes.join(" e ")} com sucesso.`,
+        login_cliente: loginCriado || solicitacao.login_cliente,
+      });
+    } catch (error: any) {
+      console.error("Erro ao enviar assinatura:", error);
+      res.status(500).json({
+        message: error?.message || "Erro interno ao enviar assinatura.",
+      });
+    }
+  };
+
   public finalizar = async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const { id_chamado } = req.body;

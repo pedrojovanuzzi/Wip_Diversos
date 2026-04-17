@@ -189,16 +189,21 @@ class Backup {
       const dumpCommand = `mysqldump -h ${db.host} -u ${db.user} -p'${db.pass}' ${db.name} > "${filePath}"`;
       console.log(`⏳ Iniciando Backup Local: ${db.name}`);
 
-      await new Promise<void>((resolve, reject) => {
+      const dumpOk = await new Promise<boolean>((resolve) => {
         exec(dumpCommand, (error, stdout, stderr) => {
           if (error) {
             console.error(`Erro no dump de ${db.name}:`, error.message);
-            return reject(error);
+            return resolve(false);
           }
           console.log(`✅ Backup local salvo: ${filePath}`);
-          resolve();
+          resolve(true);
         });
       });
+
+      if (!dumpOk) {
+        console.warn(`⚠️ Pulando upload de ${db.name} devido a erro no dump. Continuando com os próximos bancos...`);
+        continue;
+      }
 
       // 4. Upload para o OneDrive
       try {
