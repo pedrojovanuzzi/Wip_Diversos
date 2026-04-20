@@ -32,7 +32,7 @@ export default function App() {
   return (
     <>
       {tecnico ? (
-        <TrackingScreen tecnico={tecnico} onLogout={() => setTecnico(null)} />
+        <TrackingScreen tecnico={tecnico} />
       ) : (
         <SetupScreen onSaved={(data) => setTecnico(data)} />
       )}

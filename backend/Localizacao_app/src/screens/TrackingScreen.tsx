@@ -1,39 +1,24 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import * as Location from "expo-location";
-import { TecnicoData, limparTecnico } from "../storage";
+import { TecnicoData } from "../storage";
 import { enviarPosicao, getApiUrl } from "../api";
 
 interface Props {
   tecnico: TecnicoData;
-  onLogout: () => void;
 }
 
 const INTERVAL_MS = 30_000;
 
-export const TrackingScreen: React.FC<Props> = ({ tecnico, onLogout }) => {
-  const [ativo, setAtivo] = useState(true);
+export const TrackingScreen: React.FC<Props> = ({ tecnico }) => {
   const [ultimaPos, setUltimaPos] =
     useState<Location.LocationObjectCoords | null>(null);
   const [ultimoEnvio, setUltimoEnvio] = useState<Date | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [permissaoOk, setPermissaoOk] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const ativoRef = useRef(ativo);
-
-  useEffect(() => {
-    ativoRef.current = ativo;
-  }, [ativo]);
 
   const enviar = useCallback(async () => {
-    if (!ativoRef.current) return;
     try {
       const pos = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
@@ -76,25 +61,6 @@ export const TrackingScreen: React.FC<Props> = ({ tecnico, onLogout }) => {
     };
   }, [enviar, permissaoOk]);
 
-  const handleLogout = () => {
-    Alert.alert(
-      "Sair",
-      "Deseja trocar de técnico? Os dados salvos serão apagados.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Sair",
-          style: "destructive",
-          onPress: async () => {
-            if (timerRef.current) clearInterval(timerRef.current);
-            await limparTecnico();
-            onLogout();
-          },
-        },
-      ],
-    );
-  };
-
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
@@ -107,14 +73,10 @@ export const TrackingScreen: React.FC<Props> = ({ tecnico, onLogout }) => {
         <Text
           style={[
             styles.cardValue,
-            { color: ativo && permissaoOk ? "#16a34a" : "#dc2626" },
+            { color: permissaoOk ? "#16a34a" : "#dc2626" },
           ]}
         >
-          {!permissaoOk
-            ? "Sem permissão"
-            : ativo
-              ? "Rastreando"
-              : "Pausado"}
+          {permissaoOk ? "Rastreando" : "Sem permissão"}
         </Text>
       </View>
 
@@ -146,29 +108,6 @@ export const TrackingScreen: React.FC<Props> = ({ tecnico, onLogout }) => {
           <Text style={styles.erroText}>{erro}</Text>
         </View>
       )}
-
-      <TouchableOpacity
-        style={[
-          styles.button,
-          { backgroundColor: ativo ? "#f59e0b" : "#16a34a" },
-        ]}
-        onPress={() => setAtivo((a) => !a)}
-      >
-        <Text style={styles.buttonText}>
-          {ativo ? "Pausar envio" : "Retomar envio"}
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.buttonSecondary} onPress={enviar}>
-        <Text style={styles.buttonSecondaryText}>Enviar agora</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: "#dc2626", marginTop: 24 }]}
-        onPress={handleLogout}
-      >
-        <Text style={styles.buttonText}>Sair / Trocar técnico</Text>
-      </TouchableOpacity>
 
       <Text style={styles.footer}>API: {getApiUrl()}</Text>
       <Text style={styles.footer}>
@@ -208,22 +147,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   erroText: { color: "#991b1b", fontSize: 13 },
-  button: {
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  buttonSecondary: {
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: "#2563eb",
-  },
-  buttonSecondaryText: { color: "#2563eb", fontSize: 16, fontWeight: "700" },
   footer: {
     marginTop: 16,
     fontSize: 11,
