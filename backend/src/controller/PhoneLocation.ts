@@ -92,41 +92,54 @@ class PhoneLocationController {
     }
   };
 
-  // Endpoint chamado pelo celular (sem AuthGuard de usuário — usa device_token)
+  // Endpoint chamado pelo celular — auto-registra o device na primeira chamada
   updatePosition = async (req: Request, res: Response) => {
     try {
-      const { device_id, device_token, latitude, longitude, accuracy, battery } =
-        req.body;
+      const {
+        device_id,
+        person_name,
+        latitude,
+        longitude,
+        accuracy,
+        battery,
+      } = req.body;
 
-      if (!device_id || !device_token) {
-        res
-          .status(400)
-          .json({ error: "device_id e device_token são obrigatórios" });
+      if (!device_id) {
+        res.status(400).json({ error: "device_id é obrigatório" });
         return;
       }
 
       const lat = Number(latitude);
       const lng = Number(longitude);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        res
-          .status(400)
-          .json({ error: "latitude/longitude inválidos" });
+        res.status(400).json({ error: "latitude/longitude inválidos" });
         return;
       }
 
-      const device = await this.repo.findOne({
+      let device = await this.repo.findOne({
         where: { device_id: String(device_id) },
       });
 
-      if (!device || device.device_token !== device_token) {
-        res.status(401).json({ error: "Dispositivo não autorizado" });
-        return;
+      if (!device) {
+        device = this.repo.create({
+          device_id: String(device_id),
+          person_name: (person_name && String(person_name).trim()) || "Sem nome",
+          active: true,
+        });
+      } else if (
+        person_name &&
+        String(person_name).trim() &&
+        device.person_name !== String(person_name).trim()
+      ) {
+        device.person_name = String(person_name).trim();
       }
 
       device.latitude = lat;
       device.longitude = lng;
-      device.accuracy = accuracy !== undefined ? Number(accuracy) : device.accuracy;
-      device.battery = battery !== undefined ? Number(battery) : device.battery;
+      device.accuracy =
+        accuracy !== undefined ? Number(accuracy) : device.accuracy;
+      device.battery =
+        battery !== undefined ? Number(battery) : device.battery;
       device.last_position_at = new Date();
 
       await this.repo.save(device);

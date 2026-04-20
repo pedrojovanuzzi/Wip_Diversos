@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Localizacao App",
+    "slug": "localizacao-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.empresa.localizacaoapp",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Este app precisa acessar sua localização para enviar a posição do técnico.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Este app precisa acessar a localização em segundo plano para manter o rastreamento ativo.",
+        "UIBackgroundModes": ["location", "fetch"]
+      }
+    },
+    "android": {
+      "package": "com.empresa.localizacaoapp",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permita a localização para rastrear o técnico."
+        }
+      ]
+    ]
+  }
+}
