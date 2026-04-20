@@ -42,6 +42,7 @@ export async function verificarDebitosClienteDesativado(
         .createQueryBuilder("f")
         .where("f.login = :login", { login: cliente.login })
         .andWhere("f.status = :status", { status: "vencido" })
+        .andWhere("f.datadel IS NULL")
         .getMany();
 
       if (faturas.length > 0) {
