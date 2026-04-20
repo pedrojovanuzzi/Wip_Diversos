@@ -28,7 +28,7 @@ interface PhoneDevice {
   updated_at: string;
 }
 
-const REFRESH_INTERVAL_MS = 30_000;
+const REFRESH_INTERVAL_MS = 10_000;
 
 function minutesSince(iso: string | null): string {
   if (!iso) return "sem dados";
@@ -99,7 +99,8 @@ export const PhoneLocationMap = () => {
 
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<L.LayerGroup | null>(null);
+  const markersRef = useRef<Map<string, L.Marker>>(new Map());
+  const hasFitBoundsRef = useRef(false);
   const [, setTick] = useState(0);
 
   const api = useMemo(
@@ -138,7 +139,6 @@ export const PhoneLocationMap = () => {
       }).addTo(map);
 
       mapRef.current = map;
-      markersRef.current = L.layerGroup().addTo(map);
     }
     return () => {
       if (mapRef.current) {
@@ -161,19 +161,22 @@ export const PhoneLocationMap = () => {
     return () => clearInterval(id);
   }, []);
 
-  // render markers when devices change
+  // render / sync markers when devices change (sem flicker)
   useEffect(() => {
-    if (!mapRef.current || !markersRef.current) return;
-    markersRef.current.clearLayers();
+    const map = mapRef.current;
+    if (!map) return;
 
     const bounds = L.latLngBounds([]);
+    const seen = new Set<string>();
 
     devices.forEach((d) => {
       if (d.latitude == null || d.longitude == null) return;
+      seen.add(d.device_id);
+
       const online = isOnline(d.last_position_at);
       const statusColor = online ? "#16a34a" : "#6b7280";
       const statusLabel = online ? "Online" : "Offline";
-      const popup = `
+      const popupHtml = `
         <div class="pl-popup">
           <div class="pl-popup-head">
             <div class="pl-popup-avatar" style="background:${colorFromString(d.person_name)};">
@@ -205,15 +208,36 @@ export const PhoneLocationMap = () => {
           </div>
         </div>
       `;
-      const marker = L.marker([d.latitude, d.longitude], {
-        icon: buildMarkerIcon(d.person_name, online),
-      }).bindPopup(popup, { closeButton: true });
-      markersRef.current?.addLayer(marker);
+
+      const existing = markersRef.current.get(d.device_id);
+      if (existing) {
+        existing.setLatLng([d.latitude, d.longitude]);
+        existing.setIcon(buildMarkerIcon(d.person_name, online));
+        existing.setPopupContent(popupHtml);
+      } else {
+        const marker = L.marker([d.latitude, d.longitude], {
+          icon: buildMarkerIcon(d.person_name, online),
+        })
+          .bindPopup(popupHtml, { closeButton: true })
+          .addTo(map);
+        markersRef.current.set(d.device_id, marker);
+      }
+
       bounds.extend([d.latitude, d.longitude]);
     });
 
-    if (bounds.isValid()) {
-      mapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+    // remove dispositivos que sumiram da resposta
+    markersRef.current.forEach((marker, deviceId) => {
+      if (!seen.has(deviceId)) {
+        map.removeLayer(marker);
+        markersRef.current.delete(deviceId);
+      }
+    });
+
+    // centraliza apenas na primeira carga com dados
+    if (!hasFitBoundsRef.current && bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+      hasFitBoundsRef.current = true;
     }
   }, [devices]);
 
@@ -222,6 +246,9 @@ export const PhoneLocationMap = () => {
       <NavBar className="z-[1001]" />
 
       <style>{`
+        .leaflet-marker-icon.pl-marker-wrapper {
+          transition: transform 0.6s ease-out;
+        }
         .pl-marker-wrapper {
           background: transparent !important;
           border: none !important;
@@ -375,7 +402,7 @@ export const PhoneLocationMap = () => {
         <div className="p-4 border-b">
           <h1 className="text-lg font-bold">Rastreamento de Celulares</h1>
           <p className="text-xs text-gray-500">
-            Atualiza automaticamente a cada 30s
+            Atualiza automaticamente a cada {Math.round(REFRESH_INTERVAL_MS / 1000)}s
           </p>
           {loading && (
             <p className="text-xs text-blue-500 mt-1">Atualizando...</p>
