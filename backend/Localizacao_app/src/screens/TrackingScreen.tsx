@@ -1,8 +1,52 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Platform,
+  Alert,
+} from "react-native";
 import * as Location from "expo-location";
-import { TecnicoData } from "../storage";
+import * as IntentLauncher from "expo-intent-launcher";
+import {
+  TecnicoData,
+  avisoBateriaJaMostrado,
+  marcarAvisoBateriaMostrado,
+} from "../storage";
 import { enviarPosicao, getApiUrl } from "../api";
+import { iniciarRastreamentoBackground } from "../backgroundTask";
+
+async function mostrarAvisoBateriaSeNecessario() {
+  if (Platform.OS !== "android") return;
+  if (await avisoBateriaJaMostrado()) return;
+
+  Alert.alert(
+    "Otimização de bateria",
+    "Para garantir que o rastreamento não seja interrompido, desative a otimização de bateria para este app em:\n\nConfigurações → Apps → Localizacao App → Bateria → Sem restrições.",
+    [
+      {
+        text: "Depois",
+        style: "cancel",
+        onPress: () => marcarAvisoBateriaMostrado(),
+      },
+      {
+        text: "Abrir configurações",
+        onPress: async () => {
+          try {
+            await IntentLauncher.startActivityAsync(
+              "android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS",
+            );
+          } catch (err) {
+            console.warn("Erro abrindo config de bateria:", err);
+          } finally {
+            marcarAvisoBateriaMostrado();
+          }
+        },
+      },
+    ],
+  );
+}
 
 interface Props {
   tecnico: TecnicoData;
@@ -16,6 +60,7 @@ export const TrackingScreen: React.FC<Props> = ({ tecnico }) => {
   const [ultimoEnvio, setUltimoEnvio] = useState<Date | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [permissaoOk, setPermissaoOk] = useState(false);
+  const [bgAtivo, setBgAtivo] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const enviar = useCallback(async () => {
@@ -48,6 +93,26 @@ export const TrackingScreen: React.FC<Props> = ({ tecnico }) => {
         return;
       }
       setPermissaoOk(true);
+
+      // Tenta iniciar rastreamento em segundo plano (Android/iOS nativo).
+      // No web isso falha silenciosamente — fallback pro setInterval abaixo.
+      if (Platform.OS !== "web") {
+        try {
+          const ok = await iniciarRastreamentoBackground();
+          setBgAtivo(ok);
+          if (!ok) {
+            setErro(
+              "Permissão de localização em segundo plano negada. O envio só funcionará com o app aberto.",
+            );
+          } else {
+            mostrarAvisoBateriaSeNecessario();
+          }
+        } catch (err: any) {
+          console.warn("Erro ao iniciar bg:", err?.message || err);
+          setBgAtivo(false);
+        }
+      }
+
       enviar();
     })();
   }, [enviar]);
@@ -77,6 +142,13 @@ export const TrackingScreen: React.FC<Props> = ({ tecnico }) => {
           ]}
         >
           {permissaoOk ? "Rastreando" : "Sem permissão"}
+        </Text>
+        <Text style={styles.cardSub}>
+          {Platform.OS === "web"
+            ? "Modo web (só roda com a aba aberta)"
+            : bgAtivo
+              ? "Segundo plano ativo — envia mesmo com o app fechado"
+              : "Segundo plano inativo — abra o app para enviar"}
         </Text>
       </View>
 

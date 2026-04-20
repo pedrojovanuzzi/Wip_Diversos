@@ -21,6 +21,7 @@ import {
   FaClipboardList,
   FaToolbox,
   FaMapMarkedAlt,
+  FaLocationArrow,
   FaDesktop,
   FaChartLine,
   FaFilePdf,
@@ -211,6 +212,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   }
                   title="Ficha Técnica"
                   description="Fichas técnicas de chamados em campo"
+                />
+                <NavItem
+                  to="/phone-location"
+                  icon={
+                    <FaLocationArrow className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Localização"
+                  description="Mapa com a localização dos funcionários"
                 />
               </>
             )}

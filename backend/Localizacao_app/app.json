@@ -14,7 +14,8 @@
       "bundleIdentifier": "com.empresa.localizacaoapp",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Este app precisa acessar sua localização para enviar a posição do técnico.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Este app precisa acessar a localização em segundo plano para manter o rastreamento ativo.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Este app precisa acessar a localização em segundo plano para manter o rastreamento ativo mesmo com o app fechado.",
+        "NSLocationAlwaysUsageDescription": "Este app precisa acessar a localização em segundo plano para manter o rastreamento ativo mesmo com o app fechado.",
         "UIBackgroundModes": ["location", "fetch"]
       }
     },
@@ -24,14 +25,19 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
-        "FOREGROUND_SERVICE"
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "WAKE_LOCK"
       ]
     },
     "plugins": [
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Permita a localização para rastrear o técnico."
+          "locationAlwaysAndWhenInUsePermission": "Permita o acesso à localização o tempo todo para que o rastreamento continue mesmo com o app fechado.",
+          "locationWhenInUsePermission": "Permita a localização para rastrear o técnico.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ]
     ]

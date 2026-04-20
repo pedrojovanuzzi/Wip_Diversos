@@ -22,7 +22,6 @@ interface PhoneDevice {
   longitude: number | null;
   accuracy: number | null;
   battery: number | null;
-  device_token: string | null;
   active: boolean;
   last_position_at: string | null;
   created_at: string;
@@ -46,17 +45,57 @@ function minutesSince(iso: string | null): string {
   return `há ${days} dia${days > 1 ? "s" : ""}`;
 }
 
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function colorFromString(s: string): string {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    hash = s.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 65%, 45%)`;
+}
+
+function isOnline(iso: string | null): boolean {
+  if (!iso) return false;
+  return Date.now() - new Date(iso).getTime() < 15 * 60_000;
+}
+
+function buildMarkerIcon(name: string, online: boolean): L.DivIcon {
+  const initials = getInitials(name);
+  const bg = colorFromString(name);
+  const ring = online ? "#22c55e" : "#9ca3af";
+  const pulse = online
+    ? `<span class="pl-pulse" style="background:${ring};"></span>`
+    : "";
+  const html = `
+    <div class="pl-marker">
+      ${pulse}
+      <div class="pl-avatar" style="background:${bg}; box-shadow: 0 0 0 3px ${ring}, 0 2px 6px rgba(0,0,0,0.25);">
+        <span>${initials}</span>
+      </div>
+      <div class="pl-name">${name}</div>
+    </div>
+  `;
+  return L.divIcon({
+    html,
+    className: "pl-marker-wrapper",
+    iconSize: [48, 60],
+    iconAnchor: [24, 52],
+    popupAnchor: [0, -48],
+  });
+}
+
 export const PhoneLocationMap = () => {
   const { user } = useAuth();
   const [devices, setDevices] = useState<PhoneDevice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // formulário de cadastro
-  const [newName, setNewName] = useState("");
-  const [newDeviceId, setNewDeviceId] = useState("");
-  const [createdCredentials, setCreatedCredentials] =
-    useState<PhoneDevice | null>(null);
 
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -131,34 +170,44 @@ export const PhoneLocationMap = () => {
 
     devices.forEach((d) => {
       if (d.latitude == null || d.longitude == null) return;
+      const online = isOnline(d.last_position_at);
+      const statusColor = online ? "#16a34a" : "#6b7280";
+      const statusLabel = online ? "Online" : "Offline";
       const popup = `
-        <div style="font-family: sans-serif; font-size: 14px; min-width:180px;">
-          <strong style="font-size:16px;">${d.person_name}</strong><br/>
-          <div style="margin-top:4px; color:#555;">
-            ${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}
+        <div class="pl-popup">
+          <div class="pl-popup-head">
+            <div class="pl-popup-avatar" style="background:${colorFromString(d.person_name)};">
+              ${getInitials(d.person_name)}
+            </div>
+            <div class="pl-popup-heading">
+              <strong>${d.person_name}</strong>
+              <span class="pl-popup-status" style="color:${statusColor};">
+                <span class="pl-popup-dot" style="background:${statusColor};"></span>
+                ${statusLabel} · ${minutesSince(d.last_position_at)}
+              </span>
+            </div>
           </div>
-          <div style="margin-top:4px;">
-            <span style="color:#2563eb;">${minutesSince(d.last_position_at)}</span>
+          <div class="pl-popup-body">
+            <div class="pl-popup-row">
+              <span>📍</span>
+              <span>${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}</span>
+            </div>
+            ${
+              d.accuracy != null
+                ? `<div class="pl-popup-row"><span>🎯</span><span>Precisão: ${Math.round(d.accuracy)} m</span></div>`
+                : ""
+            }
+            ${
+              d.battery != null
+                ? `<div class="pl-popup-row"><span>🔋</span><span>Bateria: ${Math.round(d.battery)}%</span></div>`
+                : ""
+            }
           </div>
-          ${
-            d.accuracy != null
-              ? `<div style="color:#666; font-size:12px;">Precisão: ${Math.round(d.accuracy)} m</div>`
-              : ""
-          }
-          ${
-            d.battery != null
-              ? `<div style="color:#666; font-size:12px;">Bateria: ${Math.round(d.battery)}%</div>`
-              : ""
-          }
         </div>
       `;
-      const marker = L.marker([d.latitude, d.longitude]).bindPopup(popup);
-      marker.bindTooltip(d.person_name, {
-        permanent: true,
-        direction: "top",
-        offset: [0, -30],
-        className: "phone-location-label",
-      });
+      const marker = L.marker([d.latitude, d.longitude], {
+        icon: buildMarkerIcon(d.person_name, online),
+      }).bindPopup(popup, { closeButton: true });
       markersRef.current?.addLayer(marker);
       bounds.extend([d.latitude, d.longitude]);
     });
@@ -168,44 +217,149 @@ export const PhoneLocationMap = () => {
     }
   }, [devices]);
 
-  const handleCreateDevice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user?.token || !newName.trim()) return;
-    try {
-      const res = await axios.post<PhoneDevice>(
-        api,
-        {
-          person_name: newName.trim(),
-          device_id: newDeviceId.trim() || undefined,
-        },
-        { headers: { Authorization: `Bearer ${user.token}` } },
-      );
-      setCreatedCredentials(res.data);
-      setNewName("");
-      setNewDeviceId("");
-      fetchDevices();
-    } catch (err: any) {
-      console.error(err);
-      setError(
-        err?.response?.data?.error || "Erro ao registrar dispositivo.",
-      );
-    }
-  };
-
   return (
     <>
       <NavBar className="z-[1001]" />
 
       <style>{`
-        .phone-location-label {
-          background: rgba(255,255,255,0.9);
-          border: 1px solid #d1d5db;
-          border-radius: 6px;
-          padding: 2px 6px;
+        .pl-marker-wrapper {
+          background: transparent !important;
+          border: none !important;
+        }
+        .pl-marker {
+          position: relative;
+          width: 48px;
+          height: 60px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          pointer-events: auto;
+        }
+        .pl-avatar {
+          position: relative;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+          font-weight: 700;
+          font-size: 14px;
+          font-family: system-ui, sans-serif;
+          z-index: 2;
+          transition: transform 0.15s ease;
+        }
+        .pl-marker:hover .pl-avatar {
+          transform: scale(1.1);
+        }
+        .pl-name {
+          position: absolute;
+          top: -22px;
+          background: rgba(17,24,39,0.92);
+          color: #fff;
+          font-size: 11px;
           font-weight: 600;
-          font-size: 12px;
+          font-family: system-ui, sans-serif;
+          padding: 3px 8px;
+          border-radius: 6px;
+          white-space: nowrap;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+          pointer-events: none;
+        }
+        .pl-name::after {
+          content: '';
+          position: absolute;
+          bottom: -4px;
+          left: 50%;
+          transform: translateX(-50%);
+          border-width: 4px 4px 0 4px;
+          border-style: solid;
+          border-color: rgba(17,24,39,0.92) transparent transparent transparent;
+        }
+        .pl-pulse {
+          position: absolute;
+          top: 6px;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          opacity: 0.6;
+          animation: pl-pulse 2s ease-out infinite;
+          z-index: 1;
+        }
+        @keyframes pl-pulse {
+          0%   { transform: scale(1);   opacity: 0.5; }
+          100% { transform: scale(2.2); opacity: 0;   }
+        }
+
+        .leaflet-popup-content-wrapper {
+          border-radius: 10px !important;
+          padding: 0 !important;
+          box-shadow: 0 6px 20px rgba(0,0,0,0.18) !important;
+        }
+        .leaflet-popup-content {
+          margin: 0 !important;
+          width: auto !important;
+          min-width: 240px;
+        }
+        .pl-popup {
+          font-family: system-ui, sans-serif;
+          padding: 12px 14px;
+        }
+        .pl-popup-head {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 8px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .pl-popup-avatar {
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+          font-weight: 700;
+          font-size: 14px;
+          flex-shrink: 0;
+        }
+        .pl-popup-heading {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          min-width: 0;
+        }
+        .pl-popup-heading strong {
+          font-size: 15px;
           color: #111;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+        }
+        .pl-popup-status {
+          font-size: 12px;
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .pl-popup-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          display: inline-block;
+        }
+        .pl-popup-body {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .pl-popup-row {
+          font-size: 12px;
+          color: #444;
+          display: flex;
+          gap: 6px;
+          align-items: center;
         }
       `}</style>
 
@@ -229,66 +383,14 @@ export const PhoneLocationMap = () => {
           {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
         </div>
 
-        <div className="p-4 border-b">
-          <h2 className="text-sm font-semibold mb-2">Registrar dispositivo</h2>
-          <form onSubmit={handleCreateDevice} className="space-y-2">
-            <input
-              type="text"
-              placeholder="Nome da pessoa"
-              className="w-full p-2 border border-gray-300 rounded text-sm"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              required
-            />
-            <input
-              type="text"
-              placeholder="device_id (opcional)"
-              className="w-full p-2 border border-gray-300 rounded text-sm"
-              value={newDeviceId}
-              onChange={(e) => setNewDeviceId(e.target.value)}
-            />
-            <button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 rounded"
-            >
-              Gerar credenciais
-            </button>
-          </form>
-
-          {createdCredentials && (
-            <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-xs">
-              <p className="font-semibold text-green-800 mb-1">
-                Dispositivo criado — envie ao celular:
-              </p>
-              <p>
-                <strong>device_id:</strong>{" "}
-                <code className="break-all">
-                  {createdCredentials.device_id}
-                </code>
-              </p>
-              <p>
-                <strong>device_token:</strong>{" "}
-                <code className="break-all">
-                  {createdCredentials.device_token}
-                </code>
-              </p>
-              <button
-                className="mt-2 text-blue-600 underline"
-                onClick={() => setCreatedCredentials(null)}
-              >
-                Ocultar
-              </button>
-            </div>
-          )}
-        </div>
-
         <div className="p-4">
           <h2 className="text-sm font-semibold mb-2">
-            Dispositivos ({devices.length})
+            Funcionários ({devices.length})
           </h2>
           {devices.length === 0 && (
             <p className="text-xs text-gray-500">
-              Nenhum dispositivo cadastrado.
+              Nenhum funcionário registrado ainda. O registro é feito
+              automaticamente quando o aplicativo envia a primeira posição.
             </p>
           )}
           <ul className="space-y-2">
