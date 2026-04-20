@@ -41,7 +41,7 @@ export async function verificarDebitosClienteDesativado(
       const faturas = await faturasRepo
         .createQueryBuilder("f")
         .where("f.login = :login", { login: cliente.login })
-        .andWhere("f.status IN (:...status)", { status: ["aberto", "vencido"] })
+        .andWhere("f.status = :status", { status: "vencido" })
         .getMany();
 
       if (faturas.length > 0) {
