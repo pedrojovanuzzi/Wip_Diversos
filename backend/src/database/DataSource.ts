@@ -16,6 +16,7 @@ import { NFE } from "../entities/NFE";
 import { LicencaEntity } from "../entities/LicencaEntities";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { ChamadoFichaTecnica } from "../entities/ChamadoFichaTecnica";
+import { PhoneLocation } from "../entities/PhoneLocation";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -43,6 +44,7 @@ const AppDataSource = new DataSource({
     LicencaEntity,
     SolicitacaoServico,
     ChamadoFichaTecnica,
+    PhoneLocation,
   ],
   migrations: [path.join(__dirname, "../migration/*.{ts,js}")],
 });

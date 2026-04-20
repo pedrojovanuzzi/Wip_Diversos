@@ -28,6 +28,7 @@ import ZapSignTemplatesRoutes from "./routes/ZapSignTemplates.routes";
 import SolicitacaoServicoRouter from "./routes/SolicitacaoServico.routes";
 import ChamadoFichaTecnicaRouter from "./routes/ChamadoFichaTecnica.routes";
 import WhatsappTestRoutes from "./routes/WhatsappTest.routes";
+import PhoneLocationRoutes from "./routes/PhoneLocation.routes";
 
 // Controllers (for scheduled tasks)
 import BackupController from "./controller/Backup";
@@ -80,6 +81,7 @@ export class App {
     this.server.use("/api/solicitacao-servico", SolicitacaoServicoRouter);
     this.server.use("/api/chamados-ficha", ChamadoFichaTecnicaRouter);
     this.server.use("/api/whatsapp-test", WhatsappTestRoutes);
+    this.server.use("/api/phone-location", PhoneLocationRoutes);
   }
 
   private agendarBackup() {

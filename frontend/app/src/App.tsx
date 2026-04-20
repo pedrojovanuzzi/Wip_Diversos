@@ -56,6 +56,7 @@ import SolicitacoesServico from "./pages/SolicitacoesServico/SolicitacoesServico
 import ListarFichasTecnicas from "./pages/ChamadosFichaTecnica/ListarFichasTecnicas";
 import CriarFichaTecnica from "./pages/ChamadosFichaTecnica/CriarFichaTecnica";
 import { WhatsappTeste } from "./pages/whatsapp/WhatsappTeste";
+import PhoneLocationMap from "./pages/PhoneLocation/PhoneLocationMap";
 
 const isLocalhost =
   window.location.hostname === "localhost" ||
@@ -432,6 +433,16 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <SolicitacoesServico />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/phone-location"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <PhoneLocationMap />
               ) : (
                 <Navigate to="/auth/login" />
               )
