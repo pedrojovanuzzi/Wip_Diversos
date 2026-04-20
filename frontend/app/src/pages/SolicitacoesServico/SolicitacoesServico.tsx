@@ -859,6 +859,69 @@ const SolicitacoesServico = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        <Dialog
+          open={alertaDebitoOpen}
+          onClose={() => {
+            setAlertaDebitoOpen(false);
+            setAlertaDebitoService(null);
+          }}
+          fullWidth
+          maxWidth="sm"
+        >
+          <DialogTitle sx={{ color: "error.main" }}>
+            ⚠️ Débito Anterior Identificado
+          </DialogTitle>
+          <DialogContent>
+            <Box display="flex" flexDirection="column" gap={2} mt={1}>
+              <Alert severity="warning">
+                Este CPF possui cadastro(s) desativado(s) com faturas vencidas no MKAuth.
+              </Alert>
+              {alertaDebitoService?.dados?.alertaDebitoAnterior?.contas?.map(
+                (conta: any, idx: number) => (
+                  <Box
+                    key={idx}
+                    p={2}
+                    border="1px solid #e5e7eb"
+                    borderRadius={2}
+                    bgcolor="#fef2f2"
+                  >
+                    <Typography variant="body2">
+                      <strong>Login:</strong> {conta.login}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Nome:</strong> {conta.nome}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Faturas vencidas:</strong> {conta.totalFaturas}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Valor total:</strong> R${" "}
+                      {Number(conta.valorTotal).toFixed(2)}
+                    </Typography>
+                  </Box>
+                ),
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                setAlertaDebitoOpen(false);
+                setAlertaDebitoService(null);
+              }}
+            >
+              Fechar
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleCloseAlertaDebito}
+            >
+              Ver detalhes mesmo assim
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </div>
   );
