@@ -91,17 +91,56 @@ function buildMarkerIcon(name: string, online: boolean): L.DivIcon {
   });
 }
 
+const HIDDEN_STORAGE_KEY = "phone-location:hidden-devices";
+
+function loadHidden(): Set<string> {
+  try {
+    const raw = localStorage.getItem(HIDDEN_STORAGE_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveHidden(set: Set<string>) {
+  try {
+    localStorage.setItem(HIDDEN_STORAGE_KEY, JSON.stringify([...set]));
+  } catch {
+    // ignore
+  }
+}
+
 export const PhoneLocationMap = () => {
   const { user } = useAuth();
   const [devices, setDevices] = useState<PhoneDevice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(() => loadHidden());
 
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
   const hasFitBoundsRef = useRef(false);
   const [, setTick] = useState(0);
+
+  const toggleHidden = useCallback((deviceId: string) => {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(deviceId)) next.delete(deviceId);
+      else next.add(deviceId);
+      saveHidden(next);
+      return next;
+    });
+  }, []);
+
+  const showAll = useCallback(() => {
+    setHidden(() => {
+      const next = new Set<string>();
+      saveHidden(next);
+      return next;
+    });
+  }, []);
 
   const api = useMemo(
     () => `${process.env.REACT_APP_URL}/phone-location`,
@@ -171,6 +210,7 @@ export const PhoneLocationMap = () => {
 
     devices.forEach((d) => {
       if (d.latitude == null || d.longitude == null) return;
+      if (hidden.has(d.device_id)) return;
       seen.add(d.device_id);
 
       const online = isOnline(d.last_position_at);
@@ -239,7 +279,7 @@ export const PhoneLocationMap = () => {
       map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
       hasFitBoundsRef.current = true;
     }
-  }, [devices]);
+  }, [devices, hidden]);
 
   return (
     <>
@@ -411,9 +451,19 @@ export const PhoneLocationMap = () => {
         </div>
 
         <div className="p-4">
-          <h2 className="text-sm font-semibold mb-2">
-            Funcionários ({devices.length})
-          </h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold">
+              Funcionários ({devices.length - hidden.size}/{devices.length})
+            </h2>
+            {hidden.size > 0 && (
+              <button
+                onClick={showAll}
+                className="text-[11px] text-blue-600 hover:underline"
+              >
+                Mostrar todos
+              </button>
+            )}
+          </div>
           {devices.length === 0 && (
             <p className="text-xs text-gray-500">
               Nenhum funcionário registrado ainda. O registro é feito
@@ -421,43 +471,61 @@ export const PhoneLocationMap = () => {
             </p>
           )}
           <ul className="space-y-2">
-            {devices.map((d) => (
-              <li
-                key={d.id}
-                className="p-2 border border-gray-200 rounded text-sm"
-              >
-                <div className="flex justify-between items-start">
-                  <strong>{d.person_name}</strong>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded ${
-                      d.last_position_at &&
-                      Date.now() - new Date(d.last_position_at).getTime() <
-                        15 * 60_000
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-200 text-gray-600"
-                    }`}
-                  >
-                    {d.last_position_at &&
-                    Date.now() - new Date(d.last_position_at).getTime() <
-                      15 * 60_000
-                      ? "online"
-                      : "offline"}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-600">
-                  {minutesSince(d.last_position_at)}
-                </div>
-                {d.latitude != null && d.longitude != null ? (
-                  <div className="text-[11px] text-gray-500">
-                    {d.latitude.toFixed(4)}, {d.longitude.toFixed(4)}
+            {devices.map((d) => {
+              const isHidden = hidden.has(d.device_id);
+              const online =
+                d.last_position_at &&
+                Date.now() - new Date(d.last_position_at).getTime() <
+                  15 * 60_000;
+              return (
+                <li
+                  key={d.id}
+                  className={`p-2 border rounded text-sm transition-opacity ${
+                    isHidden
+                      ? "border-gray-200 bg-gray-50 opacity-60"
+                      : "border-gray-200"
+                  }`}
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <strong className={isHidden ? "line-through" : ""}>
+                      {d.person_name}
+                    </strong>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded ${
+                          online
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-200 text-gray-600"
+                        }`}
+                      >
+                        {online ? "online" : "offline"}
+                      </span>
+                      <button
+                        onClick={() => toggleHidden(d.device_id)}
+                        title={isHidden ? "Mostrar no mapa" : "Ocultar do mapa"}
+                        className={`text-base leading-none px-1.5 py-0.5 rounded hover:bg-gray-100 ${
+                          isHidden ? "text-gray-400" : "text-gray-700"
+                        }`}
+                      >
+                        {isHidden ? "\u{1F648}" : "\u{1F441}"}
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  <div className="text-[11px] text-gray-400">
-                    sem localização
+                  <div className="text-xs text-gray-600">
+                    {minutesSince(d.last_position_at)}
                   </div>
-                )}
-              </li>
-            ))}
+                  {d.latitude != null && d.longitude != null ? (
+                    <div className="text-[11px] text-gray-500">
+                      {d.latitude.toFixed(4)}, {d.longitude.toFixed(4)}
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-gray-400">
+                      sem localização
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>
