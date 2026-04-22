@@ -198,7 +198,7 @@ class TimeRecordController {
           });
         }
 
-        if (isSundayOrHoliday) {
+        if (isSundayOrHoliday && scale !== "12h") {
           overtimeEntry.hours100 = extraHoursFormatted;
           overtimeEntry.hours50 = 0;
         } else {

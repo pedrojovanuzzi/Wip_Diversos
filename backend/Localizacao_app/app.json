@@ -16,7 +16,10 @@
         "NSLocationWhenInUseUsageDescription": "Este app precisa acessar sua localização para enviar a posição do técnico.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Este app precisa acessar a localização em segundo plano para manter o rastreamento ativo mesmo com o app fechado.",
         "NSLocationAlwaysUsageDescription": "Este app precisa acessar a localização em segundo plano para manter o rastreamento ativo mesmo com o app fechado.",
-        "UIBackgroundModes": ["location", "fetch"]
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ]
       }
     },
     "android": {
@@ -27,7 +30,12 @@
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "plugins": [
@@ -40,6 +48,11 @@
           "isAndroidForegroundServiceEnabled": true
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c41ef753-8cb9-4539-8864-54b53e1d66e8"
+      }
+    }
   }
 }
