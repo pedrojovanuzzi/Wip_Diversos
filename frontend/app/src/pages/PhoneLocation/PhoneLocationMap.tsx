@@ -61,9 +61,11 @@ function colorFromString(s: string): string {
   return `hsl(${hue}, 65%, 45%)`;
 }
 
+const ONLINE_THRESHOLD_MS = 2 * 60_000;
+
 function isOnline(iso: string | null): boolean {
   if (!iso) return false;
-  return Date.now() - new Date(iso).getTime() < 15 * 60_000;
+  return Date.now() - new Date(iso).getTime() < ONLINE_THRESHOLD_MS;
 }
 
 function buildMarkerIcon(name: string, online: boolean): L.DivIcon {
@@ -473,10 +475,7 @@ export const PhoneLocationMap = () => {
           <ul className="space-y-2">
             {devices.map((d) => {
               const isHidden = hidden.has(d.device_id);
-              const online =
-                d.last_position_at &&
-                Date.now() - new Date(d.last_position_at).getTime() <
-                  15 * 60_000;
+              const online = isOnline(d.last_position_at);
               return (
                 <li
                   key={d.id}
