@@ -1,6 +1,7 @@
 import * as TaskManager from "expo-task-manager";
 import * as Location from "expo-location";
-import { AppState } from "react-native";
+import * as Notifications from "expo-notifications";
+import { AppState, Platform } from "react-native";
 import { carregarTecnico } from "./storage";
 import { enviarPosicao } from "./api";
 
@@ -48,16 +49,27 @@ export async function iniciarRastreamentoBackground(): Promise<boolean> {
   const { status: bg } = await Location.requestBackgroundPermissionsAsync();
   if (bg !== "granted") return false;
 
+  // Android 13+: sem permissão de notificação, o foreground service é morto
+  // pelo SO em segundos porque a notificação persistente não renderiza.
+  if (Platform.OS === "android") {
+    const current = await Notifications.getPermissionsAsync();
+    if (!current.granted) {
+      await Notifications.requestPermissionsAsync();
+    }
+  }
+
   const jaIniciado =
     await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
   if (jaIniciado) return true;
 
   await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-    accuracy: Location.Accuracy.Balanced,
+    accuracy: Location.Accuracy.High,
     timeInterval: 30_000,
-    distanceInterval: 10,
+    distanceInterval: 0,
+    deferredUpdatesInterval: 30_000,
     showsBackgroundLocationIndicator: true,
     pausesUpdatesAutomatically: false,
+    activityType: Location.ActivityType.Other,
     foregroundService: {
       notificationTitle: "Rastreamento ativo",
       notificationBody:

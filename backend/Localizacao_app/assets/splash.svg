@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1284 2778">
+  <defs>
+    <linearGradient id="pin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#1e3a8a"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1284" height="2778" fill="#ffffff"/>
+
+  <g transform="translate(642 1389)">
+    <path d="M 0 -220
+             C 125 -220 215 -130 215 -5
+             C 215 125 40 290 0 340
+             C -40 290 -215 125 -215 -5
+             C -215 -130 -125 -220 0 -220 Z"
+          fill="url(#pin)"/>
+    <circle cx="0" cy="-18" r="72" fill="#ffffff"/>
+    <circle cx="0" cy="-18" r="46" fill="#2563eb"/>
+  </g>
+</svg>
