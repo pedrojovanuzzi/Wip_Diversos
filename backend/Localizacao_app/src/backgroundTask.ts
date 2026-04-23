@@ -2,25 +2,32 @@ import * as TaskManager from "expo-task-manager";
 import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
 import { AppState, Platform } from "react-native";
-import { carregarTecnico } from "./storage";
-import { enviarPosicao } from "./api";
+import { carregarTecnico, registrarHeartbeat } from "./storage";
+import { enviarOuEnfileirar } from "./api";
 
 export const LOCATION_TASK_NAME = "localizacao-background-task";
 
 // Definido no escopo global para o SO conseguir acionar o task mesmo com o app
 // fechado/em segundo plano.
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+  await registrarHeartbeat("bg-fire", `state=${AppState.currentState}`);
   try {
     if (error) {
-      console.warn("[bg-task] erro:", error.message);
+      await registrarHeartbeat("bg-err", error.message);
       return;
     }
-    if (!data) return;
+    if (!data) {
+      await registrarHeartbeat("bg-noloc", "no-data");
+      return;
+    }
 
     const { locations } = data as {
       locations: Location.LocationObject[];
     };
-    if (!locations || locations.length === 0) return;
+    if (!locations || locations.length === 0) {
+      await registrarHeartbeat("bg-noloc", "empty-locations");
+      return;
+    }
 
     // Quando o app está em foreground, a TrackingScreen já envia via setInterval
     // — evita requisições duplicadas.
@@ -28,39 +35,58 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 
     const loc = locations[locations.length - 1];
     const tecnico = await carregarTecnico();
-    if (!tecnico) return;
+    if (!tecnico) {
+      await registrarHeartbeat("bg-err", "sem-tecnico");
+      return;
+    }
 
-    await enviarPosicao({
-      device_id: tecnico.deviceId,
-      person_name: tecnico.nome,
-      latitude: loc.coords.latitude,
-      longitude: loc.coords.longitude,
-      accuracy: loc.coords.accuracy,
-    });
+    try {
+      await enviarOuEnfileirar({
+        device_id: tecnico.deviceId,
+        person_name: tecnico.nome,
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        accuracy: loc.coords.accuracy,
+      });
+      await registrarHeartbeat(
+        "bg-ok",
+        `${loc.coords.latitude.toFixed(4)},${loc.coords.longitude.toFixed(4)}`,
+      );
+    } catch (netErr: any) {
+      // enviarOuEnfileirar já persistiu na fila; só registra o motivo.
+      await registrarHeartbeat("bg-enqueue", netErr?.message || "net-fail");
+    }
   } catch (err: any) {
-    console.warn("[bg-task] falha:", err?.message || err);
+    await registrarHeartbeat("bg-err", err?.message || String(err));
   }
 });
 
-export async function iniciarRastreamentoBackground(): Promise<boolean> {
+export type ResultadoInicio =
+  | { ok: true }
+  | { ok: false; motivo: "fg" | "bg" | "notif" };
+
+export async function iniciarRastreamentoBackground(): Promise<ResultadoInicio> {
   const { status: fg } = await Location.requestForegroundPermissionsAsync();
-  if (fg !== "granted") return false;
+  if (fg !== "granted") return { ok: false, motivo: "fg" };
 
   const { status: bg } = await Location.requestBackgroundPermissionsAsync();
-  if (bg !== "granted") return false;
+  if (bg !== "granted") return { ok: false, motivo: "bg" };
 
   // Android 13+: sem permissão de notificação, o foreground service é morto
   // pelo SO em segundos porque a notificação persistente não renderiza.
   if (Platform.OS === "android") {
-    const current = await Notifications.getPermissionsAsync();
-    if (!current.granted) {
-      await Notifications.requestPermissionsAsync();
+    let notif = await Notifications.getPermissionsAsync();
+    if (!notif.granted && notif.canAskAgain) {
+      notif = await Notifications.requestPermissionsAsync();
+    }
+    if (!notif.granted) {
+      return { ok: false, motivo: "notif" };
     }
   }
 
   const jaIniciado =
     await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
-  if (jaIniciado) return true;
+  if (jaIniciado) return { ok: true };
 
   await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
     accuracy: Location.Accuracy.High,
@@ -77,7 +103,7 @@ export async function iniciarRastreamentoBackground(): Promise<boolean> {
       notificationColor: "#2563eb",
     },
   });
-  return true;
+  return { ok: true };
 }
 
 export async function pararRastreamentoBackground(): Promise<void> {

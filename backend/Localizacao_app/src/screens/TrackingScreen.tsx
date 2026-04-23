@@ -6,6 +6,9 @@ import {
   ScrollView,
   Platform,
   Alert,
+  AppState,
+  AppStateStatus,
+  TouchableOpacity,
 } from "react-native";
 import * as Location from "expo-location";
 import * as IntentLauncher from "expo-intent-launcher";
@@ -13,8 +16,12 @@ import {
   TecnicoData,
   avisoBateriaJaMostrado,
   marcarAvisoBateriaMostrado,
+  lerHeartbeats,
+  limparHeartbeats,
+  registrarHeartbeat,
+  HeartbeatEntry,
 } from "../storage";
-import { enviarPosicao, getApiUrl } from "../api";
+import { enviarOuEnfileirar, drenarFila, getApiUrl } from "../api";
 import { iniciarRastreamentoBackground } from "../backgroundTask";
 
 async function mostrarAvisoBateriaSeNecessario() {
@@ -61,7 +68,9 @@ export const TrackingScreen: React.FC<Props> = ({ tecnico }) => {
   const [erro, setErro] = useState<string | null>(null);
   const [permissaoOk, setPermissaoOk] = useState(false);
   const [bgAtivo, setBgAtivo] = useState(false);
+  const [heartbeats, setHeartbeats] = useState<HeartbeatEntry[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hbTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const enviar = useCallback(async () => {
     try {
@@ -69,13 +78,17 @@ export const TrackingScreen: React.FC<Props> = ({ tecnico }) => {
         accuracy: Location.Accuracy.Balanced,
       });
       setUltimaPos(pos.coords);
-      await enviarPosicao({
+      await enviarOuEnfileirar({
         device_id: tecnico.deviceId,
         person_name: tecnico.nome,
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
         accuracy: pos.coords.accuracy,
       });
+      await registrarHeartbeat(
+        "fg-ok",
+        `${pos.coords.latitude.toFixed(4)},${pos.coords.longitude.toFixed(4)}`,
+      );
       setUltimoEnvio(new Date());
       setErro(null);
     } catch (err: any) {
@@ -98,12 +111,41 @@ export const TrackingScreen: React.FC<Props> = ({ tecnico }) => {
       // No web isso falha silenciosamente — fallback pro setInterval abaixo.
       if (Platform.OS !== "web") {
         try {
-          const ok = await iniciarRastreamentoBackground();
-          setBgAtivo(ok);
-          if (!ok) {
-            setErro(
-              "Permissão de localização em segundo plano negada. O envio só funcionará com o app aberto.",
-            );
+          const res = await iniciarRastreamentoBackground();
+          setBgAtivo(res.ok);
+          if (!res.ok) {
+            if (res.motivo === "notif") {
+              setErro(
+                "Permissão de notificação negada. Sem ela, o Android mata o rastreamento em segundos. Abra Configurações → Apps → Localizacao App → Notificações e ative.",
+              );
+              if (Platform.OS === "android") {
+                Alert.alert(
+                  "Notificação obrigatória",
+                  "O rastreamento em segundo plano precisa exibir uma notificação persistente. Sem ela, o Android encerra o serviço.",
+                  [
+                    { text: "Depois", style: "cancel" },
+                    {
+                      text: "Abrir configurações",
+                      onPress: () => {
+                        IntentLauncher.startActivityAsync(
+                          "android.settings.APP_NOTIFICATION_SETTINGS",
+                          {
+                            extra: {
+                              "android.provider.extra.APP_PACKAGE":
+                                "com.empresa.localizacaoapp",
+                            },
+                          },
+                        ).catch(() => {});
+                      },
+                    },
+                  ],
+                );
+              }
+            } else {
+              setErro(
+                "Permissão de localização em segundo plano negada. O envio só funcionará com o app aberto.",
+              );
+            }
           } else {
             mostrarAvisoBateriaSeNecessario();
           }
@@ -125,6 +167,36 @@ export const TrackingScreen: React.FC<Props> = ({ tecnico }) => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [enviar, permissaoOk]);
+
+  // Atualiza o painel de heartbeat a cada 5s enquanto a tela está ativa.
+  useEffect(() => {
+    const refresh = async () => {
+      const hb = await lerHeartbeats();
+      setHeartbeats(hb.slice(-20).reverse());
+    };
+    refresh();
+    hbTimerRef.current = setInterval(refresh, 5_000);
+    return () => {
+      if (hbTimerRef.current) clearInterval(hbTimerRef.current);
+    };
+  }, []);
+
+  // Drena a fila de retry ao voltar pro foreground (se houver posições que
+  // falharam por rede). NÃO re-arma o bg task — isso causa a notificação
+  // persistente a reiniciar e o SO pode derrubar o serviço inteiro.
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const onChange = async (state: AppStateStatus) => {
+      if (state !== "active") return;
+      try {
+        await drenarFila();
+      } catch (err: any) {
+        console.warn("Drenar fila falhou:", err?.message || err);
+      }
+    };
+    const sub = AppState.addEventListener("change", onChange);
+    return () => sub.remove();
+  }, []);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -181,6 +253,30 @@ export const TrackingScreen: React.FC<Props> = ({ tecnico }) => {
         </View>
       )}
 
+      <View style={styles.card}>
+        <View style={styles.hbHeader}>
+          <Text style={styles.cardLabel}>Diagnóstico (últimos 20 eventos)</Text>
+          <TouchableOpacity
+            onPress={async () => {
+              await limparHeartbeats();
+              setHeartbeats([]);
+            }}
+          >
+            <Text style={styles.hbClear}>limpar</Text>
+          </TouchableOpacity>
+        </View>
+        {heartbeats.length === 0 ? (
+          <Text style={styles.cardSub}>Nenhum evento registrado ainda.</Text>
+        ) : (
+          heartbeats.map((h, i) => (
+            <Text key={i} style={styles.hbLine}>
+              {new Date(h.ts).toLocaleTimeString()}  {h.ev}
+              {h.info ? `  ${h.info}` : ""}
+            </Text>
+          ))
+        )}
+      </View>
+
       <Text style={styles.footer}>API: {getApiUrl()}</Text>
       <Text style={styles.footer}>
         Intervalo: {Math.round(INTERVAL_MS / 1000)}s
@@ -219,6 +315,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   erroText: { color: "#991b1b", fontSize: 13 },
+  hbHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  hbClear: { fontSize: 12, color: "#2563eb", fontWeight: "600" },
+  hbLine: {
+    fontSize: 11,
+    color: "#333",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    marginBottom: 2,
+  },
   footer: {
     marginTop: 16,
     fontSize: 11,

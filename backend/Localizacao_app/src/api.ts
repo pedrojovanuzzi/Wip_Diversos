@@ -1,3 +1,5 @@
+import { lerFila, salvarFila, enfileirarPosicao, PosicaoFila } from "./storage";
+
 const DEV_API = "http://localhost:3000/api";
 const PROD_API = "https://wipdiversos.wiptelecomunicacoes.com.br/api";
 
@@ -31,4 +33,40 @@ export async function enviarPosicao(payload: PositionPayload): Promise<void> {
     const text = await res.text().catch(() => "");
     throw new Error(`Erro ${res.status}: ${text}`);
   }
+}
+
+export async function enviarOuEnfileirar(
+  payload: PositionPayload,
+): Promise<void> {
+  try {
+    await enviarPosicao(payload);
+    await drenarFila();
+  } catch (err) {
+    await enfileirarPosicao({ ...payload, ts: Date.now() });
+    throw err;
+  }
+}
+
+export async function drenarFila(): Promise<void> {
+  const fila = await lerFila();
+  if (fila.length === 0) return;
+  for (let i = 0; i < fila.length; i++) {
+    const item = fila[i];
+    try {
+      await enviarPosicao({
+        device_id: item.device_id,
+        person_name: item.person_name,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        accuracy: item.accuracy,
+        battery: item.battery,
+      });
+    } catch {
+      // Rede caiu no meio do drain — persiste o que sobrou (inclusive o atual)
+      // para tentar de novo no próximo ciclo.
+      await salvarFila(fila.slice(i));
+      return;
+    }
+  }
+  await salvarFila([]);
 }
