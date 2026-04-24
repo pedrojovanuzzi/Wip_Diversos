@@ -53,6 +53,14 @@ const SolicitacoesServico = () => {
   const [instalacaoPagaValor, setInstalacaoPagaValor] = useState("");
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [menuServiceId, setMenuServiceId] = useState<number | null>(null);
+  const [manualContratoOpen, setManualContratoOpen] = useState(false);
+  const [manualContratoTarget, setManualContratoTarget] = useState<any | null>(null);
+  const [manualContratoValor, setManualContratoValor] = useState("");
+  const [manualContratoLinkOpen, setManualContratoLinkOpen] = useState(false);
+  const [manualContratoLink, setManualContratoLink] = useState("");
+  const [manualContratoReaproveitado, setManualContratoReaproveitado] = useState(false);
+  const [manualContratoLastService, setManualContratoLastService] = useState<any | null>(null);
+  const [manualRegenerarPendente, setManualRegenerarPendente] = useState(false);
   const { user } = useAuth();
 
   const fetchServices = useCallback(
@@ -317,6 +325,107 @@ const SolicitacoesServico = () => {
       alert(msg);
     } finally {
       setLoadingAction(null);
+    }
+  };
+
+  const handleOpenContratoManual = (service: any) => {
+    setManualContratoTarget(service);
+    setManualContratoValor("");
+    setManualContratoOpen(true);
+  };
+
+  const handleCloseContratoManual = () => {
+    if (loadingAction) return;
+    setManualContratoOpen(false);
+    setManualContratoTarget(null);
+    setManualContratoValor("");
+    setManualRegenerarPendente(false);
+  };
+
+  const chamarContratoManual = async (
+    service: any,
+    valorInput: string,
+    regenerar: boolean,
+  ) => {
+    const servicoNorm = (service.servico || "").toLowerCase();
+    const ehInstalacao = servicoNorm === "instalação" || servicoNorm === "instalacao";
+    const ehMudancaEndereco =
+      servicoNorm === "mudança de endereço" ||
+      servicoNorm === "mudanca_endereco" ||
+      servicoNorm === "mudanca de endereco";
+    const aceitaValor = ehInstalacao || ehMudancaEndereco;
+
+    const body: any = {};
+    if (aceitaValor && valorInput.trim()) {
+      const valorNum = parseFloat(valorInput.replace(",", "."));
+      if (isNaN(valorNum) || valorNum < 0) {
+        alert("Informe um valor válido.");
+        return false;
+      }
+      body.valor = valorInput;
+    }
+    if (regenerar) body.regenerar = true;
+
+    setLoadingAction(service.id);
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/solicitacao-servico/gerar-contrato-manual/${service.id}`,
+        body,
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+      );
+      setManualContratoLink(response.data?.sign_url || "");
+      setManualContratoReaproveitado(Boolean(response.data?.reenvio));
+      setManualContratoLastService(service);
+      setManualContratoOpen(false);
+      setManualContratoTarget(null);
+      setManualContratoValor("");
+      setManualContratoLinkOpen(true);
+      fetchServices(page);
+      return true;
+    } catch (error: any) {
+      console.error("Erro ao gerar contrato manual:", error);
+      const msg = error.response?.data?.message || "Erro ao gerar contrato manual.";
+      alert(msg);
+      return false;
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleConfirmarContratoManual = async () => {
+    if (!manualContratoTarget) return;
+    const regenerar = manualRegenerarPendente;
+    const ok = await chamarContratoManual(manualContratoTarget, manualContratoValor, regenerar);
+    if (ok) setManualRegenerarPendente(false);
+  };
+
+  const handleGerarNovoContrato = () => {
+    const service = manualContratoLastService;
+    if (!service) return;
+    if (
+      !window.confirm(
+        "Isso vai descartar o contrato atual e gerar um novo na ZapSign. Continuar?",
+      )
+    ) {
+      return;
+    }
+    setManualContratoLinkOpen(false);
+    setManualContratoLink("");
+    setManualContratoReaproveitado(false);
+    setManualContratoTarget(service);
+    setManualContratoValor("");
+    setManualContratoOpen(true);
+    // Marca o próximo submit como regenerar via closure no confirm button abaixo
+    // usando um handler dedicado.
+    setManualRegenerarPendente(true);
+  };
+
+  const handleCopiarLinkContrato = async () => {
+    try {
+      await navigator.clipboard.writeText(manualContratoLink);
+      alert("Link copiado para a área de transferência.");
+    } catch {
+      alert("Não foi possível copiar automaticamente. Selecione e copie manualmente.");
     }
   };
 
@@ -666,6 +775,23 @@ const SolicitacoesServico = () => {
                                 </MenuItem>
                               </Tooltip>
                             )}
+                            {!service.finalizado && !service.assinado && (() => {
+                              const sNorm = (service.servico || "").toLowerCase();
+                              const elegivel =
+                                sNorm === "instalação" ||
+                                sNorm === "instalacao" ||
+                                sNorm === "mudança de endereço" ||
+                                sNorm === "mudanca_endereco" ||
+                                sNorm === "mudanca de endereco";
+                              if (!elegivel) return null;
+                              return (
+                                <Tooltip title="Gerar o contrato e receber o link aqui para enviar manualmente ao cliente (não envia por WhatsApp)" arrow placement="left">
+                                  <MenuItem onClick={() => { setMenuAnchor(null); setMenuServiceId(null); handleOpenContratoManual(service); }}>
+                                    <ListItemText>Gerar Contrato Manual</ListItemText>
+                                  </MenuItem>
+                                </Tooltip>
+                              );
+                            })()}
                             {!service.finalizado && (
                               <Tooltip title="Criar o chamado e cadastro imediatamente, sem aguardar a assinatura do contrato" arrow placement="left">
                                 <MenuItem onClick={() => { setMenuAnchor(null); setMenuServiceId(null); handleCriarSemAssinatura(service.id, service.servico); }}>
@@ -856,6 +982,113 @@ const SolicitacoesServico = () => {
               disabled={!!loadingAction}
             >
               Enviar PIX ao Cliente
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={manualContratoOpen}
+          onClose={handleCloseContratoManual}
+          fullWidth
+          maxWidth="xs"
+        >
+          <DialogTitle>
+            {manualRegenerarPendente ? "Gerar Novo Contrato" : "Gerar Contrato Manual"}
+          </DialogTitle>
+          <DialogContent>
+            <Box display="flex" flexDirection="column" gap={2} mt={1}>
+              {manualRegenerarPendente ? (
+                <Alert severity="warning">
+                  O contrato anterior será substituído por um novo na ZapSign.
+                  Informe o valor desejado (vazio ou 0 para grátis).
+                </Alert>
+              ) : (
+                <Alert severity="info">
+                  O contrato será gerado na ZapSign e o link será exibido aqui para
+                  você enviar manualmente ao cliente. Nenhuma mensagem será enviada
+                  pelo WhatsApp.
+                </Alert>
+              )}
+              {(() => {
+                const servicoNorm = (manualContratoTarget?.servico || "").toLowerCase();
+                const ehInstalacao = servicoNorm === "instalação" || servicoNorm === "instalacao";
+                const ehMudancaEndereco =
+                  servicoNorm === "mudança de endereço" ||
+                  servicoNorm === "mudanca_endereco" ||
+                  servicoNorm === "mudanca de endereco";
+                if (!ehInstalacao && !ehMudancaEndereco) return null;
+                const label = ehInstalacao
+                  ? "Valor da Instalação (R$)"
+                  : "Valor do Serviço (R$)";
+                return (
+                  <TextField
+                    label={label}
+                    value={manualContratoValor}
+                    onChange={(e) => setManualContratoValor(e.target.value)}
+                    placeholder="Ex: 350.00 (deixe vazio para grátis)"
+                    fullWidth
+                    size="small"
+                    type="number"
+                    inputProps={{ min: 0, step: "0.01" }}
+                    helperText="Deixe em branco para gerar contrato sem cobrança (grátis)."
+                  />
+                );
+              })()}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseContratoManual} disabled={!!loadingAction}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmarContratoManual}
+              variant="contained"
+              color="primary"
+              disabled={!!loadingAction}
+            >
+              Gerar Contrato
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={manualContratoLinkOpen}
+          onClose={() => setManualContratoLinkOpen(false)}
+          fullWidth
+          maxWidth="sm"
+        >
+          <DialogTitle>Link do Contrato</DialogTitle>
+          <DialogContent>
+            <Box display="flex" flexDirection="column" gap={2} mt={1}>
+              {manualContratoReaproveitado ? (
+                <Alert severity="info">
+                  Esta solicitação já possuía um contrato gerado. Reutilizamos o
+                  mesmo link — copie abaixo e envie manualmente ao cliente. Se
+                  precisar alterar o valor, clique em <strong>Gerar Novo Contrato</strong>.
+                </Alert>
+              ) : (
+                <Alert severity="success">
+                  Contrato gerado com sucesso. Copie o link abaixo e envie
+                  manualmente ao cliente.
+                </Alert>
+              )}
+              <TextField
+                label="Link de Assinatura"
+                value={manualContratoLink}
+                fullWidth
+                size="small"
+                InputProps={{ readOnly: true }}
+                onFocus={(e) => e.target.select()}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setManualContratoLinkOpen(false)}>Fechar</Button>
+            <Button onClick={handleGerarNovoContrato} color="warning">
+              Gerar Novo Contrato
+            </Button>
+            <Button onClick={handleCopiarLinkContrato} variant="contained" color="primary">
+              Copiar Link
             </Button>
           </DialogActions>
         </Dialog>

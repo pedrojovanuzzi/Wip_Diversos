@@ -913,6 +913,133 @@ class SolicitacaoServicoController {
     }
   };
 
+  public gerarContratoManual = async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { valor, regenerar } = req.body || {};
+
+    try {
+      const repository = AppDataSource.getRepository(SolicitacaoServico);
+      const solicitacao = await repository.findOne({ where: { id: Number(id) } });
+
+      if (!solicitacao) {
+        res.status(404).json({ message: "Solicitação não encontrada." });
+        return;
+      }
+
+      if (solicitacao.cancelado) {
+        res.status(409).json({ message: "Solicitação cancelada não pode ser processada." });
+        return;
+      }
+
+      if (solicitacao.assinado) {
+        res.status(409).json({ message: "O contrato já foi assinado para esta solicitação." });
+        return;
+      }
+
+      const dados = (solicitacao.dados || {}) as any;
+      const servicoNorm = (solicitacao.servico || "").toLowerCase();
+      const ehInstalacao = servicoNorm === "instalação" || servicoNorm === "instalacao";
+      const ehMudancaEndereco = servicoNorm === "mudança de endereço" || servicoNorm === "mudanca_endereco" || servicoNorm === "mudanca de endereco";
+
+      if (!ehInstalacao && !ehMudancaEndereco) {
+        res.status(400).json({
+          message: "Contrato manual disponível apenas para Instalação e Mudança de Endereço.",
+        });
+        return;
+      }
+
+      let zapSignUrl: string;
+      let contratoJaExistia = false;
+      const forcarNovo = regenerar === true || regenerar === "true";
+
+      if (solicitacao.token_zapsign && !forcarNovo) {
+        // Reutiliza o link do contrato já gerado
+        contratoJaExistia = true;
+        const isSandbox = process.env.SERVIDOR_HOMOLOGACAO === "true";
+        const baseUrl = isSandbox
+          ? "https://sandbox.api.zapsign.com.br"
+          : "https://api.zapsign.com.br";
+        const docResponse = await axios.get(
+          `${baseUrl}/api/v1/docs/${solicitacao.token_zapsign}/`,
+          { headers: { Authorization: `Bearer ${process.env.ZAPSIGN_TOKEN}` } },
+        );
+        zapSignUrl = docResponse.data.signers[0].sign_url;
+      } else {
+        let valorNormalizado: string | undefined;
+        if (valor !== undefined && valor !== null && String(valor).trim() !== "") {
+          const parsed = parseFloat(String(valor).replace(",", "."));
+          if (isNaN(parsed) || parsed < 0) {
+            res.status(400).json({ message: "Valor informado é inválido." });
+            return;
+          }
+          valorNormalizado = parsed.toFixed(2);
+        }
+
+        // Sobrescreve o valor do payload explicitamente (inclusive para 0/vazio)
+        // para não herdar um valor antigo salvo em dados.valor.
+        const payload: any = {
+          ...dados,
+          valor: valorNormalizado !== undefined ? valorNormalizado : "0,00",
+        };
+
+        // Regra do contrato manual:
+        //  - valor 0 ou vazio  -> contrato grátis
+        //  - valor > 0         -> Instalação: dificuldade de acesso (multa + taxa)
+        //                        Mudança de Endereço: contrato pago padrão
+        const valorNumFinal = valorNormalizado !== undefined ? parseFloat(valorNormalizado) : 0;
+        const ehPago = valorNumFinal > 0;
+
+        let zapResponse: any;
+        if (ehInstalacao) {
+          if (ehPago) {
+            zapResponse = await ZapSign.createContractInstalacaoDificuldadeAcesso(payload);
+          } else {
+            zapResponse = await ZapSign.createContractInstalacao({ ...payload, valor: "0,00" });
+          }
+        } else {
+          if (ehPago) {
+            zapResponse = await ZapSign.createContractMudancaEndereco(payload);
+          } else {
+            zapResponse = await ZapSign.createContractMudancaEndereco({ ...payload, valor: "0,00" });
+          }
+        }
+
+        zapSignUrl = zapResponse.signers[0].sign_url;
+        solicitacao.token_zapsign = zapResponse.token;
+
+        solicitacao.dados = { ...dados, valor: payload.valor };
+      }
+
+      solicitacao.dados = {
+        ...(solicitacao.dados || {}),
+        geradoManualmente: {
+          data: new Date().toISOString(),
+          usuario: req.user?.login || null,
+          reenvio: contratoJaExistia || undefined,
+          regerado: forcarNovo || undefined,
+        },
+      };
+      await repository.save(solicitacao);
+
+      res.status(200).json({
+        success: true,
+        sign_url: zapSignUrl,
+        reenvio: contratoJaExistia,
+        regerado: forcarNovo && !contratoJaExistia,
+        message: contratoJaExistia
+          ? "Link do contrato existente recuperado. Envie manualmente ao cliente."
+          : forcarNovo
+            ? "Novo contrato gerado. Envie o link manualmente ao cliente."
+            : "Contrato gerado. Envie o link manualmente ao cliente.",
+      });
+    } catch (error: any) {
+      console.error("Erro ao gerar contrato manual:", error);
+      res.status(500).json({
+        message: error?.message || "Erro interno ao gerar contrato manual.",
+      });
+    }
+  };
+
   public finalizar = async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const { id_chamado } = req.body;

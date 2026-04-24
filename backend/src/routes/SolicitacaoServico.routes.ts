@@ -13,5 +13,6 @@ router.post("/finalizar/:id", AuthGuard, (req, res) => SolicitacaoServicoControl
 router.post("/cancelar/:id", AuthGuard, (req, res) => SolicitacaoServicoController.cancelar(req, res));
 router.post("/criar-sem-assinatura/:id", AuthGuard, (req, res) => SolicitacaoServicoController.criarSemAssinatura(req, res));
 router.post("/enviar-assinatura/:id", AuthGuard, (req, res) => SolicitacaoServicoController.enviarAssinatura(req, res));
+router.post("/gerar-contrato-manual/:id", AuthGuard, (req, res) => SolicitacaoServicoController.gerarContratoManual(req, res));
 
 export default router;
