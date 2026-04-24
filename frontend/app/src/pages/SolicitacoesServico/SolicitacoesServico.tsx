@@ -255,6 +255,27 @@ const SolicitacoesServico = () => {
     }
   };
 
+  const handleMarcarPago = async (id: number) => {
+    if (!window.confirm("Deseja marcar esta solicitação como JÁ PAGA? Esta ação não envia cobrança ao cliente.")) return;
+
+    setLoadingAction(id);
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/solicitacao-servico/marcar-pago/${id}`,
+        {},
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+      );
+      alert(response.data?.message || "Solicitação marcada como paga.");
+      fetchServices(page);
+    } catch (error: any) {
+      console.error("Erro ao marcar como pago:", error);
+      const msg = error.response?.data?.message || "Erro ao marcar como pago.";
+      alert(msg);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
   const handleCriarSemAssinatura = async (id: number, servico: string) => {
     const servicoNorm = (servico || "").toLowerCase();
     const ehInstalacao =
@@ -803,6 +824,13 @@ const SolicitacoesServico = () => {
                               <Tooltip title="Consultar CPF manualmente. Cada consulta possui custo, use apenas em caso de erro" arrow placement="left">
                                 <MenuItem onClick={() => { setMenuAnchor(null); setMenuServiceId(null); handleOpenManualConsulta(service); }}>
                                   <ListItemText>Consulta Manual</ListItemText>
+                                </MenuItem>
+                              </Tooltip>
+                            )}
+                            {(user?.permission || 0) >= 5 && !service.pago && !service.gratis && (
+                              <Tooltip title="Marcar manualmente como já pago, sem cobrar o cliente" arrow placement="left">
+                                <MenuItem onClick={() => { setMenuAnchor(null); setMenuServiceId(null); handleMarcarPago(service.id); }} sx={{ color: "success.main" }}>
+                                  <ListItemText>Marcar como Pago</ListItemText>
                                 </MenuItem>
                               </Tooltip>
                             )}

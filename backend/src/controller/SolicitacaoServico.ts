@@ -588,6 +588,51 @@ class SolicitacaoServicoController {
     }
   };
 
+  public marcarPago = async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+
+    try {
+      const repository = AppDataSource.getRepository(SolicitacaoServico);
+      const solicitacao = await repository.findOne({
+        where: { id: Number(id) },
+      });
+
+      if (!solicitacao) {
+        res.status(404).json({ message: "Solicitação não encontrada." });
+        return;
+      }
+
+      if (solicitacao.cancelado) {
+        res.status(409).json({ message: "Solicitação cancelada não pode ser marcada como paga." });
+        return;
+      }
+
+      if (solicitacao.pago === true) {
+        res.status(409).json({ message: "Solicitação já está marcada como paga." });
+        return;
+      }
+
+      const dadosAtuais = (solicitacao.dados || {}) as any;
+      solicitacao.pago = true;
+      solicitacao.dados = {
+        ...dadosAtuais,
+        pagamentoManual: {
+          data: new Date().toISOString(),
+          usuario: req.user?.login || null,
+        },
+      };
+      await repository.save(solicitacao);
+
+      res.status(200).json({
+        success: true,
+        message: "Solicitação marcada como paga.",
+      });
+    } catch (error) {
+      console.error("Erro ao marcar solicitação como paga:", error);
+      res.status(500).json({ message: "Erro interno ao marcar como paga." });
+    }
+  };
+
   public criarSemAssinatura = async (
     req: Request,
     res: Response,
