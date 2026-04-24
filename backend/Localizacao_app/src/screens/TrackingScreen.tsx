@@ -14,8 +14,6 @@ import * as Location from "expo-location";
 import * as IntentLauncher from "expo-intent-launcher";
 import {
   TecnicoData,
-  avisoBateriaJaMostrado,
-  marcarAvisoBateriaMostrado,
   lerHeartbeats,
   limparHeartbeats,
   registrarHeartbeat,
@@ -24,30 +22,33 @@ import {
 import { enviarOuEnfileirar, drenarFila, getApiUrl } from "../api";
 import { iniciarRastreamentoBackground } from "../backgroundTask";
 
+const ANDROID_PACKAGE = "com.empresa.localizacaoapp";
+
 async function mostrarAvisoBateriaSeNecessario() {
   if (Platform.OS !== "android") return;
-  if (await avisoBateriaJaMostrado()) return;
 
   Alert.alert(
     "Otimização de bateria",
-    "Para garantir que o rastreamento não seja interrompido, desative a otimização de bateria para este app em:\n\nConfigurações → Apps → Localizacao App → Bateria → Sem restrições.",
+    "Para o rastreamento não ser interrompido com a tela apagada, o Android precisa ignorar a otimização de bateria deste app. Toque em 'Permitir' no próximo diálogo.",
     [
+      { text: "Agora não", style: "cancel" },
       {
-        text: "Depois",
-        style: "cancel",
-        onPress: () => marcarAvisoBateriaMostrado(),
-      },
-      {
-        text: "Abrir configurações",
+        text: "Permitir",
         onPress: async () => {
           try {
+            // Abre o diálogo direto de isenção (em vez da lista genérica).
             await IntentLauncher.startActivityAsync(
-              "android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS",
+              "android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+              { data: `package:${ANDROID_PACKAGE}` },
             );
           } catch (err) {
-            console.warn("Erro abrindo config de bateria:", err);
-          } finally {
-            marcarAvisoBateriaMostrado();
+            console.warn("Erro pedindo isenção de bateria:", err);
+            // Fallback: abre a lista geral se o intent direto falhar.
+            try {
+              await IntentLauncher.startActivityAsync(
+                "android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS",
+              );
+            } catch {}
           }
         },
       },
@@ -132,7 +133,7 @@ export const TrackingScreen: React.FC<Props> = ({ tecnico }) => {
                           {
                             extra: {
                               "android.provider.extra.APP_PACKAGE":
-                                "com.empresa.localizacaoapp",
+                                ANDROID_PACKAGE,
                             },
                           },
                         ).catch(() => {});
