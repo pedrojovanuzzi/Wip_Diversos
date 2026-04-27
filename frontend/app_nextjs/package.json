@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.10",
+    "@heroicons/react": "^2.2.0",
     "axios": "^1.7.9",
     "leaflet": "^1.9.4",
     "moment": "^2.30.1",

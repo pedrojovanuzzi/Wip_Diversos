@@ -7,16 +7,23 @@ export const metadata: Metadata = {
   description: "Wip Diversos — Next.js",
 };
 
-export default function RootLayout({
+import { getUser } from "@/lib/auth";
+import { NotificationProvider } from "@/lib/NotificationContext";
+
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const user = await getUser();
+
   return (
     <html lang="pt-BR">
       <body suppressHydrationWarning>
-        <LocalhostBanner />
-        {children}
+        <NotificationProvider user={user}>
+          <LocalhostBanner />
+          {children}
+        </NotificationProvider>
       </body>
     </html>
   );

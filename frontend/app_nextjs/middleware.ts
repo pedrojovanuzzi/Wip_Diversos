@@ -20,6 +20,13 @@ const PROTECTED_PREFIXES = [
   "/Pm2Logs",
   "/ServerLogs",
   "/TimeTracking",
+  "/NFSE",
+  "/BuscarNfseGerada",
+  "/GerarNotaDeServicoIndependente",
+  "/nfe/comodato",
+  "/BuscarNfe",
+  "/Nfcom",
+  "/Nfcom/Buscar",
 ];
 
 const PUBLIC_EXACT = new Set<string>([
