@@ -94,7 +94,7 @@ export const TokenAutoAtendimento = () => {
             </Link>
           </button> */}
 
-          <button className="group w-full relative overflow-hidden rounded-full p-[2px] lg:p-[3px] transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none">
+          {/* <button className="group w-full relative overflow-hidden rounded-full p-[2px] lg:p-[3px] transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full opacity-80 blur group-hover:opacity-100 transition-opacity"></div>
             <Link to="/TokenAutoAtendimento/fazer-cadastro">
               <div className="relative bg-slate-900/40 backdrop-blur-sm rounded-full w-full h-20 lg:h-32 flex items-center justify-between px-6 lg:px-10 border border-white/10 group-hover:bg-opacity-30 transition-all">
@@ -104,7 +104,7 @@ export const TokenAutoAtendimento = () => {
                 <FaUser className="text-purple-100 text-3xl lg:text-5xl" />
               </div>
             </Link>
-          </button>
+          </button> */}
         </div>
 
         <Keyboard onKeyPress={(key) => console.log(key)} />
