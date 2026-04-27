@@ -12,7 +12,15 @@ import { NextRequest, NextResponse } from "next/server";
  * Esse design evita uma chamada HTTP por request no middleware (que não tem `cache` por request).
  */
 
-const PROTECTED_PREFIXES = ["/", "/licencas"];
+const PROTECTED_PREFIXES = [
+  "/",
+  "/licencas",
+  "/Onu",
+  "/PowerDns",
+  "/Pm2Logs",
+  "/ServerLogs",
+];
+
 const PUBLIC_EXACT = new Set<string>([
   "/auth/login",
   "/feedback/Opnion",
