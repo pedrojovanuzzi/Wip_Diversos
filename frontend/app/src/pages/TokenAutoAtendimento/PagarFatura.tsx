@@ -212,8 +212,20 @@ export const PagarFatura = () => {
         // Assuming backend can handle 'stateless' invoice ID payment via Pix generator.
         const clientInvoices = await fetchInvoices(client);
         if (clientInvoices.length > 0) {
-          allInvoiceIds.push(clientInvoices[0].id); // Pick first
-          totalValue += parseFloat(clientInvoices[0].valor);
+          const firstInv = clientInvoices[0];
+          allInvoiceIds.push(firstInv.id); // Pick first
+          totalValue += parseFloat(firstInv.valor);
+
+          axios
+            .post(`${process.env.REACT_APP_URL}/totem-solicitacao/registrar`, {
+              txid: String(firstInv.id),
+              valor: firstInv.valor,
+              cpf_cnpj: client.cpf_cnpj ?? cpf,
+              login: client.login,
+            })
+            .catch((err) =>
+              console.error("[Totem] Falha ao registrar solicitação:", err),
+            );
         }
       }
 
