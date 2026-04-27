@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import LocalhostBanner from "@/components/LocalhostBanner";
 
 export const metadata: Metadata = {
   title: "Wip Diversos",
@@ -13,7 +14,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <LocalhostBanner />
+        {children}
+      </body>
     </html>
   );
 }

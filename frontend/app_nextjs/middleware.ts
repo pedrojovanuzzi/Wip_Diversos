@@ -19,11 +19,13 @@ const PROTECTED_PREFIXES = [
   "/PowerDns",
   "/Pm2Logs",
   "/ServerLogs",
+  "/TimeTracking",
 ];
 
 const PUBLIC_EXACT = new Set<string>([
   "/auth/login",
   "/feedback/Opnion",
+  "/TimeTracking/ClockIn",
 ]);
 
 function isProtected(pathname: string): boolean {
