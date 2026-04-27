@@ -20,6 +20,7 @@ import { ClientAnalytics } from "./pages/ClientAnalytics/ClientAnalytics";
 import { DDDOS_Home } from "./pages/DDDOS_Monitoring/DDDOS_Home";
 import { ServerLogs } from "./pages/logs/ServerLogs";
 import { LogViewer } from "./pages/logs/LogViewer";
+import { Pm2Logs } from "./pages/logs/Pm2Logs";
 import { PowerDns } from "./pages/powerdns/PowerDns";
 import { OnuHome } from "./pages/onu/OnuHome";
 import { AutorizarOnu } from "./pages/onu/AutorizarOnu";
@@ -305,6 +306,16 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <ServerLogs />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/Pm2Logs"
+            element={
+              user?.token && user.permission >= 5 ? (
+                <Pm2Logs />
               ) : (
                 <Navigate to="/auth/login" />
               )

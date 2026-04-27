@@ -26,6 +26,7 @@ import {
   FaChartLine,
   FaFilePdf,
   FaList,
+  FaTerminal,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -293,6 +294,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                     description="Enviar mensagens para múltiplos clientes"
                   />
                 )}
+                <NavItem
+                  to="/Pm2Logs"
+                  icon={
+                    <FaTerminal className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="PM2 Logs"
+                  description="Visualizar logs do PM2 (todos, normais e erros)"
+                />
               </>
             )}
             {permission >= 2 && (
