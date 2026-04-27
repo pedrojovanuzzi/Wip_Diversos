@@ -8,7 +8,7 @@ export interface LoginState {
   error?: string;
 }
 
-const COOKIE_MAX_AGE_SECONDS = 8 * 60 * 60; // 8h, equivalente ao 1/3 day do app antigo
+const COOKIE_MAX_AGE_SECONDS = 16 * 60 * 60;
 
 export async function loginAction(
   _prev: LoginState,
@@ -40,8 +40,10 @@ export async function loginAction(
 
     // O backend antigo devolve o token cru em res.data — pode vir como string ou objeto
     const ct = res.headers.get("content-type") ?? "";
-    const payload = ct.includes("application/json") ? await res.json() : await res.text();
-    token = typeof payload === "string" ? payload : payload?.token ?? payload;
+    const payload = ct.includes("application/json")
+      ? await res.json()
+      : await res.text();
+    token = typeof payload === "string" ? payload : (payload?.token ?? payload);
   } catch (err) {
     console.error("[login] erro:", err);
     return { error: "Erro de conexão com o backend." };
