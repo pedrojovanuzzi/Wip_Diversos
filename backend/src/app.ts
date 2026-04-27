@@ -29,6 +29,7 @@ import SolicitacaoServicoRouter from "./routes/SolicitacaoServico.routes";
 import ChamadoFichaTecnicaRouter from "./routes/ChamadoFichaTecnica.routes";
 import WhatsappTestRoutes from "./routes/WhatsappTest.routes";
 import PhoneLocationRoutes from "./routes/PhoneLocation.routes";
+import TotemSolicitacaoRoutes from "./routes/TotemSolicitacao.routes";
 
 // Controllers (for scheduled tasks)
 import BackupController from "./controller/Backup";
@@ -82,6 +83,7 @@ export class App {
     this.server.use("/api/chamados-ficha", ChamadoFichaTecnicaRouter);
     this.server.use("/api/whatsapp-test", WhatsappTestRoutes);
     this.server.use("/api/phone-location", PhoneLocationRoutes);
+    this.server.use("/api/totem-solicitacao", TotemSolicitacaoRoutes);
   }
 
   private agendarBackup() {

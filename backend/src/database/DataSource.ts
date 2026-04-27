@@ -17,6 +17,7 @@ import { LicencaEntity } from "../entities/LicencaEntities";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { ChamadoFichaTecnica } from "../entities/ChamadoFichaTecnica";
 import { PhoneLocation } from "../entities/PhoneLocation";
+import { TotemPixSolicitacao } from "../entities/TotemPixSolicitacao";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -45,8 +46,11 @@ const AppDataSource = new DataSource({
     SolicitacaoServico,
     ChamadoFichaTecnica,
     PhoneLocation,
+    TotemPixSolicitacao,
   ],
-  migrations: [path.join(__dirname, "../migration/*.{ts,js}")],
+  migrations: [
+    path.join(__dirname, "../migration/*.{ts,js}").replace(/\\/g, "/"),
+  ],
 });
 
 AppDataSource.initialize()

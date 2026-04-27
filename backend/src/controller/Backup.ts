@@ -287,6 +287,72 @@ class Backup {
     }, DOZE_HORAS_MS).unref?.();
   }
 
+  private limparBackupsAntigos(diasMaximos = 3) {
+    const backupsRoot = path.resolve(__dirname, "..", "backups");
+    if (!fs.existsSync(backupsRoot)) return;
+
+    const limiteMs = Date.now() - diasMaximos * 24 * 60 * 60 * 1000;
+    let removidos = 0;
+
+    const varrer = (dir: string) => {
+      let entries: fs.Dirent[];
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        try {
+          if (entry.isDirectory()) {
+            varrer(fullPath);
+          } else if (entry.isFile()) {
+            const stats = fs.statSync(fullPath);
+            if (stats.mtimeMs < limiteMs) {
+              fs.rmSync(fullPath, { force: true });
+              console.log(`🧹 Backup antigo removido: ${fullPath}`);
+              removidos++;
+            }
+          }
+        } catch (err) {
+          console.error(`❌ Falha ao processar ${fullPath}:`, err);
+        }
+      }
+    };
+
+    varrer(backupsRoot);
+
+    const limparDirsVazios = (dir: string) => {
+      let entries: string[];
+      try {
+        entries = fs.readdirSync(dir);
+      } catch {
+        return;
+      }
+      for (const name of entries) {
+        const fullPath = path.join(dir, name);
+        try {
+          if (fs.statSync(fullPath).isDirectory()) {
+            limparDirsVazios(fullPath);
+            if (fs.readdirSync(fullPath).length === 0) {
+              fs.rmdirSync(fullPath);
+              console.log(`🧹 Diretório vazio removido: ${fullPath}`);
+            }
+          }
+        } catch (err) {
+          console.error(`❌ Falha ao remover diretório ${fullPath}:`, err);
+        }
+      }
+    };
+
+    limparDirsVazios(backupsRoot);
+
+    console.log(
+      `🗑️ Limpeza concluída: ${removidos} arquivo(s) com mais de ${diasMaximos} dias removido(s).`
+    );
+  }
+
   private removerDiretoriosVaziosAte(dir: string, stopAt: string) {
     let current = dir;
     while (
@@ -309,6 +375,7 @@ class Backup {
   // Método público chamado pelo CRON ou agendador
   public async gerarTodos() {
     try {
+      this.limparBackupsAntigos(3);
       await this.processarBackups();
       console.log("🏁 Processo de backup automático finalizado.");
     } catch (error) {

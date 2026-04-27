@@ -241,6 +241,18 @@ export const PagarFatura = () => {
       setSelectedInvoiceIds(selectedInvoiceIds.filter((i) => i !== id));
     } else {
       setSelectedInvoiceIds([...selectedInvoiceIds, id]);
+
+      const invoice = invoices.find((i) => i.id === id);
+      axios
+        .post(`${process.env.REACT_APP_URL}/totem-solicitacao/registrar`, {
+          txid: String(id),
+          valor: invoice?.valor ?? null,
+          cpf_cnpj: selectedClient?.cpf_cnpj ?? cpf,
+          login: selectedClient?.login ?? null,
+        })
+        .catch((err) =>
+          console.error("[Totem] Falha ao registrar solicitação:", err),
+        );
     }
   };
 
