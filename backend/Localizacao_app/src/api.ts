@@ -1,14 +1,11 @@
 import { lerFila, salvarFila, enfileirarPosicao, PosicaoFila } from "./storage";
 
 const DEV_API = "http://localhost:3000/api";
-const PROD_API = "https://wipdiversos.wiptelecomunicacoes.com.br/api";
+const PROD_API = process.env.EXPO_PUBLIC_API_URL ?? "";
 
 export function getApiUrl(): string {
   // __DEV__ é true quando rodando via `expo start` (homologação)
   // e false em builds de produção.
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
   // @ts-ignore - __DEV__ é global do React Native
   return typeof __DEV__ !== "undefined" && __DEV__ ? DEV_API : PROD_API;
 }
