@@ -391,6 +391,14 @@ export const PagarFatura = () => {
 
         const response = await axios.post(endpoint, payload);
 
+        if (response.data?.terminalBusy) {
+          setTerminalAviso(
+            "A maquininha está ocupada com outra cobrança e não pode ser liberada agora. Estamos te redirecionando para o pagamento via Pix.",
+          );
+          await handleMethodSelect("pix");
+          return;
+        }
+
         if (response.status === 200) {
           setCardMessage("Termine o processo na maquininha.");
           // response.id contains the comma/hyphen separated IDs
@@ -416,7 +424,7 @@ export const PagarFatura = () => {
       const cancelado = await cancelarOrderTerminal(order.id);
       if (!cancelado) {
         setTerminalAviso(
-          "A maquininha já está com a cobrança ativa. Aperte a seta esquerda no canto superior da maquininha para cancelar e siga com o Pix.",
+          "A maquininha está com a cobrança ativa, caso queira pode cancelar na maquininha e seguir com o Pix na tela.",
         );
       } else {
         setTerminalAviso("");

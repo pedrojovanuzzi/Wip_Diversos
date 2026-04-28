@@ -101,7 +101,7 @@ class TokenAtendimento {
   private criarOrderMPNoTerminal = async (
     terminalId: string,
     payload: any,
-  ): Promise<any> => {
+  ): Promise<{ ok: true; response: any } | { ok: false; reason: string }> => {
     const post = () =>
       axios.post("https://api.mercadopago.com/v1/orders", payload, {
         headers: {
@@ -115,7 +115,7 @@ class TokenAtendimento {
       if (resp.data?.id) {
         TokenAtendimento.lastOrderByTerminal.set(terminalId, String(resp.data.id));
       }
-      return resp;
+      return { ok: true, response: resp };
     } catch (error: any) {
       const errors: any[] = error.response?.data?.errors || [];
       const isQueued = errors.some(
@@ -124,22 +124,45 @@ class TokenAtendimento {
       if (!isQueued) throw error;
 
       console.log(
-        `[MP] Terminal ${terminalId} ocupado — cancelando order pendente e tentando novamente`,
+        `[MP] Terminal ${terminalId} ocupado — tentando liberar e recriar order`,
       );
 
       const cached = TokenAtendimento.lastOrderByTerminal.get(terminalId);
-      if (cached) await this.cancelarOrderMP(cached);
+      let cancelado = false;
+      if (cached) {
+        const r = await this.cancelarOrderMP(cached);
+        cancelado = cancelado || r.ok;
+      }
 
       const found = await this.buscarOrderPendenteNoTerminal(terminalId);
-      if (found && found !== cached) await this.cancelarOrderMP(found);
+      if (found && found !== cached) {
+        const r = await this.cancelarOrderMP(found);
+        cancelado = cancelado || r.ok;
+      }
+
+      if (!cancelado) {
+        return { ok: false, reason: "terminal_busy" };
+      }
 
       TokenAtendimento.lastOrderByTerminal.delete(terminalId);
 
-      const retry = await post();
-      if (retry.data?.id) {
-        TokenAtendimento.lastOrderByTerminal.set(terminalId, String(retry.data.id));
+      try {
+        const retry = await post();
+        if (retry.data?.id) {
+          TokenAtendimento.lastOrderByTerminal.set(
+            terminalId,
+            String(retry.data.id),
+          );
+        }
+        return { ok: true, response: retry };
+      } catch (retryErr: any) {
+        const retryErrors: any[] = retryErr.response?.data?.errors || [];
+        const stillQueued = retryErrors.some(
+          (e) => e.code === "already_queued_order_on_terminal",
+        );
+        if (stillQueued) return { ok: false, reason: "terminal_busy" };
+        throw retryErr;
       }
-      return retry;
     }
   };
 
@@ -676,7 +699,7 @@ class TokenAtendimento {
 
       console.log(terminais);
 
-      const response2 = await this.criarOrderMPNoTerminal(terminais[0].id, {
+      const result = await this.criarOrderMPNoTerminal(terminais[0].id, {
         type: "point",
         external_reference: String(fatura.id),
         expiration_time: "PT1M",
@@ -699,11 +722,13 @@ class TokenAtendimento {
           },
         },
       });
-      const terminais2 = await response2.data;
-      console.log(terminais2.data);
-      console.log(response2);
 
-      console.log(terminais2);
+      if (!result.ok) {
+        res.status(200).json({ terminalBusy: true, reason: result.reason });
+        return;
+      }
+
+      const terminais2 = result.response.data;
       res.status(200).json({
         id: fatura.id,
         valor: valor,
@@ -772,7 +797,7 @@ class TokenAtendimento {
 
       console.log(terminais);
 
-      const response2 = await this.criarOrderMPNoTerminal(terminais[0].id, {
+      const result = await this.criarOrderMPNoTerminal(terminais[0].id, {
         type: "point",
         external_reference: String(fatura.id),
         expiration_time: "PT1M",
@@ -793,11 +818,13 @@ class TokenAtendimento {
           },
         },
       });
-      const terminais2 = await response2.data;
-      console.log(terminais2.data);
-      console.log(response2);
 
-      console.log(terminais2);
+      if (!result.ok) {
+        res.status(200).json({ terminalBusy: true, reason: result.reason });
+        return;
+      }
+
+      const terminais2 = result.response.data;
       res.status(200).json({
         id: fatura.id,
         valor: valor,
@@ -1084,7 +1111,7 @@ class TokenAtendimento {
 
       const externalRef = titulos.join("-"); // "101-102-103"
 
-      const mpOrder = await this.criarOrderMPNoTerminal(terminais[0].id, {
+      const result = await this.criarOrderMPNoTerminal(terminais[0].id, {
         type: "point",
         external_reference: externalRef,
         expiration_time: "PT1M",
@@ -1108,9 +1135,18 @@ class TokenAtendimento {
         },
       });
 
+      if (!result.ok) {
+        res.status(200).json({
+          terminalBusy: true,
+          reason: result.reason,
+          valor: total.toFixed(2),
+        });
+        return;
+      }
+
       res.status(200).json({
-        id: externalRef, // Using the list as ID or null? Frontend uses it for polling order.
-        order: mpOrder.data,
+        id: externalRef,
+        order: result.response.data,
         valor: total.toFixed(2),
         dataPagamento: new Date(),
       });
@@ -1173,7 +1209,7 @@ class TokenAtendimento {
 
       const externalRef = titulos.join("-");
 
-      const mpOrder = await this.criarOrderMPNoTerminal(terminais[0].id, {
+      const result = await this.criarOrderMPNoTerminal(terminais[0].id, {
         type: "point",
         external_reference: externalRef,
         expiration_time: "PT1M",
@@ -1195,9 +1231,18 @@ class TokenAtendimento {
         },
       });
 
+      if (!result.ok) {
+        res.status(200).json({
+          terminalBusy: true,
+          reason: result.reason,
+          valor: total.toFixed(2),
+        });
+        return;
+      }
+
       res.status(200).json({
         id: externalRef,
-        order: mpOrder.data,
+        order: result.response.data,
         valor: total.toFixed(2),
         dataPagamento: new Date(),
       });
