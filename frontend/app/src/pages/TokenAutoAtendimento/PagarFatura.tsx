@@ -1073,6 +1073,22 @@ export const PagarFatura = () => {
                         format(new Date(dataPagamento), "dd/MM/yyyy")}
                     </span>
                   </div>
+                  <button
+                    onClick={() => handleMethodSelect("pix")}
+                    disabled={loading}
+                    className="mb-4 lg:mb-6 w-full px-4 lg:px-6 py-3 lg:py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:shadow-emerald-500/30 hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl lg:rounded-2xl shadow-lg transition-all text-base lg:text-xl flex items-center justify-center space-x-2"
+                  >
+                    {loading ? (
+                      <>
+                        <FaSpinner className="animate-spin" />
+                        <span>Gerando Pix...</span>
+                      </>
+                    ) : (
+                      <span>
+                        Maquininha não está respondendo? Clique e pague no Pix
+                      </span>
+                    )}
+                  </button>
                   <p className="text-slate-400 text-lg lg:text-2xl max-w-lg mx-auto text-center mb-4 lg:mb-6">
                     {cardMessage}
                   </p>
