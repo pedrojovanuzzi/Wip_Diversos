@@ -329,6 +329,25 @@ export const PagarFatura = () => {
     };
   }, [order, obterOrderPorId]);
 
+  const [terminalAviso, setTerminalAviso] = useState("");
+
+  const cancelarOrderTerminal = React.useCallback(
+    async (orderId?: string | null): Promise<boolean> => {
+      const id = orderId || order?.id;
+      if (!id) return true;
+      try {
+        const r = await axios.post(
+          `${process.env.REACT_APP_URL}/TokenAutoAtendimento/CancelarOrder/${id}`,
+        );
+        return r.data?.ok === true;
+      } catch (err) {
+        console.error("Falha ao cancelar order no terminal:", err);
+        return false;
+      }
+    },
+    [order?.id],
+  );
+
   const handleMethodSelect = async (method: "pix" | "credit" | "debit") => {
     // Determine if we are doing single client single invoice (legacy flow) or multi
     // Actually, "legacy flow" now is just a subset of multi-invoice (array of 1).
@@ -393,6 +412,18 @@ export const PagarFatura = () => {
     }
 
     // Method is PIX
+    if (order?.id) {
+      const cancelado = await cancelarOrderTerminal(order.id);
+      if (!cancelado) {
+        setTerminalAviso(
+          "A maquininha já está com a cobrança ativa. Aperte a seta esquerda no canto superior da maquininha para cancelar e siga com o Pix.",
+        );
+      } else {
+        setTerminalAviso("");
+      }
+      setOrder(null);
+    }
+
     setLoading(true);
     setError("");
     try {
@@ -516,6 +547,15 @@ export const PagarFatura = () => {
           const isPaid = response.data.pago === true;
           if (isPaid) {
             console.log("Pagamento Confirmado!");
+            if (order?.id) {
+              const cancelado = await cancelarOrderTerminal(order.id);
+              if (!cancelado) {
+                setTerminalAviso(
+                  "Pagamento confirmado! Aperte a seta esquerda na maquininha para liberar o terminal.",
+                );
+              }
+              setOrder(null);
+            }
             setStep("payment-success");
           } else {
             console.log("Pagamento ainda pendente...");
@@ -545,6 +585,7 @@ export const PagarFatura = () => {
 
     if (step === "payment-pix" || step === "payment-card") {
       timeoutId = setTimeout(() => {
+        if (order?.id) cancelarOrderTerminal(order.id);
         setErrorMessage("Tempo para pagamento expirado.");
         setStep("payment-error");
         setOrder(null);
@@ -1058,6 +1099,11 @@ export const PagarFatura = () => {
                   <p className="text-slate-400 text-base lg:text-xl max-w-md mx-auto text-center">
                     Escaneie o QR Code acima para pagar
                   </p>
+                  {terminalAviso && (
+                    <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-4 text-amber-200 text-center text-base lg:text-lg max-w-md">
+                      {terminalAviso}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center w-full max-w-sm lg:max-w-xl">
@@ -1136,6 +1182,11 @@ export const PagarFatura = () => {
                 <div className="text-slate-500 text-sm">
                   Retornando ao início em 20 segundos...
                 </div>
+                {terminalAviso && (
+                  <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-4 text-amber-200 text-center text-base max-w-md mx-auto">
+                    {terminalAviso}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col space-y-4 w-full max-w-sm">

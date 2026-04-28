@@ -40,6 +40,109 @@ class TokenAtendimento {
   private recordRepo = AppDataSource.getRepository(Faturas);
   private clienteRepo = AppDataSource.getRepository(ClientesEntities);
 
+  private static lastOrderByTerminal: Map<string, string> = new Map();
+
+  private cancelarOrderMP = async (
+    orderId: string,
+  ): Promise<{ ok: boolean; reason?: string }> => {
+    try {
+      await axios.post(
+        `https://api.mercadopago.com/v1/orders/${orderId}/cancel`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+            "X-Idempotency-Key": uuidv4(),
+          },
+        },
+      );
+      return { ok: true };
+    } catch (err: any) {
+      const errors: any[] = err.response?.data?.errors || [];
+      const code = errors[0]?.code;
+      console.log(
+        `[MP] Falha ao cancelar order ${orderId}:`,
+        err.response?.data || err.message,
+      );
+      return { ok: false, reason: code };
+    }
+  };
+
+  private buscarOrderPendenteNoTerminal = async (
+    terminalId: string,
+  ): Promise<string | null> => {
+    try {
+      const r = await axios.get(
+        `https://api.mercadopago.com/v1/orders/search`,
+        {
+          params: { terminal_id: terminalId },
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+          },
+        },
+      );
+      const results: any[] =
+        r.data?.results || r.data?.elements || r.data?.data || [];
+      const pendente = results.find((o) =>
+        ["created", "processing", "at_terminal", "action_required"].includes(
+          String(o.status || "").toLowerCase(),
+        ),
+      );
+      return pendente?.id ? String(pendente.id) : null;
+    } catch (err: any) {
+      console.log(
+        "[MP] Falha ao buscar orders do terminal:",
+        err.response?.data || err.message,
+      );
+      return null;
+    }
+  };
+
+  private criarOrderMPNoTerminal = async (
+    terminalId: string,
+    payload: any,
+  ): Promise<any> => {
+    const post = () =>
+      axios.post("https://api.mercadopago.com/v1/orders", payload, {
+        headers: {
+          Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+          "X-Idempotency-Key": uuidv4(),
+        },
+      });
+
+    try {
+      const resp = await post();
+      if (resp.data?.id) {
+        TokenAtendimento.lastOrderByTerminal.set(terminalId, String(resp.data.id));
+      }
+      return resp;
+    } catch (error: any) {
+      const errors: any[] = error.response?.data?.errors || [];
+      const isQueued = errors.some(
+        (e) => e.code === "already_queued_order_on_terminal",
+      );
+      if (!isQueued) throw error;
+
+      console.log(
+        `[MP] Terminal ${terminalId} ocupado — cancelando order pendente e tentando novamente`,
+      );
+
+      const cached = TokenAtendimento.lastOrderByTerminal.get(terminalId);
+      if (cached) await this.cancelarOrderMP(cached);
+
+      const found = await this.buscarOrderPendenteNoTerminal(terminalId);
+      if (found && found !== cached) await this.cancelarOrderMP(found);
+
+      TokenAtendimento.lastOrderByTerminal.delete(terminalId);
+
+      const retry = await post();
+      if (retry.data?.id) {
+        TokenAtendimento.lastOrderByTerminal.set(terminalId, String(retry.data.id));
+      }
+      return retry;
+    }
+  };
+
   login = async (req: Request, res: Response) => {
     try {
       const cadastros = await this.clienteRepo.find({
@@ -573,38 +676,29 @@ class TokenAtendimento {
 
       console.log(terminais);
 
-      const response2 = await axios.post(
-        "https://api.mercadopago.com/v1/orders",
-        {
-          type: "point",
-          external_reference: String(fatura.id),
-          expiration_time: "PT1M",
-          transactions: {
-            payments: [
-              {
-                amount: String(valor),
-              },
-            ],
+      const response2 = await this.criarOrderMPNoTerminal(terminais[0].id, {
+        type: "point",
+        external_reference: String(fatura.id),
+        expiration_time: "PT1M",
+        transactions: {
+          payments: [
+            {
+              amount: String(valor),
+            },
+          ],
+        },
+        config: {
+          point: {
+            terminal_id: terminais[0].id,
+            print_on_terminal: "seller_ticket",
           },
-          config: {
-            point: {
-              terminal_id: terminais[0].id,
-              print_on_terminal: "seller_ticket",
-            },
-            payment_method: {
-              default_type: "credit_card",
-              installments_cost: "buyer",
-              default_installments: 1,
-            },
+          payment_method: {
+            default_type: "credit_card",
+            installments_cost: "buyer",
+            default_installments: 1,
           },
         },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-            "X-Idempotency-Key": uuidv4(),
-          },
-        },
-      );
+      });
       const terminais2 = await response2.data;
       console.log(terminais2.data);
       console.log(response2);
@@ -678,36 +772,27 @@ class TokenAtendimento {
 
       console.log(terminais);
 
-      const response2 = await axios.post(
-        "https://api.mercadopago.com/v1/orders",
-        {
-          type: "point",
-          external_reference: String(fatura.id),
-          expiration_time: "PT1M",
-          transactions: {
-            payments: [
-              {
-                amount: String(valor),
-              },
-            ],
+      const response2 = await this.criarOrderMPNoTerminal(terminais[0].id, {
+        type: "point",
+        external_reference: String(fatura.id),
+        expiration_time: "PT1M",
+        transactions: {
+          payments: [
+            {
+              amount: String(valor),
+            },
+          ],
+        },
+        config: {
+          point: {
+            terminal_id: terminais[0].id,
+            print_on_terminal: "seller_ticket",
           },
-          config: {
-            point: {
-              terminal_id: terminais[0].id,
-              print_on_terminal: "seller_ticket",
-            },
-            payment_method: {
-              default_type: "debit_card",
-            },
+          payment_method: {
+            default_type: "debit_card",
           },
         },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-            "X-Idempotency-Key": uuidv4(),
-          },
-        },
-      );
+      });
       const terminais2 = await response2.data;
       console.log(terminais2.data);
       console.log(response2);
@@ -726,6 +811,31 @@ class TokenAtendimento {
       console.log("***************************************");
       console.log(error);
       res.status(500).json({ error: "Erro ao obter lista de terminais" });
+    }
+  };
+
+  cancelarOrder = async (req: Request, res: Response) => {
+    try {
+      const { order } = req.params;
+      if (!order) {
+        res.status(400).json({ error: "Order ID não informado" });
+        return;
+      }
+
+      const result = await this.cancelarOrderMP(String(order));
+
+      if (result.ok) {
+        for (const [terminalId, id] of TokenAtendimento.lastOrderByTerminal) {
+          if (id === String(order)) {
+            TokenAtendimento.lastOrderByTerminal.delete(terminalId);
+          }
+        }
+      }
+
+      res.status(200).json(result);
+    } catch (error: any) {
+      console.log("[MP] Erro ao cancelar order:", error.response?.data || error);
+      res.status(500).json({ error: "Erro ao cancelar order" });
     }
   };
 
@@ -974,38 +1084,29 @@ class TokenAtendimento {
 
       const externalRef = titulos.join("-"); // "101-102-103"
 
-      const mpOrder = await axios.post(
-        "https://api.mercadopago.com/v1/orders",
-        {
-          type: "point",
-          external_reference: externalRef,
-          expiration_time: "PT10M", // 10 minutes
-          transactions: {
-            payments: [
-              {
-                amount: total.toFixed(2),
-              },
-            ],
+      const mpOrder = await this.criarOrderMPNoTerminal(terminais[0].id, {
+        type: "point",
+        external_reference: externalRef,
+        expiration_time: "PT1M",
+        transactions: {
+          payments: [
+            {
+              amount: total.toFixed(2),
+            },
+          ],
+        },
+        config: {
+          point: {
+            terminal_id: terminais[0].id,
+            print_on_terminal: "seller_ticket",
           },
-          config: {
-            point: {
-              terminal_id: terminais[0].id,
-              print_on_terminal: "seller_ticket",
-            },
-            payment_method: {
-              default_type: "credit_card",
-              installments_cost: "buyer",
-              default_installments: 1,
-            },
+          payment_method: {
+            default_type: "credit_card",
+            installments_cost: "buyer",
+            default_installments: 1,
           },
         },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-            "X-Idempotency-Key": uuidv4(),
-          },
-        },
-      );
+      });
 
       res.status(200).json({
         id: externalRef, // Using the list as ID or null? Frontend uses it for polling order.
@@ -1072,36 +1173,27 @@ class TokenAtendimento {
 
       const externalRef = titulos.join("-");
 
-      const mpOrder = await axios.post(
-        "https://api.mercadopago.com/v1/orders",
-        {
-          type: "point",
-          external_reference: externalRef,
-          expiration_time: "PT10M",
-          transactions: {
-            payments: [
-              {
-                amount: total.toFixed(2),
-              },
-            ],
+      const mpOrder = await this.criarOrderMPNoTerminal(terminais[0].id, {
+        type: "point",
+        external_reference: externalRef,
+        expiration_time: "PT1M",
+        transactions: {
+          payments: [
+            {
+              amount: total.toFixed(2),
+            },
+          ],
+        },
+        config: {
+          point: {
+            terminal_id: terminais[0].id,
+            print_on_terminal: "seller_ticket",
           },
-          config: {
-            point: {
-              terminal_id: terminais[0].id,
-              print_on_terminal: "seller_ticket",
-            },
-            payment_method: {
-              default_type: "debit_card",
-            },
+          payment_method: {
+            default_type: "debit_card",
           },
         },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-            "X-Idempotency-Key": uuidv4(),
-          },
-        },
-      );
+      });
 
       res.status(200).json({
         id: externalRef,
