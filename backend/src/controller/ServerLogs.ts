@@ -647,31 +647,82 @@ async function runSearchJob(
     };
 
     job.message = "Gerando planilha Excel...";
-    const rows = validatedHits
-      .sort((a, b) => a.date.getTime() - b.date.getTime())
-      .map((h) => {
-        const c = clienteMap.get(h.login);
-        return {
-          "Data/Hora": formatDate(h.date),
-          "Nome Completo": c?.nome || "",
-          Login: h.login,
-          "CPF/CNPJ": c?.cpf_cnpj || "",
-          "Endereço Completo": buildEndereco(c),
-          "Dados do Termo": c?.termo || "",
-          "Modalidade da Conexão": modalidade(c),
-          "IP Encontrado (CGNAT)": h.ip,
-          "IP Fixo Cadastrado": c?.ip || "",
-          MAC: h.mac,
-          "NAS/Concentrador": h.host,
-          "Sessão Início (radacct)": h.sessionStart
-            ? formatDate(h.sessionStart)
+
+    // Agrupa por login: hits do mesmo dia cujo intervalo entre conexões
+    // consecutivas seja <= GAP_MS são consolidados em 1 linha (início → fim).
+    const GAP_MS = 60 * 60 * 1000; // 1h
+    const sortedHits = [...validatedHits].sort(
+      (a, b) => a.login.localeCompare(b.login) || a.date.getTime() - b.date.getTime()
+    );
+
+    type Group = {
+      login: string;
+      start: Date;
+      end: Date;
+      hits: typeof sortedHits;
+    };
+    const groups: Group[] = [];
+    for (const h of sortedHits) {
+      const last = groups[groups.length - 1];
+      const sameDay =
+        last &&
+        last.login === h.login &&
+        last.end.getFullYear() === h.date.getFullYear() &&
+        last.end.getMonth() === h.date.getMonth() &&
+        last.end.getDate() === h.date.getDate();
+      if (last && sameDay && h.date.getTime() - last.end.getTime() <= GAP_MS) {
+        last.end = h.date;
+        last.hits.push(h);
+      } else {
+        groups.push({ login: h.login, start: h.date, end: h.date, hits: [h] });
+      }
+    }
+    groups.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    const uniqJoin = (vals: (string | undefined | null)[]) =>
+      Array.from(
+        new Set(vals.map((v) => (v ?? "").toString()).filter((v) => v !== ""))
+      ).join(", ");
+
+    const rows = groups.map((g) => {
+      const c = clienteMap.get(g.login);
+      const single = g.hits.length === 1;
+      const starts = g.hits.map((h) => h.sessionStart).filter(Boolean) as Date[];
+      const stops = g.hits.map((h) => h.sessionStop);
+      const sessionStart = starts.length
+        ? new Date(Math.min(...starts.map((d) => d.getTime())))
+        : null;
+      const hasActive = stops.some((s) => !s);
+      const stopDates = stops.filter(Boolean) as Date[];
+      const sessionStop = hasActive
+        ? null
+        : stopDates.length
+          ? new Date(Math.max(...stopDates.map((d) => d.getTime())))
+          : null;
+
+      return {
+        "Data/Hora Início": formatDate(g.start),
+        "Data/Hora Fim": single ? "" : formatDate(g.end),
+        Conexões: g.hits.length,
+        "Nome Completo": c?.nome || "",
+        Login: g.login,
+        "CPF/CNPJ": c?.cpf_cnpj || "",
+        "Endereço Completo": buildEndereco(c),
+        "Dados do Termo": c?.termo || "",
+        "Modalidade da Conexão": modalidade(c),
+        "IP Encontrado (CGNAT)": uniqJoin(g.hits.map((h) => h.ip)),
+        "IP Fixo Cadastrado": c?.ip || "",
+        MAC: uniqJoin(g.hits.map((h) => h.mac)),
+        "NAS/Concentrador": uniqJoin(g.hits.map((h) => h.host)),
+        "Sessão Início (radacct)": sessionStart ? formatDate(sessionStart) : "",
+        "Sessão Fim (radacct)": hasActive
+          ? "ativa"
+          : sessionStop
+            ? formatDate(sessionStop)
             : "",
-          "Sessão Fim (radacct)": h.sessionStop
-            ? formatDate(h.sessionStop)
-            : "ativa",
-          "Arquivo de Origem": h.sourceFile,
-        };
-      });
+        "Arquivo de Origem": uniqJoin(g.hits.map((h) => h.sourceFile)),
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(rows);
     const headers = Object.keys(rows[0] || {});
