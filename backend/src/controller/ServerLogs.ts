@@ -236,9 +236,9 @@ class ServerLogs {
             const text = parsed.text || "";
 
             if (useFixedFilter) {
-              // Normaliza espaços (incluindo NBSP, tabs, quebras múltiplas)
-              // para evitar que pdf-parse atrapalhe o casamento.
-              const normalized = text.replace(/[  -​\t\r\n]+/g, " ");
+              // Normaliza espaços (NBSP, tabs, quebras, zero-width).
+              // Usa \uNNNN para evitar ranges acidentais no character class.
+              const normalized = text.replace(/[    ​	]+/g, " ");
 
               // 1) Pareamento por proximidade de string: para cada
               // ocorrência literal do IP Público fixo, busca o próximo IP
@@ -435,12 +435,10 @@ class ServerLogs {
       return;
     }
     if (job.status !== "done" || !job.buffer) {
-      res
-        .status(409)
-        .json({
-          error: "Relatório ainda não está pronto.",
-          status: job.status,
-        });
+      res.status(409).json({
+        error: "Relatório ainda não está pronto.",
+        status: job.status,
+      });
       return;
     }
     res.setHeader(
