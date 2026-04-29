@@ -4,6 +4,7 @@ import { Response, Request } from "express";
 import Client from "ssh2-sftp-client";
 import zlib from "zlib";
 import * as XLSX from "xlsx";
+import pdf from "pdf-parse";
 import { In } from "typeorm";
 import MkauthSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
@@ -39,6 +40,7 @@ interface JobState {
   filename?: string;
   createdAt: number;
   finishedAt?: number;
+  ipFilter?: Set<string>;
 }
 
 const JOBS = new Map<string, JobState>();
@@ -137,11 +139,22 @@ class ServerLogs {
   public async SearchClientLogsStart(req: Request, res: Response) {
     try {
       pruneJobs();
-      const { startDate, endDate, folders } = req.body as {
-        startDate?: string;
-        endDate?: string;
-        folders?: string[];
-      };
+      const body = req.body as Record<string, any>;
+      const startDate: string | undefined = body.startDate;
+      const endDate: string | undefined = body.endDate;
+
+      // folders pode chegar como array (JSON) ou string serializada (multipart)
+      let folders: string[] | undefined;
+      if (Array.isArray(body.folders)) {
+        folders = body.folders;
+      } else if (typeof body.folders === "string") {
+        try {
+          const parsed = JSON.parse(body.folders);
+          folders = Array.isArray(parsed) ? parsed : undefined;
+        } catch (_) {
+          folders = undefined;
+        }
+      }
 
       if (!startDate || !endDate) {
         res
@@ -154,6 +167,91 @@ class ServerLogs {
           .status(400)
           .json({ error: "Selecione pelo menos uma pasta para a busca." });
         return;
+      }
+
+      // Se PDFs foram enviados, extrai somente os IPs Privados (3ª coluna
+      // da tabela MAPEAMENTO DAS PORTAS) e usa como filtro adicional.
+      let ipFilter: Set<string> | undefined;
+      const files =
+        ((req as any).files as Express.Multer.File[] | undefined) || [];
+      if (files.length > 0) {
+        const ipRe = /\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\b/g;
+        const rangeRe =
+          /RANGE\s+IPs?\s+PRIVADOS?\s+PARA\s+CGNAT\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*-\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/i;
+
+        // Range CGNAT (RFC 6598): 100.64.0.0/10 → 100.64.x.x até 100.127.x.x
+        const isCgnat = (a: number, b: number, c: number, d: number) => {
+          if (a !== 100) return false;
+          if (b < 64 || b > 127) return false;
+          if (c < 0 || c > 255) return false;
+          if (d < 0 || d > 255) return false;
+          return true;
+        };
+
+        const ipToInt = (ip: string) => {
+          const p = ip.split(".").map(Number);
+          return ((p[0] << 24) >>> 0) + (p[1] << 16) + (p[2] << 8) + p[3];
+        };
+        const intToIp = (n: number) =>
+          `${(n >>> 24) & 0xff}.${(n >>> 16) & 0xff}.${(n >>> 8) & 0xff}.${n & 0xff}`;
+
+        ipFilter = new Set<string>();
+        const failedFiles: string[] = [];
+
+        for (const file of files) {
+          if (!file.buffer || file.buffer.length === 0) continue;
+          try {
+            const parsed = await pdf(file.buffer);
+            const text = parsed.text || "";
+
+            // Caminho rápido: PDFs do gerador CGNAT (Remontti) trazem o range no
+            // cabeçalho — expande direto e evita depender da extração da tabela.
+            const rm = rangeRe.exec(text);
+            let usedRange = false;
+            if (rm) {
+              const startParts = rm[1].split(".").map(Number);
+              const endParts = rm[2].split(".").map(Number);
+              if (
+                isCgnat(startParts[0], startParts[1], startParts[2], startParts[3]) &&
+                isCgnat(endParts[0], endParts[1], endParts[2], endParts[3])
+              ) {
+                const startN = ipToInt(rm[1]);
+                const endN = ipToInt(rm[2]);
+                if (endN >= startN && endN - startN < 1_000_000) {
+                  for (let n = startN; n <= endN; n++) ipFilter.add(intToIp(n));
+                  usedRange = true;
+                }
+              }
+            }
+
+            if (!usedRange) {
+              let m: RegExpExecArray | null;
+              ipRe.lastIndex = 0;
+              while ((m = ipRe.exec(text)) !== null) {
+                const a = Number(m[1]);
+                const b = Number(m[2]);
+                const c = Number(m[3]);
+                const d = Number(m[4]);
+                if (isCgnat(a, b, c, d)) {
+                  ipFilter.add(`${a}.${b}.${c}.${d}`);
+                }
+              }
+            }
+          } catch (e: any) {
+            console.error(`Falha ao ler PDF ${file.originalname}:`, e);
+            failedFiles.push(file.originalname);
+          }
+        }
+
+        if (ipFilter.size === 0) {
+          res.status(400).json({
+            error:
+              failedFiles.length > 0
+                ? `Nenhum IP CGNAT (100.64-127.x.x) encontrado. Falha ao ler: ${failedFiles.join(", ")}`
+                : "Nenhum IP CGNAT (100.64-127.x.x) foi encontrado nos PDFs.",
+          });
+          return;
+        }
       }
 
       const start = new Date(startDate);
@@ -178,13 +276,17 @@ class ServerLogs {
         currentFile: "",
         message: "Conectando ao servidor de logs...",
         createdAt: Date.now(),
+        ipFilter,
       };
       JOBS.set(jobId, job);
 
       // dispara processamento em background
       void runSearchJob(job, start, end, folders);
 
-      res.status(202).json({ jobId });
+      res.status(202).json({
+        jobId,
+        ipFilterCount: ipFilter ? ipFilter.size : 0,
+      });
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
@@ -454,6 +556,15 @@ async function runSearchJob(
         arr.push(s);
         sessionsByLoginIp.set(key, arr);
       }
+    }
+
+    // Aplica filtro de IPs vindos do PDF, se houver
+    if (job.ipFilter && job.ipFilter.size > 0) {
+      const before = hits.length;
+      const filtered = hits.filter((h) => job.ipFilter!.has(h.ip));
+      hits.length = 0;
+      hits.push(...filtered);
+      job.message = `Filtrados por PDF: ${filtered.length}/${before} ocorrências.`;
     }
 
     // Filtra os hits: só mantemos aquelas ocorrências cujo (login, ip, data)

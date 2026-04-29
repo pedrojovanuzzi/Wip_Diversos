@@ -2,7 +2,13 @@ import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { NavBar } from "../../components/navbar/NavBar";
-import { FaRegFolder, FaFileExcel, FaSearch } from "react-icons/fa";
+import {
+  FaRegFolder,
+  FaFileExcel,
+  FaSearch,
+  FaFilePdf,
+  FaTimes,
+} from "react-icons/fa";
 
 export const ClientLogsSearch = () => {
   const { user } = useAuth();
@@ -24,6 +30,7 @@ export const ClientLogsSearch = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [ipsPdfs, setIpsPdfs] = useState<File[]>([]);
 
   const [progress, setProgress] = useState<{
     status: "idle" | "running" | "done" | "error";
@@ -112,17 +119,30 @@ export const ClientLogsSearch = () => {
     });
 
     try {
+      const formData = new FormData();
+      formData.append("startDate", startDate);
+      formData.append("endDate", endDate);
+      formData.append("folders", JSON.stringify(Array.from(selected)));
+      for (const f of ipsPdfs) formData.append("ipsPdf", f);
+
       const startResp = await axios.post(
         `${process.env.REACT_APP_URL}/ServerLogs/SearchClientLogs/start`,
+        formData,
         {
-          startDate,
-          endDate,
-          folders: Array.from(selected),
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
       const jobId: string = startResp.data?.jobId;
+      const ipFilterCount: number = startResp.data?.ipFilterCount || 0;
       if (!jobId) throw new Error("Falha ao criar o job.");
+      if (ipFilterCount > 0) {
+        setInfo(
+          `${ipsPdfs.length} PDF(s) carregado(s): ${ipFilterCount} IP(s) Privado(s) extraído(s) para filtro.`
+        );
+      }
 
       // Polling de progresso
       const poll = async (): Promise<void> => {
@@ -255,6 +275,92 @@ export const ClientLogsSearch = () => {
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              PDFs com tabela de mapeamento CGNAT (opcional)
+            </label>
+            <p className="text-xs text-slate-500 mb-2">
+              Envie um ou mais PDFs no formato do Gerador de CGNAT v2.1. Será
+              extraída a coluna <strong>IP Privado</strong> da tabela
+              "MAPEAMENTO DAS PORTAS" e somente ocorrências com IP listado
+              entrarão no relatório.
+            </p>
+
+            {ipsPdfs.length > 0 && (
+              <div className="space-y-2 mb-2">
+                {ipsPdfs.map((f, idx) => (
+                  <div
+                    key={`${f.name}-${idx}`}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-blue-200 bg-blue-50"
+                  >
+                    <FaFilePdf className="text-red-600 size-5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-slate-700 truncate">
+                        {f.name}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {(f.size / 1024).toFixed(1)} KB
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setIpsPdfs((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                      className="p-2 rounded hover:bg-blue-100 text-slate-600"
+                      title="Remover PDF"
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <label className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors">
+              <FaFilePdf className="text-slate-400 size-5 shrink-0" />
+              <span className="text-sm text-slate-600">
+                {ipsPdfs.length > 0
+                  ? "Adicionar mais PDFs..."
+                  : "Clique para selecionar um ou mais PDFs..."}
+              </span>
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const fs = Array.from(e.target.files || []);
+                  if (fs.length === 0) return;
+                  setIpsPdfs((prev) => {
+                    const seen = new Set(
+                      prev.map((p) => `${p.name}|${p.size}`)
+                    );
+                    const merged = [...prev];
+                    for (const f of fs) {
+                      const key = `${f.name}|${f.size}`;
+                      if (!seen.has(key)) {
+                        seen.add(key);
+                        merged.push(f);
+                      }
+                    }
+                    return merged;
+                  });
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {ipsPdfs.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIpsPdfs([])}
+                className="mt-2 text-xs text-slate-500 hover:text-slate-700 underline"
+              >
+                Remover todos os PDFs
+              </button>
+            )}
           </div>
 
           <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
