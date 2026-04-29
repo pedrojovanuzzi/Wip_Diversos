@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { In } from "typeorm";
 import MkauthSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
+import { Radacct } from "../entities/Radacct";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -422,13 +423,88 @@ async function runSearchJob(
       /* noop */
     }
 
-    job.message = "Buscando dados dos clientes no MKAuth...";
+    job.message = "Validando sessões no MKAuth (radacct)...";
     const uniqueLogins = Array.from(new Set(hits.map((h) => h.login)));
-    const clienteMap = new Map<string, ClientesEntities>();
+
+    // Carrega sessões candidatas: qualquer sessão de algum dos logins que
+    // tenha alguma sobreposição com o intervalo solicitado.
+    type SessionRow = {
+      username: string;
+      framedipaddress: string | null;
+      acctstarttime: Date | null;
+      acctstoptime: Date | null;
+    };
+    const sessionsByLoginIp = new Map<string, SessionRow[]>();
     if (uniqueLogins.length > 0) {
+      const RadacctRepo = MkauthSource.getRepository(Radacct);
+      const sessions = await RadacctRepo.createQueryBuilder("r")
+        .select([
+          "r.username",
+          "r.framedipaddress",
+          "r.acctstarttime",
+          "r.acctstoptime",
+        ])
+        .where("r.username IN (:...logins)", { logins: uniqueLogins })
+        .andWhere("r.acctstarttime >= :start", { start })
+        .andWhere("r.acctstoptime <= :end", { end })
+        .getMany();
+      for (const s of sessions as unknown as SessionRow[]) {
+        const key = `${s.username}|${s.framedipaddress || ""}`;
+        const arr = sessionsByLoginIp.get(key) || [];
+        arr.push(s);
+        sessionsByLoginIp.set(key, arr);
+      }
+    }
+
+    // Filtra os hits: só mantemos aquelas ocorrências cujo (login, ip, data)
+    // está coberto por uma sessão (acctstarttime <= data <= acctstoptime).
+    type ValidatedHit = (typeof hits)[number] & {
+      sessionStart: Date | null;
+      sessionStop: Date | null;
+    };
+    const validatedHits: ValidatedHit[] = [];
+    for (const h of hits) {
+      const key = `${h.login}|${h.ip}`;
+      const sess = sessionsByLoginIp.get(key);
+      if (!sess || sess.length === 0) continue;
+      const t = h.date.getTime();
+      const userStartT = start.getTime();
+      const userEndT = end.getTime();
+      const match = sess.find((s) => {
+        const startT = s.acctstarttime
+          ? new Date(s.acctstarttime).getTime()
+          : null;
+        const stopT = s.acctstoptime
+          ? new Date(s.acctstoptime).getTime()
+          : null;
+        if (startT === null || stopT === null) return false;
+        // Sessão totalmente dentro da faixa selecionada
+        if (startT < userStartT || stopT > userEndT) return false;
+        // E o horário do log está dentro da sessão
+        if (startT > t || stopT < t) return false;
+        return true;
+      });
+      if (!match) continue;
+      validatedHits.push({
+        ...h,
+        sessionStart: match.acctstarttime
+          ? new Date(match.acctstarttime)
+          : null,
+        sessionStop: match.acctstoptime ? new Date(match.acctstoptime) : null,
+      });
+    }
+
+    job.hits = validatedHits.length;
+    job.message = "Buscando dados dos clientes no MKAuth...";
+
+    const clienteMap = new Map<string, ClientesEntities>();
+    const validatedLogins = Array.from(
+      new Set(validatedHits.map((h) => h.login))
+    );
+    if (validatedLogins.length > 0) {
       const ClientRepository = MkauthSource.getRepository(ClientesEntities);
       const clientes = await ClientRepository.find({
-        where: { login: In(uniqueLogins) },
+        where: { login: In(validatedLogins) },
       });
       for (const c of clientes) {
         if (c.login) clienteMap.set(c.login, c);
@@ -460,7 +536,7 @@ async function runSearchJob(
     };
 
     job.message = "Gerando planilha Excel...";
-    const rows = hits
+    const rows = validatedHits
       .sort((a, b) => a.date.getTime() - b.date.getTime())
       .map((h) => {
         const c = clienteMap.get(h.login);
@@ -476,6 +552,12 @@ async function runSearchJob(
           "IP Fixo Cadastrado": c?.ip || "",
           MAC: h.mac,
           "NAS/Concentrador": h.host,
+          "Sessão Início (radacct)": h.sessionStart
+            ? formatDate(h.sessionStart)
+            : "",
+          "Sessão Fim (radacct)": h.sessionStop
+            ? formatDate(h.sessionStop)
+            : "ativa",
           "Arquivo de Origem": h.sourceFile,
         };
       });
