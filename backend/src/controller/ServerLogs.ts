@@ -22,8 +22,18 @@ const config = {
 const BASE_LOG_PATH = "/var/log/cgnat/syslog";
 
 const MONTH_MAP: Record<string, number> = {
-  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
-  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+  Jan: 0,
+  Feb: 1,
+  Mar: 2,
+  Apr: 3,
+  May: 4,
+  Jun: 5,
+  Jul: 6,
+  Aug: 7,
+  Sep: 8,
+  Oct: 9,
+  Nov: 10,
+  Dec: 11,
 };
 
 type JobStatus = "running" | "done" | "error";
@@ -61,7 +71,7 @@ class ServerLogs {
       await sftp.connect(config);
       const lista = await sftp.list("/var/log/cgnat/syslog");
       lista.sort((a, b) =>
-        a.name.localeCompare(b.name, "pt-BR", { numeric: true })
+        a.name.localeCompare(b.name, "pt-BR", { numeric: true }),
       );
       await sftp.end();
       res.status(200).send(lista.map((f) => f.name));
@@ -86,7 +96,7 @@ class ServerLogs {
       const lista = await sftp.list(`${path}`);
       await sftp.end();
       lista.sort((a, b) =>
-        a.name.localeCompare(b.name, "pt-BR", { numeric: true })
+        a.name.localeCompare(b.name, "pt-BR", { numeric: true }),
       );
       res.status(200).send(lista.map((f) => f.name));
     } catch (error) {
@@ -169,6 +179,23 @@ class ServerLogs {
         return;
       }
 
+      // Lista opcional de IPs Públicos fixos a inspecionar. Quando informada,
+      // apenas os IPs Privados (CGNAT) cuja linha na tabela "MAPEAMENTO DAS
+      // PORTAS" corresponda a um destes IPs Públicos serão considerados.
+      const ipv4Re = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
+      const fixedPublicIps = new Set<string>();
+      const rawFixed = body.fixedIps;
+      if (typeof rawFixed === "string" && rawFixed.trim() !== "") {
+        const matches = rawFixed.match(ipv4Re) || [];
+        for (const ip of matches) fixedPublicIps.add(ip);
+      } else if (Array.isArray(rawFixed)) {
+        for (const v of rawFixed) {
+          if (typeof v !== "string") continue;
+          const matches = v.match(ipv4Re) || [];
+          for (const ip of matches) fixedPublicIps.add(ip);
+        }
+      }
+
       // Se PDFs foram enviados, extrai somente os IPs Privados (3ª coluna
       // da tabela MAPEAMENTO DAS PORTAS) e usa como filtro adicional.
       let ipFilter: Set<string> | undefined;
@@ -178,6 +205,9 @@ class ServerLogs {
         const ipRe = /\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\b/g;
         const rangeRe =
           /RANGE\s+IPs?\s+PRIVADOS?\s+PARA\s+CGNAT\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*-\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/i;
+        // Linha da tabela: <IP Público> <portaStart> à <portaEnd> <IP Privado>
+        const mapRowRe =
+          /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+\d{1,5}\s*(?:à|a|-)\s*\d{1,5}\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/gi;
 
         // Range CGNAT (RFC 6598): 100.64.0.0/10 → 100.64.x.x até 100.127.x.x
         const isCgnat = (a: number, b: number, c: number, d: number) => {
@@ -197,12 +227,81 @@ class ServerLogs {
 
         ipFilter = new Set<string>();
         const failedFiles: string[] = [];
+        const useFixedFilter = fixedPublicIps.size > 0;
 
         for (const file of files) {
           if (!file.buffer || file.buffer.length === 0) continue;
           try {
             const parsed = await pdf(file.buffer);
             const text = parsed.text || "";
+
+            if (useFixedFilter) {
+              // Normaliza espaços (incluindo NBSP, tabs, quebras múltiplas)
+              // para evitar que pdf-parse atrapalhe o casamento.
+              const normalized = text.replace(/[  -​\t\r\n]+/g, " ");
+
+              // 1) Pareamento por proximidade de string: para cada
+              // ocorrência literal do IP Público fixo, busca o próximo IP
+              // CGNAT logo na sequência (até 200 caracteres à frente).
+              const cgnatNearRe =
+                /\b(100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3})\b/;
+              for (const pub of fixedPublicIps) {
+                let pos = 0;
+                while (true) {
+                  const idx = normalized.indexOf(pub, pos);
+                  if (idx === -1) break;
+                  const after = idx + pub.length;
+                  const slice = normalized.slice(after, after + 200);
+                  const cm = slice.match(cgnatNearRe);
+                  if (cm) ipFilter.add(cm[1]);
+                  pos = after;
+                }
+              }
+
+              // 2) Reforço — tokeniza todos os IPv4 e pareia por sequência.
+              const allIps: string[] = [];
+              let im: RegExpExecArray | null;
+              ipRe.lastIndex = 0;
+              while ((im = ipRe.exec(normalized)) !== null) {
+                allIps.push(`${im[1]}.${im[2]}.${im[3]}.${im[4]}`);
+              }
+              for (let i = 0; i < allIps.length; i++) {
+                if (!fixedPublicIps.has(allIps[i])) continue;
+                for (let j = i + 1; j < Math.min(i + 6, allIps.length); j++) {
+                  const p = allIps[j].split(".").map(Number);
+                  if (isCgnat(p[0], p[1], p[2], p[3])) {
+                    ipFilter.add(allIps[j]);
+                    break;
+                  }
+                }
+              }
+
+              // 3) Reforço — pareamento por linha completa.
+              let m: RegExpExecArray | null;
+              mapRowRe.lastIndex = 0;
+              while ((m = mapRowRe.exec(text)) !== null) {
+                const pub = m[1];
+                const priv = m[2];
+                if (!fixedPublicIps.has(pub)) continue;
+                const p = priv.split(".").map(Number);
+                if (!isCgnat(p[0], p[1], p[2], p[3])) continue;
+                ipFilter.add(priv);
+              }
+
+              // Debug: registra no log do servidor o que foi extraído.
+              const fixedFoundInPdf = Array.from(fixedPublicIps).filter((ip) =>
+                normalized.includes(ip),
+              );
+              console.log(
+                `[CGNAT/${file.originalname}] textLen=${text.length} ipv4Tokens=${allIps.length} fixedIps=${fixedPublicIps.size} fixedFoundInPdf=${fixedFoundInPdf.length} matchesAddedSoFar=${ipFilter.size}`,
+              );
+              if (fixedFoundInPdf.length === 0 && fixedPublicIps.size > 0) {
+                console.log(
+                  `[CGNAT/${file.originalname}] amostra do texto extraído (primeiros 500 chars):\n${normalized.slice(0, 500)}`,
+                );
+              }
+              continue;
+            }
 
             // Caminho rápido: PDFs do gerador CGNAT (Remontti) trazem o range no
             // cabeçalho — expande direto e evita depender da extração da tabela.
@@ -212,7 +311,12 @@ class ServerLogs {
               const startParts = rm[1].split(".").map(Number);
               const endParts = rm[2].split(".").map(Number);
               if (
-                isCgnat(startParts[0], startParts[1], startParts[2], startParts[3]) &&
+                isCgnat(
+                  startParts[0],
+                  startParts[1],
+                  startParts[2],
+                  startParts[3],
+                ) &&
                 isCgnat(endParts[0], endParts[1], endParts[2], endParts[3])
               ) {
                 const startN = ipToInt(rm[1]);
@@ -244,14 +348,24 @@ class ServerLogs {
         }
 
         if (ipFilter.size === 0) {
+          const baseMsg =
+            fixedPublicIps.size > 0
+              ? "Nenhum IP Privado correspondente aos IPs Públicos informados foi encontrado nos PDFs."
+              : "Nenhum IP CGNAT (100.64-127.x.x) foi encontrado nos PDFs.";
           res.status(400).json({
             error:
               failedFiles.length > 0
-                ? `Nenhum IP CGNAT (100.64-127.x.x) encontrado. Falha ao ler: ${failedFiles.join(", ")}`
-                : "Nenhum IP CGNAT (100.64-127.x.x) foi encontrado nos PDFs.",
+                ? `${baseMsg} Falha ao ler: ${failedFiles.join(", ")}`
+                : baseMsg,
           });
           return;
         }
+      } else if (fixedPublicIps.size > 0) {
+        res.status(400).json({
+          error:
+            "Para filtrar por IPs Públicos fixos, envie também o(s) PDF(s) com a tabela de MAPEAMENTO DAS PORTAS.",
+        });
+        return;
       }
 
       const start = new Date(startDate);
@@ -323,16 +437,19 @@ class ServerLogs {
     if (job.status !== "done" || !job.buffer) {
       res
         .status(409)
-        .json({ error: "Relatório ainda não está pronto.", status: job.status });
+        .json({
+          error: "Relatório ainda não está pronto.",
+          status: job.status,
+        });
       return;
     }
     res.setHeader(
       "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=${job.filename || `logs-clientes-${jobId}.xlsx`}`
+      `attachment; filename=${job.filename || `logs-clientes-${jobId}.xlsx`}`,
     );
     res.setHeader("X-Total-Hits", String(job.hits));
     res.setHeader("X-Files-Processed", String(job.processedFiles));
@@ -347,7 +464,7 @@ async function runSearchJob(
   job: JobState,
   start: Date,
   end: Date,
-  folders: string[]
+  folders: string[],
 ) {
   const sftp = new Client();
   try {
@@ -368,8 +485,7 @@ async function runSearchJob(
     const endM = end.getMonth() + 1;
     const endD = end.getDate();
 
-    const dayKey = (y: number, m: number, d: number) =>
-      y * 10000 + m * 100 + d;
+    const dayKey = (y: number, m: number, d: number) => y * 10000 + m * 100 + d;
     const startKey = dayKey(startY, startM, startD);
     const endKey = dayKey(endY, endM, endD);
     const monthKey = (y: number, m: number) => y * 100 + m;
@@ -392,7 +508,7 @@ async function runSearchJob(
     const allFiles: string[] = [];
     const walk = async (
       dir: string,
-      prefix: { y?: number; m?: number; d?: number }
+      prefix: { y?: number; m?: number; d?: number },
     ) => {
       let items: any[] = [];
       try {
@@ -411,7 +527,12 @@ async function runSearchJob(
             next.y = parseInt(name, 10);
           } else if (/^\d{1,2}$/.test(name)) {
             const num = parseInt(name, 10);
-            if (next.y !== undefined && next.m === undefined && num >= 1 && num <= 12) {
+            if (
+              next.y !== undefined &&
+              next.m === undefined &&
+              num >= 1 &&
+              num <= 12
+            ) {
               next.m = num;
             } else if (
               next.y !== undefined &&
@@ -469,7 +590,7 @@ async function runSearchJob(
       day: number,
       hh: number,
       mm: number,
-      ss: number
+      ss: number,
     ): Date | null => {
       const candidates = [start.getFullYear(), end.getFullYear()];
       for (const y of candidates) {
@@ -499,7 +620,7 @@ async function runSearchJob(
               parseInt(day, 10),
               parseInt(hh, 10),
               parseInt(mm, 10),
-              parseInt(ss, 10)
+              parseInt(ss, 10),
             );
             if (!d) continue;
             hits.push({
@@ -610,7 +731,7 @@ async function runSearchJob(
 
     const clienteMap = new Map<string, ClientesEntities>();
     const validatedLogins = Array.from(
-      new Set(validatedHits.map((h) => h.login))
+      new Set(validatedHits.map((h) => h.login)),
     );
     if (validatedLogins.length > 0) {
       const ClientRepository = MkauthSource.getRepository(ClientesEntities);
@@ -652,7 +773,8 @@ async function runSearchJob(
     // consecutivas seja <= GAP_MS são consolidados em 1 linha (início → fim).
     const GAP_MS = 60 * 60 * 1000; // 1h
     const sortedHits = [...validatedHits].sort(
-      (a, b) => a.login.localeCompare(b.login) || a.date.getTime() - b.date.getTime()
+      (a, b) =>
+        a.login.localeCompare(b.login) || a.date.getTime() - b.date.getTime(),
     );
 
     type Group = {
@@ -681,13 +803,15 @@ async function runSearchJob(
 
     const uniqJoin = (vals: (string | undefined | null)[]) =>
       Array.from(
-        new Set(vals.map((v) => (v ?? "").toString()).filter((v) => v !== ""))
+        new Set(vals.map((v) => (v ?? "").toString()).filter((v) => v !== "")),
       ).join(", ");
 
     const rows = groups.map((g) => {
       const c = clienteMap.get(g.login);
       const single = g.hits.length === 1;
-      const starts = g.hits.map((h) => h.sessionStart).filter(Boolean) as Date[];
+      const starts = g.hits
+        .map((h) => h.sessionStart)
+        .filter(Boolean) as Date[];
       const stops = g.hits.map((h) => h.sessionStop);
       const sessionStart = starts.length
         ? new Date(Math.min(...starts.map((d) => d.getTime())))
@@ -731,8 +855,8 @@ async function runSearchJob(
         60,
         Math.max(
           h.length + 2,
-          ...rows.map((r) => String((r as any)[h] ?? "").length + 2)
-        )
+          ...rows.map((r) => String((r as any)[h] ?? "").length + 2),
+        ),
       ),
     }));
 

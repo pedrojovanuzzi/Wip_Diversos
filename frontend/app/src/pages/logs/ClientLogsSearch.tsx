@@ -31,6 +31,7 @@ export const ClientLogsSearch = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [ipsPdfs, setIpsPdfs] = useState<File[]>([]);
+  const [fixedIpsText, setFixedIpsText] = useState("");
 
   const [progress, setProgress] = useState<{
     status: "idle" | "running" | "done" | "error";
@@ -123,6 +124,9 @@ export const ClientLogsSearch = () => {
       formData.append("startDate", startDate);
       formData.append("endDate", endDate);
       formData.append("folders", JSON.stringify(Array.from(selected)));
+      if (fixedIpsText.trim() !== "") {
+        formData.append("fixedIps", fixedIpsText);
+      }
       for (const f of ipsPdfs) formData.append("ipsPdf", f);
 
       const startResp = await axios.post(
@@ -360,6 +364,31 @@ export const ClientLogsSearch = () => {
               >
                 Remover todos os PDFs
               </button>
+            )}
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              IPs Públicos fixos a inspecionar (opcional)
+            </label>
+            <p className="text-xs text-slate-500 mb-2">
+              Cole abaixo os IPs Públicos que deseja inspecionar (um por linha,
+              separados por vírgula ou espaço). Apenas os IPs Privados
+              correspondentes a esses IPs Públicos na tabela do PDF serão
+              considerados no relatório. Requer o envio do(s) PDF(s) acima.
+            </p>
+            <textarea
+              value={fixedIpsText}
+              onChange={(e) => setFixedIpsText(e.target.value)}
+              placeholder={"143.255.134.60\n143.255.134.61\n143.255.134.62"}
+              rows={4}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {fixedIpsText.trim() !== "" && (
+              <div className="mt-1 text-xs text-slate-500">
+                {(fixedIpsText.match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g) || []).length}{" "}
+                IP(s) detectado(s).
+              </div>
             )}
           </div>
 
