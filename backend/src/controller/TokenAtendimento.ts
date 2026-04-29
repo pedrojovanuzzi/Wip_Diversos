@@ -98,10 +98,60 @@ class TokenAtendimento {
     }
   };
 
+  private getStatusOrderMP = async (
+    orderId: string,
+  ): Promise<string | null> => {
+    try {
+      const r = await axios.get(
+        `https://api.mercadopago.com/v1/orders/${orderId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+          },
+        },
+      );
+      return r.data?.status ? String(r.data.status).toLowerCase() : null;
+    } catch {
+      return null;
+    }
+  };
+
   private criarOrderMPNoTerminal = async (
     terminalId: string,
     payload: any,
   ): Promise<{ ok: true; response: any } | { ok: false; reason: string }> => {
+    const STATUS_FINALIZADOS = [
+      "finished",
+      "canceled",
+      "cancelled",
+      "expired",
+      "failed",
+      "refunded",
+      "rejected",
+    ];
+
+    const cachedExistente =
+      TokenAtendimento.lastOrderByTerminal.get(terminalId);
+    if (cachedExistente) {
+      const status = await this.getStatusOrderMP(cachedExistente);
+      if (status && !STATUS_FINALIZADOS.includes(status)) {
+        console.log(
+          `[MP] Terminal ${terminalId} ainda tem order ${cachedExistente} (status=${status}) — tentando cancelar`,
+        );
+        const cancelResult = await this.cancelarOrderMP(cachedExistente);
+        if (!cancelResult.ok) {
+          return { ok: false, reason: "terminal_busy" };
+        }
+        TokenAtendimento.lastOrderByTerminal.delete(terminalId);
+      } else {
+        TokenAtendimento.lastOrderByTerminal.delete(terminalId);
+      }
+    }
+
+    // Garante que a maquininha não esteja travada em tela de "expirou" / "cancelar cobrança"
+    // de uma sessão anterior, alternando operating_mode antes de criar nova order.
+    await this.liberarTerminalDevice(terminalId);
+
     const post = () =>
       axios.post("https://api.mercadopago.com/v1/orders", payload, {
         headers: {
@@ -110,10 +160,38 @@ class TokenAtendimento {
         },
       });
 
+    const aguardarTerminalAceitar = async (
+      orderId: string,
+    ): Promise<boolean> => {
+      // A MP cria a order com status=created. Quando o terminal pega, vira at_terminal.
+      // Se ficar em created por muito tempo, o terminal está offline/desligado.
+      const tentativas = 4;
+      const intervaloMs = 1500;
+      for (let i = 0; i < tentativas; i++) {
+        await new Promise((r) => setTimeout(r, intervaloMs));
+        const status = await this.getStatusOrderMP(orderId);
+        if (!status) continue;
+        if (status === "created") continue;
+        return true;
+      }
+      return false;
+    };
+
     try {
       const resp = await post();
-      if (resp.data?.id) {
-        TokenAtendimento.lastOrderByTerminal.set(terminalId, String(resp.data.id));
+      const orderId = resp.data?.id ? String(resp.data.id) : null;
+      if (orderId) {
+        TokenAtendimento.lastOrderByTerminal.set(terminalId, orderId);
+
+        const aceitou = await aguardarTerminalAceitar(orderId);
+        if (!aceitou) {
+          console.log(
+            `[MP] Terminal ${terminalId} não pegou a order ${orderId} (provavelmente offline) — cancelando`,
+          );
+          await this.cancelarOrderMP(orderId);
+          TokenAtendimento.lastOrderByTerminal.delete(terminalId);
+          return { ok: false, reason: "terminal_offline" };
+        }
       }
       return { ok: true, response: resp };
     } catch (error: any) {
@@ -702,7 +780,7 @@ class TokenAtendimento {
       const result = await this.criarOrderMPNoTerminal(terminais[0].id, {
         type: "point",
         external_reference: String(fatura.id),
-        expiration_time: "PT1M",
+        expiration_time: "PT2M",
         transactions: {
           payments: [
             {
@@ -800,7 +878,7 @@ class TokenAtendimento {
       const result = await this.criarOrderMPNoTerminal(terminais[0].id, {
         type: "point",
         external_reference: String(fatura.id),
-        expiration_time: "PT1M",
+        expiration_time: "PT2M",
         transactions: {
           payments: [
             {
@@ -841,6 +919,66 @@ class TokenAtendimento {
     }
   };
 
+  private liberarTerminalDevice = async (deviceId: string): Promise<void> => {
+    const patch = (operating_mode: "PDV" | "STANDALONE") =>
+      axios.patch(
+        `https://api.mercadopago.com/point/integration-api/devices/${deviceId}`,
+        { operating_mode },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+          },
+        },
+      );
+
+    const cached = TokenAtendimento.lastOrderByTerminal.get(deviceId);
+    if (cached) {
+      await this.cancelarOrderMP(cached);
+      TokenAtendimento.lastOrderByTerminal.delete(deviceId);
+    }
+
+    try {
+      await patch("STANDALONE");
+      await new Promise((r) => setTimeout(r, 1500));
+      await patch("PDV");
+    } catch (e: any) {
+      console.log(
+        "[MP] Falha ao alternar operating_mode:",
+        e.response?.data || e.message,
+      );
+    }
+  };
+
+  liberarTerminal = async (req: Request, res: Response) => {
+    try {
+      const list = await axios.get(
+        "https://api.mercadopago.com/terminals/v1/list",
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
+          },
+        },
+      );
+
+      const terminais = list.data?.data?.terminals || [];
+      if (!terminais.length) {
+        res.status(404).json({ error: "Nenhum terminal disponível" });
+        return;
+      }
+
+      const deviceId = terminais[0].id;
+      await this.liberarTerminalDevice(deviceId);
+
+      res.status(200).json({ ok: true, deviceId });
+    } catch (error: any) {
+      console.log(
+        "[MP] Erro ao liberar terminal:",
+        error.response?.data || error,
+      );
+      res.status(500).json({ error: "Erro ao liberar terminal" });
+    }
+  };
+
   cancelarOrder = async (req: Request, res: Response) => {
     try {
       const { order } = req.params;
@@ -861,7 +999,10 @@ class TokenAtendimento {
 
       res.status(200).json(result);
     } catch (error: any) {
-      console.log("[MP] Erro ao cancelar order:", error.response?.data || error);
+      console.log(
+        "[MP] Erro ao cancelar order:",
+        error.response?.data || error,
+      );
       res.status(500).json({ error: "Erro ao cancelar order" });
     }
   };
@@ -1114,7 +1255,7 @@ class TokenAtendimento {
       const result = await this.criarOrderMPNoTerminal(terminais[0].id, {
         type: "point",
         external_reference: externalRef,
-        expiration_time: "PT1M",
+        expiration_time: "PT2M",
         transactions: {
           payments: [
             {
@@ -1212,7 +1353,7 @@ class TokenAtendimento {
       const result = await this.criarOrderMPNoTerminal(terminais[0].id, {
         type: "point",
         external_reference: externalRef,
-        expiration_time: "PT1M",
+        expiration_time: "PT2M",
         transactions: {
           payments: [
             {

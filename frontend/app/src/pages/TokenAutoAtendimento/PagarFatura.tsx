@@ -366,7 +366,8 @@ export const PagarFatura = () => {
 
     if (method === "credit" || method === "debit") {
       setStep("payment-card");
-      setCardMessage("Aguardando comunicação com a maquininha...");
+      setTerminalAviso("");
+      setCardMessage("Verificando maquininha, aguarde...");
       try {
         const loginToUse = selectedClient?.login || selectedClients[0]?.login;
         const titulos = isMulti ? selectedInvoiceIds.join(",") : "";
@@ -392,9 +393,11 @@ export const PagarFatura = () => {
         const response = await axios.post(endpoint, payload);
 
         if (response.data?.terminalBusy) {
-          setTerminalAviso(
-            "A maquininha está ocupada com outra cobrança e não pode ser liberada agora. Estamos te redirecionando para o pagamento via Pix.",
-          );
+          const motivo =
+            response.data?.reason === "terminal_offline"
+              ? "A maquininha está desligada ou sem conexão no momento. Estamos te redirecionando para o pagamento via Pix."
+              : "A maquininha está ocupada com outra cobrança e não pode ser liberada agora. Estamos te redirecionando para o pagamento via Pix.";
+          setTerminalAviso(motivo);
           await handleMethodSelect("pix");
           return;
         }
@@ -423,8 +426,15 @@ export const PagarFatura = () => {
     if (order?.id) {
       const cancelado = await cancelarOrderTerminal(order.id);
       if (!cancelado) {
+        try {
+          await axios.post(
+            `${process.env.REACT_APP_URL}/TokenAutoAtendimento/LiberarTerminal`,
+          );
+        } catch (e) {
+          console.error("Falha ao liberar terminal:", e);
+        }
         setTerminalAviso(
-          "A maquininha está com a cobrança ativa, caso queira pode cancelar na maquininha e seguir com o Pix na tela.",
+          "A maquininha já recebeu a cobrança. Aperte a seta ESQUERDA no topo da maquininha para cancelar (ou aguarde ~30s para liberar sozinha). Pode pagar pelo Pix abaixo enquanto isso.",
         );
       } else {
         setTerminalAviso("");

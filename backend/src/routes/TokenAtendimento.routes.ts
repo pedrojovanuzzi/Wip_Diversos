@@ -37,5 +37,6 @@ router.post(
 
 router.get("/ObterOrderPorId/:order", tokenAtendimento.obterOrderPorId);
 router.post("/CancelarOrder/:order", tokenAtendimento.cancelarOrder);
+router.post("/LiberarTerminal", tokenAtendimento.liberarTerminal);
 
 export default router;

@@ -10,5 +10,8 @@ const router: Router = Router();
 router.get("/", AuthGuard, serverLogs.getFolders);
 router.post("/FoldersRecursion", AuthGuard, serverLogs.FoldersRecursion);
 router.post("/AccessFile", AuthGuard, serverLogs.AccessFile);
+router.post("/SearchClientLogs/start", AuthGuard, serverLogs.SearchClientLogsStart);
+router.get("/SearchClientLogs/progress/:jobId", AuthGuard, serverLogs.SearchClientLogsProgress);
+router.get("/SearchClientLogs/download/:jobId", AuthGuard, serverLogs.SearchClientLogsDownload);
 
 export default router;

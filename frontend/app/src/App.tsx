@@ -19,6 +19,7 @@ import UserChat from "./pages/whatsapp_chat/userChat/userChat";
 import { ClientAnalytics } from "./pages/ClientAnalytics/ClientAnalytics";
 import { DDDOS_Home } from "./pages/DDDOS_Monitoring/DDDOS_Home";
 import { ServerLogs } from "./pages/logs/ServerLogs";
+import { ClientLogsSearch } from "./pages/logs/ClientLogsSearch";
 import { LogViewer } from "./pages/logs/LogViewer";
 import { Pm2Logs } from "./pages/logs/Pm2Logs";
 import { PowerDns } from "./pages/powerdns/PowerDns";
@@ -306,6 +307,16 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <ServerLogs />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/ClientLogsSearch"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <ClientLogsSearch />
               ) : (
                 <Navigate to="/auth/login" />
               )
