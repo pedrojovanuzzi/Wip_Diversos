@@ -261,43 +261,59 @@ class ServerLogs {
               // Atencao: o pdf-parse extrai as colunas sem whitespace entre
               // IP-publico e porta-inicio, e entre porta-fim e IP-privado.
               // Ex.: "143.255.134.191024 à 3039100.64.64.19".
-              const rowGlobalRe = new RegExp(
-                "(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\s*\\d{4,5}\\s*(?:à|a|-|–|—)\\s*\\d{4,5}\\s*(" +
+              // Como pub e porta colam, ha ambiguidade: ex. "143.255.134.1929248"
+              // pode ser pub=.19/porta=29248 OU pub=.192/porta=9248. Para
+              // resolver, capturamos as duas portas e validamos pela diferenca
+              // (Remontti usa "PORTAS POR CLIENTE", default 2016 → diff=2015).
+              const portasMatch = /PORTAS\s+POR\s+CLIENTE[^\d]+(\d{2,5})/i.exec(
+                normalized,
+              );
+              const portasPorCliente = portasMatch
+                ? parseInt(portasMatch[1], 10)
+                : 2016;
+              const expectedDiff = portasPorCliente - 1;
+
+              // Ancora no bloco de portas (que tem diff conhecido) + CGNAT.
+              // O lookbehind "(?<=\.\d{1,3})" garante que portStart comeca
+              // logo apos o ultimo octeto do IP publico, evitando que o
+              // regex absorva digitos do IP no portStart.
+              const portCgnatRe = new RegExp(
+                "(?<=\\.\\d{1,3})(\\d{4,5})\\s*(?:à|a|-|–|—)\\s*(\\d{4,5})\\s*(" +
                   cgnatBlock +
                   ")",
                 "gi",
               );
+              const ipBackRe =
+                /(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 
               let rowMatches = 0;
               let rm2: RegExpExecArray | null;
-              while ((rm2 = rowGlobalRe.exec(normalized)) !== null) {
+              while ((rm2 = portCgnatRe.exec(normalized)) !== null) {
+                const portStart = parseInt(rm2[1], 10);
+                const portEnd = parseInt(rm2[2], 10);
+                // Validacao por diff: se portStart absorveu digito do IP
+                // publico, port_end - port_start nao bate. Rebobina para
+                // tentar matchear 1 char a frente (sem o digito errado).
+                if (portStart < 1024 || portEnd - portStart !== expectedDiff) {
+                  portCgnatRe.lastIndex = rm2.index + 1;
+                  continue;
+                }
                 rowMatches += 1;
-                const pub = rm2[1];
+
+                const portStartIdx = rm2.index;
+                const before = normalized.slice(
+                  Math.max(0, portStartIdx - 20),
+                  portStartIdx,
+                );
+                const ipm = before.match(ipBackRe);
+                if (!ipm) continue;
+                const oct = [ipm[1], ipm[2], ipm[3], ipm[4]].map(Number);
+                if (oct.some((n) => n > 255)) continue;
+                const pub = `${oct[0]}.${oct[1]}.${oct[2]}.${oct[3]}`;
                 if (!fixedPublicIps.has(pub)) continue;
-                ipFilter.add(rm2[2]);
+                ipFilter.add(rm2[3]);
               }
 
-              // Fallback: a regex acima eh a fonte primaria. Caso a tabela
-              // tenha um separador inesperado, ainda tentamos achar o IP
-              // CGNAT mais proximo apos cada porta-fim que segue o publico.
-              // Padrao colado: <pub><portStart> à <portEnd><CGNAT>
-              const fbRe = new RegExp(
-                "\\d{4,5}\\s*(?:à|a|-|–|—)\\s*\\d{4,5}\\s*(" +
-                  cgnatBlock +
-                  ")",
-              );
-              for (const pub of fixedPublicIps) {
-                let pos = 0;
-                while (true) {
-                  const idx = normalized.indexOf(pub, pos);
-                  if (idx === -1) break;
-                  const after = idx + pub.length;
-                  const slice = normalized.slice(after, after + 80);
-                  const cm = slice.match(fbRe);
-                  if (cm) ipFilter.add(cm[1]);
-                  pos = after + 1;
-                }
-              }
 
               // Debug.
               const allIps: string[] = [];
