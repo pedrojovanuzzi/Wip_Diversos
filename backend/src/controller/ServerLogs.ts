@@ -736,6 +736,10 @@ async function runSearchJob(
     // no syslog).
     const RadacctRepo = MkauthSource.getRepository(Radacct);
     let sessions: SessionRow[] = [];
+    // O piso "acctstarttime >= start" usa a janela do syslog do usuario para
+    // limitar o scan no radacct. Sessoes que comecaram antes do start nao
+    // sao consideradas — o usuario deve estender a janela se quiser pegar
+    // sessoes mais antigas.
     if (job.ipFilter && job.ipFilter.size > 0) {
       const ips = Array.from(job.ipFilter);
       sessions = (await RadacctRepo.createQueryBuilder("r")
@@ -745,12 +749,13 @@ async function runSearchJob(
           "r.acctstarttime",
           "r.acctstoptime",
         ])
-        .where("r.framedipaddress IN (:...ips)", { ips })
+        .where("r.acctstarttime >= :start", { start })
         .andWhere("r.acctstarttime <= :crime", { crime })
         .andWhere(
           "(r.acctstoptime IS NULL OR r.acctstoptime >= :crime)",
           { crime },
         )
+        .andWhere("r.framedipaddress IN (:...ips)", { ips })
         .getMany()) as unknown as SessionRow[];
     } else {
       const uniqueLogins = Array.from(new Set(hits.map((h) => h.login)));
@@ -762,12 +767,13 @@ async function runSearchJob(
             "r.acctstarttime",
             "r.acctstoptime",
           ])
-          .where("r.username IN (:...logins)", { logins: uniqueLogins })
+          .where("r.acctstarttime >= :start", { start })
           .andWhere("r.acctstarttime <= :crime", { crime })
           .andWhere(
             "(r.acctstoptime IS NULL OR r.acctstoptime >= :crime)",
             { crime },
           )
+          .andWhere("r.username IN (:...logins)", { logins: uniqueLogins })
           .getMany()) as unknown as SessionRow[];
       }
     }

@@ -31,6 +31,13 @@ const AppDataSource = new DataSource({
   ],
   synchronize: false,
   database: process.env.DATABASE_API,
+  // Aumenta tolerancia a queries pesadas no radacct (busca por IP).
+  extra: {
+    connectTimeout: 60_000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10_000,
+  },
+  maxQueryExecutionTime: 120_000,
 });
 
 AppDataSource.initialize()
