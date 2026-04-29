@@ -710,45 +710,8 @@ async function runSearchJob(
       /* noop */
     }
 
-    job.message = "Validando sessões no MKAuth (radacct)...";
-    const uniqueLogins = Array.from(new Set(hits.map((h) => h.login)));
-
-    // Carrega sessões candidatas: qualquer sessão de algum dos logins que
-    // tenha alguma sobreposição com o intervalo solicitado.
-    type SessionRow = {
-      username: string;
-      framedipaddress: string | null;
-      acctstarttime: Date | null;
-      acctstoptime: Date | null;
-    };
-    const sessionsByLoginIp = new Map<string, SessionRow[]>();
-    if (uniqueLogins.length > 0) {
-      const RadacctRepo = MkauthSource.getRepository(Radacct);
-      // Sessoes que estavam ATIVAS no instante do crime: comecaram em
-      // <= crime e terminaram em >= crime (ou ainda em aberto).
-      const sessions = await RadacctRepo.createQueryBuilder("r")
-        .select([
-          "r.username",
-          "r.framedipaddress",
-          "r.acctstarttime",
-          "r.acctstoptime",
-        ])
-        .where("r.username IN (:...logins)", { logins: uniqueLogins })
-        .andWhere("r.acctstarttime <= :crime", { crime })
-        .andWhere(
-          "(r.acctstoptime IS NULL OR r.acctstoptime >= :crime)",
-          { crime },
-        )
-        .getMany();
-      for (const s of sessions as unknown as SessionRow[]) {
-        const key = `${s.username}|${s.framedipaddress || ""}`;
-        const arr = sessionsByLoginIp.get(key) || [];
-        arr.push(s);
-        sessionsByLoginIp.set(key, arr);
-      }
-    }
-
-    // Aplica filtro de IPs vindos do PDF, se houver
+    // Aplica filtro de IPs vindos do PDF aos hits do syslog (usados para
+    // enriquecer o relatorio com MAC e NAS).
     if (job.ipFilter && job.ipFilter.size > 0) {
       const before = hits.length;
       const filtered = hits.filter((h) => job.ipFilter!.has(h.ip));
@@ -757,53 +720,69 @@ async function runSearchJob(
       job.message = `Filtrados por PDF: ${filtered.length}/${before} ocorrências.`;
     }
 
-    // Filtra os hits: só mantemos aquelas ocorrências cujo (login, ip, data)
-    // está coberto por uma sessão (acctstarttime <= data <= acctstoptime).
-    type ValidatedHit = (typeof hits)[number] & {
-      sessionStart: Date | null;
-      sessionStop: Date | null;
+    job.message = "Buscando sessões ativas no momento do crime (radacct)...";
+
+    type SessionRow = {
+      username: string;
+      framedipaddress: string | null;
+      acctstarttime: Date | null;
+      acctstoptime: Date | null;
     };
-    const validatedHits: ValidatedHit[] = [];
-    const crimeT = crime.getTime();
-    for (const h of hits) {
-      const key = `${h.login}|${h.ip}`;
-      const sess = sessionsByLoginIp.get(key);
-      if (!sess || sess.length === 0) continue;
-      // A sessao precisa estar ATIVA no instante do crime:
-      //   acctstarttime <= crimeMoment <= acctstoptime (ou stop NULL).
-      const match = sess.find((s) => {
-        const startT = s.acctstarttime
-          ? new Date(s.acctstarttime).getTime()
-          : null;
-        const stopT = s.acctstoptime
-          ? new Date(s.acctstoptime).getTime()
-          : null;
-        if (startT === null) return false;
-        if (startT > crimeT) return false;
-        if (stopT !== null && stopT < crimeT) return false;
-        return true;
-      });
-      if (!match) continue;
-      validatedHits.push({
-        ...h,
-        sessionStart: match.acctstarttime
-          ? new Date(match.acctstarttime)
-          : null,
-        sessionStop: match.acctstoptime ? new Date(match.acctstoptime) : null,
-      });
+
+    // Pivot principal: sessoes ativas no momento do crime. Quando ha
+    // ipFilter (vindo do PDF), busca por framedipaddress — assim pegamos
+    // sessoes mesmo de clientes cujo login event esta fora da janela do
+    // syslog. Sem ipFilter, cai no caminho antigo (por usernames vistos
+    // no syslog).
+    const RadacctRepo = MkauthSource.getRepository(Radacct);
+    let sessions: SessionRow[] = [];
+    if (job.ipFilter && job.ipFilter.size > 0) {
+      const ips = Array.from(job.ipFilter);
+      sessions = (await RadacctRepo.createQueryBuilder("r")
+        .select([
+          "r.username",
+          "r.framedipaddress",
+          "r.acctstarttime",
+          "r.acctstoptime",
+        ])
+        .where("r.framedipaddress IN (:...ips)", { ips })
+        .andWhere("r.acctstarttime <= :crime", { crime })
+        .andWhere(
+          "(r.acctstoptime IS NULL OR r.acctstoptime >= :crime)",
+          { crime },
+        )
+        .getMany()) as unknown as SessionRow[];
+    } else {
+      const uniqueLogins = Array.from(new Set(hits.map((h) => h.login)));
+      if (uniqueLogins.length > 0) {
+        sessions = (await RadacctRepo.createQueryBuilder("r")
+          .select([
+            "r.username",
+            "r.framedipaddress",
+            "r.acctstarttime",
+            "r.acctstoptime",
+          ])
+          .where("r.username IN (:...logins)", { logins: uniqueLogins })
+          .andWhere("r.acctstarttime <= :crime", { crime })
+          .andWhere(
+            "(r.acctstoptime IS NULL OR r.acctstoptime >= :crime)",
+            { crime },
+          )
+          .getMany()) as unknown as SessionRow[];
+      }
     }
 
-    job.hits = validatedHits.length;
+    job.hits = sessions.length;
     job.message = "Buscando dados dos clientes no MKAuth...";
 
     const clienteMap = new Map<string, ClientesEntities>();
-    const validatedLogins = Array.from(
-      new Set(validatedHits.map((h) => h.login)),
+    const sessionLogins = Array.from(
+      new Set(sessions.map((s) => s.username).filter(Boolean)),
     );
-    if (validatedLogins.length > 0) {
+    if (sessionLogins.length > 0) {
       const ClientRepository = MkauthSource.getRepository(ClientesEntities);
       const clientes = await ClientRepository.find({
-        where: { login: In(validatedLogins) },
+        where: { login: In(sessionLogins) },
       });
       for (const c of clientes) {
         if (c.login) clienteMap.set(c.login, c);
@@ -836,82 +815,62 @@ async function runSearchJob(
 
     job.message = "Gerando planilha Excel...";
 
-    // Agrupa por login: hits do mesmo dia cujo intervalo entre conexões
-    // consecutivas seja <= GAP_MS são consolidados em 1 linha (início → fim).
-    const GAP_MS = 60 * 60 * 1000; // 1h
-    const sortedHits = [...validatedHits].sort(
-      (a, b) =>
-        a.login.localeCompare(b.login) || a.date.getTime() - b.date.getTime(),
-    );
-
-    type Group = {
-      login: string;
-      start: Date;
-      end: Date;
-      hits: typeof sortedHits;
-    };
-    const groups: Group[] = [];
-    for (const h of sortedHits) {
-      const last = groups[groups.length - 1];
-      const sameDay =
-        last &&
-        last.login === h.login &&
-        last.end.getFullYear() === h.date.getFullYear() &&
-        last.end.getMonth() === h.date.getMonth() &&
-        last.end.getDate() === h.date.getDate();
-      if (last && sameDay && h.date.getTime() - last.end.getTime() <= GAP_MS) {
-        last.end = h.date;
-        last.hits.push(h);
-      } else {
-        groups.push({ login: h.login, start: h.date, end: h.date, hits: [h] });
-      }
+    // Index dos hits do syslog para enriquecer cada sessao com MAC/NAS.
+    const hitsByKey = new Map<string, typeof hits>();
+    for (const h of hits) {
+      const key = `${h.login}|${h.ip}`;
+      const arr = hitsByKey.get(key) || ([] as typeof hits);
+      arr.push(h);
+      hitsByKey.set(key, arr);
     }
-    groups.sort((a, b) => a.start.getTime() - b.start.getTime());
+    const TOLERANCE_MS = 5 * 60 * 1000; // 5 min entre syslog e radacct
 
-    const uniqJoin = (vals: (string | undefined | null)[]) =>
-      Array.from(
-        new Set(vals.map((v) => (v ?? "").toString()).filter((v) => v !== "")),
-      ).join(", ");
+    // Uma linha por sessao ativa no crime.
+    const sortedSessions = sessions
+      .filter((s) => s.acctstarttime)
+      .sort(
+        (a, b) =>
+          new Date(a.acctstarttime!).getTime() -
+          new Date(b.acctstarttime!).getTime(),
+      );
 
-    const rows = groups.map((g) => {
-      const c = clienteMap.get(g.login);
-      const single = g.hits.length === 1;
-      const starts = g.hits
-        .map((h) => h.sessionStart)
-        .filter(Boolean) as Date[];
-      const stops = g.hits.map((h) => h.sessionStop);
-      const sessionStart = starts.length
-        ? new Date(Math.min(...starts.map((d) => d.getTime())))
-        : null;
-      const hasActive = stops.some((s) => !s);
-      const stopDates = stops.filter(Boolean) as Date[];
-      const sessionStop = hasActive
-        ? null
-        : stopDates.length
-          ? new Date(Math.max(...stopDates.map((d) => d.getTime())))
-          : null;
+    const rows = sortedSessions.map((s) => {
+      const login = s.username;
+      const ip = s.framedipaddress || "";
+      const sessionStart = new Date(s.acctstarttime!);
+      const sessionStop = s.acctstoptime ? new Date(s.acctstoptime) : null;
+      const c = clienteMap.get(login);
+
+      // Acha o evento "logged in" no syslog correspondente a esta sessao
+      // (mesmo login+ip, dentro de +/- 5 min do acctstarttime).
+      const candidates = hitsByKey.get(`${login}|${ip}`) || [];
+      const startT = sessionStart.getTime();
+      let bestHit: (typeof hits)[number] | undefined;
+      let bestDelta = Infinity;
+      for (const h of candidates) {
+        const delta = Math.abs(h.date.getTime() - startT);
+        if (delta <= TOLERANCE_MS && delta < bestDelta) {
+          bestHit = h;
+          bestDelta = delta;
+        }
+      }
 
       return {
-        "Data/Hora Início": formatDate(g.start),
-        "Data/Hora Fim": single ? "" : formatDate(g.end),
-        Conexões: g.hits.length,
+        "Data/Hora Início": formatDate(sessionStart),
+        "Data/Hora Fim": sessionStop ? formatDate(sessionStop) : "ativa",
         "Nome Completo": c?.nome || "",
-        Login: g.login,
+        Login: login,
         "CPF/CNPJ": c?.cpf_cnpj || "",
         "Endereço Completo": buildEndereco(c),
         "Dados do Termo": c?.termo || "",
         "Modalidade da Conexão": modalidade(c),
-        "IP Encontrado (CGNAT)": uniqJoin(g.hits.map((h) => h.ip)),
+        "IP Encontrado (CGNAT)": ip,
         "IP Fixo Cadastrado": c?.ip || "",
-        MAC: uniqJoin(g.hits.map((h) => h.mac)),
-        "NAS/Concentrador": uniqJoin(g.hits.map((h) => h.host)),
-        "Sessão Início (radacct)": sessionStart ? formatDate(sessionStart) : "",
-        "Sessão Fim (radacct)": hasActive
-          ? "ativa"
-          : sessionStop
-            ? formatDate(sessionStop)
-            : "",
-        "Arquivo de Origem": uniqJoin(g.hits.map((h) => h.sourceFile)),
+        MAC: bestHit?.mac || "",
+        "NAS/Concentrador": bestHit?.host || "",
+        "Sessão Início (radacct)": formatDate(sessionStart),
+        "Sessão Fim (radacct)": sessionStop ? formatDate(sessionStop) : "ativa",
+        "Arquivo de Origem (syslog)": bestHit?.sourceFile || "",
       };
     });
 
