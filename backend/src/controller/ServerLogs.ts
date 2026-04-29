@@ -228,6 +228,22 @@ class ServerLogs {
         ipFilter = new Set<string>();
         const failedFiles: string[] = [];
         const useFixedFilter = fixedPublicIps.size > 0;
+        const debugPdfs: Array<{
+          name: string;
+          textLen: number;
+          ipv4Tokens: number;
+          fixedFoundInPdf: string[];
+          textSample: string;
+          mapSnippet?: string;
+          rowMatches?: number;
+        }> = [];
+
+        // Colapsa TODO whitespace (espaco, NBSP, ZWSP, tabs, quebras
+        // multiplas, separadores tipograficos) num unico espaco.
+        const collapseWs = (s: string) =>
+          s
+            .replace(/[\s\u00A0\u1680\u2000-\u200F\u2028\u2029\u202F\u205F\u2060\u3000\uFEFF]+/g, " ")
+            .trim();
 
         for (const file of files) {
           if (!file.buffer || file.buffer.length === 0) continue;
@@ -236,70 +252,82 @@ class ServerLogs {
             const text = parsed.text || "";
 
             if (useFixedFilter) {
-              // Normaliza espaços (NBSP, tabs, quebras, zero-width).
-              // Usa \uNNNN para evitar ranges acidentais no character class.
-              const normalized = text.replace(/[    ​	]+/g, " ");
+              const normalized = collapseWs(text);
 
-              // 1) Pareamento por proximidade de string: para cada
-              // ocorrência literal do IP Público fixo, busca o próximo IP
-              // CGNAT logo na sequência (até 200 caracteres à frente).
-              const cgnatNearRe =
-                /\b(100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3})\b/;
+              // Estrategia unica: linha da tabela
+              //   <IP Publico> <portaInicio> [a|à|-|–|—] <portaFim> <IP Privado CGNAT>
+              const cgnatBlock =
+                "100\\.(?:6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\.\\d{1,3}\\.\\d{1,3}";
+              // Atencao: o pdf-parse extrai as colunas sem whitespace entre
+              // IP-publico e porta-inicio, e entre porta-fim e IP-privado.
+              // Ex.: "143.255.134.191024 à 3039100.64.64.19".
+              const rowGlobalRe = new RegExp(
+                "(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\s*\\d{4,5}\\s*(?:à|a|-|–|—)\\s*\\d{4,5}\\s*(" +
+                  cgnatBlock +
+                  ")",
+                "gi",
+              );
+
+              let rowMatches = 0;
+              let rm2: RegExpExecArray | null;
+              while ((rm2 = rowGlobalRe.exec(normalized)) !== null) {
+                rowMatches += 1;
+                const pub = rm2[1];
+                if (!fixedPublicIps.has(pub)) continue;
+                ipFilter.add(rm2[2]);
+              }
+
+              // Fallback: a regex acima eh a fonte primaria. Caso a tabela
+              // tenha um separador inesperado, ainda tentamos achar o IP
+              // CGNAT mais proximo apos cada porta-fim que segue o publico.
+              // Padrao colado: <pub><portStart> à <portEnd><CGNAT>
+              const fbRe = new RegExp(
+                "\\d{4,5}\\s*(?:à|a|-|–|—)\\s*\\d{4,5}\\s*(" +
+                  cgnatBlock +
+                  ")",
+              );
               for (const pub of fixedPublicIps) {
                 let pos = 0;
                 while (true) {
                   const idx = normalized.indexOf(pub, pos);
                   if (idx === -1) break;
                   const after = idx + pub.length;
-                  const slice = normalized.slice(after, after + 200);
-                  const cm = slice.match(cgnatNearRe);
+                  const slice = normalized.slice(after, after + 80);
+                  const cm = slice.match(fbRe);
                   if (cm) ipFilter.add(cm[1]);
-                  pos = after;
+                  pos = after + 1;
                 }
               }
 
-              // 2) Reforço — tokeniza todos os IPv4 e pareia por sequência.
+              // Debug.
               const allIps: string[] = [];
               let im: RegExpExecArray | null;
               ipRe.lastIndex = 0;
               while ((im = ipRe.exec(normalized)) !== null) {
                 allIps.push(`${im[1]}.${im[2]}.${im[3]}.${im[4]}`);
               }
-              for (let i = 0; i < allIps.length; i++) {
-                if (!fixedPublicIps.has(allIps[i])) continue;
-                for (let j = i + 1; j < Math.min(i + 6, allIps.length); j++) {
-                  const p = allIps[j].split(".").map(Number);
-                  if (isCgnat(p[0], p[1], p[2], p[3])) {
-                    ipFilter.add(allIps[j]);
-                    break;
-                  }
-                }
-              }
-
-              // 3) Reforço — pareamento por linha completa.
-              let m: RegExpExecArray | null;
-              mapRowRe.lastIndex = 0;
-              while ((m = mapRowRe.exec(text)) !== null) {
-                const pub = m[1];
-                const priv = m[2];
-                if (!fixedPublicIps.has(pub)) continue;
-                const p = priv.split(".").map(Number);
-                if (!isCgnat(p[0], p[1], p[2], p[3])) continue;
-                ipFilter.add(priv);
-              }
-
-              // Debug: registra no log do servidor o que foi extraído.
               const fixedFoundInPdf = Array.from(fixedPublicIps).filter((ip) =>
                 normalized.includes(ip),
               );
-              console.log(
-                `[CGNAT/${file.originalname}] textLen=${text.length} ipv4Tokens=${allIps.length} fixedIps=${fixedPublicIps.size} fixedFoundInPdf=${fixedFoundInPdf.length} matchesAddedSoFar=${ipFilter.size}`,
-              );
-              if (fixedFoundInPdf.length === 0 && fixedPublicIps.size > 0) {
-                console.log(
-                  `[CGNAT/${file.originalname}] amostra do texto extraído (primeiros 500 chars):\n${normalized.slice(0, 500)}`,
-                );
+              let mapSnippet = "";
+              const firstPub = fixedFoundInPdf[0];
+              if (firstPub) {
+                const idx = normalized.indexOf(firstPub);
+                const from = Math.max(0, idx - 80);
+                mapSnippet = normalized.slice(from, idx + 320);
               }
+              debugPdfs.push({
+                name: file.originalname,
+                textLen: text.length,
+                ipv4Tokens: allIps.length,
+                fixedFoundInPdf,
+                textSample: normalized.slice(0, 600),
+                mapSnippet,
+                rowMatches,
+              });
+              console.log(
+                `[CGNAT/${file.originalname}] textLen=${text.length} ipv4Tokens=${allIps.length} fixedIps=${fixedPublicIps.size} fixedFoundInPdf=${fixedFoundInPdf.length} rowMatches=${rowMatches} matchesAddedSoFar=${ipFilter.size}`,
+              );
               continue;
             }
 
@@ -357,6 +385,8 @@ class ServerLogs {
               failedFiles.length > 0
                 ? `${baseMsg} Falha ao ler: ${failedFiles.join(", ")}`
                 : baseMsg,
+            fixedPublicIps: Array.from(fixedPublicIps),
+            debugPdfs,
           });
           return;
         }
