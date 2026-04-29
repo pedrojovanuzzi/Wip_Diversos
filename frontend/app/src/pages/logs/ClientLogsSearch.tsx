@@ -26,6 +26,7 @@ export const ClientLogsSearch = () => {
 
   const [startDate, setStartDate] = useState(`${todayStr}T00:00`);
   const [endDate, setEndDate] = useState(`${todayStr}T23:59`);
+  const [crimeMoment, setCrimeMoment] = useState(`${todayStr}T12:00`);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -104,6 +105,20 @@ export const ClientLogsSearch = () => {
       setErrorMsg("A data inicial deve ser anterior à data final.");
       return;
     }
+    if (!crimeMoment) {
+      setErrorMsg("Informe o momento exato do crime.");
+      return;
+    }
+    const crimeT = new Date(crimeMoment).getTime();
+    if (
+      crimeT < new Date(startDate).getTime() ||
+      crimeT > new Date(endDate).getTime()
+    ) {
+      setErrorMsg(
+        "O momento do crime deve estar entre o Início e o Fim da busca."
+      );
+      return;
+    }
     if (selected.size === 0) {
       setErrorMsg("Selecione pelo menos uma pasta.");
       return;
@@ -123,6 +138,7 @@ export const ClientLogsSearch = () => {
       const formData = new FormData();
       formData.append("startDate", startDate);
       formData.append("endDate", endDate);
+      formData.append("crimeMoment", crimeMoment);
       formData.append("folders", JSON.stringify(Array.from(selected)));
       if (fixedIpsText.trim() !== "") {
         formData.append("fixedIps", fixedIpsText);
@@ -254,10 +270,10 @@ export const ClientLogsSearch = () => {
             Crimes Cibernéticos.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Início
+                Início da busca em logs
               </label>
               <input
                 type="datetime-local"
@@ -269,7 +285,7 @@ export const ClientLogsSearch = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Fim
+                Fim da busca em logs
               </label>
               <input
                 type="datetime-local"
@@ -279,6 +295,24 @@ export const ClientLogsSearch = () => {
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Momento exato do crime (informado pela polícia)
+            </label>
+            <input
+              type="datetime-local"
+              step={1}
+              value={crimeMoment}
+              onChange={(e) => setCrimeMoment(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Usado para filtrar a sessão no MKAuth: só clientes cuja sessão
+              estava ativa neste instante exato (acctstarttime ≤ momento ≤
+              acctstoptime) entram no relatório.
+            </p>
           </div>
 
           <div className="mb-6">

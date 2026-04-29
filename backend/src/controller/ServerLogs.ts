@@ -152,6 +152,10 @@ class ServerLogs {
       const body = req.body as Record<string, any>;
       const startDate: string | undefined = body.startDate;
       const endDate: string | undefined = body.endDate;
+      // Instante exato em que o IP foi usado pelo criminoso (ex.: data/hora
+      // informada pela policia). Usado para validar a sessao no radacct:
+      // a sessao precisa estar ativa exatamente nesse momento.
+      const crimeMoment: string | undefined = body.crimeMoment;
 
       // folders pode chegar como array (JSON) ou string serializada (multipart)
       let folders: string[] | undefined;
@@ -425,6 +429,21 @@ class ServerLogs {
         return;
       }
 
+      // crimeMoment opcional. Se nao vier, usa o fim da janela como
+      // aproximacao razoavel (instante "mais recente possivel" na busca).
+      const crime = crimeMoment ? new Date(crimeMoment) : end;
+      if (Number.isNaN(crime.getTime())) {
+        res.status(400).json({ error: "Momento do crime inválido." });
+        return;
+      }
+      if (crime < start || crime > end) {
+        res.status(400).json({
+          error:
+            "O momento do crime deve estar dentro da janela de busca (entre Início e Fim).",
+        });
+        return;
+      }
+
       const jobId =
         Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
       const job: JobState = {
@@ -441,7 +460,7 @@ class ServerLogs {
       JOBS.set(jobId, job);
 
       // dispara processamento em background
-      void runSearchJob(job, start, end, folders);
+      void runSearchJob(job, start, end, crime, folders);
 
       res.status(202).json({
         jobId,
@@ -508,6 +527,7 @@ async function runSearchJob(
   job: JobState,
   start: Date,
   end: Date,
+  crime: Date,
   folders: string[],
 ) {
   const sftp = new Client();
@@ -704,6 +724,8 @@ async function runSearchJob(
     const sessionsByLoginIp = new Map<string, SessionRow[]>();
     if (uniqueLogins.length > 0) {
       const RadacctRepo = MkauthSource.getRepository(Radacct);
+      // Sessoes que estavam ATIVAS no instante do crime: comecaram em
+      // <= crime e terminaram em >= crime (ou ainda em aberto).
       const sessions = await RadacctRepo.createQueryBuilder("r")
         .select([
           "r.username",
@@ -712,8 +734,11 @@ async function runSearchJob(
           "r.acctstoptime",
         ])
         .where("r.username IN (:...logins)", { logins: uniqueLogins })
-        .andWhere("r.acctstarttime >= :start", { start })
-        .andWhere("r.acctstoptime <= :end", { end })
+        .andWhere("r.acctstarttime <= :crime", { crime })
+        .andWhere(
+          "(r.acctstoptime IS NULL OR r.acctstoptime >= :crime)",
+          { crime },
+        )
         .getMany();
       for (const s of sessions as unknown as SessionRow[]) {
         const key = `${s.username}|${s.framedipaddress || ""}`;
@@ -739,13 +764,13 @@ async function runSearchJob(
       sessionStop: Date | null;
     };
     const validatedHits: ValidatedHit[] = [];
+    const crimeT = crime.getTime();
     for (const h of hits) {
       const key = `${h.login}|${h.ip}`;
       const sess = sessionsByLoginIp.get(key);
       if (!sess || sess.length === 0) continue;
-      const t = h.date.getTime();
-      const userStartT = start.getTime();
-      const userEndT = end.getTime();
+      // A sessao precisa estar ATIVA no instante do crime:
+      //   acctstarttime <= crimeMoment <= acctstoptime (ou stop NULL).
       const match = sess.find((s) => {
         const startT = s.acctstarttime
           ? new Date(s.acctstarttime).getTime()
@@ -753,11 +778,9 @@ async function runSearchJob(
         const stopT = s.acctstoptime
           ? new Date(s.acctstoptime).getTime()
           : null;
-        if (startT === null || stopT === null) return false;
-        // Sessão totalmente dentro da faixa selecionada
-        if (startT < userStartT || stopT > userEndT) return false;
-        // E o horário do log está dentro da sessão
-        if (startT > t || stopT < t) return false;
+        if (startT === null) return false;
+        if (startT > crimeT) return false;
+        if (stopT !== null && stopT < crimeT) return false;
         return true;
       });
       if (!match) continue;
