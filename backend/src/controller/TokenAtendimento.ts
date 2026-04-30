@@ -133,18 +133,13 @@ class TokenAtendimento {
     const cachedExistente =
       TokenAtendimento.lastOrderByTerminal.get(terminalId);
     if (cachedExistente) {
+      TokenAtendimento.lastOrderByTerminal.delete(terminalId);
       const status = await this.getStatusOrderMP(cachedExistente);
       if (status && !STATUS_FINALIZADOS.includes(status)) {
         console.log(
-          `[MP] Terminal ${terminalId} ainda tem order ${cachedExistente} (status=${status}) — tentando cancelar`,
+          `[MP] Terminal ${terminalId} tinha order ${cachedExistente} (status=${status}) — cancelando em background`,
         );
-        const cancelResult = await this.cancelarOrderMP(cachedExistente);
-        if (!cancelResult.ok) {
-          return { ok: false, reason: "terminal_busy" };
-        }
-        TokenAtendimento.lastOrderByTerminal.delete(terminalId);
-      } else {
-        TokenAtendimento.lastOrderByTerminal.delete(terminalId);
+        this.cancelarOrderMP(cachedExistente).catch(() => {});
       }
     }
 
