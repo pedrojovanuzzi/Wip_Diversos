@@ -563,8 +563,25 @@ class ZapSign {
         console.log(`[ZapSign Webhook] Solicitação encontrada: ${solicitacao ? `ID ${solicitacao.id} (${solicitacao.servico})` : "NÃO ENCONTRADA"}`);
 
         if (solicitacao) {
+          // Trava idempotente: ZapSign pode mandar `doc_signed` (com todos assinados)
+          // e `all_signed` em sequência, ou reentregar webhooks em retry. Sem isso,
+          // cada chamada criaria um cadastro novo no MKAuth.
+          const updateRes = await repo
+            .createQueryBuilder()
+            .update(SolicitacaoServico)
+            .set({ assinado: true })
+            .where("id = :id AND assinado = false", { id: solicitacao.id })
+            .execute();
+
+          if (!updateRes.affected) {
+            console.log(
+              `[ZapSign Webhook] Solicitação ID ${solicitacao.id} já estava assinada — ignorando webhook duplicado (Token: ${token}).`,
+            );
+            res.status(200).json({ ok: true, duplicate: true });
+            return;
+          }
+
           solicitacao.assinado = true;
-          await repo.save(solicitacao);
           console.log(
             `[ZapSign Webhook] Solicitação ID ${solicitacao.id} marcada como assinada (Token: ${token}).`,
           );
