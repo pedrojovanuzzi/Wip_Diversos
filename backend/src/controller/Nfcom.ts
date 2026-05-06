@@ -500,6 +500,16 @@ class Nfcom {
       const folderXml = zip.folder("xmls");
       const folderPdf = zip.folder("pdfs");
 
+      // Busca a chave do Olho no Imposto UMA ÚNICA VEZ e reaproveita para todos os PDFs.
+      // Chamar por nota fazia com que o IP fosse bloqueado pela API da IBPT.
+      let chaveObs = "";
+      try {
+        const obs: any = await this.getNfcomByChaveDeOlhoNoImposto();
+        chaveObs = obs?.Chave || "";
+      } catch (err) {
+        console.error("Erro ao consultar Olho no Imposto (lote):", err);
+      }
+
       // Processa em paralelo para ser mais rápido
       await Promise.all(
         nfcoms.map(async (nfcom) => {
@@ -513,9 +523,7 @@ class Nfcom {
 
           // 2. Gera e Adiciona o PDF
           try {
-            // Passe uma observação padrão ou pegue do banco se tiver
-            const obs = await this.getNfcomByChaveDeOlhoNoImposto();
-            const pdfBuffer = await this.generateXmlPdf(nfcom, obs.Chave);
+            const pdfBuffer = await this.generateXmlPdf(nfcom, chaveObs);
 
             folderPdf?.file(`${nomeArquivo}.pdf`, pdfBuffer);
           } catch (err) {
@@ -547,15 +555,42 @@ class Nfcom {
     }
   };
 
+  private static olhoNoImpostoCache: { data: any; expiresAt: number } | null =
+    null;
+  private static olhoNoImpostoInflight: Promise<any> | null = null;
+  private static readonly OLHO_NO_IMPOSTO_TTL_MS = 60 * 60 * 1000;
+
   public async getNfcomByChaveDeOlhoNoImposto(req?: Request, res?: Response) {
-    const response = await axios.get(
-      `https://apidoni.ibpt.org.br/api/v1/servicos?token=${process.env.OLHO_NO_IMPOSTO_TOKEN}&cnpj=${process.env.OLHO_NO_IMPOSTO_CNPJ}&codigo=${process.env.OLHO_NO_IMPOSTO_CODIGO}&uf=${process.env.OLHO_NO_IMPOSTO_UF}&descricao=${process.env.OLHO_NO_IMPOSTO_DESCRICAO}&unidadeMedida=${process.env.OLHO_NO_IMPOSTO_UNIDADEMEDIDA}&valor=${process.env.OLHO_NO_IMPOSTO_VALOR}`,
-    );
+    const now = Date.now();
+    const cache = Nfcom.olhoNoImpostoCache;
+
+    let data: any;
+    if (cache && cache.expiresAt > now) {
+      data = cache.data;
+    } else if (Nfcom.olhoNoImpostoInflight) {
+      data = await Nfcom.olhoNoImpostoInflight;
+    } else {
+      Nfcom.olhoNoImpostoInflight = (async () => {
+        const response = await axios.get(
+          `https://apidoni.ibpt.org.br/api/v1/servicos?token=${process.env.OLHO_NO_IMPOSTO_TOKEN}&cnpj=${process.env.OLHO_NO_IMPOSTO_CNPJ}&codigo=${process.env.OLHO_NO_IMPOSTO_CODIGO}&uf=${process.env.OLHO_NO_IMPOSTO_UF}&descricao=${process.env.OLHO_NO_IMPOSTO_DESCRICAO}&unidadeMedida=${process.env.OLHO_NO_IMPOSTO_UNIDADEMEDIDA}&valor=${process.env.OLHO_NO_IMPOSTO_VALOR}`,
+        );
+        Nfcom.olhoNoImpostoCache = {
+          data: response.data,
+          expiresAt: Date.now() + Nfcom.OLHO_NO_IMPOSTO_TTL_MS,
+        };
+        return response.data;
+      })();
+      try {
+        data = await Nfcom.olhoNoImpostoInflight;
+      } finally {
+        Nfcom.olhoNoImpostoInflight = null;
+      }
+    }
 
     if (req || res) {
-      res?.status(200).json(response.data);
+      res?.status(200).json(data);
     } else {
-      return response.data;
+      return data;
     }
   }
 
