@@ -210,6 +210,17 @@ export default function SearchInterface() {
     }
   };
 
+  const formatLocalDateBR = (value: string) => {
+    if (!value) {
+      return new Date().toLocaleDateString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+      });
+    }
+    const [y, m, d] = value.split("-").map(Number);
+    if (!y || !m || !d) return value;
+    return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+  };
+
   const generateReportPdf = async () => {
     const newWindow = window.open("", "_blank");
     if (newWindow) {
@@ -222,15 +233,8 @@ export default function SearchInterface() {
         `${process.env.REACT_APP_URL}/NFCom/generateReportPdf`,
         {
           id: selectedIds,
-          dataInicio: new Date(dataInicio || new Date()).toLocaleDateString(
-            "pt-BR",
-            {
-              timeZone: "America/Sao_Paulo",
-            }
-          ),
-          dataFim: new Date(dataFim || new Date()).toLocaleDateString("pt-BR", {
-            timeZone: "America/Sao_Paulo",
-          }),
+          dataInicio: formatLocalDateBR(dataInicio),
+          dataFim: formatLocalDateBR(dataFim),
           password: reportPassword,
         },
         {
