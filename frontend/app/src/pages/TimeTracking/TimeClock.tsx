@@ -119,6 +119,14 @@ export const TimeClock = () => {
   }, []);
 
   useEffect(() => {
+    if (canEditDate) return;
+    const interval = setInterval(() => {
+      setSelectedTime(moment().format("YYYY-MM-DDTHH:mm:ss"));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [canEditDate]);
+
+  useEffect(() => {
     if (selectedTime) {
       const datePart = selectedTime.split("T")[0];
       setSignatureDate(datePart);
