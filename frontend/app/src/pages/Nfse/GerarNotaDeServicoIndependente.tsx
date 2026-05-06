@@ -30,9 +30,20 @@ export const GerarNotaDeServicoIndependente = () => {
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >,
   ) => {
+    const { name, value } = e.target;
+    let next = value;
+    if (name === "valor" || name === "aliquota") {
+      next = value.replace(/[^\d.,]/g, "").replace(",", ".");
+      const firstDot = next.indexOf(".");
+      if (firstDot !== -1) {
+        next =
+          next.slice(0, firstDot + 1) +
+          next.slice(firstDot + 1).replace(/\./g, "");
+      }
+    }
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: next,
     });
   };
 
@@ -162,8 +173,8 @@ export const GerarNotaDeServicoIndependente = () => {
                 Aliquota
               </label>
               <input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 name="aliquota"
                 id="aliquota"
                 className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -180,8 +191,8 @@ export const GerarNotaDeServicoIndependente = () => {
                 Valor (R$)
               </label>
               <input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 name="valor"
                 id="valor"
                 className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
