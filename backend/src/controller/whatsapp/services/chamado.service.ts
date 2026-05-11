@@ -27,6 +27,7 @@ export async function criarChamadoMkauth(
       uuid_suporte: uuidv4().substring(0, 36),
       assunto: assunto.toUpperCase(),
       abertura: agora,
+      visita: agora,
       email: session.email || "",
       status: "aberto",
       chamado: chamadoId,
