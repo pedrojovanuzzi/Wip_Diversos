@@ -21,6 +21,7 @@ import {
   MensagemLista,
   MensagemFlowEndereco,
   MensagemFlowTrocaPlano,
+  MensagemFlowWifiExtendido,
   MensagemFlowTrocaTitularidadeContato,
   MensagemFlowTrocaTitularidadeContratacao,
   MensagemFlowMudancaComodo,
@@ -30,7 +31,7 @@ import {
   whatsappOutgoingQueue,
 } from "../services/messaging.service";
 import { url as waUrl, token as waToken } from "../config";
-import { getPlanosDoSistema } from "../services/plano.service";
+import { getPlanosDoSistema, getPlanosWifiExtendido } from "../services/plano.service";
 import { criarChamadoMkauth } from "../services/chamado.service";
 
 const FLOW_TROCA_TITULARIDADE_CONTATO =
@@ -246,6 +247,44 @@ async function salvarSolicitacaoAlteracaoPlano(
     rg: session.rg || "Não informado",
     plano: session.planoEscolhido || "Não informado",
     observacao: session.observacaoTrocaPlano || "",
+    valor: "0.00",
+    valor_plano: session.valor_plano_atual || "",
+  };
+
+  return await repo.save(novaSolicitacao);
+}
+
+async function salvarSolicitacaoWifiExtendido(
+  session: any,
+  celularConversa: string,
+) {
+  const repo = AppDataSource.getRepository(SolicitacaoServico);
+  const novaSolicitacao = new SolicitacaoServico();
+
+  novaSolicitacao.servico = "Wifi Extendido";
+  novaSolicitacao.login_cliente = session.login || "Desconhecido";
+  novaSolicitacao.data_solicitacao = new Date();
+  novaSolicitacao.assinado = false;
+  novaSolicitacao.pago = true;
+  novaSolicitacao.gratis = 1;
+  novaSolicitacao.dados = {
+    nome: session.nome || "Não informado",
+    cpf: session.cpf || "Não informado",
+    email: session.email || "financeiro@wiptelecom.com.br",
+    telefone: session.celularCliente || celularConversa,
+    telefone_conversa: celularConversa,
+    login: session.login || "Não informado",
+    endereco: session.endereco_wifi_extendido || "Não informado",
+    numero: session.numero_wifi_extendido || "",
+    bairro: session.bairro_wifi_extendido || "",
+    cidade: session.cidade_wifi_extendido || "",
+    estado: session.estado_wifi_extendido || "",
+    cep: session.cep_wifi_extendido || "",
+    vencimento: session.venc_wifi_extendido || "",
+    termo: session.contrato_cliente || "",
+    rg: session.rg || "Não informado",
+    plano: session.planoEscolhido || "Não informado",
+    observacao: session.observacaoWifiExtendido || "",
     valor: "0.00",
     valor_plano: session.valor_plano_atual || "",
   };
@@ -1856,6 +1895,403 @@ export async function handleAwaitingTrocaPlanoFlow(
     await MensagensComuns(
       celular,
       "📋 Por favor, preencha o formulário de alteração de plano clicando no botão enviado acima.",
+    );
+  }
+}
+
+export async function iniciarWifiExtendido(
+  celular: any,
+  texto: any,
+  session: any,
+  type: any,
+) {
+  if (type !== "text" && type !== "interactive" && type !== undefined) {
+    await MensagensComuns(
+      celular,
+      "*Desculpe* eu sou um Robô e não entendo áudios ou imagens 😞\n🙏🏻Por gentileza, Digite",
+    );
+    return;
+  }
+
+  if (!session.wifiExtendidoStep) {
+    session.wifiExtendidoStep = "ask_cpf";
+    await MensagensComuns(
+      celular,
+      "Para iniciar a contratação de *Wifi Extendido*, por favor digite o seu *CPF/CNPJ*:",
+    );
+    session.stage = "wifi_extendido";
+    return;
+  }
+
+  if (session.wifiExtendidoStep === "ask_cpf") {
+    const cpf = texto.replace(/[^\d]+/g, "");
+    const cpfValido = validarCPF(texto);
+
+    if (!cpfValido && cpf.length !== 14 && cpf.length !== 11) {
+      await MensagensComuns(
+        celular,
+        "❌ *CPF/CNPJ* inválido. Por favor, verifique e digite novamente.",
+      );
+      return;
+    }
+
+    session.cpf = cpf;
+    const sis_cliente = await MkauthDataSource.getRepository(Sis_Cliente).find({
+      select: {
+        id: true,
+        nome: true,
+        endereco: true,
+        login: true,
+        numero: true,
+        bairro: true,
+        cidade: true,
+        estado: true,
+        cep: true,
+        venc: true,
+        termo: true,
+        email: true,
+        rg: true,
+        cpf_cnpj: true,
+        celular: true,
+        plano: true,
+      },
+      where: { cpf_cnpj: cpf, cli_ativado: "s" },
+    });
+
+    if (sis_cliente.length > 1) {
+      let currentIndex = 1;
+      const structuredData = sis_cliente.map((client) => ({
+        index: currentIndex++,
+        id: Number(client.id),
+        nome: client.nome,
+        endereco: client.endereco,
+        login: client.login,
+        numero: client.numero,
+        bairro: client.bairro,
+        cidade: client.cidade,
+        estado: client.estado,
+        cep: client.cep,
+        venc: client.venc,
+        termo: client.termo,
+        plano: client.plano,
+        cpf,
+        email: client.email,
+        rg: client.rg,
+        celular: client.celular,
+      }));
+
+      session.structuredDataWifiExtendido = structuredData;
+      session.wifiExtendidoStep = "select_address";
+
+      let messageText =
+        "🔍 Encontramos mais de um *Cadastro!* Digite o *Número* para o qual deseja contratar o *Wifi Extendido* 👇🏻\n\n";
+      structuredData.forEach((client) => {
+        messageText += `*${client.index}* Nome: ${client.nome}, Endereço: ${client.endereco} N: ${client.numero}\n\n`;
+      });
+      messageText += "👉🏻 Caso queira cancelar digite *início*";
+
+      await MensagensComuns(celular, messageText);
+      return;
+    }
+
+    if (sis_cliente.length === 1) {
+      session.login = sis_cliente[0].login;
+      session.nome = sis_cliente[0].nome;
+      session.email = sis_cliente[0].email;
+      session.rg = sis_cliente[0].rg;
+      session.endereco_wifi_extendido = sis_cliente[0].endereco || "";
+      session.numero_wifi_extendido = sis_cliente[0].numero || "";
+      session.bairro_wifi_extendido = sis_cliente[0].bairro || "";
+      session.cidade_wifi_extendido = sis_cliente[0].cidade || "";
+      session.estado_wifi_extendido = sis_cliente[0].estado || "";
+      session.cep_wifi_extendido = sis_cliente[0].cep || "";
+      session.venc_wifi_extendido = sis_cliente[0].venc || "";
+      session.contrato_cliente = sis_cliente[0].termo || "";
+      session.celularCliente = sis_cliente[0].celular;
+      const _planoSingle = sis_cliente[0].plano
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: sis_cliente[0].plano } })
+        : null;
+      session.valor_plano_atual = _planoSingle?.valor || "0,00";
+      session.dadosCompleto = {
+        nome: sis_cliente[0].nome,
+        cpf,
+        email: sis_cliente[0].email,
+        rg: sis_cliente[0].rg,
+        celular: sis_cliente[0].celular,
+        login: sis_cliente[0].login,
+        endereco: `${sis_cliente[0].endereco}, ${sis_cliente[0].numero}`,
+      };
+
+      await MensagemTermos(
+        celular,
+        "Termos Wifi Extendido",
+        "📄 Para dar *continuidade*, é preciso que *leia* o *Termo abaixo* e escolha a opção que deseja",
+        "Ler Termos",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/wifi_extendido",
+      );
+      await MensagemBotao(
+        celular,
+        "Escolha a Opção",
+        "Sim Concordo",
+        "Não",
+      );
+      session.stage = "choose_type_wifi_extendido";
+      return;
+    }
+
+    await MensagensComuns(
+      celular,
+      "🙁 Seu cadastro *não* foi *encontrado*, verifique se digitou corretamente o seu *CPF/CNPJ* ou digite *início* para voltar.",
+    );
+    return;
+  }
+
+  if (session.wifiExtendidoStep === "select_address") {
+    if (
+      texto.toLowerCase() === "inicio" ||
+      texto.toLowerCase() === "início"
+    ) {
+      session.wifiExtendidoStep = undefined;
+      session.structuredDataWifiExtendido = undefined;
+      session.login = undefined;
+      await boasVindas(celular);
+      await MensagemBotao(
+        celular,
+        "Escolha um Botão",
+        "Boleto/Pix",
+        "Serviços/Contratação",
+        "Falar com Atendente",
+      );
+      session.stage = "options_start";
+      return;
+    }
+
+    const selectedIndex = parseInt(texto, 10) - 1;
+
+    if (
+      !isNaN(selectedIndex) &&
+      selectedIndex >= 0 &&
+      selectedIndex < session.structuredDataWifiExtendido.length
+    ) {
+      const selectedClient = session.structuredDataWifiExtendido[selectedIndex];
+      session.login = selectedClient.login;
+      session.nome = selectedClient.nome;
+      session.email = selectedClient.email;
+      session.rg = selectedClient.rg;
+      session.endereco_wifi_extendido = selectedClient.endereco || "";
+      session.numero_wifi_extendido = selectedClient.numero || "";
+      session.bairro_wifi_extendido = selectedClient.bairro || "";
+      session.cidade_wifi_extendido = selectedClient.cidade || "";
+      session.estado_wifi_extendido = selectedClient.estado || "";
+      session.cep_wifi_extendido = selectedClient.cep || "";
+      session.venc_wifi_extendido = selectedClient.venc || "";
+      session.contrato_cliente = selectedClient.termo || "";
+      session.celularCliente = selectedClient.celular;
+      const _planoSelected = selectedClient.plano
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: selectedClient.plano } })
+        : null;
+      session.valor_plano_atual = _planoSelected?.valor || "0,00";
+      session.dadosCompleto = {
+        nome: selectedClient.nome,
+        cpf: session.cpf,
+        email: selectedClient.email,
+        rg: selectedClient.rg,
+        celular: selectedClient.celular,
+        login: selectedClient.login,
+        endereco: `${selectedClient.endereco}, ${selectedClient.numero}`,
+      };
+
+      await MensagemTermos(
+        celular,
+        "Termos Wifi Extendido",
+        "📄 Para dar *continuidade*, é preciso que *leia* o *Termo abaixo* e escolha a opção que deseja",
+        "Ler Termos",
+        "https://wipdiversos.wiptelecomunicacoes.com.br/doc/wifi_extendido",
+      );
+      await MensagemBotao(
+        celular,
+        "Escolha a Opção",
+        "Sim Concordo",
+        "Não",
+      );
+      session.stage = "choose_type_wifi_extendido";
+      return;
+    }
+
+    await MensagensComuns(
+      celular,
+      "⚠️ Opção *inválida*, por favor digite o número correto da opção desejada.",
+    );
+  }
+}
+
+export async function handleChooseTypeWifiExtendido(
+  celular: any,
+  texto: any,
+  session: any,
+) {
+  if (texto.toLowerCase() === "sim concordo") {
+    const planosDoSistema = await getPlanosWifiExtendido();
+    await MensagensComuns(
+      celular,
+      "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nAgora, escolha no formulário abaixo o plano de *Wifi Extendido* desejado.",
+    );
+    await MensagemFlowWifiExtendido(
+      celular,
+      "WIFI_EXTENDIDO",
+      "Escolher Plano",
+      planosDoSistema,
+    );
+    session.stage = "awaiting_wifi_extendido_flow";
+  } else if (
+    texto.toLowerCase() === "nao" ||
+    texto.toLowerCase() === "não"
+  ) {
+    await MensagensComuns(
+      celular,
+      "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
+    );
+    session._deleted = true;
+  } else {
+    await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
+  }
+}
+
+export async function handleAwaitingWifiExtendidoFlow(
+  celular: any,
+  texto: any,
+  session: any,
+) {
+  try {
+    const payload = JSON.parse(texto);
+    const planoEscolhido = payload.plano || payload.plano_escolhido;
+
+    if (!planoEscolhido) {
+      await MensagensComuns(
+        celular,
+        "📋 Por favor, escolha um plano no formulário enviado acima para continuar.",
+      );
+      return;
+    }
+
+    session.planoEscolhido = planoEscolhido;
+    session.observacaoWifiExtendido = payload.observacao || "";
+    session.wifiExtendidoStep = null;
+
+    const resumoWifiExtendido =
+      `📶 *Nova Solicitação de Wifi Extendido*\n\n` +
+      `👤 *Nome:* ${session.nome || "Não informado"}\n` +
+      `📄 *CPF:* ${session.cpf || "Não informado"}\n` +
+      `📱 *Celular:* ${session.celularCliente || celular}\n` +
+      `📧 *Email:* ${session.email || "Não informado"}\n` +
+      `🔑 *Login:* ${session.login || "Não informado"}\n` +
+      `📍 *Endereço:* ${session.endereco_wifi_extendido || "Não informado"}\n` +
+      `🪪 *RG:* ${session.rg || "Não informado"}\n` +
+      `🛜 *Plano Solicitado:* ${session.planoEscolhido}\n` +
+      `📝 *Observação:* ${session.observacaoWifiExtendido || "Sem observação"}`;
+
+    const resumoEmailHtml =
+      `<h3>Solicitação de Wifi Extendido</h3>` +
+      `<p><b>Nome:</b> ${session.nome || "Não informado"}</p>` +
+      `<p><b>CPF:</b> ${session.cpf || "Não informado"}</p>` +
+      `<p><b>Celular:</b> ${session.celularCliente || celular}</p>` +
+      `<p><b>Email:</b> ${session.email || "Não informado"}</p>` +
+      `<p><b>Login:</b> ${session.login || "Não informado"}</p>` +
+      `<p><b>Endereço:</b> ${session.endereco_wifi_extendido || "Não informado"}</p>` +
+      `<p><b>RG:</b> ${session.rg || "Não informado"}</p>` +
+      `<p><b>Plano Solicitado:</b> ${planoEscolhido}</p>` +
+      `<p><b>Observação:</b> ${session.observacaoWifiExtendido || "Sem observação"}</p>`;
+
+    try {
+      sendServiceEmail(resumoEmailHtml);
+    } catch (e) {
+      console.error("Erro ao enviar email de wifi extendido:", e);
+    }
+
+    let solicitacaoSalva: SolicitacaoServico | null = null;
+    try {
+      solicitacaoSalva = await salvarSolicitacaoWifiExtendido(session, celular);
+    } catch (error) {
+      console.error("Erro ao salvar solicitação de wifi extendido:", error);
+    }
+
+    try {
+      await criarChamadoMkauth("WIFI EXTENDIDO", session, resumoWifiExtendido, solicitacaoSalva);
+    } catch (e) {
+      console.error("[Chamado] Erro ao criar chamado de wifi extendido:", e);
+    }
+
+    await Finalizar(resumoWifiExtendido, celular, true);
+    if (process.env.TEST_PHONE) {
+      await enviarNotificacaoServico(process.env.TEST_PHONE);
+    }
+
+    try {
+      const planoRecord = session.planoEscolhido
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({
+            where: { nome: session.planoEscolhido },
+          })
+        : null;
+      const valorPlano = planoRecord?.valor || "0.00";
+
+      const payloadZap = {
+        ...(solicitacaoSalva?.dados || {}),
+        nome: session.nome || "Não informado",
+        cpf: session.cpf || "Não informado",
+        email: session.email || "financeiro@wiptelecom.com.br",
+        telefone: session.celularCliente || celular,
+        telefone_conversa: celular,
+        login: session.login || "Não informado",
+        endereco: session.endereco_wifi_extendido || "Não informado",
+        numero: session.numero_wifi_extendido || "",
+        bairro: session.bairro_wifi_extendido || "",
+        cidade: session.cidade_wifi_extendido || "",
+        estado: session.estado_wifi_extendido || "",
+        cep: session.cep_wifi_extendido || "",
+        vencimento: session.venc_wifi_extendido || "",
+        termo: session.contrato_cliente || "",
+        rg: session.rg || "Não informado",
+        plano: session.planoEscolhido,
+        valor: valorPlano,
+        valor_plano: valorPlano,
+      };
+
+      const zapResponse =
+        await ZapSign.createContractWifiExtendido(payloadZap as any);
+      const zapSignUrl = zapResponse.signers[0].sign_url;
+
+      if (solicitacaoSalva) {
+        solicitacaoSalva.token_zapsign = zapResponse.token;
+        await AppDataSource.getRepository(SolicitacaoServico).save(
+          solicitacaoSalva,
+        );
+      }
+
+      await MensagensComuns(
+        celular,
+        "✅ Recebemos a sua solicitação!\nAqui está o link com Termo de Wifi Extendido para assinatura. Obrigado pela confiança!",
+      );
+      await MensagensComuns(
+        celular,
+        `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
+      );
+      session.stage = "awaiting_signature_link";
+    } catch (error: any) {
+      console.error(
+        "Erro ao gerar link de assinatura do wifi extendido:",
+        error?.response?.data || error?.message || error,
+      );
+      await MensagensComuns(
+        celular,
+        "✅ Recebemos a sua solicitação!\nEntraremos em contato em breve para enviar o link com Termo de Wifi Extendido. Obrigado pela confiança!",
+      );
+      session.stage = "awaiting_signature_link";
+    }
+    return;
+  } catch (error) {
+    await MensagensComuns(
+      celular,
+      "📋 Por favor, preencha o formulário de Wifi Extendido clicando no botão enviado acima.",
     );
   }
 }

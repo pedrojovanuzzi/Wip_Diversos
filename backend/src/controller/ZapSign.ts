@@ -474,6 +474,11 @@ class ZapSign {
         resultados["Alteração de Plano"] = await this.createContractAlteracaoPlano(params);
       } catch (e: any) { erros["Alteração de Plano"] = e.message; }
 
+      // 8.1 Wifi Extendido
+      try {
+        resultados["Wifi Extendido"] = await this.createContractWifiExtendido(params);
+      } catch (e: any) { erros["Wifi Extendido"] = e.message; }
+
       // 9. Troca de Titularidade (Titular)
       try {
         resultados["Troca de Titularidade (titular)"] = await this.createContractTrocaTitularidadeTitular(params);
@@ -717,6 +722,7 @@ class ZapSign {
                   break;
                 case "alteração de plano":
                 case "alteracao de plano":
+                case "wifi extendido":
                   const loginPlano = dados.login || solicitacao.login_cliente;
                   if (
                     loginPlano &&
@@ -954,6 +960,45 @@ class ZapSign {
       return response.data;
     } catch (error) {
       console.error("Error in createContractAlteracaoPlano:", error);
+      throw error;
+    }
+  }
+
+  createContractWifiExtendido = async (params: Record<string, any>) => {
+    try {
+      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+        where: { nome_servico: "Wifi Extendido", tipo: "gratis" },
+      });
+      if (!template?.token_id) throw new Error("Token do template 'Wifi Extendido' não encontrado.");
+
+      const zapData = await buildUniversalZapSignData(params);
+
+      const response = await axios.post(
+        isSandbox
+          ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
+          : "https://api.zapsign.com.br/api/v1/models/create-doc/",
+        {
+          template_id: template.token_id,
+          signer_name: params.nome || "",
+          send_automatic_email: false,
+          send_automatic_whatsapp: false,
+          lang: "pt-br",
+          external_id: null,
+          data: zapData,
+          signature_placement: "<<assinatura>>",
+          rubrica_placement: "<<visto>>",
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.ZAPSIGN_TOKEN}`,
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Error in createContractWifiExtendido:", error);
       throw error;
     }
   }

@@ -23,3 +23,25 @@ export async function getPlanosDoSistema() {
     return [];
   }
 }
+
+export async function getPlanosWifiExtendido() {
+  try {
+    const planoRepository = MkauthDataSource.getRepository(SisPlano);
+    const planos = await planoRepository.find({
+      where: { nome: Like("\\_EST\\_WIFI%") },
+      order: { nome: "ASC" },
+    });
+
+    console.log(
+      `🔍 [getPlanosWifiExtendido] ${planos.length} planos encontrados.`,
+    );
+
+    return planos.map((p) => ({
+      id: p.nome,
+      title: `${p.nome.replace(/_/g, " ").trim()} - R$ ${Number((p.valor || "0").replace(",", ".")).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+    }));
+  } catch (error: any) {
+    console.error("❌ [getPlanosWifiExtendido] Erro ao buscar planos:", error);
+    return [];
+  }
+}

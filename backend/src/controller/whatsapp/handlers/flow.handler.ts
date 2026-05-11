@@ -5,7 +5,7 @@ import axios from "axios";
 import { decryptFlowRequest, encryptFlowResponse } from "../utils/crypto";
 import { limparEndereco, limparNomeRua } from "../utils/helpers";
 import { saveSession } from "../services/session.service";
-import { getPlanosDoSistema } from "../services/plano.service";
+import { getPlanosDoSistema, getPlanosWifiExtendido } from "../services/plano.service";
 import ApiMkDataSource from "../../../database/API_MK";
 import MkauthDataSource from "../../../database/MkauthSource";
 import Sessions from "../../../entities/APIMK/Sessions";
@@ -67,6 +67,19 @@ export async function Flow(req: Request, res: Response): Promise<void> {
         const screenData = {
           screen: "ALTERACAO_PLANO",
           data: { planos_do_sistema: planosDoSistema },
+        };
+
+        res.send(
+          encryptFlowResponse(screenData, aesKeyBuffer, initialVectorBuffer),
+        );
+        return;
+      }
+
+      if (screen === "WIFI_EXTENDIDO") {
+        const planosWifi = await getPlanosWifiExtendido();
+        const screenData = {
+          screen: "WIFI_EXTENDIDO",
+          data: { planos_do_sistema: planosWifi },
         };
 
         res.send(
@@ -211,6 +224,28 @@ export async function Flow(req: Request, res: Response): Promise<void> {
             await saveSession(celular, session);
           } catch (e) {
             console.error("Erro ao salvar sessão do Webhook Flow (Troca de Plano)", e);
+          }
+        }
+      }
+
+      if (screen === "WIFI_EXTENDIDO") {
+        const celular = flow_token.split("_")[1];
+
+        const dbSession = await ApiMkDataSource.getRepository(Sessions).findOne({ where: { celular } });
+        const session: any = dbSession
+          ? { stage: dbSession.stage, ...dbSession.dados }
+          : { stage: "start" };
+
+        if (session) {
+          session.dadosCadastro = {
+            ...(session.dadosCadastro || {}),
+            plano: data.plano || "",
+          };
+
+          try {
+            await saveSession(celular, session);
+          } catch (e) {
+            console.error("Erro ao salvar sessão do Webhook Flow (Wifi Extendido)", e);
           }
         }
       }

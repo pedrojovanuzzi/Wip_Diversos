@@ -445,6 +445,60 @@ export async function MensagemFlowTrocaPlano(
   }
 }
 
+export async function MensagemFlowWifiExtendido(
+  receivenumber: any,
+  flowName: string,
+  ctaText: string,
+  planosDoSistema: any[] = [],
+) {
+  try {
+    await MensagensComuns(receivenumber, AVISO_FLOW);
+    await whatsappOutgoingQueue.add(
+      "send-flow",
+      {
+        url,
+        payload: {
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: receivenumber,
+          type: "interactive",
+          interactive: {
+            type: "flow",
+            body: {
+              text: "Escolha o plano de Wifi Extendido desejado no formulario abaixo.",
+            },
+            action: {
+              name: "flow",
+              parameters: {
+                flow_message_version: "3",
+                flow_name: flowName,
+                flow_cta: ctaText,
+                flow_token: `sessao_${receivenumber}_${Date.now()}`,
+                flow_action: "navigate",
+                flow_action_payload: {
+                  screen: "WIFI_EXTENDIDO",
+                  data: { planos_do_sistema: planosDoSistema },
+                },
+                mode: "published",
+              },
+            },
+          },
+        },
+        headers: authHeaders(),
+      },
+      {
+        removeOnComplete: true,
+        removeOnFail: false,
+        attempts: 1,
+      },
+    );
+
+    console.log(`Flow '${flowName}' de wifi extendido enviado para ${receivenumber}`);
+  } catch (error: any) {
+    console.error("Erro ao enviar Flow de Wifi Extendido:", error.message);
+  }
+}
+
 export async function MensagemFlowTrocaTitularidadeContato(
   receivenumber: any,
   flowName: string,

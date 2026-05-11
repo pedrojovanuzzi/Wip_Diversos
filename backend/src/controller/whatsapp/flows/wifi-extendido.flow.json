@@ -1,0 +1,77 @@
+{
+  "version": "7.3",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "WIFI_EXTENDIDO": []
+  },
+  "screens": [
+    {
+      "id": "WIFI_EXTENDIDO",
+      "title": "Wifi Extendido",
+      "data": {
+        "planos_do_sistema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            {
+              "id": "_EXT_100MEGAS",
+              "title": "Wifi Extendido: 100 MEGA - R$ 49,90"
+            },
+            {
+              "id": "_EXT_300MEGAS",
+              "title": "Wifi Extendido: 300 MEGA - R$ 79,90"
+            }
+          ]
+        }
+      },
+      "terminal": true,
+      "success": true,
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_wifi_extendido",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Solicitacao de Wifi Extendido"
+              },
+              {
+                "type": "TextBody",
+                "text": "Escolha abaixo o plano de Wifi Extendido desejado para enviar a sua solicitacao."
+              },
+              {
+                "type": "Dropdown",
+                "name": "plano_escolhido",
+                "label": "Escolha o plano",
+                "required": true,
+                "data-source": "${data.planos_do_sistema}"
+              },
+              {
+                "type": "Footer",
+                "label": "Enviar Solicitacao",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "plano": "${form.plano_escolhido}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
