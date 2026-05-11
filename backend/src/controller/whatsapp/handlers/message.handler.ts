@@ -52,6 +52,9 @@ import {
   handleWifiEstFinalize,
   handleChooseTypeTrocaPlano,
   handleAwaitingTrocaPlanoFlow,
+  iniciarWifiExtendido,
+  handleChooseTypeWifiExtendido,
+  handleAwaitingWifiExtendidoFlow,
   handleSelectPlanTroca,
   handlePlanTrocaFinal,
   handleFinishTrocaPlan,
@@ -232,8 +235,9 @@ export async function handleMessage(
                   { id: "option_3", title: "Mudança de Cômodo" },
                   { id: "option_4", title: "Alteração Titularidade" },
                   { id: "option_5", title: "Alteração de Plano" },
-                  // { id: "option_6", title: "Renovação Contratual" },
-                  // { id: "option_7", title: "Wifi Estendido" },
+                  { id: "option_6", title: "Wifi Extendido" },
+                  // { id: "option_7", title: "Renovação Contratual" },
+                  // { id: "option_8", title: "Wifi Estendido" },
                 ],
               },
             ],
@@ -296,6 +300,10 @@ export async function handleMessage(
           await LGPD(celular);
           session.stage = "lgpd_request";
           session.service = "troca_plano";
+        } else if (t === "wifi extendido") {
+          await LGPD(celular);
+          session.stage = "lgpd_request";
+          session.service = "wifi_extendido";
         } else if (t === "wifi estendido") {
           await LGPD(celular);
           session.stage = "lgpd_request";
@@ -347,6 +355,9 @@ export async function handleMessage(
           } else if (session.service === "troca_plano") {
             session.stage = "troca_plano";
             await iniciarTrocaPlano(celular, texto, session, type);
+          } else if (session.service === "wifi_extendido") {
+            session.stage = "wifi_extendido";
+            await iniciarWifiExtendido(celular, texto, session, type);
           } else if (session.service === "renovação_contratual") {
             session.stage = "renovacao";
             await iniciarRenovacao(celular, texto, session, type);
@@ -555,6 +566,25 @@ export async function handleMessage(
 
     case "awaiting_troca_plano_flow":
       await handleAwaitingTrocaPlanoFlow(celular, texto, session);
+      break;
+
+    case "wifi_extendido":
+      await iniciarWifiExtendido(celular, texto, session, type);
+      break;
+
+    case "choose_type_wifi_extendido":
+      if (verificaType(type)) {
+        await handleChooseTypeWifiExtendido(celular, texto, session);
+      } else {
+        await MensagensComuns(
+          celular,
+          msgRobo + "Selecione uma Opção dos Botoes",
+        );
+      }
+      break;
+
+    case "awaiting_wifi_extendido_flow":
+      await handleAwaitingWifiExtendidoFlow(celular, texto, session);
       break;
 
     case "plan_troca_final":
