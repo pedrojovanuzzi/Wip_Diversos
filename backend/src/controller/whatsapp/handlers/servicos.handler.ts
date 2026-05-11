@@ -2257,7 +2257,7 @@ export async function handleAwaitingWifiExtendidoFlow(
       };
 
       const zapResponse =
-        await ZapSign.createContractAlteracaoPlano(payloadZap as any);
+        await ZapSign.createContractWifiExtendido(payloadZap as any);
       const zapSignUrl = zapResponse.signers[0].sign_url;
 
       if (solicitacaoSalva) {
@@ -2276,10 +2276,10 @@ export async function handleAwaitingWifiExtendidoFlow(
         `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
       );
       session.stage = "awaiting_signature_link";
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         "Erro ao gerar link de assinatura do wifi extendido:",
-        error,
+        error?.response?.data || error?.message || error,
       );
       await MensagensComuns(
         celular,
