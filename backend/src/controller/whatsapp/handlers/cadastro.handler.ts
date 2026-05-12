@@ -183,9 +183,7 @@ export async function handleAwaitingFlowCadastro(
       }
 
       dadosFlow.nome = nomeLimpo;
-      const primeiroNome = partesNome[0];
-      const ultimoNome = partesNome[partesNome.length - 1];
-      dadosFlow.login = (primeiroNome + ultimoNome).toUpperCase();
+      dadosFlow.login = nomeLimpo.replace(/\s+/g, "").toUpperCase();
 
       const cepLimpo = (dadosFlow.cep || "").replace(/\D/g, "");
       const celLimpo = (dadosFlow.celular || "").replace(/\D/g, "");
