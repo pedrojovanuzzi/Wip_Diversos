@@ -32,6 +32,16 @@ TimeTrackingRoutes.get(
   "/records/date/:employeeId",
   TimeRecordController.getByDate,
 );
+TimeTrackingRoutes.patch(
+  "/records/:id",
+  AuthGuard,
+  TimeRecordController.updateTimestamp,
+);
+TimeTrackingRoutes.delete(
+  "/records/:id",
+  AuthGuard,
+  TimeRecordController.deleteRecord,
+);
 
 // Overtime Routes
 TimeTrackingRoutes.post("/overtime", DailyOvertimeController.save);

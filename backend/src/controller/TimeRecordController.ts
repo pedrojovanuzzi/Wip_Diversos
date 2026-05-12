@@ -246,6 +246,127 @@ class TimeRecordController {
       res.status(500).json({ error: "Error fetching all records" });
     }
   };
+  private resolveScale = (raw: any, date: Date): "8h" | "12h" | "Integral" | "4h" => {
+    if (raw === "8h" || raw === "12h" || raw === "Integral" || raw === "4h") {
+      return raw;
+    }
+    return date.getDay() === 6 ? "4h" : "8h";
+  };
+
+  private recalcDayOvertime = async (
+    employeeId: number,
+    date: Date,
+    scale: "8h" | "12h" | "Integral" | "4h",
+  ) => {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const hasSaida = await this.timeRepo.findOne({
+      where: {
+        employeeId,
+        type: "Saída",
+        timestamp: Between(startOfDay, endOfDay),
+      },
+    });
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+
+    const dailyOvertimeRepo = AppDataSource.getRepository(DailyOvertime);
+
+    if (!hasSaida) {
+      const existing = await dailyOvertimeRepo.findOne({
+        where: { employeeId, date: dateStr },
+      });
+      if (existing) {
+        existing.hours50 = 0;
+        existing.hours100 = 0;
+        await dailyOvertimeRepo.save(existing);
+      }
+      return;
+    }
+
+    const existing = await dailyOvertimeRepo.findOne({
+      where: { employeeId, date: dateStr },
+    });
+    if (existing) {
+      existing.hours50 = 0;
+      existing.hours100 = 0;
+      await dailyOvertimeRepo.save(existing);
+    }
+
+    await this.calculateAndsaveOvertime(employeeId, date, scale);
+  };
+
+  updateTimestamp = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { timestamp, scale: scaleRaw } = req.body;
+
+      if (!timestamp) {
+        res.status(400).json({ error: "timestamp é obrigatório" });
+        return;
+      }
+
+      const record = await this.timeRepo.findOne({ where: { id: Number(id) } });
+      if (!record) {
+        res.status(404).json({ error: "Registro não encontrado" });
+        return;
+      }
+
+      const oldDate = new Date(record.timestamp);
+      const newDate = new Date(timestamp);
+
+      record.timestamp = newDate;
+      await this.timeRepo.save(record);
+
+      const sameDay =
+        oldDate.toDateString() === newDate.toDateString();
+      const scale = this.resolveScale(scaleRaw, newDate);
+
+      await this.recalcDayOvertime(record.employeeId, newDate, scale);
+      if (!sameDay) {
+        const oldScale = this.resolveScale(scaleRaw, oldDate);
+        await this.recalcDayOvertime(record.employeeId, oldDate, oldScale);
+      }
+
+      res.json(record);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Erro ao atualizar registro" });
+    }
+  };
+
+  deleteRecord = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { scale: scaleRaw } = req.body || {};
+
+      const record = await this.timeRepo.findOne({ where: { id: Number(id) } });
+      if (!record) {
+        res.status(404).json({ error: "Registro não encontrado" });
+        return;
+      }
+
+      const dayDate = new Date(record.timestamp);
+      const employeeId = record.employeeId;
+
+      await this.timeRepo.remove(record);
+
+      const scale = this.resolveScale(scaleRaw, dayDate);
+      await this.recalcDayOvertime(employeeId, dayDate, scale);
+
+      res.json({ ok: true });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Erro ao excluir registro" });
+    }
+  };
+
   getByDate = async (req: Request, res: Response) => {
     try {
       const { employeeId } = req.params;

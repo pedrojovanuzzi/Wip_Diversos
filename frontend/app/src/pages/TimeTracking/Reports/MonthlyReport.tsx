@@ -5,8 +5,13 @@ import moment from "moment";
 import { AiOutlinePrinter } from "react-icons/ai";
 import { NavBar } from "../../../components/navbar/NavBar";
 import { SignatureModal } from "../../../components/SignatureModal";
+import { useAuth } from "../../../context/AuthContext";
 
 export const MonthlyReport = () => {
+  const { user } = useAuth();
+  const token = user?.token;
+  const canEdit = (user?.permission || 0) >= 5;
+
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [month, setMonth] = useState(moment().format("MM"));
@@ -20,6 +25,65 @@ export const MonthlyReport = () => {
   }>({});
   const [monthlySignature, setMonthlySignature] = useState<string | null>(null);
   const [showSigModal, setShowSigModal] = useState(false);
+  const [editScale, setEditScale] = useState<"8h" | "12h" | "Integral" | "4h">("8h");
+  const [editing, setEditing] = useState<{ id: number; value: string } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const handleEditRecord = async (record: any) => {
+    if (!canEdit) return;
+    const current = moment(record.timestamp).format("HH:mm:ss");
+    setEditing({ id: record.id, value: current });
+  };
+
+  const handleSaveEdit = async (record: any) => {
+    if (!editing) return;
+    setSavingEdit(true);
+    try {
+      const datePart = moment(record.timestamp).format("YYYY-MM-DD");
+      const time = editing.value.length === 5 ? `${editing.value}:00` : editing.value;
+      const timestampISO = `${datePart}T${time}`;
+      const scaleToUse =
+        moment(record.timestamp).day() === 6 && editScale === "8h" ? "4h" : editScale;
+
+      await axios.patch(
+        `${process.env.REACT_APP_URL}/time-tracking/records/${record.id}`,
+        { timestamp: timestampISO, scale: scaleToUse },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setEditing(null);
+      await fetchRecords();
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao atualizar registro.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDeleteRecord = async (record: any) => {
+    if (!canEdit) return;
+    if (!window.confirm(`Excluir "${record.type}" de ${moment(record.timestamp).format("HH:mm:ss")}?`)) {
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const scaleToUse =
+        moment(record.timestamp).day() === 6 && editScale === "8h" ? "4h" : editScale;
+      await axios.delete(
+        `${process.env.REACT_APP_URL}/time-tracking/records/${record.id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          data: { scale: scaleToUse },
+        },
+      );
+      await fetchRecords();
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao excluir registro.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const componentRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
@@ -187,11 +251,11 @@ export const MonthlyReport = () => {
     <>
       <NavBar></NavBar>
       <div className="p-8 bg-gray-100 min-h-screen">
-        <h1 className="text-3xl font-bold mb-6 text-gray-800 no-print">
+        <h1 className="text-3xl font-bold mb-6 text-gray-800 print:hidden">
           Relatório Mensal
         </h1>
 
-        <div className="bg-white p-6 rounded-lg shadow-lg mb-8 no-print">
+        <div className="bg-white p-6 rounded-lg shadow-lg mb-8 print:hidden">
           <div className="flex flex-wrap gap-4 items-end">
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -244,6 +308,23 @@ export const MonthlyReport = () => {
                 onChange={(e) => setYear(e.target.value)}
               />
             </div>
+            {canEdit && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Escala (para recalcular H.E.)
+                </label>
+                <select
+                  className="mt-1 block w-full border border-gray-300 rounded-md p-2"
+                  value={editScale}
+                  onChange={(e) => setEditScale(e.target.value as any)}
+                >
+                  <option value="8h">5x2 (8h)</option>
+                  <option value="4h">5x2 Sábado (4h)</option>
+                  <option value="12h">12x36</option>
+                  <option value="Integral">Integral</option>
+                </select>
+              </div>
+            )}
             <button
               onClick={fetchRecords}
               className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -322,16 +403,71 @@ export const MonthlyReport = () => {
                       {date}
                     </td>
                     <td className="border border-gray-300">
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1 items-center">
                         {dayRecords.length > 0 ? (
-                          dayRecords.map((r, idx) => (
-                            <span
-                              key={idx}
-                              className="bg-gray-100  rounded text-[9px] border"
-                            >
-                              {moment(r.timestamp).format("HH:mm")} - {r.type}
-                            </span>
-                          ))
+                          dayRecords.map((r, idx) => {
+                            const isEditingThis = editing?.id === r.id;
+                            return (
+                              <span
+                                key={idx}
+                                className="bg-gray-100 rounded text-[9px] border px-1 inline-flex items-center gap-1"
+                              >
+                                {isEditingThis ? (
+                                  <>
+                                    <input
+                                      type="time"
+                                      step="1"
+                                      value={editing!.value}
+                                      onChange={(e) =>
+                                        setEditing({ id: r.id, value: e.target.value })
+                                      }
+                                      className="text-[10px] border-none bg-white p-0 print:hidden"
+                                    />
+                                    {" - "}
+                                    {r.type}
+                                    <button
+                                      onClick={() => handleSaveEdit(r)}
+                                      disabled={savingEdit}
+                                      className="text-green-700 font-bold print:hidden ml-1"
+                                      title="Salvar"
+                                    >
+                                      ✓
+                                    </button>
+                                    <button
+                                      onClick={() => setEditing(null)}
+                                      disabled={savingEdit}
+                                      className="text-gray-500 print:hidden"
+                                      title="Cancelar"
+                                    >
+                                      ✕
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    {moment(r.timestamp).format("HH:mm")} - {r.type}
+                                    {canEdit && (
+                                      <>
+                                        <button
+                                          onClick={() => handleEditRecord(r)}
+                                          className="text-blue-600 print:hidden ml-1"
+                                          title="Editar"
+                                        >
+                                          ✎
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteRecord(r)}
+                                          className="text-red-600 print:hidden"
+                                          title="Excluir"
+                                        >
+                                          🗑
+                                        </button>
+                                      </>
+                                    )}
+                                  </>
+                                )}
+                              </span>
+                            );
+                          })
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
@@ -413,7 +549,7 @@ export const MonthlyReport = () => {
                           setMonthlySignature(null);
                         }
                       }}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 text-[8px] opacity-0 group-hover:opacity-100 transition-opacity no-print"
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 text-[8px] opacity-0 group-hover:opacity-100 transition-opacity print:hidden"
                       title="Refazer assinatura"
                     >
                       X
@@ -423,7 +559,7 @@ export const MonthlyReport = () => {
                   <div className="flex flex-col items-center">
                     {/* <button
                       onClick={() => setShowSigModal(true)}
-                      className="text-[15px] bg-gray-300 border border-gray-400 text-white px-20 py-2 rounded hover:bg-gray-700 no-print"
+                      className="text-[15px] bg-gray-300 border border-gray-400 text-white px-20 py-2 rounded hover:bg-gray-700 print:hidden"
                     >
                       Assinar
                     </button> */}
