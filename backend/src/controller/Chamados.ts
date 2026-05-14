@@ -7,6 +7,7 @@ import { SisMsg } from "../entities/SisMsg";
 import { SelectQueryBuilder } from "typeorm";
 import {
   analyzeCancellationReason,
+  analyzeClientChurnRisk,
   askAboutCancellations,
   ollamaHealth,
   summarizeCancellations,
@@ -1043,6 +1044,240 @@ class Chamados {
       console.error("Erro ao consultar IA:", error);
       res.status(500).json({ message: "Erro ao consultar IA." });
     }
+  }
+
+  private static churnJobs: Map<
+    string,
+    {
+      total: number;
+      processed: number;
+      stage: "running" | "done" | "error" | "cancelled";
+      startedAt: number;
+      cancelRequested?: boolean;
+      result?: any;
+      error?: string;
+    }
+  > = new Map();
+
+  public async startChurnRiskAnalysis(req: Request, res: Response) {
+    try {
+      const limit = Math.min(Number(req.query.limit) || 200, 2000);
+      const months = Math.min(Number(req.query.months) || 6, 24);
+      const jobId = `churn-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+      Chamados.churnJobs.set(jobId, {
+        total: 0,
+        processed: 0,
+        stage: "running",
+        startedAt: Date.now(),
+      });
+      Chamados.runChurnRiskJob(jobId, limit, months).catch((e) => {
+        const job = Chamados.churnJobs.get(jobId);
+        if (job) {
+          job.stage = "error";
+          job.error = String(e?.message || e);
+        }
+      });
+      res.status(202).json({ jobId });
+    } catch (error) {
+      console.error("Erro ao iniciar churn risk:", error);
+      res.status(500).json({ message: "Erro ao iniciar análise." });
+    }
+  }
+
+  public async getChurnRiskStatus(req: Request, res: Response) {
+    const jobId = String(req.query.jobId || "");
+    const job = Chamados.churnJobs.get(jobId);
+    if (!job) {
+      res.status(404).json({ message: "Job não encontrado" });
+      return;
+    }
+    const { total, processed, stage, startedAt, result, error } = job;
+    res.json({
+      jobId,
+      total,
+      processed,
+      stage,
+      elapsedMs: Date.now() - startedAt,
+      ...(stage === "done" ? { result } : {}),
+      ...(stage === "error" ? { error } : {}),
+    });
+    if (stage === "done" || stage === "error" || stage === "cancelled") {
+      setTimeout(() => Chamados.churnJobs.delete(jobId), 30 * 60 * 1000);
+    }
+  }
+
+  public async cancelChurnRiskAnalysis(req: Request, res: Response) {
+    const jobId = String(req.query.jobId || "");
+    const job = Chamados.churnJobs.get(jobId);
+    if (!job) {
+      res.status(404).json({ message: "Job não encontrado" });
+      return;
+    }
+    job.cancelRequested = true;
+    res.json({ ok: true });
+  }
+
+  public async getChurnRiskForClient(req: Request, res: Response) {
+    try {
+      const login = String(req.params.login || "").trim();
+      if (!login) {
+        res.status(400).json({ message: "login é obrigatório." });
+        return;
+      }
+      const months = Math.min(Number(req.query.months) || 6, 24);
+
+      const ClientRepo = MkauthSource.getRepository(ClientesEntities);
+      const ChamadoRepo = MkauthSource.getRepository(ChamadosEntities);
+      const MsgRepo = MkauthSource.getRepository(SisMsg);
+
+      const cliente = await ClientRepo.findOne({ where: { login } });
+      if (!cliente) {
+        res.status(404).json({ message: "Cliente não encontrado." });
+        return;
+      }
+
+      const since = new Date();
+      since.setMonth(since.getMonth() - months);
+
+      const chamados = await ChamadoRepo.createQueryBuilder("c")
+        .where("c.login = :login", { login })
+        .andWhere("c.abertura >= :since", { since })
+        .orderBy("c.abertura", "DESC")
+        .limit(20)
+        .getMany();
+
+      const enriched = await Promise.all(
+        chamados.map(async (c) => {
+          const msgs = await MsgRepo.find({
+            where: { chamado: c.chamado },
+            order: { msg_data: "ASC" },
+            take: 5,
+          });
+          return {
+            abertura: c.abertura,
+            assunto: c.assunto,
+            status: c.status,
+            mensagens: msgs.map((m) => m.msg || "").filter(Boolean),
+          };
+        }),
+      );
+
+      const analysis = await analyzeClientChurnRisk(
+        {
+          login,
+          nome: cliente.nome,
+          plano: cliente.plano,
+          cidade: cliente.cidade,
+        },
+        enriched,
+      );
+
+      res.json({
+        login,
+        nome: cliente.nome,
+        cidade: cliente.cidade,
+        plano: cliente.plano,
+        chamadosAnalisados: enriched.length,
+        ...analysis,
+      });
+    } catch (error: any) {
+      console.error("Erro churn por cliente:", error);
+      res.status(500).json({ message: error?.message || "Erro" });
+    }
+  }
+
+  private static async runChurnRiskJob(
+    jobId: string,
+    limit: number,
+    months: number,
+  ) {
+    const job = Chamados.churnJobs.get(jobId);
+    if (!job) return;
+
+    const ClientRepo = MkauthSource.getRepository(ClientesEntities);
+    const ChamadoRepo = MkauthSource.getRepository(ChamadosEntities);
+    const MsgRepo = MkauthSource.getRepository(SisMsg);
+
+    const since = new Date();
+    since.setMonth(since.getMonth() - months);
+
+    const recentChamados = await ChamadoRepo.createQueryBuilder("c")
+      .select("DISTINCT c.login", "login")
+      .where("c.abertura >= :since", { since })
+      .andWhere("c.login IS NOT NULL")
+      .andWhere("c.login != ''")
+      .getRawMany();
+    const logins = recentChamados.map((r) => r.login).filter(Boolean);
+
+    const activeClients = await ClientRepo.createQueryBuilder("cli")
+      .where("cli.cli_ativado = :s", { s: "s" })
+      .andWhere("cli.login IN (:...logins)", { logins })
+      .limit(limit)
+      .getMany();
+
+    job.total = activeClients.length;
+
+    const CONCURRENCY = 3;
+    const results: any[] = [];
+
+    for (let i = 0; i < activeClients.length; i += CONCURRENCY) {
+      if (job.cancelRequested) {
+        job.stage = "cancelled";
+        return;
+      }
+      const batch = activeClients.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.all(
+        batch.map(async (cli) => {
+          const chamados = await ChamadoRepo.createQueryBuilder("c")
+            .where("c.login = :login", { login: cli.login })
+            .andWhere("c.abertura >= :since", { since })
+            .orderBy("c.abertura", "DESC")
+            .limit(15)
+            .getMany();
+          if (chamados.length === 0) return null;
+          const enriched = await Promise.all(
+            chamados.map(async (c) => {
+              const msgs = await MsgRepo.find({
+                where: { chamado: c.chamado },
+                order: { msg_data: "ASC" },
+                take: 5,
+              });
+              return {
+                abertura: c.abertura,
+                assunto: c.assunto,
+                status: c.status,
+                mensagens: msgs.map((m) => m.msg || "").filter(Boolean),
+              };
+            }),
+          );
+          const analysis = await analyzeClientChurnRisk(
+            {
+              login: cli.login,
+              nome: cli.nome,
+              plano: cli.plano,
+              cidade: cli.cidade,
+            },
+            enriched,
+          );
+          return {
+            login: cli.login,
+            nome: cli.nome,
+            cidade: cli.cidade,
+            plano: cli.plano,
+            chamadosAnalisados: enriched.length,
+            ...analysis,
+          };
+        }),
+      );
+      batchResults.forEach((r) => r && results.push(r));
+      job.processed = Math.min(i + CONCURRENCY, activeClients.length);
+    }
+
+    results.sort((a, b) => b.score - a.score);
+    job.result = { total: results.length, items: results };
+    job.stage = "done";
   }
 
   public async cancelAllCancellationAnalysis(_req: Request, res: Response) {

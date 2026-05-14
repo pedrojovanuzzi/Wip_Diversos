@@ -276,6 +276,31 @@ export const GraficoInstalacoes = () => {
   >([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+
+  const [churnLoading, setChurnLoading] = useState(false);
+  const [churnJobId, setChurnJobId] = useState<string | null>(null);
+  const [churnProgress, setChurnProgress] = useState<{
+    processed: number;
+    total: number;
+    elapsedMs: number;
+  } | null>(null);
+  const [churnLimit, setChurnLimit] = useState(100);
+  const [churnMonths, setChurnMonths] = useState(6);
+  const [churnError, setChurnError] = useState<string | null>(null);
+  const [churnResult, setChurnResult] = useState<{
+    total: number;
+    items: {
+      login: string;
+      nome: string;
+      cidade: string;
+      plano: string;
+      score: number;
+      sinais: string[];
+      acao_sugerida: string;
+      justificativa: string;
+      chamadosAnalisados: number;
+    }[];
+  } | null>(null);
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
@@ -393,6 +418,76 @@ export const GraficoInstalacoes = () => {
       ]);
     } finally {
       setChatLoading(false);
+    }
+  };
+
+  const runChurnAnalysis = async () => {
+    setChurnLoading(true);
+    setChurnError(null);
+    setChurnResult(null);
+    setChurnProgress({ processed: 0, total: 0, elapsedMs: 0 });
+    try {
+      const headers = { Authorization: `Bearer ${user?.token}` };
+      const baseUrl = process.env.REACT_APP_URL;
+      const startRes = await axios.post(
+        `${baseUrl}/chamados/analytics/churn-risk/start`,
+        null,
+        {
+          params: { limit: churnLimit, months: churnMonths },
+          headers,
+        },
+      );
+      const jobId = startRes.data.jobId;
+      setChurnJobId(jobId);
+      while (true) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const statusRes = await axios.get(
+          `${baseUrl}/chamados/analytics/churn-risk/status`,
+          { params: { jobId }, headers },
+        );
+        const data = statusRes.data;
+        setChurnProgress({
+          processed: data.processed || 0,
+          total: data.total || 0,
+          elapsedMs: data.elapsedMs || 0,
+        });
+        if (data.stage === "done") {
+          setChurnResult(data.result);
+          break;
+        }
+        if (data.stage === "cancelled") {
+          setChurnError("Análise cancelada.");
+          break;
+        }
+        if (data.stage === "error") {
+          throw new Error(data.error || "Erro na análise");
+        }
+      }
+    } catch (e: any) {
+      setChurnError(
+        e?.response?.data?.message ||
+          e?.message ||
+          "Erro ao analisar churn-risk.",
+      );
+    } finally {
+      setChurnLoading(false);
+      setChurnProgress(null);
+      setChurnJobId(null);
+    }
+  };
+
+  const cancelChurnAnalysis = async () => {
+    if (!churnJobId) return;
+    try {
+      const headers = { Authorization: `Bearer ${user?.token}` };
+      const baseUrl = process.env.REACT_APP_URL;
+      await axios.post(
+        `${baseUrl}/chamados/analytics/churn-risk/cancel`,
+        null,
+        { params: { jobId: churnJobId }, headers },
+      );
+    } catch (e) {
+      console.error("Erro ao cancelar churn:", e);
     }
   };
 
@@ -1862,6 +1957,179 @@ export const GraficoInstalacoes = () => {
                     </div>
                   </details>
                 </>
+              )}
+            </div>
+
+            {/* Clientes em risco de churn (IA) */}
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800">
+                    Clientes em Risco de Churn — IA
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    Analisa clientes ativos com chamados recentes e classifica
+                    o risco de cancelamento.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-600">Últimos</label>
+                  <input
+                    type="number"
+                    value={churnMonths}
+                    onChange={(e) =>
+                      setChurnMonths(
+                        Math.max(1, Math.min(24, Number(e.target.value) || 6)),
+                      )
+                    }
+                    className="w-16 p-1 border border-gray-300 rounded text-sm"
+                  />
+                  <span className="text-xs text-gray-600">meses, máx.</span>
+                  <input
+                    type="number"
+                    value={churnLimit}
+                    onChange={(e) =>
+                      setChurnLimit(
+                        Math.max(
+                          10,
+                          Math.min(2000, Number(e.target.value) || 100),
+                        ),
+                      )
+                    }
+                    className="w-20 p-1 border border-gray-300 rounded text-sm"
+                  />
+                  <span className="text-xs text-gray-600">clientes</span>
+                  <button
+                    onClick={runChurnAnalysis}
+                    disabled={churnLoading}
+                    className="px-4 py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {churnLoading ? (
+                      <>
+                        <AiOutlineLoading3Quarters className="animate-spin" />
+                        Analisando...
+                      </>
+                    ) : (
+                      "Analisar Churn"
+                    )}
+                  </button>
+                  {churnLoading && churnJobId && (
+                    <button
+                      onClick={cancelChurnAnalysis}
+                      className="px-4 py-2 bg-gray-600 text-white rounded font-semibold hover:bg-gray-700"
+                    >
+                      Parar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {churnLoading && churnProgress && (
+                <div className="bg-red-50 border border-red-200 rounded p-3 mb-3">
+                  <div className="flex items-center justify-between text-xs text-gray-700 mb-1">
+                    <span>
+                      Analisando clientes: {churnProgress.processed}/
+                      {churnProgress.total || "?"}
+                    </span>
+                    <span className="text-gray-500">
+                      {Math.floor(churnProgress.elapsedMs / 1000)}s
+                      {churnProgress.total > 0 &&
+                        churnProgress.processed > 0 &&
+                        ` · ETA ${Math.max(
+                          0,
+                          Math.round(
+                            (churnProgress.elapsedMs /
+                              churnProgress.processed) *
+                              (churnProgress.total - churnProgress.processed) /
+                              1000,
+                          ),
+                        )}s`}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded overflow-hidden">
+                    <div
+                      className="h-full bg-red-500 transition-all duration-500"
+                      style={{
+                        width:
+                          churnProgress.total > 0
+                            ? `${Math.round(
+                                (churnProgress.processed /
+                                  churnProgress.total) *
+                                  100,
+                              )}%`
+                            : "5%",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {churnError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded mb-3 text-sm">
+                  {churnError}
+                </div>
+              )}
+
+              {churnResult && churnResult.items.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-600 uppercase text-xs">
+                        <th className="px-2 py-2 text-left">Login</th>
+                        <th className="px-2 py-2 text-left">Nome</th>
+                        <th className="px-2 py-2 text-left">Cidade</th>
+                        <th className="px-2 py-2 text-left">Plano</th>
+                        <th className="px-2 py-2 text-center">Score</th>
+                        <th className="px-2 py-2 text-left">Sinais</th>
+                        <th className="px-2 py-2 text-left">Ação sugerida</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {churnResult.items.map((it) => {
+                        const color =
+                          it.score >= 70
+                            ? "bg-red-100 text-red-800"
+                            : it.score >= 40
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-green-100 text-green-800";
+                        return (
+                          <tr
+                            key={it.login}
+                            className="border-t border-gray-100 hover:bg-gray-50"
+                          >
+                            <td className="px-2 py-2 font-mono text-xs">
+                              {it.login}
+                            </td>
+                            <td className="px-2 py-2">{it.nome}</td>
+                            <td className="px-2 py-2 text-gray-600">
+                              {it.cidade}
+                            </td>
+                            <td className="px-2 py-2 text-gray-600">
+                              {it.plano}
+                            </td>
+                            <td className="px-2 py-2 text-center">
+                              <span
+                                className={`inline-block px-2 py-1 rounded font-bold ${color}`}
+                              >
+                                {it.score}
+                              </span>
+                            </td>
+                            <td className="px-2 py-2 text-xs text-gray-700">
+                              <ul className="list-disc pl-4 space-y-0.5">
+                                {it.sinais.slice(0, 3).map((s, i) => (
+                                  <li key={i}>{s}</li>
+                                ))}
+                              </ul>
+                            </td>
+                            <td className="px-2 py-2 text-xs text-gray-700">
+                              {it.acao_sugerida}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 

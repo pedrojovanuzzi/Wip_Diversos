@@ -67,6 +67,26 @@ router.post(
   AuthGuard,
   Chamados.askCancellationAnalysis,
 );
+router.post(
+  "/analytics/churn-risk/start",
+  AuthGuard,
+  Chamados.startChurnRiskAnalysis,
+);
+router.get(
+  "/analytics/churn-risk/status",
+  AuthGuard,
+  Chamados.getChurnRiskStatus,
+);
+router.post(
+  "/analytics/churn-risk/cancel",
+  AuthGuard,
+  Chamados.cancelChurnRiskAnalysis,
+);
+router.get(
+  "/analytics/churn-risk/client/:login",
+  AuthGuard,
+  Chamados.getChurnRiskForClient,
+);
 router.get("/analytics/ai/status", AuthGuard, Chamados.ollamaStatus);
 
 export default router;

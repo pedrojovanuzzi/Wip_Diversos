@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { ErrorMessage } from "./components/ErrorMessage";
+import { ChurnRiskCard } from "../../components/ChurnRiskCard";
 import { AuthContext, useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -363,6 +364,7 @@ export const ClientAnalytics = () => {
           if (clientinfo) {
             return (
               <div className="bg-white shadow-md m-3 p-4 w-full text-left max-w-2xl">
+                <ChurnRiskCard login={pppoe} />
                 <div className="my-5">
                   {clientlist.some((c) => c.pppoe === pppoe) && (
                     <h1>

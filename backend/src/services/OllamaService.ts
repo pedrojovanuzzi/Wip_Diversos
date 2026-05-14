@@ -198,6 +198,108 @@ export async function ollamaHealth(): Promise<{
   }
 }
 
+export interface ChurnAnalysis {
+  score: number;
+  sinais: string[];
+  acao_sugerida: string;
+  justificativa: string;
+}
+
+export async function analyzeClientChurnRisk(
+  clientInfo: {
+    login: string;
+    nome?: string;
+    plano?: string;
+    cidade?: string;
+  },
+  chamados: {
+    abertura?: Date | string | null;
+    assunto?: string | null;
+    status?: string | null;
+    mensagens: string[];
+  }[],
+): Promise<ChurnAnalysis> {
+  if (chamados.length === 0) {
+    return {
+      score: 0,
+      sinais: [],
+      acao_sugerida: "Sem dados recentes",
+      justificativa: "Cliente sem chamados no período analisado.",
+    };
+  }
+
+  const corpus = chamados
+    .slice(0, 15)
+    .map((c, i) => {
+      const dt =
+        c.abertura instanceof Date
+          ? c.abertura.toISOString().slice(0, 10)
+          : String(c.abertura || "").slice(0, 10);
+      const msgs = c.mensagens
+        .filter(Boolean)
+        .map((m) => m.slice(0, 400))
+        .slice(0, 3)
+        .join(" | ");
+      return `[${i + 1}] ${dt} | ${c.assunto || "?"} | status=${c.status || "?"}\n  msgs: ${msgs}`;
+    })
+    .join("\n");
+
+  const prompt = `Você é um analista de retenção de uma provedora de internet. Avalie o RISCO DE CANCELAMENTO de um cliente com base nos chamados recentes dele.
+
+CLIENTE:
+- login: ${clientInfo.login}
+${clientInfo.nome ? `- nome: ${clientInfo.nome}` : ""}
+${clientInfo.plano ? `- plano: ${clientInfo.plano}` : ""}
+${clientInfo.cidade ? `- cidade: ${clientInfo.cidade}` : ""}
+
+HISTÓRICO DE CHAMADOS RECENTES (${chamados.length}):
+${corpus}
+
+INSTRUÇÕES:
+- Retorne EXCLUSIVAMENTE um JSON válido, sem markdown, sem texto antes/depois.
+- Score 0-100: 0 = nenhum risco, 100 = vai cancelar muito em breve.
+- Sinais altos de risco: reclamações repetidas de qualidade, perguntas sobre rescisão/multa, ameaças, comparações com concorrente, problemas técnicos não resolvidos, irritação crescente.
+- Sinais baixos: chamados rotineiros (instalação, dúvida, fatura), sem reclamação grave.
+- "sinais" é um array curto (3-5 itens) com frases objetivas do que detectou.
+- "acao_sugerida": uma frase curta com a ação que o comercial deve tomar.
+- "justificativa": 1-2 frases resumindo o raciocínio.
+
+Formato exato:
+{"score": 0, "sinais": ["..."], "acao_sugerida": "...", "justificativa": "..."}`;
+
+  try {
+    const res = await axios.post(
+      `${OLLAMA_URL}/api/generate`,
+      {
+        model: OLLAMA_MODEL,
+        prompt,
+        format: "json",
+        stream: false,
+        options: { temperature: 0.2, num_ctx: 4096, num_predict: 500 },
+      },
+      { timeout: 120000 },
+    );
+    const raw = String(res.data?.response || "").trim();
+    const parsed = JSON.parse(raw);
+    return {
+      score: Math.max(0, Math.min(100, Number(parsed.score) || 0)),
+      sinais: Array.isArray(parsed.sinais)
+        ? parsed.sinais.map((s: any) => String(s).slice(0, 200)).slice(0, 8)
+        : [],
+      acao_sugerida: String(parsed.acao_sugerida || "").slice(0, 300),
+      justificativa: String(parsed.justificativa || "").slice(0, 500),
+    };
+  } catch (err: any) {
+    console.error("Churn analysis error:", err?.message || err);
+    return {
+      score: 0,
+      sinais: [],
+      acao_sugerida: "Erro na análise",
+      justificativa: "",
+    };
+  }
+}
+
 export interface ChatTurn {
   role: "user" | "assistant";
   content: string;
