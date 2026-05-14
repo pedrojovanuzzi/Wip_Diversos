@@ -131,6 +131,11 @@ interface ClientesAtivadosResponse {
   overallGrowth: number | null;
 }
 
+interface ClientesMensalResponse {
+  year: number;
+  series: { month: number; total: number | null }[];
+}
+
 interface MonthlyHistoryResponse {
   startYear: number;
   endYear: number;
@@ -230,6 +235,8 @@ export const GraficoInstalacoes = () => {
   const [clientesAtivados, setClientesAtivados] =
     useState<ClientesAtivadosResponse | null>(null);
   const [history, setHistory] = useState<MonthlyHistoryResponse | null>(null);
+  const [clientesMensal, setClientesMensal] =
+    useState<ClientesMensalResponse | null>(null);
   const [breakdown, setBreakdown] = useState<
     { assunto: string; total: number }[] | null
   >(null);
@@ -308,6 +315,16 @@ export const GraficoInstalacoes = () => {
         setHistory(historyRes.data);
       } catch (e) {
         console.error("Erro no histórico mensal:", e);
+      }
+
+      try {
+        const clientesMensalRes = await axios.get<ClientesMensalResponse>(
+          `${baseUrl}/chamados/analytics/clientes/mensal`,
+          { params: { year }, headers },
+        );
+        setClientesMensal(clientesMensalRes.data);
+      } catch (e) {
+        console.error("Erro nos snapshots mensais de clientes:", e);
       }
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
@@ -489,8 +506,16 @@ export const GraficoInstalacoes = () => {
     });
 
     const series = clientesAtivados?.series ?? [];
-    const currentActive = series[series.length - 1]?.total ?? 0;
-    const previousYearEnd = series[series.length - 2]?.total ?? currentActive;
+    const currentEntry = series.find((s) => s.year === year);
+    const previousEntry = series.find((s) => s.year === year - 1);
+    const currentActive =
+      currentEntry?.total ??
+      series[series.length - 1]?.total ??
+      0;
+    const previousYearEnd =
+      previousEntry?.total ??
+      series[series.length - 2]?.total ??
+      currentActive;
 
     const realClientChangeYTD = currentActive - previousYearEnd;
     const operationalNetYTD = inst.realizedYTD - canc.realizedYTD;
@@ -555,14 +580,23 @@ export const GraficoInstalacoes = () => {
           )
         : 0;
 
+    const monthlyRealSnapshots = clientesMensal?.series ?? [];
+
     const clientesChartData = current.map((_row, i) => {
       const isPast = i < cutoff;
       const stepsFromStart = i + 1;
       const accumulatedStd = netStd * Math.sqrt(stepsFromStart);
       const modeloVal = Math.round(projectedActiveByMonth[i]);
+      const snapshot = monthlyRealSnapshots.find((s) => s.month === i + 1);
+      const realValue =
+        snapshot && snapshot.total !== null
+          ? snapshot.total
+          : isPast
+            ? Math.round(realActiveByMonth[i])
+            : null;
       return {
         month: monthShort[i],
-        real: isPast ? Math.round(realActiveByMonth[i]) : null,
+        real: realValue,
         modelo: modeloVal,
         modeloRange: [
           Math.round(modeloVal - accumulatedStd),
@@ -1248,10 +1282,9 @@ export const GraficoInstalacoes = () => {
                       Projeção de Clientes Ativos — {year}
                     </h2>
                     <p className="text-xs text-gray-500">
-                      Linha sólida: clientes reais reconstruídos a partir dos
-                      chamados YTD. Tracejado roxo: o que o modelo previu para
-                      cada mês (para comparação). Tracejado verde: projeção
-                      partindo do total real atual.
+                      Linha sólida: clientes ativos reais (snapshot fim de cada
+                      mês). Tracejado roxo: previsão do modelo. Banda roxa:
+                      ±1σ. Tracejado verde: projeção futura.
                     </p>
                   </div>
                   <div className="flex gap-3">

@@ -968,6 +968,45 @@ class Chamados {
     }
   }
 
+  public async getClientesAtivadosMensal(req: Request, res: Response) {
+    try {
+      const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+      const year = Number(req.query.year) || new Date().getFullYear();
+      const today = new Date();
+      const isCurrentYear = year === today.getFullYear();
+
+      const snapshots = await Promise.all(
+        Array.from({ length: 12 }, async (_, i) => {
+          const monthIdx = i; // 0..11
+          const endOfMonth = new Date(year, monthIdx + 1, 0, 23, 59, 59);
+          const isFuture = endOfMonth > today;
+          if (isFuture) {
+            return { month: monthIdx + 1, total: null as number | null };
+          }
+          const snapshot =
+            isCurrentYear && monthIdx === today.getMonth() ? today : endOfMonth;
+          const row = await ClientRepository.createQueryBuilder("cliente")
+            .select("COUNT(cliente.id)", "total")
+            .where("cliente.data_ins IS NOT NULL")
+            .andWhere("cliente.data_ins <= :snapshot", { snapshot })
+            .andWhere(
+              "(cliente.data_desativacao > :snapshot OR (cliente.data_desativacao IS NULL AND cliente.cli_ativado = 's'))",
+              { snapshot },
+            )
+            .getRawOne();
+          return { month: monthIdx + 1, total: Number(row?.total || 0) };
+        }),
+      );
+
+      res.status(200).json({ year, series: snapshots });
+    } catch (error) {
+      console.error("Erro snapshots mensais de clientes:", error);
+      res
+        .status(500)
+        .json({ message: "Erro ao buscar histórico mensal de clientes." });
+    }
+  }
+
   public async getInstallationMonthlyHistory(req: Request, res: Response) {
     try {
       const MkRepository = MkauthSource.getRepository(ChamadosEntities);
