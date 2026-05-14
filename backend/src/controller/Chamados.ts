@@ -8,6 +8,7 @@ import { SelectQueryBuilder } from "typeorm";
 import {
   analyzeCancellationReason,
   ollamaHealth,
+  summarizeCancellations,
 } from "../services/OllamaService";
 
 type CategoryTotals = {
@@ -973,6 +974,180 @@ class Chamados {
     }
   }
 
+  private static aiJobs: Map<
+    string,
+    {
+      total: number;
+      processed: number;
+      stage: "classifying" | "summarizing" | "done" | "error";
+      startedAt: number;
+      result?: any;
+      error?: string;
+    }
+  > = new Map();
+
+  public async startCancellationAnalysis(req: Request, res: Response) {
+    try {
+      const year = Number(req.query.year) || new Date().getFullYear();
+      const limit = Math.min(Number(req.query.limit) || 200, 1000);
+
+      const jobId = `cancel-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+      Chamados.aiJobs.set(jobId, {
+        total: 0,
+        processed: 0,
+        stage: "classifying",
+        startedAt: Date.now(),
+      });
+
+      Chamados.runCancellationAnalysisJob(jobId, year, limit).catch((e) => {
+        const job = Chamados.aiJobs.get(jobId);
+        if (job) {
+          job.stage = "error";
+          job.error = String(e?.message || e);
+        }
+      });
+
+      res.status(202).json({ jobId });
+    } catch (error) {
+      console.error("Erro ao iniciar análise:", error);
+      res.status(500).json({ message: "Erro ao iniciar análise." });
+    }
+  }
+
+  public async getCancellationAnalysisStatus(req: Request, res: Response) {
+    const jobId = String(req.query.jobId || "");
+    const job = Chamados.aiJobs.get(jobId);
+    if (!job) {
+      res.status(404).json({ message: "Job não encontrado" });
+      return;
+    }
+    const { total, processed, stage, startedAt, result, error } = job;
+    res.json({
+      jobId,
+      total,
+      processed,
+      stage,
+      elapsedMs: Date.now() - startedAt,
+      ...(stage === "done" ? { result } : {}),
+      ...(stage === "error" ? { error } : {}),
+    });
+
+    // cleanup completed jobs after 10 min
+    if (stage === "done" || stage === "error") {
+      setTimeout(
+        () => Chamados.aiJobs.delete(jobId),
+        10 * 60 * 1000,
+      );
+    }
+  }
+
+  private static async runCancellationAnalysisJob(
+    jobId: string,
+    year: number,
+    limit: number,
+  ) {
+    const job = Chamados.aiJobs.get(jobId);
+    if (!job) return;
+
+    const start = new Date(year, 0, 1);
+    const end = new Date(year, 11, 31, 23, 59, 59);
+    const ChamadoRepo = MkauthSource.getRepository(ChamadosEntities);
+    const MsgRepo = MkauthSource.getRepository(SisMsg);
+
+    const chamados = await ChamadoRepo.createQueryBuilder("c")
+      .where("c.abertura BETWEEN :start AND :end", { start, end })
+      .andWhere("c.assunto LIKE :p", { p: "%Cancela%" })
+      .orderBy("c.abertura", "DESC")
+      .limit(limit)
+      .getMany();
+
+    job.total = chamados.length;
+
+    const CONCURRENCY = 4;
+    const results: any[] = [];
+    const rawMessages: string[] = [];
+
+    for (let i = 0; i < chamados.length; i += CONCURRENCY) {
+      const batch = chamados.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.all(
+        batch.map(async (c) => {
+          const msgs = await MsgRepo.find({
+            where: { chamado: c.chamado },
+            order: { msg_data: "ASC" },
+            take: 5,
+          });
+          const text = msgs
+            .map((m) => m.msg)
+            .filter(Boolean)
+            .join("\n---\n");
+          if (!text.trim()) return null;
+          const analysis = await analyzeCancellationReason(text);
+          return {
+            text,
+            record: {
+              id: c.id!,
+              chamado: c.chamado || "",
+              login: c.login || "",
+              abertura: c.abertura,
+              assunto: c.assunto || "",
+              categoria: analysis.categoria,
+              resumo: analysis.resumo,
+            },
+          };
+        }),
+      );
+      batchResults.forEach((r) => {
+        if (r) {
+          results.push(r.record);
+          rawMessages.push(r.text);
+        }
+      });
+      job.processed = Math.min(i + CONCURRENCY, chamados.length);
+    }
+
+    job.stage = "summarizing";
+    const summary = await summarizeCancellations(rawMessages);
+
+    const categories: Record<string, { count: number; samples: string[] }> = {};
+    results.forEach((r) => {
+      if (!categories[r.categoria]) {
+        categories[r.categoria] = { count: 0, samples: [] };
+      }
+      categories[r.categoria].count++;
+      if (
+        categories[r.categoria].samples.length < 8 &&
+        r.resumo &&
+        !categories[r.categoria].samples.includes(r.resumo)
+      ) {
+        categories[r.categoria].samples.push(r.resumo);
+      }
+    });
+
+    const categoryList = Object.entries(categories)
+      .map(([categoria, info]) => ({
+        categoria,
+        count: info.count,
+        percent:
+          results.length > 0
+            ? Number(((info.count / results.length) * 100).toFixed(1))
+            : 0,
+        samples: info.samples,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    job.result = {
+      year,
+      total: results.length,
+      analyzed: chamados.length,
+      summary,
+      categories: categoryList,
+      items: results,
+    };
+    job.stage = "done";
+  }
+
   public async analyzeCancellationReasons(req: Request, res: Response) {
     try {
       const year = Number(req.query.year) || new Date().getFullYear();
@@ -1001,6 +1176,7 @@ class Chamados {
         categoria: string;
         resumo: string;
       }[] = [];
+      const rawMessages: string[] = [];
 
       for (let i = 0; i < chamados.length; i += CONCURRENCY) {
         const batch = chamados.slice(i, i + CONCURRENCY);
@@ -1018,18 +1194,28 @@ class Chamados {
             if (!text.trim()) return null;
             const analysis = await analyzeCancellationReason(text);
             return {
-              id: c.id!,
-              chamado: c.chamado || "",
-              login: c.login || "",
-              abertura: c.abertura,
-              assunto: c.assunto || "",
-              categoria: analysis.categoria,
-              resumo: analysis.resumo,
+              text,
+              record: {
+                id: c.id!,
+                chamado: c.chamado || "",
+                login: c.login || "",
+                abertura: c.abertura,
+                assunto: c.assunto || "",
+                categoria: analysis.categoria,
+                resumo: analysis.resumo,
+              },
             };
           }),
         );
-        batchResults.forEach((r) => r && results.push(r));
+        batchResults.forEach((r) => {
+          if (r) {
+            results.push(r.record);
+            rawMessages.push(r.text);
+          }
+        });
       }
+
+      const summary = await summarizeCancellations(rawMessages);
 
       const categories: Record<
         string,
@@ -1065,6 +1251,7 @@ class Chamados {
         year,
         total: results.length,
         analyzed: chamados.length,
+        summary,
         categories: categoryList,
         items: results,
       });

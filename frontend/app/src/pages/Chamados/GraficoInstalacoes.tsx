@@ -248,6 +248,7 @@ export const GraficoInstalacoes = () => {
     year: number;
     total: number;
     analyzed: number;
+    summary: string;
     categories: {
       categoria: string;
       count: number;
@@ -263,6 +264,12 @@ export const GraficoInstalacoes = () => {
     }[];
   } | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [aiProgress, setAiProgress] = useState<{
+    processed: number;
+    total: number;
+    stage: string;
+    elapsedMs: number;
+  } | null>(null);
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
@@ -290,22 +297,49 @@ export const GraficoInstalacoes = () => {
     setAiLoading(true);
     setAiError(null);
     setAiResult(null);
+    setAiProgress({ processed: 0, total: 0, stage: "starting", elapsedMs: 0 });
     try {
       const headers = { Authorization: `Bearer ${user?.token}` };
       const baseUrl = process.env.REACT_APP_URL;
-      const res = await axios.get(
-        `${baseUrl}/chamados/analytics/cancelamentos/motivos`,
-        { params: { year, limit: aiLimit }, headers, timeout: 1800000 },
+
+      const startRes = await axios.post(
+        `${baseUrl}/chamados/analytics/cancelamentos/motivos/start`,
+        null,
+        { params: { year, limit: aiLimit }, headers },
       );
-      setAiResult(res.data);
+      const jobId = startRes.data.jobId;
+
+      while (true) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const statusRes = await axios.get(
+          `${baseUrl}/chamados/analytics/cancelamentos/motivos/status`,
+          { params: { jobId }, headers },
+        );
+        const data = statusRes.data;
+        setAiProgress({
+          processed: data.processed || 0,
+          total: data.total || 0,
+          stage: data.stage,
+          elapsedMs: data.elapsedMs || 0,
+        });
+        if (data.stage === "done") {
+          setAiResult(data.result);
+          break;
+        }
+        if (data.stage === "error") {
+          throw new Error(data.error || "Erro na análise");
+        }
+      }
     } catch (e: any) {
       console.error(e);
       setAiError(
         e?.response?.data?.message ||
+          e?.message ||
           "Erro ao analisar cancelamentos. Verifique se o Ollama está rodando.",
       );
     } finally {
       setAiLoading(false);
+      setAiProgress(null);
     }
   };
 
@@ -1530,6 +1564,55 @@ export const GraficoInstalacoes = () => {
                 </div>
               </div>
 
+              {aiLoading && aiProgress && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded p-3 mb-3">
+                  <div className="flex items-center justify-between text-xs text-gray-700 mb-1">
+                    <span>
+                      {aiProgress.stage === "starting" &&
+                        "Iniciando análise..."}
+                      {aiProgress.stage === "classifying" &&
+                        `Classificando chamados: ${aiProgress.processed}/${aiProgress.total}`}
+                      {aiProgress.stage === "summarizing" &&
+                        "Gerando diagnóstico geral..."}
+                    </span>
+                    <span className="text-gray-500">
+                      {Math.floor(aiProgress.elapsedMs / 1000)}s
+                      {aiProgress.total > 0 &&
+                        aiProgress.processed > 0 &&
+                        aiProgress.stage === "classifying" &&
+                        ` · ETA ${Math.max(
+                          0,
+                          Math.round(
+                            (aiProgress.elapsedMs / aiProgress.processed) *
+                              (aiProgress.total - aiProgress.processed) /
+                              1000,
+                          ),
+                        )}s`}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${
+                        aiProgress.stage === "summarizing"
+                          ? "bg-purple-500 animate-pulse"
+                          : "bg-indigo-500"
+                      }`}
+                      style={{
+                        width:
+                          aiProgress.stage === "summarizing"
+                            ? "95%"
+                            : aiProgress.total > 0
+                              ? `${Math.round(
+                                  (aiProgress.processed / aiProgress.total) *
+                                    90,
+                                )}%`
+                              : "5%",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
               {aiError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded mb-3 text-sm">
                   {aiError}
@@ -1544,7 +1627,22 @@ export const GraficoInstalacoes = () => {
                     resumo.
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  {aiResult.summary && (
+                    <div className="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded mb-4">
+                      <h3 className="font-bold text-indigo-900 mb-2">
+                        Diagnóstico Geral
+                      </h3>
+                      <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                        {aiResult.summary}
+                      </div>
+                    </div>
+                  )}
+
+                  <details className="mb-4">
+                    <summary className="cursor-pointer text-sm text-indigo-600 hover:underline font-semibold">
+                      Ver distribuição por categoria
+                    </summary>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                     {aiResult.categories.map((cat) => (
                       <div
                         key={cat.categoria}
@@ -1578,7 +1676,8 @@ export const GraficoInstalacoes = () => {
                         )}
                       </div>
                     ))}
-                  </div>
+                    </div>
+                  </details>
 
                   <details className="text-sm">
                     <summary className="cursor-pointer text-indigo-600 hover:underline">

@@ -57,16 +57,88 @@ ${trimmed}
     );
     const raw = (res.data?.response || "").trim();
     const parsed = JSON.parse(raw);
-    const categoria = CATEGORIAS_PADRAO.includes(parsed.categoria)
-      ? parsed.categoria
-      : "Outro";
+    const norm = (s: string) =>
+      String(s || "")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+        .trim();
+    const target = norm(parsed.categoria);
+    const matched = CATEGORIAS_PADRAO.find((c) => norm(c) === target);
+    const fuzzy = matched
+      ? matched
+      : CATEGORIAS_PADRAO.find((c) =>
+          target.includes(norm(c)) || norm(c).includes(target),
+        );
     return {
-      categoria,
+      categoria: fuzzy || "Outro",
       resumo: String(parsed.resumo || "").slice(0, 200),
     };
   } catch (err: any) {
-    console.error("Ollama analyze error:", err?.message || err);
+    const status = err?.response?.status;
+    const body = err?.response?.data;
+    if (status === 404) {
+      console.error(
+        `Ollama 404: modelo "${OLLAMA_MODEL}" não encontrado. ` +
+          `Rode: docker exec -it ollama ollama pull ${OLLAMA_MODEL}`,
+      );
+    } else {
+      console.error(
+        "Ollama analyze error:",
+        err?.message || err,
+        body ? `body=${JSON.stringify(body).slice(0, 200)}` : "",
+      );
+    }
     return { categoria: "Outro", resumo: "" };
+  }
+}
+
+export async function summarizeCancellations(
+  messages: string[],
+): Promise<string> {
+  const cleanMessages = messages
+    .map((m) => (m || "").trim())
+    .filter((m) => m.length > 5)
+    .map((m) => m.slice(0, 500))
+    .slice(0, 60);
+
+  if (cleanMessages.length === 0) return "";
+
+  const corpus = cleanMessages
+    .map((m, i) => `${i + 1}. ${m}`)
+    .join("\n\n");
+
+  const prompt = `Você é um analista de uma provedora de internet brasileira. Abaixo está uma lista de mensagens reais de chamados de cancelamento de clientes.
+
+Sua tarefa: redigir um DIAGNÓSTICO EXECUTIVO em português claro, com no máximo 6 parágrafos curtos. Inclua:
+
+1. Quais são os PRINCIPAIS MOTIVOS de cancelamento (em ordem de frequência aparente).
+2. Padrões recorrentes — palavras, situações, reclamações que se repetem.
+3. Quais cancelamentos parecem ser por falha da empresa (qualidade, atendimento, preço) vs externos (mudança, óbito, deixou de usar).
+4. Sugestões objetivas de ação para reduzir o churn.
+
+Escreva direto, sem listas numeradas, sem markdown, em linguagem corrida. Não cite mensagens individuais — agregue padrões.
+
+MENSAGENS:
+${corpus}
+
+DIAGNÓSTICO:`;
+
+  try {
+    const res = await axios.post(
+      `${OLLAMA_URL}/api/generate`,
+      {
+        model: OLLAMA_MODEL,
+        prompt,
+        stream: false,
+        options: { temperature: 0.4, num_ctx: 8192, num_predict: 800 },
+      },
+      { timeout: 300000 },
+    );
+    return String(res.data?.response || "").trim();
+  } catch (err: any) {
+    console.error("Ollama summarize error:", err?.message || err);
+    return "";
   }
 }
 
