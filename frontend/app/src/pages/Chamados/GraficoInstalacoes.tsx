@@ -734,40 +734,82 @@ export const GraficoInstalacoes = () => {
                 Indicadores de Desempenho — {months[month - 1]}/{year}
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div className="bg-white p-3 rounded-lg shadow-md border-l-4 border-indigo-500">
-                  <p className="text-xs text-gray-500 uppercase">
-                    Crescimento Líquido Mês
-                  </p>
-                  <p
-                    className={`text-xl font-bold ${
-                      data.performance.netGrowth.month >= 0
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {data.performance.netGrowth.month >= 0 ? "+" : ""}
-                    {data.performance.netGrowth.month}
-                  </p>
-                  <p className="text-[10px] text-gray-400">
-                    instalações − cancelamentos
-                  </p>
-                </div>
-                <div className="bg-white p-3 rounded-lg shadow-md border-l-4 border-indigo-500">
-                  <p className="text-xs text-gray-500 uppercase">
-                    Crescimento Líquido Ano
-                  </p>
-                  <p
-                    className={`text-xl font-bold ${
-                      data.performance.netGrowth.year >= 0
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {data.performance.netGrowth.year >= 0 ? "+" : ""}
-                    {data.performance.netGrowth.year}
-                  </p>
-                  <p className="text-[10px] text-gray-400">acumulado anual</p>
-                </div>
+                {(() => {
+                  const monthSeries = clientesMensal?.series ?? [];
+                  const yearEnd = clientesAtivados?.series?.find(
+                    (s) => s.year === year,
+                  )?.total;
+                  const prevYearEnd = clientesAtivados?.series?.find(
+                    (s) => s.year === year - 1,
+                  )?.total;
+
+                  const selectedMonthSnap = monthSeries.find(
+                    (s) => s.month === month,
+                  )?.total;
+                  const previousMonthSnap =
+                    month === 1
+                      ? (prevYearEnd ?? null)
+                      : (monthSeries.find((s) => s.month === month - 1)
+                          ?.total ?? null);
+                  const monthNet =
+                    selectedMonthSnap !== undefined &&
+                    selectedMonthSnap !== null &&
+                    previousMonthSnap !== null
+                      ? selectedMonthSnap - previousMonthSnap
+                      : null;
+
+                  const yearNet =
+                    yearEnd !== undefined && prevYearEnd !== undefined
+                      ? yearEnd - prevYearEnd
+                      : null;
+
+                  return (
+                    <>
+                      <div className="bg-white p-3 rounded-lg shadow-md border-l-4 border-indigo-500">
+                        <p className="text-xs text-gray-500 uppercase">
+                          Crescimento Líquido Mês
+                        </p>
+                        <p
+                          className={`text-xl font-bold ${
+                            monthNet === null
+                              ? "text-gray-400"
+                              : monthNet >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                          }`}
+                        >
+                          {monthNet === null
+                            ? "—"
+                            : `${monthNet >= 0 ? "+" : ""}${monthNet}`}
+                        </p>
+                        <p className="text-[10px] text-gray-400">
+                          clientes ativos (fim do mês)
+                        </p>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg shadow-md border-l-4 border-indigo-500">
+                        <p className="text-xs text-gray-500 uppercase">
+                          Crescimento Líquido Ano
+                        </p>
+                        <p
+                          className={`text-xl font-bold ${
+                            yearNet === null
+                              ? "text-gray-400"
+                              : yearNet >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                          }`}
+                        >
+                          {yearNet === null
+                            ? "—"
+                            : `${yearNet >= 0 ? "+" : ""}${yearNet}`}
+                        </p>
+                        <p className="text-[10px] text-gray-400">
+                          clientes ativos (vs ano anterior)
+                        </p>
+                      </div>
+                    </>
+                  );
+                })()}
                 <div className="bg-white p-3 rounded-lg shadow-md border-l-4 border-green-500">
                   <p className="text-xs text-gray-500 uppercase">
                     Média Instalações/Dia
