@@ -979,12 +979,56 @@ class Chamados {
     {
       total: number;
       processed: number;
-      stage: "classifying" | "summarizing" | "done" | "error";
+      stage:
+        | "classifying"
+        | "summarizing"
+        | "done"
+        | "error"
+        | "cancelled";
       startedAt: number;
+      cancelRequested?: boolean;
       result?: any;
       error?: string;
     }
   > = new Map();
+
+  public async cancelCancellationAnalysis(req: Request, res: Response) {
+    const jobId = String(req.query.jobId || "");
+    const job = Chamados.aiJobs.get(jobId);
+    if (!job) {
+      res.status(404).json({ message: "Job não encontrado" });
+      return;
+    }
+    job.cancelRequested = true;
+    res.json({ ok: true });
+  }
+
+  public async cancelAllCancellationAnalysis(_req: Request, res: Response) {
+    let cancelled = 0;
+    Chamados.aiJobs.forEach((job) => {
+      if (job.stage === "classifying" || job.stage === "summarizing") {
+        job.cancelRequested = true;
+        cancelled++;
+      }
+    });
+    res.json({ cancelled });
+  }
+
+  public async listCancellationAnalysisJobs(
+    _req: Request,
+    res: Response,
+  ) {
+    const jobs = Array.from(Chamados.aiJobs.entries()).map(
+      ([jobId, job]) => ({
+        jobId,
+        stage: job.stage,
+        total: job.total,
+        processed: job.processed,
+        elapsedMs: Date.now() - job.startedAt,
+      }),
+    );
+    res.json({ jobs });
+  }
 
   public async startCancellationAnalysis(req: Request, res: Response) {
     try {
@@ -1105,10 +1149,16 @@ class Chamados {
         }
       });
       job.processed = Math.min(i + CONCURRENCY, chamados.length);
+      if (job.cancelRequested) {
+        job.stage = "cancelled";
+        return;
+      }
     }
 
-    job.stage = "summarizing";
-    const summary = await summarizeCancellations(rawMessages);
+    if (job.cancelRequested) {
+      job.stage = "cancelled";
+      return;
+    }
 
     const categories: Record<string, { count: number; samples: string[] }> = {};
     results.forEach((r) => {
@@ -1136,6 +1186,9 @@ class Chamados {
         samples: info.samples,
       }))
       .sort((a, b) => b.count - a.count);
+
+    job.stage = "summarizing";
+    const summary = await summarizeCancellations(categoryList, results.length);
 
     job.result = {
       year,
@@ -1176,7 +1229,6 @@ class Chamados {
         categoria: string;
         resumo: string;
       }[] = [];
-      const rawMessages: string[] = [];
 
       for (let i = 0; i < chamados.length; i += CONCURRENCY) {
         const batch = chamados.slice(i, i + CONCURRENCY);
@@ -1194,28 +1246,18 @@ class Chamados {
             if (!text.trim()) return null;
             const analysis = await analyzeCancellationReason(text);
             return {
-              text,
-              record: {
-                id: c.id!,
-                chamado: c.chamado || "",
-                login: c.login || "",
-                abertura: c.abertura,
-                assunto: c.assunto || "",
-                categoria: analysis.categoria,
-                resumo: analysis.resumo,
-              },
+              id: c.id!,
+              chamado: c.chamado || "",
+              login: c.login || "",
+              abertura: c.abertura,
+              assunto: c.assunto || "",
+              categoria: analysis.categoria,
+              resumo: analysis.resumo,
             };
           }),
         );
-        batchResults.forEach((r) => {
-          if (r) {
-            results.push(r.record);
-            rawMessages.push(r.text);
-          }
-        });
+        batchResults.forEach((r) => r && results.push(r));
       }
-
-      const summary = await summarizeCancellations(rawMessages);
 
       const categories: Record<
         string,
@@ -1246,6 +1288,11 @@ class Chamados {
           samples: info.samples,
         }))
         .sort((a, b) => b.count - a.count);
+
+      const summary = await summarizeCancellations(
+        categoryList,
+        results.length,
+      );
 
       res.status(200).json({
         year,

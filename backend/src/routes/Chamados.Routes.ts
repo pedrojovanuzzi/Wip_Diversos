@@ -57,6 +57,11 @@ router.get(
   AuthGuard,
   Chamados.getCancellationAnalysisStatus,
 );
+router.post(
+  "/analytics/cancelamentos/motivos/cancel",
+  AuthGuard,
+  Chamados.cancelCancellationAnalysis,
+);
 router.get("/analytics/ai/status", AuthGuard, Chamados.ollamaStatus);
 
 export default router;

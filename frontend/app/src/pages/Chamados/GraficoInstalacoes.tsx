@@ -270,6 +270,7 @@ export const GraficoInstalacoes = () => {
     stage: string;
     elapsedMs: number;
   } | null>(null);
+  const [aiJobId, setAiJobId] = useState<string | null>(null);
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
@@ -308,6 +309,7 @@ export const GraficoInstalacoes = () => {
         { params: { year, limit: aiLimit }, headers },
       );
       const jobId = startRes.data.jobId;
+      setAiJobId(jobId);
 
       while (true) {
         await new Promise((r) => setTimeout(r, 1500));
@@ -326,6 +328,10 @@ export const GraficoInstalacoes = () => {
           setAiResult(data.result);
           break;
         }
+        if (data.stage === "cancelled") {
+          setAiError("Análise cancelada pelo usuário.");
+          break;
+        }
         if (data.stage === "error") {
           throw new Error(data.error || "Erro na análise");
         }
@@ -340,6 +346,22 @@ export const GraficoInstalacoes = () => {
     } finally {
       setAiLoading(false);
       setAiProgress(null);
+      setAiJobId(null);
+    }
+  };
+
+  const cancelAiAnalysis = async () => {
+    if (!aiJobId) return;
+    try {
+      const headers = { Authorization: `Bearer ${user?.token}` };
+      const baseUrl = process.env.REACT_APP_URL;
+      await axios.post(
+        `${baseUrl}/chamados/analytics/cancelamentos/motivos/cancel`,
+        null,
+        { params: { jobId: aiJobId }, headers },
+      );
+    } catch (e) {
+      console.error("Erro ao cancelar análise:", e);
     }
   };
 
@@ -1561,6 +1583,14 @@ export const GraficoInstalacoes = () => {
                       "Analisar com IA"
                     )}
                   </button>
+                  {aiLoading && aiJobId && (
+                    <button
+                      onClick={cancelAiAnalysis}
+                      className="px-4 py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700"
+                    >
+                      Parar
+                    </button>
+                  )}
                 </div>
               </div>
 

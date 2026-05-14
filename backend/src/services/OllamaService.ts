@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5:1.5b";
 
 export interface CancellationAnalysis {
   categoria: string;
@@ -67,8 +67,8 @@ ${trimmed}
     const matched = CATEGORIAS_PADRAO.find((c) => norm(c) === target);
     const fuzzy = matched
       ? matched
-      : CATEGORIAS_PADRAO.find((c) =>
-          target.includes(norm(c)) || norm(c).includes(target),
+      : CATEGORIAS_PADRAO.find(
+          (c) => target.includes(norm(c)) || norm(c).includes(target),
         );
     return {
       categoria: fuzzy || "Outro",
@@ -93,34 +93,72 @@ ${trimmed}
   }
 }
 
+export interface CategorySummaryInput {
+  categoria: string;
+  count: number;
+  percent: number;
+  samples: string[];
+}
+
+const INTERNAL_CATEGORIES = new Set([
+  "Preço",
+  "Qualidade do sinal",
+  "Atendimento",
+]);
+
+const EXTERNAL_CATEGORIES = new Set([
+  "Mudança de endereço",
+  "Foi para concorrente",
+  "Falta de pagamento",
+  "Não usa mais internet",
+  "Cliente faleceu",
+]);
+
 export async function summarizeCancellations(
-  messages: string[],
+  categories: CategorySummaryInput[],
+  totalAnalyzed: number,
 ): Promise<string> {
-  const cleanMessages = messages
-    .map((m) => (m || "").trim())
-    .filter((m) => m.length > 5)
-    .map((m) => m.slice(0, 500))
-    .slice(0, 60);
+  if (categories.length === 0 || totalAnalyzed === 0) return "";
 
-  if (cleanMessages.length === 0) return "";
+  const sorted = [...categories].sort((a, b) => b.count - a.count);
 
-  const corpus = cleanMessages
-    .map((m, i) => `${i + 1}. ${m}`)
-    .join("\n\n");
+  const internalCount = sorted
+    .filter((c) => INTERNAL_CATEGORIES.has(c.categoria))
+    .reduce((a, c) => a + c.count, 0);
+  const externalCount = sorted
+    .filter((c) => EXTERNAL_CATEGORIES.has(c.categoria))
+    .reduce((a, c) => a + c.count, 0);
+  const internalPct = Math.round((internalCount / totalAnalyzed) * 100);
+  const externalPct = Math.round((externalCount / totalAnalyzed) * 100);
 
-  const prompt = `Você é um analista de uma provedora de internet brasileira. Abaixo está uma lista de mensagens reais de chamados de cancelamento de clientes.
+  const breakdown = sorted
+    .map((c) => {
+      const samples = c.samples
+        .slice(0, 4)
+        .map((s) => `   - "${s}"`)
+        .join("\n");
+      return `- ${c.categoria}: ${c.count} casos (${c.percent}%)\n${samples}`;
+    })
+    .join("\n");
 
-Sua tarefa: redigir um DIAGNÓSTICO EXECUTIVO em português claro, com no máximo 6 parágrafos curtos. Inclua:
+  const prompt = `Você é um analista de churn de uma provedora de internet. Os dados abaixo já foram classificados — sua tarefa é APENAS narrar esses números, sem inventar nada.
 
-1. Quais são os PRINCIPAIS MOTIVOS de cancelamento (em ordem de frequência aparente).
-2. Padrões recorrentes — palavras, situações, reclamações que se repetem.
-3. Quais cancelamentos parecem ser por falha da empresa (qualidade, atendimento, preço) vs externos (mudança, óbito, deixou de usar).
-4. Sugestões objetivas de ação para reduzir o churn.
+DADOS REAIS:
+Total analisado: ${totalAnalyzed} chamados de cancelamento
+Por falha interna (Preço/Qualidade/Atendimento): ${internalCount} (${internalPct}%)
+Por causa externa (Mudança/Concorrente/Não-pagamento/Não-usa/Faleceu): ${externalCount} (${externalPct}%)
 
-Escreva direto, sem listas numeradas, sem markdown, em linguagem corrida. Não cite mensagens individuais — agregue padrões.
+Distribuição por motivo (em ordem de frequência):
+${breakdown}
 
-MENSAGENS:
-${corpus}
+INSTRUÇÕES:
+- Escreva 3 a 5 parágrafos curtos em português corrido, sem listas, sem markdown, sem títulos.
+- Use SOMENTE os números acima. NÃO invente percentuais diferentes.
+- Comece descrevendo o motivo dominante (o mais frequente).
+- Depois comente os 2-3 motivos seguintes em importância.
+- Cite a divisão interna vs externo usando EXATAMENTE os percentuais acima.
+- Termine com 2-3 sugestões concretas de ação focadas nos motivos dominantes encontrados.
+- Não generalize categorias raras como se fossem maioria.
 
 DIAGNÓSTICO:`;
 
@@ -131,7 +169,7 @@ DIAGNÓSTICO:`;
         model: OLLAMA_MODEL,
         prompt,
         stream: false,
-        options: { temperature: 0.4, num_ctx: 8192, num_predict: 800 },
+        options: { temperature: 0.3, num_ctx: 4096, num_predict: 700 },
       },
       { timeout: 300000 },
     );
@@ -157,5 +195,64 @@ export async function ollamaHealth(): Promise<{
     };
   } catch {
     return { ok: false, model: OLLAMA_MODEL, modelsAvailable: [] };
+  }
+}
+
+export async function ensureOllamaModel(): Promise<void> {
+  const target = OLLAMA_MODEL;
+  try {
+    const tags = await axios.get(`${OLLAMA_URL}/api/tags`, { timeout: 5000 });
+    const available: string[] = (tags.data?.models || []).map(
+      (m: any) => m.name,
+    );
+    const isPresent = available.some(
+      (n) => n === target || n.startsWith(`${target}:`),
+    );
+    if (isPresent) {
+      console.log(`[Ollama] modelo "${target}" já disponível.`);
+      return;
+    }
+
+    console.log(`[Ollama] baixando modelo "${target}"... (pode levar minutos)`);
+    const res = await axios.post(
+      `${OLLAMA_URL}/api/pull`,
+      { model: target, stream: true },
+      { responseType: "stream", timeout: 0 },
+    );
+
+    await new Promise<void>((resolve, reject) => {
+      let lastPct = -1;
+      res.data.on("data", (chunk: Buffer) => {
+        const lines = chunk.toString().split("\n").filter(Boolean);
+        for (const line of lines) {
+          try {
+            const ev = JSON.parse(line);
+            if (ev.total && ev.completed) {
+              const pct = Math.floor((ev.completed / ev.total) * 100);
+              if (pct !== lastPct && pct % 10 === 0) {
+                console.log(
+                  `[Ollama] ${ev.status || "pulling"}: ${pct}%`,
+                );
+                lastPct = pct;
+              }
+            } else if (ev.status) {
+              console.log(`[Ollama] ${ev.status}`);
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+      });
+      res.data.on("end", () => {
+        console.log(`[Ollama] modelo "${target}" pronto.`);
+        resolve();
+      });
+      res.data.on("error", reject);
+    });
+  } catch (err: any) {
+    console.error(
+      `[Ollama] falha ao garantir modelo "${target}":`,
+      err?.message || err,
+    );
   }
 }
