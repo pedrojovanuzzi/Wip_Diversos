@@ -2,7 +2,7 @@ import axios from "axios";
 import MkauthSource from "../database/MkauthSource";
 
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5:1.5b";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5:7b";
 const OLLAMA_MODEL_SQL = process.env.OLLAMA_MODEL_SQL || "qwen2.5-coder:7b";
 
 const ALLOWED_TABLES = new Set([
