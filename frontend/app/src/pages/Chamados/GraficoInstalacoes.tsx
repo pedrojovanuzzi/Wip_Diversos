@@ -228,6 +228,10 @@ export const GraficoInstalacoes = () => {
   const [clientesAtivados, setClientesAtivados] =
     useState<ClientesAtivadosResponse | null>(null);
   const [agentStats, setAgentStats] = useState<AgentStat[]>([]);
+  const [breakdown, setBreakdown] = useState<
+    { assunto: string; total: number }[] | null
+  >(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
@@ -287,6 +291,18 @@ export const GraficoInstalacoes = () => {
       setYearly(yearlyRes.data);
       setAgentStats(agentRes.data);
       setClientesAtivados(clientesRes.data);
+
+      try {
+        const breakdownRes = await axios.get<{
+          breakdown: { assunto: string; total: number }[];
+        }>(
+          `${baseUrl}/chamados/analytics/instalacoes/diagnostico`,
+          { params: { year }, headers },
+        );
+        setBreakdown(breakdownRes.data.breakdown);
+      } catch (e) {
+        console.error("Erro no diagnóstico de assuntos:", e);
+      }
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
       alert("Erro ao carregar gráficos.");
@@ -382,9 +398,21 @@ export const GraficoInstalacoes = () => {
       };
     });
 
-    const currentActive =
-      clientesAtivados?.series?.[clientesAtivados.series.length - 1]?.total ??
-      0;
+    const series = clientesAtivados?.series ?? [];
+    const currentActive = series[series.length - 1]?.total ?? 0;
+    const previousYearEnd = series[series.length - 2]?.total ?? currentActive;
+
+    const realClientChangeYTD = currentActive - previousYearEnd;
+    const operationalNetYTD = inst.realizedYTD - canc.realizedYTD;
+
+    const conversionRatio =
+      operationalNetYTD !== 0
+        ? realClientChangeYTD / operationalNetYTD
+        : null;
+
+    const operationalRemainingNets = current.map(
+      (_row, i) => (inst.remaining[i] || 0) - (canc.remaining[i] || 0),
+    );
 
     let running = currentActive;
     const clientesChartData = current.map((_row, i) => {
@@ -396,8 +424,14 @@ export const GraficoInstalacoes = () => {
           previsto: i === cutoff - 1 ? currentActive : null,
         };
       }
-      const netMonth = (inst.remaining[i] || 0) - (canc.remaining[i] || 0);
-      running += netMonth;
+      const opNet = operationalRemainingNets[i];
+      const clientDelta =
+        conversionRatio !== null
+          ? Math.round(opNet * conversionRatio)
+          : Math.round(
+              cutoff > 0 ? (realClientChangeYTD / cutoff) : 0,
+            );
+      running += clientDelta;
       return {
         month: monthShort[i],
         atual: null,
@@ -405,7 +439,7 @@ export const GraficoInstalacoes = () => {
       };
     });
 
-    const projectedNet = inst.projectedRemaining - canc.projectedRemaining;
+    const projectedNet = running - currentActive;
 
     return {
       cutoffMonth: cutoff,
@@ -834,6 +868,71 @@ export const GraficoInstalacoes = () => {
                     />
                   </LineChart>
                 </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Diagnóstico: distintos assuntos contados como Instalação */}
+            {breakdown && breakdown.length > 0 && (
+              <div className="bg-white p-6 rounded-lg shadow-md">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800">
+                      Diagnóstico — Assuntos contados como "Instalação" ({year}
+                      )
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      Total: {breakdown.reduce((a, r) => a + r.total, 0)}{" "}
+                      chamados. Verifique se algum tipo não deveria estar sendo
+                      contado.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowBreakdown((s) => !s)}
+                    className="text-sm text-indigo-600 hover:underline"
+                  >
+                    {showBreakdown ? "Ocultar" : "Mostrar"} detalhes
+                  </button>
+                </div>
+                {showBreakdown && (
+                  <div className="overflow-x-auto mt-2">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-600 uppercase text-xs">
+                          <th className="px-3 py-2 text-left">Assunto</th>
+                          <th className="px-3 py-2 text-right">Qtd</th>
+                          <th className="px-3 py-2 text-right">%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const total = breakdown.reduce(
+                            (a, r) => a + r.total,
+                            0,
+                          );
+                          return breakdown.map((row) => (
+                            <tr
+                              key={row.assunto}
+                              className="border-t border-gray-100"
+                            >
+                              <td className="px-3 py-2 text-gray-800">
+                                {row.assunto}
+                              </td>
+                              <td className="px-3 py-2 text-right font-semibold">
+                                {row.total}
+                              </td>
+                              <td className="px-3 py-2 text-right text-gray-500">
+                                {total > 0
+                                  ? ((row.total / total) * 100).toFixed(1)
+                                  : "0"}
+                                %
+                              </td>
+                            </tr>
+                          ));
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 

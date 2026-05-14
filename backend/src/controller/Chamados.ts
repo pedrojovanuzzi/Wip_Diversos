@@ -57,7 +57,7 @@ const addCategorySums = (
 ): SelectQueryBuilder<ChamadosEntities> =>
   qb
     .addSelect(
-      "SUM(CASE WHEN chamado.assunto LIKE '%Instala%' AND chamado.assunto NOT LIKE '%INSTALACAO INTERNA DO CLIENTE%' AND chamado.assunto NOT LIKE '%INSTALACAO TEMPORARIA%' AND chamado.assunto NOT LIKE '%INSTALACAO WIFI ESTENDIDO%' THEN 1 ELSE 0 END)",
+      "SUM(CASE WHEN chamado.assunto LIKE '%Instala%' AND chamado.assunto NOT LIKE '%INSTALACAO INTERNA DO CLIENTE%' AND chamado.assunto NOT LIKE '%INSTALACAO TEMPORARIA%' AND chamado.assunto NOT LIKE '%INSTALACAO WIFI ESTENDIDO%' AND chamado.assunto NOT LIKE '%NAO HA POSSIBILIDADE DE INSTALACAO/CANCELAMENTO%' AND chamado.assunto NOT LIKE '%INSTALACAO DECO%' AND chamado.assunto NOT LIKE '%INSTALACAO FEIRA DA LUA%' THEN 1 ELSE 0 END)",
       "instalacao",
     )
     .addSelect(
@@ -965,6 +965,59 @@ class Chamados {
       res
         .status(500)
         .json({ message: "Erro ao buscar estatísticas por atendente." });
+    }
+  }
+
+  public async getInstallationAssuntosBreakdown(
+    req: Request,
+    res: Response,
+  ) {
+    try {
+      const MkRepository = MkauthSource.getRepository(ChamadosEntities);
+      const year = Number(req.query.year) || new Date().getFullYear();
+      const firstDay = new Date(year, 0, 1);
+      const lastDay = new Date(year, 11, 31, 23, 59, 59);
+
+      const rows = await MkRepository.createQueryBuilder("chamado")
+        .select("chamado.assunto", "assunto")
+        .addSelect("COUNT(chamado.id)", "total")
+        .where("chamado.abertura BETWEEN :start AND :end", {
+          start: firstDay,
+          end: lastDay,
+        })
+        .andWhere("chamado.assunto LIKE :p", { p: "%Instala%" })
+        .andWhere("chamado.assunto NOT LIKE :e1", {
+          e1: "%INSTALACAO INTERNA DO CLIENTE%",
+        })
+        .andWhere("chamado.assunto NOT LIKE :e2", {
+          e2: "%INSTALACAO TEMPORARIA%",
+        })
+        .andWhere("chamado.assunto NOT LIKE :e3", {
+          e3: "%INSTALACAO WIFI ESTENDIDO%",
+        })
+        .andWhere("chamado.assunto NOT LIKE :e4", {
+          e4: "%NAO HA POSSIBILIDADE DE INSTALACAO/CANCELAMENTO%",
+        })
+        .andWhere("chamado.assunto NOT LIKE :e5", {
+          e5: "%INSTALACAO DECO%",
+        })
+        .andWhere("chamado.assunto NOT LIKE :e6", {
+          e6: "%INSTALACAO FEIRA DA LUA%",
+        })
+        .groupBy("chamado.assunto")
+        .orderBy("total", "DESC")
+        .getRawMany();
+
+      const breakdown = rows.map((r) => ({
+        assunto: r.assunto,
+        total: Number(r.total),
+      }));
+      const totalCount = breakdown.reduce((acc, r) => acc + r.total, 0);
+
+      res.status(200).json({ year, totalCount, breakdown });
+    } catch (error) {
+      console.error("Erro breakdown instalações:", error);
+      res.status(500).json({ message: "Erro ao gerar diagnóstico." });
     }
   }
 }

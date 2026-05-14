@@ -27,5 +27,10 @@ router.get(
   AuthGuard,
   Chamados.getClientesAtivadosComparison,
 );
+router.get(
+  "/analytics/instalacoes/diagnostico",
+  AuthGuard,
+  Chamados.getInstallationAssuntosBreakdown,
+);
 
 export default router;
