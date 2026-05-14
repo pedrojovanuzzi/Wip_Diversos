@@ -27,6 +27,7 @@ import { OnuHome } from "./pages/onu/OnuHome";
 import { AutorizarOnu } from "./pages/onu/AutorizarOnu";
 import { DesautorizaOnu } from "./pages/onu/DesautorizaOnu";
 import { useAuth } from "./context/AuthContext";
+import { DbChatWidget } from "./components/DbChatWidget";
 import { OnuSettings } from "./pages/onu/OnuSettings";
 import { LogsClient } from "./pages/ClientAnalytics/LogsClient";
 import { Create } from "./pages/create_users/Create";
@@ -618,6 +619,7 @@ function App() {
           )}
         </Routes>
       </div>
+      <DbChatWidget />
     </BrowserRouter>
   );
 }

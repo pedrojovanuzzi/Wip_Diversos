@@ -271,6 +271,11 @@ export const GraficoInstalacoes = () => {
     elapsedMs: number;
   } | null>(null);
   const [aiJobId, setAiJobId] = useState<string | null>(null);
+  const [chatHistory, setChatHistory] = useState<
+    { role: "user" | "assistant"; content: string }[]
+  >([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
@@ -298,6 +303,7 @@ export const GraficoInstalacoes = () => {
     setAiLoading(true);
     setAiError(null);
     setAiResult(null);
+    setChatHistory([]);
     setAiProgress({ processed: 0, total: 0, stage: "starting", elapsedMs: 0 });
     try {
       const headers = { Authorization: `Bearer ${user?.token}` };
@@ -346,7 +352,47 @@ export const GraficoInstalacoes = () => {
     } finally {
       setAiLoading(false);
       setAiProgress(null);
-      setAiJobId(null);
+    }
+  };
+
+  const sendChatQuestion = async () => {
+    const question = chatInput.trim();
+    if (!question || !aiJobId || chatLoading) return;
+    const newHistory = [
+      ...chatHistory,
+      { role: "user" as const, content: question },
+    ];
+    setChatHistory(newHistory);
+    setChatInput("");
+    setChatLoading(true);
+    try {
+      const headers = { Authorization: `Bearer ${user?.token}` };
+      const baseUrl = process.env.REACT_APP_URL;
+      const res = await axios.post(
+        `${baseUrl}/chamados/analytics/cancelamentos/motivos/ask`,
+        {
+          jobId: aiJobId,
+          question,
+          history: chatHistory,
+        },
+        { headers, timeout: 300000 },
+      );
+      setChatHistory([
+        ...newHistory,
+        { role: "assistant", content: res.data.answer || "(sem resposta)" },
+      ]);
+    } catch (e: any) {
+      setChatHistory([
+        ...newHistory,
+        {
+          role: "assistant",
+          content:
+            "Erro ao consultar a IA. " +
+            (e?.response?.data?.message || e?.message || ""),
+        },
+      ]);
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -1664,6 +1710,71 @@ export const GraficoInstalacoes = () => {
                       </h3>
                       <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
                         {aiResult.summary}
+                      </div>
+                    </div>
+                  )}
+
+                  {aiJobId && (
+                    <div className="border border-gray-200 rounded p-4 mb-4 bg-white">
+                      <h3 className="font-bold text-gray-800 mb-2">
+                        Perguntar à IA sobre esta análise
+                      </h3>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Faça perguntas em cima dos dados acima — ex.: "quantos
+                        cancelaram por mudança?", "tem cliente com reclamação
+                        de preço?", "qual é o padrão de fim de semana?".
+                      </p>
+
+                      {chatHistory.length > 0 && (
+                        <div className="max-h-80 overflow-y-auto space-y-2 mb-3 border border-gray-100 rounded p-2 bg-gray-50">
+                          {chatHistory.map((m, i) => (
+                            <div
+                              key={i}
+                              className={`text-sm p-2 rounded ${
+                                m.role === "user"
+                                  ? "bg-indigo-100 text-indigo-900"
+                                  : "bg-white border border-gray-200 text-gray-800"
+                              }`}
+                            >
+                              <div className="text-[10px] uppercase font-bold mb-1 opacity-60">
+                                {m.role === "user" ? "Você" : "IA"}
+                              </div>
+                              <div className="whitespace-pre-wrap">
+                                {m.content}
+                              </div>
+                            </div>
+                          ))}
+                          {chatLoading && (
+                            <div className="text-xs text-gray-500 italic flex items-center gap-2 p-2">
+                              <AiOutlineLoading3Quarters className="animate-spin" />
+                              Pensando...
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              sendChatQuestion();
+                            }
+                          }}
+                          disabled={chatLoading}
+                          placeholder="Digite sua pergunta..."
+                          className="flex-1 p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <button
+                          onClick={sendChatQuestion}
+                          disabled={chatLoading || !chatInput.trim()}
+                          className="px-4 py-2 bg-indigo-600 text-white rounded text-sm font-semibold hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                          Enviar
+                        </button>
                       </div>
                     </div>
                   )}

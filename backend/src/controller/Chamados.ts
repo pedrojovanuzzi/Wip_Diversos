@@ -7,6 +7,7 @@ import { SisMsg } from "../entities/SisMsg";
 import { SelectQueryBuilder } from "typeorm";
 import {
   analyzeCancellationReason,
+  askAboutCancellations,
   ollamaHealth,
   summarizeCancellations,
 } from "../services/OllamaService";
@@ -1001,6 +1002,47 @@ class Chamados {
     }
     job.cancelRequested = true;
     res.json({ ok: true });
+  }
+
+  public async askCancellationAnalysis(req: Request, res: Response) {
+    try {
+      const { jobId, question, history } = req.body as {
+        jobId?: string;
+        question?: string;
+        history?: { role: "user" | "assistant"; content: string }[];
+      };
+
+      if (!jobId || !question?.trim()) {
+        res
+          .status(400)
+          .json({ message: "jobId e question são obrigatórios." });
+        return;
+      }
+
+      const job = Chamados.aiJobs.get(jobId);
+      if (!job || job.stage !== "done" || !job.result) {
+        res
+          .status(404)
+          .json({ message: "Análise não encontrada ou não concluída." });
+        return;
+      }
+
+      const answer = await askAboutCancellations(
+        {
+          summary: job.result.summary,
+          categories: job.result.categories,
+          totalAnalyzed: job.result.total,
+          items: job.result.items,
+        },
+        history || [],
+        question.trim(),
+      );
+
+      res.json({ answer });
+    } catch (error) {
+      console.error("Erro ao consultar IA:", error);
+      res.status(500).json({ message: "Erro ao consultar IA." });
+    }
   }
 
   public async cancelAllCancellationAnalysis(_req: Request, res: Response) {

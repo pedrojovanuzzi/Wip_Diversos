@@ -198,8 +198,83 @@ export async function ollamaHealth(): Promise<{
   }
 }
 
-export async function ensureOllamaModel(): Promise<void> {
-  const target = OLLAMA_MODEL;
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export async function askAboutCancellations(
+  context: {
+    summary: string;
+    categories: CategorySummaryInput[];
+    totalAnalyzed: number;
+    items: { login: string; categoria: string; resumo: string }[];
+  },
+  history: ChatTurn[],
+  question: string,
+): Promise<string> {
+  const sorted = [...context.categories].sort((a, b) => b.count - a.count);
+  const breakdown = sorted
+    .map(
+      (c) =>
+        `- ${c.categoria}: ${c.count} casos (${c.percent}%)` +
+        (c.samples.length
+          ? "\n" + c.samples.slice(0, 3).map((s) => `   • "${s}"`).join("\n")
+          : ""),
+    )
+    .join("\n");
+
+  const sampleItems = context.items
+    .slice(0, 30)
+    .map((i) => `[${i.categoria}] ${i.login}: ${i.resumo}`)
+    .join("\n");
+
+  const messages: { role: "system" | "user" | "assistant"; content: string }[] =
+    [
+      {
+        role: "system",
+        content: `Você é um analista de churn de uma provedora de internet. Responda perguntas do usuário SOMENTE com base no contexto abaixo. Se a pergunta não puder ser respondida com esses dados, diga claramente que não tem informação suficiente. Seja conciso (máximo 3 parágrafos), em português, sem markdown.
+
+CONTEXTO:
+Total analisado: ${context.totalAnalyzed} chamados de cancelamento.
+
+Diagnóstico geral já produzido:
+"""
+${context.summary || "(diagnóstico não disponível)"}
+"""
+
+Distribuição por motivo:
+${breakdown}
+
+Amostra de chamados individuais (até 30):
+${sampleItems}`,
+      },
+      ...history.map((t) => ({
+        role: t.role as "user" | "assistant",
+        content: t.content,
+      })),
+      { role: "user", content: question },
+    ];
+
+  try {
+    const res = await axios.post(
+      `${OLLAMA_URL}/api/chat`,
+      {
+        model: OLLAMA_MODEL,
+        messages,
+        stream: false,
+        options: { temperature: 0.3, num_ctx: 8192, num_predict: 600 },
+      },
+      { timeout: 180000 },
+    );
+    return String(res.data?.message?.content || "").trim();
+  } catch (err: any) {
+    console.error("Ollama chat error:", err?.message || err);
+    return "Erro ao consultar o modelo. Verifique se o Ollama está rodando.";
+  }
+}
+
+async function pullSingleModel(target: string): Promise<void> {
   try {
     const tags = await axios.get(`${OLLAMA_URL}/api/tags`, { timeout: 5000 });
     const available: string[] = (tags.data?.models || []).map(
@@ -231,12 +306,12 @@ export async function ensureOllamaModel(): Promise<void> {
               const pct = Math.floor((ev.completed / ev.total) * 100);
               if (pct !== lastPct && pct % 10 === 0) {
                 console.log(
-                  `[Ollama] ${ev.status || "pulling"}: ${pct}%`,
+                  `[Ollama] ${target} ${ev.status || "pulling"}: ${pct}%`,
                 );
                 lastPct = pct;
               }
             } else if (ev.status) {
-              console.log(`[Ollama] ${ev.status}`);
+              console.log(`[Ollama] ${target} ${ev.status}`);
             }
           } catch {
             /* ignore */
@@ -254,5 +329,17 @@ export async function ensureOllamaModel(): Promise<void> {
       `[Ollama] falha ao garantir modelo "${target}":`,
       err?.message || err,
     );
+  }
+}
+
+export async function ensureOllamaModel(): Promise<void> {
+  const sqlModel = process.env.OLLAMA_MODEL_SQL || "qwen2.5-coder:7b";
+  const targets = new Set<string>([OLLAMA_MODEL]);
+  if (sqlModel && sqlModel !== OLLAMA_MODEL) targets.add(sqlModel);
+  console.log(
+    `[Ollama] modelos a garantir: ${Array.from(targets).join(", ")}`,
+  );
+  for (const t of targets) {
+    await pullSingleModel(t);
   }
 }
