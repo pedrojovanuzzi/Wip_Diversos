@@ -171,8 +171,9 @@ Retorne APENAS o SQL puro, sem markdown, sem explicação, sem comentários. Ape
       prompt,
       stream: false,
       options: { temperature: 0.1, num_ctx: 4096, num_predict: 400 },
+      keep_alive: "30m",
     },
-    { timeout: 60000 },
+    { timeout: 300000 },
   );
 
   let sql = String(res.data?.response || "").trim();
@@ -283,8 +284,9 @@ Responda à pergunta de forma direta e objetiva, em português. Cite números re
       prompt,
       stream: false,
       options: { temperature: 0.3, num_ctx: 4096, num_predict: 500 },
+      keep_alive: "30m",
     },
-    { timeout: 120000 },
+    { timeout: 300000 },
   );
   return String(res.data?.response || "").trim();
 }

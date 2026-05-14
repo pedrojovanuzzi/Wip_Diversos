@@ -53,8 +53,9 @@ ${trimmed}
         format: "json",
         stream: false,
         options: { temperature: 0.2, num_ctx: 4096 },
+        keep_alive: "30m",
       },
-      { timeout: 120000, signal },
+      { timeout: 300000, signal },
     );
     const raw = (res.data?.response || "").trim();
     const parsed = JSON.parse(raw);
@@ -174,8 +175,9 @@ DIAGNÓSTICO:`;
         prompt,
         stream: false,
         options: { temperature: 0.3, num_ctx: 4096, num_predict: 700 },
+        keep_alive: "30m",
       },
-      { timeout: 300000 },
+      { timeout: 600000 },
     );
     return String(res.data?.response || "").trim();
   } catch (err: any) {
@@ -313,8 +315,9 @@ Retorne EXCLUSIVAMENTE um JSON válido, sem markdown:
         format: "json",
         stream: false,
         options: { temperature: 0.2, num_ctx: 4096, num_predict: 500 },
+        keep_alive: "30m",
       },
-      { timeout: 120000, signal },
+      { timeout: 300000, signal },
     );
     const raw = String(res.data?.response || "").trim();
     const parsed = JSON.parse(raw);
@@ -406,8 +409,9 @@ ${sampleItems}`,
         messages,
         stream: false,
         options: { temperature: 0.3, num_ctx: 8192, num_predict: 600 },
+        keep_alive: "30m",
       },
-      { timeout: 180000 },
+      { timeout: 300000 },
     );
     return String(res.data?.message?.content || "").trim();
   } catch (err: any) {
