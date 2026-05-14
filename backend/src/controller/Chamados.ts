@@ -968,6 +968,62 @@ class Chamados {
     }
   }
 
+  public async getInstallationMonthlyHistory(req: Request, res: Response) {
+    try {
+      const MkRepository = MkauthSource.getRepository(ChamadosEntities);
+      const yearsRequested = Number(req.query.years ?? 5);
+      const endYear = Number(
+        req.query.endYear ?? new Date().getFullYear(),
+      );
+      const startYear = endYear - yearsRequested + 1;
+
+      const start = new Date(startYear, 0, 1);
+      const end = new Date(endYear, 11, 31, 23, 59, 59);
+
+      const rows = await addCategorySums(
+        MkRepository.createQueryBuilder("chamado")
+          .select("YEAR(chamado.abertura)", "year")
+          .addSelect("MONTH(chamado.abertura)", "month"),
+      )
+        .where("chamado.abertura BETWEEN :start AND :end", { start, end })
+        .groupBy("year")
+        .addGroupBy("month")
+        .orderBy("year", "ASC")
+        .addOrderBy("month", "ASC")
+        .getRawMany();
+
+      const years: Record<
+        number,
+        ({ month: number } & CategoryTotals)[]
+      > = {};
+      for (let y = startYear; y <= endYear; y++) {
+        years[y] = Array.from({ length: 12 }, (_, i) => ({
+          month: i + 1,
+          ...emptyTotals(),
+        }));
+      }
+      rows.forEach((row) => {
+        const y = Number(row.year);
+        const m = Number(row.month);
+        if (years[y] && m >= 1 && m <= 12) {
+          years[y][m - 1] = { month: m, ...parseTotals(row) };
+        }
+      });
+
+      const series = Object.keys(years)
+        .map((y) => Number(y))
+        .sort((a, b) => a - b)
+        .map((y) => ({ year: y, monthly: years[y] }));
+
+      res.status(200).json({ startYear, endYear, series });
+    } catch (error) {
+      console.error("Erro histórico mensal:", error);
+      res
+        .status(500)
+        .json({ message: "Erro ao buscar histórico mensal." });
+    }
+  }
+
   public async getInstallationAssuntosBreakdown(
     req: Request,
     res: Response,

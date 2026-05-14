@@ -32,5 +32,10 @@ router.get(
   AuthGuard,
   Chamados.getInstallationAssuntosBreakdown,
 );
+router.get(
+  "/analytics/instalacoes/historico-mensal",
+  AuthGuard,
+  Chamados.getInstallationMonthlyHistory,
+);
 
 export default router;

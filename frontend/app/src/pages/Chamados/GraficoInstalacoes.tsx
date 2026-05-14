@@ -4,6 +4,8 @@ import {
   Bar,
   LineChart,
   Line,
+  Area,
+  ComposedChart,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -25,12 +27,6 @@ interface InstallationStat {
   mudanca: number;
   troca: number;
   cancelamento: number;
-}
-
-interface AgentStat {
-  agent: string;
-  opened: number;
-  closed: number;
 }
 
 interface CategoryTotals {
@@ -135,6 +131,12 @@ interface ClientesAtivadosResponse {
   overallGrowth: number | null;
 }
 
+interface MonthlyHistoryResponse {
+  startYear: number;
+  endYear: number;
+  series: { year: number; monthly: MonthlySeriesRow[] }[];
+}
+
 interface YearlySeriesRow {
   year: number;
   totals: CategoryTotals;
@@ -227,7 +229,7 @@ export const GraficoInstalacoes = () => {
   const [yearly, setYearly] = useState<YearlyComparisonResponse | null>(null);
   const [clientesAtivados, setClientesAtivados] =
     useState<ClientesAtivadosResponse | null>(null);
-  const [agentStats, setAgentStats] = useState<AgentStat[]>([]);
+  const [history, setHistory] = useState<MonthlyHistoryResponse | null>(null);
   const [breakdown, setBreakdown] = useState<
     { assunto: string; total: number }[] | null
   >(null);
@@ -262,34 +264,28 @@ export const GraficoInstalacoes = () => {
       const headers = { Authorization: `Bearer ${user?.token}` };
       const baseUrl = process.env.REACT_APP_URL;
 
-      const [statsRes, trendRes, yearlyRes, agentRes, clientesRes] =
-        await Promise.all([
-          axios.get<StatsResponse>(
-            `${baseUrl}/chamados/analytics/instalacoes`,
-            { params: { month, year }, headers },
-          ),
-          axios.get<MonthlyTrendResponse>(
-            `${baseUrl}/chamados/analytics/instalacoes/trend`,
-            { params: { year }, headers },
-          ),
-          axios.get<YearlyComparisonResponse>(
-            `${baseUrl}/chamados/analytics/instalacoes/anos`,
-            { params: { years: 5 }, headers },
-          ),
-          axios.get<AgentStat[]>(`${baseUrl}/chamados/analytics/agents`, {
-            params: { month, year },
-            headers,
-          }),
-          axios.get<ClientesAtivadosResponse>(
-            `${baseUrl}/chamados/analytics/clientes/ativados`,
-            { headers },
-          ),
-        ]);
+      const [statsRes, trendRes, yearlyRes, clientesRes] = await Promise.all([
+        axios.get<StatsResponse>(
+          `${baseUrl}/chamados/analytics/instalacoes`,
+          { params: { month, year }, headers },
+        ),
+        axios.get<MonthlyTrendResponse>(
+          `${baseUrl}/chamados/analytics/instalacoes/trend`,
+          { params: { year }, headers },
+        ),
+        axios.get<YearlyComparisonResponse>(
+          `${baseUrl}/chamados/analytics/instalacoes/anos`,
+          { params: { years: 5 }, headers },
+        ),
+        axios.get<ClientesAtivadosResponse>(
+          `${baseUrl}/chamados/analytics/clientes/ativados`,
+          { headers },
+        ),
+      ]);
 
       setData(statsRes.data);
       setTrend(trendRes.data);
       setYearly(yearlyRes.data);
-      setAgentStats(agentRes.data);
       setClientesAtivados(clientesRes.data);
 
       try {
@@ -302,6 +298,16 @@ export const GraficoInstalacoes = () => {
         setBreakdown(breakdownRes.data.breakdown);
       } catch (e) {
         console.error("Erro no diagnóstico de assuntos:", e);
+      }
+
+      try {
+        const historyRes = await axios.get<MonthlyHistoryResponse>(
+          `${baseUrl}/chamados/analytics/instalacoes/historico-mensal`,
+          { params: { years: 5, endYear: year }, headers },
+        );
+        setHistory(historyRes.data);
+      } catch (e) {
+        console.error("Erro no histórico mensal:", e);
       }
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
@@ -345,23 +351,99 @@ export const GraficoInstalacoes = () => {
       const realizedYTD = current
         .slice(0, cutoff)
         .reduce((acc, r) => acc + (r[key] || 0), 0);
-      const previousYTD = previous
-        .slice(0, cutoff)
-        .reduce((acc, r) => acc + (r[key] || 0), 0);
-      const ratio = previousYTD > 0 ? realizedYTD / previousYTD : null;
-      const avg =
-        realizedYTD > 0 && cutoff > 0 ? realizedYTD / cutoff : 0;
+
+      // Build known points from multi-year history. If history is unavailable,
+      // fall back to previousYear + currentYear YTD (2 years).
+      const knownPoints: { x: number; y: number; m: number }[] = [];
+      const historyYears = history?.series ?? [];
+      const currentYearIdx = historyYears.findIndex((s) => s.year === year);
+      const pastYears =
+        currentYearIdx >= 0
+          ? historyYears.slice(0, currentYearIdx)
+          : [{ year: year - 1, monthly: previous as MonthlySeriesRow[] }];
+
+      let x = 0;
+      pastYears.forEach((yr) => {
+        yr.monthly.forEach((row, i) => {
+          knownPoints.push({ x, y: (row as any)[key] || 0, m: i });
+          x++;
+        });
+      });
+      current.slice(0, cutoff).forEach((row, i) => {
+        knownPoints.push({ x, y: row[key] || 0, m: i });
+        x++;
+      });
+
+      // Seasonal index (additive): per-month mean − overall mean
+      const seasonalSum = Array(12).fill(0);
+      const seasonalCount = Array(12).fill(0);
+      knownPoints.forEach((p) => {
+        seasonalSum[p.m] += p.y;
+        seasonalCount[p.m] += 1;
+      });
+      const overallMean =
+        knownPoints.reduce((a, p) => a + p.y, 0) / knownPoints.length;
+      const seasonalIndex = seasonalSum.map((s, i) =>
+        seasonalCount[i] > 0 ? s / seasonalCount[i] - overallMean : 0,
+      );
+
+      // Deseasonalized series + linear regression
+      const deseasoned = knownPoints.map((p) => ({
+        x: p.x,
+        y: p.y - seasonalIndex[p.m],
+      }));
+      const n = deseasoned.length;
+      const sumX = deseasoned.reduce((a, p) => a + p.x, 0);
+      const sumY = deseasoned.reduce((a, p) => a + p.y, 0);
+      const sumXY = deseasoned.reduce((a, p) => a + p.x * p.y, 0);
+      const sumX2 = deseasoned.reduce((a, p) => a + p.x * p.x, 0);
+      const denom = n * sumX2 - sumX * sumX;
+      const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
+      const intercept = n > 0 ? (sumY - slope * sumX) / n : 0;
+
+      const baseXForCurrentYear = pastYears.length * 12;
       const remaining = current.map((_, i) => {
         if (i < cutoff) return 0;
-        if (ratio !== null) {
-          return Math.max(0, Math.round((previous[i]?.[key] ?? 0) * ratio));
-        }
-        return Math.round(avg);
+        const xFuture = baseXForCurrentYear + i;
+        const trend = slope * xFuture + intercept;
+        return Math.max(0, Math.round(trend + seasonalIndex[i]));
       });
+
+      // What the model would have predicted for every month of the year
+      // (used for projection-vs-reality comparison on past months)
+      const predicted = current.map((_, i) => {
+        const xMonth = baseXForCurrentYear + i;
+        const trend = slope * xMonth + intercept;
+        return Math.max(0, Math.round(trend + seasonalIndex[i]));
+      });
+
+      // Residual standard deviation over the entire training set
+      // (used to draw a ±1σ confidence band around the model line)
+      const residuals = knownPoints.map((p) => {
+        const fitted = slope * p.x + intercept + seasonalIndex[p.m];
+        return p.y - fitted;
+      });
+      const residualMean =
+        residuals.reduce((a, v) => a + v, 0) / (residuals.length || 1);
+      const residualVar =
+        residuals.length > 1
+          ? residuals.reduce(
+              (a, v) => a + (v - residualMean) ** 2,
+              0,
+            ) /
+            (residuals.length - 1)
+          : 0;
+      const residualStd = Math.sqrt(residualVar);
+
       return {
         realizedYTD,
         remaining,
+        predicted,
+        residualStd,
         projectedRemaining: remaining.reduce((a, v) => a + v, 0),
+        slope,
+        intercept,
+        seasonalIndex,
       };
     };
 
@@ -370,9 +452,13 @@ export const GraficoInstalacoes = () => {
 
     const chartData = current.map((row, i) => {
       const isPast = i < cutoff;
+      const lo = Math.max(0, inst.predicted[i] - inst.residualStd);
+      const hi = inst.predicted[i] + inst.residualStd;
       return {
         month: monthShort[i],
         real: isPast ? row.instalacao : null,
+        modelo: inst.predicted[i],
+        modeloRange: [lo, hi] as [number, number],
         previsto:
           i === cutoff - 1
             ? row.instalacao
@@ -385,9 +471,13 @@ export const GraficoInstalacoes = () => {
 
     const cancellationChartData = current.map((row, i) => {
       const isPast = i < cutoff;
+      const lo = Math.max(0, canc.predicted[i] - canc.residualStd);
+      const hi = canc.predicted[i] + canc.residualStd;
       return {
         month: monthShort[i],
         real: isPast ? row.cancelamento : null,
+        modelo: canc.predicted[i],
+        modeloRange: [lo, hi] as [number, number],
         previsto:
           i === cutoff - 1
             ? row.cancelamento
@@ -410,36 +500,84 @@ export const GraficoInstalacoes = () => {
         ? realClientChangeYTD / operationalNetYTD
         : null;
 
-    const operationalRemainingNets = current.map(
-      (_row, i) => (inst.remaining[i] || 0) - (canc.remaining[i] || 0),
-    );
+    // Reconstruct real client count month-by-month from realized chamados
+    const realActiveByMonth: number[] = [];
+    let runningReal = previousYearEnd;
+    for (let i = 0; i < cutoff; i++) {
+      const opNet =
+        (current[i]?.instalacao || 0) - (current[i]?.cancelamento || 0);
+      const delta =
+        conversionRatio !== null
+          ? opNet * conversionRatio
+          : cutoff > 0
+            ? realClientChangeYTD / cutoff
+            : 0;
+      runningReal += delta;
+      realActiveByMonth.push(runningReal);
+    }
 
-    let running = currentActive;
-    const clientesChartData = current.map((_row, i) => {
-      const isPast = i < cutoff;
-      if (isPast) {
-        return {
-          month: monthShort[i],
-          atual: i === cutoff - 1 ? currentActive : null,
-          previsto: i === cutoff - 1 ? currentActive : null,
-        };
-      }
-      const opNet = operationalRemainingNets[i];
-      const clientDelta =
+    // Build projection curve for the entire year using the model predictions
+    const projectedActiveByMonth: number[] = [];
+    let runningProj = previousYearEnd;
+    for (let i = 0; i < 12; i++) {
+      const opNetPred =
+        (inst.predicted[i] || 0) - (canc.predicted[i] || 0);
+      const delta =
+        conversionRatio !== null
+          ? opNetPred * conversionRatio
+          : cutoff > 0
+            ? realClientChangeYTD / cutoff
+            : 0;
+      runningProj += delta;
+      projectedActiveByMonth.push(runningProj);
+    }
+
+    // Forward-running curve from currentActive using operational projections
+    let runningFromCurrent = currentActive;
+    const forwardFromCurrent: (number | null)[] = current.map((_row, i) => {
+      if (i < cutoff) return null;
+      const opNet = (inst.remaining[i] || 0) - (canc.remaining[i] || 0);
+      const delta =
         conversionRatio !== null
           ? Math.round(opNet * conversionRatio)
-          : Math.round(
-              cutoff > 0 ? (realClientChangeYTD / cutoff) : 0,
-            );
-      running += clientDelta;
+          : Math.round(cutoff > 0 ? realClientChangeYTD / cutoff : 0);
+      runningFromCurrent += delta;
+      return runningFromCurrent;
+    });
+
+    // Confidence band for clientes: stdev of the net (inst − canc) residuals,
+    // converted to client space, then accumulated over time (sqrt-of-time scaling)
+    const netStd =
+      conversionRatio !== null
+        ? Math.sqrt(
+            (inst.residualStd ** 2 + canc.residualStd ** 2) *
+              conversionRatio ** 2,
+          )
+        : 0;
+
+    const clientesChartData = current.map((_row, i) => {
+      const isPast = i < cutoff;
+      const stepsFromStart = i + 1;
+      const accumulatedStd = netStd * Math.sqrt(stepsFromStart);
+      const modeloVal = Math.round(projectedActiveByMonth[i]);
       return {
         month: monthShort[i],
-        atual: null,
-        previsto: running,
+        real: isPast ? Math.round(realActiveByMonth[i]) : null,
+        modelo: modeloVal,
+        modeloRange: [
+          Math.round(modeloVal - accumulatedStd),
+          Math.round(modeloVal + accumulatedStd),
+        ] as [number, number],
+        previsto:
+          i === cutoff - 1
+            ? currentActive
+            : i >= cutoff
+              ? forwardFromCurrent[i]
+              : null,
       };
     });
 
-    const projectedNet = running - currentActive;
+    const projectedNet = runningFromCurrent - currentActive;
 
     return {
       cutoffMonth: cutoff,
@@ -451,6 +589,7 @@ export const GraficoInstalacoes = () => {
       currentActive,
       projectedNet,
       projectedClientesEOY: currentActive + projectedNet,
+      realClientChangeYTD,
       clientesChartData,
       cancellationChartData,
     };
@@ -782,8 +921,12 @@ export const GraficoInstalacoes = () => {
                     </h2>
                     <p className="text-xs text-gray-500">
                       Real até {monthShort[forecast.cutoffMonth - 1]} +
-                      projeção dos meses restantes (sazonalidade {year - 1}{" "}
-                      ajustada pelo ritmo YTD)
+                      projeção dos meses restantes (regressão linear +
+                      sazonalidade aditiva, base{" "}
+                      {history
+                        ? `${history.startYear}–${history.endYear}`
+                        : `${year - 1}–${year}`}
+                      )
                     </p>
                   </div>
                   <div className="flex gap-3">
@@ -811,6 +954,20 @@ export const GraficoInstalacoes = () => {
                         {forecast.projectedYearTotal}
                       </p>
                     </div>
+                    <div className="bg-purple-50 border border-purple-100 rounded p-2 text-center min-w-[140px]">
+                      <p className="text-[10px] uppercase text-purple-700 font-semibold">
+                        Média/mês {year}
+                      </p>
+                      <p className="text-lg font-bold text-purple-900">
+                        {(forecast.projectedYearTotal / 12).toFixed(1)}
+                      </p>
+                      <p className="text-[10px] text-purple-700">
+                        YTD:{" "}
+                        {(
+                          forecast.realizedYTD / forecast.cutoffMonth
+                        ).toFixed(1)}
+                      </p>
+                    </div>
                     <div className="bg-blue-50 border border-blue-200 rounded p-2 text-center min-w-[160px]">
                       <p className="text-[10px] uppercase text-blue-700 font-semibold">
                         Clientes ao fim de {year}
@@ -827,7 +984,7 @@ export const GraficoInstalacoes = () => {
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height="82%">
-                  <LineChart
+                  <ComposedChart
                     data={forecast.chartData}
                     margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
                   >
@@ -836,6 +993,15 @@ export const GraficoInstalacoes = () => {
                     <YAxis />
                     <Tooltip />
                     <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="modeloRange"
+                      stroke="none"
+                      fill="#9333ea"
+                      fillOpacity={0.12}
+                      name="Banda ±1σ"
+                      legendType="rect"
+                    />
                     <Line
                       type="monotone"
                       dataKey="real"
@@ -847,6 +1013,15 @@ export const GraficoInstalacoes = () => {
                     >
                       <LabelList dataKey="real" position="top" />
                     </Line>
+                    <Line
+                      type="monotone"
+                      dataKey="modelo"
+                      stroke="#9333ea"
+                      strokeWidth={2}
+                      strokeDasharray="2 4"
+                      name="Modelo (regressão)"
+                      dot={false}
+                    />
                     <Line
                       type="monotone"
                       dataKey="previsto"
@@ -866,7 +1041,7 @@ export const GraficoInstalacoes = () => {
                       strokeDasharray="2 4"
                       name={`Real ${year - 1}`}
                     />
-                  </LineChart>
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -946,8 +1121,12 @@ export const GraficoInstalacoes = () => {
                     </h2>
                     <p className="text-xs text-gray-500">
                       Real até {monthShort[forecast.cutoffMonth - 1]} +
-                      projeção dos meses restantes (sazonalidade {year - 1}{" "}
-                      ajustada pelo ritmo YTD)
+                      projeção dos meses restantes (regressão linear +
+                      sazonalidade aditiva, base{" "}
+                      {history
+                        ? `${history.startYear}–${history.endYear}`
+                        : `${year - 1}–${year}`}
+                      )
                     </p>
                   </div>
                   <div className="flex gap-3">
@@ -976,10 +1155,29 @@ export const GraficoInstalacoes = () => {
                           forecast.cancellation.projectedRemaining}
                       </p>
                     </div>
+                    <div className="bg-purple-50 border border-purple-100 rounded p-2 text-center min-w-[140px]">
+                      <p className="text-[10px] uppercase text-purple-700 font-semibold">
+                        Média/mês {year}
+                      </p>
+                      <p className="text-lg font-bold text-purple-900">
+                        {(
+                          (forecast.cancellation.realizedYTD +
+                            forecast.cancellation.projectedRemaining) /
+                          12
+                        ).toFixed(1)}
+                      </p>
+                      <p className="text-[10px] text-purple-700">
+                        YTD:{" "}
+                        {(
+                          forecast.cancellation.realizedYTD /
+                          forecast.cutoffMonth
+                        ).toFixed(1)}
+                      </p>
+                    </div>
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height="82%">
-                  <LineChart
+                  <ComposedChart
                     data={forecast.cancellationChartData}
                     margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
                   >
@@ -988,6 +1186,15 @@ export const GraficoInstalacoes = () => {
                     <YAxis />
                     <Tooltip />
                     <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="modeloRange"
+                      stroke="none"
+                      fill="#9333ea"
+                      fillOpacity={0.12}
+                      name="Banda ±1σ"
+                      legendType="rect"
+                    />
                     <Line
                       type="monotone"
                       dataKey="real"
@@ -999,6 +1206,15 @@ export const GraficoInstalacoes = () => {
                     >
                       <LabelList dataKey="real" position="top" />
                     </Line>
+                    <Line
+                      type="monotone"
+                      dataKey="modelo"
+                      stroke="#9333ea"
+                      strokeWidth={2}
+                      strokeDasharray="2 4"
+                      name="Modelo (regressão)"
+                      dot={false}
+                    />
                     <Line
                       type="monotone"
                       dataKey="previsto"
@@ -1018,27 +1234,59 @@ export const GraficoInstalacoes = () => {
                       strokeDasharray="2 4"
                       name={`Real ${year - 1}`}
                     />
-                  </LineChart>
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             )}
 
             {/* Projeção de clientes ativos até o final do ano */}
             {forecast && (
-              <div className="bg-white p-6 rounded-lg shadow-md h-[500px]">
+              <div className="bg-white p-6 rounded-lg shadow-md h-[520px]">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="text-xl font-bold text-gray-800">
                       Projeção de Clientes Ativos — {year}
                     </h2>
                     <p className="text-xs text-gray-500">
-                      Acumulado mês a mês: clientes atuais + (instalações −
-                      cancelamentos) projetados
+                      Linha sólida: clientes reais reconstruídos a partir dos
+                      chamados YTD. Tracejado roxo: o que o modelo previu para
+                      cada mês (para comparação). Tracejado verde: projeção
+                      partindo do total real atual.
                     </p>
+                  </div>
+                  <div className="flex gap-3">
+                    {(() => {
+                      const totalNet =
+                        forecast.realClientChangeYTD + forecast.projectedNet;
+                      const avgMes = totalNet / 12;
+                      const ytdAvg =
+                        forecast.cutoffMonth > 0
+                          ? forecast.realClientChangeYTD / forecast.cutoffMonth
+                          : 0;
+                      return (
+                        <div className="bg-green-50 border border-green-200 rounded p-2 text-center min-w-[180px]">
+                          <p className="text-[10px] uppercase text-green-700 font-semibold">
+                            Média líquida/mês {year}
+                          </p>
+                          <p
+                            className={`text-lg font-bold ${
+                              avgMes >= 0 ? "text-green-800" : "text-red-700"
+                            }`}
+                          >
+                            {avgMes >= 0 ? "+" : ""}
+                            {avgMes.toFixed(1)}
+                          </p>
+                          <p className="text-[10px] text-green-700">
+                            YTD: {ytdAvg >= 0 ? "+" : ""}
+                            {ytdAvg.toFixed(1)} cliente/mês
+                          </p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height="85%">
-                  <LineChart
+                  <ComposedChart
                     data={forecast.clientesChartData}
                     margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
                   >
@@ -1059,13 +1307,48 @@ export const GraficoInstalacoes = () => {
                       }
                     />
                     <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="modeloRange"
+                      stroke="none"
+                      fill="#9333ea"
+                      fillOpacity={0.12}
+                      name="Banda ±1σ"
+                      legendType="rect"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="real"
+                      stroke="#2563eb"
+                      strokeWidth={3}
+                      name="Real (reconstruído)"
+                      connectNulls
+                      activeDot={{ r: 6 }}
+                    >
+                      <LabelList
+                        dataKey="real"
+                        position="top"
+                        formatter={(v: any) =>
+                          typeof v === "number" ? v.toLocaleString("pt-BR") : ""
+                        }
+                      />
+                    </Line>
+                    <Line
+                      type="monotone"
+                      dataKey="modelo"
+                      stroke="#9333ea"
+                      strokeWidth={2}
+                      strokeDasharray="2 4"
+                      name="Modelo (regressão)"
+                      dot={false}
+                    />
                     <Line
                       type="monotone"
                       dataKey="previsto"
-                      stroke="#2563eb"
+                      stroke="#10b981"
                       strokeWidth={3}
                       strokeDasharray="6 4"
-                      name="Clientes ativos (projeção)"
+                      name="Projeção (a partir do real)"
                       connectNulls
                     >
                       <LabelList
@@ -1076,7 +1359,7 @@ export const GraficoInstalacoes = () => {
                         }
                       />
                     </Line>
-                  </LineChart>
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -1171,67 +1454,6 @@ export const GraficoInstalacoes = () => {
               )}
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-md h-[600px]">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">
-                Chamados Abertos/Fechados por Atendente
-              </h2>
-              {loading ? (
-                <div className="flex h-full items-center justify-center">
-                  <AiOutlineLoading3Quarters className="animate-spin text-4xl text-indigo-600" />
-                </div>
-              ) : agentStats.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={agentStats}
-                    margin={{
-                      top: 20,
-                      right: 30,
-                      left: 20,
-                      bottom: 100,
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="agent"
-                      interval={0}
-                      tickFormatter={(value) => {
-                        const firstName = value.split(" ")[0];
-                        return value.includes(" ")
-                          ? `${firstName}...`
-                          : firstName;
-                      }}
-                    />
-                    <YAxis />
-                    <Tooltip cursor={{ fill: "transparent" }} />
-                    <Legend
-                      verticalAlign="top"
-                      wrapperStyle={{
-                        paddingBottom: "20px",
-                        paddingTop: "10px",
-                      }}
-                    />
-                    <Bar
-                      dataKey="opened"
-                      name="Chamados Abertos"
-                      fill="#8884d8"
-                    >
-                      <LabelList dataKey="opened" position="top" />
-                    </Bar>
-                    <Bar
-                      dataKey="closed"
-                      name="Chamados Fechados"
-                      fill="#82ca9d"
-                    >
-                      <LabelList dataKey="closed" position="top" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex h-full items-center justify-center text-gray-500">
-                  Nenhum dado encontrado para o período selecionado.
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
