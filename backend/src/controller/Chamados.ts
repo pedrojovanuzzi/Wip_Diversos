@@ -989,6 +989,7 @@ class Chamados {
         | "cancelled";
       startedAt: number;
       cancelRequested?: boolean;
+      abortController?: AbortController;
       result?: any;
       error?: string;
     }
@@ -1002,6 +1003,11 @@ class Chamados {
       return;
     }
     job.cancelRequested = true;
+    try {
+      job.abortController?.abort();
+    } catch {
+      /* ignore */
+    }
     res.json({ ok: true });
   }
 
@@ -1054,6 +1060,7 @@ class Chamados {
       stage: "running" | "done" | "error" | "cancelled";
       startedAt: number;
       cancelRequested?: boolean;
+      abortController?: AbortController;
       result?: any;
       error?: string;
     }
@@ -1071,6 +1078,7 @@ class Chamados {
         processed: 0,
         stage: "running",
         startedAt: Date.now(),
+        abortController: new AbortController(),
       });
       Chamados.runChurnRiskJob(jobId, limit, months).catch((e) => {
         const job = Chamados.churnJobs.get(jobId);
@@ -1116,6 +1124,11 @@ class Chamados {
       return;
     }
     job.cancelRequested = true;
+    try {
+      job.abortController?.abort();
+    } catch {
+      /* ignore */
+    }
     res.json({ ok: true });
   }
 
@@ -1221,62 +1234,90 @@ class Chamados {
 
     const CONCURRENCY = 3;
     const results: any[] = [];
+    const signal = job.abortController?.signal;
 
-    for (let i = 0; i < activeClients.length; i += CONCURRENCY) {
-      if (job.cancelRequested) {
+    try {
+      for (let i = 0; i < activeClients.length; i += CONCURRENCY) {
+        if (job.cancelRequested) {
+          job.stage = "cancelled";
+          return;
+        }
+        const batch = activeClients.slice(i, i + CONCURRENCY);
+        const batchResults = await Promise.all(
+          batch.map(async (cli) => {
+            if (job.cancelRequested) return null;
+            const chamados = await ChamadoRepo.createQueryBuilder("c")
+              .where("c.login = :login", { login: cli.login })
+              .andWhere("c.abertura >= :since", { since })
+              .orderBy("c.abertura", "DESC")
+              .limit(15)
+              .getMany();
+            if (chamados.length === 0) return null;
+
+            // Pré-filtro: se todos os chamados são apenas assuntos
+            // positivos (renovação, instalação, troca de equipamento),
+            // não há indício de churn — pula análise por IA.
+            const POSITIVE_ONLY = /^(renova|instala|troca|mudan)/i;
+            const hasNegativeAssunto = chamados.some(
+              (c) =>
+                !POSITIVE_ONLY.test((c.assunto || "").trim()),
+            );
+            if (!hasNegativeAssunto) return null;
+
+            const enriched = await Promise.all(
+              chamados.map(async (c) => {
+                const msgs = await MsgRepo.find({
+                  where: { chamado: c.chamado },
+                  order: { msg_data: "ASC" },
+                  take: 5,
+                });
+                return {
+                  abertura: c.abertura,
+                  assunto: c.assunto,
+                  status: c.status,
+                  mensagens: msgs.map((m) => m.msg || "").filter(Boolean),
+                };
+              }),
+            );
+            const analysis = await analyzeClientChurnRisk(
+              {
+                login: cli.login,
+                nome: cli.nome,
+                plano: cli.plano,
+                cidade: cli.cidade,
+              },
+              enriched,
+              signal,
+            );
+            return {
+              login: cli.login,
+              nome: cli.nome,
+              cidade: cli.cidade,
+              plano: cli.plano,
+              chamadosAnalisados: enriched.length,
+              ...analysis,
+            };
+          }),
+        );
+        batchResults.forEach((r) => r && results.push(r));
+        job.processed = Math.min(i + CONCURRENCY, activeClients.length);
+      }
+    } catch (err: any) {
+      if (job.cancelRequested || err?.name === "CanceledError") {
         job.stage = "cancelled";
         return;
       }
-      const batch = activeClients.slice(i, i + CONCURRENCY);
-      const batchResults = await Promise.all(
-        batch.map(async (cli) => {
-          const chamados = await ChamadoRepo.createQueryBuilder("c")
-            .where("c.login = :login", { login: cli.login })
-            .andWhere("c.abertura >= :since", { since })
-            .orderBy("c.abertura", "DESC")
-            .limit(15)
-            .getMany();
-          if (chamados.length === 0) return null;
-          const enriched = await Promise.all(
-            chamados.map(async (c) => {
-              const msgs = await MsgRepo.find({
-                where: { chamado: c.chamado },
-                order: { msg_data: "ASC" },
-                take: 5,
-              });
-              return {
-                abertura: c.abertura,
-                assunto: c.assunto,
-                status: c.status,
-                mensagens: msgs.map((m) => m.msg || "").filter(Boolean),
-              };
-            }),
-          );
-          const analysis = await analyzeClientChurnRisk(
-            {
-              login: cli.login,
-              nome: cli.nome,
-              plano: cli.plano,
-              cidade: cli.cidade,
-            },
-            enriched,
-          );
-          return {
-            login: cli.login,
-            nome: cli.nome,
-            cidade: cli.cidade,
-            plano: cli.plano,
-            chamadosAnalisados: enriched.length,
-            ...analysis,
-          };
-        }),
-      );
-      batchResults.forEach((r) => r && results.push(r));
-      job.processed = Math.min(i + CONCURRENCY, activeClients.length);
+      throw err;
     }
 
-    results.sort((a, b) => b.score - a.score);
-    job.result = { total: results.length, items: results };
+    const filtered = results
+      .filter((r) => r.score >= 30)
+      .sort((a, b) => b.score - a.score);
+    job.result = {
+      total: filtered.length,
+      analyzed: results.length,
+      items: filtered,
+    };
     job.stage = "done";
   }
 
@@ -1320,6 +1361,7 @@ class Chamados {
         processed: 0,
         stage: "classifying",
         startedAt: Date.now(),
+        abortController: new AbortController(),
       });
 
       Chamados.runCancellationAnalysisJob(jobId, year, limit).catch((e) => {
@@ -1389,47 +1431,57 @@ class Chamados {
     const CONCURRENCY = 4;
     const results: any[] = [];
     const rawMessages: string[] = [];
+    const signal = job.abortController?.signal;
 
-    for (let i = 0; i < chamados.length; i += CONCURRENCY) {
-      const batch = chamados.slice(i, i + CONCURRENCY);
-      const batchResults = await Promise.all(
-        batch.map(async (c) => {
-          const msgs = await MsgRepo.find({
-            where: { chamado: c.chamado },
-            order: { msg_data: "ASC" },
-            take: 5,
-          });
-          const text = msgs
-            .map((m) => m.msg)
-            .filter(Boolean)
-            .join("\n---\n");
-          if (!text.trim()) return null;
-          const analysis = await analyzeCancellationReason(text);
-          return {
-            text,
-            record: {
-              id: c.id!,
-              chamado: c.chamado || "",
-              login: c.login || "",
-              abertura: c.abertura,
-              assunto: c.assunto || "",
-              categoria: analysis.categoria,
-              resumo: analysis.resumo,
-            },
-          };
-        }),
-      );
-      batchResults.forEach((r) => {
-        if (r) {
-          results.push(r.record);
-          rawMessages.push(r.text);
+    try {
+      for (let i = 0; i < chamados.length; i += CONCURRENCY) {
+        if (job.cancelRequested) {
+          job.stage = "cancelled";
+          return;
         }
-      });
-      job.processed = Math.min(i + CONCURRENCY, chamados.length);
-      if (job.cancelRequested) {
+        const batch = chamados.slice(i, i + CONCURRENCY);
+        const batchResults = await Promise.all(
+          batch.map(async (c) => {
+            if (job.cancelRequested) return null;
+            const msgs = await MsgRepo.find({
+              where: { chamado: c.chamado },
+              order: { msg_data: "ASC" },
+              take: 5,
+            });
+            const text = msgs
+              .map((m) => m.msg)
+              .filter(Boolean)
+              .join("\n---\n");
+            if (!text.trim()) return null;
+            const analysis = await analyzeCancellationReason(text, signal);
+            return {
+              text,
+              record: {
+                id: c.id!,
+                chamado: c.chamado || "",
+                login: c.login || "",
+                abertura: c.abertura,
+                assunto: c.assunto || "",
+                categoria: analysis.categoria,
+                resumo: analysis.resumo,
+              },
+            };
+          }),
+        );
+        batchResults.forEach((r) => {
+          if (r) {
+            results.push(r.record);
+            rawMessages.push(r.text);
+          }
+        });
+        job.processed = Math.min(i + CONCURRENCY, chamados.length);
+      }
+    } catch (err: any) {
+      if (job.cancelRequested || err?.name === "CanceledError") {
         job.stage = "cancelled";
         return;
       }
+      throw err;
     }
 
     if (job.cancelRequested) {

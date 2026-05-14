@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5:1.5b";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5:7b";
 
 export interface CancellationAnalysis {
   categoria: string;
@@ -22,6 +22,7 @@ const CATEGORIAS_PADRAO = [
 
 export async function analyzeCancellationReason(
   text: string,
+  signal?: AbortSignal,
 ): Promise<CancellationAnalysis> {
   const trimmed = (text || "").slice(0, 3000).trim();
   if (!trimmed) {
@@ -53,7 +54,7 @@ ${trimmed}
         stream: false,
         options: { temperature: 0.2, num_ctx: 4096 },
       },
-      { timeout: 120000 },
+      { timeout: 120000, signal },
     );
     const raw = (res.data?.response || "").trim();
     const parsed = JSON.parse(raw);
@@ -75,6 +76,9 @@ ${trimmed}
       resumo: String(parsed.resumo || "").slice(0, 200),
     };
   } catch (err: any) {
+    if (axios.isCancel(err) || err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
+      throw err;
+    }
     const status = err?.response?.status;
     const body = err?.response?.data;
     if (status === 404) {
@@ -218,6 +222,7 @@ export async function analyzeClientChurnRisk(
     status?: string | null;
     mensagens: string[];
   }[],
+  signal?: AbortSignal,
 ): Promise<ChurnAnalysis> {
   if (chamados.length === 0) {
     return {
@@ -244,28 +249,60 @@ export async function analyzeClientChurnRisk(
     })
     .join("\n");
 
-  const prompt = `Você é um analista de retenção de uma provedora de internet. Avalie o RISCO DE CANCELAMENTO de um cliente com base nos chamados recentes dele.
+  const prompt = `Você é um analista de retenção de uma provedora de internet. Sua tarefa: dar uma NOTA DE RISCO DE CANCELAMENTO de 0 a 100 baseado nos chamados recentes deste cliente.
+
+REGRAS RÍGIDAS DE PONTUAÇÃO:
+
+SCORE ALTO (70-100) — só quando houver SINAIS EXPLÍCITOS de querer sair:
+- Cliente pediu cancelamento, mesmo que tenha desistido depois
+- Cliente perguntou sobre multa de rescisão, prazo de fidelidade, como cancelar
+- Cliente comparou negativamente com concorrente ("vou pra X que é melhor")
+- Cliente ameaçou cancelar ("vou cancelar se não resolver")
+- 3 ou mais reclamações técnicas DA MESMA falha nos últimos meses (problema não resolvido)
+- Cliente demonstrou irritação grave / acusação à empresa
+
+SCORE MÉDIO (40-69) — sinais ambíguos:
+- Reclamação técnica única não resolvida (lentidão, queda)
+- Pediu desconto ou ameaça velada
+- Dúvida sobre fatura/cobrança que pode virar disputa
+
+SCORE BAIXO (0-39) — chamados rotineiros, SEM SINAL DE SAÍDA:
+- Instalação, renovação de contrato, mudança de plano — esses são RETENÇÃO, não risco
+- Alteração de nome/senha de WiFi
+- Configuração técnica simples já resolvida
+- Visita técnica concluída com sucesso
+- Cliente apenas tirou dúvida
+
+REGRAS ABSOLUTAS:
+- Renovação de contrato = SCORE BAIXO. Renovar é o oposto de cancelar.
+- Instalação nova = SCORE BAIXO. Cliente acabou de chegar.
+- Troca de equipamento concluída = SCORE BAIXO.
+- Mudança de SSID/senha WiFi = SCORE BAIXO.
+- Se NÃO há sinais explícitos das categorias ALTO ou MÉDIO, score DEVE ser < 40.
+- Score 100 é apenas pra casos onde cliente JÁ pediu cancelamento formal.
+
+EXEMPLOS:
+- "Cliente renovou contrato por mais 12 meses" → score 5
+- "Mudou nome do WiFi de WipX pra CasaY" → score 5
+- "Cliente reclamou de internet lenta 1x e foi resolvido" → score 30
+- "Cliente perguntou valor da multa de rescisão" → score 75
+- "3 chamados de queda na mesma semana, cliente irritado" → score 80
+- "Cliente pediu cancelamento formal, técnico retirou equipamento" → score 95
 
 CLIENTE:
 - login: ${clientInfo.login}
 ${clientInfo.nome ? `- nome: ${clientInfo.nome}` : ""}
 ${clientInfo.plano ? `- plano: ${clientInfo.plano}` : ""}
-${clientInfo.cidade ? `- cidade: ${clientInfo.cidade}` : ""}
 
-HISTÓRICO DE CHAMADOS RECENTES (${chamados.length}):
+CHAMADOS (${chamados.length}):
 ${corpus}
 
-INSTRUÇÕES:
-- Retorne EXCLUSIVAMENTE um JSON válido, sem markdown, sem texto antes/depois.
-- Score 0-100: 0 = nenhum risco, 100 = vai cancelar muito em breve.
-- Sinais altos de risco: reclamações repetidas de qualidade, perguntas sobre rescisão/multa, ameaças, comparações com concorrente, problemas técnicos não resolvidos, irritação crescente.
-- Sinais baixos: chamados rotineiros (instalação, dúvida, fatura), sem reclamação grave.
-- "sinais" é um array curto (3-5 itens) com frases objetivas do que detectou.
-- "acao_sugerida": uma frase curta com a ação que o comercial deve tomar.
-- "justificativa": 1-2 frases resumindo o raciocínio.
+Retorne EXCLUSIVAMENTE um JSON válido, sem markdown:
+{"score": 0, "sinais": ["frase curta 1", "frase curta 2"], "acao_sugerida": "...", "justificativa": "..."}
 
-Formato exato:
-{"score": 0, "sinais": ["..."], "acao_sugerida": "...", "justificativa": "..."}`;
+- "sinais": 2-4 frases CURTAS e ESPECÍFICAS do que você encontrou no histórico (não invente). Se não há nada relevante, retorne sinais vazios e score baixo.
+- "acao_sugerida": ação concreta. Se score < 40, sugira "Nenhuma ação necessária" ou "Manter monitoramento".
+- "justificativa": uma frase explicando o score com base nas regras acima.`;
 
   try {
     const res = await axios.post(
@@ -277,7 +314,7 @@ Formato exato:
         stream: false,
         options: { temperature: 0.2, num_ctx: 4096, num_predict: 500 },
       },
-      { timeout: 120000 },
+      { timeout: 120000, signal },
     );
     const raw = String(res.data?.response || "").trim();
     const parsed = JSON.parse(raw);
@@ -290,6 +327,9 @@ Formato exato:
       justificativa: String(parsed.justificativa || "").slice(0, 500),
     };
   } catch (err: any) {
+    if (axios.isCancel(err) || err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
+      throw err;
+    }
     console.error("Churn analysis error:", err?.message || err);
     return {
       score: 0,

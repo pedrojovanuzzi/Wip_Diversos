@@ -229,6 +229,7 @@ const GrowthBadge: React.FC<{
 
 export const GraficoInstalacoes = () => {
   const { user } = useAuth();
+  const canUseAi = (user?.permission || 0) >= 5;
   const [data, setData] = useState<StatsResponse | null>(null);
   const [trend, setTrend] = useState<MonthlyTrendResponse | null>(null);
   const [yearly, setYearly] = useState<YearlyComparisonResponse | null>(null);
@@ -1681,6 +1682,7 @@ export const GraficoInstalacoes = () => {
             )}
 
             {/* Análise de motivos de cancelamento via IA (Ollama local) */}
+            {canUseAi && (
             <div className="bg-white p-6 rounded-lg shadow-md">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
@@ -1959,8 +1961,10 @@ export const GraficoInstalacoes = () => {
                 </>
               )}
             </div>
+            )}
 
             {/* Clientes em risco de churn (IA) */}
+            {canUseAi && (
             <div className="bg-white p-6 rounded-lg shadow-md">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
@@ -2132,6 +2136,7 @@ export const GraficoInstalacoes = () => {
                 </div>
               )}
             </div>
+            )}
 
             {/* Evolução diária */}
             <div className="bg-white p-6 rounded-lg shadow-md h-[500px]">
