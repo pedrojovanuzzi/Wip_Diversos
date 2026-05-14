@@ -57,7 +57,9 @@ function montarMensagemFinalizacao(f: ChamadoFichaTecnica): string {
   }
 
   if (f.motivo) {
-    partes.push(`MOTIVO PELO QUAL NAO FOI TESTADO OS EQUIPAMENTOS: ${f.motivo}`);
+    partes.push(
+      `MOTIVO PELO QUAL NAO FOI TESTADO OS EQUIPAMENTOS: ${f.motivo}`,
+    );
   }
 
   if (f.observacao) {
@@ -106,7 +108,12 @@ class ChamadoFichaTecnicaController {
       const repo = AppDataSource.getRepository(ChamadoFichaTecnica);
       const body = req.body as Partial<ChamadoFichaTecnica>;
 
-      if (!body.chamado_number || !body.cliente || !body.usuario || !body.servico) {
+      if (
+        !body.chamado_number ||
+        !body.cliente ||
+        !body.usuario ||
+        !body.servico
+      ) {
         res.status(400).json({
           errors: [
             {
@@ -172,7 +179,8 @@ class ChamadoFichaTecnicaController {
         await repo.save(salva);
       } catch (mkErr: any) {
         salva.mkauth_sincronizado = false;
-        salva.mkauth_erro = mkErr?.message || "Falha ao inserir resposta no MKAUTH.";
+        salva.mkauth_erro =
+          mkErr?.message || "Falha ao inserir resposta no MKAUTH.";
         await repo.save(salva);
 
         res.status(502).json({
@@ -218,16 +226,24 @@ class ChamadoFichaTecnicaController {
 
       if (startDate && endDate) {
         where.criado_em = Between(
-          moment(startDate as string).startOf("day").toDate(),
-          moment(endDate as string).endOf("day").toDate(),
+          moment(startDate as string)
+            .startOf("day")
+            .toDate(),
+          moment(endDate as string)
+            .endOf("day")
+            .toDate(),
         );
       } else if (startDate) {
         where.criado_em = MoreThanOrEqual(
-          moment(startDate as string).startOf("day").toDate(),
+          moment(startDate as string)
+            .startOf("day")
+            .toDate(),
         );
       } else if (endDate) {
         where.criado_em = LessThanOrEqual(
-          moment(endDate as string).endOf("day").toDate(),
+          moment(endDate as string)
+            .endOf("day")
+            .toDate(),
         );
       }
 

@@ -302,17 +302,6 @@ export const GraficoInstalacoes = () => {
     // eslint-disable-next-line
   }, [month, year, user?.token]);
 
-  const trendChartData = trend
-    ? trend.currentYear.monthly.map((row, i) => ({
-        month: monthShort[i],
-        atual: row.instalacao,
-        anterior: trend.previousYear.monthly[i]?.instalacao ?? 0,
-        cancelamentoAtual: row.cancelamento,
-        cancelamentoAnterior:
-          trend.previousYear.monthly[i]?.cancelamento ?? 0,
-      }))
-    : [];
-
   const yearlyChartData = yearly
     ? yearly.seriesYtd.map((row) => ({
         year: String(row.year),
@@ -330,56 +319,108 @@ export const GraficoInstalacoes = () => {
       }))
     : [];
 
-  const renderComparisonCard = (
-    title: string,
-    subtitle: string,
-    block: ComparisonBlock | undefined,
-    current: CategoryTotals | undefined,
-  ) => {
-    if (!block || !current) return null;
-    return (
-      <div className="bg-white p-4 rounded-lg shadow-md border border-gray-100">
-        <h3 className="text-sm font-bold text-gray-800">{title}</h3>
-        <p className="text-xs text-gray-500 mb-3">{subtitle}</p>
-        <div className="space-y-2">
-          {(Object.keys(categoryLabels) as (keyof CategoryTotals)[]).map(
-            (key) => {
-              const currentVal = current[key];
-              const prevVal = block.totals[key];
-              const diff = currentVal - prevVal;
-              const invert = key === "cancelamento";
-              return (
-                <div
-                  key={key}
-                  className="flex items-center justify-between text-xs border-b border-gray-50 pb-1"
-                >
-                  <span className="text-gray-600 uppercase">
-                    {categoryLabels[key]}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-800 font-semibold">
-                      {currentVal}
-                    </span>
-                    <span className="text-gray-400">vs</span>
-                    <span className="text-gray-500">{prevVal}</span>
-                    <span className="text-gray-400">
-                      ({diff >= 0 ? "+" : ""}
-                      {diff})
-                    </span>
-                    <GrowthBadge
-                      value={block.growth[key]}
-                      invert={invert}
-                      compact
-                    />
-                  </div>
-                </div>
-              );
-            },
-          )}
-        </div>
-      </div>
-    );
-  };
+  const forecast = (() => {
+    if (!trend) return null;
+    const current = trend.currentYear.monthly;
+    const previous = trend.previousYear.monthly;
+    const cutoff = trend.comparisons.cutoffMonth;
+
+    const projectByCategory = (key: "instalacao" | "cancelamento") => {
+      const realizedYTD = current
+        .slice(0, cutoff)
+        .reduce((acc, r) => acc + (r[key] || 0), 0);
+      const previousYTD = previous
+        .slice(0, cutoff)
+        .reduce((acc, r) => acc + (r[key] || 0), 0);
+      const ratio = previousYTD > 0 ? realizedYTD / previousYTD : null;
+      const avg =
+        realizedYTD > 0 && cutoff > 0 ? realizedYTD / cutoff : 0;
+      const remaining = current.map((_, i) => {
+        if (i < cutoff) return 0;
+        if (ratio !== null) {
+          return Math.max(0, Math.round((previous[i]?.[key] ?? 0) * ratio));
+        }
+        return Math.round(avg);
+      });
+      return {
+        realizedYTD,
+        remaining,
+        projectedRemaining: remaining.reduce((a, v) => a + v, 0),
+      };
+    };
+
+    const inst = projectByCategory("instalacao");
+    const canc = projectByCategory("cancelamento");
+
+    const chartData = current.map((row, i) => {
+      const isPast = i < cutoff;
+      return {
+        month: monthShort[i],
+        real: isPast ? row.instalacao : null,
+        previsto:
+          i === cutoff - 1
+            ? row.instalacao
+            : isPast
+              ? null
+              : inst.remaining[i],
+        anterior: previous[i]?.instalacao ?? 0,
+      };
+    });
+
+    const cancellationChartData = current.map((row, i) => {
+      const isPast = i < cutoff;
+      return {
+        month: monthShort[i],
+        real: isPast ? row.cancelamento : null,
+        previsto:
+          i === cutoff - 1
+            ? row.cancelamento
+            : isPast
+              ? null
+              : canc.remaining[i],
+        anterior: previous[i]?.cancelamento ?? 0,
+      };
+    });
+
+    const currentActive =
+      clientesAtivados?.series?.[clientesAtivados.series.length - 1]?.total ??
+      0;
+
+    let running = currentActive;
+    const clientesChartData = current.map((_row, i) => {
+      const isPast = i < cutoff;
+      if (isPast) {
+        return {
+          month: monthShort[i],
+          atual: i === cutoff - 1 ? currentActive : null,
+          previsto: i === cutoff - 1 ? currentActive : null,
+        };
+      }
+      const netMonth = (inst.remaining[i] || 0) - (canc.remaining[i] || 0);
+      running += netMonth;
+      return {
+        month: monthShort[i],
+        atual: null,
+        previsto: running,
+      };
+    });
+
+    const projectedNet = inst.projectedRemaining - canc.projectedRemaining;
+
+    return {
+      cutoffMonth: cutoff,
+      realizedYTD: inst.realizedYTD,
+      projectedRemaining: inst.projectedRemaining,
+      projectedYearTotal: inst.realizedYTD + inst.projectedRemaining,
+      chartData,
+      cancellation: canc,
+      currentActive,
+      projectedNet,
+      projectedClientesEOY: currentActive + projectedNet,
+      clientesChartData,
+      cancellationChartData,
+    };
+  })();
 
   return (
     <>
@@ -571,110 +612,7 @@ export const GraficoInstalacoes = () => {
             </div>
           )}
 
-          {/* Cards de comparação */}
-          {data?.comparisons && (
-            <div className="mb-6">
-              <h2 className="text-sm font-bold text-gray-500 uppercase mb-2">
-                Comparativos
-              </h2>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {renderComparisonCard(
-                  "vs Mês Anterior",
-                  "Mês-a-mês (MoM)",
-                  data.comparisons.previousMonth,
-                  data.totals,
-                )}
-                {renderComparisonCard(
-                  "vs Mesmo Mês / Ano Anterior",
-                  "Ano-a-ano do mês (YoY)",
-                  data.comparisons.previousYearSameMonth,
-                  data.totals,
-                )}
-                {renderComparisonCard(
-                  `vs Ano ${year - 1} Completo`,
-                  "Acumulado anual vs ano anterior",
-                  data.comparisons.previousYear,
-                  data.yearTotals,
-                )}
-              </div>
-            </div>
-          )}
-
           <div className="flex flex-col gap-6">
-            {/* Tendência mensal ano atual vs anterior */}
-            <div className="bg-white p-6 rounded-lg shadow-md h-[500px]">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-800">
-                  Tendência Mensal — Instalações {year} vs {year - 1}
-                </h2>
-                {trend && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-500">
-                      {trend.comparisons.cutoffMonth < 12
-                        ? `Variação YTD (Jan–${monthShort[trend.comparisons.cutoffMonth - 1]}):`
-                        : "Variação anual:"}
-                    </span>
-                    <GrowthBadge
-                      value={trend.comparisons.yearGrowth.instalacao}
-                    />
-                  </div>
-                )}
-              </div>
-              {loading ? (
-                <div className="flex h-full items-center justify-center">
-                  <AiOutlineLoading3Quarters className="animate-spin text-4xl text-indigo-600" />
-                </div>
-              ) : trendChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="85%">
-                  <LineChart
-                    data={trendChartData}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="atual"
-                      stroke={categoryColors.instalacao}
-                      strokeWidth={3}
-                      name={`Instalações ${year}`}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="anterior"
-                      stroke={categoryColors.instalacao}
-                      strokeWidth={2}
-                      strokeDasharray="6 4"
-                      name={`Instalações ${year - 1}`}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="cancelamentoAtual"
-                      stroke={categoryColors.cancelamento}
-                      strokeWidth={2}
-                      name={`Cancelamentos ${year}`}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="cancelamentoAnterior"
-                      stroke={categoryColors.cancelamento}
-                      strokeWidth={1.5}
-                      strokeDasharray="6 4"
-                      name={`Cancelamentos ${year - 1}`}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex h-full items-center justify-center text-gray-500">
-                  Nenhum dado encontrado para o período.
-                </div>
-              )}
-            </div>
-
             {/* Comparação anual (últimos 5 anos) */}
             <div className="bg-white p-6 rounded-lg shadow-md h-[500px]">
               <div className="flex items-center justify-between mb-4">
@@ -800,61 +738,247 @@ export const GraficoInstalacoes = () => {
               )}
             </div>
 
-            {/* Tabela YoY por mês */}
-            {trend && (
-              <div className="bg-white p-6 rounded-lg shadow-md">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">
-                  Variação Mês-a-Mês e Ano-a-Ano (Instalações)
-                </h2>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 text-gray-600 uppercase text-xs">
-                        <th className="px-3 py-2 text-left">Mês</th>
-                        <th className="px-3 py-2 text-right">{year}</th>
-                        <th className="px-3 py-2 text-right">{year - 1}</th>
-                        <th className="px-3 py-2 text-right">MoM</th>
-                        <th className="px-3 py-2 text-right">YoY</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {trend.currentYear.monthly.map((row, i) => (
-                        <tr
-                          key={row.month}
-                          className="border-t border-gray-100"
-                        >
-                          <td className="px-3 py-2 text-gray-800">
-                            {monthShort[i]}
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold text-gray-800">
-                            {row.instalacao}
-                          </td>
-                          <td className="px-3 py-2 text-right text-gray-500">
-                            {trend.previousYear.monthly[i]?.instalacao ?? 0}
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <GrowthBadge
-                              value={
-                                trend.comparisons.monthOverMonth[i]?.growth
-                                  .instalacao ?? null
-                              }
-                              compact
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <GrowthBadge
-                              value={
-                                trend.comparisons.yearOverYear[i]?.growth
-                                  .instalacao ?? null
-                              }
-                              compact
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            {/* Previsão até o final do ano */}
+            {forecast && (
+              <div className="bg-white p-6 rounded-lg shadow-md h-[560px]">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800">
+                      Previsão de Instalações — {year}
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      Real até {monthShort[forecast.cutoffMonth - 1]} +
+                      projeção dos meses restantes (sazonalidade {year - 1}{" "}
+                      ajustada pelo ritmo YTD)
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="bg-indigo-50 border border-indigo-100 rounded p-2 text-center min-w-[120px]">
+                      <p className="text-[10px] uppercase text-indigo-600 font-semibold">
+                        Realizado YTD
+                      </p>
+                      <p className="text-lg font-bold text-indigo-900">
+                        {forecast.realizedYTD}
+                      </p>
+                    </div>
+                    <div className="bg-green-50 border border-green-100 rounded p-2 text-center min-w-[120px]">
+                      <p className="text-[10px] uppercase text-green-700 font-semibold">
+                        Projeção restante
+                      </p>
+                      <p className="text-lg font-bold text-green-800">
+                        {forecast.projectedRemaining}
+                      </p>
+                    </div>
+                    <div className="bg-gray-900 rounded p-2 text-center min-w-[140px]">
+                      <p className="text-[10px] uppercase text-gray-300 font-semibold">
+                        Total previsto {year}
+                      </p>
+                      <p className="text-lg font-bold text-white">
+                        {forecast.projectedYearTotal}
+                      </p>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded p-2 text-center min-w-[160px]">
+                      <p className="text-[10px] uppercase text-blue-700 font-semibold">
+                        Clientes ao fim de {year}
+                      </p>
+                      <p className="text-lg font-bold text-blue-900">
+                        {forecast.projectedClientesEOY.toLocaleString("pt-BR")}
+                      </p>
+                      <p className="text-[10px] text-blue-700">
+                        {forecast.currentActive.toLocaleString("pt-BR")}{" "}
+                        {forecast.projectedNet >= 0 ? "+" : ""}
+                        {forecast.projectedNet}
+                      </p>
+                    </div>
+                  </div>
                 </div>
+                <ResponsiveContainer width="100%" height="82%">
+                  <LineChart
+                    data={forecast.chartData}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="real"
+                      stroke={categoryColors.instalacao}
+                      strokeWidth={3}
+                      name={`Real ${year}`}
+                      connectNulls
+                      activeDot={{ r: 6 }}
+                    >
+                      <LabelList dataKey="real" position="top" />
+                    </Line>
+                    <Line
+                      type="monotone"
+                      dataKey="previsto"
+                      stroke="#10b981"
+                      strokeWidth={3}
+                      strokeDasharray="6 4"
+                      name="Projeção"
+                      connectNulls
+                    >
+                      <LabelList dataKey="previsto" position="top" />
+                    </Line>
+                    <Line
+                      type="monotone"
+                      dataKey="anterior"
+                      stroke="#9ca3af"
+                      strokeWidth={2}
+                      strokeDasharray="2 4"
+                      name={`Real ${year - 1}`}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Previsão de cancelamentos até o final do ano */}
+            {forecast && (
+              <div className="bg-white p-6 rounded-lg shadow-md h-[560px]">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800">
+                      Previsão de Cancelamentos — {year}
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      Real até {monthShort[forecast.cutoffMonth - 1]} +
+                      projeção dos meses restantes (sazonalidade {year - 1}{" "}
+                      ajustada pelo ritmo YTD)
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="bg-red-50 border border-red-100 rounded p-2 text-center min-w-[120px]">
+                      <p className="text-[10px] uppercase text-red-700 font-semibold">
+                        Realizado YTD
+                      </p>
+                      <p className="text-lg font-bold text-red-900">
+                        {forecast.cancellation.realizedYTD}
+                      </p>
+                    </div>
+                    <div className="bg-orange-50 border border-orange-100 rounded p-2 text-center min-w-[120px]">
+                      <p className="text-[10px] uppercase text-orange-700 font-semibold">
+                        Projeção restante
+                      </p>
+                      <p className="text-lg font-bold text-orange-800">
+                        {forecast.cancellation.projectedRemaining}
+                      </p>
+                    </div>
+                    <div className="bg-gray-900 rounded p-2 text-center min-w-[140px]">
+                      <p className="text-[10px] uppercase text-gray-300 font-semibold">
+                        Total previsto {year}
+                      </p>
+                      <p className="text-lg font-bold text-white">
+                        {forecast.cancellation.realizedYTD +
+                          forecast.cancellation.projectedRemaining}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height="82%">
+                  <LineChart
+                    data={forecast.cancellationChartData}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="real"
+                      stroke={categoryColors.cancelamento}
+                      strokeWidth={3}
+                      name={`Real ${year}`}
+                      connectNulls
+                      activeDot={{ r: 6 }}
+                    >
+                      <LabelList dataKey="real" position="top" />
+                    </Line>
+                    <Line
+                      type="monotone"
+                      dataKey="previsto"
+                      stroke="#f97316"
+                      strokeWidth={3}
+                      strokeDasharray="6 4"
+                      name="Projeção"
+                      connectNulls
+                    >
+                      <LabelList dataKey="previsto" position="top" />
+                    </Line>
+                    <Line
+                      type="monotone"
+                      dataKey="anterior"
+                      stroke="#9ca3af"
+                      strokeWidth={2}
+                      strokeDasharray="2 4"
+                      name={`Real ${year - 1}`}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Projeção de clientes ativos até o final do ano */}
+            {forecast && (
+              <div className="bg-white p-6 rounded-lg shadow-md h-[500px]">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800">
+                      Projeção de Clientes Ativos — {year}
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      Acumulado mês a mês: clientes atuais + (instalações −
+                      cancelamentos) projetados
+                    </p>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height="85%">
+                  <LineChart
+                    data={forecast.clientesChartData}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis
+                      domain={[
+                        (dataMin: number) =>
+                          Math.max(0, Math.floor(dataMin * 0.98)),
+                        (dataMax: number) => Math.ceil(dataMax * 1.02),
+                      ]}
+                    />
+                    <Tooltip
+                      formatter={(value: any) =>
+                        typeof value === "number"
+                          ? value.toLocaleString("pt-BR")
+                          : value
+                      }
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="previsto"
+                      stroke="#2563eb"
+                      strokeWidth={3}
+                      strokeDasharray="6 4"
+                      name="Clientes ativos (projeção)"
+                      connectNulls
+                    >
+                      <LabelList
+                        dataKey="previsto"
+                        position="top"
+                        formatter={(v: any) =>
+                          typeof v === "number" ? v.toLocaleString("pt-BR") : ""
+                        }
+                      />
+                    </Line>
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             )}
 
