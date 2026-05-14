@@ -10,5 +10,23 @@ services:
     # Usamos a variável de ambiente do arquivo .env aqui
     command: redis-server --save 60 1 --loglevel warning --requirepass ${DATABASE_PASSWORD_API}
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    # GPU NVIDIA (descomente se tiver GPU + nvidia-container-toolkit instalado)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
 volumes:
   redis_data:
+  ollama_models:

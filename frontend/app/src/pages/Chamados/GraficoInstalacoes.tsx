@@ -242,6 +242,27 @@ export const GraficoInstalacoes = () => {
   >(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiLimit, setAiLimit] = useState(100);
+  const [aiResult, setAiResult] = useState<{
+    year: number;
+    total: number;
+    analyzed: number;
+    categories: {
+      categoria: string;
+      count: number;
+      percent: number;
+      samples: string[];
+    }[];
+    items: {
+      id: number;
+      login: string;
+      abertura: string;
+      categoria: string;
+      resumo: string;
+    }[];
+  } | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
@@ -264,6 +285,29 @@ export const GraficoInstalacoes = () => {
     { length: 5 },
     (_, i) => new Date().getFullYear() - i,
   );
+
+  const runAiAnalysis = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    setAiResult(null);
+    try {
+      const headers = { Authorization: `Bearer ${user?.token}` };
+      const baseUrl = process.env.REACT_APP_URL;
+      const res = await axios.get(
+        `${baseUrl}/chamados/analytics/cancelamentos/motivos`,
+        { params: { year, limit: aiLimit }, headers, timeout: 1800000 },
+      );
+      setAiResult(res.data);
+    } catch (e: any) {
+      console.error(e);
+      setAiError(
+        e?.response?.data?.message ||
+          "Erro ao analisar cancelamentos. Verifique se o Ollama está rodando.",
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -1438,6 +1482,148 @@ export const GraficoInstalacoes = () => {
                 </ResponsiveContainer>
               </div>
             )}
+
+            {/* Análise de motivos de cancelamento via IA (Ollama local) */}
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800">
+                    Motivos de Cancelamento — Análise por IA ({year})
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    Lê as mensagens dos chamados de cancelamento via Ollama
+                    (modelo local) e agrupa por motivo. Pode levar alguns
+                    minutos dependendo do volume.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-600">
+                    Máx. chamados:
+                  </label>
+                  <input
+                    type="number"
+                    value={aiLimit}
+                    onChange={(e) =>
+                      setAiLimit(
+                        Math.max(
+                          10,
+                          Math.min(1000, Number(e.target.value) || 100),
+                        ),
+                      )
+                    }
+                    className="w-20 p-1 border border-gray-300 rounded text-sm"
+                  />
+                  <button
+                    onClick={runAiAnalysis}
+                    disabled={aiLoading}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded font-semibold hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {aiLoading ? (
+                      <>
+                        <AiOutlineLoading3Quarters className="animate-spin" />
+                        Analisando...
+                      </>
+                    ) : (
+                      "Analisar com IA"
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {aiError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded mb-3 text-sm">
+                  {aiError}
+                </div>
+              )}
+
+              {aiResult && (
+                <>
+                  <div className="text-xs text-gray-500 mb-3">
+                    {aiResult.total} de {aiResult.analyzed} chamados
+                    classificados. Apenas os que tinham mensagem entram no
+                    resumo.
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                    {aiResult.categories.map((cat) => (
+                      <div
+                        key={cat.categoria}
+                        className="border border-gray-200 rounded p-3"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-bold text-gray-800">
+                            {cat.categoria}
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg font-bold text-indigo-700">
+                              {cat.count}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ({cat.percent}%)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded overflow-hidden mb-2">
+                          <div
+                            className="h-full bg-indigo-500"
+                            style={{ width: `${cat.percent}%` }}
+                          />
+                        </div>
+                        {cat.samples.length > 0 && (
+                          <ul className="text-xs text-gray-600 space-y-1 list-disc pl-4">
+                            {cat.samples.map((s, i) => (
+                              <li key={i}>"{s}"</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <details className="text-sm">
+                    <summary className="cursor-pointer text-indigo-600 hover:underline">
+                      Ver todos os {aiResult.items.length} chamados
+                      classificados
+                    </summary>
+                    <div className="overflow-x-auto mt-2">
+                      <table className="min-w-full text-xs">
+                        <thead>
+                          <tr className="bg-gray-50 text-gray-600 uppercase">
+                            <th className="px-2 py-1 text-left">Data</th>
+                            <th className="px-2 py-1 text-left">Login</th>
+                            <th className="px-2 py-1 text-left">Categoria</th>
+                            <th className="px-2 py-1 text-left">Resumo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {aiResult.items.map((it) => (
+                            <tr
+                              key={it.id}
+                              className="border-t border-gray-100"
+                            >
+                              <td className="px-2 py-1 text-gray-500">
+                                {it.abertura
+                                  ? new Date(it.abertura).toLocaleDateString(
+                                      "pt-BR",
+                                    )
+                                  : "—"}
+                              </td>
+                              <td className="px-2 py-1 text-gray-800">
+                                {it.login}
+                              </td>
+                              <td className="px-2 py-1">{it.categoria}</td>
+                              <td className="px-2 py-1 text-gray-600">
+                                {it.resumo}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                </>
+              )}
+            </div>
 
             {/* Evolução diária */}
             <div className="bg-white p-6 rounded-lg shadow-md h-[500px]">

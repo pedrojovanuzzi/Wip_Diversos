@@ -3,7 +3,12 @@ import MkauthSource from "../database/MkauthSource";
 import { ChamadosEntities } from "../entities/ChamadosEntities";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { FuncionariosEntities } from "../entities/FuncionariosEntities";
+import { SisMsg } from "../entities/SisMsg";
 import { SelectQueryBuilder } from "typeorm";
+import {
+  analyzeCancellationReason,
+  ollamaHealth,
+} from "../services/OllamaService";
 
 type CategoryTotals = {
   instalacao: number;
@@ -965,6 +970,118 @@ class Chamados {
       res
         .status(500)
         .json({ message: "Erro ao buscar estatísticas por atendente." });
+    }
+  }
+
+  public async analyzeCancellationReasons(req: Request, res: Response) {
+    try {
+      const year = Number(req.query.year) || new Date().getFullYear();
+      const limit = Math.min(Number(req.query.limit) || 200, 1000);
+
+      const start = new Date(year, 0, 1);
+      const end = new Date(year, 11, 31, 23, 59, 59);
+
+      const ChamadoRepo = MkauthSource.getRepository(ChamadosEntities);
+      const MsgRepo = MkauthSource.getRepository(SisMsg);
+
+      const chamados = await ChamadoRepo.createQueryBuilder("c")
+        .where("c.abertura BETWEEN :start AND :end", { start, end })
+        .andWhere("c.assunto LIKE :p", { p: "%Cancela%" })
+        .orderBy("c.abertura", "DESC")
+        .limit(limit)
+        .getMany();
+
+      const CONCURRENCY = 4;
+      const results: {
+        id: number;
+        chamado: string;
+        login: string;
+        abertura: Date | undefined;
+        assunto: string;
+        categoria: string;
+        resumo: string;
+      }[] = [];
+
+      for (let i = 0; i < chamados.length; i += CONCURRENCY) {
+        const batch = chamados.slice(i, i + CONCURRENCY);
+        const batchResults = await Promise.all(
+          batch.map(async (c) => {
+            const msgs = await MsgRepo.find({
+              where: { chamado: c.chamado },
+              order: { msg_data: "ASC" },
+              take: 5,
+            });
+            const text = msgs
+              .map((m) => m.msg)
+              .filter(Boolean)
+              .join("\n---\n");
+            if (!text.trim()) return null;
+            const analysis = await analyzeCancellationReason(text);
+            return {
+              id: c.id!,
+              chamado: c.chamado || "",
+              login: c.login || "",
+              abertura: c.abertura,
+              assunto: c.assunto || "",
+              categoria: analysis.categoria,
+              resumo: analysis.resumo,
+            };
+          }),
+        );
+        batchResults.forEach((r) => r && results.push(r));
+      }
+
+      const categories: Record<
+        string,
+        { count: number; samples: string[] }
+      > = {};
+      results.forEach((r) => {
+        if (!categories[r.categoria]) {
+          categories[r.categoria] = { count: 0, samples: [] };
+        }
+        categories[r.categoria].count++;
+        if (
+          categories[r.categoria].samples.length < 8 &&
+          r.resumo &&
+          !categories[r.categoria].samples.includes(r.resumo)
+        ) {
+          categories[r.categoria].samples.push(r.resumo);
+        }
+      });
+
+      const categoryList = Object.entries(categories)
+        .map(([categoria, info]) => ({
+          categoria,
+          count: info.count,
+          percent:
+            results.length > 0
+              ? Number(((info.count / results.length) * 100).toFixed(1))
+              : 0,
+          samples: info.samples,
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      res.status(200).json({
+        year,
+        total: results.length,
+        analyzed: chamados.length,
+        categories: categoryList,
+        items: results,
+      });
+    } catch (error) {
+      console.error("Erro análise de cancelamentos:", error);
+      res
+        .status(500)
+        .json({ message: "Erro ao analisar cancelamentos." });
+    }
+  }
+
+  public async ollamaStatus(_req: Request, res: Response) {
+    try {
+      const status = await ollamaHealth();
+      res.status(status.ok ? 200 : 503).json(status);
+    } catch (error) {
+      res.status(500).json({ ok: false, error: String(error) });
     }
   }
 
