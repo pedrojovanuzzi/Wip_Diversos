@@ -291,9 +291,16 @@ Responda à pergunta de forma direta e objetiva, em português. Cite números re
   return String(res.data?.response || "").trim();
 }
 
+export type DbChatStage =
+  | "generating_sql"
+  | "executing"
+  | "summarizing"
+  | "done";
+
 export async function dbChatAsk(
   question: string,
   history: DbChatTurn[],
+  onStage?: (stage: DbChatStage) => void,
 ): Promise<{
   sql: string;
   rows: any[];
@@ -301,6 +308,7 @@ export async function dbChatAsk(
   answer: string;
   durationMs: number;
 }> {
+  onStage?.("generating_sql");
   const sql = await generateSqlFromQuestion(question, history);
   const validation = validateSql(sql);
   if (!validation.ok) {
@@ -313,7 +321,9 @@ export async function dbChatAsk(
     };
   }
 
+  onStage?.("executing");
   const { rows, durationMs } = await executeReadOnly(validation.sql);
+  onStage?.("summarizing");
   const answer = await summarizeAnswer(question, validation.sql, rows);
   return {
     sql: validation.sql,

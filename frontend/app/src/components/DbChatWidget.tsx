@@ -19,6 +19,7 @@ export const DbChatWidget: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState<string>("");
   const [history, setHistory] = useState<ChatTurn[]>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -53,27 +54,49 @@ export const DbChatWidget: React.FC = () => {
     setHistory(next);
     setInput("");
     setLoading(true);
+    setStage("generating_sql");
     try {
       const baseUrl = process.env.REACT_APP_URL;
-      const res = await axios.post(
-        `${baseUrl}/db-chat/ask`,
+      const startRes = await axios.post(
+        `${baseUrl}/db-chat/ask/start`,
         {
           question: q,
           history: history.map((h) => ({ role: h.role, content: h.content })),
         },
         {
           headers: { Authorization: `Bearer ${user.token}` },
-          timeout: 300000,
+          timeout: 30000,
         },
       );
+      const jobId = startRes.data.jobId;
+
+      let result: any = null;
+      while (true) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const statusRes = await axios.get(`${baseUrl}/db-chat/ask/status`, {
+          params: { jobId },
+          headers: { Authorization: `Bearer ${user.token}` },
+          timeout: 30000,
+        });
+        const data = statusRes.data;
+        if (data.stage) setStage(data.stage);
+        if (data.stage === "done") {
+          result = data.result;
+          break;
+        }
+        if (data.stage === "error") {
+          throw new Error(data.error || "Erro na consulta");
+        }
+      }
+
       setHistory([
         ...next,
         {
           role: "assistant",
-          content: res.data.answer || "(sem resposta)",
-          sql: res.data.sql,
-          rowCount: res.data.rowCount,
-          rows: res.data.rows,
+          content: result?.answer || "(sem resposta)",
+          sql: result?.sql,
+          rowCount: result?.rowCount,
+          rows: result?.rows,
         },
       ]);
     } catch (e: any) {
@@ -88,7 +111,15 @@ export const DbChatWidget: React.FC = () => {
       ]);
     } finally {
       setLoading(false);
+      setStage("");
     }
+  };
+
+  const stageLabel = (s: string) => {
+    if (s === "generating_sql") return "Gerando SQL...";
+    if (s === "executing") return "Executando consulta no banco...";
+    if (s === "summarizing") return "Formatando resposta...";
+    return "Processando...";
   };
 
   const clearHistory = () => {
@@ -181,7 +212,7 @@ export const DbChatWidget: React.FC = () => {
             {loading && (
               <div className="text-xs text-gray-500 italic flex items-center gap-2">
                 <AiOutlineLoading3Quarters className="animate-spin" />
-                Gerando SQL, executando e formatando resposta...
+                {stageLabel(stage)}
               </div>
             )}
           </div>
