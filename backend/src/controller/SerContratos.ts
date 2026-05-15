@@ -1,7 +1,13 @@
 import { Request, Response } from "express";
 import MkauthSource from "../database/MkauthSource";
+import AppDataSource from "../database/DataSource";
 import { SisSerContratos } from "../entities/SisSerContratos";
 import { ClientesEntities } from "../entities/ClientesEntities";
+import { StreamingAssinante } from "../entities/StreamingAssinante";
+import {
+  insertAssinante,
+  deleteTicket,
+} from "../services/WatchBrasilService";
 
 const VALORES: Record<string, number> = {
   STREAMER: 39.9,
@@ -130,9 +136,53 @@ class SerContratos {
         throw e;
       });
 
+      // Integração Watch Brasil — só pra STREAMER
+      let streamingInfo: any = null;
+      if (tipoNorm === "STREAMER") {
+        try {
+          const apiResp = await insertAssinante({
+            email: cliente.email || "",
+            assinanteIDIntegracao: cliente.login,
+            phone: cliente.celular || cliente.fone || "",
+          });
+          const ticket =
+            apiResp?.ticket ||
+            apiResp?.pTicket ||
+            apiResp?.data?.ticket ||
+            null;
+
+          const streamingRepo =
+            AppDataSource.getRepository(StreamingAssinante);
+          let assinante = await streamingRepo.findOne({
+            where: { login: cliente.login },
+          });
+          if (!assinante) {
+            assinante = streamingRepo.create({
+              login: cliente.login,
+            });
+          }
+          assinante.email = cliente.email || "";
+          assinante.phone = cliente.celular || cliente.fone || "";
+          assinante.assinante_id_integracao = cliente.login;
+          assinante.ticket = ticket || assinante.ticket;
+          assinante.ativo = true;
+          assinante.last_response = JSON.stringify(apiResp).slice(0, 2000);
+          await streamingRepo.save(assinante);
+          streamingInfo = { ticket, assinante };
+        } catch (e: any) {
+          console.error("Erro ao criar assinante Watch Brasil:", e?.message);
+          streamingInfo = {
+            error:
+              "Streaming adicionado localmente, mas falha ao registrar na Watch Brasil: " +
+              (e?.response?.data?.message || e?.message || "erro desconhecido"),
+          };
+        }
+      }
+
       res.status(201).json({
         message: `${saved.length} item(ns) adicionado(s).`,
         items: saved,
+        streaming: streamingInfo,
       });
     } catch (error: any) {
       if (error?.status === 409) {
@@ -159,8 +209,30 @@ class SerContratos {
         res.status(404).json({ message: "Item não encontrado." });
         return;
       }
+
+      // Se for STREAMER, derruba na Watch Brasil também
+      let streamingNote: string | null = null;
+      if ((item.nome || "").toUpperCase() === "STREAMER") {
+        try {
+          const streamingRepo =
+            AppDataSource.getRepository(StreamingAssinante);
+          const assinante = await streamingRepo.findOne({
+            where: { login: item.login },
+          });
+          if (assinante?.ticket) {
+            await deleteTicket(assinante.ticket);
+          }
+          if (assinante) await streamingRepo.delete(assinante.id);
+        } catch (e: any) {
+          console.error("Erro ao remover ticket Watch Brasil:", e?.message);
+          streamingNote =
+            "Removido localmente mas falhou remoção na Watch Brasil: " +
+            (e?.response?.data?.message || e?.message || "erro");
+        }
+      }
+
       await repo.delete(id);
-      res.json({ ok: true });
+      res.json({ ok: true, streaming: streamingNote });
     } catch (error: any) {
       console.error("Erro ao remover sercontratos:", error);
       res.status(500).json({ message: "Erro ao remover." });

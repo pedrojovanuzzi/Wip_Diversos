@@ -1,9 +1,15 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { BsTrash, BsCamera, BsCollectionPlay } from "react-icons/bs";
+import {
+  BsTrash,
+  BsCamera,
+  BsCollectionPlay,
+  BsGearFill,
+} from "react-icons/bs";
 
 interface ContratoItem {
   id: number;
@@ -25,6 +31,7 @@ interface ListResponse {
 
 export const SerContratos: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loginInput, setLoginInput] = useState("");
   const [loaded, setLoaded] = useState<ListResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -127,9 +134,18 @@ export const SerContratos: React.FC = () => {
       <NavBar />
       <div className="min-h-screen bg-gray-100 p-6">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">
-            Serviços Adicionais — Streaming e Câmeras
-          </h1>
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold text-gray-800">
+              Serviços Adicionais — Streaming e Câmeras
+            </h1>
+            <button
+              onClick={() => navigate("/Streaming")}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded font-semibold hover:bg-gray-900"
+              title="Gerenciar assinantes do Watch Brasil"
+            >
+              <BsGearFill /> Admin Streaming
+            </button>
+          </div>
 
           <div className="bg-white p-4 rounded-lg shadow-md mb-4">
             <label className="block text-sm font-semibold text-gray-700 mb-1">

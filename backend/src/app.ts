@@ -7,6 +7,7 @@ import Auth from "./routes/Auth.Routes";
 import ChamadosRouter from "./routes/Chamados.Routes";
 import DbChatRoutes from "./routes/DbChat.Routes";
 import SerContratosRoutes from "./routes/SerContratos.Routes";
+import StreamingRoutes from "./routes/Streaming.Routes";
 import Home from "./routes/Home.Routes";
 import Feed from "./routes/Feedback.routes";
 import NFSE from "./routes/NFSE.routes";
@@ -63,6 +64,7 @@ export class App {
     this.server.use("/api/chamados", ChamadosRouter);
     this.server.use("/api/db-chat", DbChatRoutes);
     this.server.use("/api/sercontratos", SerContratosRoutes);
+    this.server.use("/api/streaming", StreamingRoutes);
     this.server.use("/api/", Home);
     this.server.use("/api/auth", Auth);
     this.server.use("/api/feedback", Feed);

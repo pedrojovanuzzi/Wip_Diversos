@@ -29,6 +29,7 @@ import { DesautorizaOnu } from "./pages/onu/DesautorizaOnu";
 import { useAuth } from "./context/AuthContext";
 import { DbChatWidget } from "./components/DbChatWidget";
 import { SerContratos } from "./pages/SerContratos/SerContratos";
+import { StreamingAdmin } from "./pages/SerContratos/StreamingAdmin";
 import { OnuSettings } from "./pages/onu/OnuSettings";
 import { LogsClient } from "./pages/ClientAnalytics/LogsClient";
 import { Create } from "./pages/create_users/Create";
@@ -538,6 +539,16 @@ function App() {
             element={
               user?.token ? (
                 <SerContratos />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/Streaming"
+            element={
+              user?.token ? (
+                <StreamingAdmin />
               ) : (
                 <Navigate to="/auth/login" />
               )
