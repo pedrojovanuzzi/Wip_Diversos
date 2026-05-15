@@ -2,7 +2,14 @@ import axios from "axios";
 
 const BASE_URL =
   process.env.WATCH_BRASIL_URL || "https://apiweb.watch.tv.br/watch";
+const TOKEN_URI =
+  process.env.WATCH_BRASIL_TOKEN_URI ||
+  "https://apiweb.watch.tv.br/oauth/token";
+const AUTH_URI =
+  process.env.WATCH_BRASIL_AUTH_URI ||
+  "https://apiweb.watch.tv.br/watch/v1/oauth/authenticate";
 const CLIENT_ID = process.env.WATCH_BRASIL_CLIENT_ID || "";
+const CLIENT_SECRET = process.env.WATCH_BRASIL_CLIENT_SECRET || "";
 const REDIRECT_URL = process.env.WATCH_BRASIL_REDIRECT_URL || "";
 const PACOTE_DEFAULT = process.env.WATCH_BRASIL_PACOTE_DEFAULT || "";
 
