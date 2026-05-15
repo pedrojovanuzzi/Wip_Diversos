@@ -21,6 +21,42 @@ interface CachedToken {
 
 let cachedToken: CachedToken | null = null;
 
+interface PendingAuth {
+  resolve: (code: string) => void;
+  reject: (err: Error) => void;
+  timer: NodeJS.Timeout;
+}
+let pendingAuth: PendingAuth | null = null;
+const CALLBACK_TIMEOUT_MS = 60000;
+
+export function deliverAuthCode(code: string): boolean {
+  if (!pendingAuth) return false;
+  const p = pendingAuth;
+  pendingAuth = null;
+  clearTimeout(p.timer);
+  p.resolve(code);
+  return true;
+}
+
+function waitForAuthCode(): Promise<string> {
+  if (pendingAuth) {
+    return Promise.reject(
+      new Error("Já existe uma autenticação Watch Brasil em andamento"),
+    );
+  }
+  return new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingAuth = null;
+      reject(
+        new Error(
+          `Timeout aguardando callback /redirect com code (${CALLBACK_TIMEOUT_MS}ms)`,
+        ),
+      );
+    }, CALLBACK_TIMEOUT_MS);
+    pendingAuth = { resolve, reject, timer };
+  });
+}
+
 function form(params: Record<string, any>): string {
   const sp = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -42,32 +78,60 @@ export async function authenticate(force = false): Promise<string> {
   if (!CLIENT_SECRET)
     throw new Error("WATCH_BRASIL_CLIENT_SECRET não configurado");
 
-  const authRes = await axios.post(
-    AUTH_URI,
-    form({
-      client_id: CLIENT_ID,
-      redirect_url: REDIRECT_URL,
-      approval_prompt: "false",
-      uid: "1",
-    }),
-    {
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      timeout: 30000,
-    },
-  );
+  if (!REDIRECT_URL)
+    throw new Error("WATCH_BRASIL_REDIRECT_URL não configurado");
 
-  const authData = authRes.data;
-  const code =
+  const codePromise = waitForAuthCode();
+
+  let authData: any;
+  try {
+    const authRes = await axios.post(
+      AUTH_URI,
+      form({
+        client_id: CLIENT_ID,
+        redirect_url: REDIRECT_URL,
+        approval_prompt: "false",
+        uid: "1",
+      }),
+      {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        timeout: 30000,
+      },
+    );
+    authData = authRes.data;
+  } catch (e) {
+    if (pendingAuth) {
+      clearTimeout(pendingAuth.timer);
+      pendingAuth = null;
+    }
+    throw e;
+  }
+
+  const inlineCode =
     authData?.code ||
     authData?.authorization_code ||
     authData?.auth_code ||
     authData?.value;
-  if (!code || typeof code !== "string") {
-    throw new Error(
-      "Resposta de /authenticate sem code reconhecido: " +
-        JSON.stringify(authData).slice(0, 300),
-    );
+  if (inlineCode && typeof inlineCode === "string") {
+    if (pendingAuth) {
+      clearTimeout(pendingAuth.timer);
+      pendingAuth = null;
+    }
+    return exchangeCodeForToken(inlineCode, TTL);
   }
+
+  const code = await codePromise;
+  return exchangeCodeForToken(code, TTL);
+}
+
+export async function exchangeCodeForToken(
+  code: string,
+  fallbackTtlMs = 50 * 60 * 1000,
+): Promise<string> {
+  if (!CLIENT_ID) throw new Error("WATCH_BRASIL_CLIENT_ID não configurado");
+  if (!CLIENT_SECRET)
+    throw new Error("WATCH_BRASIL_CLIENT_SECRET não configurado");
+  if (!code) throw new Error("code obrigatório para troca de token");
 
   const tokenRes = await axios.post(
     TOKEN_URI,
@@ -98,7 +162,9 @@ export async function authenticate(force = false): Promise<string> {
 
   const expiresIn = Number(tokenData?.expires_in);
   const ttlMs =
-    Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn * 1000 : TTL;
+    Number.isFinite(expiresIn) && expiresIn > 0
+      ? expiresIn * 1000
+      : fallbackTtlMs;
 
   cachedToken = { token, fetchedAt: Date.now(), ttlMs };
   return token;
