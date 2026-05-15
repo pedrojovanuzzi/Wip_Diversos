@@ -38,7 +38,7 @@ import { FaFlask } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Cookies from "js-cookie";
-import { BsFillSendPlusFill } from "react-icons/bs";
+import { BsFillSendPlusFill, BsCameraVideoFill } from "react-icons/bs";
 
 type Color = {
   color?: string;
@@ -197,6 +197,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   }
                   title="Pix"
                   description="Gestão de pagamentos via Pix"
+                />
+                <NavItem
+                  to="/SerContratos"
+                  icon={
+                    <BsCameraVideoFill className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Streaming / Câmeras"
+                  description="Contratar serviços adicionais de streaming e câmeras"
                 />
                 <NavItem
                   to="/solicitacoes-servico"

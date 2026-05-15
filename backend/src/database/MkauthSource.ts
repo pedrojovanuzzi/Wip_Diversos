@@ -9,6 +9,7 @@ import { Sis_prodCliente } from "../entities/Sis_prodCliente";
 import { SisProduto } from "../entities/SisProduto";
 import { SisPlano } from "../entities/SisPlano";
 import { SisMsg } from "../entities/SisMsg";
+import { SisSerContratos } from "../entities/SisSerContratos";
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ const AppDataSource = new DataSource({
     SisProduto,
     SisPlano,
     SisMsg,
+    SisSerContratos,
   ],
   synchronize: false,
   database: process.env.DATABASE_API,

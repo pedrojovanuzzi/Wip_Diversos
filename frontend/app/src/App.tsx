@@ -28,6 +28,7 @@ import { AutorizarOnu } from "./pages/onu/AutorizarOnu";
 import { DesautorizaOnu } from "./pages/onu/DesautorizaOnu";
 import { useAuth } from "./context/AuthContext";
 import { DbChatWidget } from "./components/DbChatWidget";
+import { SerContratos } from "./pages/SerContratos/SerContratos";
 import { OnuSettings } from "./pages/onu/OnuSettings";
 import { LogsClient } from "./pages/ClientAnalytics/LogsClient";
 import { Create } from "./pages/create_users/Create";
@@ -531,6 +532,16 @@ function App() {
           <Route
             path="/GerarNotaDeServicoIndependente"
             element={<GerarNotaDeServicoIndependente />}
+          />
+          <Route
+            path="/SerContratos"
+            element={
+              user?.token ? (
+                <SerContratos />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
           />
           <Route path="/TimeTracking/ClockIn" element={<TimeClock />} />
           <Route
