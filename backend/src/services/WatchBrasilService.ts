@@ -39,9 +39,11 @@ export async function authenticate(force = false): Promise<string> {
     return cachedToken.token;
   }
   if (!CLIENT_ID) throw new Error("WATCH_BRASIL_CLIENT_ID não configurado");
+  if (!CLIENT_SECRET)
+    throw new Error("WATCH_BRASIL_CLIENT_SECRET não configurado");
 
-  const res = await axios.post(
-    `${BASE_URL}/v1/oauth/authenticate`,
+  const authRes = await axios.post(
+    AUTH_URI,
     form({
       client_id: CLIENT_ID,
       redirect_url: REDIRECT_URL,
@@ -54,16 +56,51 @@ export async function authenticate(force = false): Promise<string> {
     },
   );
 
-  const data = res.data;
-  const token =
-    data?.access_token || data?.token || data?.Authorization || data?.value;
-  if (!token || typeof token !== "string") {
+  const authData = authRes.data;
+  const code =
+    authData?.code ||
+    authData?.authorization_code ||
+    authData?.auth_code ||
+    authData?.value;
+  if (!code || typeof code !== "string") {
     throw new Error(
-      "Resposta de autenticação Watch Brasil sem token reconhecido: " +
-        JSON.stringify(data).slice(0, 300),
+      "Resposta de /authenticate sem code reconhecido: " +
+        JSON.stringify(authData).slice(0, 300),
     );
   }
-  cachedToken = { token, fetchedAt: Date.now(), ttlMs: TTL };
+
+  const tokenRes = await axios.post(
+    TOKEN_URI,
+    form({
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      code,
+      grant_type: "password",
+    }),
+    {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      timeout: 30000,
+    },
+  );
+
+  const tokenData = tokenRes.data;
+  const token =
+    tokenData?.access_token ||
+    tokenData?.token ||
+    tokenData?.Authorization ||
+    tokenData?.value;
+  if (!token || typeof token !== "string") {
+    throw new Error(
+      "Resposta de /oauth/token sem access_token reconhecido: " +
+        JSON.stringify(tokenData).slice(0, 300),
+    );
+  }
+
+  const expiresIn = Number(tokenData?.expires_in);
+  const ttlMs =
+    Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn * 1000 : TTL;
+
+  cachedToken = { token, fetchedAt: Date.now(), ttlMs };
   return token;
 }
 
