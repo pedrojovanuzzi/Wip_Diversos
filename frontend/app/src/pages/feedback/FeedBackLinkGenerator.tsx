@@ -79,8 +79,16 @@ const YesOrNoChart = ({
   label: string;
   isMobile: boolean;
 }) => {
-  const simCount = data.find((d) => d.note === 1)?.count || 0;
-  const naoCount = data.find((d) => d.note === 0)?.count || 0;
+  const truthy = (v: any) =>
+    v === 1 || v === "1" || v === true || v === "true" || v === "sim";
+  const falsy = (v: any) =>
+    v === 0 || v === "0" || v === false || v === "false" || v === "nao" || v === "não";
+  const simCount = data
+    .filter((d) => truthy(d.note))
+    .reduce((s, d) => s + Number(d.count || 0), 0);
+  const naoCount = data
+    .filter((d) => falsy(d.note))
+    .reduce((s, d) => s + Number(d.count || 0), 0);
 
   return (
     <BarChart

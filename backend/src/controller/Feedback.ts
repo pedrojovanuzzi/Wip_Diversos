@@ -91,6 +91,7 @@ class FeedbackController {
       feedback.you_problem_as_solved = feedbackData.ratingDoYouProblemSolved;
       feedback.you_recomend = feedbackData.ratingDoYouRecomend;
       feedback.used = true;
+      feedback.time = new Date();
 
       await feedbackRepository.save(feedback);
 

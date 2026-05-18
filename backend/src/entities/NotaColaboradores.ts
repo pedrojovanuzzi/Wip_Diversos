@@ -10,32 +10,30 @@ export class Feedback {
     @Column({type: 'varchar'})
     login?: string
 
-    @Column({type: 'varchar'})
+    @Column({type: 'varchar', nullable: true})
     opnion?: string
 
-    @Column({type: 'varchar'})
+    @Column({type: 'varchar', nullable: true})
     note_internet?: string
 
-    @Column({type: 'varchar'})
+    @Column({type: 'varchar', nullable: true})
     note_service?: string
 
-    @Column({type: 'varchar'})
+    @Column({type: 'varchar', nullable: true})
     note_response_time?: string
 
-    @Column({type: 'varchar'})
+    @Column({type: 'varchar', nullable: true})
     note_technician_service?: string
 
-    @Column({type: 'varchar'})
+    @Column({type: 'varchar', nullable: true})
     you_problem_as_solved?: string
 
-    @Column({type: 'varchar'})
+    @Column({type: 'varchar', nullable: true})
     you_recomend?: string
 
     @Column({type: 'boolean', default: false })
+    used?: boolean;
 
-    used
-    ?: boolean;
-
-    @Column({type: 'datetime'})
+    @Column({type: 'datetime', nullable: true})
     time?: Date
 }
