@@ -33,6 +33,9 @@ export class DailyOvertime {
   @Column({ type: "longtext", nullable: true })
   signature!: string;
 
+  @Column({ type: "varchar", length: 20, nullable: true, name: "day_status" })
+  dayStatus!: string | null;
+
   @CreateDateColumn()
   created_at!: Date;
 

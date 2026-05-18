@@ -23,6 +23,8 @@ export const MonthlyReport = () => {
   const [overtimeData, setOvertimeData] = useState<{
     [key: string]: { hours50: any; hours100: any };
   }>({});
+  const [dayStatuses, setDayStatuses] = useState<{ [key: string]: string }>({});
+  const [savingStatusDate, setSavingStatusDate] = useState<string | null>(null);
   const [monthlySignature, setMonthlySignature] = useState<string | null>(null);
   const [showSigModal, setShowSigModal] = useState(false);
   const [editScale, setEditScale] = useState<"8h" | "12h" | "Integral" | "4h">("8h");
@@ -148,6 +150,7 @@ export const MonthlyReport = () => {
       );
       const overtime: any = {};
       const signatures: any = {};
+      const statuses: { [key: string]: string } = {};
 
       res.data.forEach((r: any) => {
         const d = moment(r.date.toString().split("T")[0]).format("DD/MM/YYYY");
@@ -158,9 +161,13 @@ export const MonthlyReport = () => {
         if (r.signature) {
           signatures[d] = r.signature;
         }
+        if (r.dayStatus) {
+          statuses[d] = r.dayStatus;
+        }
       });
       setOvertimeData(overtime);
       setDailySignatures(signatures);
+      setDayStatuses(statuses);
     } catch (error) {
       console.error("Error fetching overtime:", error);
     }
@@ -169,6 +176,37 @@ export const MonthlyReport = () => {
   const handleSaveSignature = (data: string) => {
     setMonthlySignature(data);
     setShowSigModal(false);
+  };
+
+  const saveDayStatus = async (
+    dateBr: string,
+    status: "FOLGA" | "FALTA" | "ATESTADO" | null,
+  ) => {
+    if (!selectedEmployee) return;
+    const isoDate = moment(dateBr, "DD/MM/YYYY").format("YYYY-MM-DD");
+    setSavingStatusDate(dateBr);
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_URL}/time-tracking/day-status`,
+        {
+          employeeId: Number(selectedEmployee),
+          date: isoDate,
+          status,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setDayStatuses((prev) => {
+        const next = { ...prev };
+        if (status) next[dateBr] = status;
+        else delete next[dateBr];
+        return next;
+      });
+    } catch (error) {
+      console.error("Erro ao salvar status do dia:", error);
+      alert("Erro ao salvar status do dia.");
+    } finally {
+      setSavingStatusDate(null);
+    }
   };
 
   const fetchRecords = async () => {
@@ -468,8 +506,60 @@ export const MonthlyReport = () => {
                               </span>
                             );
                           })
+                        ) : dayStatuses[date] ? (
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              dayStatuses[date] === "FOLGA"
+                                ? "bg-blue-100 text-blue-800 border border-blue-300"
+                                : dayStatuses[date] === "FALTA"
+                                ? "bg-red-100 text-red-800 border border-red-300"
+                                : "bg-yellow-100 text-yellow-800 border border-yellow-300"
+                            }`}
+                          >
+                            {dayStatuses[date]}
+                          </span>
                         ) : (
                           <span className="text-gray-400">-</span>
+                        )}
+                        {dayRecords.length === 0 && (
+                          <div className="flex gap-1 ml-1 print:hidden">
+                            {dayStatuses[date] ? (
+                              <button
+                                disabled={savingStatusDate === date}
+                                onClick={() => saveDayStatus(date, null)}
+                                className="text-[9px] px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50"
+                                title="Remover status"
+                              >
+                                ×
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  disabled={savingStatusDate === date}
+                                  onClick={() => saveDayStatus(date, "FOLGA")}
+                                  className="text-[9px] px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded disabled:opacity-50"
+                                >
+                                  Folga
+                                </button>
+                                <button
+                                  disabled={savingStatusDate === date}
+                                  onClick={() => saveDayStatus(date, "FALTA")}
+                                  className="text-[9px] px-1.5 py-0.5 bg-red-100 hover:bg-red-200 text-red-800 rounded disabled:opacity-50"
+                                >
+                                  Falta
+                                </button>
+                                <button
+                                  disabled={savingStatusDate === date}
+                                  onClick={() =>
+                                    saveDayStatus(date, "ATESTADO")
+                                  }
+                                  className="text-[9px] px-1.5 py-0.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded disabled:opacity-50"
+                                >
+                                  Atestado
+                                </button>
+                              </>
+                            )}
+                          </div>
                         )}
                       </div>
                     </td>

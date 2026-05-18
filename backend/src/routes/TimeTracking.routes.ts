@@ -46,6 +46,7 @@ TimeTrackingRoutes.delete(
 // Overtime Routes
 TimeTrackingRoutes.post("/overtime", DailyOvertimeController.save);
 TimeTrackingRoutes.post("/signature", DailyOvertimeController.saveSignature);
+TimeTrackingRoutes.post("/day-status", DailyOvertimeController.saveDayStatus);
 
 TimeTrackingRoutes.get(
   "/overtime/:employeeId/:month/:year",

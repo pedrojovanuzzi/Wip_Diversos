@@ -108,6 +108,54 @@ class DailyOvertimeController {
     }
   };
 
+  saveDayStatus = async (req: Request, res: Response) => {
+    try {
+      const { employeeId, date, status } = req.body as {
+        employeeId?: number | string;
+        date?: string;
+        status?: string | null;
+      };
+      const empId = Number(employeeId);
+      if (!empId || !date) {
+        res.status(400).json({ error: "employeeId e date são obrigatórios." });
+        return;
+      }
+      const allowed = ["FOLGA", "FALTA", "ATESTADO", null, ""];
+      const normalized =
+        status === null || status === "" || status === undefined
+          ? null
+          : String(status).toUpperCase();
+      if (!allowed.includes(normalized as any)) {
+        res.status(400).json({
+          error: "status inválido. Use FOLGA, FALTA, ATESTADO ou null.",
+        });
+        return;
+      }
+
+      const repo = DataSource.getRepository(DailyOvertime);
+      let record = await repo.findOne({
+        where: { employeeId: empId, date },
+      });
+      if (record) {
+        record.dayStatus = normalized;
+        await repo.save(record);
+      } else {
+        record = repo.create({
+          employeeId: empId,
+          date,
+          hours50: 0,
+          hours100: 0,
+          dayStatus: normalized,
+        });
+        await repo.save(record);
+      }
+      res.json(record);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Internal Error" });
+    }
+  };
+
   getByMonth = async (req: Request, res: Response) => {
     try {
       const { employeeId, month, year } = req.params;
