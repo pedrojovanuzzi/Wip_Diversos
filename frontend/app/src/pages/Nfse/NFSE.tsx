@@ -227,17 +227,22 @@ export const NFSE = () => {
     <div>
       <NavBar />
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
-      <Link
-        className="flex justify-center sm:justify-start"
-        to="/BuscarNfseGerada"
-      >
-        <button
-          className="bg-violet-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
-          onClick={() => setShowPopUp(true)}
-        >
-          NF-es Geradas
-        </button>
-      </Link>
+      <div className="flex flex-wrap justify-center sm:justify-start">
+        <Link to="/BuscarNfseGerada">
+          <button
+            className="bg-violet-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
+          >
+            NF-es Geradas
+          </button>
+        </Link>
+        <Link to="/NFSE/ServicosAdicionais">
+          <button
+            className="bg-emerald-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-12 m-5 rounded hover:bg-emerald-600 transition-all"
+          >
+            Serviços Adicionais (Streaming/Câmera)
+          </button>
+        </Link>
+      </div>
       <Filter
         setActiveFilters={setActiveFilters}
         setDate={setDateFilter}

@@ -1760,6 +1760,399 @@ export class NFSEController {
       res.status(500).json({ error: "Erro interno" });
     }
   }
+
+  public BuscarClientesServicos = async (req: Request, res: Response) => {
+    try {
+      const { cpf, cidade, ativo } = (req.body || {}) as {
+        cpf?: string;
+        cidade?: string;
+        ativo?: string;
+      };
+
+      const params: any[] = [];
+      const where: string[] = [];
+      where.push(
+        "(UPPER(TRIM(sc.nome)) = 'STREAMER' OR UPPER(TRIM(sc.nome)) = 'CAMERA')",
+      );
+      if (cpf) {
+        const cpfDigits = String(cpf).replace(/\D/g, "");
+        if (cpfDigits) {
+          where.push(
+            "REPLACE(REPLACE(REPLACE(c.cpf_cnpj,'.',''),'-',''),'/','') LIKE ?",
+          );
+          params.push(`%${cpfDigits}%`);
+        }
+      }
+      if (cidade) {
+        where.push("UPPER(c.cidade) LIKE ?");
+        params.push(`%${String(cidade).toUpperCase()}%`);
+      }
+      if (ativo === "s" || ativo === "n") {
+        where.push("c.cli_ativado = ?");
+        params.push(ativo);
+      }
+
+      const sql = `
+        SELECT
+          c.login,
+          c.nome,
+          c.email,
+          c.cidade,
+          c.cpf_cnpj,
+          c.cli_ativado,
+          SUM(CASE WHEN UPPER(TRIM(sc.nome)) = 'STREAMER' THEN 1 ELSE 0 END) AS qtd_streamer,
+          SUM(CASE WHEN UPPER(TRIM(sc.nome)) = 'CAMERA'   THEN 1 ELSE 0 END) AS qtd_camera,
+          SUM(CASE WHEN UPPER(TRIM(sc.nome)) = 'STREAMER' THEN sc.valor ELSE 0 END) AS valor_streamer,
+          SUM(CASE WHEN UPPER(TRIM(sc.nome)) = 'CAMERA'   THEN sc.valor ELSE 0 END) AS valor_camera,
+          SUM(sc.valor) AS valor_total
+        FROM sis_sercontratos sc
+        INNER JOIN sis_cliente c ON UPPER(TRIM(c.login)) = UPPER(TRIM(sc.login))
+        WHERE ${where.join(" AND ")}
+        GROUP BY c.login, c.nome, c.email, c.cidade, c.cpf_cnpj, c.cli_ativado
+        ORDER BY c.nome ASC
+      `;
+
+      const rows = await MkauthSource.query(sql, params);
+      res.json(rows);
+    } catch (error: any) {
+      console.error("Erro BuscarClientesServicos:", error?.message);
+      res.status(500).json({ error: "Erro ao buscar clientes." });
+    }
+  };
+
+  private async _emitirNfseServicoUnico(opts: {
+    login: string;
+    valor: number;
+    servico: string;
+    descricao: string;
+    password: string;
+    ambiente: string;
+    aliquota: string;
+    currentRpsNumber: number;
+    nextNfseNumber: number;
+    targetSeries: string;
+  }): Promise<{ ok: boolean; error?: any; nfse?: any }> {
+    const {
+      login,
+      valor,
+      servico,
+      descricao,
+      password,
+      ambiente,
+      aliquota,
+      currentRpsNumber,
+      nextNfseNumber,
+      targetSeries,
+    } = opts;
+
+    const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+    const ClientData = await ClientRepository.findOne({ where: { login } });
+    if (!ClientData) {
+      return { ok: false, error: `Cliente ${login} não encontrado` };
+    }
+
+    const uuidLanc = uuidv4();
+
+    let ibgeId = "3503406";
+    try {
+      const resp = await axios.get(
+        `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`,
+      );
+      ibgeId = resp.data.id;
+    } catch {
+      /* ignore */
+    }
+
+    const email =
+      ClientData?.email && ClientData.email.trim() !== ""
+        ? ClientData.email.trim()
+        : "sememail@wiptelecom.com.br";
+
+    const cnpjPrestador =
+      ambiente === "producao"
+        ? process.env.MUNICIPIO_LOGIN
+        : process.env.MUNICIPIO_CNPJ_TEST;
+    const inscricaoPrestador =
+      ambiente === "producao"
+        ? process.env.MUNICIPIO_INCRICAO
+        : process.env.MUNICIPIO_INCRICAO_TEST;
+
+    const aliquotaFmt = Number(aliquota || 0).toFixed(4);
+    const serieToUse = ambiente === "homologacao" ? "wip99" : targetSeries;
+    const emailToUse =
+      ambiente === "homologacao"
+        ? "suporte_wiptelecom@outlook.com"
+        : email;
+    const regimeEspecial = ambiente === "homologacao" ? "" : "6";
+    const optanteSimples = ambiente === "homologacao" ? "2" : "1";
+
+    const xml = this.xmlFactory.createRpsXml(
+      uuidLanc,
+      currentRpsNumber,
+      serieToUse,
+      "1",
+      new Date(),
+      "1",
+      Number(valor),
+      aliquotaFmt,
+      2,
+      1,
+      servico,
+      this.removerAcentos(descricao || "Servicos Adicionais"),
+      "3503406",
+      1,
+      cnpjPrestador!,
+      inscricaoPrestador!,
+      ClientData.cpf_cnpj,
+      this.removerAcentos(ClientData.nome || ""),
+      this.removerAcentos(ClientData.endereco || ""),
+      ClientData.numero || "",
+      this.removerAcentos(ClientData.complemento || ""),
+      this.removerAcentos(ClientData.bairro || ""),
+      String(ibgeId),
+      "SP",
+      ClientData.cep.replace(/[^0-9]/g, "") || "",
+      ClientData.celular.replace(/[^0-9]/g, "") || "",
+      emailToUse,
+      regimeEspecial,
+      optanteSimples,
+      2,
+    );
+
+    const signedRps = this.fiorilliProvider.assinarXml(
+      xml,
+      "InfDeclaracaoPrestacaoServico",
+      password,
+    );
+
+    const loteId = `lote${currentRpsNumber}`;
+    const loteXml = this.xmlFactory.createLoteXml(
+      loteId,
+      cnpjPrestador || "",
+      inscricaoPrestador || "",
+      1,
+      signedRps,
+    );
+
+    const loginMunicipio =
+      ambiente === "producao"
+        ? process.env.MUNICIPIO_LOGIN
+        : process.env.MUNICIPIO_LOGIN_TEST;
+    const senhaMunicipio =
+      ambiente === "producao"
+        ? process.env.MUNICIPIO_SENHA
+        : process.env.MUNICIPIO_SENHA_TEST;
+
+    const soapXml = this.xmlFactory.createEnviarLoteSoap(
+      loteXml,
+      loginMunicipio!,
+      senhaMunicipio!,
+    );
+
+    let responseXml;
+    try {
+      responseXml = await this.fiorilliProvider.sendSoapRequest(
+        soapXml,
+        "EnviarLoteRpsSincronoEnvio",
+        password,
+      );
+    } catch (err: any) {
+      console.error(
+        "[NFSE-Servicos] SOAP fault para",
+        login,
+        ":",
+        err?.response?.data || err?.message,
+      );
+      return { ok: false, error: err?.response?.data || err?.message || err };
+    }
+
+    console.log("[NFSE-Servicos] Response XML para", login, ":", responseXml);
+
+    const parsed = await parseStringPromise(responseXml, {
+      explicitArray: false,
+    });
+    const resposta =
+      parsed?.["soap:Envelope"]?.["soap:Body"]?.[
+        "ns3:recepcionarLoteRpsSincronoResponse"
+      ]?.["ns2:EnviarLoteRpsSincronoResposta"];
+
+    const temSucesso = resposta?.["ns2:ListaNfse"]?.["ns2:CompNfse"];
+    const temErro =
+      resposta?.["ns2:ListaMensagemRetorno"]?.["ns2:MensagemRetorno"] ||
+      resposta?.["ns2:ListaMensagemRetornoLote"]?.["ns2:MensagemRetorno"];
+
+    if (!temSucesso) {
+      console.error(
+        "[NFSE-Servicos] Falha para",
+        login,
+        "— erro:",
+        JSON.stringify(temErro || resposta).slice(0, 2000),
+      );
+      return { ok: false, error: temErro || resposta };
+    }
+
+    const NsfeData = AppDataSource.getRepository(NFSE);
+    const novoRegistro = NsfeData.create({
+      login,
+      numeroRps: currentRpsNumber,
+      serieRps: serieToUse,
+      tipoRps: 1,
+      dataEmissao: new Date(),
+      competencia: new Date(),
+      valorServico: Number(valor),
+      aliquota: Number(aliquota) || 0,
+      issRetido: 2,
+      responsavelRetencao: 1,
+      itemListaServico: servico,
+      discriminacao: descricao || "Servicos Adicionais",
+      codigoMunicipio: 0,
+      exigibilidadeIss: 1,
+      cnpjPrestador: cnpjPrestador || "",
+      inscricaoMunicipalPrestador: inscricaoPrestador || "",
+      cpfTomador: ClientData.cpf_cnpj.replace(/[^0-9]/g, "") || "",
+      razaoSocialTomador: ClientData.nome || "",
+      enderecoTomador: ClientData.endereco || "",
+      numeroEndereco: ClientData.numero || "",
+      complemento: ClientData.complemento || undefined,
+      bairro: ClientData.bairro || "",
+      uf: "SP",
+      cep: ClientData.cep.replace(/[^0-9]/g, "") || "",
+      telefoneTomador: ClientData.celular.replace(/[^0-9]/g, "") || undefined,
+      emailTomador: email,
+      optanteSimplesNacional: 1,
+      incentivoFiscal: 2,
+      ambiente,
+      status: "Ativa",
+      numeroNfe: nextNfseNumber,
+    });
+    await NsfeData.save(novoRegistro);
+    return { ok: true, nfse: temSucesso };
+  }
+
+  public EmitirNfseServicos = async (req: Request, res: Response) => {
+    try {
+      const {
+        logins,
+        password,
+        ambiente = "homologacao",
+        aliquota,
+        servico,
+        nfeNumber,
+        rpsNumber,
+      } = req.body as {
+        logins?: string[];
+        password?: string;
+        ambiente?: string;
+        aliquota?: string;
+        servico?: string;
+        nfeNumber?: string | number;
+        rpsNumber?: string | number;
+      };
+
+      if (!Array.isArray(logins) || logins.length === 0) {
+        res.status(400).json({ error: "Selecione ao menos um cliente." });
+        return;
+      }
+      if (!password || !nfeNumber) {
+        res
+          .status(400)
+          .json({ error: "password e nfeNumber são obrigatórios." });
+        return;
+      }
+
+      this.PASSWORD = password;
+      this.configureProvider(ambiente);
+
+      const NsfeData = AppDataSource.getRepository(NFSE);
+      const lastProd = await NsfeData.findOne({
+        where: { serieRps: Not("wip99") },
+        order: { id: "DESC" },
+      });
+      const targetSeries = lastProd?.serieRps || "1";
+
+      const startNumbers = await this.getLastNfseNumber(
+        Number(nfeNumber),
+        ambiente,
+      );
+      let nextNfseNumber = startNumbers.nextNfseNumber;
+      let currentRpsNumber = rpsNumber
+        ? Number(rpsNumber)
+        : startNumbers.nextRpsNumber;
+
+      const results: any[] = [];
+      for (const login of logins) {
+        const rows = (await MkauthSource.query(
+          `SELECT UPPER(TRIM(nome)) AS nome, valor FROM sis_sercontratos
+           WHERE UPPER(TRIM(login)) = UPPER(TRIM(?))
+             AND (UPPER(TRIM(nome)) = 'STREAMER' OR UPPER(TRIM(nome)) = 'CAMERA')`,
+          [login],
+        )) as { nome: string; valor: any }[];
+
+        if (!rows.length) {
+          results.push({ login, ok: false, error: "Sem serviços adicionais." });
+          continue;
+        }
+
+        const qtdStreamer = rows.filter((r) => r.nome === "STREAMER").length;
+        const qtdCamera = rows.filter((r) => r.nome === "CAMERA").length;
+        const valorStreamer = rows
+          .filter((r) => r.nome === "STREAMER")
+          .reduce((s, r) => s + Number(r.valor || 0), 0);
+        const valorCamera = rows
+          .filter((r) => r.nome === "CAMERA")
+          .reduce((s, r) => s + Number(r.valor || 0), 0);
+        const valorTotal = valorStreamer + valorCamera;
+
+        const partes: string[] = [];
+        if (qtdStreamer > 0)
+          partes.push(
+            `Streaming (${qtdStreamer}x): R$ ${valorStreamer.toFixed(2).replace(".", ",")}`,
+          );
+        if (qtdCamera > 0)
+          partes.push(
+            `Camera (${qtdCamera}x): R$ ${valorCamera.toFixed(2).replace(".", ",")}`,
+          );
+        const descricao = `Servicos adicionais - ${partes.join(" / ")} - Total: R$ ${valorTotal
+          .toFixed(2)
+          .replace(".", ",")}`;
+
+        const r = await this._emitirNfseServicoUnico({
+          login,
+          valor: valorTotal,
+          servico: servico || "Servicos Adicionais",
+          descricao,
+          password,
+          ambiente,
+          aliquota: aliquota || "",
+          currentRpsNumber,
+          nextNfseNumber,
+          targetSeries,
+        });
+        results.push({
+          login,
+          ok: r.ok,
+          error: r.error,
+          numeroRps: currentRpsNumber,
+          numeroNfe: nextNfseNumber,
+          valor: valorTotal,
+        });
+
+        if (r.ok) {
+          currentRpsNumber += 1;
+          nextNfseNumber += 1;
+        }
+      }
+
+      const okCount = results.filter((r) => r.ok).length;
+      res.json({
+        message: `${okCount}/${results.length} NFSE(s) emitida(s).`,
+        results,
+      });
+    } catch (error: any) {
+      console.error("Erro EmitirNfseServicos:", error?.message);
+      res.status(500).json({ error: "Erro interno", detalhes: error?.message });
+    }
+  };
 }
 
 export default new NFSEController();

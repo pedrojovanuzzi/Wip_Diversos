@@ -48,6 +48,7 @@ import { CriarChamado } from "./pages/TokenAutoAtendimento/CriarChamado";
 import { FazerCadastro } from "./pages/TokenAutoAtendimento/FazerCadastro";
 import { PdfViewer } from "./pages/PdfViewer/PdfViewer";
 import { GerarNotaDeServicoIndependente } from "./pages/Nfse/GerarNotaDeServicoIndependente";
+import { NFSEServicosAdicionais } from "./pages/Nfse/NFSEServicosAdicionais";
 import { TimeClock } from "./pages/TimeTracking/TimeClock";
 import { EmployeeManager } from "./pages/TimeTracking/Admin/EmployeeManager";
 import { TimeTrackingMap } from "./pages/TimeTracking/TimeTrackingMap";
@@ -192,6 +193,16 @@ function App() {
           <Route path="/feedback/Opnion" element={<Opnion />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
+          <Route
+            path="/NFSE/ServicosAdicionais"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <NFSEServicosAdicionais />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
           <Route
             path="/NFSE"
             element={
