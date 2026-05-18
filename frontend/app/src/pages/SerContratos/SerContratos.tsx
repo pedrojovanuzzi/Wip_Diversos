@@ -38,6 +38,14 @@ export const SerContratos: React.FC = () => {
   const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [qtdCamera, setQtdCamera] = useState(1);
+  const [showStreamingForm, setShowStreamingForm] = useState(false);
+  const [streamingForm, setStreamingForm] = useState({
+    email: "",
+    phone: "",
+  });
+  const [streamingFormError, setStreamingFormError] = useState<string | null>(
+    null,
+  );
   const [message, setMessage] = useState<{
     text: string;
     type: "success" | "error";
@@ -72,14 +80,17 @@ export const SerContratos: React.FC = () => {
     }
   };
 
-  const addServico = async (tipo: "STREAMER" | "CAMERA") => {
+  const addServico = async (
+    tipo: "STREAMER" | "CAMERA",
+    extras?: Record<string, any>,
+  ) => {
     if (!loaded) return;
     setAdding(true);
     try {
       const body =
         tipo === "CAMERA"
           ? { login: loaded.login, tipo, quantidade: qtdCamera }
-          : { login: loaded.login, tipo };
+          : { login: loaded.login, tipo, ...(extras || {}) };
       const res = await axios.post(`${base}/sercontratos`, body, { headers });
       showMsg(res.data.message || "Adicionado com sucesso.", "success");
       await fetchList(loaded.login);
@@ -91,6 +102,38 @@ export const SerContratos: React.FC = () => {
     } finally {
       setAdding(false);
     }
+  };
+
+  const validateStreamingForm = (): string | null => {
+    const { email, phone } = streamingForm;
+    if (!email.trim()) return "Email obrigatório.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      return "Email inválido.";
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (phoneDigits.length < 10 || phoneDigits.length > 11)
+      return "Celular inválido (10 ou 11 dígitos).";
+    return null;
+  };
+
+  const submitStreamingForm = async () => {
+    const err = validateStreamingForm();
+    if (err) {
+      setStreamingFormError(err);
+      return;
+    }
+    setStreamingFormError(null);
+    await addServico("STREAMER", {
+      email: streamingForm.email.trim(),
+      phone: streamingForm.phone.replace(/\D/g, ""),
+    });
+    setShowStreamingForm(false);
+    setStreamingForm({ email: "", phone: "" });
+  };
+
+  const openStreamingForm = () => {
+    setStreamingFormError(null);
+    setStreamingForm({ email: "", phone: "" });
+    setShowStreamingForm(true);
   };
 
   const removeItem = async (id: number) => {
@@ -222,7 +265,7 @@ export const SerContratos: React.FC = () => {
                     </div>
                   ) : (
                     <button
-                      onClick={() => addServico("STREAMER")}
+                      onClick={openStreamingForm}
                       disabled={adding}
                       className="w-full py-2 bg-purple-600 text-white rounded font-semibold hover:bg-purple-700 disabled:bg-gray-400"
                     >
@@ -344,6 +387,76 @@ export const SerContratos: React.FC = () => {
             </>
           )}
         </div>
+
+        {showStreamingForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <BsCollectionPlay className="text-2xl text-purple-600" />
+                <h2 className="text-xl font-bold text-gray-800">
+                  Cadastro do Streaming
+                </h2>
+              </div>
+              <p className="text-xs text-gray-500 mb-4">
+                Preencha os dados do cliente para ativar o streaming.
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={streamingForm.email}
+                    onChange={(e) =>
+                      setStreamingForm((f) => ({ ...f, email: e.target.value }))
+                    }
+                    placeholder="cliente@email.com"
+                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Celular
+                  </label>
+                  <input
+                    type="tel"
+                    value={streamingForm.phone}
+                    onChange={(e) =>
+                      setStreamingForm((f) => ({ ...f, phone: e.target.value }))
+                    }
+                    placeholder="(14) 99999-9999"
+                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              {streamingFormError && (
+                <div className="mt-3 p-2 bg-red-100 border border-red-200 text-red-800 text-sm rounded">
+                  {streamingFormError}
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-5">
+                <button
+                  onClick={() => setShowStreamingForm(false)}
+                  disabled={adding}
+                  className="flex-1 py-2 bg-gray-200 text-gray-800 rounded font-semibold hover:bg-gray-300 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={submitStreamingForm}
+                  disabled={adding}
+                  className="flex-1 py-2 bg-purple-600 text-white rounded font-semibold hover:bg-purple-700 disabled:bg-gray-400"
+                >
+                  {adding ? "Adicionando..." : "Confirmar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

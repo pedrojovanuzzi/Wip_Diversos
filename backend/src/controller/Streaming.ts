@@ -1,10 +1,13 @@
 import { Request, Response } from "express";
 import AppDataSource from "../database/DataSource";
+import MkauthSource from "../database/MkauthSource";
 import { StreamingAssinante } from "../entities/StreamingAssinante";
+import { SisSerContratos } from "../entities/SisSerContratos";
 import {
   editPhone,
   updateTicketStatus,
   deleteTicket,
+  getPacote,
 } from "../services/WatchBrasilService";
 
 class Streaming {
@@ -102,6 +105,24 @@ class Streaming {
     }
   }
 
+  public async getPacote(req: Request, res: Response) {
+    try {
+      const pPacote = req.query.pPacote || req.params.id;
+      if (!pPacote) {
+        res.status(400).json({ message: "pPacote obrigatório." });
+        return;
+      }
+      const data = await getPacote(String(pPacote));
+      res.json(data);
+    } catch (e: any) {
+      console.error("Erro getPacote Watch Brasil:", e?.response?.data || e?.message);
+      res.status(502).json({
+        message: "Erro ao consultar pacote no Watch Brasil.",
+        detail: e?.response?.data || e?.message,
+      });
+    }
+  }
+
   public async remove(req: Request, res: Response) {
     try {
       const id = Number(req.params.id);
@@ -126,7 +147,23 @@ class Streaming {
         }
       }
       await repo.delete(id);
-      res.json({ ok: true, remoteNote });
+
+      let contratosRemoved = 0;
+      try {
+        const contratosRepo = MkauthSource.getRepository(SisSerContratos);
+        const result = await contratosRepo
+          .createQueryBuilder()
+          .delete()
+          .from(SisSerContratos)
+          .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: assinante.login })
+          .andWhere("UPPER(TRIM(nome)) = :tipo", { tipo: "STREAMER" })
+          .execute();
+        contratosRemoved = result.affected || 0;
+      } catch (e: any) {
+        console.error("Erro ao remover sissercontratos STREAMER:", e?.message);
+      }
+
+      res.json({ ok: true, remoteNote, contratosRemoved });
     } catch (e: any) {
       console.error(e);
       res.status(500).json({ message: "Erro ao remover." });

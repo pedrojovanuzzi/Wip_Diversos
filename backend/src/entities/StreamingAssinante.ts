@@ -28,6 +28,9 @@ export class StreamingAssinante {
   @Column({ type: "varchar", length: 255, nullable: true })
   ticket!: string;
 
+  @Column({ type: "varchar", length: 100, nullable: true })
+  chave!: string;
+
   @Column({ type: "varchar", length: 255, nullable: true })
   assinante_id_integracao!: string;
 

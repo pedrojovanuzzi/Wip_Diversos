@@ -5,6 +5,8 @@ import AuthGuard from "../middleware/AuthGuard";
 const router: Router = Router();
 
 router.get("/", AuthGuard, Streaming.list);
+router.get("/pacotes/:id", AuthGuard, Streaming.getPacote);
+router.get("/pacotes", AuthGuard, Streaming.getPacote);
 router.get("/login/:login", AuthGuard, Streaming.getByLogin);
 router.put("/:id/phone", AuthGuard, Streaming.updatePhone);
 router.put("/:id/status", AuthGuard, Streaming.toggleStatus);

@@ -46,10 +46,18 @@ class SerContratos {
 
   public async add(req: Request, res: Response) {
     try {
-      const { login, tipo, quantidade } = req.body as {
+      const {
+        login,
+        tipo,
+        quantidade,
+        email: emailForm,
+        phone: phoneForm,
+      } = req.body as {
         login?: string;
         tipo?: string;
         quantidade?: number;
+        email?: string;
+        phone?: string;
       };
       const usuario = (req as any).user?.username || "sistema";
 
@@ -97,6 +105,84 @@ class SerContratos {
       const qtd = Math.max(1, Math.min(Number(quantidade) || 1, 20));
       const valorUnitario = VALORES[tipoNorm];
 
+      // STREAMER: valida na Watch Brasil ANTES de gravar local
+      let streamingInfo: any = null;
+      if (tipoNorm === "STREAMER") {
+        const emailUse = (emailForm || cliente.email || "").trim();
+        const phoneUse = ((phoneForm || cliente.celular || cliente.fone || "") + "")
+          .replace(/\D/g, "");
+        if (!emailUse) {
+          res.status(400).json({ message: "Email é obrigatório para streaming." });
+          return;
+        }
+        if (!phoneUse) {
+          res.status(400).json({ message: "Celular é obrigatório para streaming." });
+          return;
+        }
+        const assinanteIDIntegracao = String(cliente.id);
+        try {
+          const apiResp = await insertAssinante({
+            email: emailUse,
+            assinanteIDIntegracao,
+            phone: phoneUse,
+          });
+          console.log("[WatchBrasil][insertAssinante] resposta:", apiResp);
+          if (apiResp?.HasError === true) {
+            throw new Error(
+              "Watch Brasil HasError: " +
+                (apiResp?.ErrorMessage || JSON.stringify(apiResp).slice(0, 300)),
+            );
+          }
+          const ticket =
+            apiResp?.ticket ||
+            apiResp?.pTicket ||
+            apiResp?.data?.ticket ||
+            apiResp?.Result?.ticket ||
+            apiResp?.Result?.[0]?.ticket ||
+            null;
+          const chave =
+            apiResp?.chave ||
+            apiResp?.Result?.chave ||
+            apiResp?.Result?.[0]?.chave ||
+            null;
+
+          const streamingRepo =
+            AppDataSource.getRepository(StreamingAssinante);
+          let assinante = await streamingRepo.findOne({
+            where: { login: cliente.login },
+          });
+          if (!assinante) {
+            assinante = streamingRepo.create({ login: cliente.login });
+          }
+          assinante.email = emailUse;
+          assinante.phone = phoneUse;
+          assinante.assinante_id_integracao = assinanteIDIntegracao;
+          assinante.ticket = ticket || assinante.ticket;
+          assinante.chave = chave || assinante.chave;
+          assinante.ativo = true;
+          assinante.last_response = JSON.stringify(apiResp).slice(0, 2000);
+          await streamingRepo.save(assinante);
+          streamingInfo = { ticket, chave, assinante };
+        } catch (e: any) {
+          console.error(
+            "Erro ao criar assinante Watch Brasil:",
+            e?.response?.status,
+            e?.response?.data || e?.message,
+          );
+          res.status(502).json({
+            message:
+              "Falha ao registrar streaming na Watch Brasil. Nada foi gravado.",
+            detail:
+              e?.response?.data?.ErrorMessage ||
+              e?.response?.data?.message ||
+              e?.response?.data ||
+              e?.message ||
+              "erro desconhecido",
+          });
+          return;
+        }
+      }
+
       const saved = await MkauthSource.transaction(async (manager) => {
         const trxRepo = manager.getRepository(SisSerContratos);
 
@@ -135,49 +221,6 @@ class SerContratos {
         }
         throw e;
       });
-
-      // Integração Watch Brasil — só pra STREAMER
-      let streamingInfo: any = null;
-      if (tipoNorm === "STREAMER") {
-        try {
-          const apiResp = await insertAssinante({
-            email: cliente.email || "",
-            assinanteIDIntegracao: cliente.login,
-            phone: cliente.celular || cliente.fone || "",
-          });
-          const ticket =
-            apiResp?.ticket ||
-            apiResp?.pTicket ||
-            apiResp?.data?.ticket ||
-            null;
-
-          const streamingRepo =
-            AppDataSource.getRepository(StreamingAssinante);
-          let assinante = await streamingRepo.findOne({
-            where: { login: cliente.login },
-          });
-          if (!assinante) {
-            assinante = streamingRepo.create({
-              login: cliente.login,
-            });
-          }
-          assinante.email = cliente.email || "";
-          assinante.phone = cliente.celular || cliente.fone || "";
-          assinante.assinante_id_integracao = cliente.login;
-          assinante.ticket = ticket || assinante.ticket;
-          assinante.ativo = true;
-          assinante.last_response = JSON.stringify(apiResp).slice(0, 2000);
-          await streamingRepo.save(assinante);
-          streamingInfo = { ticket, assinante };
-        } catch (e: any) {
-          console.error("Erro ao criar assinante Watch Brasil:", e?.message);
-          streamingInfo = {
-            error:
-              "Streaming adicionado localmente, mas falha ao registrar na Watch Brasil: " +
-              (e?.response?.data?.message || e?.message || "erro desconhecido"),
-          };
-        }
-      }
 
       res.status(201).json({
         message: `${saved.length} item(ns) adicionado(s).`,

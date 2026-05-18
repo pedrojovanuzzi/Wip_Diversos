@@ -91,7 +91,7 @@ export async function authenticate(force = false): Promise<string> {
         client_id: CLIENT_ID,
         redirect_url: REDIRECT_URL,
         approval_prompt: "false",
-        uid: "1",
+        uid: CLIENT_SECRET,
       }),
       {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -176,28 +176,70 @@ export async function exchangeCodeForToken(
   return token;
 }
 
+function authHeader(token: string): string {
+  return token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`;
+}
+
 async function postWithAuth<T = any>(
   path: string,
   body: Record<string, any>,
   retried = false,
 ): Promise<T> {
   const token = await authenticate();
+  const url = `${BASE_URL}${path}`;
+  const payload = form(body);
+  console.log("[WatchBrasil][POST]", url, "body:", body);
   try {
-    const res = await axios.post(`${BASE_URL}${path}`, form(body), {
+    const res = await axios.post(url, payload, {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: token,
+        Authorization: authHeader(token),
       },
       timeout: 30000,
     });
+    console.log("[WatchBrasil][POST]", url, "status:", res.status, "data:", res.data);
     return res.data as T;
   } catch (err: any) {
+    console.error(
+      "[WatchBrasil][POST]",
+      url,
+      "FAIL status:",
+      err?.response?.status,
+      "data:",
+      err?.response?.data,
+    );
     if (!retried && err?.response?.status === 401) {
       cachedToken = null;
       return postWithAuth<T>(path, body, true);
     }
     throw err;
   }
+}
+
+async function getWithAuth<T = any>(
+  path: string,
+  params: Record<string, any> = {},
+  retried = false,
+): Promise<T> {
+  const token = await authenticate();
+  try {
+    const res = await axios.get(`${BASE_URL}${path}`, {
+      params,
+      headers: { Authorization: authHeader(token) },
+      timeout: 30000,
+    });
+    return res.data as T;
+  } catch (err: any) {
+    if (!retried && err?.response?.status === 401) {
+      cachedToken = null;
+      return getWithAuth<T>(path, params, true);
+    }
+    throw err;
+  }
+}
+
+export async function getPacote(idPacote: number | string) {
+  return getWithAuth("/v1/pacotes/get", { pPacote: idPacote });
 }
 
 export interface InsertAssinanteInput {

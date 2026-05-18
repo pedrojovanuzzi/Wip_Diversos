@@ -77,7 +77,11 @@ ${trimmed}
       resumo: String(parsed.resumo || "").slice(0, 200),
     };
   } catch (err: any) {
-    if (axios.isCancel(err) || err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
+    if (
+      axios.isCancel(err) ||
+      err?.name === "CanceledError" ||
+      err?.code === "ERR_CANCELED"
+    ) {
       throw err;
     }
     const status = err?.response?.status;
@@ -330,7 +334,11 @@ Retorne EXCLUSIVAMENTE um JSON válido, sem markdown:
       justificativa: String(parsed.justificativa || "").slice(0, 500),
     };
   } catch (err: any) {
-    if (axios.isCancel(err) || err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
+    if (
+      axios.isCancel(err) ||
+      err?.name === "CanceledError" ||
+      err?.code === "ERR_CANCELED"
+    ) {
       throw err;
     }
     console.error("Churn analysis error:", err?.message || err);
@@ -364,7 +372,11 @@ export async function askAboutCancellations(
       (c) =>
         `- ${c.categoria}: ${c.count} casos (${c.percent}%)` +
         (c.samples.length
-          ? "\n" + c.samples.slice(0, 3).map((s) => `   • "${s}"`).join("\n")
+          ? "\n" +
+            c.samples
+              .slice(0, 3)
+              .map((s) => `   • "${s}"`)
+              .join("\n")
           : ""),
     )
     .join("\n");
@@ -482,9 +494,7 @@ export async function ensureOllamaModel(): Promise<void> {
   const sqlModel = process.env.OLLAMA_MODEL_SQL || "qwen2.5-coder:7b";
   const targets = new Set<string>([OLLAMA_MODEL]);
   if (sqlModel && sqlModel !== OLLAMA_MODEL) targets.add(sqlModel);
-  console.log(
-    `[Ollama] modelos a garantir: ${Array.from(targets).join(", ")}`,
-  );
+  console.log(`[Ollama] modelos a garantir: ${Array.from(targets).join(", ")}`);
   for (const t of targets) {
     await pullSingleModel(t);
   }
