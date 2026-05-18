@@ -148,11 +148,17 @@ export async function exchangeCodeForToken(
   );
 
   const tokenData = tokenRes.data;
+  const result =
+    Array.isArray(tokenData?.Result) && tokenData.Result.length > 0
+      ? tokenData.Result[0]
+      : tokenData?.Result || tokenData;
   const token =
+    result?.access_token ||
+    result?.token ||
+    result?.Authorization ||
+    result?.value ||
     tokenData?.access_token ||
-    tokenData?.token ||
-    tokenData?.Authorization ||
-    tokenData?.value;
+    tokenData?.token;
   if (!token || typeof token !== "string") {
     throw new Error(
       "Resposta de /oauth/token sem access_token reconhecido: " +
@@ -160,7 +166,7 @@ export async function exchangeCodeForToken(
     );
   }
 
-  const expiresIn = Number(tokenData?.expires_in);
+  const expiresIn = Number(result?.expires_in ?? tokenData?.expires_in);
   const ttlMs =
     Number.isFinite(expiresIn) && expiresIn > 0
       ? expiresIn * 1000

@@ -67,9 +67,9 @@ async function handleRedirect(req: Request, res: Response) {
   }
 
   try {
-    await exchangeCodeForToken(code);
-    console.log("[WatchBrasil][redirect] token obtido via code (sem pending)");
-    res.json({ ok: true, state, delivered: false });
+    const token = await exchangeCodeForToken(code);
+    console.log("[WatchBrasil][redirect] token obtido via code (sem pending):", token);
+    res.json({ ok: true, state, delivered: false, token });
   } catch (e: any) {
     console.error(
       "[WatchBrasil][redirect] falha ao trocar code por token:",
