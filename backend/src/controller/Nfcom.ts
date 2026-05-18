@@ -257,8 +257,29 @@ class Nfcom {
       const now = new Date();
       const dhEmi = formatDate(now);
 
-      const value = Number(FaturasData.valor) - ClientData.desconto;
-      console.log(value);
+      // Soma serviços agregados (STREAMER + CAMERA) para subtrair da mensalidade
+      let valorServicosAgregados = 0;
+      try {
+        const agregados = (await MkauthSource.query(
+          `SELECT COALESCE(SUM(valor), 0) AS total
+           FROM sis_sercontratos
+           WHERE UPPER(TRIM(login)) = UPPER(TRIM(?))
+             AND (UPPER(TRIM(nome)) = 'STREAMER' OR UPPER(TRIM(nome)) = 'CAMERA')`,
+          [ClientData.login],
+        )) as { total: any }[];
+        valorServicosAgregados = Number(agregados?.[0]?.total || 0);
+      } catch (e) {
+        console.warn("Erro ao calcular serviços agregados:", (e as any)?.message);
+      }
+
+      const valorBruto =
+        Number(FaturasData.valor) -
+        Number(ClientData.desconto || 0) -
+        valorServicosAgregados;
+      const value = valorBruto > 0 ? valorBruto : 0;
+      console.log(
+        `NFCom valor: fatura=${FaturasData.valor} desconto=${ClientData.desconto || 0} agregados=${valorServicosAgregados} final=${value}`,
+      );
 
       const vProd = (value * (1 - reducao)).toFixed(2);
       console.log(vProd);
