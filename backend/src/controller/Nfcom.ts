@@ -257,15 +257,20 @@ class Nfcom {
       const now = new Date();
       const dhEmi = formatDate(now);
 
-      // Soma serviços agregados (STREAMER + CAMERA) para subtrair da mensalidade
+      // Soma serviços agregados (STREAMER + CAMERA) ATIVOS no momento em que a
+      // fatura foi gerada. Considera só contratos cuja data <= vencimento da fatura.
       let valorServicosAgregados = 0;
       try {
+        const dataLimite = FaturasData.datavenc
+          ? new Date(FaturasData.datavenc).toISOString().slice(0, 10)
+          : new Date().toISOString().slice(0, 10);
         const agregados = (await MkauthSource.query(
           `SELECT COALESCE(SUM(valor), 0) AS total
            FROM sis_sercontratos
            WHERE UPPER(TRIM(login)) = UPPER(TRIM(?))
-             AND (UPPER(TRIM(nome)) = 'STREAMER' OR UPPER(TRIM(nome)) = 'CAMERA')`,
-          [ClientData.login],
+             AND (UPPER(TRIM(nome)) = 'STREAMER' OR UPPER(TRIM(nome)) = 'CAMERA')
+             AND (data IS NULL OR DATE(data) <= ?)`,
+          [ClientData.login, dataLimite],
         )) as { total: any }[];
         valorServicosAgregados = Number(agregados?.[0]?.total || 0);
       } catch (e) {
