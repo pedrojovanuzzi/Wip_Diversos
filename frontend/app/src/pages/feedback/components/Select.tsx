@@ -1,21 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import { Label, Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headlessui/react";
 import { ChevronUpDownIcon } from "@heroicons/react/16/solid";
 import { CheckIcon } from "@heroicons/react/20/solid";
 
-const people = [
-  { id: 0, name: "Selecione um Técnico", online: false },
-  { id: 1, name: "Arnaldo", online: true },
-  { id: 2, name: "Bruno", online: true },
-  { id: 3, name: "Marcelo", online: true },
-  { id: 4, name: "Marcio", online: true },
-  { id: 5, name: "Grazieli", online: true },
-  { id: 6, name: "Ketilyn", online: true },
-  { id: 7, name: "Kauan", online: true },
-  { id: 8, name: "Rafael", online: true },
-  { id: 9, name: "Fernando", online: true },
-  { id: 10, name: "Kamily", online: true },
-];
+const PLACEHOLDER = { id: 0, name: "Selecione um Técnico", online: false };
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
@@ -26,7 +15,32 @@ interface SelectProps {
 }
 
 export default function Select({ onChange }: SelectProps) {
-  const [selected, setSelected] = useState(people[0]);
+  const [selected, setSelected] = useState(PLACEHOLDER);
+  const [people, setPeople] = useState<
+    { id: number; name: string; online: boolean }[]
+  >([PLACEHOLDER]);
+
+  useEffect(() => {
+    const loadEmployees = async () => {
+      try {
+        const res = await axios.get(
+          `${process.env.REACT_APP_URL}/time-tracking/employee`,
+        );
+        const list = (res.data as any[])
+          .filter((e) => e.active !== false)
+          .map((e) => ({
+            id: Number(e.id),
+            name: String(e.name || "").trim(),
+            online: true,
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+        setPeople([PLACEHOLDER, ...list]);
+      } catch (e) {
+        console.error("Erro ao carregar funcionários:", e);
+      }
+    };
+    loadEmployees();
+  }, []);
 
   const handleChange = (person: { id: number; name: string; online: boolean }) => {
     if(person.name === "Selecione um Técnico"){
