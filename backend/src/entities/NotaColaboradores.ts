@@ -10,7 +10,7 @@ export class Feedback {
     @Column({type: 'varchar'})
     login?: string
 
-    @Column({type: 'varchar', nullable: true})
+    @Column({type: 'text', nullable: true})
     opnion?: string
 
     @Column({type: 'varchar', nullable: true})

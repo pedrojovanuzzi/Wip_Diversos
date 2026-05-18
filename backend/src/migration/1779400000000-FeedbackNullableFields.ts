@@ -4,8 +4,11 @@ export class FeedbackNullableFields1779400000000 implements MigrationInterface {
   name = "FeedbackNullableFields1779400000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // opnion pode ter textos longos — usa TEXT pra não truncar dados existentes
+    await queryRunner.query(
+      `ALTER TABLE \`feedback\` MODIFY COLUMN \`opnion\` TEXT NULL`,
+    );
     const cols = [
-      "opnion",
       "note_internet",
       "note_service",
       "note_response_time",
@@ -24,8 +27,10 @@ export class FeedbackNullableFields1779400000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE \`feedback\` MODIFY COLUMN \`opnion\` TEXT NOT NULL`,
+    );
     const cols = [
-      "opnion",
       "note_internet",
       "note_service",
       "note_response_time",
