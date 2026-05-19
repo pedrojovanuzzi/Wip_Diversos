@@ -33,6 +33,7 @@ export const StreamingAdmin: React.FC = () => {
 
   const base = process.env.REACT_APP_URL;
   const headers = { Authorization: `Bearer ${user?.token}` };
+  const canManage = (user?.permission ?? 0) >= 5;
 
   const flash = (text: string, type: "ok" | "err") => {
     setMsg({ text, type });
@@ -257,25 +258,36 @@ export const StreamingAdmin: React.FC = () => {
                         {new Date(it.created_at).toLocaleDateString("pt-BR")}
                       </td>
                       <td className="p-2 text-center space-x-1">
-                        <button
-                          onClick={() => toggleStatus(it)}
-                          disabled={busyId === it.id || !it.ticket}
-                          className={`px-2 py-1 rounded text-xs font-semibold ${
-                            it.ativo
-                              ? "bg-yellow-500 text-white hover:bg-yellow-600"
-                              : "bg-green-600 text-white hover:bg-green-700"
-                          } disabled:bg-gray-400 disabled:cursor-not-allowed`}
-                          title={!it.ticket ? "Sem ticket" : ""}
-                        >
-                          {it.ativo ? "Desativar" : "Ativar"}
-                        </button>
-                        <button
-                          onClick={() => remove(it)}
-                          disabled={busyId === it.id}
-                          className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:bg-gray-400"
-                        >
-                          <BsTrash />
-                        </button>
+                        {canManage ? (
+                          <>
+                            <button
+                              onClick={() => toggleStatus(it)}
+                              disabled={busyId === it.id || !it.ticket}
+                              className={`px-2 py-1 rounded text-xs font-semibold ${
+                                it.ativo
+                                  ? "bg-yellow-500 text-white hover:bg-yellow-600"
+                                  : "bg-green-600 text-white hover:bg-green-700"
+                              } disabled:bg-gray-400 disabled:cursor-not-allowed`}
+                              title={!it.ticket ? "Sem ticket" : ""}
+                            >
+                              {it.ativo ? "Desativar" : "Ativar"}
+                            </button>
+                            <button
+                              onClick={() => remove(it)}
+                              disabled={busyId === it.id}
+                              className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:bg-gray-400"
+                            >
+                              <BsTrash />
+                            </button>
+                          </>
+                        ) : (
+                          <span
+                            className="text-xs text-gray-400"
+                            title="Permissão insuficiente"
+                          >
+                            —
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))

@@ -50,6 +50,7 @@ export const SerContratos: React.FC = () => {
     text: string;
     type: "success" | "error";
   } | null>(null);
+  const [notFound, setNotFound] = useState(false);
 
   const base = process.env.REACT_APP_URL;
   const headers = { Authorization: `Bearer ${user?.token}` };
@@ -63,6 +64,7 @@ export const SerContratos: React.FC = () => {
     const target = (login ?? loginInput).trim();
     if (!target) return;
     setLoading(true);
+    setNotFound(false);
     try {
       const res = await axios.get<ListResponse>(
         `${base}/sercontratos/${encodeURIComponent(target)}`,
@@ -70,10 +72,14 @@ export const SerContratos: React.FC = () => {
       );
       setLoaded(res.data);
     } catch (e: any) {
-      showMsg(
-        e?.response?.data?.message || "Erro ao consultar cliente.",
-        "error",
-      );
+      if (e?.response?.status === 404) {
+        setNotFound(true);
+      } else {
+        showMsg(
+          e?.response?.data?.message || "Erro ao consultar cliente.",
+          "error",
+        );
+      }
       setLoaded(null);
     } finally {
       setLoading(false);
@@ -198,9 +204,10 @@ export const SerContratos: React.FC = () => {
               <input
                 type="text"
                 value={loginInput}
-                onChange={(e) =>
-                  setLoginInput(e.target.value.toUpperCase().trim())
-                }
+                onChange={(e) => {
+                  setLoginInput(e.target.value.toUpperCase().trim());
+                  if (notFound) setNotFound(false);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") fetchList();
                 }}
@@ -230,6 +237,16 @@ export const SerContratos: React.FC = () => {
               }`}
             >
               {message.text}
+            </div>
+          )}
+
+          {notFound && (
+            <div className="mb-4 p-4 rounded bg-red-50 border border-red-200 text-red-800 text-center">
+              <p className="font-semibold">Cliente não cadastrado.</p>
+              <p className="text-sm">
+                Verifique o login digitado. Não é possível adicionar Streaming
+                ou Câmera para um cliente inexistente.
+              </p>
             </div>
           )}
 

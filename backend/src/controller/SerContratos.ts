@@ -26,6 +26,15 @@ class SerContratos {
         res.status(400).json({ message: "login é obrigatório." });
         return;
       }
+      const clienteRepo = MkauthSource.getRepository(ClientesEntities);
+      const cliente = await clienteRepo.findOne({
+        where: { login },
+        select: { login: true },
+      });
+      if (!cliente) {
+        res.status(404).json({ message: "Cliente não cadastrado." });
+        return;
+      }
       const repo = MkauthSource.getRepository(SisSerContratos);
       const items = await repo.find({
         where: { login },
