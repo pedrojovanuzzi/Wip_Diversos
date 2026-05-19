@@ -22,6 +22,11 @@ router.get(
   AuthGuard,
   nfcom.getNfcomByChaveDeOlhoNoImposto
 );
+router.get(
+  "/declaracaoQuitacao/declaranteDefaults",
+  AuthGuard,
+  nfcom.obterDeclaranteDefaults
+);
 router.post(
   "/declaracaoQuitacao/buscarCliente",
   AuthGuard,

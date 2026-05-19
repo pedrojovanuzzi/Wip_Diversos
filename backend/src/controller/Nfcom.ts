@@ -2709,6 +2709,18 @@ class Nfcom {
     }
   };
 
+  public obterDeclaranteDefaults = async (
+    _req: Request,
+    res: Response,
+  ): Promise<void> => {
+    const cnpj = process.env.CPF_CNPJ || "";
+    res.status(200).json({
+      nome: process.env.RAZAO_SOCIAL || "Wip Telecom",
+      cpf_cnpj: cnpj,
+      endereco: "Emilio Carraro, 945 - Altos da Cidade",
+    });
+  };
+
   public buscarClienteDeclaracao = async (
     req: Request,
     res: Response,
@@ -2761,17 +2773,19 @@ class Nfcom {
   };
 
   private gerarPdfDeclaracaoQuitacao(d: {
-    tipo_pessoa: string;
+    declarante_nome?: string;
+    declarante_cpf_cnpj?: string;
+    declarante_endereco?: string;
     nome: string;
     cpf_cnpj: string;
-    contrato?: string;
-    data_declaracao?: string;
     endereco?: string;
-    bairro?: string;
+    periodo_inicio?: string;
+    periodo_fim?: string;
     cidade?: string;
-    ano_referencia?: string;
+    data_declaracao?: string;
     signatario_nome?: string;
-    signatario_empresa?: string;
+    signatario_cpf?: string;
+    assinatura_base64?: string;
   }): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       try {
@@ -2781,53 +2795,100 @@ class Nfcom {
         doc.on("end", () => resolve(Buffer.concat(buffers)));
         doc.on("error", reject);
 
-        const docType =
-          (d.tipo_pessoa || "").toLowerCase().startsWith("j")
-            ? "CNPJ"
-            : "CPF";
-        const dataObj = d.data_declaracao ? new Date(d.data_declaracao) : null;
-        const dia = dataObj ? String(dataObj.getUTCDate()).padStart(2, "0") : "___";
-        const mesNomes = [
-          "janeiro","fevereiro","março","abril","maio","junho",
-          "julho","agosto","setembro","outubro","novembro","dezembro",
-        ];
-        const mes = dataObj ? mesNomes[dataObj.getUTCMonth()] : "__________";
-        const ano = dataObj ? dataObj.getUTCFullYear().toString() : "______";
+        const fmtDoc = (v?: string) => {
+          const d = (v || "").replace(/\D/g, "");
+          if (!d) return v || "";
+          if (d.length === 11)
+            return d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+          if (d.length === 14)
+            return d.replace(
+              /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
+              "$1.$2.$3/$4-$5",
+            );
+          return v || "";
+        };
+
+        const fmtDate = (s?: string) => {
+          if (!s) return "__/__/____";
+          const dt = new Date(s);
+          if (isNaN(dt.getTime())) return "__/__/____";
+          const dd = String(dt.getUTCDate()).padStart(2, "0");
+          const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+          const yyyy = dt.getUTCFullYear();
+          return `${dd}/${mm}/${yyyy}`;
+        };
 
         doc
           .font("Helvetica-Bold")
           .fontSize(14)
-          .text("DECLARAÇÃO DE QUITAÇÃO DE DÉBITOS", { align: "center" });
-        doc.moveDown(2);
+          .text("DECLARAÇÃO ANUAL DE PAGAMENTO E QUITAÇÃO DE VALORES", {
+            align: "center",
+          });
+        doc.moveDown(1.5);
+
+        doc.font("Helvetica-Bold").fontSize(11).text("DECLARANTE:");
+        doc.font("Helvetica").fontSize(11);
+        doc.text(`Nome/Razão Social: ${d.declarante_nome || "____________"}`);
+        doc.text(`CPF/CNPJ: ${fmtDoc(d.declarante_cpf_cnpj) || "________________"}`);
+        doc.text(`Endereço: ${d.declarante_endereco || "________________"}`);
+        doc.moveDown(0.8);
+
+        doc.font("Helvetica-Bold").fontSize(11).text("DECLARADO:");
+        doc.font("Helvetica").fontSize(11);
+        doc.text(`Nome/Razão Social: ${d.nome || "____________"}`);
+        doc.text(`CPF/CNPJ: ${fmtDoc(d.cpf_cnpj) || "________________"}`);
+        doc.text(`Endereço: ${d.endereco || "________________"}`);
+        doc.moveDown(1);
+
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(12)
+          .text("DECLARAÇÃO", { align: "center" });
+        doc.moveDown(0.8);
 
         doc.font("Helvetica").fontSize(11);
-        const corpo =
-          `Pelo presente instrumento que a pessoa ${d.tipo_pessoa || "(física ou Jurídica)"} ` +
-          `de nome ${d.nome}, inscrita no ${docType} sob o N°: ${d.cpf_cnpj}, ` +
-          `com sede ${d.endereco || "____________________"}, ` +
-          `${d.bairro || "____________"}, ${d.cidade || "____________"}, ` +
-          `declara por meio de seu sócio ou representante legal que não possui débitos ` +
-          `referente ao contrato ${d.contrato ? `nº ${d.contrato}` : "nº ____________________"} ` +
-          `conforme condições mencionadas no contrato de prestação de serviços ` +
-          `celebrado entre as partes.`;
-        doc.text(corpo, { align: "justify" });
-        doc.moveDown(1.2);
+        doc.text(
+          `Declaro, para os devidos fins, que durante o período de ${fmtDate(
+            d.periodo_inicio,
+          )} a ${fmtDate(
+            d.periodo_fim,
+          )}, foram realizados os pagamentos referentes aos serviços/produtos contratados, bem como a correspondente geração/emissão das respectivas notas fiscais, encontrando-se quitadas todas as obrigações financeiras entre as partes até a presente data.`,
+          { align: "justify" },
+        );
+        doc.moveDown(0.8);
+        doc.text(
+          "Declaro ainda que não existem pendências financeiras relativas aos valores vencidos no período acima mencionado, dando-se plena, geral e irrevogável quitação dos valores pagos.",
+          { align: "justify" },
+        );
+        doc.moveDown(0.8);
+        doc.text("Por ser verdade, firmo a presente declaração.", {
+          align: "justify",
+        });
+        doc.moveDown(1);
 
-        const segundoParagrafo =
-          "A presente declaração, de acordo com a lei nº: 12.007/2009 substitui, " +
-          "para a comprovação do cumprimento das obrigações do consumidor, as quitações " +
-          "dos faturamentos mensais dos débitos do ano " +
-          `${d.ano_referencia ? `de ${d.ano_referencia}` : "a que se refere"} ` +
-          "e dos anos anteriores.";
-        doc.text(segundoParagrafo, { align: "justify" });
+        doc.text(`Cidade: ${d.cidade || "____________"}`);
+        doc.text(`Data: ${fmtDate(d.data_declaracao)}`);
         doc.moveDown(2);
 
-        doc.text(`${d.cidade || "Cidade"}, ${dia} de ${mes} de ${ano}.`);
-        doc.moveDown(4);
+        if (d.assinatura_base64) {
+          try {
+            const raw = d.assinatura_base64.includes(",")
+              ? d.assinatura_base64.split(",")[1]
+              : d.assinatura_base64;
+            const imgBuf = Buffer.from(raw, "base64");
+            doc.image(imgBuf, { width: 180, height: 70 });
+          } catch (e) {
+            console.error("Falha ao embutir assinatura:", e);
+          }
+        } else {
+          doc.moveDown(2);
+        }
 
-        doc.text("_______________________________________");
-        doc.text(d.signatario_nome || "Nome");
-        doc.text(d.signatario_empresa || "Empresa");
+        doc.font("Helvetica-Bold").text("Assinatura do Declarante");
+        doc.moveDown(0.5);
+        doc.font("Helvetica");
+        doc.text(`Nome: ${d.signatario_nome || "____________"}`);
+        doc.text(`CPF: ${fmtDoc(d.signatario_cpf) || "_____________"}`);
 
         doc.end();
       } catch (err) {
@@ -2858,6 +2919,13 @@ class Nfcom {
         ano_referencia,
         signatario_nome,
         signatario_empresa,
+        declarante_nome,
+        declarante_cpf_cnpj,
+        declarante_endereco,
+        periodo_inicio,
+        periodo_fim,
+        signatario_cpf,
+        assinatura_base64,
       } = req.body;
 
       if (!nome || !cpf_cnpj) {
@@ -2866,17 +2934,19 @@ class Nfcom {
       }
 
       const pdfBuffer = await this.gerarPdfDeclaracaoQuitacao({
-        tipo_pessoa,
+        declarante_nome,
+        declarante_cpf_cnpj,
+        declarante_endereco,
         nome,
         cpf_cnpj,
-        contrato,
-        data_declaracao,
         endereco,
-        bairro,
+        periodo_inicio,
+        periodo_fim,
         cidade,
-        ano_referencia,
+        data_declaracao,
         signatario_nome,
-        signatario_empresa,
+        signatario_cpf,
+        assinatura_base64,
       });
       const pdf_base64 = pdfBuffer.toString("base64");
 
@@ -2893,6 +2963,13 @@ class Nfcom {
         ano_referencia,
         signatario_nome,
         signatario_empresa,
+        declarante_nome,
+        declarante_cpf_cnpj,
+        declarante_endereco,
+        periodo_inicio: periodo_inicio ? new Date(periodo_inicio) : null,
+        periodo_fim: periodo_fim ? new Date(periodo_fim) : null,
+        signatario_cpf,
+        assinatura_base64,
         pdf_base64,
       });
       const salvo = await repo.save(novo);

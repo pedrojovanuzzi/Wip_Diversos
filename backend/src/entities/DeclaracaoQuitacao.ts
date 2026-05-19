@@ -44,6 +44,27 @@ export class DeclaracaoQuitacao {
   @Column({ type: "longtext", nullable: true })
   pdf_base64!: string;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  declarante_nome!: string;
+
+  @Column({ type: "varchar", length: 30, nullable: true })
+  declarante_cpf_cnpj!: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  declarante_endereco!: string;
+
+  @Column({ type: "date", nullable: true })
+  periodo_inicio!: Date;
+
+  @Column({ type: "date", nullable: true })
+  periodo_fim!: Date;
+
+  @Column({ type: "varchar", length: 30, nullable: true })
+  signatario_cpf!: string;
+
+  @Column({ type: "longtext", nullable: true })
+  assinatura_base64!: string;
+
   @CreateDateColumn()
   created_at!: Date;
 }

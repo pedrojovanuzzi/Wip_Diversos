@@ -1,12 +1,42 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
 import { CiSearch } from "react-icons/ci";
 import { useNavigate } from "react-router-dom";
+import { SignatureModal } from "../../components/SignatureModal";
 
-const EMPRESA_PADRAO = "Wip Telecom";
+const DECLARANTE_PADRAO = {
+  nome: "Wip Telecom",
+  cpf_cnpj: "",
+  endereco: "Emilio Carraro, 945 - Altos da Cidade",
+};
+
+function formatCpfCnpj(v: string): string {
+  const d = (v || "").replace(/\D/g, "").slice(0, 14);
+  if (d.length <= 11) {
+    return d
+      .replace(/^(\d{3})(\d)/, "$1.$2")
+      .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d)/, ".$1-$2");
+  }
+  return d
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d)/, "$1-$2");
+}
+
+const hojeISO = () => new Date().toISOString().slice(0, 10);
+const inicioDoAnoPassado = () => {
+  const ano = new Date().getFullYear() - 1;
+  return `${ano}-01-01`;
+};
+const fimDoAnoPassado = () => {
+  const ano = new Date().getFullYear() - 1;
+  return `${ano}-12-31`;
+};
 
 export default function DeclaracaoQuitacao() {
   const { user } = useAuth();
@@ -17,24 +47,61 @@ export default function DeclaracaoQuitacao() {
   const [busca, setBusca] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [showAssinatura, setShowAssinatura] = useState(false);
 
   const [form, setForm] = useState({
+    declarante_nome: DECLARANTE_PADRAO.nome,
+    declarante_cpf_cnpj: DECLARANTE_PADRAO.cpf_cnpj,
+    declarante_endereco: DECLARANTE_PADRAO.endereco,
+
     tipo_pessoa: "Física",
     nome: "",
     cpf_cnpj: "",
     login: "",
-    contrato: "",
-    data_declaracao: new Date().toISOString().slice(0, 10),
     endereco: "",
     bairro: "",
     cidade: "",
-    ano_referencia: String(new Date().getFullYear() - 1),
+    contrato: "",
+
+    periodo_inicio: inicioDoAnoPassado(),
+    periodo_fim: fimDoAnoPassado(),
+    data_declaracao: hojeISO(),
+
     signatario_nome: "",
-    signatario_empresa: EMPRESA_PADRAO,
+    signatario_cpf: "",
+    signatario_empresa: DECLARANTE_PADRAO.nome,
+    ano_referencia: String(new Date().getFullYear() - 1),
+
+    assinatura_base64: "",
   });
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((p) => ({ ...p, [k]: e.target.value }));
+  const set =
+    (k: keyof typeof form) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await axios.get(
+          `${process.env.REACT_APP_URL}/NFCom/declaracaoQuitacao/declaranteDefaults`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        setForm((p) => ({
+          ...p,
+          declarante_nome: data.nome || p.declarante_nome,
+          declarante_cpf_cnpj: data.cpf_cnpj
+            ? formatCpfCnpj(data.cpf_cnpj)
+            : p.declarante_cpf_cnpj,
+          declarante_endereco: data.endereco || p.declarante_endereco,
+          signatario_empresa: data.nome || p.signatario_empresa,
+        }));
+      } catch {
+        // mantém defaults locais
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const buscarCliente = async () => {
     if (!busca.trim()) {
@@ -52,7 +119,7 @@ export default function DeclaracaoQuitacao() {
         ...p,
         tipo_pessoa: data.tipo_pessoa || p.tipo_pessoa,
         nome: data.nome || "",
-        cpf_cnpj: data.cpf_cnpj || "",
+        cpf_cnpj: data.cpf_cnpj ? formatCpfCnpj(data.cpf_cnpj) : "",
         endereco: data.endereco || "",
         bairro: data.bairro || "",
         cidade: data.cidade || "",
@@ -69,7 +136,11 @@ export default function DeclaracaoQuitacao() {
 
   const gerarESalvar = async () => {
     if (!form.nome || !form.cpf_cnpj) {
-      showError("Nome e CPF/CNPJ são obrigatórios.");
+      showError("Nome e CPF/CNPJ do declarado são obrigatórios.");
+      return;
+    }
+    if (!form.assinatura_base64) {
+      showError("Assine o documento antes de salvar.");
       return;
     }
     setSalvando(true);
@@ -94,21 +165,12 @@ export default function DeclaracaoQuitacao() {
     }
   };
 
-  const dataFormatada = useMemo(() => {
-    if (!form.data_declaracao) return { dia: "___", mes: "__________", ano: "______" };
-    const dt = new Date(form.data_declaracao + "T00:00:00");
-    const meses = [
-      "janeiro","fevereiro","março","abril","maio","junho",
-      "julho","agosto","setembro","outubro","novembro","dezembro",
-    ];
-    return {
-      dia: String(dt.getDate()).padStart(2, "0"),
-      mes: meses[dt.getMonth()],
-      ano: String(dt.getFullYear()),
-    };
-  }, [form.data_declaracao]);
-
-  const docLabel = form.tipo_pessoa.toLowerCase().startsWith("j") ? "CNPJ" : "CPF";
+  const fmtBR = (s: string) => {
+    if (!s) return "__/__/____";
+    const dt = new Date(s + "T00:00:00");
+    if (isNaN(dt.getTime())) return "__/__/____";
+    return dt.toLocaleDateString("pt-BR");
+  };
 
   return (
     <div>
@@ -116,7 +178,7 @@ export default function DeclaracaoQuitacao() {
       <div className="max-w-6xl mx-auto p-4">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h1 className="text-2xl font-semibold">
-            Declaração de Quitação de Débitos
+            Declaração Anual de Pagamento e Quitação de Valores
           </h1>
           <button
             onClick={() => navigate("/Nfcom/DeclaracoesQuitacao")}
@@ -129,7 +191,7 @@ export default function DeclaracaoQuitacao() {
         <div className="flex flex-wrap gap-2 mb-6 items-end">
           <div className="flex-1 min-w-[240px]">
             <label className="block text-sm text-gray-600 mb-1">
-              Buscar cliente (CPF/CNPJ ou login)
+              Buscar cliente (CPF/CNPJ ou login) — preenche o "Declarado"
             </label>
             <input
               value={busca}
@@ -149,48 +211,91 @@ export default function DeclaracaoQuitacao() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Tipo de pessoa</label>
-              <select
-                value={form.tipo_pessoa}
-                onChange={set("tipo_pessoa")}
-                className="ring-1 ring-gray-400 p-2 rounded w-full"
-              >
-                <option value="Física">Física</option>
-                <option value="Jurídica">Jurídica</option>
-              </select>
-            </div>
-            <Field label="Nome / Razão Social" value={form.nome} onChange={set("nome")} />
-            <Field label={`${docLabel}`} value={form.cpf_cnpj} onChange={set("cpf_cnpj")} />
-            <Field label="Endereço (rua, número)" value={form.endereco} onChange={set("endereco")} />
-            <Field label="Bairro" value={form.bairro} onChange={set("bairro")} />
-            <Field label="Cidade" value={form.cidade} onChange={set("cidade")} />
-            <Field label="Nº do contrato" value={form.contrato} onChange={set("contrato")} />
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Data da declaração</label>
-              <input
-                type="date"
-                value={form.data_declaracao}
-                onChange={set("data_declaracao")}
-                className="ring-1 ring-gray-400 p-2 rounded w-full"
+          <div className="space-y-4">
+            <Section title="DECLARANTE">
+              <Field label="Nome / Razão Social" value={form.declarante_nome} onChange={set("declarante_nome")} />
+              <Field
+                label="CPF/CNPJ"
+                value={form.declarante_cpf_cnpj}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    declarante_cpf_cnpj: formatCpfCnpj(e.target.value),
+                  }))
+                }
               />
-            </div>
-            <Field
-              label="Ano de referência"
-              value={form.ano_referencia}
-              onChange={set("ano_referencia")}
-            />
-            <Field
-              label="Nome do signatário"
-              value={form.signatario_nome}
-              onChange={set("signatario_nome")}
-            />
-            <Field
-              label="Empresa"
-              value={form.signatario_empresa}
-              onChange={set("signatario_empresa")}
-            />
+              <Field label="Endereço" value={form.declarante_endereco} onChange={set("declarante_endereco")} />
+            </Section>
+
+            <Section title="DECLARADO">
+              <Field label="Nome / Razão Social" value={form.nome} onChange={set("nome")} />
+              <Field
+                label="CPF/CNPJ"
+                value={form.cpf_cnpj}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    cpf_cnpj: formatCpfCnpj(e.target.value),
+                  }))
+                }
+              />
+              <Field label="Endereço" value={form.endereco} onChange={set("endereco")} />
+            </Section>
+
+            <Section title="Período">
+              <div className="grid grid-cols-2 gap-3">
+                <DateField label="Início" value={form.periodo_inicio} onChange={set("periodo_inicio")} />
+                <DateField label="Fim" value={form.periodo_fim} onChange={set("periodo_fim")} />
+              </div>
+            </Section>
+
+            <Section title="Assinatura">
+              <Field label="Cidade" value={form.cidade} onChange={set("cidade")} />
+              <DateField label="Data da declaração" value={form.data_declaracao} onChange={set("data_declaracao")} />
+              <Field label="Nome do declarante (signatário)" value={form.signatario_nome} onChange={set("signatario_nome")} />
+              <Field
+                label="CPF do signatário"
+                value={form.signatario_cpf}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    signatario_cpf: formatCpfCnpj(e.target.value),
+                  }))
+                }
+              />
+
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Assinatura</label>
+                {form.assinatura_base64 ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="border border-gray-300 rounded p-2 bg-white">
+                      <img src={form.assinatura_base64} alt="Assinatura" className="h-20 object-contain" />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowAssinatura(true)}
+                        className="bg-indigo-600 text-white py-1 px-3 rounded text-sm hover:bg-indigo-700"
+                      >
+                        Reassinar
+                      </button>
+                      <button
+                        onClick={() => setForm((p) => ({ ...p, assinatura_base64: "" }))}
+                        className="bg-gray-300 text-gray-800 py-1 px-3 rounded text-sm hover:bg-gray-400"
+                      >
+                        Limpar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowAssinatura(true)}
+                    className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700"
+                  >
+                    Assinar
+                  </button>
+                )}
+              </div>
+            </Section>
 
             <div className="pt-2">
               <button
@@ -205,44 +310,68 @@ export default function DeclaracaoQuitacao() {
 
           <div className="border border-gray-300 rounded p-6 bg-white shadow-sm text-sm leading-6">
             <h2 className="text-center font-bold mb-6">
-              DECLARAÇÃO DE QUITAÇÃO DE DÉBITOS
+              DECLARAÇÃO ANUAL DE PAGAMENTO E QUITAÇÃO DE VALORES
             </h2>
-            <p className="text-justify mb-4">
-              Pelo presente instrumento que a pessoa{" "}
-              <b>{form.tipo_pessoa}</b> de nome <b>{form.nome || "____________"}</b>,
-              inscrita no <b>{docLabel}</b> sob o N°:{" "}
-              <b>{form.cpf_cnpj || "____________"}</b>, com sede{" "}
-              <b>{form.endereco || "____________"}</b>,{" "}
-              <b>{form.bairro || "____________"}</b>,{" "}
-              <b>{form.cidade || "____________"}</b>, declara por meio de seu
-              sócio ou representante legal que não possui débitos referente ao
-              contrato{" "}
-              <b>{form.contrato ? `nº ${form.contrato}` : "nº ____________"}</b>{" "}
-              conforme condições mencionadas no contrato de prestação de serviços
-              celebrado entre as partes.
+
+            <p className="font-bold">DECLARANTE:</p>
+            <p>Nome/Razão Social: {form.declarante_nome || "____________"}</p>
+            <p>CPF/CNPJ: {form.declarante_cpf_cnpj || "________________"}</p>
+            <p className="mb-3">Endereço: {form.declarante_endereco || "________________"}</p>
+
+            <p className="font-bold">DECLARADO:</p>
+            <p>Nome/Razão Social: {form.nome || "____________"}</p>
+            <p>CPF/CNPJ: {form.cpf_cnpj || "________________"}</p>
+            <p className="mb-3">Endereço: {form.endereco || "________________"}</p>
+
+            <p className="text-center font-bold my-2">DECLARAÇÃO</p>
+
+            <p className="text-justify mb-3">
+              Declaro, para os devidos fins, que durante o período de{" "}
+              <b>{fmtBR(form.periodo_inicio)}</b> a <b>{fmtBR(form.periodo_fim)}</b>,
+              foram realizados os pagamentos referentes aos serviços/produtos
+              contratados, bem como a correspondente geração/emissão das
+              respectivas notas fiscais, encontrando-se quitadas todas as
+              obrigações financeiras entre as partes até a presente data.
             </p>
-            <p className="text-justify mb-4">
-              A presente declaração, de acordo com a lei nº: 12.007/2009
-              substitui, para a comprovação do cumprimento das obrigações do
-              consumidor, as quitações dos faturamentos mensais dos débitos do
-              ano{" "}
-              {form.ano_referencia ? (
-                <b>de {form.ano_referencia}</b>
-              ) : (
-                "a que se refere"
-              )}{" "}
-              e dos anos anteriores.
+            <p className="text-justify mb-3">
+              Declaro ainda que não existem pendências financeiras relativas aos
+              valores vencidos no período acima mencionado, dando-se plena,
+              geral e irrevogável quitação dos valores pagos.
             </p>
-            <p className="mb-12">
-              {form.cidade || "Cidade"}, {dataFormatada.dia} de{" "}
-              {dataFormatada.mes} de {dataFormatada.ano}.
-            </p>
-            <p>_______________________________________</p>
-            <p>{form.signatario_nome || "Nome"}</p>
-            <p>{form.signatario_empresa || "Empresa"}</p>
+            <p className="mb-3">Por ser verdade, firmo a presente declaração.</p>
+
+            <p>Cidade: {form.cidade || "____________"}</p>
+            <p className="mb-6">Data: {fmtBR(form.data_declaracao)}</p>
+
+            {form.assinatura_base64 && (
+              <img
+                src={form.assinatura_base64}
+                alt="Assinatura"
+                className="h-16 object-contain mb-1"
+              />
+            )}
+            <p className="font-bold">Assinatura do Declarante</p>
+            <p>Nome: {form.signatario_nome || "____________"}</p>
+            <p>CPF: {form.signatario_cpf || "_____________"}</p>
           </div>
         </div>
       </div>
+
+      {showAssinatura && (
+        <SignatureModal
+          onSave={(data) => setForm((p) => ({ ...p, assinatura_base64: data }))}
+          onClose={() => setShowAssinatura(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-gray-50 ring-1 ring-gray-200 rounded p-3 space-y-2">
+      <h3 className="font-semibold text-gray-700">{title}</h3>
+      {children}
     </div>
   );
 }
@@ -260,6 +389,28 @@ function Field({
     <div>
       <label className="block text-sm text-gray-600 mb-1">{label}</label>
       <input
+        value={value}
+        onChange={onChange}
+        className="ring-1 ring-gray-400 p-2 rounded w-full"
+      />
+    </div>
+  );
+}
+
+function DateField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-sm text-gray-600 mb-1">{label}</label>
+      <input
+        type="date"
         value={value}
         onChange={onChange}
         className="ring-1 ring-gray-400 p-2 rounded w-full"
