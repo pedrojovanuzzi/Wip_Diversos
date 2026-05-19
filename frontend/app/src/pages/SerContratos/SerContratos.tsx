@@ -246,22 +246,10 @@ export const SerContratos: React.FC = () => {
                     máx. 1 por cliente
                   </p>
                   {totalStreaming > 0 ? (
-                    <div className="flex items-center justify-between bg-purple-50 p-2 rounded">
+                    <div className="flex items-center bg-purple-50 p-2 rounded">
                       <span className="text-sm text-purple-800 font-semibold">
                         ✓ Cliente já possui Streaming
                       </span>
-                      <button
-                        onClick={() => {
-                          const item = loaded.items.find(
-                            (i) => i.nome === "STREAMER",
-                          );
-                          if (item) removeItem(item.id);
-                        }}
-                        className="text-red-600 hover:text-red-800"
-                        title="Remover"
-                      >
-                        <BsTrash />
-                      </button>
                     </div>
                   ) : (
                     <button
@@ -370,13 +358,19 @@ export const SerContratos: React.FC = () => {
                           </td>
                           <td className="p-2 text-gray-600">{it.insuser}</td>
                           <td className="p-2 text-center">
-                            <button
-                              onClick={() => removeItem(it.id)}
-                              disabled={removingId === it.id}
-                              className="text-red-600 hover:text-red-800 disabled:text-gray-400"
-                            >
-                              <BsTrash />
-                            </button>
+                            {it.nome === "STREAMER" ? (
+                              <span className="text-gray-300" title="Streaming não pode ser removido por aqui">
+                                —
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => removeItem(it.id)}
+                                disabled={removingId === it.id}
+                                className="text-red-600 hover:text-red-800 disabled:text-gray-400"
+                              >
+                                <BsTrash />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
