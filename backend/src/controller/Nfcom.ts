@@ -2709,10 +2709,14 @@ class Nfcom {
     }
   };
 
-  public buscarClienteDeclaracao = async (req: Request, res: Response) => {
+  public buscarClienteDeclaracao = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
     const { busca } = req.body;
     if (!busca || !String(busca).trim()) {
-      return res.status(400).json({ error: "Informe CPF/CNPJ ou login." });
+      res.status(400).json({ error: "Informe CPF/CNPJ ou login." });
+      return;
     }
     try {
       const repo = MkauthSource.getRepository(ClientesEntities);
@@ -2735,10 +2739,11 @@ class Nfcom {
         },
       });
       if (!cliente) {
-        return res.status(404).json({ error: "Cliente não encontrado." });
+        res.status(404).json({ error: "Cliente não encontrado." });
+        return;
       }
       const isCnpj = (cliente.cpf_cnpj || "").replace(/\D/g, "").length > 11;
-      return res.status(200).json({
+      res.status(200).json({
         login: cliente.login,
         nome: cliente.nome,
         cpf_cnpj: cliente.cpf_cnpj,
@@ -2751,7 +2756,7 @@ class Nfcom {
       });
     } catch (err) {
       console.error("Erro buscarClienteDeclaracao:", err);
-      return res.status(500).json({ error: "Erro ao buscar cliente." });
+      res.status(500).json({ error: "Erro ao buscar cliente." });
     }
   };
 
@@ -2831,7 +2836,10 @@ class Nfcom {
     });
   }
 
-  public salvarDeclaracaoQuitacao = async (req: Request, res: Response) => {
+  public salvarDeclaracaoQuitacao = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
     try {
       const {
         DeclaracaoQuitacao,
@@ -2853,9 +2861,8 @@ class Nfcom {
       } = req.body;
 
       if (!nome || !cpf_cnpj) {
-        return res
-          .status(400)
-          .json({ error: "Nome e CPF/CNPJ são obrigatórios." });
+        res.status(400).json({ error: "Nome e CPF/CNPJ são obrigatórios." });
+        return;
       }
 
       const pdfBuffer = await this.gerarPdfDeclaracaoQuitacao({
@@ -2889,18 +2896,19 @@ class Nfcom {
         pdf_base64,
       });
       const salvo = await repo.save(novo);
-      return res
-        .status(200)
-        .json({ id: (salvo as any).id, pdf_base64 });
+      res.status(200).json({ id: (salvo as any).id, pdf_base64 });
     } catch (err) {
       console.error("Erro salvarDeclaracaoQuitacao:", err);
-      return res
+      res
         .status(500)
         .json({ error: "Erro ao salvar declaração de quitação." });
     }
   };
 
-  public listarDeclaracoesQuitacao = async (req: Request, res: Response) => {
+  public listarDeclaracoesQuitacao = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
     try {
       const {
         DeclaracaoQuitacao,
@@ -2939,14 +2947,17 @@ class Nfcom {
       }
 
       const lista = await qb.getMany();
-      return res.status(200).json(lista);
+      res.status(200).json(lista);
     } catch (err) {
       console.error("Erro listarDeclaracoesQuitacao:", err);
-      return res.status(500).json({ error: "Erro ao listar declarações." });
+      res.status(500).json({ error: "Erro ao listar declarações." });
     }
   };
 
-  public obterDeclaracaoQuitacao = async (req: Request, res: Response) => {
+  public obterDeclaracaoQuitacao = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
     try {
       const {
         DeclaracaoQuitacao,
@@ -2955,12 +2966,13 @@ class Nfcom {
       const id = Number(req.params.id);
       const item = await repo.findOne({ where: { id } as any });
       if (!item) {
-        return res.status(404).json({ error: "Declaração não encontrada." });
+        res.status(404).json({ error: "Declaração não encontrada." });
+        return;
       }
-      return res.status(200).json(item);
+      res.status(200).json(item);
     } catch (err) {
       console.error("Erro obterDeclaracaoQuitacao:", err);
-      return res.status(500).json({ error: "Erro ao obter declaração." });
+      res.status(500).json({ error: "Erro ao obter declaração." });
     }
   };
 }
