@@ -42,6 +42,8 @@ import { PixAdmin } from "./pages/Pix/PixAdmin";
 import { PixfindPaid } from "./pages/Pix/PixfindPaid";
 import Nfcom from "./pages/Nfcom/Nfcom";
 import SearchInterface from "./pages/Nfcom/SearchInterface";
+import DeclaracaoQuitacao from "./pages/Nfcom/DeclaracaoQuitacao";
+import DeclaracoesQuitacaoLista from "./pages/Nfcom/DeclaracoesQuitacaoLista";
 import { TokenAutoAtendimento } from "./pages/TokenAutoAtendimento/TokenAutoAtendimento";
 import { PagarFatura } from "./pages/TokenAutoAtendimento/PagarFatura";
 import { CriarChamado } from "./pages/TokenAutoAtendimento/CriarChamado";
@@ -509,6 +511,26 @@ function App() {
             element={
               user?.token && user.permission >= 1 ? (
                 <SearchInterface />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/Nfcom/DeclaracaoQuitacao"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <DeclaracaoQuitacao />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/Nfcom/DeclaracoesQuitacao"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <DeclaracoesQuitacaoLista />
               ) : (
                 <Navigate to="/auth/login" />
               )

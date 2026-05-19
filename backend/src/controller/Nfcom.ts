@@ -2708,6 +2708,261 @@ class Nfcom {
       res.status(500).json({ error: "Erro ao gerar PDF" });
     }
   };
+
+  public buscarClienteDeclaracao = async (req: Request, res: Response) => {
+    const { busca } = req.body;
+    if (!busca || !String(busca).trim()) {
+      return res.status(400).json({ error: "Informe CPF/CNPJ ou login." });
+    }
+    try {
+      const repo = MkauthSource.getRepository(ClientesEntities);
+      const termo = String(busca).trim();
+      const apenasDigitos = termo.replace(/\D/g, "");
+      const where: any[] = [{ login: termo }];
+      if (apenasDigitos) where.push({ cpf_cnpj: Like(`%${apenasDigitos}%`) });
+
+      const cliente = await repo.findOne({
+        where,
+        select: {
+          login: true,
+          nome: true,
+          cpf_cnpj: true,
+          endereco: true,
+          bairro: true,
+          cidade: true,
+          cep: true,
+          termo: true,
+        },
+      });
+      if (!cliente) {
+        return res.status(404).json({ error: "Cliente não encontrado." });
+      }
+      const isCnpj = (cliente.cpf_cnpj || "").replace(/\D/g, "").length > 11;
+      return res.status(200).json({
+        login: cliente.login,
+        nome: cliente.nome,
+        cpf_cnpj: cliente.cpf_cnpj,
+        endereco: cliente.endereco,
+        bairro: cliente.bairro,
+        cidade: cliente.cidade,
+        cep: cliente.cep,
+        contrato: cliente.termo,
+        tipo_pessoa: isCnpj ? "Jurídica" : "Física",
+      });
+    } catch (err) {
+      console.error("Erro buscarClienteDeclaracao:", err);
+      return res.status(500).json({ error: "Erro ao buscar cliente." });
+    }
+  };
+
+  private gerarPdfDeclaracaoQuitacao(d: {
+    tipo_pessoa: string;
+    nome: string;
+    cpf_cnpj: string;
+    contrato?: string;
+    data_declaracao?: string;
+    endereco?: string;
+    bairro?: string;
+    cidade?: string;
+    ano_referencia?: string;
+    signatario_nome?: string;
+    signatario_empresa?: string;
+  }): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({ size: "A4", margin: 60 });
+        const buffers: Buffer[] = [];
+        doc.on("data", (c) => buffers.push(c));
+        doc.on("end", () => resolve(Buffer.concat(buffers)));
+        doc.on("error", reject);
+
+        const docType =
+          (d.tipo_pessoa || "").toLowerCase().startsWith("j")
+            ? "CNPJ"
+            : "CPF";
+        const dataObj = d.data_declaracao ? new Date(d.data_declaracao) : null;
+        const dia = dataObj ? String(dataObj.getUTCDate()).padStart(2, "0") : "___";
+        const mesNomes = [
+          "janeiro","fevereiro","março","abril","maio","junho",
+          "julho","agosto","setembro","outubro","novembro","dezembro",
+        ];
+        const mes = dataObj ? mesNomes[dataObj.getUTCMonth()] : "__________";
+        const ano = dataObj ? dataObj.getUTCFullYear().toString() : "______";
+
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(14)
+          .text("DECLARAÇÃO DE QUITAÇÃO DE DÉBITOS", { align: "center" });
+        doc.moveDown(2);
+
+        doc.font("Helvetica").fontSize(11);
+        const corpo =
+          `Pelo presente instrumento que a pessoa ${d.tipo_pessoa || "(física ou Jurídica)"} ` +
+          `de nome ${d.nome}, inscrita no ${docType} sob o N°: ${d.cpf_cnpj}, ` +
+          `com sede ${d.endereco || "____________________"}, ` +
+          `${d.bairro || "____________"}, ${d.cidade || "____________"}, ` +
+          `declara por meio de seu sócio ou representante legal que não possui débitos ` +
+          `referente ao contrato ${d.contrato ? `nº ${d.contrato}` : "nº ____________________"} ` +
+          `conforme condições mencionadas no contrato de prestação de serviços ` +
+          `celebrado entre as partes.`;
+        doc.text(corpo, { align: "justify" });
+        doc.moveDown(1.2);
+
+        const segundoParagrafo =
+          "A presente declaração, de acordo com a lei nº: 12.007/2009 substitui, " +
+          "para a comprovação do cumprimento das obrigações do consumidor, as quitações " +
+          "dos faturamentos mensais dos débitos do ano " +
+          `${d.ano_referencia ? `de ${d.ano_referencia}` : "a que se refere"} ` +
+          "e dos anos anteriores.";
+        doc.text(segundoParagrafo, { align: "justify" });
+        doc.moveDown(2);
+
+        doc.text(`${d.cidade || "Cidade"}, ${dia} de ${mes} de ${ano}.`);
+        doc.moveDown(4);
+
+        doc.text("_______________________________________");
+        doc.text(d.signatario_nome || "Nome");
+        doc.text(d.signatario_empresa || "Empresa");
+
+        doc.end();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  public salvarDeclaracaoQuitacao = async (req: Request, res: Response) => {
+    try {
+      const {
+        DeclaracaoQuitacao,
+      } = require("../entities/DeclaracaoQuitacao");
+      const repo = DataSource.getRepository(DeclaracaoQuitacao);
+      const {
+        tipo_pessoa,
+        nome,
+        cpf_cnpj,
+        login,
+        contrato,
+        data_declaracao,
+        endereco,
+        bairro,
+        cidade,
+        ano_referencia,
+        signatario_nome,
+        signatario_empresa,
+      } = req.body;
+
+      if (!nome || !cpf_cnpj) {
+        return res
+          .status(400)
+          .json({ error: "Nome e CPF/CNPJ são obrigatórios." });
+      }
+
+      const pdfBuffer = await this.gerarPdfDeclaracaoQuitacao({
+        tipo_pessoa,
+        nome,
+        cpf_cnpj,
+        contrato,
+        data_declaracao,
+        endereco,
+        bairro,
+        cidade,
+        ano_referencia,
+        signatario_nome,
+        signatario_empresa,
+      });
+      const pdf_base64 = pdfBuffer.toString("base64");
+
+      const novo = repo.create({
+        tipo_pessoa,
+        nome,
+        cpf_cnpj,
+        login,
+        contrato,
+        data_declaracao: data_declaracao ? new Date(data_declaracao) : null,
+        endereco,
+        bairro,
+        cidade,
+        ano_referencia,
+        signatario_nome,
+        signatario_empresa,
+        pdf_base64,
+      });
+      const salvo = await repo.save(novo);
+      return res
+        .status(200)
+        .json({ id: (salvo as any).id, pdf_base64 });
+    } catch (err) {
+      console.error("Erro salvarDeclaracaoQuitacao:", err);
+      return res
+        .status(500)
+        .json({ error: "Erro ao salvar declaração de quitação." });
+    }
+  };
+
+  public listarDeclaracoesQuitacao = async (req: Request, res: Response) => {
+    try {
+      const {
+        DeclaracaoQuitacao,
+      } = require("../entities/DeclaracaoQuitacao");
+      const repo = DataSource.getRepository(DeclaracaoQuitacao);
+
+      const { cpf, login, ano } = req.query as {
+        cpf?: string;
+        login?: string;
+        ano?: string;
+      };
+
+      const qb = repo
+        .createQueryBuilder("d")
+        .orderBy("d.id", "DESC")
+        .select([
+          "d.id",
+          "d.nome",
+          "d.cpf_cnpj",
+          "d.login",
+          "d.contrato",
+          "d.data_declaracao",
+          "d.ano_referencia",
+          "d.created_at",
+        ]);
+
+      if (cpf && cpf.trim()) {
+        const digits = cpf.replace(/\D/g, "");
+        qb.andWhere("d.cpf_cnpj LIKE :cpf", { cpf: `%${digits || cpf}%` });
+      }
+      if (login && login.trim()) {
+        qb.andWhere("d.login LIKE :login", { login: `%${login.trim()}%` });
+      }
+      if (ano && /^\d{4}$/.test(ano)) {
+        qb.andWhere("d.ano_referencia = :ano", { ano });
+      }
+
+      const lista = await qb.getMany();
+      return res.status(200).json(lista);
+    } catch (err) {
+      console.error("Erro listarDeclaracoesQuitacao:", err);
+      return res.status(500).json({ error: "Erro ao listar declarações." });
+    }
+  };
+
+  public obterDeclaracaoQuitacao = async (req: Request, res: Response) => {
+    try {
+      const {
+        DeclaracaoQuitacao,
+      } = require("../entities/DeclaracaoQuitacao");
+      const repo = DataSource.getRepository(DeclaracaoQuitacao);
+      const id = Number(req.params.id);
+      const item = await repo.findOne({ where: { id } as any });
+      if (!item) {
+        return res.status(404).json({ error: "Declaração não encontrada." });
+      }
+      return res.status(200).json(item);
+    } catch (err) {
+      console.error("Erro obterDeclaracaoQuitacao:", err);
+      return res.status(500).json({ error: "Erro ao obter declaração." });
+    }
+  };
 }
 
 export default Nfcom;
