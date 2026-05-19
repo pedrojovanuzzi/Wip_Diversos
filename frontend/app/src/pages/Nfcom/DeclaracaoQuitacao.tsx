@@ -59,6 +59,7 @@ export default function DeclaracaoQuitacao() {
     cpf_cnpj: "",
     login: "",
     endereco: "",
+    numero: "",
     bairro: "",
     cidade: "",
     contrato: "",
@@ -67,8 +68,8 @@ export default function DeclaracaoQuitacao() {
     periodo_fim: fimDoAnoPassado(),
     data_declaracao: hojeISO(),
 
-    signatario_nome: "",
-    signatario_cpf: "",
+    signatario_nome: "Izabel Cristina Penteado",
+    signatario_cpf: "276.443.258-59",
     signatario_empresa: DECLARANTE_PADRAO.nome,
     ano_referencia: String(new Date().getFullYear() - 1),
 
@@ -95,6 +96,8 @@ export default function DeclaracaoQuitacao() {
             : p.declarante_cpf_cnpj,
           declarante_endereco: data.endereco || p.declarante_endereco,
           signatario_empresa: data.nome || p.signatario_empresa,
+          signatario_nome: data.signatario_nome || p.signatario_nome,
+          signatario_cpf: data.signatario_cpf || p.signatario_cpf,
         }));
       } catch {
         // mantém defaults locais
@@ -121,6 +124,7 @@ export default function DeclaracaoQuitacao() {
         nome: data.nome || "",
         cpf_cnpj: data.cpf_cnpj ? formatCpfCnpj(data.cpf_cnpj) : "",
         endereco: data.endereco || "",
+        numero: data.numero || "",
         bairro: data.bairro || "",
         cidade: data.cidade || "",
         contrato: data.contrato || p.contrato,
@@ -239,7 +243,14 @@ export default function DeclaracaoQuitacao() {
                   }))
                 }
               />
-              <Field label="Endereço" value={form.endereco} onChange={set("endereco")} />
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <Field label="Endereço (rua)" value={form.endereco} onChange={set("endereco")} />
+                </div>
+                <Field label="Número" value={form.numero} onChange={set("numero")} />
+              </div>
+              <Field label="Bairro" value={form.bairro} onChange={set("bairro")} />
+              <Field label="Nº do contrato" value={form.contrato} onChange={set("contrato")} />
             </Section>
 
             <Section title="Período">
@@ -252,17 +263,26 @@ export default function DeclaracaoQuitacao() {
             <Section title="Assinatura">
               <Field label="Cidade" value={form.cidade} onChange={set("cidade")} />
               <DateField label="Data da declaração" value={form.data_declaracao} onChange={set("data_declaracao")} />
-              <Field label="Nome do declarante (signatário)" value={form.signatario_nome} onChange={set("signatario_nome")} />
-              <Field
-                label="CPF do signatário"
-                value={form.signatario_cpf}
-                onChange={(e) =>
-                  setForm((p) => ({
-                    ...p,
-                    signatario_cpf: formatCpfCnpj(e.target.value),
-                  }))
-                }
-              />
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Nome do declarante (signatário)
+                </label>
+                <input
+                  value={form.signatario_nome}
+                  readOnly
+                  className="ring-1 ring-gray-300 p-2 rounded w-full bg-gray-100 text-gray-700 cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  CPF do signatário
+                </label>
+                <input
+                  value={form.signatario_cpf}
+                  readOnly
+                  className="ring-1 ring-gray-300 p-2 rounded w-full bg-gray-100 text-gray-700 cursor-not-allowed"
+                />
+              </div>
 
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Assinatura</label>
@@ -321,7 +341,17 @@ export default function DeclaracaoQuitacao() {
             <p className="font-bold">DECLARADO:</p>
             <p>Nome/Razão Social: {form.nome || "____________"}</p>
             <p>CPF/CNPJ: {form.cpf_cnpj || "________________"}</p>
-            <p className="mb-3">Endereço: {form.endereco || "________________"}</p>
+            <p>
+              Endereço:{" "}
+              {[
+                form.endereco,
+                form.numero ? `nº ${form.numero}` : "",
+                form.bairro,
+              ]
+                .filter((v) => v && v.trim())
+                .join(", ") || "________________"}
+            </p>
+            <p className="mb-3">Nº do contrato: {form.contrato || "____________"}</p>
 
             <p className="text-center font-bold my-2">DECLARAÇÃO</p>
 

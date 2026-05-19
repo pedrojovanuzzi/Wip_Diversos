@@ -2718,6 +2718,8 @@ class Nfcom {
       nome: process.env.RAZAO_SOCIAL || "Wip Telecom",
       cpf_cnpj: cnpj,
       endereco: "Emilio Carraro, 945 - Altos da Cidade",
+      signatario_nome: "Izabel Cristina Penteado",
+      signatario_cpf: "276.443.258-59",
     });
   };
 
@@ -2744,6 +2746,7 @@ class Nfcom {
           nome: true,
           cpf_cnpj: true,
           endereco: true,
+          numero: true,
           bairro: true,
           cidade: true,
           cep: true,
@@ -2760,6 +2763,7 @@ class Nfcom {
         nome: cliente.nome,
         cpf_cnpj: cliente.cpf_cnpj,
         endereco: cliente.endereco,
+        numero: cliente.numero,
         bairro: cliente.bairro,
         cidade: cliente.cidade,
         cep: cliente.cep,
@@ -2779,6 +2783,9 @@ class Nfcom {
     nome: string;
     cpf_cnpj: string;
     endereco?: string;
+    numero?: string;
+    bairro?: string;
+    contrato?: string;
     periodo_inicio?: string;
     periodo_fim?: string;
     cidade?: string;
@@ -2833,11 +2840,20 @@ class Nfcom {
         doc.text(`Endereço: ${d.declarante_endereco || "________________"}`);
         doc.moveDown(0.8);
 
+        const enderecoCompleto = [
+          d.endereco,
+          d.numero ? `nº ${d.numero}` : "",
+          d.bairro,
+        ]
+          .filter((v) => v && String(v).trim())
+          .join(", ");
+
         doc.font("Helvetica-Bold").fontSize(11).text("DECLARADO:");
         doc.font("Helvetica").fontSize(11);
         doc.text(`Nome/Razão Social: ${d.nome || "____________"}`);
         doc.text(`CPF/CNPJ: ${fmtDoc(d.cpf_cnpj) || "________________"}`);
-        doc.text(`Endereço: ${d.endereco || "________________"}`);
+        doc.text(`Endereço: ${enderecoCompleto || "________________"}`);
+        doc.text(`Nº do contrato: ${d.contrato || "____________"}`);
         doc.moveDown(1);
 
         doc
@@ -2933,6 +2949,7 @@ class Nfcom {
         return;
       }
 
+      const { numero } = req.body as { numero?: string };
       const pdfBuffer = await this.gerarPdfDeclaracaoQuitacao({
         declarante_nome,
         declarante_cpf_cnpj,
@@ -2940,6 +2957,9 @@ class Nfcom {
         nome,
         cpf_cnpj,
         endereco,
+        numero,
+        bairro,
+        contrato,
         periodo_inicio,
         periodo_fim,
         cidade,
