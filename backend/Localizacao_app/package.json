@@ -12,7 +12,7 @@
     "@expo/metro-runtime": "~3.2.3",
     "@react-native-async-storage/async-storage": "1.23.1",
     "expo": "~51.0.0",
-    "expo-dev-client": "~4.0.29",
+    "expo-dev-client": "~55.0.28",
     "expo-intent-launcher": "~11.0.1",
     "expo-location": "~17.0.1",
     "expo-notifications": "~0.28.19",
