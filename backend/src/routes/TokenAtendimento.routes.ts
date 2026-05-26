@@ -11,10 +11,7 @@ router.post("/ChooseHome", tokenAtendimento.chooseHome);
 router.post("/CreateCadastro", tokenAtendimento.criarCadastro);
 router.post("/GerarPixToken", tokenAtendimento.gerarPixToken);
 router.post("/FaturaWentPaid", tokenAtendimento.faturaWentPaid);
-router.post(
-  "/ReceberPagamentoMercadoPagoWebhook",
-  tokenAtendimento.receberPagamentoMercadoPagoWebhook,
-);
+router.post("/CallbackVendaPayGo", tokenAtendimento.callbackVendaPayGo);
 router.post(
   "/ObterListaTerminaisEGerarPagamentoCredito",
   tokenAtendimento.obterListaTerminaisEGerarPagamentoCredito,

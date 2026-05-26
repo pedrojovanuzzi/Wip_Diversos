@@ -6,6 +6,7 @@ import {
   HiCheck,
   HiCreditCard,
   HiCurrencyDollar,
+  HiClock,
   HiXCircle,
   HiPrinter,
   HiArrowRight,
@@ -54,7 +55,6 @@ export const PagarFatura = () => {
     | "payment-success"
     | "payment-error"
   >("search");
-  const [errorMessage, setErrorMessage] = useState("");
   const [cpf, setCpf] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -74,6 +74,8 @@ export const PagarFatura = () => {
   const [cardMessage, setCardMessage] = useState(
     "Insira o cartão na maquininha e siga as instruções.",
   );
+  const [mostrarComoCancelar, setMostrarComoCancelar] = useState(false);
+  const [cartaoRecusado, setCartaoRecusado] = useState(false);
 
   useIdleTimeout({
     onIdle: () =>
@@ -290,17 +292,20 @@ export const PagarFatura = () => {
 
         console.log(response.data);
 
-        if (response.data.status === "expired") {
-          setErrorMessage("Pagamento expirado.");
-          setStep("payment-error");
+        if (response.data.status === "declined") {
+          // Cartão processado e recusado de verdade pela adquirente.
           setOrder(null);
+          setCartaoRecusado(true);
+          setStep("payment-error");
         } else if (
-          response.data.status === "failed" ||
-          response.data.status === "canceled"
+          response.data.status === "expired" ||
+          response.data.status === "canceled" ||
+          response.data.status === "failed"
         ) {
-          setErrorMessage("Pagamento Falhou.");
-          setStep("payment-error");
+          // Cancelamento (Anula) ou tempo esgotado.
           setOrder(null);
+          setCartaoRecusado(false);
+          setStep("payment-error");
         }
       } catch (err: any) {
         console.error(err);
@@ -314,15 +319,15 @@ export const PagarFatura = () => {
   );
 
   useEffect(() => {
-    let intervalId: NodeJS.Timer;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
     if (order) {
       // Initial call
       obterOrderPorId(false);
 
-      // Polling every 5 seconds
+      // Polling a cada 2 segundos
       intervalId = setInterval(() => {
         obterOrderPorId(true);
-      }, 5000);
+      }, 2000);
     }
     return () => {
       if (intervalId) clearInterval(intervalId);
@@ -348,6 +353,31 @@ export const PagarFatura = () => {
     [order?.id],
   );
 
+  // Cancela qualquer cobrança aberta no pinpad do terminal. O backend varre o
+  // terminal, então não precisa do ID da venda.
+  const liberarTerminalPinpad = React.useCallback(async () => {
+    try {
+      const r = await axios.post(
+        `${process.env.REACT_APP_URL}/TokenAutoAtendimento/LiberarTerminal`,
+      );
+      console.log("[LiberarTerminal] resposta:", r.data);
+    } catch (err) {
+      console.error("Falha ao liberar terminal:", err);
+    }
+  }, []);
+
+  // Depois que o cartão foi solicitado (tela payment-card) não há volta:
+  // bloqueia o botão "voltar" do navegador enquanto a transação está no pinpad.
+  useEffect(() => {
+    if (step !== "payment-card") return;
+    window.history.pushState(null, "", window.location.href);
+    const bloquearVoltar = () => {
+      window.history.pushState(null, "", window.location.href);
+    };
+    window.addEventListener("popstate", bloquearVoltar);
+    return () => window.removeEventListener("popstate", bloquearVoltar);
+  }, [step]);
+
   const handleMethodSelect = async (method: "pix" | "credit" | "debit") => {
     // Determine if we are doing single client single invoice (legacy flow) or multi
     // Actually, "legacy flow" now is just a subset of multi-invoice (array of 1).
@@ -366,6 +396,8 @@ export const PagarFatura = () => {
 
     if (method === "credit" || method === "debit") {
       setStep("payment-card");
+      setMostrarComoCancelar(false);
+      setCartaoRecusado(false);
       setTerminalAviso("");
       setCardMessage("Verificando maquininha, aguarde...");
       try {
@@ -541,7 +573,7 @@ export const PagarFatura = () => {
   };
 
   useEffect(() => {
-    let intervalId: NodeJS.Timer;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
 
     if (faturaId) {
       const checkPayment = async () => {
@@ -602,12 +634,13 @@ export const PagarFatura = () => {
     let timeoutId: NodeJS.Timeout;
 
     if (step === "payment-pix" || step === "payment-card") {
+      // Tempo limite de 2 minutos (cartão e Pix).
+      const tempoLimite = 120000;
       timeoutId = setTimeout(() => {
-        if (order?.id) cancelarOrderTerminal(order.id);
-        setErrorMessage("Tempo para pagamento expirado.");
-        setStep("payment-error");
+        if (step === "payment-card") liberarTerminalPinpad();
         setOrder(null);
-      }, 120000); // 2 minutes
+        setStep("payment-error");
+      }, tempoLimite);
     }
 
     return () => {
@@ -639,7 +672,7 @@ export const PagarFatura = () => {
     } else if (step === "payment-error") {
       timer = setTimeout(() => {
         navigate("/TokenAutoAtendimento", { state: { forceIdle: true } });
-      }, 20000);
+      }, 10000);
     }
     return () => {
       if (timer) clearTimeout(timer);
@@ -661,7 +694,7 @@ export const PagarFatura = () => {
       case "payment-success":
         return "Concluído";
       case "payment-error":
-        return "Erro no Pagamento";
+        return cartaoRecusado ? "Cartão Recusado" : "Tempo Expirado";
       default:
         return "";
     }
@@ -681,6 +714,9 @@ export const PagarFatura = () => {
       // But typically back means "go up".
       // If we came from click -> selection.
       setSelectedClient(null);
+    } else if (step === "method") {
+      // Volta para a seleção de faturas, mantendo o que já foi escolhido.
+      setStep("invoice-selection");
     } else {
       navigate("/TokenAutoAtendimento", { state: { forceIdle: false } });
     }
@@ -704,7 +740,9 @@ export const PagarFatura = () => {
         <div className="flex items-center justify-between px-6 lg:px-10 pt-8 lg:pt-16 pb-4 lg:pb-6 bg-slate-900/40 border-b border-white/5">
           <div className="flex items-center space-x-3 lg:space-x-6 text-cyan-400">
             {/* Conditional Back Button in Header - Positioned to the left of title */}
-            {(step === "search" || step === "selection") && (
+            {["search", "selection", "invoice-selection", "method"].includes(
+              step,
+            ) && (
               <button
                 onClick={handleBack}
                 className="p-2 lg:p-4 -ml-2 lg:-ml-4 rounded-full hover:bg-white/5 transition-colors mr-2 lg:mr-4"
@@ -1137,22 +1175,6 @@ export const PagarFatura = () => {
                         format(new Date(dataPagamento), "dd/MM/yyyy")}
                     </span>
                   </div>
-                  <button
-                    onClick={() => handleMethodSelect("pix")}
-                    disabled={loading}
-                    className="mb-4 lg:mb-6 w-full px-4 lg:px-6 py-3 lg:py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:shadow-emerald-500/30 hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl lg:rounded-2xl shadow-lg transition-all text-base lg:text-xl flex items-center justify-center space-x-2"
-                  >
-                    {loading ? (
-                      <>
-                        <FaSpinner className="animate-spin" />
-                        <span>Gerando Pix...</span>
-                      </>
-                    ) : (
-                      <span>
-                        Maquininha não está respondendo? Clique e pague no Pix
-                      </span>
-                    )}
-                  </button>
                   <p className="text-slate-400 text-lg lg:text-2xl max-w-lg mx-auto text-center mb-4 lg:mb-6">
                     {cardMessage}
                   </p>
@@ -1175,12 +1197,27 @@ export const PagarFatura = () => {
                   Cancelar / Voltar
                 </button>
               )}
-              {step === "payment-card" && (
-                <span className="mt-4 lg:mt-8 px-4 lg:px-8 py-3 lg:py-5 bg-red-800 hover:bg-red-700 text-white rounded-xl lg:rounded-2xl border border-white/10 transition-colors text-base lg:text-xl block max-w-sm lg:max-w-xl text-center">
-                  Para Cancelar, Clique na seta esquerda no canto superior da
-                  maquininha!
-                </span>
-              )}
+              {step === "payment-card" &&
+                (mostrarComoCancelar ? (
+                  <div className="mt-4 lg:mt-8 px-4 lg:px-8 py-3 lg:py-5 bg-red-800 text-white rounded-xl lg:rounded-2xl border border-white/10 max-w-sm lg:max-w-xl text-center flex flex-col items-center gap-3">
+                    <span className="text-base lg:text-xl">
+                      Para Cancelar o pagamento, clique em "Anula" na
+                      maquininha
+                    </span>
+                    <img
+                      src="/imgs/anula-maquininha.png"
+                      alt="Tecla Anula na maquininha"
+                      className="w-40 lg:w-56 h-auto rounded-lg"
+                    />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setMostrarComoCancelar(true)}
+                    className="mt-4 lg:mt-8 px-6 lg:px-10 py-3 lg:py-5 bg-red-700 hover:bg-red-600 text-white font-bold rounded-xl lg:rounded-2xl border border-white/10 transition-colors text-base lg:text-xl uppercase tracking-wide"
+                  >
+                    Cancelar Pagamento
+                  </button>
+                ))}
             </div>
           )}
 
@@ -1232,21 +1269,41 @@ export const PagarFatura = () => {
 
           {step === "payment-error" && (
             <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8 animate-fadeIn">
-              <div className="w-32 h-32 bg-red-500/20 rounded-full flex items-center justify-center">
-                <HiXCircle className="text-6xl text-red-500" />
-              </div>
-
-              <div className="text-center space-y-4">
-                <h2 className="text-3xl font-bold text-white">
-                  {errorMessage || "Erro no Pagamento"}
-                </h2>
-                <p className="text-slate-400 text-lg">
-                  Não foi possível concluir a transação.
-                </p>
-                <div className="text-slate-500 text-sm">
-                  Retornando ao início em 10 segundos...
-                </div>
-              </div>
+              {cartaoRecusado ? (
+                <>
+                  <div className="w-32 h-32 bg-red-500/20 rounded-full flex items-center justify-center">
+                    <HiXCircle className="text-6xl text-red-500" />
+                  </div>
+                  <div className="text-center space-y-4">
+                    <h2 className="text-3xl font-bold text-white">
+                      Cartão Recusado
+                    </h2>
+                    <p className="text-slate-400 text-lg">
+                      Tente outro cartão ou outra forma de pagamento.
+                    </p>
+                    <div className="text-slate-500 text-sm">
+                      Retornando ao início...
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-32 h-32 bg-amber-500/20 rounded-full flex items-center justify-center">
+                    <HiClock className="text-6xl text-amber-400" />
+                  </div>
+                  <div className="text-center space-y-4">
+                    <h2 className="text-3xl font-bold text-white">
+                      Tempo para Pagamento Expirado
+                    </h2>
+                    <p className="text-slate-400 text-lg">
+                      Você não concluiu o pagamento a tempo.
+                    </p>
+                    <div className="text-slate-500 text-sm">
+                      Retornando ao início...
+                    </div>
+                  </div>
+                </>
+              )}
 
               <button
                 onClick={() =>
@@ -1254,9 +1311,9 @@ export const PagarFatura = () => {
                     state: { forceIdle: true },
                   })
                 }
-                className="mt-8 px-10 py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:shadow-red-500/50 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95"
+                className="mt-8 px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/50 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95"
               >
-                Tentar Novamente
+                Voltar ao Início
               </button>
             </div>
           )}

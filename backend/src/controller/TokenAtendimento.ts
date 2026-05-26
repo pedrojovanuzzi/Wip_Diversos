@@ -36,206 +36,176 @@ const urlPix = isSandbox
   ? "https://pix-h.api.efipay.com.br"
   : "https://pix.api.efipay.com.br";
 
+// =========================================================
+// PayGo / ControlPay (TEF de cartão)
+// =========================================================
+const PAYGO_BASE = "https://api.controlpay.com.br";
+
+// O token é guardado já URL-encoded no .env, então entra direto na URL.
+const PAYGO_TOKEN = process.env.PAYGO_TOKEN || "";
+const PAYGO_TERMINAL_ID = process.env.PAYGO_TERMINAL_ID || "";
+const PAYGO_FORMA_CREDITO = process.env.PAYGO_FORMA_CREDITO || "21";
+const PAYGO_FORMA_DEBITO = process.env.PAYGO_FORMA_DEBITO || "22";
+const PAYGO_CANCEL_PASS = process.env.PAYGO_CANCEL_PASS || "";
+
+const paygoUrl = (endpoint: string) =>
+  `${PAYGO_BASE}/${endpoint}?key=${PAYGO_TOKEN}`;
+
+const PAYGO_HEADERS = {
+  "Content-Type": "application/json",
+  "User-Agent": "WipTotem/1.0",
+};
+
+// IDs de status da intenção de venda no ControlPay.
+const PAYGO_STATUS = {
+  PENDENTE: 5,
+  EM_PAGAMENTO: 6,
+  CREDITADO: 10,
+  EXPIRADO: 15,
+  CANCELADO: 20,
+  RECUSADO: 25,
+};
+
 class TokenAtendimento {
   private recordRepo = AppDataSource.getRepository(Faturas);
   private clienteRepo = AppDataSource.getRepository(ClientesEntities);
 
-  private static lastOrderByTerminal: Map<string, string> = new Map();
+  // Mapeia a intenção de venda da PayGo -> IDs das faturas, para confirmar
+  // o pagamento quando a transação for creditada.
+  private static faturasPorVenda: Map<string, string[]> = new Map();
 
-  private cancelarOrderMP = async (
-    orderId: string,
-  ): Promise<{ ok: boolean; reason?: string }> => {
+  private extrairStatusIntencao = (intencao: any): number | null => {
+    const s =
+      intencao?.intencaoVendaStatus?.id ??
+      intencao?.status?.id ??
+      intencao?.status ??
+      intencao?.statusId;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  // Distingue uma recusa real da adquirente (cartão negado) de um simples
+  // cancelamento/tempo esgotado. Numa recusa real o cartão foi processado,
+  // então o pagamentoExterno traz dados da adquirente; num cancelamento/tempo
+  // nada foi processado e esses campos vêm vazios.
+  private foiRecusaReal = (intencao: any): boolean => {
+    const pagamentos: any[] = intencao?.pagamentosExternos || [];
+    const naoVazio = (v: any) => v != null && String(v).trim() !== "";
+    return pagamentos.some(
+      (p) =>
+        naoVazio(p?.codigoRespostaAdquirente) ||
+        naoVazio(p?.mensagemRespostaAdquirente) ||
+        naoVazio(p?.nsuTid) ||
+        naoVazio(p?.trnNsu) ||
+        naoVazio(p?.adquirente) ||
+        naoVazio(p?.bandeira),
+    );
+  };
+
+  private getIntencaoVendaPayGo = async (
+    intencaoVendaId: string,
+  ): Promise<any | null> => {
     try {
-      await axios.post(
-        `https://api.mercadopago.com/v1/orders/${orderId}/cancel`,
+      const r = await axios.post(
+        paygoUrl("IntencaoVenda/GetById"),
         {},
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-            "X-Idempotency-Key": uuidv4(),
-          },
-        },
+        { headers: PAYGO_HEADERS, params: { intencaoVendaId } },
       );
-      return { ok: true };
-    } catch (err: any) {
-      const errors: any[] = err.response?.data?.errors || [];
-      const code = errors[0]?.code;
-      console.log(
-        `[MP] Falha ao cancelar order ${orderId}:`,
-        err.response?.data || err.message,
-      );
-      return { ok: false, reason: code };
-    }
-  };
-
-  private buscarOrderPendenteNoTerminal = async (
-    terminalId: string,
-  ): Promise<string | null> => {
-    try {
-      const r = await axios.get(
-        `https://api.mercadopago.com/v1/orders/search`,
-        {
-          params: { terminal_id: terminalId },
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-          },
-        },
-      );
-      const results: any[] =
-        r.data?.results || r.data?.elements || r.data?.data || [];
-      const pendente = results.find((o) =>
-        ["created", "processing", "at_terminal", "action_required"].includes(
-          String(o.status || "").toLowerCase(),
-        ),
-      );
-      return pendente?.id ? String(pendente.id) : null;
+      return r.data?.intencaoVenda || r.data || null;
     } catch (err: any) {
       console.log(
-        "[MP] Falha ao buscar orders do terminal:",
+        "[PayGo] Falha ao consultar intenção de venda:",
         err.response?.data || err.message,
       );
       return null;
     }
   };
 
-  private getStatusOrderMP = async (
-    orderId: string,
-  ): Promise<string | null> => {
-    try {
-      const r = await axios.get(
-        `https://api.mercadopago.com/v1/orders/${orderId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-          },
-        },
-      );
-      return r.data?.status ? String(r.data.status).toLowerCase() : null;
-    } catch {
-      return null;
-    }
-  };
+  private marcarFaturasPagas = async (
+    ids: (string | number)[],
+  ): Promise<void> => {
+    const idsNum = ids
+      .map((i) => Number(String(i).trim()))
+      .filter((n) => Number.isFinite(n) && n > 0);
 
-  private criarOrderMPNoTerminal = async (
-    terminalId: string,
-    payload: any,
-  ): Promise<{ ok: true; response: any } | { ok: false; reason: string }> => {
-    const STATUS_FINALIZADOS = [
-      "finished",
-      "canceled",
-      "cancelled",
-      "expired",
-      "failed",
-      "refunded",
-      "rejected",
-    ];
-
-    const cachedExistente =
-      TokenAtendimento.lastOrderByTerminal.get(terminalId);
-    if (cachedExistente) {
-      TokenAtendimento.lastOrderByTerminal.delete(terminalId);
-      const status = await this.getStatusOrderMP(cachedExistente);
-      if (status && !STATUS_FINALIZADOS.includes(status)) {
-        console.log(
-          `[MP] Terminal ${terminalId} tinha order ${cachedExistente} (status=${status}) — cancelando em background`,
-        );
-        this.cancelarOrderMP(cachedExistente).catch(() => {});
+    for (const id of idsNum) {
+      const fatura = await this.recordRepo.findOne({ where: { id } });
+      if (!fatura) {
+        console.log(`[PayGo] Fatura ${id} não encontrada.`);
+        continue;
       }
-    }
+      if (fatura.status === "pago") continue;
 
-    // Garante que a maquininha não esteja travada em tela de "expirou" / "cancelar cobrança"
-    // de uma sessão anterior, alternando operating_mode antes de criar nova order.
-    await this.liberarTerminalDevice(terminalId);
-
-    const post = () =>
-      axios.post("https://api.mercadopago.com/v1/orders", payload, {
-        headers: {
-          Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-          "X-Idempotency-Key": uuidv4(),
-        },
+      await this.recordRepo.update(fatura.id, {
+        status: "pago",
+        datapag: new Date(),
+        formapag: "payGoTef",
+        coletor: "payGoTef",
+        valorpag: fatura.valor,
       });
+      console.log(`[PayGo] Fatura ${id} confirmada paga via PayGo TEF.`);
 
-    const aguardarTerminalAceitar = async (
-      orderId: string,
-    ): Promise<boolean> => {
-      // A MP cria a order com status=created. Quando o terminal pega, vira at_terminal.
-      // Se ficar em created por muito tempo, o terminal está offline/desligado.
-      const tentativas = 4;
-      const intervaloMs = 1500;
-      for (let i = 0; i < tentativas; i++) {
-        await new Promise((r) => setTimeout(r, intervaloMs));
-        const status = await this.getStatusOrderMP(orderId);
-        if (!status) continue;
-        if (status === "created") continue;
-        return true;
+      const cliente = await this.clienteRepo.findOne({
+        where: { login: fatura.login },
+      });
+      if (cliente) {
+        const remObsDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
+          .toISOString()
+          .replace("T", " ")
+          .replace("Z", "");
+        await this.clienteRepo.update(
+          { login: cliente.login },
+          { observacao: "sim", rem_obs: remObsDate },
+        );
       }
-      return false;
+    }
+  };
+
+  private criarVendaPayGo = async (opts: {
+    faturaIds: (string | number)[];
+    valor: number;
+    tipo: "credito" | "debito";
+  }): Promise<
+    { ok: true; intencaoVendaId: string } | { ok: false; reason: string }
+  > => {
+    const referencia = opts.faturaIds.map((i) => String(i)).join("-");
+
+    const body = {
+      formaPagamentoId: Number(
+        opts.tipo === "credito" ? PAYGO_FORMA_CREDITO : PAYGO_FORMA_DEBITO,
+      ),
+      terminalId: PAYGO_TERMINAL_ID,
+      valorTotalVendido: opts.valor.toFixed(2).replace(".", ","),
+      quantidadeParcelas: 1,
+      parcelamentoAdmin: opts.tipo === "credito",
+      iniciarTransacaoAutomaticamente: true,
+      aguardarTefIniciarTransacao: true,
+      referencia,
+      observacao: "Totem autoatendimento",
     };
 
     try {
-      const resp = await post();
-      const orderId = resp.data?.id ? String(resp.data.id) : null;
-      if (orderId) {
-        TokenAtendimento.lastOrderByTerminal.set(terminalId, orderId);
+      const r = await axios.post(paygoUrl("Venda/Vender/"), body, {
+        headers: PAYGO_HEADERS,
+      });
+      const intencao = r.data?.intencaoVenda || r.data;
+      const intencaoVendaId = intencao?.id ? String(intencao.id) : null;
 
-        const aceitou = await aguardarTerminalAceitar(orderId);
-        if (!aceitou) {
-          console.log(
-            `[MP] Terminal ${terminalId} não pegou a order ${orderId} (provavelmente offline) — cancelando`,
-          );
-          await this.cancelarOrderMP(orderId);
-          TokenAtendimento.lastOrderByTerminal.delete(terminalId);
-          return { ok: false, reason: "terminal_offline" };
-        }
+      if (!intencaoVendaId) {
+        return { ok: false, reason: "terminal_offline" };
       }
-      return { ok: true, response: resp };
-    } catch (error: any) {
-      const errors: any[] = error.response?.data?.errors || [];
-      const isQueued = errors.some(
-        (e) => e.code === "already_queued_order_on_terminal",
-      );
-      if (!isQueued) throw error;
 
+      TokenAtendimento.faturasPorVenda.set(
+        intencaoVendaId,
+        opts.faturaIds.map((i) => String(i)),
+      );
+      return { ok: true, intencaoVendaId };
+    } catch (err: any) {
       console.log(
-        `[MP] Terminal ${terminalId} ocupado — tentando liberar e recriar order`,
+        "[PayGo] Falha ao criar venda:",
+        err.response?.data || err.message,
       );
-
-      const cached = TokenAtendimento.lastOrderByTerminal.get(terminalId);
-      let cancelado = false;
-      if (cached) {
-        const r = await this.cancelarOrderMP(cached);
-        cancelado = cancelado || r.ok;
-      }
-
-      const found = await this.buscarOrderPendenteNoTerminal(terminalId);
-      if (found && found !== cached) {
-        const r = await this.cancelarOrderMP(found);
-        cancelado = cancelado || r.ok;
-      }
-
-      if (!cancelado) {
-        return { ok: false, reason: "terminal_busy" };
-      }
-
-      TokenAtendimento.lastOrderByTerminal.delete(terminalId);
-
-      try {
-        const retry = await post();
-        if (retry.data?.id) {
-          TokenAtendimento.lastOrderByTerminal.set(
-            terminalId,
-            String(retry.data.id),
-          );
-        }
-        return { ok: true, response: retry };
-      } catch (retryErr: any) {
-        const retryErrors: any[] = retryErr.response?.data?.errors || [];
-        const stillQueued = retryErrors.some(
-          (e) => e.code === "already_queued_order_on_terminal",
-        );
-        if (stillQueued) return { ok: false, reason: "terminal_busy" };
-        throw retryErr;
-      }
+      return { ok: false, reason: "terminal_offline" };
     }
   };
 
@@ -654,320 +624,204 @@ class TokenAtendimento {
     }
   };
 
-  receberPagamentoMercadoPagoWebhook = async (req: Request, res: Response) => {
+  // Callback de venda do ControlPay (URL Callback Venda configurada no PayGo).
+  // A PayGo só envia os IDs como query params; o status real é confirmado
+  // consultando a intenção de venda pela API.
+  callbackVendaPayGo = async (req: Request, res: Response) => {
     try {
-      const { body } = req;
+      const intencaoVendaId = String(
+        req.query.intencaoVendaId || req.body?.intencaoVendaId || "",
+      ).trim();
+      const referencia = String(
+        req.query.intencaoVendaReferencia ||
+          req.body?.intencaoVendaReferencia ||
+          "",
+      ).trim();
 
-      console.log(body);
+      console.log("[PayGo] Callback venda recebido:", {
+        intencaoVendaId,
+        referencia,
+      });
 
-      const valor = body.data.total_paid_amount;
-      const faturaId = body.data.external_reference;
-
-      const status = body.data.status;
-
-      if (status == "processed") {
-        const ids = String(faturaId).split(/[,-]/);
-
-        for (const id of ids) {
-          const fatura = await this.recordRepo.findOne({
-            where: {
-              id: Number(id),
-            },
-          });
-
-          if (fatura) {
-            await this.recordRepo.update(fatura.id, {
-              status: "pago",
-              datapag: new Date(),
-              formapag: "mercadoPagoPoint",
-              coletor: "mercadoPagoPoint",
-              valorpag: fatura.valor, // Note: We might want the calculated value, but here we just mark as paid. Ideally we usually use the 'total_paid_amount' distributed? For now, setting 'valor' is consistent with "paid full".
-              // Better: if multiple, total_paid_amount is sum. We can't easily know specific amount for each if it was bundled.
-              // Assuming full payment of the invoice value.
-            });
-            console.log(`Fatura ${id} confirmada paga via MercadoPago.`);
-
-            const cliente = await this.clienteRepo.findOne({
-              where: {
-                login: fatura.login,
-              },
-            });
-
-            if (!cliente) {
-              console.log(`Cliente ${fatura.login} nao encontrado.`);
-              continue;
-            }
-
-            if (cliente) {
-              const remObsDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
-                .toISOString()
-                .replace("T", " ")
-                .replace("Z", "");
-              await this.clienteRepo.update(
-                { login: cliente.login },
-                { observacao: "sim", rem_obs: remObsDate },
-              );
-            }
-          }
-        }
-
-        res.status(200).json({ message: "Pagamento recebido com sucesso" });
+      if (!intencaoVendaId) {
+        res.status(200).json({ ok: true });
         return;
       }
-    } catch (error) {
-      console.log(error);
-      res.status(500).json({ error: "Erro ao receber pagamento" });
+
+      const intencao = await this.getIntencaoVendaPayGo(intencaoVendaId);
+      const status = this.extrairStatusIntencao(intencao);
+
+      if (status === PAYGO_STATUS.CREDITADO) {
+        const ids =
+          TokenAtendimento.faturasPorVenda.get(intencaoVendaId) ||
+          (referencia || String(intencao?.referencia || ""))
+            .split(/[,-]/)
+            .filter(Boolean);
+        if (ids.length) {
+          await this.marcarFaturasPagas(ids);
+          TokenAtendimento.faturasPorVenda.delete(intencaoVendaId);
+        }
+      }
+
+      res.status(200).json({ ok: true });
+    } catch (error: any) {
+      console.log(
+        "[PayGo] Erro no callback de venda:",
+        error.response?.data || error,
+      );
+      // Devolve erro para a PayGo reenviar o callback depois.
+      res.status(500).json({ error: "Erro ao processar callback" });
+    }
+  };
+
+  private gerarPagamentoCartaoUnico = async (
+    req: Request,
+    res: Response,
+    tipo: "credito" | "debito",
+  ) => {
+    try {
+      const { login } = req.body;
+
+      const cliente = await this.clienteRepo.findOne({
+        where: { login, cli_ativado: "s" },
+      });
+
+      if (!cliente) {
+        res.status(404).json({ error: "Cliente nao encontrado" });
+        return;
+      }
+
+      const fatura = await this.recordRepo.findOne({
+        where: {
+          login: cliente.login,
+          status: In(["aberto", "vencido"]),
+          datadel: IsNull(),
+        },
+        order: { datavenc: "ASC" as const },
+      });
+
+      if (!fatura) {
+        res.status(404).json({ error: "Fatura nao encontrada" });
+        return;
+      }
+
+      const valor = await this.aplicarJuros_Desconto(
+        fatura.valor,
+        cliente.login,
+        fatura.datavenc,
+      );
+
+      const result = await this.criarVendaPayGo({
+        faturaIds: [fatura.id],
+        valor,
+        tipo,
+      });
+
+      if (!result.ok) {
+        res.status(200).json({ terminalBusy: true, reason: result.reason });
+        return;
+      }
+
+      res.status(200).json({
+        id: fatura.id,
+        valor,
+        order: { id: result.intencaoVendaId },
+        dataPagamento: fatura.datavenc,
+      });
+    } catch (error: any) {
+      console.log(
+        "[PayGo] Erro ao gerar pagamento de cartão:",
+        error.response?.data || error,
+      );
+      res.status(500).json({ error: "Erro ao gerar pagamento" });
     }
   };
 
   obterListaTerminaisEGerarPagamentoCredito = async (
     req: Request,
     res: Response,
-  ) => {
-    try {
-      const { login } = req.body;
-
-      const cliente = await this.clienteRepo.findOne({
-        where: {
-          login,
-          cli_ativado: "s",
-        },
-      });
-
-      if (!cliente) {
-        res.status(404).json({ error: "Cliente nao encontrado" });
-        return;
-      }
-
-      const fatura = await this.recordRepo.findOne({
-        where: {
-          login: cliente.login,
-          status: In(["aberto", "vencido"]),
-          datadel: IsNull(),
-        },
-        order: { datavenc: "ASC" as const },
-      });
-
-      if (!fatura) {
-        res.status(404).json({ error: "Fatura nao encontrada" });
-        return;
-      }
-
-      const valor = await this.aplicarJuros_Desconto(
-        fatura.valor,
-        cliente.login,
-        fatura.datavenc,
-      );
-
-      const response = await axios.get(
-        "https://api.mercadopago.com/terminals/v1/list",
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-          },
-        },
-      );
-
-      const terminais = await response.data.data.terminals;
-
-      console.log(terminais);
-
-      const result = await this.criarOrderMPNoTerminal(terminais[0].id, {
-        type: "point",
-        external_reference: String(fatura.id),
-        expiration_time: "PT2M",
-        transactions: {
-          payments: [
-            {
-              amount: String(valor),
-            },
-          ],
-        },
-        config: {
-          point: {
-            terminal_id: terminais[0].id,
-            print_on_terminal: "seller_ticket",
-          },
-          payment_method: {
-            default_type: "credit_card",
-            installments_cost: "buyer",
-            default_installments: 1,
-          },
-        },
-      });
-
-      if (!result.ok) {
-        res.status(200).json({ terminalBusy: true, reason: result.reason });
-        return;
-      }
-
-      const terminais2 = result.response.data;
-      res.status(200).json({
-        id: fatura.id,
-        valor: valor,
-        order: terminais2,
-        dataPagamento: fatura.datavenc,
-      });
-    } catch (error: any) {
-      console.log("********** ERRO MERCADO PAGO **********");
-      console.log(JSON.stringify(error.response?.data, null, 2));
-      console.log(JSON.stringify(error.response, null, 2));
-      console.log("***************************************");
-      console.log(error);
-      res.status(500).json({ error: "Erro ao obter lista de terminais" });
-    }
-  };
+  ) => this.gerarPagamentoCartaoUnico(req, res, "credito");
 
   obterListaTerminaisEGerarPagamentoDebito = async (
     req: Request,
     res: Response,
-  ) => {
+  ) => this.gerarPagamentoCartaoUnico(req, res, "debito");
+
+  // Procura intenções de venda ainda pendentes / em andamento no terminal e
+  // cancela cada uma. Não precisa do ID da venda — varre o terminal — então
+  // libera o pinpad mesmo quando o totem não chegou a receber o ID (ex.: o
+  // cliente saiu da tela antes de a venda terminar de ser criada).
+  liberarTerminal = async (_req: Request, res: Response) => {
     try {
-      const { login } = req.body;
-
-      const cliente = await this.clienteRepo.findOne({
-        where: {
-          login,
-          cli_ativado: "s",
-        },
-      });
-
-      if (!cliente) {
-        res.status(404).json({ error: "Cliente nao encontrado" });
-        return;
+      // O filtro por "status" do GetByFiltros não funciona — então buscamos
+      // todas as vendas recentes do terminal e filtramos aqui no código.
+      let lista: any[] = [];
+      try {
+        const r = await axios.post(
+          paygoUrl("IntencaoVenda/GetByFiltros"),
+          { terminalId: PAYGO_TERMINAL_ID },
+          { headers: PAYGO_HEADERS },
+        );
+        lista =
+          r.data?.intencoesVendas ||
+          r.data?.intencaoVendas ||
+          r.data?.data ||
+          [];
+      } catch (err: any) {
+        console.log(
+          "[PayGo] Falha ao buscar vendas do terminal:",
+          err.response?.data || err.message,
+        );
       }
 
-      const fatura = await this.recordRepo.findOne({
-        where: {
-          login: cliente.login,
-          status: In(["aberto", "vencido"]),
-          datadel: IsNull(),
-        },
-        order: { datavenc: "ASC" as const },
-      });
-
-      if (!fatura) {
-        res.status(404).json({ error: "Fatura nao encontrada" });
-        return;
-      }
-
-      const valor = await this.aplicarJuros_Desconto(
-        fatura.valor,
-        cliente.login,
-        fatura.datavenc,
-      );
-
-      const response = await axios.get(
-        "https://api.mercadopago.com/terminals/v1/list",
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-          },
-        },
-      );
-
-      const terminais = await response.data.data.terminals;
-
-      console.log(terminais);
-
-      const result = await this.criarOrderMPNoTerminal(terminais[0].id, {
-        type: "point",
-        external_reference: String(fatura.id),
-        expiration_time: "PT2M",
-        transactions: {
-          payments: [
+      let canceladas = 0;
+      for (const intencao of lista) {
+        // Só cancela o que está aberto. Nunca cancela uma venda já creditada
+        // (isso dispararia um estorno no pinpad).
+        const status = this.extrairStatusIntencao(intencao);
+        if (
+          status !== PAYGO_STATUS.PENDENTE &&
+          status !== PAYGO_STATUS.EM_PAGAMENTO
+        ) {
+          continue;
+        }
+        const id = intencao?.id ? String(intencao.id) : null;
+        if (!id) continue;
+        try {
+          await axios.post(
+            paygoUrl("Venda/CancelarVenda"),
             {
-              amount: String(valor),
+              intencaoVendaId: id,
+              terminalId: PAYGO_TERMINAL_ID,
+              senhaTecnica: PAYGO_CANCEL_PASS,
             },
-          ],
-        },
-        config: {
-          point: {
-            terminal_id: terminais[0].id,
-            print_on_terminal: "seller_ticket",
-          },
-          payment_method: {
-            default_type: "debit_card",
-          },
-        },
-      });
-
-      if (!result.ok) {
-        res.status(200).json({ terminalBusy: true, reason: result.reason });
-        return;
+            { headers: PAYGO_HEADERS },
+          );
+          TokenAtendimento.faturasPorVenda.delete(id);
+          canceladas++;
+        } catch (err: any) {
+          console.log(
+            `[PayGo] Falha ao cancelar venda ${id}:`,
+            err.response?.data || err.message,
+          );
+        }
       }
 
-      const terminais2 = result.response.data;
-      res.status(200).json({
-        id: fatura.id,
-        valor: valor,
-        order: terminais2,
-        dataPagamento: fatura.datavenc,
-      });
-    } catch (error: any) {
-      console.log("********** ERRO MERCADO PAGO **********");
-      console.log(JSON.stringify(error.response?.data, null, 2));
-      console.log(JSON.stringify(error.response, null, 2));
-      console.log("***************************************");
-      console.log(error);
-      res.status(500).json({ error: "Erro ao obter lista de terminais" });
-    }
-  };
-
-  private liberarTerminalDevice = async (deviceId: string): Promise<void> => {
-    const patch = (operating_mode: "PDV" | "STANDALONE") =>
-      axios.patch(
-        `https://api.mercadopago.com/point/integration-api/devices/${deviceId}`,
-        { operating_mode },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-          },
-        },
-      );
-
-    const cached = TokenAtendimento.lastOrderByTerminal.get(deviceId);
-    if (cached) {
-      await this.cancelarOrderMP(cached);
-      TokenAtendimento.lastOrderByTerminal.delete(deviceId);
-    }
-
-    try {
-      await patch("STANDALONE");
-      await new Promise((r) => setTimeout(r, 1500));
-      await patch("PDV");
-    } catch (e: any) {
+      const vendas = lista.map((iv: any) => ({
+        id: iv?.id,
+        status: this.extrairStatusIntencao(iv),
+        statusNome: iv?.intencaoVendaStatus?.nome,
+      }));
       console.log(
-        "[MP] Falha ao alternar operating_mode:",
-        e.response?.data || e.message,
+        `[PayGo] liberarTerminal: ${canceladas} cancelada(s) de ${lista.length} venda(s)`,
+        vendas,
       );
-    }
-  };
-
-  liberarTerminal = async (req: Request, res: Response) => {
-    try {
-      const list = await axios.get(
-        "https://api.mercadopago.com/terminals/v1/list",
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-          },
-        },
-      );
-
-      const terminais = list.data?.data?.terminals || [];
-      if (!terminais.length) {
-        res.status(404).json({ error: "Nenhum terminal disponível" });
-        return;
-      }
-
-      const deviceId = terminais[0].id;
-      await this.liberarTerminalDevice(deviceId);
-
-      res.status(200).json({ ok: true, deviceId });
+      res
+        .status(200)
+        .json({ ok: true, canceladas, total: lista.length, vendas });
     } catch (error: any) {
       console.log(
-        "[MP] Erro ao liberar terminal:",
+        "[PayGo] Erro ao liberar terminal:",
         error.response?.data || error,
       );
       res.status(500).json({ error: "Erro ao liberar terminal" });
@@ -982,50 +836,101 @@ class TokenAtendimento {
         return;
       }
 
-      const result = await this.cancelarOrderMP(String(order));
+      // Só cancela se a venda ainda estiver pendente / em andamento.
+      // Cancelar uma venda já creditada dispara um estorno no pinpad
+      // (pede o cartão de novo), o que não queremos no fluxo do totem.
+      const intencao = await this.getIntencaoVendaPayGo(String(order));
+      const status = this.extrairStatusIntencao(intencao);
 
-      if (result.ok) {
-        for (const [terminalId, id] of TokenAtendimento.lastOrderByTerminal) {
-          if (id === String(order)) {
-            TokenAtendimento.lastOrderByTerminal.delete(terminalId);
-          }
-        }
+      if (
+        status !== PAYGO_STATUS.PENDENTE &&
+        status !== PAYGO_STATUS.EM_PAGAMENTO
+      ) {
+        TokenAtendimento.faturasPorVenda.delete(String(order));
+        res.status(200).json({ ok: true, status });
+        return;
       }
 
-      res.status(200).json(result);
+      try {
+        await axios.post(
+          paygoUrl("Venda/CancelarVenda"),
+          {
+            intencaoVendaId: String(order),
+            terminalId: PAYGO_TERMINAL_ID,
+            senhaTecnica: PAYGO_CANCEL_PASS,
+            aguardarTefIniciarTransacao: true,
+          },
+          { headers: PAYGO_HEADERS },
+        );
+        TokenAtendimento.faturasPorVenda.delete(String(order));
+        res.status(200).json({ ok: true });
+      } catch (err: any) {
+        console.log(
+          "[PayGo] Falha ao cancelar venda:",
+          err.response?.data || err.message,
+        );
+        res.status(200).json({ ok: false });
+      }
     } catch (error: any) {
-      console.log(
-        "[MP] Erro ao cancelar order:",
-        error.response?.data || error,
-      );
-      res.status(500).json({ error: "Erro ao cancelar order" });
+      console.log("[PayGo] Erro ao cancelar venda:", error);
+      res.status(500).json({ error: "Erro ao cancelar venda" });
     }
   };
 
   obterOrderPorId = async (req: Request, res: Response) => {
     try {
       const { order } = req.params;
-
-      const response = await axios.get(
-        `https://api.mercadopago.com/v1/orders/${order}`,
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-          },
-        },
-      );
-
-      if (!response) {
-        res.status(404).json({ error: "Order nao encontrado" });
+      if (!order) {
+        res.status(400).json({ error: "Order ID não informado" });
         return;
       }
 
-      console.log(response.data);
+      const intencao = await this.getIntencaoVendaPayGo(String(order));
+      if (!intencao) {
+        res.status(404).json({ error: "Venda nao encontrada" });
+        return;
+      }
 
-      res.status(200).json(response.data);
-    } catch (error) {
-      console.log(error);
-      res.status(500).json({ error: error });
+      const status = this.extrairStatusIntencao(intencao);
+      let statusTexto = "pending";
+
+      if (status === PAYGO_STATUS.CREDITADO) {
+        statusTexto = "approved";
+        const ids =
+          TokenAtendimento.faturasPorVenda.get(String(order)) ||
+          String(intencao.referencia || "")
+            .split(/[,-]/)
+            .filter(Boolean);
+        if (ids.length) {
+          await this.marcarFaturasPagas(ids);
+          TokenAtendimento.faturasPorVenda.delete(String(order));
+        }
+      } else if (status === PAYGO_STATUS.EXPIRADO) {
+        statusTexto = "expired";
+      } else if (status === PAYGO_STATUS.CANCELADO) {
+        statusTexto = "canceled";
+      } else if (status === PAYGO_STATUS.RECUSADO) {
+        const recusaReal = this.foiRecusaReal(intencao);
+        statusTexto = recusaReal ? "declined" : "failed";
+        console.log(
+          `[PayGo] Venda ${order} status 25 — recusaReal=${recusaReal}`,
+          (intencao?.pagamentosExternos || []).map((p: any) => ({
+            codigoRespostaAdquirente: p?.codigoRespostaAdquirente,
+            mensagemRespostaAdquirente: p?.mensagemRespostaAdquirente,
+            nsuTid: p?.nsuTid,
+            adquirente: p?.adquirente,
+            bandeira: p?.bandeira,
+          })),
+        );
+      }
+
+      res.status(200).json({ status: statusTexto, paygoStatus: status });
+    } catch (error: any) {
+      console.log(
+        "[PayGo] Erro ao consultar venda:",
+        error.response?.data || error,
+      );
+      res.status(500).json({ error: "Erro ao consultar venda" });
     }
   };
   listarFaturasAbertas = async (req: Request, res: Response) => {
@@ -1198,7 +1103,11 @@ class TokenAtendimento {
     }
   };
 
-  gerarPagamentoMultiploCredito = async (req: Request, res: Response) => {
+  private gerarPagamentoCartaoMultiplo = async (
+    req: Request,
+    res: Response,
+    tipo: "credito" | "debito",
+  ) => {
     try {
       const titulos: string[] = String(req.body.titulos || "")
         .split(",")
@@ -1221,54 +1130,17 @@ class TokenAtendimento {
 
       let total = 0;
       for (const fatura of faturas) {
-        const valorCalc = await this.aplicarJuros_Desconto(
+        total += await this.aplicarJuros_Desconto(
           fatura.valor,
           fatura.login,
           fatura.datavenc,
         );
-        total += valorCalc;
       }
 
-      // MercadoPago Logic
-      const response = await axios.get(
-        "https://api.mercadopago.com/terminals/v1/list",
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-          },
-        },
-      );
-
-      const terminais = response.data.data.terminals;
-      if (!terminais.length) {
-        res.status(500).json({ error: "Nenhum terminal disponível" });
-        return;
-      }
-
-      const externalRef = titulos.join("-"); // "101-102-103"
-
-      const result = await this.criarOrderMPNoTerminal(terminais[0].id, {
-        type: "point",
-        external_reference: externalRef,
-        expiration_time: "PT2M",
-        transactions: {
-          payments: [
-            {
-              amount: total.toFixed(2),
-            },
-          ],
-        },
-        config: {
-          point: {
-            terminal_id: terminais[0].id,
-            print_on_terminal: "seller_ticket",
-          },
-          payment_method: {
-            default_type: "credit_card",
-            installments_cost: "buyer",
-            default_installments: 1,
-          },
-        },
+      const result = await this.criarVendaPayGo({
+        faturaIds: titulos,
+        valor: total,
+        tipo,
       });
 
       if (!result.ok) {
@@ -1281,116 +1153,25 @@ class TokenAtendimento {
       }
 
       res.status(200).json({
-        id: externalRef,
-        order: result.response.data,
+        id: titulos.join("-"),
+        order: { id: result.intencaoVendaId },
         valor: total.toFixed(2),
         dataPagamento: new Date(),
       });
     } catch (error: any) {
-      console.log("********** ERRO MERCADO PAGO **********");
-      console.log(JSON.stringify(error.response?.data, null, 2));
-      console.log(JSON.stringify(error.response, null, 2));
-      console.log("***************************************");
-      console.error(error);
-      res.status(500).json({ error: "Erro ao gerar pagamento múltiplo" });
-    }
-  };
-
-  gerarPagamentoMultiploDebito = async (req: Request, res: Response) => {
-    try {
-      const titulos: string[] = String(req.body.titulos || "")
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean);
-
-      if (titulos.length === 0) {
-        res.status(400).json({ error: "Nenhum título informado" });
-        return;
-      }
-
-      const faturas = await this.recordRepo.find({
-        where: { id: In(titulos.map(Number)) },
-      });
-
-      if (!faturas.length) {
-        res.status(404).json({ error: "Faturas não encontradas" });
-        return;
-      }
-
-      let total = 0;
-      for (const fatura of faturas) {
-        const valorCalc = await this.aplicarJuros_Desconto(
-          fatura.valor,
-          fatura.login,
-          fatura.datavenc,
-        );
-        total += valorCalc;
-      }
-
-      // MercadoPago Logic
-      const response = await axios.get(
-        "https://api.mercadopago.com/terminals/v1/list",
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESSTOKEN}`,
-          },
-        },
+      console.log(
+        "[PayGo] Erro ao gerar pagamento múltiplo:",
+        error.response?.data || error,
       );
-
-      const terminais = response.data.data.terminals;
-      if (!terminais.length) {
-        res.status(500).json({ error: "Nenhum terminal disponível" });
-        return;
-      }
-
-      const externalRef = titulos.join("-");
-
-      const result = await this.criarOrderMPNoTerminal(terminais[0].id, {
-        type: "point",
-        external_reference: externalRef,
-        expiration_time: "PT2M",
-        transactions: {
-          payments: [
-            {
-              amount: total.toFixed(2),
-            },
-          ],
-        },
-        config: {
-          point: {
-            terminal_id: terminais[0].id,
-            print_on_terminal: "seller_ticket",
-          },
-          payment_method: {
-            default_type: "debit_card",
-          },
-        },
-      });
-
-      if (!result.ok) {
-        res.status(200).json({
-          terminalBusy: true,
-          reason: result.reason,
-          valor: total.toFixed(2),
-        });
-        return;
-      }
-
-      res.status(200).json({
-        id: externalRef,
-        order: result.response.data,
-        valor: total.toFixed(2),
-        dataPagamento: new Date(),
-      });
-    } catch (error: any) {
-      console.log("********** ERRO MERCADO PAGO **********");
-      console.log(JSON.stringify(error.response?.data, null, 2));
-      console.log(JSON.stringify(error.response, null, 2));
-      console.log("***************************************");
-      console.error(error);
       res.status(500).json({ error: "Erro ao gerar pagamento múltiplo" });
     }
   };
+
+  gerarPagamentoMultiploCredito = async (req: Request, res: Response) =>
+    this.gerarPagamentoCartaoMultiplo(req, res, "credito");
+
+  gerarPagamentoMultiploDebito = async (req: Request, res: Response) =>
+    this.gerarPagamentoCartaoMultiplo(req, res, "debito");
 }
 
 export default TokenAtendimento;

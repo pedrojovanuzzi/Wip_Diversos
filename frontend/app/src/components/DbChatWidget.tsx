@@ -3,6 +3,7 @@ import axios from "axios";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { BsChatDots, BsX, BsCode } from "react-icons/bs";
 import { useAuth } from "../context/AuthContext";
+import { useLocation } from "react-router-dom";
 
 interface ChatTurn {
   role: "user" | "assistant";
@@ -16,6 +17,7 @@ const STORAGE_KEY = "dbchat-history-v1";
 
 export const DbChatWidget: React.FC = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,6 +46,8 @@ export const DbChatWidget: React.FC = () => {
     }
   }, [open, history, loading]);
 
+  // O totem (autoatendimento) não deve exibir o chat de IA.
+  if (location.pathname.startsWith("/TokenAutoAtendimento")) return null;
   if (!user?.token) return null;
 
   const send = async () => {
