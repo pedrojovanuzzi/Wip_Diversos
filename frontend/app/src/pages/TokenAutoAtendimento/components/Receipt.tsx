@@ -7,11 +7,23 @@ interface ReceiptProps {
   faturaId: number | string | null;
   valor: string;
   dataPagamento: string;
+  dataVencimento?: string;
   plano: string;
 }
 
 export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(
-  ({ clientName, cpfCnpj, faturaId, valor, dataPagamento, plano }, ref) => {
+  (
+    {
+      clientName,
+      cpfCnpj,
+      faturaId,
+      valor,
+      dataPagamento,
+      dataVencimento,
+      plano,
+    },
+    ref,
+  ) => {
     return (
       <div
         ref={ref}
@@ -106,8 +118,8 @@ export const Receipt = React.forwardRef<HTMLDivElement, ReceiptProps>(
               <div className="text-right">
                 <span className="text-[10px] block font-bold">VENCIMENTO</span>
                 <span>
-                  {dataPagamento
-                    ? format(new Date(dataPagamento), "dd/MM/yy")
+                  {dataVencimento
+                    ? format(new Date(dataVencimento), "dd/MM/yy")
                     : "-"}
                 </span>
               </div>

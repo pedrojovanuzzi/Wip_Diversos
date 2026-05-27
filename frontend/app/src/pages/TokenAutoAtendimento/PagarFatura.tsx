@@ -1335,6 +1335,12 @@ export const PagarFatura = () => {
           faturaId={faturaId}
           valor={valorPagamento}
           dataPagamento={dataPagamento}
+          dataVencimento={
+            invoices
+              .filter((inv) => selectedInvoiceIds.includes(inv.id))
+              .map((inv) => inv.data_vencimento)
+              .sort()[0]
+          }
           plano={selectedClient?.plano || ""}
         />
       </div>

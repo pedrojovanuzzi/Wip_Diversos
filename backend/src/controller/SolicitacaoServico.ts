@@ -217,6 +217,18 @@ class SolicitacaoServicoController {
         solicitacao.pago = false;
         solicitacao.gratis = 0;
         solicitacao.consulta_cpf_realizada = true;
+
+        if (!solicitacao.login_cliente) {
+          try {
+            const loginCriado = await ZapSign.registerClientInMkAuth(dados);
+            solicitacao.login_cliente = loginCriado;
+          } catch (err) {
+            console.error(
+              "[ConsultarCpf] Falha ao criar cadastro no MKAuth:",
+              err,
+            );
+          }
+        }
         await repository.save(solicitacao);
 
         await MensagensComuns(
@@ -348,6 +360,21 @@ class SolicitacaoServicoController {
         solicitacao.pago = false;
         solicitacao.gratis = 0;
         solicitacao.consulta_cpf_realizada = true;
+
+        if (!solicitacao.login_cliente) {
+          try {
+            const dadosCadastro = { ...dados, cpf, nome };
+            const loginCriado = await ZapSign.registerClientInMkAuth(
+              dadosCadastro,
+            );
+            solicitacao.login_cliente = loginCriado;
+          } catch (err) {
+            console.error(
+              "[ConsultarCpfManual] Falha ao criar cadastro no MKAuth:",
+              err,
+            );
+          }
+        }
         await repository.save(solicitacao);
 
         await MensagensComuns(
