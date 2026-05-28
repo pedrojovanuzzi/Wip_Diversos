@@ -11,12 +11,14 @@ import {
 
 const VALORES: Record<string, number> = {
   STREAMER: 39.9,
+  STREAMER_COLAB: 0,
   CAMERA: 20.0,
 };
 
 const CFOP_DEFAULT = "5949";
 
-const UNIQUE_PER_LOGIN = new Set(["STREAMER"]);
+const UNIQUE_PER_LOGIN = new Set(["STREAMER", "STREAMER_COLAB"]);
+const STREAMING_TYPES = new Set(["STREAMER", "STREAMER_COLAB"]);
 
 class SerContratos {
   public async listByLogin(req: Request, res: Response) {
@@ -61,12 +63,14 @@ class SerContratos {
         quantidade,
         email: emailForm,
         phone: phoneForm,
+        replace,
       } = req.body as {
         login?: string;
         tipo?: string;
         quantidade?: number;
         email?: string;
         phone?: string;
+        replace?: boolean;
       };
       const usuario = (req as any).user?.username || "sistema";
 
@@ -101,7 +105,59 @@ class SerContratos {
           .andWhere("UPPER(TRIM(s.nome)) = :tipo", { tipo })
           .getCount();
 
-      if (UNIQUE_PER_LOGIN.has(tipoNorm)) {
+      // Streamer e Streamer Colaborador são mutuamente exclusivos.
+      // Se já houver qualquer um dos dois e não tiver "replace=true", bloqueia.
+      // Com replace=true, remove o anterior (e ticket Watch Brasil) antes de inserir.
+      if (STREAMING_TYPES.has(tipoNorm)) {
+        const existing = await repo
+          .createQueryBuilder("s")
+          .where("UPPER(TRIM(s.login)) = UPPER(TRIM(:l))", { l: login })
+          .andWhere("UPPER(TRIM(s.nome)) IN (:...tipos)", {
+            tipos: Array.from(STREAMING_TYPES),
+          })
+          .getMany();
+
+        if (existing.length > 0) {
+          if (!replace) {
+            const atual = (existing[0].nome || "").toUpperCase();
+            res.status(409).json({
+              message: `Cliente já possui ${atual}. Confirme a substituição.`,
+              code: "STREAMING_REPLACE_REQUIRED",
+              currentType: atual,
+            });
+            return;
+          }
+          // Remove streaming(s) anterior(es)
+          try {
+            const streamingRepo = AppDataSource.getRepository(StreamingAssinante);
+            const assinante = await streamingRepo.findOne({
+              where: { login: cliente.login },
+            });
+            if (assinante?.ticket) {
+              try {
+                await deleteTicket(assinante.ticket);
+              } catch (e: any) {
+                console.error(
+                  "Falha ao remover ticket Watch Brasil ao substituir:",
+                  e?.message,
+                );
+              }
+            }
+            if (assinante) await streamingRepo.delete(assinante.id);
+          } catch (e: any) {
+            console.error("Erro ao limpar streaming anterior:", e?.message);
+          }
+          await repo
+            .createQueryBuilder()
+            .delete()
+            .from(SisSerContratos)
+            .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: login })
+            .andWhere("UPPER(TRIM(nome)) IN (:...tipos)", {
+              tipos: Array.from(STREAMING_TYPES),
+            })
+            .execute();
+        }
+      } else if (UNIQUE_PER_LOGIN.has(tipoNorm)) {
         const total = await countExisting(login, tipoNorm);
         if (total > 0) {
           res.status(409).json({
@@ -111,12 +167,13 @@ class SerContratos {
         }
       }
 
+
       const qtd = Math.max(1, Math.min(Number(quantidade) || 1, 20));
       const valorUnitario = VALORES[tipoNorm];
 
-      // STREAMER: valida na Watch Brasil ANTES de gravar local
+      // STREAMER / STREAMER_COLAB: valida na Watch Brasil ANTES de gravar local
       let streamingInfo: any = null;
-      if (tipoNorm === "STREAMER") {
+      if (STREAMING_TYPES.has(tipoNorm)) {
         const emailUse = (emailForm || cliente.email || "").trim();
         const phoneUse = ((phoneForm || cliente.celular || cliente.fone || "") + "")
           .replace(/\D/g, "");
@@ -196,11 +253,17 @@ class SerContratos {
         const trxRepo = manager.getRepository(SisSerContratos);
 
         if (UNIQUE_PER_LOGIN.has(tipoNorm)) {
-          const recheck = await trxRepo
+          const qb = trxRepo
             .createQueryBuilder("s")
-            .where("UPPER(TRIM(s.login)) = UPPER(TRIM(:l))", { l: login })
-            .andWhere("UPPER(TRIM(s.nome)) = :tipo", { tipo: tipoNorm })
-            .getCount();
+            .where("UPPER(TRIM(s.login)) = UPPER(TRIM(:l))", { l: login });
+          if (STREAMING_TYPES.has(tipoNorm)) {
+            qb.andWhere("UPPER(TRIM(s.nome)) IN (:...tipos)", {
+              tipos: Array.from(STREAMING_TYPES),
+            });
+          } else {
+            qb.andWhere("UPPER(TRIM(s.nome)) = :tipo", { tipo: tipoNorm });
+          }
+          const recheck = await qb.getCount();
           if (recheck > 0) {
             throw new Error("UNIQUE_VIOLATION");
           }
@@ -262,9 +325,9 @@ class SerContratos {
         return;
       }
 
-      // Se for STREAMER, derruba na Watch Brasil também
+      // Se for STREAMER ou STREAMER_COLAB, derruba na Watch Brasil também
       let streamingNote: string | null = null;
-      if ((item.nome || "").toUpperCase() === "STREAMER") {
+      if (STREAMING_TYPES.has((item.nome || "").toUpperCase())) {
         try {
           const streamingRepo =
             AppDataSource.getRepository(StreamingAssinante);
@@ -288,6 +351,69 @@ class SerContratos {
     } catch (error: any) {
       console.error("Erro ao remover sercontratos:", error);
       res.status(500).json({ message: "Erro ao remover." });
+    }
+  }
+
+  // Troca apenas a tag entre STREAMER e STREAMER_COLAB sem mexer no
+  // Watch Brasil. A conta do cliente permanece ativa; apenas o nome e o
+  // valor do serviço mudam (pago <-> grátis).
+  public async convertStreamingTipo(req: Request, res: Response) {
+    try {
+      const login = String(req.body?.login || "").trim();
+      const novoTipoRaw = String(req.body?.novoTipo || "").trim().toUpperCase();
+      if (!login || !novoTipoRaw) {
+        res.status(400).json({ message: "login e novoTipo obrigatórios." });
+        return;
+      }
+      if (!STREAMING_TYPES.has(novoTipoRaw)) {
+        res.status(400).json({
+          message: "novoTipo deve ser STREAMER ou STREAMER_COLAB.",
+        });
+        return;
+      }
+      const repo = MkauthSource.getRepository(SisSerContratos);
+      const atuais = await repo
+        .createQueryBuilder("s")
+        .where("UPPER(TRIM(s.login)) = UPPER(TRIM(:l))", { l: login })
+        .andWhere("UPPER(TRIM(s.nome)) IN (:...tipos)", {
+          tipos: Array.from(STREAMING_TYPES),
+        })
+        .getMany();
+
+      if (atuais.length === 0) {
+        res.status(404).json({
+          message: "Cliente não possui streaming para converter.",
+        });
+        return;
+      }
+      const ja = atuais.find((a) => (a.nome || "").toUpperCase() === novoTipoRaw);
+      if (ja && atuais.length === 1) {
+        res.status(409).json({
+          message: `Cliente já está como ${novoTipoRaw}.`,
+        });
+        return;
+      }
+
+      const novoValor = VALORES[novoTipoRaw];
+      const result = await repo
+        .createQueryBuilder()
+        .update(SisSerContratos)
+        .set({ nome: novoTipoRaw, valor: novoValor })
+        .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: login })
+        .andWhere("UPPER(TRIM(nome)) IN (:...tipos)", {
+          tipos: Array.from(STREAMING_TYPES),
+        })
+        .execute();
+
+      res.json({
+        ok: true,
+        updated: result.affected || 0,
+        novoTipo: novoTipoRaw,
+        novoValor,
+      });
+    } catch (error: any) {
+      console.error("Erro ao converter tipo de streaming:", error);
+      res.status(500).json({ message: "Erro ao converter streaming." });
     }
   }
 

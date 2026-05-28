@@ -39,6 +39,9 @@ export const SerContratos: React.FC = () => {
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [qtdCamera, setQtdCamera] = useState(1);
   const [showStreamingForm, setShowStreamingForm] = useState(false);
+  const [streamingFormTipo, setStreamingFormTipo] = useState<
+    "STREAMER" | "STREAMER_COLAB"
+  >("STREAMER");
   const [streamingForm, setStreamingForm] = useState({
     email: "",
     phone: "",
@@ -87,7 +90,7 @@ export const SerContratos: React.FC = () => {
   };
 
   const addServico = async (
-    tipo: "STREAMER" | "CAMERA",
+    tipo: "STREAMER" | "STREAMER_COLAB" | "CAMERA",
     extras?: Record<string, any>,
   ) => {
     if (!loaded) return;
@@ -101,10 +104,42 @@ export const SerContratos: React.FC = () => {
       showMsg(res.data.message || "Adicionado com sucesso.", "success");
       await fetchList(loaded.login);
     } catch (e: any) {
-      showMsg(
-        e?.response?.data?.message || "Erro ao adicionar serviço.",
-        "error",
-      );
+      if (
+        e?.response?.status === 409 &&
+        e?.response?.data?.code === "STREAMING_REPLACE_REQUIRED"
+      ) {
+        const atual = e.response.data.currentType || "STREAMING";
+        if (
+          window.confirm(
+            `Cliente já possui ${atual}. Deseja substituir pelo novo streaming?`,
+          )
+        ) {
+          try {
+            const retry = await axios.post(
+              `${base}/sercontratos`,
+              {
+                login: loaded.login,
+                tipo,
+                replace: true,
+                ...(tipo === "CAMERA" ? { quantidade: qtdCamera } : extras || {}),
+              },
+              { headers },
+            );
+            showMsg(retry.data.message || "Substituído com sucesso.", "success");
+            await fetchList(loaded.login);
+          } catch (e2: any) {
+            showMsg(
+              e2?.response?.data?.message || "Erro ao substituir streaming.",
+              "error",
+            );
+          }
+        }
+      } else {
+        showMsg(
+          e?.response?.data?.message || "Erro ao adicionar serviço.",
+          "error",
+        );
+      }
     } finally {
       setAdding(false);
     }
@@ -128,7 +163,7 @@ export const SerContratos: React.FC = () => {
       return;
     }
     setStreamingFormError(null);
-    await addServico("STREAMER", {
+    await addServico(streamingFormTipo, {
       email: streamingForm.email.trim(),
       phone: streamingForm.phone.replace(/\D/g, ""),
     });
@@ -136,8 +171,9 @@ export const SerContratos: React.FC = () => {
     setStreamingForm({ email: "", phone: "" });
   };
 
-  const openStreamingForm = () => {
+  const openStreamingForm = (tipo: "STREAMER" | "STREAMER_COLAB") => {
     setStreamingFormError(null);
+    setStreamingFormTipo(tipo);
     setStreamingForm({ email: "", phone: "" });
     setShowStreamingForm(true);
   };
@@ -154,6 +190,42 @@ export const SerContratos: React.FC = () => {
       showMsg(e?.response?.data?.message || "Erro ao remover.", "error");
     } finally {
       setRemovingId(null);
+    }
+  };
+
+  const convertStreaming = async (
+    novoTipo: "STREAMER" | "STREAMER_COLAB",
+  ) => {
+    if (!loaded) return;
+    const labelNovo =
+      novoTipo === "STREAMER_COLAB" ? "Colaborador (grátis)" : "Pago";
+    if (
+      !window.confirm(
+        `Converter o streaming deste cliente para ${labelNovo}? A conta no Watch Brasil será mantida.`,
+      )
+    )
+      return;
+    setAdding(true);
+    try {
+      const res = await axios.post(
+        `${base}/sercontratos/streaming/convert`,
+        { login: loaded.login, novoTipo },
+        { headers },
+      );
+      showMsg(
+        res.data?.updated
+          ? `Streaming convertido para ${novoTipo}.`
+          : "Nada para converter.",
+        "success",
+      );
+      await fetchList(loaded.login);
+    } catch (e: any) {
+      showMsg(
+        e?.response?.data?.message || "Erro ao converter streaming.",
+        "error",
+      );
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -175,6 +247,10 @@ export const SerContratos: React.FC = () => {
 
   const totalStreaming = loaded?.items.filter((i) => i.nome === "STREAMER")
     .length || 0;
+  const totalStreamingColab = loaded?.items.filter(
+    (i) => i.nome === "STREAMER_COLAB",
+  ).length || 0;
+  const temStreaming = totalStreaming > 0 || totalStreamingColab > 0;
   const totalCameras = loaded?.items.filter((i) => i.nome === "CAMERA").length ||
     0;
 
@@ -259,24 +335,66 @@ export const SerContratos: React.FC = () => {
                     <h2 className="font-bold text-gray-800">Streaming</h2>
                   </div>
                   <p className="text-xs text-gray-500 mb-2">
-                    R$ {(loaded.valoresUnitarios.STREAMER ?? 39.9).toFixed(2)} —
-                    máx. 1 por cliente
+                    Pago R$ {(loaded.valoresUnitarios.STREAMER ?? 39.9).toFixed(2)} ·
+                    Colaborador grátis — máx. 1 por cliente
                   </p>
-                  {totalStreaming > 0 ? (
-                    <div className="flex items-center bg-purple-50 p-2 rounded">
+                  {temStreaming && (
+                    <div className="flex items-center bg-purple-50 p-2 rounded mb-2">
                       <span className="text-sm text-purple-800 font-semibold">
-                        ✓ Cliente já possui Streaming
+                        ✓ Cliente possui{" "}
+                        {totalStreamingColab > 0
+                          ? "Streaming Colaborador (grátis)"
+                          : "Streaming"}
                       </span>
                     </div>
-                  ) : (
-                    <button
-                      onClick={openStreamingForm}
-                      disabled={adding}
-                      className="w-full py-2 bg-purple-600 text-white rounded font-semibold hover:bg-purple-700 disabled:bg-gray-400"
-                    >
-                      {adding ? "Adicionando..." : "Adicionar Streaming"}
-                    </button>
                   )}
+                  <div className="flex flex-col gap-2">
+                    {!temStreaming && (
+                      <>
+                        <button
+                          onClick={() => openStreamingForm("STREAMER")}
+                          disabled={adding}
+                          className="w-full py-2 bg-purple-600 text-white rounded font-semibold hover:bg-purple-700 disabled:bg-gray-400"
+                        >
+                          {adding ? "Aguarde..." : "Adicionar Streaming"}
+                        </button>
+                        <button
+                          onClick={() => openStreamingForm("STREAMER_COLAB")}
+                          disabled={adding}
+                          className="w-full py-2 bg-emerald-600 text-white rounded font-semibold hover:bg-emerald-700 disabled:bg-gray-400"
+                          title="Libera a TV sem custo na mensalidade"
+                        >
+                          {adding
+                            ? "Aguarde..."
+                            : "Adicionar Streaming Colaborador (grátis)"}
+                        </button>
+                      </>
+                    )}
+                    {totalStreaming > 0 && (
+                      <button
+                        onClick={() => convertStreaming("STREAMER_COLAB")}
+                        disabled={adding}
+                        className="w-full py-2 bg-emerald-600 text-white rounded font-semibold hover:bg-emerald-700 disabled:bg-gray-400"
+                        title="Mantém a conta no Watch Brasil; só zera a cobrança"
+                      >
+                        {adding
+                          ? "Aguarde..."
+                          : "Converter para Colaborador (grátis)"}
+                      </button>
+                    )}
+                    {totalStreamingColab > 0 && (
+                      <button
+                        onClick={() => convertStreaming("STREAMER")}
+                        disabled={adding}
+                        className="w-full py-2 bg-purple-600 text-white rounded font-semibold hover:bg-purple-700 disabled:bg-gray-400"
+                        title="Mantém a conta no Watch Brasil; passa a cobrar"
+                      >
+                        {adding
+                          ? "Aguarde..."
+                          : "Converter para Pago"}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="bg-white p-4 rounded-lg shadow-md">
@@ -364,7 +482,11 @@ export const SerContratos: React.FC = () => {
                           className="border-t border-gray-100 hover:bg-gray-50"
                         >
                           <td className="p-2 text-gray-500">{it.id}</td>
-                          <td className="p-2 font-semibold">{it.nome}</td>
+                          <td className="p-2 font-semibold">
+                            {it.nome === "STREAMER_COLAB"
+                              ? "STREAMING COLABORADOR"
+                              : it.nome}
+                          </td>
                           <td className="p-2 text-right">
                             R$ {Number(it.valor).toFixed(2)}
                           </td>
@@ -376,7 +498,7 @@ export const SerContratos: React.FC = () => {
                           <td className="p-2 text-gray-600">{it.insuser}</td>
                           <td className="p-2 text-center">
                             {it.nome === "STREAMER" ? (
-                              <span className="text-gray-300" title="Streaming não pode ser removido por aqui">
+                              <span className="text-gray-300" title="Streaming pago não pode ser removido por aqui">
                                 —
                               </span>
                             ) : (
@@ -405,11 +527,15 @@ export const SerContratos: React.FC = () => {
               <div className="flex items-center gap-2 mb-4">
                 <BsCollectionPlay className="text-2xl text-purple-600" />
                 <h2 className="text-xl font-bold text-gray-800">
-                  Cadastro do Streaming
+                  {streamingFormTipo === "STREAMER_COLAB"
+                    ? "Cadastro do Streaming Colaborador (grátis)"
+                    : "Cadastro do Streaming"}
                 </h2>
               </div>
               <p className="text-xs text-gray-500 mb-4">
-                Preencha os dados do cliente para ativar o streaming.
+                {streamingFormTipo === "STREAMER_COLAB"
+                  ? "Libera a TV sem custo na mensalidade. Substitui qualquer streaming anterior."
+                  : "Preencha os dados do cliente para ativar o streaming."}
               </p>
 
               <div className="space-y-3">
