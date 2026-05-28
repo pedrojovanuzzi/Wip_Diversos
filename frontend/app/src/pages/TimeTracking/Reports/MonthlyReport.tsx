@@ -5,6 +5,7 @@ import moment from "moment";
 import { AiOutlinePrinter } from "react-icons/ai";
 import { NavBar } from "../../../components/navbar/NavBar";
 import { SignatureModal } from "../../../components/SignatureModal";
+import { CpfVerificationModal } from "../../../components/CpfVerificationModal";
 import { useAuth } from "../../../context/AuthContext";
 
 export const MonthlyReport = () => {
@@ -30,6 +31,14 @@ export const MonthlyReport = () => {
   const [editScale, setEditScale] = useState<"8h" | "12h" | "Integral" | "4h">("8h");
   const [editing, setEditing] = useState<{ id: number; value: string } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [daySignFlow, setDaySignFlow] = useState<{
+    dateIso: string;
+    dateBr: string;
+    signature?: string;
+  } | null>(null);
+  const [showDaySigModal, setShowDaySigModal] = useState(false);
+  const [showDayCpfModal, setShowDayCpfModal] = useState(false);
+  const [savingDaySig, setSavingDaySig] = useState(false);
 
   const handleEditRecord = async (record: any) => {
     if (!canEdit) return;
@@ -84,6 +93,50 @@ export const MonthlyReport = () => {
       alert("Erro ao excluir registro.");
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handleOpenSignDay = (dateBr: string) => {
+    if (!selectedEmployee) {
+      alert("Selecione um funcionário primeiro.");
+      return;
+    }
+    const dateIso = moment(dateBr, "DD/MM/YYYY").format("YYYY-MM-DD");
+    setDaySignFlow({ dateIso, dateBr });
+    setShowDaySigModal(true);
+  };
+
+  const handleSaveDaySignature = (data: string) => {
+    if (!daySignFlow) return;
+    setDaySignFlow({ ...daySignFlow, signature: data });
+    setShowDaySigModal(false);
+    setShowDayCpfModal(true);
+  };
+
+  const handleConfirmDayCpf = async (cpf: string) => {
+    if (!daySignFlow?.signature || !selectedEmployee) return;
+    setSavingDaySig(true);
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_URL}/time-tracking/signature`,
+        {
+          employeeId: Number(selectedEmployee),
+          date: daySignFlow.dateIso,
+          signature: daySignFlow.signature,
+          cpf,
+        },
+      );
+      setDailySignatures((prev) => ({
+        ...prev,
+        [daySignFlow.dateBr]: daySignFlow.signature!,
+      }));
+      setShowDayCpfModal(false);
+      setDaySignFlow(null);
+    } catch (e: any) {
+      console.error(e);
+      alert(e.response?.data?.error || "Erro ao salvar assinatura do dia.");
+    } finally {
+      setSavingDaySig(false);
     }
   };
 
@@ -443,7 +496,8 @@ export const MonthlyReport = () => {
                     <td className="border border-gray-300">
                       <div className="flex flex-wrap gap-1 items-center">
                         {dayRecords.length > 0 ? (
-                          dayRecords.map((r, idx) => {
+                          <>
+                            {dayRecords.map((r, idx) => {
                             const isEditingThis = editing?.id === r.id;
                             return (
                               <span
@@ -505,7 +559,17 @@ export const MonthlyReport = () => {
                                 )}
                               </span>
                             );
-                          })
+                            })}
+                            {canEdit && !dailySignatures[date] && (
+                              <button
+                                onClick={() => handleOpenSignDay(date)}
+                                className="text-purple-700 print:hidden ml-1 text-[10px] border border-purple-300 rounded px-1"
+                                title="Assinar este dia"
+                              >
+                                ✍️ Assinar dia
+                              </button>
+                            )}
+                          </>
                         ) : dayStatuses[date] ? (
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -670,6 +734,21 @@ export const MonthlyReport = () => {
           onSave={handleSaveSignature}
         />
       )}
+      {showDaySigModal && (
+        <SignatureModal
+          onClose={() => setShowDaySigModal(false)}
+          onSave={handleSaveDaySignature}
+        />
+      )}
+      <CpfVerificationModal
+        isOpen={showDayCpfModal}
+        onClose={() => {
+          setShowDayCpfModal(false);
+          setDaySignFlow(null);
+        }}
+        onConfirm={handleConfirmDayCpf}
+        loading={savingDaySig}
+      />
     </>
   );
 };
