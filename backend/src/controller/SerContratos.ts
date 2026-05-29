@@ -96,6 +96,94 @@ class SerContratos {
         return;
       }
 
+      // STREAMER pago: bloqueia se houver mensalidade vencida (status aberto + datavenc < hoje).
+      // E, após passar, limpa títulos em aberto fora do mês atual — mas só os "seguros"
+      // (sem remessa CNAB e sem chave de gateway). Os registrados são listados pra
+      // tratamento manual. Não se aplica ao COLAB (grátis não altera valor de fatura).
+      if (tipoNorm === "STREAMER") {
+        const hoje = new Date();
+        const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        const inicioProx = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
+        const fmt = (d: Date) => d.toISOString().slice(0, 10);
+        const dataHoje = fmt(hoje);
+        const dataIniMes = fmt(inicioMes);
+        const dataIniProx = fmt(inicioProx);
+
+        const vencidas = (await MkauthSource.query(
+          `SELECT id, datavenc, valor, nossonum
+             FROM sis_lanc
+            WHERE UPPER(TRIM(login)) = UPPER(TRIM(?))
+              AND status = 'aberto'
+              AND (deltitulo = 0 OR deltitulo IS NULL)
+              AND DATE(datavenc) < ?`,
+          [login, dataHoje],
+        )) as any[];
+
+        if (vencidas.length > 0) {
+          res.status(409).json({
+            message: `Cliente possui ${vencidas.length} mensalidade(s) vencida(s). Regularize antes de adicionar streaming.`,
+            code: "OVERDUE_INVOICES",
+            vencidas: vencidas.map((v) => ({
+              id: v.id,
+              datavenc: v.datavenc,
+              valor: v.valor,
+              nossonum: v.nossonum,
+            })),
+          });
+          return;
+        }
+
+        // Lista títulos em aberto fora do mês atual
+        const abertosForaMes = (await MkauthSource.query(
+          `SELECT id, datavenc, valor, nossonum, gerourem,
+                  chave_gnet, chave_juno, chave_galaxpay, chave_iugu, chave_bfacil,
+                  codigo_barras
+             FROM sis_lanc
+            WHERE UPPER(TRIM(login)) = UPPER(TRIM(?))
+              AND status = 'aberto'
+              AND (deltitulo = 0 OR deltitulo IS NULL)
+              AND (DATE(datavenc) < ? OR DATE(datavenc) >= ?)`,
+          [login, dataIniMes, dataIniProx],
+        )) as any[];
+
+        const registrados = abertosForaMes.filter(
+          (t) =>
+            Number(t.gerourem) === 1 ||
+            t.chave_gnet ||
+            t.chave_juno ||
+            t.chave_galaxpay ||
+            t.chave_iugu ||
+            t.chave_bfacil,
+        );
+        const seguros = abertosForaMes.filter((t) => !registrados.includes(t));
+
+        let removidos = 0;
+        if (seguros.length > 0) {
+          const ids = seguros.map((t) => t.id);
+          const result = await MkauthSource.query(
+            `DELETE FROM sis_lanc WHERE id IN (${ids.map(() => "?").join(",")})`,
+            ids,
+          );
+          removidos = (result as any)?.affectedRows ?? seguros.length;
+        }
+
+        // Anexa no objeto pra responder no final
+        (res as any).locals = (res as any).locals || {};
+        (res as any).locals.faturasLimpeza = {
+          removidos,
+          registradosPendentes: registrados.map((t) => ({
+            id: t.id,
+            datavenc: t.datavenc,
+            valor: t.valor,
+            nossonum: t.nossonum,
+            motivo:
+              Number(t.gerourem) === 1
+                ? "remessa CNAB já enviada"
+                : "cobrança registrada em gateway",
+          })),
+        };
+      }
+
       const repo = MkauthSource.getRepository(SisSerContratos);
 
       const countExisting = async (l: string, tipo: string) =>
@@ -294,10 +382,12 @@ class SerContratos {
         throw e;
       });
 
+      const faturasLimpeza = (res as any).locals?.faturasLimpeza;
       res.status(201).json({
         message: `${saved.length} item(ns) adicionado(s).`,
         items: saved,
         streaming: streamingInfo,
+        ...(faturasLimpeza ? { faturasLimpeza } : {}),
       });
     } catch (error: any) {
       if (error?.status === 409) {

@@ -101,10 +101,40 @@ export const SerContratos: React.FC = () => {
           ? { login: loaded.login, tipo, quantidade: qtdCamera }
           : { login: loaded.login, tipo, ...(extras || {}) };
       const res = await axios.post(`${base}/sercontratos`, body, { headers });
-      showMsg(res.data.message || "Adicionado com sucesso.", "success");
+      const fl = res.data?.faturasLimpeza;
+      let extraMsg = "";
+      if (fl?.removidos > 0) {
+        extraMsg += ` ${fl.removidos} fatura(s) em aberto fora do mês foram removidas.`;
+      }
+      if (fl?.registradosPendentes?.length > 0) {
+        const detalhes = fl.registradosPendentes
+          .map(
+            (t: any) =>
+              `#${t.id} (venc ${new Date(t.datavenc).toLocaleDateString("pt-BR")}) — ${t.motivo}`,
+          )
+          .join("\n");
+        window.alert(
+          `Atenção: as faturas abaixo NÃO foram removidas porque já estão registradas no banco/gateway. Trate manualmente:\n\n${detalhes}`,
+        );
+      }
+      showMsg((res.data.message || "Adicionado com sucesso.") + extraMsg, "success");
       await fetchList(loaded.login);
     } catch (e: any) {
       if (
+        e?.response?.status === 409 &&
+        e?.response?.data?.code === "OVERDUE_INVOICES"
+      ) {
+        const vs = e.response.data.vencidas || [];
+        const lista = vs
+          .map(
+            (v: any) =>
+              `#${v.id} — venc ${new Date(v.datavenc).toLocaleDateString("pt-BR")} — R$ ${Number(v.valor).toFixed(2)}`,
+          )
+          .join("\n");
+        window.alert(
+          `${e.response.data.message}\n\nFaturas vencidas:\n${lista}`,
+        );
+      } else if (
         e?.response?.status === 409 &&
         e?.response?.data?.code === "STREAMING_REPLACE_REQUIRED"
       ) {
