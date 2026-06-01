@@ -38,6 +38,8 @@ export const TimeClock = () => {
     new Date().toISOString().split("T")[0],
   );
   const [showSigModal, setShowSigModal] = useState(false);
+  // CPF validado na batida, reaproveitado para salvar a assinatura do dia
+  const [verifiedCpf, setVerifiedCpf] = useState("");
 
   const [scale, setScale] = useState<"8h" | "12h" | "Integral" | "4h">("8h");
   const [dailyRecords, setDailyRecords] = useState<any[]>([]);
@@ -176,57 +178,48 @@ export const TimeClock = () => {
 
     const { type } = pendingAction;
 
-    if (type !== "signature") {
-      if (!location) {
-        setErrorMessage("Localização perdida. Tente novamente.");
-        setShowErrorModal(true);
-        setShowCpfModal(false);
-        return;
-      }
+    if (!location) {
+      setErrorMessage("Localização perdida. Tente novamente.");
+      setShowErrorModal(true);
+      setShowCpfModal(false);
+      return;
     }
 
     setLoading(true);
     setMessage("");
 
     try {
-      if (type === "signature") {
-        const { date, signature } = pendingAction.payload;
-        await axios.post(
-          `${process.env.REACT_APP_URL}/time-tracking/signature`,
-          {
-            employeeId,
-            date,
-            signature,
-            cpf,
-          },
-        );
-        setMessage("Assinatura salva com sucesso!");
-        setShowSigModal(false);
-      } else {
-        // Clock In
-        const photo = capture();
-        if (!photo) {
-          throw new Error("Erro ao capturar foto.");
-        }
-        await axios.post(
-          `${process.env.REACT_APP_URL}/time-tracking/clock-in`,
-          {
-            employeeId,
-            lat: location?.lat,
-            lng: location?.lng,
-            photo,
-            type,
-            timestamp: selectedTime,
-            cpf,
-            scale, // Pass the selected scale
-          },
-        );
-        setMessage(`Ponto registrado com sucesso: ${type}!`);
-        setEmployeeId("");
-        fetchDailyRecords();
+      // Clock In
+      const photo = capture();
+      if (!photo) {
+        throw new Error("Erro ao capturar foto.");
       }
 
+      // É a primeira batida do dia? (avaliado antes de atualizar os registros)
+      const isFirstPunchOfDay = dailyRecords.length === 0;
+
+      await axios.post(`${process.env.REACT_APP_URL}/time-tracking/clock-in`, {
+        employeeId,
+        lat: location?.lat,
+        lng: location?.lng,
+        photo,
+        type,
+        timestamp: selectedTime,
+        cpf,
+        scale, // Pass the selected scale
+      });
+      setMessage(`Ponto registrado com sucesso: ${type}!`);
+      fetchDailyRecords();
       setShowCpfModal(false);
+
+      if (isFirstPunchOfDay) {
+        // Na primeira batida do dia, abre a assinatura da folha automaticamente,
+        // reaproveitando o CPF já validado (sem precisar do botão "Assinar Dia").
+        setVerifiedCpf(cpf);
+        setShowSigModal(true);
+      } else {
+        setEmployeeId("");
+      }
     } catch (error: any) {
       console.error(error);
       const errorMsg =
@@ -255,14 +248,30 @@ export const TimeClock = () => {
     const [y, m, d] = signatureDate.split("-");
     const formattedDate = `${y}-${m}-${d}`;
 
-    setPendingAction({
-      type: "signature",
-      payload: {
+    setLoading(true);
+    setMessage("");
+
+    try {
+      await axios.post(`${process.env.REACT_APP_URL}/time-tracking/signature`, {
+        employeeId,
         date: formattedDate,
         signature: signatureData,
-      },
-    });
-    setShowCpfModal(true);
+        cpf: verifiedCpf,
+      });
+      setMessage("Assinatura salva com sucesso!");
+      setShowSigModal(false);
+      setEmployeeId("");
+    } catch (error: any) {
+      console.error(error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Erro ao salvar a assinatura.";
+      setErrorMessage(errorMsg);
+      setShowErrorModal(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -392,26 +401,6 @@ export const TimeClock = () => {
             >
               Saída
             </button>
-
-            {/* Signature Section */}
-            <div className="col-span-2 mt-4 pt-4 border-t border-gray-200">
-              <div className="flex justify-center gap-2">
-                <button
-                  onClick={() => {
-                    if (!employeeId) {
-                      setErrorMessage("Selecione um funcionário primeiro.");
-                      setShowErrorModal(true);
-                      return;
-                    }
-                    setShowSigModal(true);
-                  }}
-                  disabled={loading}
-                  className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded transition duration-200 flex items-center justify-center gap-2"
-                >
-                  <span>✍️</span> Assinar Dia
-                </button>
-              </div>
-            </div>
           </div>
 
           {loading && (
