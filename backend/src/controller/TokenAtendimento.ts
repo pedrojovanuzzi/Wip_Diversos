@@ -70,9 +70,12 @@ class TokenAtendimento {
   private recordRepo = AppDataSource.getRepository(Faturas);
   private clienteRepo = AppDataSource.getRepository(ClientesEntities);
 
-  // Mapeia a intenção de venda da PayGo -> IDs das faturas, para confirmar
-  // o pagamento quando a transação for creditada.
-  private static faturasPorVenda: Map<string, string[]> = new Map();
+  // Mapeia a intenção de venda da PayGo -> faturas (id + valor exato cobrado),
+  // para confirmar o pagamento e gravar o valor real quando creditada.
+  private static faturasPorVenda: Map<
+    string,
+    { id: string; valor: number }[]
+  > = new Map();
 
   private extrairStatusIntencao = (intencao: any): number | null => {
     const s =
@@ -122,13 +125,12 @@ class TokenAtendimento {
   };
 
   private marcarFaturasPagas = async (
-    ids: (string | number)[],
+    itens: { id: string | number; valor?: number }[],
   ): Promise<void> => {
-    const idsNum = ids
-      .map((i) => Number(String(i).trim()))
-      .filter((n) => Number.isFinite(n) && n > 0);
+    for (const item of itens) {
+      const id = Number(String(item.id).trim());
+      if (!Number.isFinite(id) || id <= 0) continue;
 
-    for (const id of idsNum) {
       const fatura = await this.recordRepo.findOne({ where: { id } });
       if (!fatura) {
         console.log(`[PayGo] Fatura ${id} não encontrada.`);
@@ -136,12 +138,24 @@ class TokenAtendimento {
       }
       if (fatura.status === "pago") continue;
 
+      // Usa o valor exato cobrado no cartão (guardado ao criar a venda). Só
+      // recalcula com juros/desconto como fallback — ex.: confirmação após
+      // reinício do servidor, quando o mapa em memória foi perdido.
+      const valorPago =
+        item.valor != null
+          ? item.valor
+          : await this.aplicarJuros_Desconto(
+              fatura.valor,
+              fatura.login,
+              fatura.datavenc,
+            );
+
       await this.recordRepo.update(fatura.id, {
         status: "pago",
         datapag: new Date(),
         formapag: "payGoTef",
         coletor: "payGoTef",
-        valorpag: fatura.valor,
+        valorpag: valorPago.toFixed(2),
       });
       console.log(`[PayGo] Fatura ${id} confirmada paga via PayGo TEF.`);
 
@@ -162,20 +176,20 @@ class TokenAtendimento {
   };
 
   private criarVendaPayGo = async (opts: {
-    faturaIds: (string | number)[];
-    valor: number;
+    faturas: { id: string | number; valor: number }[];
     tipo: "credito" | "debito";
   }): Promise<
     { ok: true; intencaoVendaId: string } | { ok: false; reason: string }
   > => {
-    const referencia = opts.faturaIds.map((i) => String(i)).join("-");
+    const referencia = opts.faturas.map((f) => String(f.id)).join("-");
+    const valorTotal = opts.faturas.reduce((acc, f) => acc + f.valor, 0);
 
     const body = {
       formaPagamentoId: Number(
         opts.tipo === "credito" ? PAYGO_FORMA_CREDITO : PAYGO_FORMA_DEBITO,
       ),
       terminalId: PAYGO_TERMINAL_ID,
-      valorTotalVendido: opts.valor.toFixed(2).replace(".", ","),
+      valorTotalVendido: valorTotal.toFixed(2).replace(".", ","),
       quantidadeParcelas: 1,
       parcelamentoAdmin: opts.tipo === "credito",
       iniciarTransacaoAutomaticamente: true,
@@ -197,7 +211,7 @@ class TokenAtendimento {
 
       TokenAtendimento.faturasPorVenda.set(
         intencaoVendaId,
-        opts.faturaIds.map((i) => String(i)),
+        opts.faturas.map((f) => ({ id: String(f.id), valor: f.valor })),
       );
       return { ok: true, intencaoVendaId };
     } catch (err: any) {
@@ -652,13 +666,14 @@ class TokenAtendimento {
       const status = this.extrairStatusIntencao(intencao);
 
       if (status === PAYGO_STATUS.CREDITADO) {
-        const ids =
+        const itens =
           TokenAtendimento.faturasPorVenda.get(intencaoVendaId) ||
           (referencia || String(intencao?.referencia || ""))
             .split(/[,-]/)
-            .filter(Boolean);
-        if (ids.length) {
-          await this.marcarFaturasPagas(ids);
+            .filter(Boolean)
+            .map((id) => ({ id }));
+        if (itens.length) {
+          await this.marcarFaturasPagas(itens);
           TokenAtendimento.faturasPorVenda.delete(intencaoVendaId);
         }
       }
@@ -712,8 +727,7 @@ class TokenAtendimento {
       );
 
       const result = await this.criarVendaPayGo({
-        faturaIds: [fatura.id],
-        valor,
+        faturas: [{ id: fatura.id, valor }],
         tipo,
       });
 
@@ -896,13 +910,14 @@ class TokenAtendimento {
 
       if (status === PAYGO_STATUS.CREDITADO) {
         statusTexto = "approved";
-        const ids =
+        const itens =
           TokenAtendimento.faturasPorVenda.get(String(order)) ||
           String(intencao.referencia || "")
             .split(/[,-]/)
-            .filter(Boolean);
-        if (ids.length) {
-          await this.marcarFaturasPagas(ids);
+            .filter(Boolean)
+            .map((id) => ({ id }));
+        if (itens.length) {
+          await this.marcarFaturasPagas(itens);
           TokenAtendimento.faturasPorVenda.delete(String(order));
         }
       } else if (status === PAYGO_STATUS.EXPIRADO) {
@@ -1128,18 +1143,19 @@ class TokenAtendimento {
         return;
       }
 
-      let total = 0;
+      const faturasComValor: { id: number; valor: number }[] = [];
       for (const fatura of faturas) {
-        total += await this.aplicarJuros_Desconto(
+        const valor = await this.aplicarJuros_Desconto(
           fatura.valor,
           fatura.login,
           fatura.datavenc,
         );
+        faturasComValor.push({ id: fatura.id, valor });
       }
+      const total = faturasComValor.reduce((acc, f) => acc + f.valor, 0);
 
       const result = await this.criarVendaPayGo({
-        faturaIds: titulos,
-        valor: total,
+        faturas: faturasComValor,
         tipo,
       });
 
