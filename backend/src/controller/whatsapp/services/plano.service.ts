@@ -5,10 +5,12 @@ import MkauthDataSource from "../../../database/MkauthSource";
 export async function getPlanosDoSistema() {
   try {
     const planoRepository = MkauthDataSource.getRepository(SisPlano);
-    const planos = await planoRepository.find({
-      where: { nome: Like("\\_%") },
-      order: { nome: "ASC" },
-    });
+    const planos = await planoRepository
+      .createQueryBuilder("p")
+      .where("p.nome LIKE :prefix ESCAPE '\\\\'", { prefix: "\\_%" })
+      .andWhere("p.nome NOT LIKE :est ESCAPE '\\\\'", { est: "\\_EST%" })
+      .orderBy("p.nome", "ASC")
+      .getMany();
 
     console.log(
       `🔍 [getPlanosDoSistema] ${planos.length} planos encontrados.`,
