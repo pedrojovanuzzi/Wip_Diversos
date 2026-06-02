@@ -1,3 +1,5 @@
+import { FiMessageCircle } from "react-icons/fi";
+
 interface Opnion {
   login: string;
   opnion: string;
@@ -10,61 +12,59 @@ interface ListProps {
 
 export default function List({ people }: ListProps) {
   return (
-    <div className="px-4 sm:px-6 lg:px-8">
-      <div className="sm:flex sm:items-center sm:p-10">
-        <div className="sm:flex-auto">
-          <h1 className="text-base font-semibold text-gray-900">Opiniões</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            Uma Lista dos Feedbacks mais recentes dos clientes
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="inline-flex rounded-xl p-2.5 bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200">
+          <FiMessageCircle className="size-6" />
+        </div>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Opiniões dos clientes
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Feedbacks mais recentes recebidos pela pesquisa de satisfação.
           </p>
         </div>
-        <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none"></div>
       </div>
-      <div className="mt-8 flow-root">
-        <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-          <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-            <table className="min-w-full divide-y divide-gray-300 h-screen">
-              <thead>
-                <tr>
-                  <th
-                    scope="col"
-                    className="py-3.5 pl-4 pr-3 text-center text-sm font-semibold text-gray-900 sm:pl-0"
-                  >
-                    Técnico no Local
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-3.5 text-center text-sm font-semibold text-gray-900"
-                  >
-                    Feedback
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-3.5 text-sm text-center font-semibold text-gray-900"
-                  >
-                    Horário
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {people.map((person) => (
-                  <tr key={person.login}>
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm  font-medium text-gray-900 sm:pl-0">
-                      {person.login}
-                    </td>
-                    <td className="px-3 py-4 text-sm max-w-md break-all overflow-hidden text-gray-500">
-                      {person.opnion}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm  text-gray-500">
-                      {person.time}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+
+      {(!people || people.length === 0) && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-10 text-center text-slate-500">
+          Nenhuma opinião registrada ainda.
         </div>
-      </div>
+      )}
+
+      {people && people.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-100 overflow-hidden">
+          {people.map((person, idx) => (
+            <article
+              key={`${person.login}-${idx}`}
+              className="p-5 sm:p-6 hover:bg-slate-50 transition"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="size-9 rounded-full bg-gradient-to-br from-indigo-500 to-sky-500 text-white text-sm font-bold inline-flex items-center justify-center shadow-sm">
+                    {(person.login || "?").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {person.login || "—"}
+                    </p>
+                    <p className="text-xs text-slate-400">Técnico no local</p>
+                  </div>
+                </div>
+                <span className="text-xs text-slate-400 self-start sm:self-auto">
+                  {person.time}
+                </span>
+              </div>
+              <p className="mt-3 text-sm text-slate-700 leading-relaxed break-words">
+                {person.opnion || (
+                  <span className="italic text-slate-400">Sem comentário.</span>
+                )}
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

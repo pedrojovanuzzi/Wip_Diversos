@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import axios from "axios";
+import { Link } from "react-router-dom";
+import { BarChart } from "@mui/x-charts/BarChart";
 import { NavBar } from "../../components/navbar/NavBar";
 import Select from "./components/Select";
-import { BarChart } from "@mui/x-charts/BarChart";
 import Toggle from "./components/Toggle";
- import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
+import { FiLink2, FiCopy, FiCheck, FiMessageCircle } from "react-icons/fi";
 
 interface Tech {
   id: number;
@@ -28,6 +30,16 @@ interface NoteYesOrNo {
   count: number;
 }
 
+const ChartCard: React.FC<{
+  title: string;
+  children: React.ReactNode;
+}> = ({ title, children }) => (
+  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
+    <h3 className="text-sm font-semibold text-slate-700 mb-2">{title}</h3>
+    <div className="flex justify-center">{children}</div>
+  </div>
+);
+
 const FeedbackBarChart = ({
   data,
   label,
@@ -37,7 +49,7 @@ const FeedbackBarChart = ({
   label: string;
   isMobile: boolean;
 }) => {
-  const chartData = data.map((d) => ({
+  const chartData = (data || []).map((d) => ({
     note: d.note,
     count: d.count,
   }));
@@ -82,7 +94,12 @@ const YesOrNoChart = ({
   const truthy = (v: any) =>
     v === 1 || v === "1" || v === true || v === "true" || v === "sim";
   const falsy = (v: any) =>
-    v === 0 || v === "0" || v === false || v === "false" || v === "nao" || v === "não";
+    v === 0 ||
+    v === "0" ||
+    v === false ||
+    v === "false" ||
+    v === "nao" ||
+    v === "não";
   const simCount = data
     .filter((d) => truthy(d.note))
     .reduce((s, d) => s + Number(d.count || 0), 0);
@@ -97,7 +114,7 @@ const YesOrNoChart = ({
       series={[
         {
           data: [simCount, naoCount],
-          label: label,
+          label,
           id: "yes-no",
         },
       ]}
@@ -120,11 +137,7 @@ const TechBarChart = ({
   label: string;
   isMobile: boolean;
 }) => {
-  if (!Array.isArray(data)) {
-    console.warn("Data passed to TechBarChart is not an array:", data);
-    return null; // Retorna nada caso os dados estejam errados
-  }
-
+  if (!Array.isArray(data)) return null;
   const chartData = data.map((d) => ({
     note: d.note,
     count: d.count,
@@ -163,111 +176,101 @@ const FeedbackLinkGenerator = () => {
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [copied, setCopied] = useState(false);
   const { user } = useAuth();
   const token = user?.token;
-  const [noteData, setNoteData] = useState<{ [key: string]: Note[] }>({
+
+  const [noteData, setNoteData] = useState<{ [key: string]: any[] }>({
     internet: [],
     service: [],
     responseTime: [],
+    recommend: [],
+    solved: [],
   });
-  const [technoteData, settechNoteData] = useState<{
-    [key: string]: NoteTech[];
-  }>({
+  const [technoteData, settechNoteData] = useState<{ technician: NoteTech[] }>({
     technician: [],
   });
   const [isMonthly, setMonthly] = useState(true);
   const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768);
 
-
-// Função para buscar notas gerais
-const fetchNotes = async (type: string) => {
-  // Define se o período é "month" ou "year"
-  const period = isMonthly ? "month" : "year";
-
-  // Monta o endpoint
-  const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
-
-  try {
-    // Faz a requisição GET usando axios
-    const response = await axios.get(endpoint, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`, // passa o token no header
-      },
-    });
-
-    // O axios já converte automaticamente para JSON em response.data
-    console.log(response.data);
-
-    return response.data;
-  } catch (error) {
-    console.error("Erro ao buscar notas:", error);
-    return []; // Retorna array vazio em caso de erro
-  }
-};
-
-// Função para buscar notas de um técnico específico
-const fetchNotesTech = async (type: string): Promise<NoteTech[]> => {
-  const period = isMonthly ? "month" : "year";
-  const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
-
-  try {
-    // Faz a requisição POST usando axios
-    const response = await axios.post(
-      endpoint,
-      { technician: selectedTechnician }, // corpo da requisição
-      {
+  const fetchNotes = async (type: string) => {
+    const period = isMonthly ? "month" : "year";
+    const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
+    try {
+      const response = await axios.get(endpoint, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      }
-    );
-
-    console.log(response.data);
-
-    // Converte o dado recebido para o formato correto
-    const parsedData: NoteTech[] = response.data.map((item: any) => ({
-      note: item.note,
-      count: Number(item.count), // Converte count para número
-      name: item.login || "",    // Usa o campo login como 'name'
-    }));
-
-    return parsedData;
-  } catch (error: any) {
-    console.error("Erro ao buscar dados do técnico:", error);
-    return [];
-  }
-};
-
-// Função para gerar link de feedback
-const createLink = async () => {
-  if (!selectedTechnician) {
-    alert("Selecione um técnico antes de gerar o link.");
-    return;
-  }
-
-  try {
-    // Faz a requisição POST usando axios
-    const response = await axios.post(
-      `${process.env.REACT_APP_URL}/feedback/create`,
-      { technician: selectedTechnician }, // corpo
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    if (response.data?.link) {
-      setGeneratedLink(response.data.link); // pega o link do backend
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Erro ao buscar notas:", error);
+      return [];
     }
-  } catch (error) {
-    console.error("Erro ao gerar o link:", error);
-  }
-};
+  };
 
+  const fetchNotesTech = async (type: string): Promise<NoteTech[]> => {
+    const period = isMonthly ? "month" : "year";
+    const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
+    try {
+      const response = await axios.post(
+        endpoint,
+        { technician: selectedTechnician },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      const parsedData: NoteTech[] = response.data.map((item: any) => ({
+        note: item.note,
+        count: Number(item.count),
+        login: item.login || "",
+      }));
+      return parsedData;
+    } catch (error: any) {
+      console.error("Erro ao buscar dados do técnico:", error);
+      return [];
+    }
+  };
+
+  const createLink = async () => {
+    if (!selectedTechnician) {
+      alert("Selecione um técnico antes de gerar o link.");
+      return;
+    }
+    setCreating(true);
+    setCopied(false);
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/feedback/create`,
+        { technician: selectedTechnician },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      if (response.data?.link) setGeneratedLink(response.data.link);
+    } catch (error) {
+      console.error("Erro ao gerar o link:", error);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const copyLink = () => {
+    if (!generatedLink) return;
+    navigator.clipboard.writeText(
+      `${process.env.REACT_APP_BASE_URL}${generatedLink}`,
+    );
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -276,13 +279,12 @@ const createLink = async () => {
   }, []);
 
   useEffect(() => {
-    const parseNoteData = (data: any[]): NoteYesOrNo[] => {
-      return data.map((item) => ({
-        note: Array.isArray(item.note.data) ? item.note.data[0] : item.note,
+    const parseNoteData = (data: any[]): NoteYesOrNo[] =>
+      data.map((item) => ({
+        note: Array.isArray(item.note?.data) ? item.note.data[0] : item.note,
         count: Number(item.count),
       }));
-    };
-  
+
     const fetchAllNotes = async () => {
       try {
         setLoading(true);
@@ -294,128 +296,188 @@ const createLink = async () => {
             fetchNotes("DoYouRecommend"),
             fetchNotes("DoYouProblemAsSolved"),
           ]);
-  
-        const processedRecommend = parseNoteData(recommend);
-        const processedSolved = parseNoteData(solved);
-  
+
         setNoteData({
           internet,
           service,
           responseTime,
-          recommend: processedRecommend,
-          solved: processedSolved,
+          recommend: parseNoteData(recommend),
+          solved: parseNoteData(solved),
         });
-  
+
         const tech = await fetchNotesTech("Technician");
         settechNoteData({ technician: tech });
-        setLoading(false);
       } catch (error) {
         console.error("Erro ao buscar os dados:", error);
+      } finally {
+        setLoading(false);
       }
     };
-  
-    fetchAllNotes();
-  }, [isMonthly, selectedTechnician]);
-  
 
-  
+    fetchAllNotes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMonthly, selectedTechnician]);
 
   return (
-    <>
+    <div className="min-h-screen bg-slate-100">
       <NavBar />
-      <div className="flex justify-center flex-col mt-20 gap-10 sm:gap-5 font-semibold">
-        <h1>Gerador de Link para Feedback</h1>
-
-        <div>
-          <Select onChange={(tech: Tech) => setSelectedTechnician(tech.name)} />
-        </div>
-
-        <div className="flex flex-col sm:flex-row justify-center items-center gap-10">
-          <button
-            className="bg-slate-900 self-center  text-gray-300 rounded p-5 hover:bg-slate-700"
-            onClick={createLink}
-          >
-            Gerar Link
-          </button>
-          <a
-            href="/feedback/Opnion"
-            className="bg-slate-400 p-5 rounded transition-all hover:bg-slate-300"
-          >
-            Opinião
-          </a>
-        </div>
-
-        {generatedLink && (
-          <div>
-            <p>
-              Compartilhe este link com os clientes:{" "}
-              <button
-                className="text-sky-600 m-5 underline"
-                onClick={() => navigator.clipboard.writeText(`${process.env.REACT_APP_BASE_URL}` + generatedLink)}
-              >
-                Copiar Link
-              </button>
-            </p>
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="inline-flex rounded-xl p-2.5 bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200">
+              <FiLink2 className="size-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+                Pesquisa de Satisfação
+              </h1>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Gere links de feedback e acompanhe os indicadores.
+              </p>
+            </div>
           </div>
-        ) }
 
-        <div className="flex flex-col items-center gap-10 mt-1 sm:mt-10">
-          <Toggle
-            checked={!isMonthly}
-            onChange={() => setMonthly((prev) => !prev)}
-          />
-          {loading &&
-          <><h1>Carregando ...</h1></>
-          }
-          <div className="flex flex-col sm:flex-row flex-wrap gap-20 justify-center">
-            <div className="flex sm:max-w-[30%] bg-gray-200">
+          <Link
+            to="/feedback/Opnion"
+            className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition"
+          >
+            <FiMessageCircle />
+            Ver opiniões
+          </Link>
+        </div>
+
+        {/* Card gerar link */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-base font-semibold text-slate-900">
+            Gerar link de feedback
+          </h2>
+          <p className="text-sm text-slate-500 mt-1 mb-4">
+            Selecione o técnico que esteve no atendimento e gere o link para
+            enviar ao cliente.
+          </p>
+
+          <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Técnico
+              </label>
+              <Select
+                onChange={(tech: Tech) => setSelectedTechnician(tech.name)}
+              />
+            </div>
+            <button
+              onClick={createLink}
+              disabled={creating || !selectedTechnician}
+              className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {creating ? "Gerando…" : "Gerar Link"}
+            </button>
+          </div>
+
+          {generatedLink && (
+            <div className="mt-5">
+              <p className="text-xs font-medium text-slate-700 mb-1.5">
+                Link gerado
+              </p>
+              <div className="flex items-stretch gap-2">
+                <div className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 break-all">
+                  {`${process.env.REACT_APP_BASE_URL}${generatedLink}`}
+                </div>
+                <button
+                  onClick={copyLink}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+                >
+                  {copied ? <FiCheck className="text-emerald-500" /> : <FiCopy />}
+                  {copied ? "Copiado!" : "Copiar"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-5 sm:hidden">
+            <Link
+              to="/feedback/Opnion"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+            >
+              <FiMessageCircle />
+              Ver opiniões
+            </Link>
+          </div>
+        </div>
+
+        {/* Toggle período */}
+        <div className="mt-8 mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-slate-900">
+            Indicadores
+          </h2>
+          <div className="flex items-center gap-2 rounded-full bg-white border border-slate-200 px-3 py-1.5 shadow-sm">
+            <span className="text-xs text-slate-500">Período:</span>
+            <Toggle
+              checked={!isMonthly}
+              onChange={() => setMonthly((prev) => !prev)}
+            />
+          </div>
+        </div>
+
+        {loading && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-10 text-center text-slate-500">
+            Carregando indicadores…
+          </div>
+        )}
+
+        {!loading && (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <ChartCard title="Notas — Internet">
               <FeedbackBarChart
                 data={noteData.internet}
                 label="Notas sobre a Internet"
                 isMobile={isMobile}
               />
-            </div>
-            <div className="flex sm:max-w-[30%] bg-gray-200">
+            </ChartCard>
+            <ChartCard title="Notas — Atendimento">
               <FeedbackBarChart
                 data={noteData.service}
                 label="Notas sobre o Atendimento"
                 isMobile={isMobile}
               />
-            </div>
-            <div className="flex sm:max-w-[30%] bg-gray-200">
+            </ChartCard>
+            <ChartCard title="Notas — Tempo de Resposta">
               <FeedbackBarChart
                 data={noteData.responseTime}
                 label="Notas sobre o Tempo de Resposta"
                 isMobile={isMobile}
               />
-            </div>
-            <div className="flex sm:max-w-[30%] bg-gray-200">
+            </ChartCard>
+            <ChartCard title="Recomendariam a empresa">
               <YesOrNoChart
                 data={noteData.recommend}
-                label="Clientes que nós Recomendam"
+                label="Clientes que nos recomendam"
                 isMobile={isMobile}
               />
-            </div>
-            <div className="flex sm:max-w-[30%] bg-gray-200">
+            </ChartCard>
+            <ChartCard title="Problemas resolvidos">
               <YesOrNoChart
                 data={noteData.solved}
-                label="Clientes que solucionamos os problemas"
+                label="Problemas que solucionamos"
                 isMobile={isMobile}
               />
-            </div>
-            <div className="flex sm:max-w-[30%] bg-gray-200">
-              {technoteData.technician.length > 0 && (
+            </ChartCard>
+            {technoteData.technician.length > 0 && (
+              <ChartCard
+                title={`Notas — Técnico ${selectedTechnician || ""}`.trim()}
+              >
                 <TechBarChart
                   data={technoteData.technician}
                   label={`Notas sobre o ${selectedTechnician}`}
                   isMobile={isMobile}
                 />
-              )}
-            </div>
+              </ChartCard>
+            )}
           </div>
-        </div>
+        )}
       </div>
-    </>
+    </div>
   );
 };
 

@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { NavBar } from "../../components/navbar/NavBar";
 import axios from "axios";
 import {
   LineChart,
@@ -10,59 +9,45 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
-import { ErrorMessage } from "./components/ErrorMessage";
-import { AuthContext, useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import {
+  FiSearch,
+  FiRefreshCw,
+  FiExternalLink,
+  FiActivity,
+  FiUser,
+} from "react-icons/fi";
+import { NavBar } from "../../components/navbar/NavBar";
+import { ErrorMessage } from "./components/ErrorMessage";
+import { useAuth } from "../../context/AuthContext";
 
 function formatarBytes(bytes: number): string {
-  if (bytes >= 1024 ** 3) {
-    return (bytes / 1024 ** 3).toFixed(2) + " GB";
-  } else if (bytes >= 1024 ** 2) {
-    return (bytes / 1024 ** 2).toFixed(2) + " MB";
-  } else if (bytes >= 1024) {
-    return (bytes / 1024).toFixed(2) + " KB";
-  } else {
-    return bytes + " B";
-  }
+  if (bytes >= 1024 ** 3) return (bytes / 1024 ** 3).toFixed(2) + " GB";
+  if (bytes >= 1024 ** 2) return (bytes / 1024 ** 2).toFixed(2) + " MB";
+  if (bytes >= 1024) return (bytes / 1024).toFixed(2) + " KB";
+  return bytes + " B";
 }
 
-// converte uptime do Mikrotik para segundos (suporta y, mo, w, d, h, m, s)
 export function parseUptime(raw: string): number {
-  // garante que temos uma string, remove espaços e normaliza para minúsculas
-  const s = String(raw ?? "")
-    .trim()
-    .toLowerCase();
+  const s = String(raw ?? "").trim().toLowerCase();
   if (!s) return 0;
-
-  // tabela de multiplicadores por unidade
-  // OBS: mês (mo) = 30 dias, ano (y) = 365 dias (aproximação)
   const unitToSec: Record<string, number> = {
-    y: 365 * 24 * 60 * 60,  // 1 ano em segundos
-    mo: 30 * 24 * 60 * 60,  // 1 mês em segundos (aproximado)
-    w: 7 * 24 * 60 * 60,    // 1 semana
-    d: 24 * 60 * 60,        // 1 dia
-    h: 60 * 60,             // 1 hora
-    m: 60,                  // 1 minuto
-    s: 1,                   // 1 segundo
+    y: 365 * 24 * 60 * 60,
+    mo: 30 * 24 * 60 * 60,
+    w: 7 * 24 * 60 * 60,
+    d: 24 * 60 * 60,
+    h: 60 * 60,
+    m: 60,
+    s: 1,
   };
-
-  // regex que captura "<numero><unidade>", incluindo "mo" e "y"
   const re = /(\d+)\s*(y|mo|w|d|h|m|s)/g;
-
   let total = 0;
   let match: RegExpExecArray | null;
-
-  // percorre cada combinação <valor><unidade> encontrada na string
   while ((match = re.exec(s)) !== null) {
-    const value = Number(match[1]);
-    const unit = match[2];
-    total += value * (unitToSec[unit] ?? 0);
+    total += Number(match[1]) * (unitToSec[match[2]] ?? 0);
   }
-
-  if (!Number.isFinite(total)) return 0;
-  return total;
+  return Number.isFinite(total) ? total : 0;
 }
-
 
 type Cliente = {
   suspensao: boolean;
@@ -99,6 +84,74 @@ type ClientList = {
   callerId: string;
 };
 
+const Spinner: React.FC<{ text?: string; inline?: boolean }> = ({
+  text,
+  inline,
+}) => (
+  <span
+    className={`inline-flex items-center gap-2 text-slate-400 ${inline ? "" : "ml-2"}`}
+  >
+    <svg className="animate-spin size-4" viewBox="0 0 24 24">
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+        fill="none"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8v8z"
+      />
+    </svg>
+    {text && <span className="text-xs">{text}</span>}
+  </span>
+);
+
+const SectionCard: React.FC<{
+  step?: number;
+  title: string;
+  children: React.ReactNode;
+  right?: React.ReactNode;
+}> = ({ step, title, children, right }) => (
+  <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+    <div className="flex items-center justify-between gap-3 mb-3">
+      <div className="flex items-center gap-2.5">
+        {step !== undefined && (
+          <span className="inline-flex size-6 rounded-full bg-slate-900 text-white text-xs font-bold items-center justify-center">
+            {step}
+          </span>
+        )}
+        <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+      </div>
+      {right}
+    </div>
+    {children}
+  </section>
+);
+
+const StatusPill: React.FC<{
+  tone: "ok" | "bad" | "neutral";
+  children: React.ReactNode;
+}> = ({ tone, children }) => {
+  const cls =
+    tone === "ok"
+      ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+      : tone === "bad"
+        ? "bg-rose-50 text-rose-700 ring-rose-200"
+        : "bg-slate-50 text-slate-600 ring-slate-200";
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ring-inset ${cls}`}
+    >
+      {children}
+    </span>
+  );
+};
+
 export const ClientAnalytics = () => {
   const [pppoe, setPppoe] = useState<string>("");
   const [clientinfo, setClientInfo] = useState<Cliente>();
@@ -113,7 +166,7 @@ export const ClientAnalytics = () => {
   const [errorInfo, setErrorInfo] = useState<string | null>(null);
   const [loadingConectado, setLoadingConectado] = useState(false);
   const [errorConectado, setErrorConectado] = useState<string | null>(null);
-  const [loadingDescon, setLoadingDescon] = useState(false);
+  const [, setLoadingDescon] = useState(false);
   const [errorDescon, setErrorDescon] = useState<string | null>(null);
   const [loadingSinal, setLoadingSinal] = useState(false);
   const [errorSinal, setErrorSinal] = useState<string | null>(null);
@@ -132,31 +185,8 @@ export const ClientAnalytics = () => {
   const { user } = useAuth();
   const token = user?.token;
 
-  // Spinner reutilizável
-  const Spinner: React.FC<{ text?: string }> = ({ text }) => (
-    <span className="flex ml-5 items-center gap-2 text-gray-500">
-      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-        <circle
-          className="opacity-25"
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          strokeWidth="4"
-          fill="none"
-        />
-        <path
-          className="opacity-75"
-          fill="currentColor"
-          d="M4 12a8 8 0 018-8v8z"
-        />
-      </svg>
-      {text}
-    </span>
-  );
-
-  function redirectLogs(){
-    navigate('/ClientAnalytics/Logs');
+  function redirectLogs() {
+    navigate("/ClientAnalytics/Logs");
   }
 
   const fetchClientInfo = async (pppoe: string) => {
@@ -183,21 +213,17 @@ export const ClientAnalytics = () => {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/info",
         { pppoe },
-        {
-          headers: { Authorization: `Bearer ${token}`, timeout: 60000 },
-        }
+        { headers: { Authorization: `Bearer ${token}`, timeout: 60000 } },
       );
       setClientInfo(response.data.user);
       setSuspenso(response.data.suspensao);
       await fetchDesconexoes(pppoe);
       await fetchSinal(pppoe);
       await fetchMikrotik(pppoe);
-      console.log(response);
     } catch (e: any) {
       setErrorInfo(
-        e.response?.data?.error || "Erro inesperado ao buscar informações."
+        e.response?.data?.error || "Erro inesperado ao buscar informações.",
       );
-      console.log(e);
     } finally {
       setLoadingInfo(false);
     }
@@ -211,7 +237,7 @@ export const ClientAnalytics = () => {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/Desconections",
         { pppoe },
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 },
       );
       setDesconexoes(response.data.desconexoes);
     } catch {
@@ -227,10 +253,9 @@ export const ClientAnalytics = () => {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/TempoReal",
         { pppoe },
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 },
       );
       setTempoReal((prev) => [...prev, response.data.tmp]);
-      console.log(response.data.tmp);
     } catch {
       setErrorTempoReal("Erro ao buscar consumo em tempo real");
     } finally {
@@ -245,7 +270,7 @@ export const ClientAnalytics = () => {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/Reset",
         { pppoe },
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 },
       );
       setErrorLoading(response.data.message);
     } catch (e: any) {
@@ -263,6 +288,7 @@ export const ClientAnalytics = () => {
       setErrorTempoReal("Erro ao buscar dados do Mikrotik");
     }
     setLoadingTempoReal(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testes, errorMikrotik]);
 
   const fetchMikrotik = async (pppoe: string) => {
@@ -273,7 +299,7 @@ export const ClientAnalytics = () => {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/Mikrotik",
         { pppoe },
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 },
       );
       setTestes(response.data.tests);
       setConectado(response.data.conectado);
@@ -294,7 +320,7 @@ export const ClientAnalytics = () => {
       const response = await axios.post(
         process.env.REACT_APP_URL + "/ClientAnalytics/SinalOnu",
         { pppoe },
-        { headers: { Authorization: `Bearer ${token}`, timeout: 60000 } }
+        { headers: { Authorization: `Bearer ${token}`, timeout: 60000 } },
       );
       setSinalOnu(response.data.respostaTelnet);
     } catch (e: any) {
@@ -309,13 +335,11 @@ export const ClientAnalytics = () => {
       setLoadingClientList(true);
       setErrorClientList("");
       setClientList([]);
-
       const response = await axios.get(
         process.env.REACT_APP_URL + "/ClientAnalytics/ClientList",
-        { headers: { Authorization: `Bearer ${token}`, timeout: 60000 } }
+        { headers: { Authorization: `Bearer ${token}`, timeout: 60000 } },
       );
       setClientList(response.data);
-      console.log(response.data);
     } catch (error) {
       setErrorClientList("Falha ao consultar tabelas: " + error);
     } finally {
@@ -324,389 +348,442 @@ export const ClientAnalytics = () => {
   };
 
   useEffect(() => {
-    const exec = async () => {
-      await fetchClientsList();
-    };
-    exec();
+    fetchClientsList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  const servidorAtual = clientlist.find((c) => c.pppoe === pppoe)?.servidor;
+
   return (
-    <>
+    <div className="min-h-screen bg-slate-100">
       <NavBar />
-      <div className="bg-gray-100 min-h-screen flex flex-col items-center py-6 px-4 text-sm">
-        <h1 className="text-2xl">ClientAnalytics</h1>
-
-        <div className="flex items-center mb-6 w-full max-w-md">
-          <input
-            type="text"
-            placeholder="PPPOE do cliente"
-            className="flex-1 p-2 border border-gray-400 rounded-l"
-            value={pppoe}
-            onChange={(e) => {
-              setPppoe(e.target.value);
-            }}
-          />
-          <button
-            onClick={() => {
-              fetchClientInfo(pppoe);
-            }}
-            className="bg-red-700 hover:bg-red-500 transition-all text-white px-4 py-2 rounded-r"
-          >
-            OK
-          </button>
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="inline-flex rounded-xl p-2.5 bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200">
+            <FiActivity className="size-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Client Analytics
+            </h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Diagnóstico completo de conexão, ONU e tráfego em tempo real.
+            </p>
+          </div>
         </div>
-        {(() => {
-          if (errorInfo) {
-            return <ErrorMessage message={errorInfo} />;
-          }
 
-          if (clientinfo) {
-            return (
-              <div className="bg-white shadow-md m-3 p-4 w-full text-left max-w-2xl">
-                <div className="my-5">
-                  {clientlist.some((c) => c.pppoe === pppoe) && (
-                    <h1>
-                      {clientlist.find((c) => c.pppoe === pppoe)?.servidor}
-                    </h1>
-                  )}
-                  <h2 className="font-semibold mb-2">Analise detalhada:</h2>
-                  <ul className="space-y-1">
-                    <li className="my-5">
-                      1. Cliente em Suspensão?:{" "}
-                      <span className="text-green-600 font-semibold">
-                        {!suspenso && <>NÃO</>}
-                      </span>
-                      <span className="text-red-600 font-semibold">
-                        {suspenso && <>SIM</>}
-                      </span>
-                    </li>
-                    <li className="my-5">
-                      <li className="my-5">
-                        <div>2. Dados ONU:</div>
+        {/* Search */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="PPPOE do cliente"
+                className="w-full rounded-xl border border-slate-200 pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
+                value={pppoe}
+                onChange={(e) => setPppoe(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && pppoe) fetchClientInfo(pppoe);
+                }}
+              />
+            </div>
+            <button
+              onClick={() => fetchClientInfo(pppoe)}
+              disabled={!pppoe || loadingInfo}
+              className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loadingInfo ? "Analisando…" : "Analisar"}
+            </button>
+          </div>
 
-                        {loadingSinal ? (
-                          // 1. enquanto carrega
-                          <Spinner text="Carregando ONU..." />
-                        ) : errorSinal ? (
-                          // 2. se houve erro
-                          <ErrorMessage message={errorSinal} />
-                        ) : (
-                          // 3. quando tiver o resultado
-                          <pre
-                            className={`text-left text-sm my-5 ml-3 font-mono whitespace-pre text-green-500`}
-                          >
-                            {sinalOnu}
-                          </pre>
-                        )}
-                      </li>
-                    </li>
+          {errorInfo && (
+            <div className="mt-3 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-800">
+              {errorInfo}
+            </div>
+          )}
+        </div>
 
-                    {!loadingSinal && (
-                      <div className="flex flex-col sm:flex-row">
-                        <button
-                          onClick={() => fetchSinal(pppoe)}
-                          className="sm:mx-2 my-2 sm:my-0 bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all"
-                        >
-                          Testar Onu Novamente
-                        </button>
-                        {loadingReset ? (
-                          <>
-                            <Spinner text="Reiniciando ONU" />
-                          </>
-                        ) : errorLoading ? (
-                          <>
-                            <button
-                              onClick={() => fetchReset(pppoe)}
-                              className="bg-blue-700 sm:mx-2 my-2 sm:my-0 text-white px-6 py-2 rounded hover:bg-blue-400 transition-all"
-                            >
-                              Reiniciar ONU
-                            </button>
-                            <ErrorMessage message={errorLoading} />
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => fetchReset(pppoe)}
-                            className="bg-blue-700 text-white px-6 py-2 rounded hover:bg-blue-400 transition-all"
-                          >
-                            Reiniciar ONU
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="p-5 mt-5"></div>
-                    <li className="flex">
-                      3. Conectado?:{" "}
-                      {loadingConectado ? (
-                        <Spinner />
-                      ) : errorConectado ? (
-                        <ErrorMessage message={errorConectado} />
-                      ) : conectado === true ? (
-                        <pre
-                          className={`text-left text-sm ml-3 font-mono whitespace-pre text-green-500`}
-                        >
-                          UP
-                        </pre>
-                      ) : null}
-                    </li>
-                  </ul>
+        {/* Resultado */}
+        {clientinfo && (
+          <div className="mt-6 space-y-4">
+            {/* Cliente header */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-full bg-slate-900 text-white inline-flex items-center justify-center">
+                  <FiUser />
                 </div>
+                <div>
+                  <p className="text-base font-semibold text-slate-900">
+                    {pppoe}
+                  </p>
+                  {servidorAtual && (
+                    <p className="text-xs text-slate-500">
+                      Servidor: {servidorAtual}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <StatusPill tone={suspenso ? "bad" : "ok"}>
+                  {suspenso ? "Suspenso" : "Ativo"}
+                </StatusPill>
+                {loadingConectado ? (
+                  <StatusPill tone="neutral">
+                    <Spinner inline text="Verificando…" />
+                  </StatusPill>
+                ) : errorConectado ? (
+                  <StatusPill tone="bad">Conexão: DOWN</StatusPill>
+                ) : conectado === true ? (
+                  <StatusPill tone="ok">Conexão: UP</StatusPill>
+                ) : (
+                  <StatusPill tone="neutral">Conexão: —</StatusPill>
+                )}
+              </div>
+            </div>
 
-                <h3 className="mt-6 mb-2 font-semibold">Relatorio</h3>
+            {/* Dados ONU */}
+            <SectionCard
+              step={1}
+              title="Dados ONU"
+              right={
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => fetchSinal(pppoe)}
+                    disabled={loadingSinal}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700 transition disabled:opacity-50"
+                  >
+                    <FiRefreshCw className="size-3.5" />
+                    Testar
+                  </button>
+                  <button
+                    onClick={() => fetchReset(pppoe)}
+                    disabled={loadingReset}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                  >
+                    {loadingReset ? "Reiniciando…" : "Reiniciar"}
+                  </button>
+                </div>
+              }
+            >
+              {loadingSinal ? (
+                <Spinner text="Carregando ONU…" />
+              ) : errorSinal ? (
+                <ErrorMessage message={errorSinal} />
+              ) : sinalOnu ? (
+                <pre className="rounded-xl bg-slate-900 text-emerald-300 font-mono text-xs sm:text-sm p-4 whitespace-pre overflow-x-auto">
+                  {sinalOnu}
+                </pre>
+              ) : (
+                <p className="text-sm text-slate-400">Sem dados de ONU.</p>
+              )}
+              {errorLoading && (
+                <p className="mt-2 text-xs text-rose-600">{errorLoading}</p>
+              )}
+            </SectionCard>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left border border-gray-300">
-                    <thead className="bg-gray-800 text-white">
+            {/* Desconexões */}
+            <SectionCard step={2} title="Relatório de conexões">
+              {errorDescon ? (
+                <ErrorMessage message={errorDescon} />
+              ) : desconexoes && desconexoes.length > 0 ? (
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="min-w-full text-xs">
+                    <thead className="bg-slate-50 text-slate-600 uppercase tracking-wide">
                       <tr>
-                        <th className="p-2">Login</th>
-                        <th className="p-2">Hora Inicial</th>
-                        <th className="p-2">Hora Final</th>
-                        <th className="p-2">Duração</th>
-                        <th className="p-2">Tráfego</th>
-                        <th className="p-2">Ip</th>
+                        <th className="px-3 py-2 text-left font-semibold">
+                          Login
+                        </th>
+                        <th className="px-3 py-2 text-left font-semibold">
+                          Início
+                        </th>
+                        <th className="px-3 py-2 text-left font-semibold">
+                          Fim
+                        </th>
+                        <th className="px-3 py-2 text-left font-semibold">
+                          Duração
+                        </th>
+                        <th className="px-3 py-2 text-left font-semibold">
+                          Tráfego (in / out)
+                        </th>
+                        <th className="px-3 py-2 text-left font-semibold">
+                          IP
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-black text-gray-100 divide-y divide-gray-700">
-                      {desconexoes?.map((d, i) => (
-                        <tr key={i}>
-                          <td className="p-2">{d.username}</td>
-
-                          <td className="p-2">
-                            {new Date(d.acctstarttime).toLocaleString("pt-BR", {
-                              year: "numeric",
-                              month: "2-digit",
-                              day: "2-digit",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                            })}
-                          </td>
-                          <td className="p-2">
-                            {d.acctstoptime && (
-                              <>
-                                {new Date(d.acctstoptime).toLocaleString(
-                                  "pt-BR",
-                                  {
-                                    year: "numeric",
-                                    month: "2-digit",
-                                    day: "2-digit",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                    second: "2-digit",
-                                  }
-                                )}
-                              </>
-                            )}
-                            {!d.acctstoptime && <>Conectado</>}
-                          </td>
-
-                          <td className="p-2">
-                            {(() => {
-                              const start = new Date(d.acctstarttime);
-                              const stop = new Date(d.acctstoptime);
-
-                              const diffMs = stop.getTime() - start.getTime();
-                              if (isNaN(diffMs) || diffMs < 0) return "--";
-
-                              const h = Math.floor(diffMs / 3600000);
-                              const m = Math.floor((diffMs % 3600000) / 60000);
-                              const s = Math.floor((diffMs % 60000) / 1000);
-
-                              const pad = (n: number) =>
-                                n.toString().padStart(2, "0");
-                              return `${pad(h)}:${pad(m)}:${pad(s)}`;
-                            })()}
-                          </td>
-
-                          <td className="p-2">
-                            {formatarBytes(Number(d.acctinputoctets))} /{" "}
-                            {formatarBytes(Number(d.acctoutputoctets))}
-                          </td>
-
-                          <td className="p-2">{d.framedipaddress}</td>
-                        </tr>
-                      ))}
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {desconexoes.map((d, i) => {
+                        const start = new Date(d.acctstarttime);
+                        const stop = new Date(d.acctstoptime);
+                        const diffMs = stop.getTime() - start.getTime();
+                        const dur =
+                          isNaN(diffMs) || diffMs < 0
+                            ? "--"
+                            : `${String(Math.floor(diffMs / 3600000)).padStart(2, "0")}:${String(Math.floor((diffMs % 3600000) / 60000)).padStart(2, "0")}:${String(Math.floor((diffMs % 60000) / 1000)).padStart(2, "0")}`;
+                        return (
+                          <tr key={i} className="hover:bg-slate-50">
+                            <td className="px-3 py-2 font-medium">
+                              {d.username}
+                            </td>
+                            <td className="px-3 py-2">
+                              {start.toLocaleString("pt-BR")}
+                            </td>
+                            <td className="px-3 py-2">
+                              {d.acctstoptime ? (
+                                stop.toLocaleString("pt-BR")
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  Conectado
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 font-mono">{dur}</td>
+                            <td className="px-3 py-2">
+                              {formatarBytes(Number(d.acctinputoctets))} /{" "}
+                              {formatarBytes(Number(d.acctoutputoctets))}
+                            </td>
+                            <td className="px-3 py-2 font-mono">
+                              {d.framedipaddress}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
+              ) : (
+                <p className="text-sm text-slate-400">
+                  Nenhuma desconexão registrada.
+                </p>
+              )}
+            </SectionCard>
 
-                <div className="mt-6 space-y-2">
-                  <p className="flex">
-                    <span>Ping:</span>
-                    {loadingMikrotik ? (
-                      <Spinner />
-                    ) : errorMikrotik ? (
-                      <ErrorMessage message={errorMikrotik} />
-                    ) : (
-                      <span className="text-green-600 ml-3">
-                        {testes?.ping}
-                      </span>
-                    )}
-                  </p>
-                  <p className="flex items-center gap-2">
-                    Fragmentação:{" "}
-                    {loadingMikrotik ? (
-                      <Spinner />
-                    ) : errorMikrotik ? (
-                      <ErrorMessage message={errorMikrotik} />
-                    ) : testes?.fr !== "Sem Fragmentação" ? (
-                      <span className="text-red-500">{testes?.fr}</span>
-                    ) : (
-                      <span className="text-green-600">Sem Fragmentação</span>
-                    )}
-                  </p>
-
-                  <p className="flex">
-                    Velocidade:{" "}
-                    {loadingMikrotik ? (
-                      <Spinner />
-                    ) : errorMikrotik ? (
-                      <ErrorMessage message={errorMikrotik} />
-                    ) : (
-                      <span className="text-green-600 ml-3">
-                        {testes?.velocidade}
-                      </span>
-                    )}
-                  </p>
-
-                  {testes && (
-                    <button
-                      onClick={() => {
-                        fetchMikrotik(pppoe);
-                      }}
-                      className="bg-red-700 text-white px-6 py-2 rounded hover:bg-red-400 transition-all"
-                    >
-                      Realizar o Teste Novamente
-                    </button>
-                  )}
-                </div>
-
-                <div className="mt-6 w-full max-w-xl">
-                  <h4 className="font-semibold mb-2">Consumo em Tempo Real:</h4>
-                  {loadingTempoReal ? (
-                    <Spinner />
-                  ) : errorTempoReal ? (
-                    <ErrorMessage message={errorTempoReal} />
-                  ) : tempoReal.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={200}>
-                      <LineChart data={tempoReal}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <YAxis
-                          domain={[
-                            0,
-                            (dataMax: number) => Math.max(5, dataMax),
-                          ]}
-                        />
-                        <Tooltip />
-                        <Line
-                          type="monotone"
-                          dataKey="tmp_tx"
-                          stroke="#10B981" // verde
-                          strokeWidth={2}
-                          dot={false}
-                          name="TX"
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="tmp_rx"
-                          stroke="#3B82F6" // azul
-                          strokeWidth={2}
-                          dot={false}
-                          name="RX"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : null}
-                </div>
-
-                <div className="mt-6 flex justify-center">
+            {/* Mikrotik tests */}
+            <SectionCard
+              step={3}
+              title="Testes de rede"
+              right={
+                testes && (
                   <button
-                    onClick={() => {
-                      const ip = desconexoes[0].framedipaddress;
-                      const port = process.env.REACT_APP_PORT_ROUTER;
-                      window.open(
-                        `http://${ip}:${port}`,
-                        "_blank",
-                        "noopener,noreferrer"
-                      );
-                    }}
-                    className="bg-red-700 transition-all hover:bg-red-500 text-white px-6 py-2 rounded"
+                    onClick={() => fetchMikrotik(pppoe)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700 transition"
                   >
-                    Acessar Roteador
+                    <FiRefreshCw className="size-3.5" />
+                    Repetir
                   </button>
-                </div>
+                )
+              }
+            >
+              <div className="grid sm:grid-cols-3 gap-3">
+                <Metric
+                  label="Ping"
+                  loading={loadingMikrotik}
+                  error={errorMikrotik}
+                  value={testes?.ping}
+                />
+                <Metric
+                  label="Fragmentação"
+                  loading={loadingMikrotik}
+                  error={errorMikrotik}
+                  value={testes?.fr}
+                  badIf={(v) => !!v && v !== "Sem Fragmentação"}
+                />
+                <Metric
+                  label="Velocidade"
+                  loading={loadingMikrotik}
+                  error={errorMikrotik}
+                  value={testes?.velocidade}
+                />
               </div>
-            );
-          }
+            </SectionCard>
 
-          return null;
-        })()}
+            {/* Tempo Real */}
+            <SectionCard step={4} title="Consumo em tempo real">
+              {loadingTempoReal && tempoReal.length === 0 ? (
+                <Spinner text="Aguardando dados…" />
+              ) : errorTempoReal ? (
+                <ErrorMessage message={errorTempoReal} />
+              ) : tempoReal.length > 0 ? (
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart data={tempoReal}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis stroke="#94a3b8" fontSize={11} />
+                      <YAxis
+                        stroke="#94a3b8"
+                        fontSize={11}
+                        domain={[
+                          0,
+                          (dataMax: number) => Math.max(5, dataMax),
+                        ]}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: 12,
+                          border: "1px solid #e2e8f0",
+                          fontSize: 12,
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="tmp_tx"
+                        stroke="#10B981"
+                        strokeWidth={2}
+                        dot={false}
+                        name="TX"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="tmp_rx"
+                        stroke="#3B82F6"
+                        strokeWidth={2}
+                        dot={false}
+                        name="RX"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400">Sem dados ainda.</p>
+              )}
+            </SectionCard>
 
-        {clientlist && (
-          <>
-            <h1 className="text-3xl mb-5">
-              Total Clientes: {clientlist.length}
-            </h1>
-            <div className="w-72 sm:w-1/2 self-center overflow-auto">
-              <div className="inline-block h-96 py-2 align-middle sm:px-6 lg:px-8">
-                <table className="relative divide-y divide-gray-300">
-                  <thead>
+            {/* Acessar roteador */}
+            {desconexoes.length > 0 && (
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    const ip = desconexoes[0].framedipaddress;
+                    const port = process.env.REACT_APP_PORT_ROUTER;
+                    window.open(
+                      `http://${ip}:${port}`,
+                      "_blank",
+                      "noopener,noreferrer",
+                    );
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2.5 text-sm font-semibold hover:bg-slate-700 transition"
+                >
+                  <FiExternalLink />
+                  Acessar Roteador
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Lista geral de clientes */}
+        <div className="mt-10">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">
+                Clientes ativos
+              </h2>
+              <p className="text-xs text-slate-500">
+                Total: {clientlist?.length || 0}
+              </p>
+            </div>
+            <button
+              onClick={redirectLogs}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition"
+            >
+              Ver logs
+            </button>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            {loadingClientList ? (
+              <div className="p-6">
+                <Spinner text="Carregando clientes…" />
+              </div>
+            ) : errorClientList ? (
+              <div className="p-6">
+                <ErrorMessage message={errorClientList} />
+              </div>
+            ) : (
+              <div className="max-h-96 overflow-auto">
+                <table className="min-w-full text-xs">
+                  <thead className="bg-slate-50 sticky top-0 text-slate-600 uppercase tracking-wide">
                     <tr>
-                      <th>Servidor</th>
-                      <th>PPPOE</th>
-                      <th>callerId</th>
-                      <th>IP</th>
-                      <th>Uptime</th>
+                      <th className="px-3 py-2 text-left font-semibold">
+                        Servidor
+                      </th>
+                      <th className="px-3 py-2 text-left font-semibold">
+                        PPPOE
+                      </th>
+                      <th className="px-3 py-2 text-left font-semibold">
+                        Caller ID
+                      </th>
+                      <th className="px-3 py-2 text-left font-semibold">IP</th>
+                      <th className="px-3 py-2 text-left font-semibold">
+                        Uptime
+                      </th>
                     </tr>
                   </thead>
-
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
                     {clientlist
                       .slice()
                       .sort(
                         (a, b) =>
                           parseUptime(a.upTime ?? "") -
-                          parseUptime(b.upTime ?? "")
+                          parseUptime(b.upTime ?? ""),
                       )
-                      .map((f) => (
-                        <tr>
-                          <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
-                            {f.servidor}
-                          </td>
-                          <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
+                      .map((f, i) => (
+                        <tr
+                          key={`${f.pppoe}-${i}`}
+                          className="hover:bg-slate-50 cursor-pointer"
+                          onClick={() => {
+                            setPppoe(f.pppoe);
+                            fetchClientInfo(f.pppoe);
+                          }}
+                        >
+                          <td className="px-3 py-2">{f.servidor}</td>
+                          <td className="px-3 py-2 font-medium text-slate-900">
                             {f.pppoe}
                           </td>
-                          <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
-                            {f.callerId}
-                          </td>
-                          <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
-                            {f.ip}
-                          </td>
-                          <td className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0">
-                            {f.upTime}
-                          </td>
+                          <td className="px-3 py-2 font-mono">{f.callerId}</td>
+                          <td className="px-3 py-2 font-mono">{f.ip}</td>
+                          <td className="px-3 py-2">{f.upTime}</td>
                         </tr>
                       ))}
                   </tbody>
-                  
                 </table>
-                
-                {loadingClientList ? (
-                  // 1. enquanto carrega
-                  <Spinner text="Carregando ONU..." />
-                ) : errorClientList ? (
-                  // 2. se houve erro
-                  <ErrorMessage message={errorClientList} />
-                ) : (
-                  <></>
-                )}
               </div>
-              
-            </div>
-            <button onClick={redirectLogs} className="p-2 bg-slate-600 text-gray-200 w-full sm:w-1/4 mt-2">Logs</button>
-          </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Metric: React.FC<{
+  label: string;
+  value?: string;
+  loading: boolean;
+  error: string | null;
+  badIf?: (v?: string) => boolean;
+}> = ({ label, value, loading, error, badIf }) => {
+  const isBad = badIf ? badIf(value) : false;
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <div className="mt-1 text-sm font-semibold">
+        {loading ? (
+          <Spinner inline />
+        ) : error ? (
+          <span className="text-rose-600">{error}</span>
+        ) : value ? (
+          <span className={isBad ? "text-rose-600" : "text-emerald-600"}>
+            {value}
+          </span>
+        ) : (
+          <span className="text-slate-400">—</span>
         )}
       </div>
-    </>
+    </div>
   );
 };
