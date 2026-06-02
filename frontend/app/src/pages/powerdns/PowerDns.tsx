@@ -11,6 +11,9 @@ export const PowerDns = () => {
   const [messageType, setMessageType] = useState<"success" | "error" | "">("");
   const [dominioText, setDominioText] = useState("");
   const [fileMode, setFileMode] = useState<"inserir" | "remover">("inserir");
+  const [dominioMode, setDominioMode] = useState<"inserir" | "remover">(
+    "inserir",
+  );
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   async function handleFile(file: File) {
@@ -46,12 +49,23 @@ export const PowerDns = () => {
   async function handleDomainSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!dominioText.trim()) return;
+
+    if (dominioMode === "remover") {
+      const ok = window.confirm(
+        `Tem certeza que deseja REMOVER o domínio "${dominioText}" da lista?`,
+      );
+      if (!ok) return;
+    }
+
     setMessage("");
     setMessageType("");
 
+    const endpoint =
+      dominioMode === "inserir" ? "inserirDominio" : "removerDominio";
+
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_URL}/PowerDns/inserirDominio`,
+        `${process.env.REACT_APP_URL}/PowerDns/${endpoint}`,
         { dominio: dominioText },
         {
           headers: {
@@ -61,13 +75,16 @@ export const PowerDns = () => {
           timeout: 60000,
         },
       );
-      console.log("✅ Domínio inserido:", response.data);
+      console.log("✅ Domínio processado:", response.data);
       setMessage(response.data.message);
       setMessageType("success");
       setDominioText(""); // Limpa o campo após sucesso
     } catch (error: any) {
       console.error("❌ Erro:", error);
-      setMessage(error.response?.data?.error || "Erro ao inserir domínio.");
+      setMessage(
+        error.response?.data?.error ||
+          `Erro ao ${dominioMode === "inserir" ? "inserir" : "remover"} domínio.`,
+      );
       setMessageType("error");
     }
   }
@@ -196,8 +213,37 @@ export const PowerDns = () => {
         {/* Envio de domínio único por Texto */}
         <div className="bg-white p-6 rounded-lg shadow-md flex flex-col items-center w-full max-w-md">
           <h2 className="text-lg font-semibold mb-4 text-gray-700">
-            Adicionar domínio único
+            {dominioMode === "inserir"
+              ? "Adicionar domínio único"
+              : "Remover domínio único"}
           </h2>
+
+          {/* Toggle Adicionar / Remover */}
+          <div className="flex w-full mb-4 rounded-md overflow-hidden border border-gray-300">
+            <button
+              type="button"
+              onClick={() => setDominioMode("inserir")}
+              className={`flex-1 py-2 text-sm font-semibold transition-colors ${
+                dominioMode === "inserir"
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              Adicionar
+            </button>
+            <button
+              type="button"
+              onClick={() => setDominioMode("remover")}
+              className={`flex-1 py-2 text-sm font-semibold transition-colors ${
+                dominioMode === "remover"
+                  ? "bg-red-600 text-white"
+                  : "bg-white text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              Remover
+            </button>
+          </div>
+
           <form
             onSubmit={handleDomainSubmit}
             className="flex flex-col w-full gap-4"
@@ -212,9 +258,13 @@ export const PowerDns = () => {
             <button
               type="submit"
               disabled={!dominioText.trim()}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`text-white font-bold py-2 px-4 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                dominioMode === "inserir"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-red-600 hover:bg-red-700"
+              }`}
             >
-              Inserir Domínio
+              {dominioMode === "inserir" ? "Inserir Domínio" : "Remover Domínio"}
             </button>
           </form>
         </div>

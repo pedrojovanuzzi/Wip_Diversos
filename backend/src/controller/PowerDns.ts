@@ -41,6 +41,27 @@ class PowerDNS {
     }
   }
 
+  public async removerDominio(req: Request, res: Response): Promise<void> {
+    try {
+      const { dominio } = req.body;
+
+      if (!dominio || typeof dominio !== "string") {
+        res
+          .status(400)
+          .json({ error: "O domínio é obrigatório e deve ser um texto." });
+        return;
+      }
+
+      const dominioARemover = dominio.toLowerCase().replace(/\.+$/, "") + ".";
+      const response = await removerDominios([dominioARemover]);
+
+      res.status(200).json({ message: response });
+    } catch (error) {
+      console.error("Erro ao remover domínio:", error);
+      res.status(500).json({ error: "Erro interno ao remover o domínio." });
+    }
+  }
+
   private async processarPdf(
     req: Request,
     res: Response,
