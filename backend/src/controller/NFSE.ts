@@ -5,7 +5,7 @@ import { Request, Response } from "express";
 import { DOMParser } from "xmldom";
 import axios from "axios";
 import moment from "moment-timezone";
-import { In, Between, IsNull, Not, Like } from "typeorm";
+import { In, Between, IsNull, Not, Like, Raw } from "typeorm";
 import { parseStringPromise } from "xml2js";
 import { v4 as uuidv4 } from "uuid";
 
@@ -1032,7 +1032,8 @@ export class NFSEController {
 
   async BuscarNSFE(req: Request, res: Response) {
     try {
-      const { cpf, filters, dateFilter, ambiente, status } = req.body;
+      const { cpf, filters, dateFilter, ambiente, status, numeroNfse } =
+        req.body;
       const w: any = {};
       if (cpf) w.cpf_cnpj = Like(`%${cpf}%`);
       if (filters) {
@@ -1057,6 +1058,8 @@ export class NFSEController {
 
       console.log(startDate, endDate);
 
+      const numeroNfseStr = (numeroNfse ?? "").toString().trim();
+
       const nfseData = AppDataSource.getRepository(NFSE);
       const nfseResponse = await nfseData.find({
         where: {
@@ -1064,6 +1067,14 @@ export class NFSEController {
           timestamp: Between(startDate, endDate) as any,
           ambiente: ambiente,
           status: status,
+          ...(numeroNfseStr
+            ? {
+                numeroNfe: Raw(
+                  (alias) => `CAST(${alias} AS CHAR) LIKE :nfseNum`,
+                  { nfseNum: `%${numeroNfseStr}%` },
+                ),
+              }
+            : {}),
         },
         order: { id: "DESC" },
       });

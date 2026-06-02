@@ -24,6 +24,7 @@ export const BuscarNfseGerada = () => {
   const [showCertPasswordPopUp, setShowCertPasswordPopUp] = useState(false);
   const [certPassword, setCertPassword] = useState<string>("");
   const [searchCpf, setSearchCpf] = useState<string>("");
+  const [searchNumeroNfse, setSearchNumeroNfse] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
   const [status, setStatus] = useState<string>("");
   const [pdfDados, setPdfDados] = useState<any[]>([]);
@@ -262,6 +263,7 @@ export const BuscarNfseGerada = () => {
           dateFilter: dateFilter,
           ambiente: ambiente || "homologacao",
           status: status || null,
+          numeroNfse: searchNumeroNfse.trim() || null,
         },
         {
           headers: {
@@ -282,6 +284,7 @@ export const BuscarNfseGerada = () => {
 
   const handleClear = () => {
     setSearchCpf("");
+    setSearchNumeroNfse("");
     setDataInicio("");
     setDataFim("");
     setClientes([]);
@@ -343,6 +346,32 @@ export const BuscarNfseGerada = () => {
                       value={searchCpf}
                       onChange={(e) => setSearchCpf(e.target.value)}
                       placeholder="Ex: 000.000.000-00"
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Campo Número da NFSE */}
+                <div className="relative">
+                  <label
+                    htmlFor="numeroNfse"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Nº da NFS-e
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <BsFiletypeDoc />
+                    </span>
+                    <input
+                      id="numeroNfse"
+                      type="text"
+                      inputMode="numeric"
+                      value={searchNumeroNfse}
+                      onChange={(e) =>
+                        setSearchNumeroNfse(e.target.value.replace(/\D/g, ""))
+                      }
+                      placeholder="Ex: 12345"
                       className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
