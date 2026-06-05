@@ -68,11 +68,15 @@ async function findNginxConf(): Promise<string> {
   throw new Error("Arquivo de config nginx não encontrado para o domínio.");
 }
 
-/** Insere/substitui o bloco do MediaMTX no conteúdo, antes do último `}`. */
+/**
+ * Insere/substitui o bloco do MediaMTX no server block HTTPS.
+ * Ancora no `location /api/` (que está sempre no server 443), evitando inserir
+ * por engano no server de redirect (porta 80).
+ */
 function patchNginxContent(content: string): string {
   const block = buildNginxBlock();
 
-  // Remove bloco anterior se existir
+  // Remove bloco anterior se existir (entre os marcadores)
   const beginIdx = content.indexOf(BEGIN_MARKER);
   const endIdx = content.indexOf(END_MARKER);
   if (beginIdx !== -1 && endIdx !== -1) {
@@ -81,10 +85,23 @@ function patchNginxContent(content: string): string {
     content = content.slice(0, lineStart) + content.slice(lineEnd);
   }
 
-  // Insere antes do último } do server block
-  const lastBrace = content.lastIndexOf("\n}");
-  if (lastBrace === -1) throw new Error("Não encontrou o fechamento do server block.");
-  return content.slice(0, lastBrace) + "\n\n" + block + "\n" + content.slice(lastBrace);
+  // Anchor 1: antes do `location /api/` (garante o server HTTPS correto)
+  const apiIdx = content.indexOf("location /api/");
+  if (apiIdx !== -1) {
+    const lineStart = content.lastIndexOf("\n", apiIdx) + 1;
+    return content.slice(0, lineStart) + block + "\n\n" + content.slice(lineStart);
+  }
+
+  // Anchor 2 (fallback): antes do `listen 443`
+  const listenIdx = content.indexOf("listen 443");
+  if (listenIdx !== -1) {
+    const lineStart = content.lastIndexOf("\n", listenIdx) + 1;
+    return content.slice(0, lineStart) + block + "\n\n" + content.slice(lineStart);
+  }
+
+  throw new Error(
+    "Não encontrei 'location /api/' nem 'listen 443' para ancorar o bloco /stream.",
+  );
 }
 
 class NginxService {
