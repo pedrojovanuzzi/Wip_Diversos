@@ -6,3 +6,7 @@ dist/*
 test_nfcom.ts
 msg.json
 log.json
+
+# Gravações de câmeras (MediaMTX) — não versionar os vídeos, manter só a pasta
+storage/recordings/*
+!storage/recordings/.gitkeep

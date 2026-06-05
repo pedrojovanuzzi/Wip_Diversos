@@ -42,9 +42,10 @@ services:
       - MTX_WEBRTCADDITIONALHOSTS=${MEDIAMTX_WEBRTC_PUBLIC_IP}
     volumes:
       - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
-      - mediamtx_recordings:/recordings
+      # Grava direto numa pasta do projeto (bind mount) em vez de volume Docker,
+      # para o backend ler facilmente em backend/storage/recordings.
+      - ./storage/recordings:/recordings
 
 volumes:
   redis_data:
   ollama_models:
-  mediamtx_recordings:
