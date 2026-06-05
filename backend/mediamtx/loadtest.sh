@@ -52,6 +52,13 @@ start() {
 
   echo "🎬 Iniciando $n câmeras de teste..."
 
+  # 0. Garante baseline limpo: mata qualquer ffmpeg residual de testes anteriores.
+  if pgrep ffmpeg > /dev/null; then
+    echo "   ⚠ ffmpeg residual encontrado — limpando antes de começar."
+    pkill -9 ffmpeg 2>/dev/null || true
+    sleep 2
+  fi
+
   # 1. Cria os paths via API
   for i in $(seq 1 "$n"); do
     curl -s -X POST "$API/v3/config/paths/add/${PREFIX}${i}" \
@@ -93,7 +100,9 @@ status() {
 
 stop() {
   echo "🛑 Parando teste..."
-  pkill -f "ffmpeg -nostdin -re -f lavfi" 2>/dev/null || true
+  # No servidor de produção, NENHUM ffmpeg é legítimo (o MediaMTX puxa RTSP
+  # nativamente, sem ffmpeg). Então matamos todos para não acumular zumbis.
+  pkill -9 ffmpeg 2>/dev/null || true
   rm -f "$PIDFILE"
 
   # Remove os paths de teste da API
