@@ -4,6 +4,8 @@ import bcrypt from "bcrypt";
 import { v4 as uuidv4 } from "uuid";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
 import { Like } from "typeorm";
 import AppDataSource from "../database/DataSource";
 import MkauthSource from "../database/MkauthSource";
@@ -18,6 +20,21 @@ dotenv.config();
 
 const jwtSecret = String(process.env.JWT_SECRET);
 const FRONT_URL = (process.env.URL || "http://localhost:3001").replace(/\/$/, "");
+// Pasta no host onde o MediaMTX grava (volume Docker). Configurável por .env.
+const RECORDINGS_PATH =
+  process.env.MEDIAMTX_RECORDINGS_PATH ||
+  "/var/lib/docker/volumes/backend_mediamtx_recordings/_data";
+
+/** Resolve o diretório de gravações de uma câmera, validando a posse pelo cliente. */
+async function getCameraDir(
+  cid: number,
+  id: number,
+): Promise<{ cam: CameraEntity; dir: string } | null> {
+  const repo = AppDataSource.getRepository(CameraEntity);
+  const cam = await repo.findOne({ where: { id, cliente_id: cid } });
+  if (!cam) return null;
+  return { cam, dir: path.join(RECORDINGS_PATH, cam.path_name) };
+}
 
 class Camera {
   // ===================== ADMIN (operador interno) =====================
@@ -545,6 +562,62 @@ class Camera {
     } catch (e: any) {
       console.error("getRecordingPlayback:", e?.message);
       res.status(500).json({ message: "Erro ao obter playback." });
+    }
+  }
+
+  // ===================== PASTA DE GRAVAÇÕES (arquivos no disco) =====================
+
+  /** Lista os arquivos .mp4 gravados da câmera (pasta no disco). */
+  public async listFiles(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      const info = await getCameraDir(cid, id);
+      if (!info) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+      if (!fs.existsSync(info.dir)) {
+        res.json({ items: [] });
+        return;
+      }
+      const items = fs
+        .readdirSync(info.dir)
+        .filter((f) => f.endsWith(".mp4"))
+        .map((name) => {
+          const st = fs.statSync(path.join(info.dir, name));
+          return { name, size: st.size, mtime: st.mtime };
+        })
+        .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+      res.json({ items });
+    } catch (e: any) {
+      console.error("listFiles:", e?.message);
+      res.status(500).json({ message: "Erro ao listar arquivos." });
+    }
+  }
+
+  /** Serve um arquivo de gravação (com suporte a Range para seek no vídeo). */
+  public async getFile(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      // basename evita path traversal (../).
+      const filename = path.basename(String(req.params.filename || ""));
+      const info = await getCameraDir(cid, id);
+      if (!info) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+      const filePath = path.join(info.dir, filename);
+      if (!filePath.startsWith(info.dir) || !fs.existsSync(filePath)) {
+        res.status(404).json({ message: "Arquivo não encontrado." });
+        return;
+      }
+      // Express trata Range, Content-Type (.mp4 → video/mp4) e ETag automaticamente.
+      res.sendFile(filePath);
+    } catch (e: any) {
+      console.error("getFile:", e?.message);
+      if (!res.headersSent) res.status(500).json({ message: "Erro ao servir arquivo." });
     }
   }
 

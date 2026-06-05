@@ -39,5 +39,7 @@ router.get(
   CameraClientGuard,
   Camera.getRecordingPlayback,
 );
+router.get("/cameras/:id/files", CameraClientGuard, Camera.listFiles);
+router.get("/cameras/:id/files/:filename", CameraClientGuard, Camera.getFile);
 
 export default router;

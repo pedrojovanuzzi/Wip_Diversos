@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { MdVideocam, MdLogout, MdAdd, MdPlayArrow } from "react-icons/md";
+import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload } from "react-icons/md";
 import { BsTrash } from "react-icons/bs";
 import { WhepPlayer } from "./components/WhepPlayer";
 import { getCamSession, getCamToken, clearCamSession } from "./cameraAuth";
@@ -14,9 +14,10 @@ interface Cam {
   created_at: string;
 }
 
-interface Segment {
-  start: string;
-  duration?: number;
+interface RecFile {
+  name: string;
+  size: number;
+  mtime: string;
 }
 
 export default function CameraPortal() {
@@ -38,13 +39,15 @@ export default function CameraPortal() {
   const [rtsp, setRtsp] = useState("");
   const [adding, setAdding] = useState(false);
 
-  // live + recordings
+  // live
   const [liveCam, setLiveCam] = useState<Cam | null>(null);
   const [whepUrl, setWhepUrl] = useState<string | null>(null);
-  const [recCam, setRecCam] = useState<Cam | null>(null);
-  const [segments, setSegments] = useState<Segment[]>([]);
-  const [recLoading, setRecLoading] = useState(false);
-  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
+
+  // pasta (arquivos no disco)
+  const [folderCam, setFolderCam] = useState<Cam | null>(null);
+  const [files, setFiles] = useState<RecFile[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [fileVideoUrl, setFileVideoUrl] = useState<string | null>(null);
 
   const flash = (text: string, type: "ok" | "err") => {
     setMsg({ text, type });
@@ -107,7 +110,7 @@ export default function CameraPortal() {
     try {
       await axios.delete(`${base}/cameras/cameras/${id}`, { headers: authHeaders() });
       if (liveCam?.id === id) closeLive();
-      if (recCam?.id === id) setRecCam(null);
+      if (folderCam?.id === id) setFolderCam(null);
       await load();
     } catch (e: any) {
       if (!handleAuthError(e)) flash("Erro ao remover.", "err");
@@ -115,7 +118,7 @@ export default function CameraPortal() {
   };
 
   const openLive = async (cam: Cam) => {
-    setRecCam(null);
+    setFolderCam(null);
     setLiveCam(cam);
     setWhepUrl(null);
     try {
@@ -134,37 +137,30 @@ export default function CameraPortal() {
     setWhepUrl(null);
   };
 
-  const openRecordings = async (cam: Cam) => {
+  const openFolder = async (cam: Cam) => {
     closeLive();
-    setRecCam(cam);
-    setPlaybackUrl(null);
-    setRecLoading(true);
+    setFolderCam(cam);
+    setFileVideoUrl(null);
+    setFilesLoading(true);
     try {
-      const res = await axios.get(`${base}/cameras/cameras/${cam.id}/recordings`, {
+      const res = await axios.get(`${base}/cameras/cameras/${cam.id}/files`, {
         headers: authHeaders(),
       });
-      setSegments(res.data.items || []);
+      setFiles(res.data.items || []);
     } catch (e: any) {
-      if (!handleAuthError(e)) flash("Erro ao listar gravações.", "err");
+      if (!handleAuthError(e)) flash("Erro ao abrir a pasta.", "err");
     } finally {
-      setRecLoading(false);
+      setFilesLoading(false);
     }
   };
 
-  const playSegment = async (cam: Cam, seg: Segment) => {
-    setPlaybackUrl(null);
-    try {
-      const res = await axios.get(
-        `${base}/cameras/cameras/${cam.id}/recordings/playback`,
-        {
-          headers: authHeaders(),
-          params: { start: seg.start, duration: seg.duration || 60 },
-        },
-      );
-      setPlaybackUrl(res.data.url);
-    } catch (e: any) {
-      if (!handleAuthError(e)) flash("Erro ao reproduzir.", "err");
-    }
+  // URL do arquivo (token na query, pois <video> não envia header).
+  const fileUrl = (camId: number, name: string) =>
+    `${base}/cameras/cameras/${camId}/files/${encodeURIComponent(name)}?token=${getCamToken()}`;
+
+  const fmtSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
+    return (bytes / 1024 / 1024).toFixed(1) + " MB";
   };
 
   const logout = () => {
@@ -259,47 +255,76 @@ export default function CameraPortal() {
           </div>
         )}
 
-        {/* Gravações */}
-        {recCam && (
+        {/* Pasta (arquivos gravados) */}
+        {folderCam && (
           <div className="mb-6 bg-white ring-1 ring-gray-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold">Gravações — {recCam.nome}</h2>
-              <button
-                onClick={() => setRecCam(null)}
-                className="text-sm text-gray-500 hover:text-gray-800"
-              >
-                Fechar
-              </button>
+              <h2 className="font-semibold flex items-center gap-2">
+                <MdFolder className="text-indigo-600" /> Pasta — {folderCam.nome}
+              </h2>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => openFolder(folderCam)}
+                  className="text-sm text-indigo-600 hover:text-indigo-800"
+                >
+                  Atualizar
+                </button>
+                <button
+                  onClick={() => setFolderCam(null)}
+                  className="text-sm text-gray-500 hover:text-gray-800"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
-            {playbackUrl && (
+
+            {fileVideoUrl && (
               <video
-                key={playbackUrl}
-                src={playbackUrl}
+                key={fileVideoUrl}
+                src={fileVideoUrl}
                 controls
                 autoPlay
                 className="w-full aspect-video bg-black rounded-md mb-3"
               />
             )}
-            {recLoading ? (
+
+            {filesLoading ? (
               <p className="flex items-center gap-2 text-gray-500">
                 <AiOutlineLoading3Quarters className="animate-spin" /> Carregando...
               </p>
-            ) : segments.length === 0 ? (
-              <p className="text-gray-400 text-sm">Nenhuma gravação disponível ainda.</p>
+            ) : files.length === 0 ? (
+              <p className="text-gray-400 text-sm">
+                Nenhum arquivo gravado ainda. As gravações aparecem aqui conforme o
+                MediaMTX grava (pode levar alguns minutos).
+              </p>
             ) : (
-              <ul className="divide-y max-h-64 overflow-auto">
-                {segments.map((seg, i) => (
+              <ul className="divide-y max-h-80 overflow-auto">
+                {files.map((f) => (
                   <li
-                    key={i}
-                    className="flex items-center justify-between py-2 text-sm"
+                    key={f.name}
+                    className="flex items-center justify-between py-2 text-sm gap-2"
                   >
-                    <span>{new Date(seg.start).toLocaleString()}</span>
-                    <button
-                      onClick={() => playSegment(recCam, seg)}
-                      className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
-                    >
-                      <MdPlayArrow /> Reproduzir
-                    </button>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{f.name}</p>
+                      <p className="text-gray-400 text-xs">
+                        {new Date(f.mtime).toLocaleString()} · {fmtSize(f.size)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button
+                        onClick={() => setFileVideoUrl(fileUrl(folderCam.id, f.name))}
+                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
+                      >
+                        <MdPlayArrow /> Ver
+                      </button>
+                      <a
+                        href={fileUrl(folderCam.id, f.name)}
+                        download={f.name}
+                        className="inline-flex items-center gap-1 text-gray-600 hover:text-gray-900"
+                      >
+                        <MdDownload /> Baixar
+                      </a>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -341,10 +366,10 @@ export default function CameraPortal() {
                     Ao vivo
                   </button>
                   <button
-                    onClick={() => openRecordings(cam)}
-                    className="flex-1 ring-1 ring-gray-300 rounded-md px-3 py-1.5 text-sm"
+                    onClick={() => openFolder(cam)}
+                    className="flex-1 inline-flex items-center justify-center gap-1 ring-1 ring-gray-300 rounded-md px-3 py-1.5 text-sm"
                   >
-                    Gravações
+                    <MdFolder /> Pasta
                   </button>
                 </div>
               </div>
