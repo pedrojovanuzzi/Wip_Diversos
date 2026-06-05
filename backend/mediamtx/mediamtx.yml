@@ -50,9 +50,6 @@ authHTTPAddress: http://localhost:3000/api/cameras/mediamtx-auth
 # Ações que exigem checagem externa. A publicação/pull interno é liberada.
 authHTTPExclude:
   - action: publish
-    user: any
-    ip: any
-    path: any
   - action: api
   - action: metrics
   - action: pprof
