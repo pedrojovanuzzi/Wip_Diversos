@@ -36,6 +36,22 @@ async function getCameraDir(
   return { cam, dir: path.join(RECORDINGS_PATH, cam.path_name) };
 }
 
+/** Apaga a pasta de gravações de uma câmera no disco (ao remover a câmera). */
+function deleteCameraRecordings(pathName: string): void {
+  try {
+    if (!pathName) return;
+    const dir = path.join(RECORDINGS_PATH, pathName);
+    // Garante que estamos dentro do RECORDINGS_PATH (evita remoção indevida).
+    if (!dir.startsWith(RECORDINGS_PATH)) return;
+    if (fs.existsSync(dir)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+      console.log(`🗑️  Gravações removidas: ${dir}`);
+    }
+  } catch (e: any) {
+    console.error("deleteCameraRecordings:", e?.message);
+  }
+}
+
 class Camera {
   // ===================== ADMIN (operador interno) =====================
 
@@ -281,6 +297,8 @@ class Camera {
         } catch (e: any) {
           console.error("removePath:", e?.message);
         }
+        // Apaga as gravações do disco de cada câmera.
+        deleteCameraRecordings(cam.path_name);
       }
       await camRepo.delete({ cliente_id: id });
       await repo.delete(id);
@@ -489,6 +507,8 @@ class Camera {
         console.error("removePath:", e?.message);
       }
       await repo.delete(id);
+      // Apaga as gravações do disco junto com a câmera.
+      deleteCameraRecordings(cam.path_name);
       res.json({ ok: true });
     } catch (e: any) {
       console.error("removeCamera:", e?.message);
