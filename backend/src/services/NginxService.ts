@@ -1,9 +1,11 @@
-import { Client } from "ssh2";
-import SftpClient from "ssh2-sftp-client";
-import dotenv from "dotenv";
+import { exec } from "child_process";
 import fs from "fs";
+import { promisify } from "util";
+import dotenv from "dotenv";
 
 dotenv.config();
+
+const execAsync = promisify(exec);
 
 const BEGIN_MARKER = "# === MEDIAMTX_STREAM_BEGIN ===";
 const END_MARKER = "# === MEDIAMTX_STREAM_END ===";
@@ -33,63 +35,40 @@ function buildNginxBlock(): string {
     ${END_MARKER}`;
 }
 
-function getSshOptions() {
-  const host = process.env.NGINX_SSH_HOST;
-  const username = process.env.NGINX_SSH_USER || "root";
-  const port = Number(process.env.NGINX_SSH_PORT || 22);
-  const keyPath = process.env.NGINX_SSH_KEY_PATH;
-  const password = process.env.NGINX_SSH_PASSWORD;
-
-  if (!host) throw new Error("NGINX_SSH_HOST não configurado no .env");
-
-  const opts: any = { host, port, username, readyTimeout: 10000 };
-  if (keyPath) {
-    opts.privateKey = fs.readFileSync(keyPath);
-  } else if (password) {
-    opts.password = password;
-  } else {
-    throw new Error("Configure NGINX_SSH_KEY_PATH ou NGINX_SSH_PASSWORD no .env");
-  }
-  return opts;
-}
-
-/** Roda um comando via SSH e retorna stdout+stderr. */
-function sshExec(command: string): Promise<string> {
-  const opts = getSshOptions();
-  return new Promise((resolve, reject) => {
-    const conn = new Client();
-    let output = "";
-    conn
-      .on("ready", () => {
-        conn.exec(command, (err, stream) => {
-          if (err) { conn.end(); return reject(err); }
-          stream
-            .on("close", (code: number) => {
-              conn.end();
-              if (code !== 0) return reject(new Error(`exit ${code}:\n${output}`));
-              resolve(output);
-            })
-            .on("data", (d: Buffer) => { output += d.toString(); })
-            .stderr.on("data", (d: Buffer) => { output += d.toString(); });
-        });
-      })
-      .on("error", reject)
-      .connect(opts);
-  });
-}
-
 /** Encontra o arquivo nginx que contém o domínio wipdiversos. */
 async function findNginxConf(): Promise<string> {
-  const output = await sshExec(
-    `grep -rl 'wipdiversos.wiptelecomunicacoes.com.br' ` +
-    `/etc/nginx/sites-enabled/ /etc/nginx/sites-available/ /etc/nginx/conf.d/ 2>/dev/null | head -1`,
-  );
-  const path = output.trim();
-  if (!path) throw new Error("Arquivo de config nginx não encontrado para o domínio.");
-  return path;
+  const dirs = [
+    "/etc/nginx/sites-enabled",
+    "/etc/nginx/sites-available",
+    "/etc/nginx/conf.d",
+  ];
+
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) continue;
+    const files = fs.readdirSync(dir);
+    for (const file of files) {
+      const fullPath = `${dir}/${file}`;
+      try {
+        const content = fs.readFileSync(fullPath, "utf8");
+        if (content.includes("wipdiversos.wiptelecomunicacoes.com.br")) {
+          return fullPath;
+        }
+      } catch {}
+    }
+  }
+
+  // Fallback: nginx.conf raiz
+  if (fs.existsSync("/etc/nginx/nginx.conf")) {
+    const content = fs.readFileSync("/etc/nginx/nginx.conf", "utf8");
+    if (content.includes("wipdiversos.wiptelecomunicacoes.com.br")) {
+      return "/etc/nginx/nginx.conf";
+    }
+  }
+
+  throw new Error("Arquivo de config nginx não encontrado para o domínio.");
 }
 
-/** Insere/substitui o bloco do MediaMTX no conteúdo do nginx, antes do último `}`. */
+/** Insere/substitui o bloco do MediaMTX no conteúdo, antes do último `}`. */
 function patchNginxContent(content: string): string {
   const block = buildNginxBlock();
 
@@ -97,80 +76,72 @@ function patchNginxContent(content: string): string {
   const beginIdx = content.indexOf(BEGIN_MARKER);
   const endIdx = content.indexOf(END_MARKER);
   if (beginIdx !== -1 && endIdx !== -1) {
-    const before = content.slice(0, content.lastIndexOf("\n", beginIdx) + 1);
-    const after = content.slice(content.indexOf("\n", endIdx) + 1);
-    content = before + after;
+    const lineStart = content.lastIndexOf("\n", beginIdx);
+    const lineEnd = content.indexOf("\n", endIdx);
+    content = content.slice(0, lineStart) + content.slice(lineEnd);
   }
 
-  // Insere antes do último } (fechamento do server block)
+  // Insere antes do último } do server block
   const lastBrace = content.lastIndexOf("\n}");
-  if (lastBrace === -1) throw new Error("Não encontrou o fechamento do server block no nginx.");
+  if (lastBrace === -1) throw new Error("Não encontrou o fechamento do server block.");
   return content.slice(0, lastBrace) + "\n\n" + block + "\n" + content.slice(lastBrace);
 }
 
 class NginxService {
-  /**
-   * Lê o arquivo nginx via SFTP, insere/substitui o bloco do MediaMTX,
-   * escreve de volta e recarrega o nginx — tudo sem tocar no servidor manualmente.
-   */
   public async applyMediaMtxBlock(): Promise<{ ok: boolean; output: string; confPath?: string }> {
-    const sftp = new SftpClient();
     const logs: string[] = [];
     try {
-      const opts = getSshOptions();
-
-      // 1. Acha o arquivo de config
       logs.push("Localizando arquivo nginx...");
       const confPath = await findNginxConf();
       logs.push(`Arquivo: ${confPath}`);
 
-      // 2. Lê o conteúdo via SFTP
-      await sftp.connect(opts);
-      const buffer = await sftp.get(confPath) as Buffer;
-      const original = buffer.toString("utf8");
+      const original = fs.readFileSync(confPath, "utf8");
       logs.push(`Lido: ${original.length} bytes`);
 
-      // 3. Faz backup e aplica o patch em memória
+      // Backup
+      fs.writeFileSync(confPath + ".bak", original, "utf8");
+      logs.push("Backup salvo.");
+
       const patched = patchNginxContent(original);
+      fs.writeFileSync(confPath, patched, "utf8");
+      logs.push("Arquivo atualizado. Testando nginx...");
 
-      // 4. Salva o backup e o arquivo novo via SFTP
-      await sftp.put(Buffer.from(original, "utf8"), confPath + ".bak");
-      await sftp.put(Buffer.from(patched, "utf8"), confPath);
-      await sftp.end();
-      logs.push("Arquivo escrito. Testando nginx...");
+      // nginx -t
+      const { stdout: testOut, stderr: testErr } = await execAsync("nginx -t 2>&1 || true");
+      const testResult = (testOut + testErr).trim();
+      logs.push(testResult);
 
-      // 5. nginx -t + reload via SSH
-      const reloadOut = await sshExec("nginx -t 2>&1 && systemctl reload nginx && echo OK_RELOAD");
-      logs.push(reloadOut.trim());
-
-      if (!reloadOut.includes("OK_RELOAD")) {
+      if (!testResult.includes("test is successful") && !testResult.includes("syntax is ok")) {
         // Rollback
-        await sftp.connect(opts);
-        await sftp.put(Buffer.from(original, "utf8"), confPath);
-        await sftp.end();
-        throw new Error("nginx -t falhou, config restaurada do backup:\n" + reloadOut);
+        fs.writeFileSync(confPath, original, "utf8");
+        logs.push("ERRO: config inválida — backup restaurado.");
+        return { ok: false, output: logs.join("\n"), confPath };
       }
+
+      await execAsync("systemctl reload nginx");
+      logs.push("nginx recarregado com sucesso.");
 
       return { ok: true, output: logs.join("\n"), confPath };
     } catch (e: any) {
-      try { await sftp.end(); } catch {}
-      return { ok: false, output: [...logs, e?.message || String(e)].join("\n") };
+      logs.push("ERRO: " + (e?.message || String(e)));
+      return { ok: false, output: logs.join("\n") };
     }
   }
 
-  /** Verifica se o bloco já está aplicado e o status do nginx. */
   public async checkStatus(): Promise<{ ok: boolean; blockPresent: boolean; nginxActive: boolean; output: string }> {
     try {
       const confPath = await findNginxConf();
-      const [blockOut, statusOut] = await Promise.all([
-        sshExec(`grep -l '${BEGIN_MARKER}' '${confPath}' 2>/dev/null || echo AUSENTE`),
-        sshExec("systemctl is-active nginx"),
-      ]);
+      const content = fs.readFileSync(confPath, "utf8");
+      const blockPresent = content.includes(BEGIN_MARKER);
+
+      const { stdout } = await execAsync("systemctl is-active nginx 2>/dev/null || echo inactive");
+      const nginxActive = stdout.trim() === "active";
+
       return {
         ok: true,
-        blockPresent: !blockOut.includes("AUSENTE"),
-        nginxActive: statusOut.trim() === "active",
-        output: `Conf: ${confPath}\nBloco: ${blockOut.trim()}\nnginx: ${statusOut.trim()}`,
+        blockPresent,
+        nginxActive,
+        output: `Conf: ${confPath}\nBloco /stream: ${blockPresent ? "presente" : "ausente"}\nnginx: ${stdout.trim()}`,
       };
     } catch (e: any) {
       return { ok: false, blockPresent: false, nginxActive: false, output: e?.message || String(e) };
