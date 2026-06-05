@@ -11,6 +11,7 @@ import { CameraCliente } from "../entities/CameraCliente";
 import { Camera as CameraEntity } from "../entities/Camera";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import MediaMtxService from "../services/MediaMtxService";
+import NginxService from "../services/NginxService";
 import { generateStreamToken } from "./CameraAuth";
 
 dotenv.config();
@@ -271,6 +272,18 @@ class Camera {
       console.error("removerCliente:", e?.message);
       res.status(500).json({ message: "Erro ao remover cliente." });
     }
+  }
+
+  // ===================== NGINX (admin) =====================
+
+  public async nginxStatus(_req: Request, res: Response) {
+    const result = await NginxService.checkStatus();
+    res.json(result);
+  }
+
+  public async nginxApply(_req: Request, res: Response) {
+    const result = await NginxService.applyMediaMtxBlock();
+    res.status(result.ok ? 200 : 500).json(result);
   }
 
   // ===================== SETUP (público, via UUID) =====================

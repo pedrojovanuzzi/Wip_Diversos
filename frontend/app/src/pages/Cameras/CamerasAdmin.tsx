@@ -12,6 +12,9 @@ import {
   BsPencil,
   BsCheck,
   BsX,
+  BsGearFill,
+  BsCheckCircleFill,
+  BsExclamationCircleFill,
 } from "react-icons/bs";
 
 interface ClienteItem {
@@ -33,14 +36,45 @@ export const CamerasAdmin: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [filter, setFilter] = useState("");
-  const [editEmail, setEditEmail] = useState<{ id: number; value: string } | null>(
-    null,
-  );
+  const [editEmail, setEditEmail] = useState<{ id: number; value: string } | null>(null);
+  const [nginxStatus, setNginxStatus] = useState<{
+    blockPresent?: boolean;
+    nginxActive?: boolean;
+    output?: string;
+  } | null>(null);
+  const [nginxLoading, setNginxLoading] = useState(false);
+  const [nginxApplying, setNginxApplying] = useState(false);
   const [msg, setMsg] = useState<{ text: string; type: "ok" | "err" } | null>(null);
 
   const flash = (text: string, type: "ok" | "err") => {
     setMsg({ text, type });
     setTimeout(() => setMsg(null), 5000);
+  };
+
+  const checkNginx = async () => {
+    setNginxLoading(true);
+    try {
+      const res = await axios.get(`${base}/cameras/admin/nginx/status`, { headers });
+      setNginxStatus(res.data);
+    } catch (e: any) {
+      setNginxStatus({ output: e?.response?.data?.output || "Erro ao verificar nginx." });
+    } finally {
+      setNginxLoading(false);
+    }
+  };
+
+  const applyNginx = async () => {
+    setNginxApplying(true);
+    try {
+      const res = await axios.post(`${base}/cameras/admin/nginx/apply`, {}, { headers });
+      setNginxStatus(res.data);
+      flash(res.data.ok ? "Nginx configurado e recarregado!" : "Falhou. Veja o log.", res.data.ok ? "ok" : "err");
+      if (res.data.ok) await checkNginx();
+    } catch (e: any) {
+      flash(e?.response?.data?.output || "Erro ao aplicar.", "err");
+    } finally {
+      setNginxApplying(false);
+    }
   };
 
   const load = async () => {
@@ -174,6 +208,65 @@ export const CamerasAdmin: React.FC = () => {
             {msg.text}
           </div>
         )}
+
+        {/* Painel nginx */}
+        <div className="bg-white ring-1 ring-gray-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold flex items-center gap-2">
+              <BsGearFill className="text-gray-500" /> Configuração do servidor (nginx)
+            </h2>
+            <div className="flex gap-2">
+              <button
+                onClick={checkNginx}
+                disabled={nginxLoading || nginxApplying}
+                className="px-3 py-1.5 text-sm ring-1 ring-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              >
+                {nginxLoading ? "Verificando..." : "Verificar status"}
+              </button>
+              <button
+                onClick={applyNginx}
+                disabled={nginxLoading || nginxApplying}
+                className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {nginxApplying ? "Aplicando..." : "Aplicar config /stream"}
+              </button>
+            </div>
+          </div>
+
+          {nginxStatus && (
+            <div className="mt-2 space-y-1">
+              {nginxStatus.blockPresent !== undefined && (
+                <div className="flex items-center gap-2 text-sm">
+                  {nginxStatus.blockPresent
+                    ? <BsCheckCircleFill className="text-green-500" />
+                    : <BsExclamationCircleFill className="text-yellow-500" />}
+                  <span>
+                    Bloco /stream: <b>{nginxStatus.blockPresent ? "presente" : "não aplicado"}</b>
+                  </span>
+                  {nginxStatus.nginxActive !== undefined && (
+                    <span className="ml-4 flex items-center gap-1">
+                      {nginxStatus.nginxActive
+                        ? <BsCheckCircleFill className="text-green-500" />
+                        : <BsExclamationCircleFill className="text-red-500" />}
+                      nginx: <b>{nginxStatus.nginxActive ? "ativo" : "inativo"}</b>
+                    </span>
+                  )}
+                </div>
+              )}
+              {nginxStatus.output && (
+                <pre className="bg-gray-50 rounded p-2 text-xs text-gray-600 overflow-auto max-h-32">
+                  {nginxStatus.output}
+                </pre>
+              )}
+            </div>
+          )}
+          {!nginxStatus && (
+            <p className="text-sm text-gray-400">
+              Clique em <b>Verificar status</b> para ver se o nginx já está configurado,
+              ou <b>Aplicar config /stream</b> para configurar automaticamente via SSH.
+            </p>
+          )}
+        </div>
 
         <input
           value={filter}

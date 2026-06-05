@@ -15,6 +15,8 @@ router.post("/mediamtx-auth", Camera.mediamtxAuth);
 router.get("/mediamtx-auth", Camera.mediamtxAuth);
 
 // ---- Admin (operador interno) ----
+router.get("/admin/nginx/status", AuthGuard, Camera.nginxStatus);
+router.post("/admin/nginx/apply", AuthGuard, Camera.nginxApply);
 router.get("/admin/sis-clientes", AuthGuard, Camera.buscarSisClientes);
 router.post("/admin/clientes", AuthGuard, Camera.criarCliente);
 router.post("/admin/clientes/ensure", AuthGuard, Camera.ensureCliente);

@@ -35,8 +35,9 @@ services:
     restart: unless-stopped
     ports:
       - "8554:8554" # RTSP
-      - "8889:8889" # WebRTC / WHEP (exponha atrás de HTTPS em produção)
-      - "9996:9996" # Playback de gravações
+      - "8889:8889" # WebRTC / WHEP (HTTP — proxiado pelo nginx em /stream)
+      - "8189:8189/udp" # WebRTC ICE (mídia do vídeo — abrir UDP no firewall)
+      - "9996:9996" # Playback de gravações (proxiado em /stream/playback)
       - "9997:9997" # API (manter interna; não expor publicamente)
     volumes:
       - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro

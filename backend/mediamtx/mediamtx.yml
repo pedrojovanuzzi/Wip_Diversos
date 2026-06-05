@@ -11,8 +11,12 @@ apiAddress: :9997
 # ---------- WebRTC (visualização ao vivo no navegador) ----------
 webrtc: yes
 webrtcAddress: :8889
-# Em produção atrás de proxy/HTTPS, ajuste os ICE servers/host conforme a rede.
-# webrtcAdditionalHosts: [cam.seudominio.com]
+# Porta UDP do ICE (a mídia do vídeo trafega por aqui). Precisa estar aberta no firewall.
+webrtcLocalUDPAddress: :8189
+# IP/host público do servidor — sem isso o navegador remoto não recebe um candidato ICE
+# utilizável e o vídeo não conecta (o sinal até abre, mas a imagem não chega).
+# >>> TROQUE pelo IP público fixo do servidor <<<
+webrtcAdditionalHosts: [SEU_IP_PUBLICO]
 
 # ---------- HLS (fallback opcional) ----------
 hls: no
