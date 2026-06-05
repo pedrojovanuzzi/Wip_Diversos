@@ -37,6 +37,9 @@ services:
     # o container consiga puxar streams RTSP de câmeras acessíveis pelo host.
     # Com host network, `ports:` é ignorado (as portas já ficam no host diretamente).
     network_mode: host
+    environment:
+      # IP público do servidor para os candidatos ICE do WebRTC (vem do .env).
+      - MTX_WEBRTCADDITIONALHOSTS=${MEDIAMTX_WEBRTC_PUBLIC_IP}
     volumes:
       - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
       - mediamtx_recordings:/recordings
