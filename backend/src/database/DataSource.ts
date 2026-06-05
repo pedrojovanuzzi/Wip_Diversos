@@ -20,6 +20,8 @@ import { PhoneLocation } from "../entities/PhoneLocation";
 import { TotemPixSolicitacao } from "../entities/TotemPixSolicitacao";
 import { StreamingAssinante } from "../entities/StreamingAssinante";
 import { DeclaracaoQuitacao } from "../entities/DeclaracaoQuitacao";
+import { CameraCliente } from "../entities/CameraCliente";
+import { Camera } from "../entities/Camera";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -51,6 +53,8 @@ const AppDataSource = new DataSource({
     TotemPixSolicitacao,
     StreamingAssinante,
     DeclaracaoQuitacao,
+    CameraCliente,
+    Camera,
   ],
   migrations: [
     path.join(__dirname, "../migration/*.{ts,js}").replace(/\\/g, "/"),
@@ -78,6 +82,17 @@ AppDataSource.initialize()
       console.log(
         `🧹 Limpeza de Jobs: ${result.affected} jobs 'processando' foram marcados como 'interrompido'.`,
       );
+    }
+
+    // Re-sincroniza as câmeras ativas no MediaMTX (paths via API são voláteis).
+    // Import dinâmico para evitar dependência circular (MediaMtxService importa este DataSource).
+    try {
+      const { default: MediaMtxService } = await import(
+        "../services/MediaMtxService"
+      );
+      await MediaMtxService.syncAllActive();
+    } catch (err) {
+      console.error("Falha ao sincronizar câmeras no MediaMTX:", err);
     }
   })
   .catch((err) => {

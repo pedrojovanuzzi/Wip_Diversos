@@ -54,6 +54,13 @@ export const SerContratos: React.FC = () => {
     type: "success" | "error";
   } | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [camLinkModal, setCamLinkModal] = useState<{
+    login: string;
+    setupLink: string | null;
+    status: string;
+    alreadyConfigured?: boolean;
+  } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const base = process.env.REACT_APP_URL;
   const headers = { Authorization: `Bearer ${user?.token}` };
@@ -119,6 +126,9 @@ export const SerContratos: React.FC = () => {
       }
       showMsg((res.data.message || "Adicionado com sucesso.") + extraMsg, "success");
       await fetchList(loaded.login);
+      if (tipo === "CAMERA") {
+        await ensureCameraClient(loaded.login);
+      }
     } catch (e: any) {
       if (
         e?.response?.status === 409 &&
@@ -172,6 +182,40 @@ export const SerContratos: React.FC = () => {
       }
     } finally {
       setAdding(false);
+    }
+  };
+
+  // Garante a conta de câmeras do cliente e abre o popup com o link de cadastro.
+  const ensureCameraClient = async (login: string) => {
+    try {
+      const res = await axios.post(
+        `${base}/cameras/admin/clientes/ensure`,
+        { login },
+        { headers },
+      );
+      setLinkCopied(false);
+      setCamLinkModal({
+        login,
+        setupLink: res.data.setupLink ?? null,
+        status: res.data.status,
+        alreadyConfigured: res.data.alreadyConfigured,
+      });
+    } catch (e: any) {
+      showMsg(
+        e?.response?.data?.message ||
+          "Câmera adicionada, mas falhou ao gerar o link de acesso.",
+        "error",
+      );
+    }
+  };
+
+  const copySetupLink = async () => {
+    if (!camLinkModal?.setupLink) return;
+    try {
+      await navigator.clipboard.writeText(camLinkModal.setupLink);
+      setLinkCopied(true);
+    } catch {
+      // ignore
     }
   };
 
@@ -293,13 +337,24 @@ export const SerContratos: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-800">
               Serviços Adicionais — Streaming e Câmeras
             </h1>
-            <button
-              onClick={() => navigate("/Streaming")}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded font-semibold hover:bg-gray-900"
-              title="Gerenciar assinantes do Watch Brasil"
-            >
-              <BsGearFill /> Admin Streaming
-            </button>
+            <div className="flex items-center gap-2">
+              {(user?.permission ?? 0) >= 5 && (
+                <button
+                  onClick={() => navigate("/Cameras/Admin")}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded font-semibold hover:bg-indigo-700"
+                  title="Gerenciar câmeras (CFTV) dos clientes"
+                >
+                  <BsCamera /> Gerenciar Câmeras
+                </button>
+              )}
+              <button
+                onClick={() => navigate("/Streaming")}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded font-semibold hover:bg-gray-900"
+                title="Gerenciar assinantes do Watch Brasil"
+              >
+                <BsGearFill /> Admin Streaming
+              </button>
+            </div>
           </div>
 
           <div className="bg-white p-4 rounded-lg shadow-md mb-4">
@@ -619,6 +674,64 @@ export const SerContratos: React.FC = () => {
                   className="flex-1 py-2 bg-purple-600 text-white rounded font-semibold hover:bg-purple-700 disabled:bg-gray-400"
                 >
                   {adding ? "Adicionando..." : "Confirmar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Popup: link de cadastro de câmeras do cliente */}
+        {camLinkModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <BsCamera className="text-2xl text-indigo-600" />
+                <h2 className="text-xl font-bold text-gray-800">
+                  Acesso às câmeras
+                </h2>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">
+                Cliente <span className="font-semibold">{camLinkModal.login}</span>
+              </p>
+
+              {camLinkModal.setupLink ? (
+                <>
+                  <p className="text-sm text-gray-700 mb-2">
+                    Envie este link para o cliente definir o <b>e-mail e a senha</b> de
+                    acesso ao portal de câmeras:
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      readOnly
+                      value={camLinkModal.setupLink}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="flex-1 p-2 border border-gray-300 rounded text-sm bg-gray-50"
+                    />
+                    <button
+                      onClick={copySetupLink}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded font-semibold hover:bg-indigo-700 whitespace-nowrap"
+                    >
+                      {linkCopied ? "Copiado!" : "Copiar"}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    O login do cliente é o próprio PPPOE e não pode ser alterado.
+                  </p>
+                </>
+              ) : (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                  Este cliente já configurou o acesso (status:{" "}
+                  <b>{camLinkModal.status}</b>). Para gerar um novo link, use o
+                  botão <b>Gerenciar Câmeras</b>.
+                </div>
+              )}
+
+              <div className="flex justify-end mt-5">
+                <button
+                  onClick={() => setCamLinkModal(null)}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded font-semibold hover:bg-gray-300"
+                >
+                  Fechar
                 </button>
               </div>
             </div>

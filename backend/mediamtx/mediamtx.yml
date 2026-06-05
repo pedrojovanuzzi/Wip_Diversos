@@ -1,0 +1,54 @@
+###############################################
+# MediaMTX — configuração para o portal de câmeras
+# Roda em container separado. O backend Node orquestra via API (porta 9997).
+# Docs: https://github.com/bluenviron/mediamtx
+###############################################
+
+# ---------- API de controle ----------
+api: yes
+apiAddress: :9997
+
+# ---------- WebRTC (visualização ao vivo no navegador) ----------
+webrtc: yes
+webrtcAddress: :8889
+# Em produção atrás de proxy/HTTPS, ajuste os ICE servers/host conforme a rede.
+# webrtcAdditionalHosts: [cam.seudominio.com]
+
+# ---------- HLS (fallback opcional) ----------
+hls: no
+
+# ---------- RTSP (porta de ingestão; o pull é feito pelo MediaMTX) ----------
+rtsp: yes
+rtspAddress: :8554
+
+# ---------- Playback server (reprodução de gravações) ----------
+playback: yes
+playbackAddress: :9996
+
+# ---------- Gravação 24/7 com retenção de 3 dias ----------
+# Na v1.x as opções de gravação ficam em pathDefaults (aplicadas a todos os paths).
+pathDefaults:
+  record: yes
+  recordPath: /recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+  recordFormat: fmp4
+  recordSegmentDuration: 1h
+  recordDeleteAfter: 72h
+
+# ---------- Autenticação externa via HTTP (delegada ao backend) ----------
+# O MediaMTX consulta o backend para autorizar leitura/playback.
+# O backend valida o token curto emitido por /cameras/:id/stream.
+authMethod: http
+# Backend roda no host (npm start), então o container o alcança via host.docker.internal.
+# Se você containerizar o backend na mesma rede, troque por http://backend:3000/...
+authHTTPAddress: http://host.docker.internal:3000/api/cameras/mediamtx-auth
+# Ações que exigem checagem externa. A publicação/pull interno é liberada.
+authHTTPExclude:
+  - action: publish
+  - action: api
+  - action: metrics
+  - action: pprof
+
+# ---------- Paths ----------
+# Os paths das câmeras são criados dinamicamente pelo backend via API.
+# Nenhum path estático é necessário aqui.
+paths: {}

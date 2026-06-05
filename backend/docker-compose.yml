@@ -27,6 +27,26 @@ services:
     #           count: all
     #           capabilities: [gpu]
 
+  # Servidor de mídia do Portal de Câmeras (CFTV). O backend (no host) orquestra
+  # via http://localhost:9997 e o MediaMTX chama o backend via host.docker.internal:3000.
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: mediamtx
+    restart: unless-stopped
+    ports:
+      - "8554:8554" # RTSP
+      - "8889:8889" # WebRTC / WHEP (exponha atrás de HTTPS em produção)
+      - "9996:9996" # Playback de gravações
+      - "9997:9997" # API (manter interna; não expor publicamente)
+    volumes:
+      - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
+      - mediamtx_recordings:/recordings
+    # Permite que o container alcance o backend rodando no host (Linux).
+    # No Docker Desktop (Windows/Mac) host.docker.internal já existe.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   redis_data:
   ollama_models:
+  mediamtx_recordings:
