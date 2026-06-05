@@ -44,7 +44,7 @@ pathDefaults:
 authMethod: http
 # Backend roda no host (npm start), então o container o alcança via host.docker.internal.
 # Se você containerizar o backend na mesma rede, troque por http://backend:3000/...
-authHTTPAddress: http://host.docker.internal:3000/api/cameras/mediamtx-auth
+authHTTPAddress: http://localhost:3000/api/cameras/mediamtx-auth
 # Ações que exigem checagem externa. A publicação/pull interno é liberada.
 authHTTPExclude:
   - action: publish

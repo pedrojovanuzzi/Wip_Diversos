@@ -33,19 +33,13 @@ services:
     image: bluenviron/mediamtx:latest
     container_name: mediamtx
     restart: unless-stopped
-    ports:
-      - "8554:8554" # RTSP
-      - "8889:8889" # WebRTC / WHEP (HTTP — proxiado pelo nginx em /stream)
-      - "8189:8189/udp" # WebRTC ICE (mídia do vídeo — abrir UDP no firewall)
-      - "9996:9996" # Playback de gravações (proxiado em /stream/playback)
-      - "9997:9997" # API (manter interna; não expor publicamente)
+    # network_mode: host dá acesso total à rede do servidor — necessário para que
+    # o container consiga puxar streams RTSP de câmeras acessíveis pelo host.
+    # Com host network, `ports:` é ignorado (as portas já ficam no host diretamente).
+    network_mode: host
     volumes:
       - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
       - mediamtx_recordings:/recordings
-    # Permite que o container alcance o backend rodando no host (Linux).
-    # No Docker Desktop (Windows/Mac) host.docker.internal já existe.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
 volumes:
   redis_data:
