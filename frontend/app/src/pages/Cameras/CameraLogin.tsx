@@ -49,8 +49,12 @@ export default function CameraLogin() {
             type="text"
             required
             autoComplete="username"
+            placeholder="Seu login ou e-mail"
             className="mt-1 block w-full rounded-md ring-1 ring-gray-300 px-3 py-2"
           />
+          <p className="text-xs text-gray-400 mt-1">
+            Use seu login de acesso (PPPOE) ou o e-mail cadastrado.
+          </p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Senha</label>

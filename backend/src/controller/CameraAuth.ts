@@ -41,8 +41,12 @@ class CameraAuth {
       }
 
       const { login, password } = req.body;
+      const ident = String(login).trim();
       const repo = DataSource.getRepository(CameraCliente);
-      const cliente = await repo.findOne({ where: { login } });
+      // Aceita login PPPOE ou e-mail (clientes costumam digitar o e-mail).
+      const cliente = await repo.findOne({
+        where: [{ login: ident }, { email: ident }],
+      });
 
       if (!cliente || !cliente.password) {
         res.status(422).json({ errors: [{ msg: "Usuário ou senha inválidos" }] });
