@@ -48,6 +48,9 @@ export const DbChatWidget: React.FC = () => {
 
   // O totem (autoatendimento) não deve exibir o chat de IA.
   if (location.pathname.startsWith("/TokenAutoAtendimento")) return null;
+  // Páginas do cliente de câmeras (login, portal, setup) — não exibir o chat,
+  // mesmo que um operador esteja logado no sistema interno na mesma sessão.
+  if (/^\/Cameras\/(Login|Portal|Setup)/i.test(location.pathname)) return null;
   if (!user?.token) return null;
 
   const send = async () => {
