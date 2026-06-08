@@ -31,6 +31,10 @@ export class Camera {
   @Column({ type: "boolean", default: true })
   ativo!: boolean;
 
+  // Gravação 24/7 ligada (true) ou pausada (false). O "ao vivo" continua mesmo pausado.
+  @Column({ type: "boolean", default: true })
+  gravando!: boolean;
+
   @CreateDateColumn({ type: "timestamp" })
   created_at?: Date;
 

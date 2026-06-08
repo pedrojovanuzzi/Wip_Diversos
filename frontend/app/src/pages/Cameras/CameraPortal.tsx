@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload, MdRefresh, MdExpandMore, MdChevronRight, MdEdit, MdDeleteSweep } from "react-icons/md";
+import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload, MdRefresh, MdExpandMore, MdChevronRight, MdEdit, MdDeleteSweep, MdPause, MdFiberManualRecord } from "react-icons/md";
 import { BsTrash } from "react-icons/bs";
 import { WhepPlayer } from "./components/WhepPlayer";
 import InstallPWAButton from "./components/InstallPWAButton";
@@ -12,6 +12,7 @@ interface Cam {
   id: number;
   nome: string;
   ativo: boolean;
+  gravando: boolean;
   created_at: string;
 }
 
@@ -190,6 +191,23 @@ export default function CameraPortal() {
       await load();
     } catch (e: any) {
       if (!handleAuthError(e)) flash("Erro ao remover.", "err");
+    }
+  };
+
+  const toggleRecording = async (cam: Cam) => {
+    const novo = !cam.gravando;
+    try {
+      await axios.put(
+        `${base}/cameras/cameras/${cam.id}/recording`,
+        { gravando: novo },
+        { headers: authHeaders() },
+      );
+      setCams((prev) =>
+        prev.map((c) => (c.id === cam.id ? { ...c, gravando: novo } : c)),
+      );
+      flash(novo ? "Gravação retomada." : "Gravação pausada.", "ok");
+    } catch (e: any) {
+      if (!handleAuthError(e)) flash("Erro ao alterar a gravação.", "err");
     }
   };
 
@@ -607,7 +625,15 @@ export default function CameraPortal() {
                 className="bg-white ring-1 ring-gray-200 rounded-lg p-4 flex flex-col"
               >
                 <div className="flex items-start justify-between">
-                  <h3 className="font-semibold">{cam.nome}</h3>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <span
+                      title={cam.gravando ? "Gravando" : "Gravação pausada"}
+                      className={`inline-block w-2 h-2 rounded-full ${
+                        cam.gravando ? "bg-red-500" : "bg-gray-300"
+                      }`}
+                    />
+                    {cam.nome}
+                  </h3>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => openEdit(cam)}
@@ -639,6 +665,24 @@ export default function CameraPortal() {
                     <MdFolder /> Pasta
                   </button>
                 </div>
+                <button
+                  onClick={() => toggleRecording(cam)}
+                  className={`mt-2 inline-flex items-center justify-center gap-1 rounded-md px-3 py-1.5 text-sm ring-1 ${
+                    cam.gravando
+                      ? "ring-gray-300 text-gray-700 hover:bg-gray-50"
+                      : "ring-red-300 text-red-600 bg-red-50 hover:bg-red-100"
+                  }`}
+                >
+                  {cam.gravando ? (
+                    <>
+                      <MdPause /> Pausar gravação
+                    </>
+                  ) : (
+                    <>
+                      <MdFiberManualRecord /> Retomar gravação
+                    </>
+                  )}
+                </button>
               </div>
             ))}
           </div>

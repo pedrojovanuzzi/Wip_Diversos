@@ -33,6 +33,7 @@ router.get("/cameras", CameraClientGuard, Camera.listarCameras);
 router.post("/cameras", CameraClientGuard, Camera.addCamera);
 router.get("/cameras/:id", CameraClientGuard, Camera.getCameraDetail);
 router.put("/cameras/:id", CameraClientGuard, Camera.editCamera);
+router.put("/cameras/:id/recording", CameraClientGuard, Camera.setRecording);
 router.delete("/cameras/:id", CameraClientGuard, Camera.removeCamera);
 router.get("/cameras/:id/stream", CameraClientGuard, Camera.getStream);
 router.get("/cameras/:id/recordings", CameraClientGuard, Camera.listRecordings);

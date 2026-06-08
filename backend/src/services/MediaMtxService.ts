@@ -46,12 +46,16 @@ class MediaMtxService {
     });
   }
 
-  /** Cadastra (ou regrava) o path de uma câmera com gravação 24/7 habilitada. */
-  public async addPath(pathName: string, rtspUrl: string): Promise<void> {
+  /** Cadastra (ou regrava) o path de uma câmera. `record` liga/desliga a gravação. */
+  public async addPath(
+    pathName: string,
+    rtspUrl: string,
+    record: boolean = true,
+  ): Promise<void> {
     const body = {
       source: rtspUrl,
       sourceOnDemand: false,
-      record: true,
+      record,
       recordDeleteAfter: RECORD_DELETE_AFTER,
     };
     try {
@@ -70,6 +74,14 @@ class MediaMtxService {
       }
       throw e;
     }
+  }
+
+  /** Liga/desliga a gravação de um path já existente (sem derrubar o ao vivo). */
+  public async setRecord(pathName: string, record: boolean): Promise<void> {
+    await this.api.patch(
+      `/v3/config/paths/patch/${encodeURIComponent(pathName)}`,
+      { record },
+    );
   }
 
   /** Remove o path de uma câmera (ignora 404). */
@@ -144,7 +156,7 @@ class MediaMtxService {
       const cameras = await repo.find({ where: { ativo: true } });
       for (const cam of cameras) {
         try {
-          await this.addPath(cam.path_name, cam.rtsp_url);
+          await this.addPath(cam.path_name, cam.rtsp_url, cam.gravando);
         } catch (e: any) {
           console.error(
             `MediaMTX: falha ao sincronizar câmera ${cam.path_name}:`,

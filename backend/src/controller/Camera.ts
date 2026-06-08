@@ -408,6 +408,7 @@ class Camera {
           id: c.id,
           nome: c.nome,
           ativo: c.ativo,
+          gravando: c.gravando,
           created_at: c.created_at,
         })),
       });
@@ -543,7 +544,7 @@ class Camera {
 
       if (sourceChanged && cam.ativo) {
         try {
-          await MediaMtxService.addPath(cam.path_name, cam.rtsp_url);
+          await MediaMtxService.addPath(cam.path_name, cam.rtsp_url, cam.gravando);
         } catch (e: any) {
           console.error("addPath(edit):", e?.message);
         }
@@ -552,6 +553,42 @@ class Camera {
     } catch (e: any) {
       console.error("editCamera:", e?.message);
       res.status(500).json({ message: "Erro ao editar câmera." });
+    }
+  }
+
+  /** Pausa/retoma a gravação 24/7 (o ao vivo continua). Persiste o estado. */
+  public async setRecording(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      const gravando = req.body.gravando === true || req.body.gravando === "true";
+      const repo = AppDataSource.getRepository(CameraEntity);
+      const cam = await repo.findOne({ where: { id, cliente_id: cid } });
+      if (!cam) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+
+      cam.gravando = gravando;
+      await repo.save(cam);
+
+      if (cam.ativo) {
+        try {
+          await MediaMtxService.setRecord(cam.path_name, gravando);
+        } catch (e: any) {
+          console.error("setRecord:", e?.message);
+          res.status(201).json({
+            id: cam.id,
+            gravando: cam.gravando,
+            warning: "Estado salvo, mas o servidor de mídia não respondeu agora.",
+          });
+          return;
+        }
+      }
+      res.json({ id: cam.id, gravando: cam.gravando });
+    } catch (e: any) {
+      console.error("setRecording:", e?.message);
+      res.status(500).json({ message: "Erro ao alterar a gravação." });
     }
   }
 
