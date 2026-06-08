@@ -11,7 +11,7 @@ dotenv.config();
  *
  * O MediaMTX grava 24/7 e só faz retenção por TEMPO (recordDeleteAfter). Aqui
  * complementamos com retenção por TAMANHO: cada cliente tem direito a um limite
- * fixo (15 GB) somando todas as suas câmeras. Quando o uso passa do limite,
+ * fixo (5 GB) somando todas as suas câmeras. Quando o uso passa do limite,
  * apagamos os segmentos .mp4 mais antigos (entre todas as câmeras do cliente)
  * até voltar abaixo da cota.
  */
@@ -21,8 +21,8 @@ const RECORDINGS_PATH =
   process.env.MEDIAMTX_RECORDINGS_PATH ||
   "/var/lib/docker/volumes/backend_mediamtx_recordings/_data";
 
-// Cota fixa por cliente: 15 GB. Constante pública (sem .env).
-export const STORAGE_QUOTA_GB = 15;
+// Cota fixa por cliente: 5 GB (provisório). Constante pública (sem .env).
+export const STORAGE_QUOTA_GB = 5;
 export const STORAGE_QUOTA_BYTES = STORAGE_QUOTA_GB * 1024 * 1024 * 1024;
 
 interface SegmentFile {
