@@ -590,7 +590,7 @@ class Camera {
   public async getStorage(req: Request, res: Response) {
     try {
       const cid = req.cameraCliente!.id!;
-      // Aplica a cota antes de reportar: se estiver acima de 15 GB, apaga as
+      // Aplica a cota antes de reportar: se estiver acima de 5 GB, apaga as
       // gravações mais antigas e então devolve o uso já dentro do limite.
       await CameraStorageService.enforceQuotaForCliente(cid);
       const usage = await CameraStorageService.getClienteUsage(cid);
