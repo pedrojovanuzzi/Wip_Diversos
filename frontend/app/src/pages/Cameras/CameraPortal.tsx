@@ -489,6 +489,14 @@ export default function CameraPortal() {
                 src={fileVideoUrl}
                 controls
                 autoPlay
+                onError={() => {
+                  flash(
+                    "Gravação indisponível — pode ter sido removida pela limpeza por movimento.",
+                    "err",
+                  );
+                  setFileVideoUrl(null);
+                  if (folderCam) openFolder(folderCam); // recarrega a lista
+                }}
                 className="w-full aspect-video bg-black rounded-md mb-3"
               />
             )}
