@@ -31,6 +31,7 @@ router.get("/me", CameraClientGuard, CameraAuth.me);
 router.get("/storage", CameraClientGuard, Camera.getStorage);
 router.get("/cameras", CameraClientGuard, Camera.listarCameras);
 router.post("/cameras", CameraClientGuard, Camera.addCamera);
+router.get("/cameras/:id", CameraClientGuard, Camera.getCameraDetail);
 router.put("/cameras/:id", CameraClientGuard, Camera.editCamera);
 router.delete("/cameras/:id", CameraClientGuard, Camera.removeCamera);
 router.get("/cameras/:id/stream", CameraClientGuard, Camera.getStream);
@@ -46,5 +47,7 @@ router.get("/cameras/:id/files", CameraClientGuard, Camera.listFiles);
 // valida contra path traversal.
 router.get("/cameras/:id/files/*", CameraClientGuard, Camera.getFile);
 router.delete("/cameras/:id/files/*", CameraClientGuard, Camera.deleteFile);
+// Limpa uma pasta de gravações inteira (ex.: o dia "2026-06/08").
+router.delete("/cameras/:id/folder/*", CameraClientGuard, Camera.clearFolder);
 
 export default router;

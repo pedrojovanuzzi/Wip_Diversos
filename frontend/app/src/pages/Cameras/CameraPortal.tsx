@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload, MdRefresh, MdExpandMore, MdChevronRight } from "react-icons/md";
+import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload, MdRefresh, MdExpandMore, MdChevronRight, MdEdit, MdDeleteSweep } from "react-icons/md";
 import { BsTrash } from "react-icons/bs";
 import { WhepPlayer } from "./components/WhepPlayer";
 import InstallPWAButton from "./components/InstallPWAButton";
@@ -47,6 +47,12 @@ export default function CameraPortal() {
   const [nome, setNome] = useState("");
   const [rtsp, setRtsp] = useState("");
   const [adding, setAdding] = useState(false);
+
+  // editar câmera (nome, ip, porta)
+  const [editCam, setEditCam] = useState<Cam | null>(null);
+  const [editForm, setEditForm] = useState({ nome: "", ip: "", porta: "" });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
 
   // live
   const [liveCam, setLiveCam] = useState<Cam | null>(null);
@@ -252,6 +258,64 @@ export default function CameraPortal() {
     }
   };
 
+  const openEdit = async (cam: Cam) => {
+    setEditCam(cam);
+    setEditForm({ nome: cam.nome, ip: "", porta: "" });
+    setEditLoading(true);
+    try {
+      const res = await axios.get(`${base}/cameras/cameras/${cam.id}`, {
+        headers: authHeaders(),
+      });
+      setEditForm({
+        nome: res.data.nome || cam.nome,
+        ip: res.data.host || "",
+        porta: res.data.port ? String(res.data.port) : "",
+      });
+    } catch (e: any) {
+      if (!handleAuthError(e)) flash("Erro ao carregar a câmera.", "err");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const saveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCam) return;
+    setEditSaving(true);
+    try {
+      await axios.put(
+        `${base}/cameras/cameras/${editCam.id}`,
+        { nome: editForm.nome, ip: editForm.ip, porta: editForm.porta },
+        { headers: authHeaders() },
+      );
+      setEditCam(null);
+      flash("Câmera atualizada.", "ok");
+      await load();
+    } catch (e: any) {
+      if (!handleAuthError(e))
+        flash(e?.response?.data?.message || "Erro ao salvar.", "err");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const clearFolder = async (dir: string, count: number) => {
+    if (!folderCam || !dir) return;
+    if (!window.confirm(`Apagar TODAS as ${count} gravações de ${dirLabel(dir)}?`))
+      return;
+    try {
+      const sub = dir.split("/").map(encodeURIComponent).join("/");
+      await axios.delete(`${base}/cameras/cameras/${folderCam.id}/folder/${sub}`, {
+        headers: authHeaders(),
+      });
+      if (fileVideoUrl) setFileVideoUrl(null);
+      setFiles((prev) => prev.filter((x) => x.dir !== dir));
+      loadStorage();
+    } catch (e: any) {
+      if (!handleAuthError(e)) flash("Erro ao limpar a pasta.", "err");
+    }
+  };
+
   const fmtSize = (bytes: number) => {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
     return (bytes / 1024 / 1024).toFixed(1) + " MB";
@@ -444,21 +508,32 @@ export default function CameraPortal() {
                   const open = openDirs.has(g.dir);
                   return (
                     <div key={g.dir || "_outras"} className="ring-1 ring-gray-200 rounded-md">
-                      <button
-                        onClick={() => toggleDir(g.dir)}
-                        className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50"
-                      >
-                        <span className="flex items-center gap-2 font-medium text-gray-700">
-                          {open ? <MdExpandMore /> : <MdChevronRight />}
-                          <MdFolder className="text-indigo-600" />
-                          {dirLabel(g.dir)}
-                        </span>
-                        <span className="text-gray-400 text-xs">
-                          {g.items.length}{" "}
-                          {g.items.length === 1 ? "gravação" : "gravações"} ·{" "}
-                          {fmtSize(g.totalSize)}
-                        </span>
-                      </button>
+                      <div className="flex items-center px-3 py-2 text-sm hover:bg-gray-50">
+                        <button
+                          onClick={() => toggleDir(g.dir)}
+                          className="flex-1 flex items-center justify-between gap-2 min-w-0"
+                        >
+                          <span className="flex items-center gap-2 font-medium text-gray-700 min-w-0">
+                            {open ? <MdExpandMore /> : <MdChevronRight />}
+                            <MdFolder className="text-indigo-600" />
+                            {dirLabel(g.dir)}
+                          </span>
+                          <span className="text-gray-400 text-xs shrink-0">
+                            {g.items.length}{" "}
+                            {g.items.length === 1 ? "gravação" : "gravações"} ·{" "}
+                            {fmtSize(g.totalSize)}
+                          </span>
+                        </button>
+                        {g.dir && (
+                          <button
+                            onClick={() => clearFolder(g.dir, g.items.length)}
+                            title="Limpar pasta (apaga todas as gravações do dia)"
+                            className="ml-3 inline-flex items-center gap-1 text-red-500 hover:text-red-700 shrink-0"
+                          >
+                            <MdDeleteSweep /> Limpar
+                          </button>
+                        )}
+                      </div>
                       {open && (
                         <ul className="divide-y border-t">
                           {g.items.map((f) => (
@@ -525,13 +600,22 @@ export default function CameraPortal() {
               >
                 <div className="flex items-start justify-between">
                   <h3 className="font-semibold">{cam.nome}</h3>
-                  <button
-                    onClick={() => removeCamera(cam.id)}
-                    className="text-red-500 hover:text-red-700"
-                    title="Remover"
-                  >
-                    <BsTrash />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openEdit(cam)}
+                      className="text-gray-500 hover:text-indigo-600"
+                      title="Editar (nome, IP, porta)"
+                    >
+                      <MdEdit />
+                    </button>
+                    <button
+                      onClick={() => removeCamera(cam.id)}
+                      className="text-red-500 hover:text-red-700"
+                      title="Remover"
+                    >
+                      <BsTrash />
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-4 flex gap-2">
                   <button
@@ -552,6 +636,85 @@ export default function CameraPortal() {
           </div>
         )}
       </main>
+
+      {/* Modal: editar câmera (nome, IP, porta) */}
+      {editCam && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !editSaving && setEditCam(null)}
+        >
+          <form
+            onSubmit={saveEdit}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm bg-white rounded-lg p-5 space-y-4"
+          >
+            <h2 className="font-semibold flex items-center gap-2 text-gray-800">
+              <MdEdit className="text-indigo-600" /> Editar câmera
+            </h2>
+
+            {editLoading ? (
+              <p className="flex items-center gap-2 text-gray-500 py-6 justify-center">
+                <AiOutlineLoading3Quarters className="animate-spin" /> Carregando...
+              </p>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                  <input
+                    value={editForm.nome}
+                    onChange={(e) => setEditForm((s) => ({ ...s, nome: e.target.value }))}
+                    required
+                    className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-[2fr_1fr] gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">IP</label>
+                    <input
+                      value={editForm.ip}
+                      onChange={(e) => setEditForm((s) => ({ ...s, ip: e.target.value }))}
+                      required
+                      placeholder="192.168.0.10"
+                      className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Porta</label>
+                    <input
+                      value={editForm.porta}
+                      onChange={(e) => setEditForm((s) => ({ ...s, porta: e.target.value }))}
+                      inputMode="numeric"
+                      placeholder="554"
+                      className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400">
+                  Usuário, senha e caminho do stream são mantidos.
+                </p>
+              </>
+            )}
+
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setEditCam(null)}
+                disabled={editSaving}
+                className="text-sm text-gray-500 hover:text-gray-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={editSaving || editLoading}
+                className="bg-indigo-600 disabled:bg-gray-300 text-white rounded-md px-4 py-2 text-sm"
+              >
+                {editSaving ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

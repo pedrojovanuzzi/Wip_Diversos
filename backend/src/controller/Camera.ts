@@ -53,6 +53,19 @@ function deleteCameraRecordings(pathName: string): void {
   }
 }
 
+/**
+ * Quebra uma URL RTSP em partes para editar só host/porta sem mexer nas
+ * credenciais nem no caminho. Ex.: rtsp://user:pass@1.2.3.4:554/stream
+ *   -> { prefix: "rtsp://user:pass@", host: "1.2.3.4", port: "554", rest: "/stream" }
+ */
+function parseRtsp(
+  url: string,
+): { prefix: string; host: string; port: string; rest: string } | null {
+  const m = url.match(/^(rtsps?:\/\/(?:[^@/]+@)?)([^:/?#]+)(?::(\d+))?(.*)$/i);
+  if (!m) return null;
+  return { prefix: m[1], host: m[2], port: m[3] || "", rest: m[4] || "" };
+}
+
 class Camera {
   // ===================== ADMIN (operador interno) =====================
 
@@ -451,6 +464,31 @@ class Camera {
     }
   }
 
+  /** Dados para a tela de edição (nome + host/porta; a senha NÃO é exposta). */
+  public async getCameraDetail(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      const repo = AppDataSource.getRepository(CameraEntity);
+      const cam = await repo.findOne({ where: { id, cliente_id: cid } });
+      if (!cam) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+      const parts = parseRtsp(cam.rtsp_url);
+      res.json({
+        id: cam.id,
+        nome: cam.nome,
+        ativo: cam.ativo,
+        host: parts?.host || "",
+        port: parts?.port || "",
+      });
+    } catch (e: any) {
+      console.error("getCameraDetail:", e?.message);
+      res.status(500).json({ message: "Erro ao obter câmera." });
+    }
+  }
+
   public async editCamera(req: Request, res: Response) {
     try {
       const cid = req.cameraCliente!.id!;
@@ -463,14 +501,39 @@ class Camera {
       }
 
       const nome = req.body.nome !== undefined ? String(req.body.nome).trim() : cam.nome;
-      const rtsp_url =
-        req.body.rtsp_url !== undefined
-          ? String(req.body.rtsp_url).trim()
-          : cam.rtsp_url;
 
-      if (rtsp_url && !/^rtsps?:\/\//i.test(rtsp_url)) {
-        res.status(400).json({ message: "A URL deve começar com rtsp:// ou rtsps://" });
-        return;
+      // Monta a nova URL. Aceita rtsp_url completo OU só ip/porta (rebuild,
+      // preservando credenciais e caminho). O navegador usa ip/porta.
+      let rtsp_url = cam.rtsp_url;
+      if (req.body.rtsp_url !== undefined && String(req.body.rtsp_url).trim()) {
+        rtsp_url = String(req.body.rtsp_url).trim();
+        if (!/^rtsps?:\/\//i.test(rtsp_url)) {
+          res.status(400).json({ message: "A URL deve começar com rtsp:// ou rtsps://" });
+          return;
+        }
+      } else if (req.body.ip !== undefined || req.body.porta !== undefined) {
+        const parts = parseRtsp(cam.rtsp_url);
+        if (!parts) {
+          res.status(400).json({
+            message: "Não foi possível interpretar a URL atual; edite a URL completa.",
+          });
+          return;
+        }
+        const ip =
+          req.body.ip !== undefined ? String(req.body.ip).trim() : parts.host;
+        const porta =
+          req.body.porta !== undefined
+            ? String(req.body.porta).trim()
+            : parts.port;
+        if (!ip) {
+          res.status(400).json({ message: "O IP é obrigatório." });
+          return;
+        }
+        if (porta && !/^\d+$/.test(porta)) {
+          res.status(400).json({ message: "Porta inválida." });
+          return;
+        }
+        rtsp_url = `${parts.prefix}${ip}${porta ? `:${porta}` : ""}${parts.rest}`;
       }
 
       const sourceChanged = rtsp_url !== cam.rtsp_url;
@@ -730,6 +793,55 @@ class Camera {
     } catch (e: any) {
       console.error("deleteFile:", e?.message);
       res.status(500).json({ message: "Erro ao apagar gravação." });
+    }
+  }
+
+  /** Limpa uma pasta de gravações inteira (ex.: o dia "2026-06/08"). */
+  public async clearFolder(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      const rel = String((req.params as any)[0] || "");
+      if (!rel) {
+        res.status(400).json({ message: "Pasta não informada." });
+        return;
+      }
+      const info = await getCameraDir(cid, id);
+      if (!info) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+      // Resolve e garante que continua dentro da pasta da câmera (anti traversal).
+      // Não permite apagar a própria pasta-raiz da câmera (rel vazio já barrado).
+      const baseResolved = path.resolve(info.dir);
+      const target = path.resolve(baseResolved, rel);
+      if (target === baseResolved || !target.startsWith(baseResolved + path.sep)) {
+        res.status(404).json({ message: "Pasta não encontrada." });
+        return;
+      }
+      if (!fs.existsSync(target) || !fs.statSync(target).isDirectory()) {
+        res.status(404).json({ message: "Pasta não encontrada." });
+        return;
+      }
+
+      fs.rmSync(target, { recursive: true, force: true });
+
+      // Remove as pastas-pai que ficarem vazias (ex.: o mês, ao apagar o dia).
+      let dir = path.dirname(target);
+      while (dir !== baseResolved && dir.startsWith(baseResolved + path.sep)) {
+        try {
+          if (fs.readdirSync(dir).length > 0) break;
+          fs.rmdirSync(dir);
+        } catch {
+          break;
+        }
+        dir = path.dirname(dir);
+      }
+
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error("clearFolder:", e?.message);
+      res.status(500).json({ message: "Erro ao limpar pasta." });
     }
   }
 
