@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import icon from "../../assets/icon.png";
 import { MdVideocam } from "react-icons/md";
 import { saveCamSession } from "./cameraAuth";
+import InstallPWAButton from "./components/InstallPWAButton";
 
 export default function CameraLogin() {
   const navigate = useNavigate();
@@ -75,6 +76,10 @@ export default function CameraLogin() {
           {submitting ? "Entrando..." : "Entrar"}
         </button>
       </form>
+
+      <div className="mt-6">
+        <InstallPWAButton />
+      </div>
     </div>
   );
 }

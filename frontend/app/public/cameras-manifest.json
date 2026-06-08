@@ -1,0 +1,25 @@
+{
+  "short_name": "Câmeras",
+  "name": "Portal de Câmeras — Wip Telecom",
+  "description": "Acesse suas câmeras ao vivo e gravações.",
+  "icons": [
+    {
+      "src": "cameras-icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "cameras-icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/Cameras/Login",
+  "scope": "/Cameras/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#4f46e5",
+  "background_color": "#ffffff"
+}

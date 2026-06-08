@@ -5,6 +5,7 @@ import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload } from "react-icons/md";
 import { BsTrash } from "react-icons/bs";
 import { WhepPlayer } from "./components/WhepPlayer";
+import InstallPWAButton from "./components/InstallPWAButton";
 import { getCamSession, getCamToken, clearCamSession } from "./cameraAuth";
 
 interface Cam {
@@ -196,6 +197,7 @@ export default function CameraPortal() {
             <MdVideocam className="text-indigo-600 text-xl" /> Minhas Câmeras
           </h1>
           <div className="flex items-center gap-3 text-sm text-gray-500">
+            <InstallPWAButton />
             <span>{session?.login}</span>
             <button
               onClick={logout}
