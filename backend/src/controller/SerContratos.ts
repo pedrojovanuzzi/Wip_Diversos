@@ -17,7 +17,9 @@ const VALORES: Record<string, number> = {
 
 const CFOP_DEFAULT = "5949";
 
-const UNIQUE_PER_LOGIN = new Set(["STREAMER", "STREAMER_COLAB"]);
+// CAMERA é único por login (1 "tag" por cliente, como o streaming). A quantidade
+// de câmeras em si é ilimitada e configurada pelo cliente no portal de câmeras.
+const UNIQUE_PER_LOGIN = new Set(["STREAMER", "STREAMER_COLAB", "CAMERA"]);
 const STREAMING_TYPES = new Set(["STREAMER", "STREAMER_COLAB"]);
 
 class SerContratos {

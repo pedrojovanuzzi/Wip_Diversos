@@ -38,7 +38,6 @@ export const SerContratos: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
-  const [qtdCamera, setQtdCamera] = useState(1);
   const [showStreamingForm, setShowStreamingForm] = useState(false);
   const [streamingFormTipo, setStreamingFormTipo] = useState<
     "STREAMER" | "STREAMER_COLAB"
@@ -104,10 +103,7 @@ export const SerContratos: React.FC = () => {
     if (!loaded) return;
     setAdding(true);
     try {
-      const body =
-        tipo === "CAMERA"
-          ? { login: loaded.login, tipo, quantidade: qtdCamera }
-          : { login: loaded.login, tipo, ...(extras || {}) };
+      const body = { login: loaded.login, tipo, ...(extras || {}) };
       const res = await axios.post(`${base}/sercontratos`, body, { headers });
       const fl = res.data?.faturasLimpeza;
       let extraMsg = "";
@@ -162,7 +158,7 @@ export const SerContratos: React.FC = () => {
                 login: loaded.login,
                 tipo,
                 replace: true,
-                ...(tipo === "CAMERA" ? { quantidade: qtdCamera } : extras || {}),
+                ...(extras || {}),
               },
               { headers },
             );
@@ -496,47 +492,31 @@ export const SerContratos: React.FC = () => {
                     <h2 className="font-bold text-gray-800">Câmeras</h2>
                   </div>
                   <p className="text-xs text-gray-500 mb-2">
-                    R$ {(loaded.valoresUnitarios.CAMERA ?? 20).toFixed(2)} cada
-                    — múltiplas permitidas
+                    R$ {(loaded.valoresUnitarios.CAMERA ?? 20).toFixed(2)}/mês —
+                    máx. 1 por cliente · câmeras ilimitadas no portal
                   </p>
-                  <div className="mb-2 text-sm text-blue-800 font-semibold">
-                    Atual: {totalCameras} câmera(s){" "}
-                    {totalCameras > 0 && (
-                      <span className="text-gray-600 font-normal">
-                        = R$ {(totalCameras * 20).toFixed(2)}
+                  {totalCameras > 0 && (
+                    <div className="flex items-center bg-blue-50 p-2 rounded mb-2">
+                      <span className="text-sm text-blue-800 font-semibold">
+                        ✓ Cliente possui Câmeras
                       </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <div className="flex gap-2">
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={qtdCamera}
-                      onChange={(e) =>
-                        setQtdCamera(
-                          Math.max(
-                            1,
-                            Math.min(20, Number(e.target.value) || 1),
-                          ),
-                        )
-                      }
-                      className="w-20 p-2 border border-gray-300 rounded text-center"
-                    />
-                    <button
-                      onClick={() => addServico("CAMERA")}
-                      disabled={adding}
-                      className="flex-1 py-2 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 disabled:bg-gray-400"
-                    >
-                      {adding ? "Adicionando..." : `Adicionar ${qtdCamera}`}
-                    </button>
-                    {totalCameras > 0 && (
+                    {totalCameras === 0 ? (
+                      <button
+                        onClick={() => addServico("CAMERA")}
+                        disabled={adding}
+                        className="flex-1 py-2 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+                      >
+                        {adding ? "Adicionando..." : "Adicionar Câmeras"}
+                      </button>
+                    ) : (
                       <button
                         onClick={removeAllCameras}
-                        className="px-3 py-2 bg-red-100 text-red-700 rounded font-semibold hover:bg-red-200"
-                        title="Remover todas"
+                        className="flex-1 py-2 bg-red-100 text-red-700 rounded font-semibold hover:bg-red-200"
                       >
-                        <BsTrash />
+                        Remover Câmeras
                       </button>
                     )}
                   </div>

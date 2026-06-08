@@ -20,6 +20,11 @@ interface RecFile {
   mtime: string;
 }
 
+interface Storage {
+  usedBytes: number;
+  quotaBytes: number;
+}
+
 export default function CameraPortal() {
   const navigate = useNavigate();
   const base = process.env.REACT_APP_URL;
@@ -31,6 +36,7 @@ export default function CameraPortal() {
   );
 
   const [cams, setCams] = useState<Cam[]>([]);
+  const [storage, setStorage] = useState<Storage | null>(null);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ text: string; type: "ok" | "err" } | null>(null);
 
@@ -66,6 +72,17 @@ export default function CameraPortal() {
     [navigate],
   );
 
+  const loadStorage = useCallback(async () => {
+    try {
+      const res = await axios.get(`${base}/cameras/storage`, {
+        headers: authHeaders(),
+      });
+      setStorage(res.data);
+    } catch (e: any) {
+      handleAuthError(e); // silencioso: não bloqueia o portal por causa da barra
+    }
+  }, [base, authHeaders, handleAuthError]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -73,12 +90,13 @@ export default function CameraPortal() {
         headers: authHeaders(),
       });
       setCams(res.data.items || []);
+      loadStorage();
     } catch (e: any) {
       if (!handleAuthError(e)) flash("Erro ao carregar câmeras.", "err");
     } finally {
       setLoading(false);
     }
-  }, [base, authHeaders, handleAuthError]);
+  }, [base, authHeaders, handleAuthError, loadStorage]);
 
   useEffect(() => {
     load();
@@ -163,6 +181,8 @@ export default function CameraPortal() {
     return (bytes / 1024 / 1024).toFixed(1) + " MB";
   };
 
+  const fmtGB = (bytes: number) => (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
+
   const logout = () => {
     clearCamSession();
     navigate("/Cameras/Login");
@@ -197,6 +217,39 @@ export default function CameraPortal() {
             }`}
           >
             {msg.text}
+          </div>
+        )}
+
+        {/* Uso de armazenamento (cota por cliente) */}
+        {storage && (
+          <div className="bg-white ring-1 ring-gray-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="font-medium text-gray-700">Armazenamento</span>
+              <span className="text-gray-500">
+                {fmtGB(storage.usedBytes)} de {fmtGB(storage.quotaBytes)}
+              </span>
+            </div>
+            {(() => {
+              const pct = storage.quotaBytes
+                ? Math.min(100, (storage.usedBytes / storage.quotaBytes) * 100)
+                : 0;
+              const cor =
+                pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-indigo-600";
+              return (
+                <>
+                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${cor} transition-all`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Ao atingir o limite, as gravações mais antigas são apagadas
+                    automaticamente.
+                  </p>
+                </>
+              );
+            })()}
           </div>
         )}
 

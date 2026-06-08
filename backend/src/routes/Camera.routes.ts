@@ -28,6 +28,7 @@ router.delete("/admin/clientes/:id", AuthGuard, Camera.removerCliente);
 
 // ---- Cliente (portal) ----
 router.get("/me", CameraClientGuard, CameraAuth.me);
+router.get("/storage", CameraClientGuard, Camera.getStorage);
 router.get("/cameras", CameraClientGuard, Camera.listarCameras);
 router.post("/cameras", CameraClientGuard, Camera.addCamera);
 router.put("/cameras/:id", CameraClientGuard, Camera.editCamera);

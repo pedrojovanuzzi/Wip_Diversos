@@ -13,6 +13,7 @@ import { CameraCliente } from "../entities/CameraCliente";
 import { Camera as CameraEntity } from "../entities/Camera";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import MediaMtxService from "../services/MediaMtxService";
+import CameraStorageService from "../services/CameraStorageService";
 import NginxService from "../services/NginxService";
 import { generateStreamToken } from "./CameraAuth";
 
@@ -582,6 +583,21 @@ class Camera {
     } catch (e: any) {
       console.error("getRecordingPlayback:", e?.message);
       res.status(500).json({ message: "Erro ao obter playback." });
+    }
+  }
+
+  /** Consumo de armazenamento do cliente (usado x cota de 15 GB). */
+  public async getStorage(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      // Aplica a cota antes de reportar: se estiver acima de 15 GB, apaga as
+      // gravações mais antigas e então devolve o uso já dentro do limite.
+      await CameraStorageService.enforceQuotaForCliente(cid);
+      const usage = await CameraStorageService.getClienteUsage(cid);
+      res.json(usage);
+    } catch (e: any) {
+      console.error("getStorage:", e?.message);
+      res.status(500).json({ message: "Erro ao obter uso de armazenamento." });
     }
   }
 
