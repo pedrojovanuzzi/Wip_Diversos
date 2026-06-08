@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload } from "react-icons/md";
+import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload, MdRefresh } from "react-icons/md";
 import { BsTrash } from "react-icons/bs";
 import { WhepPlayer } from "./components/WhepPlayer";
 import InstallPWAButton from "./components/InstallPWAButton";
@@ -38,6 +38,7 @@ export default function CameraPortal() {
 
   const [cams, setCams] = useState<Cam[]>([]);
   const [storage, setStorage] = useState<Storage | null>(null);
+  const [storageLoading, setStorageLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ text: string; type: "ok" | "err" } | null>(null);
 
@@ -74,6 +75,7 @@ export default function CameraPortal() {
   );
 
   const loadStorage = useCallback(async () => {
+    setStorageLoading(true);
     try {
       const res = await axios.get(`${base}/cameras/storage`, {
         headers: authHeaders(),
@@ -81,6 +83,8 @@ export default function CameraPortal() {
       setStorage(res.data);
     } catch (e: any) {
       handleAuthError(e); // silencioso: não bloqueia o portal por causa da barra
+    } finally {
+      setStorageLoading(false);
     }
   }, [base, authHeaders, handleAuthError]);
 
@@ -227,9 +231,20 @@ export default function CameraPortal() {
           <div className="bg-white ring-1 ring-gray-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between text-sm mb-2">
               <span className="font-medium text-gray-700">Armazenamento</span>
-              <span className="text-gray-500">
-                {fmtGB(storage.usedBytes)} de {fmtGB(storage.quotaBytes)}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500">
+                  {fmtGB(storage.usedBytes)} de {fmtGB(storage.quotaBytes)}
+                </span>
+                <button
+                  onClick={loadStorage}
+                  disabled={storageLoading}
+                  title="Atualizar uso de armazenamento"
+                  className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 disabled:text-gray-400"
+                >
+                  <MdRefresh className={storageLoading ? "animate-spin" : ""} />
+                  Atualizar
+                </button>
+              </div>
             </div>
             {(() => {
               const pct = storage.quotaBytes
