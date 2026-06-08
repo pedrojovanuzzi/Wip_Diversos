@@ -1,0 +1,31 @@
+# MediaMTX para TESTE LOCAL no Windows (Docker Desktop).
+# Usa publicação de portas em vez de network_mode: host (que é limitado no Windows).
+# O container alcança o backend (no host) via host.docker.internal.
+#
+#   docker compose -f docker-compose.local.yml up -d
+#   docker compose -f docker-compose.local.yml logs -f mediamtx
+#   docker compose -f docker-compose.local.yml down
+#
+services:
+  mediamtx:
+    build:
+      context: ./mediamtx
+      dockerfile: Dockerfile
+    image: wip/mediamtx-tz:latest
+    container_name: mediamtx-local
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # IP que o MediaMTX anuncia nos candidatos ICE do WebRTC (=127.0.0.1 no .env local).
+      - MTX_WEBRTCADDITIONALHOSTS=${MEDIAMTX_WEBRTC_PUBLIC_IP}
+    ports:
+      - "8554:8554"      # RTSP
+      - "8889:8889"      # WebRTC / WHEP (o navegador conecta aqui)
+      - "8189:8189/udp"  # ICE UDP
+      - "8189:8189/tcp"  # ICE TCP (fallback)
+      - "9996:9996"      # Playback de gravações
+      - "9997:9997"      # API de controle (usada pelo backend)
+    volumes:
+      - ./mediamtx/mediamtx.local.yml:/mediamtx.yml:ro
+      - ./storage/recordings:/recordings

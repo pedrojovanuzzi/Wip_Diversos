@@ -617,14 +617,33 @@ class Camera {
         res.json({ items: [] });
         return;
       }
-      const items = fs
-        .readdirSync(info.dir)
-        .filter((f) => f.endsWith(".mp4"))
-        .map((name) => {
-          const st = fs.statSync(path.join(info.dir, name));
-          return { name, size: st.size, mtime: st.mtime };
-        })
-        .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+      // As gravações ficam em subpastas (recordPath: %path/%Y-%m/%d/...).
+      // `dir` é a subpasta relativa, ex: "2026-06/08" ("" para arquivos antigos,
+      // gravados direto na pasta da câmera). Varre recursivamente (qualquer nível).
+      const items: { name: string; dir: string; size: number; mtime: Date }[] = [];
+      const walk = (absDir: string, relDir: string) => {
+        let entries: fs.Dirent[];
+        try {
+          entries = fs.readdirSync(absDir, { withFileTypes: true });
+        } catch {
+          return;
+        }
+        for (const entry of entries) {
+          const abs = path.join(absDir, entry.name);
+          if (entry.isDirectory()) {
+            walk(abs, relDir ? `${relDir}/${entry.name}` : entry.name);
+          } else if (entry.isFile() && entry.name.endsWith(".mp4")) {
+            try {
+              const st = fs.statSync(abs);
+              items.push({ name: entry.name, dir: relDir, size: st.size, mtime: st.mtime });
+            } catch {
+              /* removido entre o readdir e o stat — ignora */
+            }
+          }
+        }
+      };
+      walk(info.dir, "");
+      items.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
       res.json({ items });
     } catch (e: any) {
       console.error("listFiles:", e?.message);
@@ -637,15 +656,25 @@ class Camera {
     try {
       const cid = req.cameraCliente!.id!;
       const id = Number(req.params.id);
-      // basename evita path traversal (../).
-      const filename = path.basename(String(req.params.filename || ""));
+      // Caminho relativo (subpasta + arquivo), ex: "2026-06/08/14-43-19.mp4".
+      // Funciona para qualquer profundidade e para gravações antigas (sem subpasta).
+      const rel = String((req.params as any)[0] || "");
       const info = await getCameraDir(cid, id);
       if (!info) {
         res.status(404).json({ message: "Câmera não encontrada." });
         return;
       }
-      const filePath = path.join(info.dir, filename);
-      if (!filePath.startsWith(info.dir) || !fs.existsSync(filePath)) {
+      // Resolve e garante que continua dentro da pasta da câmera (anti path traversal).
+      const baseResolved = path.resolve(info.dir);
+      const filePath = path.resolve(baseResolved, rel);
+      if (
+        filePath !== baseResolved &&
+        !filePath.startsWith(baseResolved + path.sep)
+      ) {
+        res.status(404).json({ message: "Arquivo não encontrado." });
+        return;
+      }
+      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
         res.status(404).json({ message: "Arquivo não encontrado." });
         return;
       }
@@ -654,6 +683,53 @@ class Camera {
     } catch (e: any) {
       console.error("getFile:", e?.message);
       if (!res.headersSent) res.status(500).json({ message: "Erro ao servir arquivo." });
+    }
+  }
+
+  /** Apaga uma gravação. Remove também as subpastas que ficarem vazias. */
+  public async deleteFile(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      const rel = String((req.params as any)[0] || "");
+      const info = await getCameraDir(cid, id);
+      if (!info) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+      // Resolve e garante que continua dentro da pasta da câmera (anti path traversal).
+      const baseResolved = path.resolve(info.dir);
+      const filePath = path.resolve(baseResolved, rel);
+      if (
+        filePath === baseResolved ||
+        !filePath.startsWith(baseResolved + path.sep)
+      ) {
+        res.status(404).json({ message: "Arquivo não encontrado." });
+        return;
+      }
+      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+        res.status(404).json({ message: "Arquivo não encontrado." });
+        return;
+      }
+
+      fs.rmSync(filePath, { force: true });
+
+      // Sobe removendo as pastas que ficaram vazias, sem passar da pasta da câmera.
+      let dir = path.dirname(filePath);
+      while (dir !== baseResolved && dir.startsWith(baseResolved + path.sep)) {
+        try {
+          if (fs.readdirSync(dir).length > 0) break;
+          fs.rmdirSync(dir);
+        } catch {
+          break;
+        }
+        dir = path.dirname(dir);
+      }
+
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error("deleteFile:", e?.message);
+      res.status(500).json({ message: "Erro ao apagar gravação." });
     }
   }
 

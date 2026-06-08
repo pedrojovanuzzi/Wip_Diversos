@@ -41,6 +41,10 @@ router.get(
   Camera.getRecordingPlayback,
 );
 router.get("/cameras/:id/files", CameraClientGuard, Camera.listFiles);
-router.get("/cameras/:id/files/:filename", CameraClientGuard, Camera.getFile);
+// Curinga: aceita o caminho relativo da gravação em qualquer profundidade
+// (ex: "2026-06/08/arquivo.mp4") e também as antigas, planas. O controller
+// valida contra path traversal.
+router.get("/cameras/:id/files/*", CameraClientGuard, Camera.getFile);
+router.delete("/cameras/:id/files/*", CameraClientGuard, Camera.deleteFile);
 
 export default router;

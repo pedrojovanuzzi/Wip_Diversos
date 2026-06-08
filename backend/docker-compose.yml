@@ -30,7 +30,11 @@ services:
   # Servidor de mídia do Portal de Câmeras (CFTV). O backend (no host) orquestra
   # via http://localhost:9997 e o MediaMTX chama o backend via host.docker.internal:3000.
   mediamtx:
-    image: bluenviron/mediamtx:latest
+    # Imagem própria = MediaMTX + tzdata (horário de Brasília no recordPath).
+    build:
+      context: ./mediamtx
+      dockerfile: Dockerfile
+    image: wip/mediamtx-tz:latest
     container_name: mediamtx
     restart: unless-stopped
     # network_mode: host dá acesso total à rede do servidor — necessário para que

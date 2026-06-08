@@ -1,0 +1,56 @@
+###############################################
+# MediaMTX — configuração LOCAL (teste no PC Windows / Docker Desktop)
+# Diferenças vs mediamtx.yml (produção):
+#  - authHTTPAddress usa host.docker.internal (o backend roda no host, fora do container)
+#  - WebRTC com ICE por UDP e TCP no mesmo porta 8189 (NAT do Docker Desktop é mais
+#    confiável assim). O IP do candidato vem de MTX_WEBRTCADDITIONALHOSTS (=127.0.0.1).
+#  - NÃO usa network_mode: host (no Windows isso é limitado). As portas são publicadas
+#    pelo docker-compose.local.yml.
+###############################################
+
+# ---------- API de controle ----------
+api: yes
+apiAddress: :9997
+
+# ---------- WebRTC (visualização ao vivo no navegador) ----------
+webrtc: yes
+webrtcAddress: :8889
+# Porta UDP do ICE (mídia do vídeo). Publicada como 8189/udp.
+webrtcLocalUDPAddress: :8189
+# ICE por TCP na mesma porta (fallback robusto através do NAT do Docker Desktop).
+webrtcLocalTCPAddress: :8189
+
+# ---------- HLS ----------
+hls: no
+
+# ---------- RTSP (ingestão; o pull é feito pelo MediaMTX) ----------
+rtsp: yes
+rtspAddress: :8554
+
+# ---------- Playback server (reprodução de gravações) ----------
+playback: yes
+playbackAddress: :9996
+
+# ---------- Gravação com retenção curta ----------
+pathDefaults:
+  record: yes
+  # Pasta do mês (%Y-%m) > pasta do dia (%d) > arquivo por horário. O TZ da
+  # imagem é America/Sao_Paulo, então a data/hora é horário de Brasília.
+  recordPath: /recordings/%path/%Y-%m/%d/%H-%M-%S-%f
+  recordFormat: fmp4
+  recordSegmentDuration: 1m
+  recordDeleteAfter: 72h
+
+# ---------- Autenticação externa via HTTP (delegada ao backend) ----------
+authMethod: http
+# O backend roda no host; o container o alcança via host.docker.internal.
+authHTTPAddress: http://host.docker.internal:3000/api/cameras/mediamtx-auth
+authHTTPExclude:
+  - action: publish
+  - action: api
+  - action: metrics
+  - action: pprof
+
+# ---------- Paths ----------
+# Criados dinamicamente pelo backend via API.
+paths: {}

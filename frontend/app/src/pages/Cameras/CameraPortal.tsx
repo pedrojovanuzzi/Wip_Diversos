@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload, MdRefresh } from "react-icons/md";
+import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload, MdRefresh, MdExpandMore, MdChevronRight } from "react-icons/md";
 import { BsTrash } from "react-icons/bs";
 import { WhepPlayer } from "./components/WhepPlayer";
 import InstallPWAButton from "./components/InstallPWAButton";
@@ -17,6 +17,7 @@ interface Cam {
 
 interface RecFile {
   name: string;
+  dir: string; // subpasta relativa (ex: "2026-06/08"); "" para gravações antigas
   size: number;
   mtime: string;
 }
@@ -56,6 +57,52 @@ export default function CameraPortal() {
   const [files, setFiles] = useState<RecFile[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [fileVideoUrl, setFileVideoUrl] = useState<string | null>(null);
+  const [openDirs, setOpenDirs] = useState<Set<string>>(new Set());
+
+  // Agrupa as gravações por subpasta (dia). Pastas sem arquivo simplesmente não
+  // aparecem aqui — o backend só devolve arquivos, nunca pastas vazias.
+  const folderGroups = useMemo(() => {
+    const map = new Map<string, RecFile[]>();
+    for (const f of files) {
+      const key = f.dir || "";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(f);
+    }
+    const groups = Array.from(map.entries()).map(([dir, items]) => {
+      items.sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime());
+      return {
+        dir,
+        items,
+        totalSize: items.reduce((s, f) => s + f.size, 0),
+        latest: items[0] ? new Date(items[0].mtime).getTime() : 0,
+      };
+    });
+    groups.sort((a, b) => b.latest - a.latest); // dia mais recente primeiro
+    return groups;
+  }, [files]);
+
+  // Rótulo da pasta: "2026-06/08" -> "08/06/2026". Mantém o formato cru se não casar.
+  const dirLabel = (dir: string) => {
+    if (!dir) return "Outras gravações";
+    const m = dir.match(/(\d{4})-(\d{2})(?:\/|-)(\d{2})/);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : dir;
+  };
+
+  const toggleDir = (dir: string) =>
+    setOpenDirs((prev) => {
+      const next = new Set(prev);
+      if (next.has(dir)) next.delete(dir);
+      else next.add(dir);
+      return next;
+    });
+
+  // Ao carregar a lista, abre por padrão a pasta do dia mais recente. Só age
+  // quando nada está aberto (não recolhe o que o usuário abriu, nem ao apagar).
+  useEffect(() => {
+    if (folderGroups.length) {
+      setOpenDirs((prev) => (prev.size === 0 ? new Set([folderGroups[0].dir]) : prev));
+    }
+  }, [folderGroups]);
 
   const flash = (text: string, type: "ok" | "err") => {
     setMsg({ text, type });
@@ -164,6 +211,7 @@ export default function CameraPortal() {
     closeLive();
     setFolderCam(cam);
     setFileVideoUrl(null);
+    setOpenDirs(new Set()); // reabre a pasta do dia mais recente (via useEffect)
     setFilesLoading(true);
     try {
       const res = await axios.get(`${base}/cameras/cameras/${cam.id}/files`, {
@@ -177,9 +225,32 @@ export default function CameraPortal() {
     }
   };
 
-  // URL do arquivo (token na query, pois <video> não envia header).
-  const fileUrl = (camId: number, name: string) =>
-    `${base}/cameras/cameras/${camId}/files/${encodeURIComponent(name)}?token=${getCamToken()}`;
+  // Caminho relativo da gravação (subpasta + arquivo), com cada segmento codificado.
+  const filePath = (dir: string, name: string) => {
+    const sub = dir ? dir.split("/").map(encodeURIComponent).join("/") + "/" : "";
+    return `${sub}${encodeURIComponent(name)}`;
+  };
+
+  // URL do arquivo (token na query, pois <video>/<a> não enviam header).
+  const fileUrl = (camId: number, dir: string, name: string) =>
+    `${base}/cameras/cameras/${camId}/files/${filePath(dir, name)}?token=${getCamToken()}`;
+
+  const deleteRecording = async (f: RecFile) => {
+    if (!folderCam) return;
+    if (!window.confirm("Apagar esta gravação? Esta ação não pode ser desfeita.")) return;
+    try {
+      const url = fileUrl(folderCam.id, f.dir, f.name); // se o vídeo aberto era esse, fecha
+      await axios.delete(
+        `${base}/cameras/cameras/${folderCam.id}/files/${filePath(f.dir, f.name)}`,
+        { headers: authHeaders() },
+      );
+      if (fileVideoUrl === url) setFileVideoUrl(null);
+      setFiles((prev) => prev.filter((x) => !(x.dir === f.dir && x.name === f.name)));
+      loadStorage();
+    } catch (e: any) {
+      if (!handleAuthError(e)) flash("Erro ao apagar gravação.", "err");
+    }
+  };
 
   const fmtSize = (bytes: number) => {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
@@ -368,36 +439,70 @@ export default function CameraPortal() {
                 MediaMTX grava (pode levar alguns minutos).
               </p>
             ) : (
-              <ul className="divide-y max-h-80 overflow-auto">
-                {files.map((f) => (
-                  <li
-                    key={f.name}
-                    className="flex items-center justify-between py-2 text-sm gap-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{f.name}</p>
-                      <p className="text-gray-400 text-xs">
-                        {new Date(f.mtime).toLocaleString()} · {fmtSize(f.size)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
+              <div className="space-y-2 max-h-96 overflow-auto">
+                {folderGroups.map((g) => {
+                  const open = openDirs.has(g.dir);
+                  return (
+                    <div key={g.dir || "_outras"} className="ring-1 ring-gray-200 rounded-md">
                       <button
-                        onClick={() => setFileVideoUrl(fileUrl(folderCam.id, f.name))}
-                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
+                        onClick={() => toggleDir(g.dir)}
+                        className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50"
                       >
-                        <MdPlayArrow /> Ver
+                        <span className="flex items-center gap-2 font-medium text-gray-700">
+                          {open ? <MdExpandMore /> : <MdChevronRight />}
+                          <MdFolder className="text-indigo-600" />
+                          {dirLabel(g.dir)}
+                        </span>
+                        <span className="text-gray-400 text-xs">
+                          {g.items.length}{" "}
+                          {g.items.length === 1 ? "gravação" : "gravações"} ·{" "}
+                          {fmtSize(g.totalSize)}
+                        </span>
                       </button>
-                      <a
-                        href={fileUrl(folderCam.id, f.name)}
-                        download={f.name}
-                        className="inline-flex items-center gap-1 text-gray-600 hover:text-gray-900"
-                      >
-                        <MdDownload /> Baixar
-                      </a>
+                      {open && (
+                        <ul className="divide-y border-t">
+                          {g.items.map((f) => (
+                            <li
+                              key={`${f.dir}/${f.name}`}
+                              className="flex items-center justify-between py-2 px-3 text-sm gap-2"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate font-medium">{f.name}</p>
+                                <p className="text-gray-400 text-xs">
+                                  {new Date(f.mtime).toLocaleString()} · {fmtSize(f.size)}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <button
+                                  onClick={() =>
+                                    setFileVideoUrl(fileUrl(folderCam.id, f.dir, f.name))
+                                  }
+                                  className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
+                                >
+                                  <MdPlayArrow /> Ver
+                                </button>
+                                <a
+                                  href={fileUrl(folderCam.id, f.dir, f.name)}
+                                  download={f.name}
+                                  className="inline-flex items-center gap-1 text-gray-600 hover:text-gray-900"
+                                >
+                                  <MdDownload /> Baixar
+                                </a>
+                                <button
+                                  onClick={() => deleteRecording(f)}
+                                  className="inline-flex items-center gap-1 text-red-500 hover:text-red-700"
+                                >
+                                  <BsTrash /> Excluir
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
-                  </li>
-                ))}
-              </ul>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}

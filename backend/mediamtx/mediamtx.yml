@@ -33,11 +33,16 @@ playbackAddress: :9996
 
 # ---------- Gravação 24/7 com retenção de 3 dias ----------
 # Na v1.x as opções de gravação ficam em pathDefaults (aplicadas a todos os paths).
+# Segmentos curtos (1m): o backend (CameraMotionService) analisa cada segmento
+# finalizado e apaga os que não têm movimento. Com segmentos de 1h a poda seria
+# inútil (qualquer movimento preservaria a hora inteira).
 pathDefaults:
   record: yes
-  recordPath: /recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+  # Pasta do mês (%Y-%m) > pasta do dia (%d) > arquivo por horário. A imagem
+  # (Dockerfile) tem TZ=America/Sao_Paulo, então a data/hora é de Brasília.
+  recordPath: /recordings/%path/%Y-%m/%d/%H-%M-%S-%f
   recordFormat: fmp4
-  recordSegmentDuration: 1h
+  recordSegmentDuration: 1m
   recordDeleteAfter: 72h
 
 # ---------- Autenticação externa via HTTP (delegada ao backend) ----------
