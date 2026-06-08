@@ -7,6 +7,7 @@ import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import {
   BsTrash,
   BsCamera,
+  BsCameraVideoFill,
   BsCollectionPlay,
   BsGearFill,
 } from "react-icons/bs";
@@ -338,6 +339,13 @@ export const SerContratos: React.FC = () => {
               Serviços Adicionais — Streaming e Câmeras
             </h1>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.open("/Cameras/Login", "_blank")}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded font-semibold hover:bg-emerald-700"
+                title="Abrir o portal de câmeras do cliente"
+              >
+                <BsCameraVideoFill /> Portal de Câmeras
+              </button>
               {(user?.permission ?? 0) >= 5 && (
                 <button
                   onClick={() => navigate("/Cameras/Admin")}
