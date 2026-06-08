@@ -586,7 +586,7 @@ class Camera {
     }
   }
 
-  /** Consumo de armazenamento do cliente (usado x cota de 15 GB). */
+  /** Consumo de armazenamento do cliente (usado x cota de 5 GB). */
   public async getStorage(req: Request, res: Response) {
     try {
       const cid = req.cameraCliente!.id!;
