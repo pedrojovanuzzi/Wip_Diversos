@@ -35,6 +35,11 @@ export class Camera {
   @Column({ type: "boolean", default: true })
   gravando!: boolean;
 
+  // Regiões de interesse da detecção de movimento: JSON com array de retângulos
+  // [{x,y,w,h}] normalizado (0..1). NULL = analisa o quadro inteiro.
+  @Column({ type: "varchar", length: 1024, nullable: true })
+  motion_roi?: string | null;
+
   @CreateDateColumn({ type: "timestamp" })
   created_at?: Date;
 

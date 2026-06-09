@@ -94,6 +94,16 @@ AppDataSource.initialize()
     } catch (err) {
       console.error("Falha ao sincronizar câmeras no MediaMTX:", err);
     }
+
+    // Inicia a gravação por movimento (listeners de eventos das câmeras ativas).
+    try {
+      const { default: CameraIvsService } = await import(
+        "../services/CameraIvsService"
+      );
+      await CameraIvsService.startAll();
+    } catch (err) {
+      console.error("Falha ao iniciar gravação por movimento:", err);
+    }
   })
   .catch((err) => {
     console.error("Error during Data Source initialization", err);

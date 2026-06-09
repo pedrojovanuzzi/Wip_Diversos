@@ -14,6 +14,12 @@ import { Camera as CameraEntity } from "../entities/Camera";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import MediaMtxService from "../services/MediaMtxService";
 import CameraStorageService from "../services/CameraStorageService";
+import {
+  digestGet,
+  parseRtspCreds,
+  CAMERA_HTTP_PORT,
+} from "../services/CameraHttp";
+import CameraIvsService from "../services/CameraIvsService";
 import NginxService from "../services/NginxService";
 import { generateStreamToken } from "./CameraAuth";
 
@@ -306,6 +312,7 @@ class Camera {
 
       const cameras = await camRepo.find({ where: { cliente_id: id } });
       for (const cam of cameras) {
+        CameraIvsService.stopCamera(cam.path_name);
         try {
           await MediaMtxService.removePath(cam.path_name);
         } catch (e: any) {
@@ -444,8 +451,12 @@ class Camera {
       });
       await repo.save(cam);
 
+      // Inicia o listener de movimento (vai ligar a gravação quando detectar).
+      CameraIvsService.startCamera(cam);
+
       try {
-        await MediaMtxService.addPath(path_name, rtsp_url);
+        // Base sem gravação contínua — a gravação é disparada por movimento.
+        await MediaMtxService.addPath(path_name, rtsp_url, false);
       } catch (e: any) {
         console.error("addPath:", e?.message);
         // Mantém no DB; o syncAllActive tentará novamente. Avisa o cliente.
@@ -544,10 +555,12 @@ class Camera {
 
       if (sourceChanged && cam.ativo) {
         try {
-          await MediaMtxService.addPath(cam.path_name, cam.rtsp_url, cam.gravando);
+          await MediaMtxService.addPath(cam.path_name, cam.rtsp_url, false);
         } catch (e: any) {
           console.error("addPath(edit):", e?.message);
         }
+        // Host/credenciais podem ter mudado: reinicia o listener de movimento.
+        CameraIvsService.startCamera(cam);
       }
       res.json({ id: cam.id, nome: cam.nome, ativo: cam.ativo });
     } catch (e: any) {
@@ -556,7 +569,11 @@ class Camera {
     }
   }
 
-  /** Pausa/retoma a gravação 24/7 (o ao vivo continua). Persiste o estado. */
+  /**
+   * Pausa/retoma a gravação por movimento (interruptor mestre). O ao vivo
+   * continua. Pausado: não grava nem com movimento; retomado: grava quando a
+   * câmera detectar movimento. Persiste o estado em `gravando`.
+   */
   public async setRecording(req: Request, res: Response) {
     try {
       const cid = req.cameraCliente!.id!;
@@ -572,23 +589,117 @@ class Camera {
       cam.gravando = gravando;
       await repo.save(cam);
 
-      if (cam.ativo) {
-        try {
-          await MediaMtxService.setRecord(cam.path_name, gravando);
-        } catch (e: any) {
-          console.error("setRecord:", e?.message);
-          res.status(201).json({
-            id: cam.id,
-            gravando: cam.gravando,
-            warning: "Estado salvo, mas o servidor de mídia não respondeu agora.",
-          });
-          return;
-        }
-      }
+      // Interruptor mestre da gravação por movimento. Pausar desliga já; retomar
+      // não liga agora — a gravação volta no próximo movimento detectado.
+      CameraIvsService.setEnabled(cam.path_name, gravando);
+
       res.json({ id: cam.id, gravando: cam.gravando });
     } catch (e: any) {
       console.error("setRecording:", e?.message);
       res.status(500).json({ message: "Erro ao alterar a gravação." });
+    }
+  }
+
+  /** Lê a configuração de detecção de movimento NA PRÓPRIA CÂMERA. */
+  public async getMotionDetect(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      const repo = AppDataSource.getRepository(CameraEntity);
+      const cam = await repo.findOne({ where: { id, cliente_id: cid } });
+      if (!cam) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+      const creds = parseRtspCreds(cam.rtsp_url);
+      if (!creds) {
+        res.status(400).json({ message: "URL da câmera inválida." });
+        return;
+      }
+      const { status, body } = await digestGet(
+        creds.host,
+        CAMERA_HTTP_PORT,
+        creds.user,
+        creds.pass,
+        "/cgi-bin/configManager.cgi?action=getConfig&name=MotionDetect",
+      );
+      if (status !== 200) {
+        res.status(502).json({ message: "A câmera não respondeu." });
+        return;
+      }
+      const val = (k: string) => {
+        const m = body.match(
+          new RegExp(`MotionDetect\\[0\\]\\.${k}=([^\\r\\n]+)`),
+        );
+        return m ? m[1].trim() : "";
+      };
+      res.json({
+        enable: val("Enable") === "true",
+        recordEnable: val("EventHandler\\.RecordEnable") === "true",
+        recordLatch: Number(val("EventHandler\\.RecordLatch")) || 10,
+        sensitive: Number(val("MotionDetectWindow\\[0\\]\\.Sensitive")) || 40,
+        threshold: Number(val("MotionDetectWindow\\[0\\]\\.Threshold")) || 8,
+      });
+    } catch (e: any) {
+      console.error("getMotionDetect:", e?.message);
+      res.status(502).json({ message: "Falha ao consultar a câmera." });
+    }
+  }
+
+  /** Ativa/ajusta a detecção de movimento NA PRÓPRIA CÂMERA. */
+  public async setMotionDetect(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      const repo = AppDataSource.getRepository(CameraEntity);
+      const cam = await repo.findOne({ where: { id, cliente_id: cid } });
+      if (!cam) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+      const creds = parseRtspCreds(cam.rtsp_url);
+      if (!creds) {
+        res.status(400).json({ message: "URL da câmera inválida." });
+        return;
+      }
+
+      const b = req.body || {};
+      const clamp = (v: any, min: number, max: number, def: number) => {
+        const n = Number(v);
+        return isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : def;
+      };
+      const enable = b.enable === true || b.enable === "true";
+      const recordEnable = b.recordEnable === true || b.recordEnable === "true";
+      const sensitive = clamp(b.sensitive, 0, 100, 40);
+      const threshold = clamp(b.threshold, 0, 100, 8);
+      const recordLatch = clamp(b.recordLatch, 1, 600, 10);
+
+      // Monta o setConfig (colchetes URL-encodados). Sensibilidade/limiar na
+      // região principal (Window[0]).
+      const p = "MotionDetect%5B0%5D";
+      const params = [
+        `${p}.Enable=${enable}`,
+        `${p}.EventHandler.RecordEnable=${recordEnable}`,
+        `${p}.EventHandler.RecordLatch=${recordLatch}`,
+        `${p}.MotionDetectWindow%5B0%5D.Sensitive=${sensitive}`,
+        `${p}.MotionDetectWindow%5B0%5D.Threshold=${threshold}`,
+      ].join("&");
+
+      const { status, body } = await digestGet(
+        creds.host,
+        CAMERA_HTTP_PORT,
+        creds.user,
+        creds.pass,
+        `/cgi-bin/configManager.cgi?action=setConfig&${params}`,
+      );
+      if (status !== 200 || !/ok/i.test(body)) {
+        res.status(502).json({ message: "A câmera recusou a configuração." });
+        return;
+      }
+      res.json({ ok: true, enable, recordEnable, recordLatch, sensitive, threshold });
+    } catch (e: any) {
+      console.error("setMotionDetect:", e?.message);
+      res.status(502).json({ message: "Falha ao configurar a câmera." });
     }
   }
 
@@ -602,6 +713,7 @@ class Camera {
         res.status(404).json({ message: "Câmera não encontrada." });
         return;
       }
+      CameraIvsService.stopCamera(cam.path_name);
       try {
         await MediaMtxService.removePath(cam.path_name);
       } catch (e: any) {

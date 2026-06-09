@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload, MdRefresh, MdExpandMore, MdChevronRight, MdEdit, MdDeleteSweep, MdPause, MdFiberManualRecord } from "react-icons/md";
+import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload, MdRefresh, MdExpandMore, MdChevronRight, MdEdit, MdDeleteSweep, MdPause, MdFiberManualRecord, MdSensors, MdSkipPrevious, MdSkipNext } from "react-icons/md";
 import { BsTrash } from "react-icons/bs";
 import { WhepPlayer } from "./components/WhepPlayer";
 import InstallPWAButton from "./components/InstallPWAButton";
@@ -55,6 +55,19 @@ export default function CameraPortal() {
   const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
 
+  // detecção de movimento NA CÂMERA
+  interface MotionDetect {
+    enable: boolean;
+    recordEnable: boolean;
+    recordLatch: number; // segundos gravando após o movimento
+    sensitive: number; // 0..100 (maior = mais sensível)
+    threshold: number; // 0..100 (área mínima alterada)
+  }
+  const [detectCam, setDetectCam] = useState<Cam | null>(null);
+  const [detect, setDetect] = useState<MotionDetect | null>(null);
+  const [detectLoading, setDetectLoading] = useState(false);
+  const [detectSaving, setDetectSaving] = useState(false);
+
   // live
   const [liveCam, setLiveCam] = useState<Cam | null>(null);
   const [whepUrl, setWhepUrl] = useState<string | null>(null);
@@ -65,6 +78,48 @@ export default function CameraPortal() {
   const [filesLoading, setFilesLoading] = useState(false);
   const [fileVideoUrl, setFileVideoUrl] = useState<string | null>(null);
   const [openDirs, setOpenDirs] = useState<Set<string>>(new Set());
+  const [playingKey, setPlayingKey] = useState<string | null>(null); // dir/name tocando
+
+  // Gravações em ordem cronológica (para a linha do tempo e o anterior/próximo).
+  const filesAsc = useMemo(
+    () =>
+      [...files].sort(
+        (a, b) => new Date(a.mtime).getTime() - new Date(b.mtime).getTime(),
+      ),
+    [files],
+  );
+
+  // Linha do tempo de UM dia (grupo): ordena, calcula t0..t1 e blocos de
+  // atividade (segmentos com <60s de intervalo viram um bloco só, estilo Nest).
+  type Timeline = {
+    asc: RecFile[];
+    t0: number;
+    t1: number;
+    span: number;
+    blocks: [number, number][];
+  };
+  const buildTimeline = (items: RecFile[]): Timeline | null => {
+    if (!items.length) return null;
+    const t = (f: RecFile) => new Date(f.mtime).getTime();
+    const asc = [...items].sort((a, b) => t(a) - t(b));
+    const t0 = t(asc[0]);
+    const t1 = t(asc[asc.length - 1]);
+    const span = Math.max(1, t1 - t0);
+    const GAP = 60000;
+    const blocks: [number, number][] = [];
+    let bs = t(asc[0]);
+    let be = bs;
+    for (let i = 1; i < asc.length; i++) {
+      const ti = t(asc[i]);
+      if (ti - be > GAP) {
+        blocks.push([bs, be]);
+        bs = ti;
+      }
+      be = ti;
+    }
+    blocks.push([bs, be]);
+    return { asc, t0, t1, span, blocks };
+  };
 
   // Agrupa as gravações por subpasta (dia). Pastas sem arquivo simplesmente não
   // aparecem aqui — o backend só devolve arquivos, nunca pastas vazias.
@@ -235,6 +290,7 @@ export default function CameraPortal() {
     closeLive();
     setFolderCam(cam);
     setFileVideoUrl(null);
+    setPlayingKey(null);
     setOpenDirs(new Set()); // reabre a pasta do dia mais recente (via useEffect)
     setFilesLoading(true);
     try {
@@ -258,6 +314,54 @@ export default function CameraPortal() {
   // URL do arquivo (token na query, pois <video>/<a> não enviam header).
   const fileUrl = (camId: number, dir: string, name: string) =>
     `${base}/cameras/cameras/${camId}/files/${filePath(dir, name)}?token=${getCamToken()}`;
+
+  // ---- Linha do tempo / player ----
+  const segKey = (f: RecFile) => `${f.dir}/${f.name}`;
+
+  const playSeg = (f: RecFile) => {
+    if (!folderCam) return;
+    setFileVideoUrl(fileUrl(folderCam.id, f.dir, f.name));
+    setPlayingKey(segKey(f));
+  };
+
+  // Anterior/próximo na ordem cronológica.
+  const stepSeg = (dir: 1 | -1) => {
+    if (!playingKey) {
+      if (filesAsc.length) playSeg(dir === 1 ? filesAsc[0] : filesAsc[filesAsc.length - 1]);
+      return;
+    }
+    const i = filesAsc.findIndex((f) => segKey(f) === playingKey);
+    const ni = i + dir;
+    if (ni >= 0 && ni < filesAsc.length) playSeg(filesAsc[ni]);
+  };
+
+  // Clique na barra de um dia: toca o segmento daquele dia mais próximo do instante.
+  const onTimelineClick = (e: React.MouseEvent, tl: Timeline) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    const target = tl.t0 + frac * tl.span;
+    let best = tl.asc[0];
+    let bd = Infinity;
+    for (const f of tl.asc) {
+      const d = Math.abs(new Date(f.mtime).getTime() - target);
+      if (d < bd) {
+        bd = d;
+        best = f;
+      }
+    }
+    playSeg(best);
+  };
+
+  // Posição (0..1) do segmento tocando DENTRO desta barra (null se for de outro dia).
+  const playingFracIn = (tl: Timeline): number | null => {
+    if (!playingKey) return null;
+    const f = tl.asc.find((x) => segKey(x) === playingKey);
+    if (!f) return null;
+    return (new Date(f.mtime).getTime() - tl.t0) / tl.span;
+  };
+
+  const fmtClock = (ms: number) =>
+    new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   const deleteRecording = async (f: RecFile) => {
     if (!folderCam) return;
@@ -314,6 +418,46 @@ export default function CameraPortal() {
         flash(e?.response?.data?.message || "Erro ao salvar.", "err");
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  // ---- Detecção de movimento NA CÂMERA ----
+  const openDetect = async (cam: Cam) => {
+    setDetectCam(cam);
+    setDetect(null);
+    setDetectLoading(true);
+    try {
+      const res = await axios.get(
+        `${base}/cameras/cameras/${cam.id}/motion-detect`,
+        { headers: authHeaders() },
+      );
+      setDetect(res.data);
+    } catch (e: any) {
+      if (!handleAuthError(e))
+        flash(e?.response?.data?.message || "A câmera não respondeu.", "err");
+      setDetectCam(null);
+    } finally {
+      setDetectLoading(false);
+    }
+  };
+
+  const saveDetect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!detectCam || !detect) return;
+    setDetectSaving(true);
+    try {
+      await axios.put(
+        `${base}/cameras/cameras/${detectCam.id}/motion-detect`,
+        detect,
+        { headers: authHeaders() },
+      );
+      flash("Detecção de movimento salva na câmera.", "ok");
+      setDetectCam(null);
+    } catch (e: any) {
+      if (!handleAuthError(e))
+        flash(e?.response?.data?.message || "A câmera recusou.", "err");
+    } finally {
+      setDetectSaving(false);
     }
   };
 
@@ -507,6 +651,7 @@ export default function CameraPortal() {
                 src={fileVideoUrl}
                 controls
                 autoPlay
+                onEnded={() => stepSeg(1)} // emenda no próximo momento
                 onError={() => {
                   flash(
                     "Gravação indisponível — pode ter sido removida pela limpeza por movimento.",
@@ -517,6 +662,31 @@ export default function CameraPortal() {
                 }}
                 className="w-full aspect-video bg-black rounded-md mb-3"
               />
+            )}
+
+            {/* Controles de navegação entre momentos (anterior/próximo) */}
+            {fileVideoUrl && (
+              <div className="flex items-center justify-center gap-4 mb-4 text-sm">
+                <button
+                  onClick={() => stepSeg(-1)}
+                  className="inline-flex items-center gap-1 text-gray-600 hover:text-indigo-700"
+                >
+                  <MdSkipPrevious /> Anterior
+                </button>
+                <span className="text-gray-500">
+                  {playingKey
+                    ? new Date(
+                        filesAsc.find((f) => segKey(f) === playingKey)?.mtime || 0,
+                      ).toLocaleString()
+                    : ""}
+                </span>
+                <button
+                  onClick={() => stepSeg(1)}
+                  className="inline-flex items-center gap-1 text-gray-600 hover:text-indigo-700"
+                >
+                  Próximo <MdSkipNext />
+                </button>
+              </div>
             )}
 
             {filesLoading ? (
@@ -560,13 +730,47 @@ export default function CameraPortal() {
                           </button>
                         )}
                       </div>
-                      {open && (
-                        <ul className="divide-y border-t">
-                          {g.items.map((f) => (
-                            <li
-                              key={`${f.dir}/${f.name}`}
-                              className="flex items-center justify-between py-2 px-3 text-sm gap-2"
-                            >
+                      {open && (() => {
+                        const tl = buildTimeline(g.items);
+                        return (
+                          <div className="border-t">
+                            {/* Linha do tempo deste dia (clique para reproduzir) */}
+                            {tl && (
+                              <div className="px-3 py-3 border-b">
+                                <div
+                                  onClick={(e) => onTimelineClick(e, tl)}
+                                  title="Clique para reproduzir a partir deste horário"
+                                  className="relative h-8 bg-gray-100 rounded cursor-pointer overflow-hidden"
+                                >
+                                  {tl.blocks.map(([s, e2], i) => (
+                                    <div
+                                      key={i}
+                                      className="absolute top-1 bottom-1 bg-indigo-500/70 rounded-sm"
+                                      style={{
+                                        left: `${((s - tl.t0) / tl.span) * 100}%`,
+                                        width: `${Math.max(0.4, ((e2 - s) / tl.span) * 100)}%`,
+                                      }}
+                                    />
+                                  ))}
+                                  {playingFracIn(tl) != null && (
+                                    <div
+                                      className="absolute top-0 bottom-0 w-0.5 bg-red-600"
+                                      style={{ left: `${playingFracIn(tl)! * 100}%` }}
+                                    />
+                                  )}
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                                  <span>{fmtClock(tl.t0)}</span>
+                                  <span>{fmtClock(tl.t1)}</span>
+                                </div>
+                              </div>
+                            )}
+                            <ul className="divide-y">
+                              {g.items.map((f) => (
+                                <li
+                                  key={`${f.dir}/${f.name}`}
+                                  className="flex items-center justify-between py-2 px-3 text-sm gap-2"
+                                >
                               <div className="min-w-0">
                                 <p className="truncate font-medium">{f.name}</p>
                                 <p className="text-gray-400 text-xs">
@@ -575,9 +779,7 @@ export default function CameraPortal() {
                               </div>
                               <div className="flex items-center gap-3 shrink-0">
                                 <button
-                                  onClick={() =>
-                                    setFileVideoUrl(fileUrl(folderCam.id, f.dir, f.name))
-                                  }
+                                  onClick={() => playSeg(f)}
                                   className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
                                 >
                                   <MdPlayArrow /> Ver
@@ -596,10 +798,12 @@ export default function CameraPortal() {
                                   <BsTrash /> Excluir
                                 </button>
                               </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
@@ -635,6 +839,13 @@ export default function CameraPortal() {
                     {cam.nome}
                   </h3>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openDetect(cam)}
+                      className="text-gray-500 hover:text-emerald-600"
+                      title="Detecção de movimento (na câmera)"
+                    >
+                      <MdSensors />
+                    </button>
                     <button
                       onClick={() => openEdit(cam)}
                       className="text-gray-500 hover:text-indigo-600"
@@ -762,6 +973,130 @@ export default function CameraPortal() {
                 className="bg-indigo-600 disabled:bg-gray-300 text-white rounded-md px-4 py-2 text-sm"
               >
                 {editSaving ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal: detecção de movimento NA CÂMERA */}
+      {detectCam && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => !detectSaving && setDetectCam(null)}
+        >
+          <form
+            onSubmit={saveDetect}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white rounded-lg p-5 space-y-4"
+          >
+            <h2 className="font-semibold flex items-center gap-2 text-gray-800">
+              <MdSensors className="text-emerald-600" /> Detecção de movimento —{" "}
+              {detectCam.nome}
+            </h2>
+            <p className="text-sm text-gray-500">
+              A detecção é feita pela própria câmera. A área é configurada na
+              câmera; aqui você liga e ajusta a sensibilidade.
+            </p>
+
+            {detectLoading || !detect ? (
+              <p className="flex items-center gap-2 text-gray-500 py-6 justify-center">
+                <AiOutlineLoading3Quarters className="animate-spin" /> Carregando da câmera...
+              </p>
+            ) : (
+              <>
+                <label className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-gray-700">Detecção ativada</span>
+                  <input
+                    type="checkbox"
+                    checked={detect.enable}
+                    onChange={(e) =>
+                      setDetect({ ...detect, enable: e.target.checked })
+                    }
+                    className="h-4 w-4"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-gray-700">Gravar ao detectar</span>
+                  <input
+                    type="checkbox"
+                    checked={detect.recordEnable}
+                    onChange={(e) =>
+                      setDetect({ ...detect, recordEnable: e.target.checked })
+                    }
+                    className="h-4 w-4"
+                  />
+                </label>
+
+                <div>
+                  <label className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-medium text-gray-700">Sensibilidade</span>
+                    <span className="text-gray-400">{detect.sensitive}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={detect.sensitive}
+                    onChange={(e) =>
+                      setDetect({ ...detect, sensitive: Number(e.target.value) })
+                    }
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-400">Maior = detecta movimentos menores.</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Limiar (área)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={detect.threshold}
+                      onChange={(e) =>
+                        setDetect({ ...detect, threshold: Number(e.target.value) })
+                      }
+                      className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Gravar após (s)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={600}
+                      value={detect.recordLatch}
+                      onChange={(e) =>
+                        setDetect({ ...detect, recordLatch: Number(e.target.value) })
+                      }
+                      className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setDetectCam(null)}
+                disabled={detectSaving}
+                className="text-sm text-gray-500 hover:text-gray-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={detectSaving || detectLoading || !detect}
+                className="bg-emerald-600 disabled:bg-gray-300 text-white rounded-md px-4 py-2 text-sm"
+              >
+                {detectSaving ? "Salvando..." : "Salvar na câmera"}
               </button>
             </div>
           </form>

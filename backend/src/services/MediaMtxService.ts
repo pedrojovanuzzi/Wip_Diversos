@@ -55,6 +55,9 @@ class MediaMtxService {
     const body = {
       source: rtspUrl,
       sourceOnDemand: false,
+      // Força o pull RTSP em TCP: evita perda/jitter de pacote do UDP, que causa
+      // "drift" na temporização e faz o MediaMTX cortar segmentos curtos demais.
+      rtspTransport: "tcp",
       record,
       recordDeleteAfter: RECORD_DELETE_AFTER,
     };
@@ -156,7 +159,8 @@ class MediaMtxService {
       const cameras = await repo.find({ where: { ativo: true } });
       for (const cam of cameras) {
         try {
-          await this.addPath(cam.path_name, cam.rtsp_url, cam.gravando);
+          // Base sem gravação contínua: a gravação é ligada por movimento (IVS).
+          await this.addPath(cam.path_name, cam.rtsp_url, false);
         } catch (e: any) {
           console.error(
             `MediaMTX: falha ao sincronizar câmera ${cam.path_name}:`,

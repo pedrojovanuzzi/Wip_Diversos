@@ -40,7 +40,6 @@ import CameraRoutes from "./routes/Camera.routes";
 // Controllers (for scheduled tasks)
 import BackupController from "./controller/Backup";
 import PixController from "./controller/Pix";
-import CameraMotionService from "./services/CameraMotionService";
 // import DosProtectController from "./controller/DosProtect";
 
 const backup = new BackupController();
@@ -55,7 +54,6 @@ export class App {
     this.router();
     this.agendarBackup();
     this.agendarPixAutomatico();
-    this.agendarPodaPorMovimento();
     // this.verificaDDOS();
   }
 
@@ -134,19 +132,6 @@ export class App {
     });
 
     console.log("📅 Agendador de Pix");
-  }
-
-  private agendarPodaPorMovimento() {
-    // 🕒 A cada minuto: analisa os segmentos finalizados e apaga os sem movimento.
-    cron.schedule("* * * * *", async () => {
-      try {
-        await CameraMotionService.pruneAll();
-      } catch (err) {
-        console.error("❌ Falha na poda por movimento das câmeras:", err);
-      }
-    });
-
-    console.log("📅 Agendador de poda por movimento das câmeras inicializado.");
   }
 
   // private verificaDDOS(){

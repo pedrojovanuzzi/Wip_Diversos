@@ -34,6 +34,9 @@ router.post("/cameras", CameraClientGuard, Camera.addCamera);
 router.get("/cameras/:id", CameraClientGuard, Camera.getCameraDetail);
 router.put("/cameras/:id", CameraClientGuard, Camera.editCamera);
 router.put("/cameras/:id/recording", CameraClientGuard, Camera.setRecording);
+// Detecção de movimento NA CÂMERA (lê/grava a config via configManager.cgi).
+router.get("/cameras/:id/motion-detect", CameraClientGuard, Camera.getMotionDetect);
+router.put("/cameras/:id/motion-detect", CameraClientGuard, Camera.setMotionDetect);
 router.delete("/cameras/:id", CameraClientGuard, Camera.removeCamera);
 router.get("/cameras/:id/stream", CameraClientGuard, Camera.getStream);
 router.get("/cameras/:id/recordings", CameraClientGuard, Camera.listRecordings);
