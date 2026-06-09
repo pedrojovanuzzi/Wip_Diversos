@@ -440,7 +440,11 @@ export default function CameraPortal() {
       setDetect(res.data);
     } catch (e: any) {
       if (!handleAuthError(e))
-        flash(e?.response?.data?.message || "A câmera não respondeu.", "err");
+        flash(
+          e?.response?.data?.message ||
+            "Não foi possível conectar à câmera. Verifique o IP e a Porta HTTP em ✏️ Editar câmera.",
+          "err",
+        );
       setDetectCam(null);
     } finally {
       setDetectLoading(false);

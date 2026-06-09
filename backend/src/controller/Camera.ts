@@ -640,7 +640,10 @@ class Camera {
         "/cgi-bin/configManager.cgi?action=getConfig&name=MotionDetect",
       );
       if (status !== 200) {
-        res.status(502).json({ message: "A câmera não respondeu." });
+        res.status(502).json({
+          message:
+            "Não foi possível conectar à câmera. Verifique o IP e a Porta HTTP em ✏️ Editar câmera.",
+        });
         return;
       }
       const val = (k: string) => {
@@ -658,7 +661,10 @@ class Camera {
       });
     } catch (e: any) {
       console.error("getMotionDetect:", e?.message);
-      res.status(502).json({ message: "Falha ao consultar a câmera." });
+      res.status(502).json({
+        message:
+          "Não foi possível conectar à câmera. Verifique o IP e a Porta HTTP em ✏️ Editar câmera.",
+      });
     }
   }
 
@@ -709,13 +715,19 @@ class Camera {
         `/cgi-bin/configManager.cgi?action=setConfig&${params}`,
       );
       if (status !== 200 || !/ok/i.test(body)) {
-        res.status(502).json({ message: "A câmera recusou a configuração." });
+        res.status(502).json({
+          message:
+            "Não foi possível salvar na câmera. Verifique o IP e a Porta HTTP em ✏️ Editar câmera.",
+        });
         return;
       }
       res.json({ ok: true, enable, recordEnable, recordLatch, sensitive, threshold });
     } catch (e: any) {
       console.error("setMotionDetect:", e?.message);
-      res.status(502).json({ message: "Falha ao configurar a câmera." });
+      res.status(502).json({
+        message:
+          "Não foi possível salvar na câmera. Verifique o IP e a Porta HTTP em ✏️ Editar câmera.",
+      });
     }
   }
 
