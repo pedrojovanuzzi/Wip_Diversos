@@ -48,6 +48,7 @@ function parseRtspCreds(
 interface CamConn {
   pathName: string;
   host: string;
+  port: number;
   user: string;
   pass: string;
   enabled: boolean; // interruptor mestre (= camera.gravando)
@@ -115,7 +116,10 @@ class CameraIvsService {
     }
     const conn: CamConn = {
       pathName: cam.path_name,
-      ...creds,
+      host: creds.host,
+      port: cam.http_port || CAMERA_HTTP_PORT,
+      user: creds.user,
+      pass: creds.pass,
       enabled: cam.gravando !== false,
       recording: false,
       stopped: false,
@@ -171,7 +175,7 @@ class CameraIvsService {
 
   private connect(conn: CamConn): void {
     if (conn.stopped) return;
-    const opts = { host: conn.host, port: CAMERA_HTTP_PORT, path: this.uri() };
+    const opts = { host: conn.host, port: conn.port, path: this.uri() };
 
     const challenge = http.get(opts, (res) => {
       if (res.statusCode !== 401) {

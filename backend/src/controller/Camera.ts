@@ -494,6 +494,7 @@ class Camera {
         ativo: cam.ativo,
         host: parts?.host || "",
         port: parts?.port || "",
+        http_port: cam.http_port || 80,
       });
     } catch (e: any) {
       console.error("getCameraDetail:", e?.message);
@@ -549,6 +550,19 @@ class Camera {
       }
 
       const sourceChanged = rtsp_url !== cam.rtsp_url;
+
+      // Porta HTTP da câmera (eventos/CGI).
+      let httpChanged = false;
+      if (req.body.http_port !== undefined) {
+        const hp = Number(req.body.http_port);
+        if (!Number.isInteger(hp) || hp < 1 || hp > 65535) {
+          res.status(400).json({ message: "Porta HTTP inválida." });
+          return;
+        }
+        httpChanged = hp !== cam.http_port;
+        cam.http_port = hp;
+      }
+
       cam.nome = nome;
       cam.rtsp_url = rtsp_url;
       await repo.save(cam);
@@ -559,7 +573,9 @@ class Camera {
         } catch (e: any) {
           console.error("addPath(edit):", e?.message);
         }
-        // Host/credenciais podem ter mudado: reinicia o listener de movimento.
+      }
+      // Host, credenciais ou porta HTTP mudaram: reconecta o listener de movimento.
+      if ((sourceChanged || httpChanged) && cam.ativo) {
         CameraIvsService.startCamera(cam);
       }
       res.json({ id: cam.id, nome: cam.nome, ativo: cam.ativo });
@@ -618,7 +634,7 @@ class Camera {
       }
       const { status, body } = await digestGet(
         creds.host,
-        CAMERA_HTTP_PORT,
+        cam.http_port || CAMERA_HTTP_PORT,
         creds.user,
         creds.pass,
         "/cgi-bin/configManager.cgi?action=getConfig&name=MotionDetect",
@@ -687,7 +703,7 @@ class Camera {
 
       const { status, body } = await digestGet(
         creds.host,
-        CAMERA_HTTP_PORT,
+        cam.http_port || CAMERA_HTTP_PORT,
         creds.user,
         creds.pass,
         `/cgi-bin/configManager.cgi?action=setConfig&${params}`,

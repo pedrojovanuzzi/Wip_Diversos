@@ -24,6 +24,11 @@ export class Camera {
   @Column({ type: "text" })
   rtsp_url!: string;
 
+  // Porta HTTP da câmera (eventos de movimento + config via CGI). Padrão 80;
+  // câmeras com IP público/port-forward costumam usar outra porta.
+  @Column({ type: "int", default: 80 })
+  http_port!: number;
+
   // Identificador do path no MediaMTX (ex: cli3_cam_ab12cd34).
   @Column({ type: "varchar", length: 64, unique: true })
   path_name!: string;

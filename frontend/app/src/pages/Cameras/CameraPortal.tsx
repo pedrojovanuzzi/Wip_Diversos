@@ -51,7 +51,7 @@ export default function CameraPortal() {
 
   // editar câmera (nome, ip, porta)
   const [editCam, setEditCam] = useState<Cam | null>(null);
-  const [editForm, setEditForm] = useState({ nome: "", ip: "", porta: "" });
+  const [editForm, setEditForm] = useState({ nome: "", ip: "", porta: "", httpPort: "" });
   const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
 
@@ -382,7 +382,7 @@ export default function CameraPortal() {
 
   const openEdit = async (cam: Cam) => {
     setEditCam(cam);
-    setEditForm({ nome: cam.nome, ip: "", porta: "" });
+    setEditForm({ nome: cam.nome, ip: "", porta: "", httpPort: "" });
     setEditLoading(true);
     try {
       const res = await axios.get(`${base}/cameras/cameras/${cam.id}`, {
@@ -392,6 +392,7 @@ export default function CameraPortal() {
         nome: res.data.nome || cam.nome,
         ip: res.data.host || "",
         porta: res.data.port ? String(res.data.port) : "",
+        httpPort: res.data.http_port ? String(res.data.http_port) : "80",
       });
     } catch (e: any) {
       if (!handleAuthError(e)) flash("Erro ao carregar a câmera.", "err");
@@ -407,7 +408,12 @@ export default function CameraPortal() {
     try {
       await axios.put(
         `${base}/cameras/cameras/${editCam.id}`,
-        { nome: editForm.nome, ip: editForm.ip, porta: editForm.porta },
+        {
+          nome: editForm.nome,
+          ip: editForm.ip,
+          porta: editForm.porta,
+          http_port: editForm.httpPort,
+        },
         { headers: authHeaders() },
       );
       setEditCam(null);
@@ -930,19 +936,21 @@ export default function CameraPortal() {
                     className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-[2fr_1fr] gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">IP</label>
+                  <input
+                    value={editForm.ip}
+                    onChange={(e) => setEditForm((s) => ({ ...s, ip: e.target.value }))}
+                    required
+                    placeholder="192.168.0.10"
+                    className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">IP</label>
-                    <input
-                      value={editForm.ip}
-                      onChange={(e) => setEditForm((s) => ({ ...s, ip: e.target.value }))}
-                      required
-                      placeholder="192.168.0.10"
-                      className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Porta</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Porta RTSP
+                    </label>
                     <input
                       value={editForm.porta}
                       onChange={(e) => setEditForm((s) => ({ ...s, porta: e.target.value }))}
@@ -951,9 +959,22 @@ export default function CameraPortal() {
                       className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Porta HTTP
+                    </label>
+                    <input
+                      value={editForm.httpPort}
+                      onChange={(e) => setEditForm((s) => ({ ...s, httpPort: e.target.value }))}
+                      inputMode="numeric"
+                      placeholder="80"
+                      className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
                 </div>
                 <p className="text-xs text-gray-400">
-                  Usuário, senha e caminho do stream são mantidos.
+                  Usuário, senha e caminho do stream são mantidos. A Porta HTTP é a da
+                  interface/eventos da câmera (padrão 80; mude se usar port-forward).
                 </p>
               </>
             )}
