@@ -72,11 +72,20 @@ export default function CameraPortal() {
     recordLatch: number; // segundos gravando após o movimento
     sensitive: number; // 0..100 (maior = mais sensível)
     threshold: number; // 0..100 (área mínima alterada)
+    region?: number[]; // 18 linhas, cada uma bitmask de 14 colunas (0..16383)
+    gridRows?: number;
+    gridCols?: number;
   }
   const [detectCam, setDetectCam] = useState<Cam | null>(null);
   const [detect, setDetect] = useState<MotionDetect | null>(null);
   const [detectLoading, setDetectLoading] = useState(false);
   const [detectSaving, setDetectSaving] = useState(false);
+  // Editor de região: grade de células (linha × coluna) ligada/desligada.
+  const GRID_ROWS = 18;
+  const GRID_COLS = 14;
+  const [regionGrid, setRegionGrid] = useState<boolean[][]>([]);
+  const paintingRef = useRef<boolean | null>(null); // valor sendo pintado no arraste
+  const [snapTs, setSnapTs] = useState(0); // cache-buster do snapshot
 
   // debug (só localhost): log de eventos de movimento vindos da câmera
   const [debugCam, setDebugCam] = useState<Cam | null>(null);
@@ -486,9 +495,25 @@ export default function CameraPortal() {
   };
 
   // ---- Detecção de movimento NA CÂMERA ----
+  // região (18 ints de 14 bits) -> grade booleana [linha][coluna]
+  const regionToGrid = (region?: number[]): boolean[][] =>
+    Array.from({ length: GRID_ROWS }, (_, r) => {
+      const v = region?.[r] ?? 0;
+      return Array.from({ length: GRID_COLS }, (_, c) => ((v >> c) & 1) === 1);
+    });
+  // grade booleana -> região (18 ints de 14 bits)
+  const gridToRegion = (grid: boolean[][]): number[] =>
+    Array.from({ length: GRID_ROWS }, (_, r) => {
+      let v = 0;
+      for (let c = 0; c < GRID_COLS; c++) if (grid[r]?.[c]) v |= 1 << c;
+      return v;
+    });
+
   const openDetect = async (cam: Cam) => {
     setDetectCam(cam);
     setDetect(null);
+    setRegionGrid([]);
+    setSnapTs(Date.now());
     setDetectLoading(true);
     try {
       const res = await axios.get(
@@ -496,6 +521,7 @@ export default function CameraPortal() {
         { headers: authHeaders() },
       );
       setDetect(res.data);
+      setRegionGrid(regionToGrid(res.data?.region));
     } catch (e: any) {
       if (!handleAuthError(e))
         flash(
@@ -509,19 +535,37 @@ export default function CameraPortal() {
     }
   };
 
+  // Pintura da grade (clique + arraste).
+  const paintCell = (r: number, c: number, value?: boolean) =>
+    setRegionGrid((prev) => {
+      const grid = prev.length ? prev.map((row) => row.slice()) : regionToGrid();
+      const next = value ?? !grid[r][c];
+      grid[r][c] = next;
+      return grid;
+    });
+  const fillGrid = (value: boolean) =>
+    setRegionGrid(
+      Array.from({ length: GRID_ROWS }, () =>
+        Array.from({ length: GRID_COLS }, () => value),
+      ),
+    );
+
   const saveDetect = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!detectCam || !detect) return;
     setDetectSaving(true);
     try {
-      const res = await axios.put<{ syncedRegion?: boolean }>(
+      const region = gridToRegion(
+        regionGrid.length ? regionGrid : regionToGrid(detect.region),
+      );
+      const res = await axios.put<{ mirroredRegion?: boolean }>(
         `${base}/cameras/cameras/${detectCam.id}/motion-detect`,
-        detect,
+        { ...detect, region },
         { headers: authHeaders() },
       );
       flash(
-        res.data?.syncedRegion
-          ? "Salvo na câmera (região sincronizada para o evento)."
+        res.data?.mirroredRegion
+          ? "Salvo na câmera (região aplicada às 4 janelas)."
           : "Detecção de movimento salva na câmera.",
         "ok",
       );
@@ -1139,15 +1183,15 @@ export default function CameraPortal() {
           <form
             onSubmit={saveDetect}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-white rounded-lg p-5 space-y-4"
+            className="w-full max-w-md bg-white rounded-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto"
           >
             <h2 className="font-semibold flex items-center gap-2 text-gray-800">
               <MdSensors className="text-emerald-600" /> Detecção de movimento —{" "}
               {detectCam.nome}
             </h2>
             <p className="text-sm text-gray-500">
-              A detecção é feita pela própria câmera. A área é configurada na
-              câmera; aqui você liga e ajusta a sensibilidade.
+              A detecção é feita pela própria câmera. Marque abaixo a área a
+              vigiar e ajuste a sensibilidade.
             </p>
 
             {detectLoading || !detect ? (
@@ -1229,6 +1273,85 @@ export default function CameraPortal() {
                       className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
                     />
                   </div>
+                </div>
+
+                {/* Editor de região: clique/arraste sobre a imagem para marcar
+                    onde detectar. Verde = detecta; vazio = ignora. */}
+                <div>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-medium text-gray-700">
+                      Área de detecção
+                    </span>
+                    <span className="flex gap-3 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => fillGrid(true)}
+                        className="text-indigo-600 hover:text-indigo-800"
+                      >
+                        Tudo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fillGrid(false)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        Limpar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSnapTs(Date.now())}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        Atualizar imagem
+                      </button>
+                    </span>
+                  </div>
+                  <div
+                    className="relative w-full aspect-video bg-black rounded-md overflow-hidden select-none"
+                    onMouseLeave={() => (paintingRef.current = null)}
+                    onMouseUp={() => (paintingRef.current = null)}
+                  >
+                    <img
+                      src={`${base}/cameras/cameras/${detectCam.id}/snapshot?token=${getCamToken()}&t=${snapTs}`}
+                      alt="snapshot"
+                      draggable={false}
+                      className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                    />
+                    <div
+                      className="absolute inset-0 grid"
+                      style={{
+                        gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+                        gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`,
+                      }}
+                    >
+                      {Array.from({ length: GRID_ROWS }).map((_, r) =>
+                        Array.from({ length: GRID_COLS }).map((__, c) => {
+                          const on = regionGrid[r]?.[c];
+                          return (
+                            <div
+                              key={`${r}-${c}`}
+                              onMouseDown={() => {
+                                const v = !regionGrid[r]?.[c];
+                                paintingRef.current = v;
+                                paintCell(r, c, v);
+                              }}
+                              onMouseEnter={() => {
+                                if (paintingRef.current !== null)
+                                  paintCell(r, c, paintingRef.current);
+                              }}
+                              className={`border border-white/10 cursor-pointer ${
+                                on ? "bg-emerald-500/40" : "hover:bg-white/10"
+                              }`}
+                            />
+                          );
+                        }),
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Clique e arraste para marcar a área. A mesma área vale para as
+                    4 janelas da câmera.
+                  </p>
                 </div>
               </>
             )}

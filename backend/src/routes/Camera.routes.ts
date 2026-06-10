@@ -51,6 +51,8 @@ router.put("/cameras/:id/recording", CameraClientGuard, Camera.setRecording);
 // Detecção de movimento NA CÂMERA (lê/grava a config via configManager.cgi).
 router.get("/cameras/:id/motion-detect", CameraClientGuard, Camera.getMotionDetect);
 router.put("/cameras/:id/motion-detect", CameraClientGuard, Camera.setMotionDetect);
+// Snapshot JPEG (fundo do editor de região). Token via query (tag <img>).
+router.get("/cameras/:id/snapshot", CameraClientGuard, Camera.getSnapshot);
 // Debug da detecção de movimento (eventos vindos da câmera) — só via localhost.
 router.get(
   "/cameras/:id/motion-debug",

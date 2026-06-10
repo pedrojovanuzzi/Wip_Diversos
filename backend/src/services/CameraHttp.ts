@@ -96,3 +96,49 @@ export function digestGet(
     challenge.on("error", reject);
   });
 }
+
+/**
+ * Igual ao digestGet, mas devolve o corpo BINÁRIO (Buffer) — ex.: snapshot.cgi
+ * (JPEG). Resolve com o status, o buffer e o content-type da resposta.
+ */
+export function digestGetRaw(
+  host: string,
+  port: number,
+  user: string,
+  pass: string,
+  uri: string,
+  timeoutMs = 8000,
+): Promise<{ status: number; buffer: Buffer; contentType: string }> {
+  return new Promise((resolve, reject) => {
+    const opts = { host, port, path: uri, timeout: timeoutMs };
+    const collect = (resp: http.IncomingMessage) => {
+      const chunks: Buffer[] = [];
+      resp.on("data", (d) => chunks.push(d as Buffer));
+      resp.on("end", () =>
+        resolve({
+          status: resp.statusCode || 0,
+          buffer: Buffer.concat(chunks),
+          contentType: String(resp.headers["content-type"] || ""),
+        }),
+      );
+    };
+    const challenge = http.get(opts, (res) => {
+      if (res.statusCode !== 401) {
+        collect(res);
+        return;
+      }
+      const c = parseChallenge(res.headers["www-authenticate"] || "");
+      res.resume();
+      if (!c.nonce || !c.realm) {
+        reject(new Error("desafio Digest inválido"));
+        return;
+      }
+      const auth = digestHeader(user, pass, uri, c);
+      const r2 = http.get({ ...opts, headers: { Authorization: auth } }, collect);
+      r2.on("timeout", () => r2.destroy(new Error("timeout")));
+      r2.on("error", reject);
+    });
+    challenge.on("timeout", () => challenge.destroy(new Error("timeout")));
+    challenge.on("error", reject);
+  });
+}
