@@ -919,7 +919,21 @@ class Camera {
         return;
       }
       // Express trata Range, Content-Type (.mp4 → video/mp4) e ETag automaticamente.
-      res.sendFile(filePath);
+      // O callback captura erros assíncronos do envio (ex.: EACCES = sem permissão
+      // de leitura no arquivo gravado pelo container; ENOENT = removido na hora).
+      res.sendFile(filePath, (err: any) => {
+        if (err) {
+          console.error(
+            "getFile sendFile:",
+            err?.code || "",
+            err?.message,
+            filePath,
+          );
+          if (!res.headersSent) {
+            res.status(500).json({ message: "Erro ao servir arquivo." });
+          }
+        }
+      });
     } catch (e: any) {
       console.error("getFile:", e?.message);
       if (!res.headersSent) res.status(500).json({ message: "Erro ao servir arquivo." });
