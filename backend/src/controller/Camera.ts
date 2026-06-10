@@ -918,10 +918,14 @@ class Camera {
         res.status(404).json({ message: "Arquivo não encontrado." });
         return;
       }
-      // Express trata Range, Content-Type (.mp4 → video/mp4) e ETag automaticamente.
+      // acceptRanges:false → ignora o header Range e manda o arquivo .mp4 INTEIRO
+      // numa única resposta 200 (sem 206/streaming em pedaços). Como os segmentos
+      // são curtos (~1 min, poucos MB), é mais rápido entregar o arquivo completo
+      // de uma vez do que o navegador ficar fatiando em dezenas de Range requests.
+      // Express trata Content-Type (.mp4 → video/mp4) e ETag automaticamente.
       // O callback captura erros assíncronos do envio (ex.: EACCES = sem permissão
       // de leitura no arquivo gravado pelo container; ENOENT = removido na hora).
-      res.sendFile(filePath, (err: any) => {
+      res.sendFile(filePath, { acceptRanges: false }, (err: any) => {
         if (err) {
           console.error(
             "getFile sendFile:",
