@@ -81,6 +81,8 @@ export default function CameraPortal() {
   // debug (só localhost): log de eventos de movimento vindos da câmera
   const [debugCam, setDebugCam] = useState<Cam | null>(null);
   const [debugLog, setDebugLog] = useState<DebugLog | null>(null);
+  const [rawConfig, setRawConfig] = useState<string | null>(null);
+  const [rawConfigLoading, setRawConfigLoading] = useState(false);
 
   // live
   const [liveCam, setLiveCam] = useState<Cam | null>(null);
@@ -512,12 +514,17 @@ export default function CameraPortal() {
     if (!detectCam || !detect) return;
     setDetectSaving(true);
     try {
-      await axios.put(
+      const res = await axios.put<{ syncedRegion?: boolean }>(
         `${base}/cameras/cameras/${detectCam.id}/motion-detect`,
         detect,
         { headers: authHeaders() },
       );
-      flash("Detecção de movimento salva na câmera.", "ok");
+      flash(
+        res.data?.syncedRegion
+          ? "Salvo na câmera (região sincronizada para o evento)."
+          : "Detecção de movimento salva na câmera.",
+        "ok",
+      );
       setDetectCam(null);
     } catch (e: any) {
       if (!handleAuthError(e))
@@ -531,6 +538,25 @@ export default function CameraPortal() {
   const openDebug = (cam: Cam) => {
     setDebugCam(cam);
     setDebugLog(null);
+    setRawConfig(null);
+  };
+
+  // Lê a config MotionDetect crua da câmera (pra inspecionar o Region).
+  const loadRawConfig = async () => {
+    if (!debugCam) return;
+    setRawConfigLoading(true);
+    try {
+      const res = await axios.get<{ status: number; raw: string }>(
+        `${base}/cameras/cameras/${debugCam.id}/motion-config-raw`,
+        { headers: authHeaders() },
+      );
+      setRawConfig(res.data.raw || "(vazio)");
+    } catch (e: any) {
+      if (!handleAuthError(e))
+        setRawConfig("Erro ao ler a config da câmera.");
+    } finally {
+      setRawConfigLoading(false);
+    }
   };
 
   // Enquanto o painel está aberto, busca o log a cada 1,5s.
@@ -1285,6 +1311,24 @@ export default function CameraPortal() {
               ))}
             </div>
 
+            {/* Config crua da câmera (inspecionar o Region) */}
+            <div className="px-5 py-2 border-b">
+              <button
+                onClick={loadRawConfig}
+                disabled={rawConfigLoading}
+                className="text-xs text-amber-700 hover:text-amber-900 underline disabled:opacity-50"
+              >
+                {rawConfigLoading
+                  ? "Lendo config da câmera…"
+                  : "Ver config crua (MotionDetect / Region)"}
+              </button>
+              {rawConfig && (
+                <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all bg-gray-900 text-gray-100 rounded p-2 text-[11px] leading-snug">
+                  {rawConfig}
+                </pre>
+              )}
+            </div>
+
             {/* Log */}
             <div className="flex-1 overflow-y-auto px-5 py-3 font-mono text-xs leading-relaxed bg-gray-50">
               {!debugLog ? (
@@ -1304,6 +1348,8 @@ export default function CameraPortal() {
                       className={`py-0.5 ${
                         e.type === "error"
                           ? "text-red-600"
+                          : e.type === "raw"
+                          ? "text-teal-700"
                           : e.type === "motion"
                           ? "text-gray-900"
                           : e.type === "record"
@@ -1313,8 +1359,15 @@ export default function CameraPortal() {
                     >
                       <span className="text-gray-400">
                         {new Date(e.ts).toLocaleTimeString()}
-                      </span>{" "}
-                      {e.msg}
+                      </span>
+                      {e.type === "raw" ? (
+                        // Payload exato da câmera (pode ser JSON multi-linha).
+                        <pre className="mt-0.5 whitespace-pre-wrap break-all bg-white/60 rounded px-2 py-1 ring-1 ring-teal-100">
+                          {e.msg}
+                        </pre>
+                      ) : (
+                        <span> {e.msg}</span>
+                      )}
                     </div>
                   ))
               )}

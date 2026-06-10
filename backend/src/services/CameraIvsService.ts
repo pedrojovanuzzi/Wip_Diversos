@@ -63,10 +63,10 @@ interface CamConn {
 /** Uma linha do log de debug (movimento/conexão/gravação) de uma câmera. */
 interface DebugEntry {
   ts: number;
-  type: "motion" | "record" | "conn" | "error";
+  type: "raw" | "motion" | "record" | "conn" | "error";
   msg: string;
 }
-const DEBUG_MAX = 300; // linhas mantidas por câmera (ring buffer)
+const DEBUG_MAX = 500; // linhas mantidas por câmera (ring buffer)
 
 class CameraIvsService {
   private conns = new Map<string, CamConn>();
@@ -264,16 +264,33 @@ class CameraIvsService {
           }
           conn.connected = true;
           this.pushDebug(conn.pathName, "conn", "📡 conectado — escutando eventos de movimento da câmera");
+          // O eventManager.cgi responde em multipart/x-mixed-replace: cada evento
+          // vem entre marcadores de boundary. Fatiamos por boundary para capturar
+          // o CORPO BRUTO de cada evento (incl. o data={...} JSON) sem quebrá-lo.
+          const ctype = String(r2.headers["content-type"] || "");
+          const bm = /boundary=([^;\s]+)/i.exec(ctype);
+          const boundary = bm ? `--${bm[1].trim()}` : null;
           let buf = "";
           r2.setEncoding("utf8");
           r2.on("data", (d: string) => {
             buf += d;
-            let i: number;
-            while ((i = buf.indexOf("\n")) >= 0) {
-              this.handleLine(conn, buf.slice(0, i));
-              buf = buf.slice(i + 1);
+            if (boundary) {
+              let idx: number;
+              while ((idx = buf.indexOf(boundary)) >= 0) {
+                const part = buf.slice(0, idx);
+                if (part.trim()) this.handleEvent(conn, part);
+                buf = buf.slice(idx + boundary.length);
+              }
+              if (buf.length > 65536) buf = buf.slice(-8192);
+            } else {
+              // Sem boundary (câmera não-multipart): trata linha a linha.
+              let i: number;
+              while ((i = buf.indexOf("\n")) >= 0) {
+                this.handleEvent(conn, buf.slice(0, i));
+                buf = buf.slice(i + 1);
+              }
+              if (buf.length > 8192) buf = buf.slice(-1024);
             }
-            if (buf.length > 8192) buf = buf.slice(-1024);
           });
           r2.on("end", () => this.onDisconnect(conn, "fim do stream"));
           r2.on("close", () => this.onDisconnect(conn, "conexão fechada"));
@@ -307,8 +324,23 @@ class CameraIvsService {
     );
   }
 
-  private handleLine(conn: CamConn, line: string): void {
-    const m = line.match(/Code=VideoMotion;action=(\w+)/);
+  /**
+   * Processa um evento bruto do eventManager (um bloco multipart já sem o
+   * boundary). Registra o CORPO EXATO que a câmera enviou (cabeçalhos +
+   * Code=...;action=...;data={...}) e, em paralelo, aciona a gravação.
+   */
+  private handleEvent(conn: CamConn, segment: string): void {
+    // Separa cabeçalhos do corpo (corpo = depois da 1ª linha em branco).
+    let body = segment;
+    const sep = segment.search(/\r?\n\r?\n/);
+    if (sep >= 0) body = segment.slice(segment.indexOf("\n", sep) + 1);
+    body = body.replace(/^[\r\n]+|[\r\n]+$/g, "");
+    if (!body) return;
+
+    // Log EXATO do que veio da câmera (preserva o JSON do data={...}).
+    this.pushDebug(conn.pathName, "raw", body);
+
+    const m = body.match(/Code=VideoMotion;action=(\w+)/);
     if (!m) return;
     const action = m[1];
     if (action === "Start") this.onMotionStart(conn);

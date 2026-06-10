@@ -696,32 +696,93 @@ class Camera {
       const threshold = clamp(b.threshold, 0, 100, 8);
       const recordLatch = clamp(b.recordLatch, 1, 600, 10);
 
+      // Lê a config atual para descobrir a máscara de região da janela 0
+      // (grade de 18 linhas; cada Region[i] é o bitmask das colunas daquela
+      // linha). A interface da câmera grava a região em
+      // MotionDetectWindow[0].Region, mas o motor do evento VideoMotion usa o
+      // MotionDetect[0].Region (nível superior). Se eles ficam dessincronizados,
+      // a detecção do evento ignora a área desenhada e dispara no quadro todo.
+      const ROWS = 18;
+      const region: (string | undefined)[] = [];
+      try {
+        const cur = await digestGet(
+          creds.host,
+          cam.http_port || CAMERA_HTTP_PORT,
+          creds.user,
+          creds.pass,
+          "/cgi-bin/configManager.cgi?action=getConfig&name=MotionDetect",
+        );
+        if (cur.status === 200) {
+          for (let i = 0; i < ROWS; i++) {
+            const m = cur.body.match(
+              new RegExp(
+                `MotionDetect\\[0\\]\\.MotionDetectWindow\\[0\\]\\.Region\\[${i}\\]=(\\d+)`,
+              ),
+            );
+            if (m) region[i] = m[1];
+          }
+        }
+      } catch {
+        /* sem a região atual seguimos salvando só sensibilidade/limiar */
+      }
+
       // Monta o setConfig (colchetes URL-encodados). Sensibilidade/limiar na
-      // região principal (Window[0]).
+      // região principal (Window[0]). NOTA: a câmera corta a conexão se o URL
+      // ficar muito longo (~2 KB no request-line), por isso a região vai numa
+      // requisição separada — e mandamos só o Region de nível superior (a região
+      // da janela a interface da câmera já mantém).
       const p = "MotionDetect%5B0%5D";
-      const params = [
+      const baseParams = [
         `${p}.Enable=${enable}`,
         `${p}.EventHandler.RecordEnable=${recordEnable}`,
         `${p}.EventHandler.RecordLatch=${recordLatch}`,
         `${p}.MotionDetectWindow%5B0%5D.Sensitive=${sensitive}`,
         `${p}.MotionDetectWindow%5B0%5D.Threshold=${threshold}`,
-      ].join("&");
+      ];
 
-      const { status, body } = await digestGet(
-        creds.host,
-        cam.http_port || CAMERA_HTTP_PORT,
-        creds.user,
-        creds.pass,
-        `/cgi-bin/configManager.cgi?action=setConfig&${params}`,
-      );
-      if (status !== 200 || !/ok/i.test(body)) {
+      const setConfig = (params: string[]) =>
+        digestGet(
+          creds.host,
+          cam.http_port || CAMERA_HTTP_PORT,
+          creds.user,
+          creds.pass,
+          `/cgi-bin/configManager.cgi?action=setConfig&${params.join("&")}`,
+        );
+
+      const r1 = await setConfig(baseParams);
+      if (r1.status !== 200 || !/ok/i.test(r1.body)) {
         res.status(502).json({
           message:
             "Não foi possível salvar na câmera. Verifique o IP e a Porta HTTP em ✏️ Editar câmera.",
         });
         return;
       }
-      res.json({ ok: true, enable, recordEnable, recordLatch, sensitive, threshold });
+
+      // Sincroniza a região para o Region de nível superior (o que o evento
+      // VideoMotion respeita). Vai numa requisição própria pra não estourar o URL.
+      let syncedRegion = false;
+      if (region.some((v) => v !== undefined)) {
+        const regionParams: string[] = [];
+        for (let i = 0; i < ROWS; i++) {
+          regionParams.push(`${p}.Region%5B${i}%5D=${region[i] ?? "0"}`);
+        }
+        try {
+          const r2 = await setConfig(regionParams);
+          syncedRegion = r2.status === 200 && /ok/i.test(r2.body);
+        } catch (e: any) {
+          console.error("setMotionDetect (region sync):", e?.message);
+        }
+      }
+
+      res.json({
+        ok: true,
+        enable,
+        recordEnable,
+        recordLatch,
+        sensitive,
+        threshold,
+        syncedRegion,
+      });
     } catch (e: any) {
       console.error("setMotionDetect:", e?.message);
       res.status(502).json({
@@ -750,6 +811,40 @@ class Camera {
     } catch (e: any) {
       console.error("getMotionDebug:", e?.message);
       res.status(500).json({ message: "Erro ao obter debug." });
+    }
+  }
+
+  /**
+   * Dump CRU da config de detecção de movimento direto da câmera
+   * (getConfig&name=MotionDetect), incluindo a região (Region). Usado para
+   * inspecionar o formato real do modelo. Exposto só via localhost.
+   */
+  public async getMotionConfigRaw(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      const repo = AppDataSource.getRepository(CameraEntity);
+      const cam = await repo.findOne({ where: { id, cliente_id: cid } });
+      if (!cam) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+      const creds = parseRtspCreds(cam.rtsp_url);
+      if (!creds) {
+        res.status(400).json({ message: "URL da câmera inválida." });
+        return;
+      }
+      const { status, body } = await digestGet(
+        creds.host,
+        cam.http_port || CAMERA_HTTP_PORT,
+        creds.user,
+        creds.pass,
+        "/cgi-bin/configManager.cgi?action=getConfig&name=MotionDetect",
+      );
+      res.json({ status, raw: body });
+    } catch (e: any) {
+      console.error("getMotionConfigRaw:", e?.message);
+      res.status(502).json({ message: "Não foi possível ler a config da câmera." });
     }
   }
 

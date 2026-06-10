@@ -58,6 +58,13 @@ router.get(
   CameraClientGuard,
   Camera.getMotionDebug,
 );
+// Dump cru da config MotionDetect da câmera (inspecionar o Region) — localhost.
+router.get(
+  "/cameras/:id/motion-config-raw",
+  localhostOnly,
+  CameraClientGuard,
+  Camera.getMotionConfigRaw,
+);
 router.delete("/cameras/:id", CameraClientGuard, Camera.removeCamera);
 router.get("/cameras/:id/stream", CameraClientGuard, Camera.getStream);
 router.get("/cameras/:id/recordings", CameraClientGuard, Camera.listRecordings);
