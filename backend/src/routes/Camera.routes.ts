@@ -1,10 +1,24 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import Camera from "../controller/Camera";
 import CameraAuth from "../controller/CameraAuth";
 import AuthGuard from "../middleware/AuthGuard";
 import CameraClientGuard from "../middleware/CameraClientGuard";
 
 const router: Router = Router();
+
+/**
+ * Libera a rota só quando acessada por localhost (ferramenta de debug em dev).
+ * Baseia-se no Host enviado pelo cliente (não no IP do socket, que atrás de um
+ * proxy reverso seria sempre 127.0.0.1). Em produção o Host é o domínio → 404.
+ */
+function localhostOnly(req: Request, res: Response, next: NextFunction) {
+  const host = (req.hostname || "").toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+    next();
+    return;
+  }
+  res.status(404).json({ message: "Não encontrado." });
+}
 
 // ---- Públicas ----
 router.post("/login", CameraAuth.login);
@@ -37,6 +51,13 @@ router.put("/cameras/:id/recording", CameraClientGuard, Camera.setRecording);
 // Detecção de movimento NA CÂMERA (lê/grava a config via configManager.cgi).
 router.get("/cameras/:id/motion-detect", CameraClientGuard, Camera.getMotionDetect);
 router.put("/cameras/:id/motion-detect", CameraClientGuard, Camera.setMotionDetect);
+// Debug da detecção de movimento (eventos vindos da câmera) — só via localhost.
+router.get(
+  "/cameras/:id/motion-debug",
+  localhostOnly,
+  CameraClientGuard,
+  Camera.getMotionDebug,
+);
 router.delete("/cameras/:id", CameraClientGuard, Camera.removeCamera);
 router.get("/cameras/:id/stream", CameraClientGuard, Camera.getStream);
 router.get("/cameras/:id/recordings", CameraClientGuard, Camera.listRecordings);

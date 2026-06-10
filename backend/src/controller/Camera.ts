@@ -731,6 +731,28 @@ class Camera {
     }
   }
 
+  /**
+   * Log de debug da detecção de movimento (eventos que chegam da câmera +
+   * estado da conexão e da gravação). Usado pelo painel de debug — exposto só
+   * via localhost (ver guarda na rota).
+   */
+  public async getMotionDebug(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      const repo = AppDataSource.getRepository(CameraEntity);
+      const cam = await repo.findOne({ where: { id, cliente_id: cid } });
+      if (!cam) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+      res.json(CameraIvsService.getDebug(cam.path_name));
+    } catch (e: any) {
+      console.error("getMotionDebug:", e?.message);
+      res.status(500).json({ message: "Erro ao obter debug." });
+    }
+  }
+
   public async removeCamera(req: Request, res: Response) {
     try {
       const cid = req.cameraCliente!.id!;

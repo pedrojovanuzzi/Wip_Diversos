@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload, MdRefresh, MdExpandMore, MdChevronRight, MdEdit, MdDeleteSweep, MdPause, MdFiberManualRecord, MdSensors, MdSkipPrevious, MdSkipNext } from "react-icons/md";
+import { MdVideocam, MdLogout, MdAdd, MdPlayArrow, MdFolder, MdDownload, MdRefresh, MdExpandMore, MdChevronRight, MdEdit, MdDeleteSweep, MdPause, MdFiberManualRecord, MdSensors, MdSkipPrevious, MdSkipNext, MdBugReport } from "react-icons/md";
 import { BsTrash } from "react-icons/bs";
 import { WhepPlayer } from "./components/WhepPlayer";
 import InstallPWAButton from "./components/InstallPWAButton";
@@ -26,6 +26,16 @@ interface RecFile {
 interface Storage {
   usedBytes: number;
   quotaBytes: number;
+}
+
+// Ferramentas de debug só aparecem quando o portal roda em localhost (dev).
+const IS_LOCALHOST =
+  typeof window !== "undefined" &&
+  ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+
+interface DebugLog {
+  state: { connected: boolean; recording: boolean; enabled: boolean };
+  entries: { ts: number; type: string; msg: string }[];
 }
 
 export default function CameraPortal() {
@@ -67,6 +77,10 @@ export default function CameraPortal() {
   const [detect, setDetect] = useState<MotionDetect | null>(null);
   const [detectLoading, setDetectLoading] = useState(false);
   const [detectSaving, setDetectSaving] = useState(false);
+
+  // debug (só localhost): log de eventos de movimento vindos da câmera
+  const [debugCam, setDebugCam] = useState<Cam | null>(null);
+  const [debugLog, setDebugLog] = useState<DebugLog | null>(null);
 
   // live
   const [liveCam, setLiveCam] = useState<Cam | null>(null);
@@ -513,6 +527,35 @@ export default function CameraPortal() {
     }
   };
 
+  // ---- Debug (localhost): log de eventos de movimento vindos da câmera ----
+  const openDebug = (cam: Cam) => {
+    setDebugCam(cam);
+    setDebugLog(null);
+  };
+
+  // Enquanto o painel está aberto, busca o log a cada 1,5s.
+  useEffect(() => {
+    if (!debugCam) return;
+    let alive = true;
+    const fetchLog = async () => {
+      try {
+        const res = await axios.get<DebugLog>(
+          `${base}/cameras/cameras/${debugCam.id}/motion-debug`,
+          { headers: authHeaders() },
+        );
+        if (alive) setDebugLog(res.data);
+      } catch {
+        /* mantém o último log enquanto reconecta */
+      }
+    };
+    fetchLog();
+    const t = setInterval(fetchLog, 1500);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [debugCam, base, authHeaders]);
+
   const clearFolder = async (dir: string, count: number) => {
     if (!folderCam || !dir) return;
     if (!window.confirm(`Apagar TODAS as ${count} gravações de ${dirLabel(dir)}?`))
@@ -904,6 +947,15 @@ export default function CameraPortal() {
                     >
                       <MdSensors />
                     </button>
+                    {IS_LOCALHOST && (
+                      <button
+                        onClick={() => openDebug(cam)}
+                        className="text-gray-500 hover:text-amber-600"
+                        title="Debug — eventos de movimento (localhost)"
+                      >
+                        <MdBugReport />
+                      </button>
+                    )}
                     <button
                       onClick={() => openEdit(cam)}
                       className="text-gray-500 hover:text-indigo-600"
@@ -1173,6 +1225,101 @@ export default function CameraPortal() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Painel de DEBUG (só localhost): eventos de movimento vindos da câmera */}
+      {debugCam && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setDebugCam(null)}
+        >
+          <div
+            className="bg-white rounded-lg w-full max-w-2xl max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3 border-b">
+              <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                <MdBugReport className="text-amber-600" /> Debug — {debugCam.nome}
+              </h3>
+              <button
+                onClick={() => setDebugCam(null)}
+                className="text-sm text-gray-500 hover:text-gray-800"
+              >
+                Fechar
+              </button>
+            </div>
+
+            {/* Estado atual da conexão/gravação */}
+            <div className="flex flex-wrap gap-2 px-5 py-3 border-b text-xs">
+              {[
+                {
+                  on: debugLog?.state.connected,
+                  yes: "Conectada à câmera",
+                  no: "Sem conexão",
+                },
+                {
+                  on: debugLog?.state.enabled,
+                  yes: "Gravação por movimento ativa",
+                  no: "Gravação por movimento pausada",
+                },
+                {
+                  on: debugLog?.state.recording,
+                  yes: "Gravando agora",
+                  no: "Parada",
+                },
+              ].map((b, i) => (
+                <span
+                  key={i}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ${
+                    b.on ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      b.on ? "bg-emerald-500" : "bg-gray-400"
+                    }`}
+                  />
+                  {b.on ? b.yes : b.no}
+                </span>
+              ))}
+            </div>
+
+            {/* Log */}
+            <div className="flex-1 overflow-y-auto px-5 py-3 font-mono text-xs leading-relaxed bg-gray-50">
+              {!debugLog ? (
+                <div className="text-gray-400">Carregando…</div>
+              ) : debugLog.entries.length === 0 ? (
+                <div className="text-gray-400">
+                  Nenhum evento ainda. Gere movimento na frente da câmera para ver
+                  os eventos aparecerem aqui (atualiza a cada 1,5s).
+                </div>
+              ) : (
+                debugLog.entries
+                  .slice()
+                  .reverse()
+                  .map((e, i) => (
+                    <div
+                      key={i}
+                      className={`py-0.5 ${
+                        e.type === "error"
+                          ? "text-red-600"
+                          : e.type === "motion"
+                          ? "text-gray-900"
+                          : e.type === "record"
+                          ? "text-indigo-700"
+                          : "text-gray-500"
+                      }`}
+                    >
+                      <span className="text-gray-400">
+                        {new Date(e.ts).toLocaleTimeString()}
+                      </span>{" "}
+                      {e.msg}
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

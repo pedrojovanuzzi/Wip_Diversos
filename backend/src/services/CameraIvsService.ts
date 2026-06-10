@@ -53,14 +53,52 @@ interface CamConn {
   pass: string;
   enabled: boolean; // interruptor mestre (= camera.gravando)
   recording: boolean; // estado atual da gravação no MediaMTX
+  connected: boolean; // stream de eventos da câmera aberto (200)
   req?: http.ClientRequest;
   stopTimer?: NodeJS.Timeout; // desligar a gravação após o latch
   reconnectTimer?: NodeJS.Timeout;
   stopped: boolean;
 }
 
+/** Uma linha do log de debug (movimento/conexão/gravação) de uma câmera. */
+interface DebugEntry {
+  ts: number;
+  type: "motion" | "record" | "conn" | "error";
+  msg: string;
+}
+const DEBUG_MAX = 300; // linhas mantidas por câmera (ring buffer)
+
 class CameraIvsService {
   private conns = new Map<string, CamConn>();
+  // Log de debug por câmera (sobrevive a reconexões enquanto o processo vive).
+  private debugLogs = new Map<string, DebugEntry[]>();
+
+  // ---------------- log de debug ----------------
+  private pushDebug(pathName: string, type: DebugEntry["type"], msg: string): void {
+    let arr = this.debugLogs.get(pathName);
+    if (!arr) {
+      arr = [];
+      this.debugLogs.set(pathName, arr);
+    }
+    arr.push({ ts: Date.now(), type, msg });
+    if (arr.length > DEBUG_MAX) arr.splice(0, arr.length - DEBUG_MAX);
+  }
+
+  /** Snapshot do estado + linhas de debug de uma câmera (para o painel de debug). */
+  public getDebug(pathName: string): {
+    state: { connected: boolean; recording: boolean; enabled: boolean };
+    entries: DebugEntry[];
+  } {
+    const conn = this.conns.get(pathName);
+    return {
+      state: {
+        connected: conn?.connected ?? false,
+        recording: conn?.recording ?? false,
+        enabled: conn?.enabled ?? false,
+      },
+      entries: this.debugLogs.get(pathName) ?? [],
+    };
+  }
 
   // ---------------- controle de gravação ----------------
   private async setRecord(conn: CamConn, on: boolean): Promise<void> {
@@ -68,8 +106,10 @@ class CameraIvsService {
     conn.recording = on;
     try {
       await MediaMtxService.setRecord(conn.pathName, on);
+      this.pushDebug(conn.pathName, "record", on ? "▶ gravação LIGADA" : "⏹ gravação desligada");
     } catch (e: any) {
       console.error(`CameraIvs: falha ao alternar gravação de ${conn.pathName}:`, e?.message);
+      this.pushDebug(conn.pathName, "error", `falha ao ${on ? "ligar" : "desligar"} gravação: ${e?.message}`);
       conn.recording = !on; // reverte o estado para tentar de novo depois
     }
   }
@@ -79,11 +119,21 @@ class CameraIvsService {
       clearTimeout(conn.stopTimer);
       conn.stopTimer = undefined;
     }
+    this.pushDebug(
+      conn.pathName,
+      "motion",
+      conn.enabled ? "🟢 movimento DETECTADO" : "🟡 movimento (ignorado — gravação pausada)",
+    );
     if (conn.enabled) void this.setRecord(conn, true);
   }
 
   private onMotionStop(conn: CamConn): void {
     if (conn.stopTimer) clearTimeout(conn.stopTimer);
+    this.pushDebug(
+      conn.pathName,
+      "motion",
+      `⚪ movimento parou — mantém gravando por ${RECORD_LATCH_MS / 1000}s`,
+    );
     conn.stopTimer = setTimeout(() => {
       conn.stopTimer = undefined;
       void this.setRecord(conn, false);
@@ -122,6 +172,7 @@ class CameraIvsService {
       pass: creds.pass,
       enabled: cam.gravando !== false,
       recording: false,
+      connected: false,
       stopped: false,
     };
     this.conns.set(cam.path_name, conn);
@@ -147,6 +198,7 @@ class CameraIvsService {
     const conn = this.conns.get(pathName);
     if (!conn) return;
     conn.enabled = enabled;
+    this.pushDebug(pathName, "record", enabled ? "⏯ gravação por movimento RETOMADA" : "⏸ gravação por movimento PAUSADA");
     if (!enabled) {
       // Pausado: cancela qualquer latch e desliga a gravação agora.
       if (conn.stopTimer) {
@@ -173,6 +225,15 @@ class CameraIvsService {
     )}%5D`;
   }
 
+  /** Marca como desconectado (uma vez) e agenda a reconexão. */
+  private onDisconnect(conn: CamConn, reason: string): void {
+    if (conn.connected) {
+      conn.connected = false;
+      this.pushDebug(conn.pathName, "conn", `🔌 desconectado (${reason}) — reconectando…`);
+    }
+    this.scheduleReconnect(conn);
+  }
+
   private connect(conn: CamConn): void {
     if (conn.stopped) return;
     const opts = { host: conn.host, port: conn.port, path: this.uri() };
@@ -180,13 +241,15 @@ class CameraIvsService {
     const challenge = http.get(opts, (res) => {
       if (res.statusCode !== 401) {
         res.resume();
-        this.scheduleReconnect(conn);
+        this.pushDebug(conn.pathName, "error", `resposta inesperada da câmera (HTTP ${res.statusCode})`);
+        this.onDisconnect(conn, `HTTP ${res.statusCode}`);
         return;
       }
       const c = this.parseChallenge(res.headers["www-authenticate"] || "");
       res.resume();
       if (!c.nonce || !c.realm) {
-        this.scheduleReconnect(conn);
+        this.pushDebug(conn.pathName, "error", "challenge Digest inválido (sem nonce/realm)");
+        this.onDisconnect(conn, "auth inválida");
         return;
       }
       const auth = this.digestHeader(conn, c);
@@ -195,9 +258,12 @@ class CameraIvsService {
         (r2) => {
           if (r2.statusCode !== 200) {
             r2.resume();
-            this.scheduleReconnect(conn);
+            this.pushDebug(conn.pathName, "error", `autenticação falhou (HTTP ${r2.statusCode}) — confira usuário/senha`);
+            this.onDisconnect(conn, `HTTP ${r2.statusCode}`);
             return;
           }
+          conn.connected = true;
+          this.pushDebug(conn.pathName, "conn", "📡 conectado — escutando eventos de movimento da câmera");
           let buf = "";
           r2.setEncoding("utf8");
           r2.on("data", (d: string) => {
@@ -209,15 +275,15 @@ class CameraIvsService {
             }
             if (buf.length > 8192) buf = buf.slice(-1024);
           });
-          r2.on("end", () => this.scheduleReconnect(conn));
-          r2.on("close", () => this.scheduleReconnect(conn));
-          r2.on("error", () => this.scheduleReconnect(conn));
+          r2.on("end", () => this.onDisconnect(conn, "fim do stream"));
+          r2.on("close", () => this.onDisconnect(conn, "conexão fechada"));
+          r2.on("error", (e: any) => this.onDisconnect(conn, e?.message || "erro"));
         },
       );
-      stream.on("error", () => this.scheduleReconnect(conn));
+      stream.on("error", (e: any) => this.onDisconnect(conn, e?.message || "erro"));
       conn.req = stream;
     });
-    challenge.on("error", () => this.scheduleReconnect(conn));
+    challenge.on("error", (e: any) => this.onDisconnect(conn, e?.message || "erro de rede"));
   }
 
   private parseChallenge(h: string): Record<string, string> {
