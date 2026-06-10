@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
@@ -76,9 +76,12 @@ export default function CameraPortal() {
   const [folderCam, setFolderCam] = useState<Cam | null>(null);
   const [files, setFiles] = useState<RecFile[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
-  const [fileVideoUrl, setFileVideoUrl] = useState<string | null>(null);
+  const [fileVideoUrl, setFileVideoUrl] = useState<string | null>(null); // blob: URL
+  const [videoLoading, setVideoLoading] = useState(false);
+  const blobUrlRef = useRef<string | null>(null); // blob: atual (para revogar)
   const [openDirs, setOpenDirs] = useState<Set<string>>(new Set());
   const [playingKey, setPlayingKey] = useState<string | null>(null); // dir/name tocando
+  const playingKeyRef = useRef<string | null>(null); // espelho de playingKey (corrida async)
 
   // Gravações em ordem cronológica (para a linha do tempo e o anterior/próximo).
   const filesAsc = useMemo(
@@ -289,8 +292,7 @@ export default function CameraPortal() {
   const openFolder = async (cam: Cam) => {
     closeLive();
     setFolderCam(cam);
-    setFileVideoUrl(null);
-    setPlayingKey(null);
+    clearVideo();
     setOpenDirs(new Set()); // reabre a pasta do dia mais recente (via useEffect)
     setFilesLoading(true);
     try {
@@ -318,10 +320,51 @@ export default function CameraPortal() {
   // ---- Linha do tempo / player ----
   const segKey = (f: RecFile) => `${f.dir}/${f.name}`;
 
-  const playSeg = (f: RecFile) => {
+  // Fecha o player e libera o blob: atual da memória.
+  const clearVideo = useCallback(() => {
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    setFileVideoUrl(null);
+    setPlayingKey(null);
+    playingKeyRef.current = null;
+  }, []);
+
+  // Libera o blob ao desmontar a página.
+  useEffect(() => clearVideo, [clearVideo]);
+
+  // Baixa a gravação INTEIRA num único GET e toca a partir da memória (blob:).
+  // Assim o navegador não fatia o vídeo em dezenas de Range requests: pega o
+  // arquivo completo de uma vez e o player roda sem mais idas à rede.
+  const playSeg = async (f: RecFile) => {
     if (!folderCam) return;
-    setFileVideoUrl(fileUrl(folderCam.id, f.dir, f.name));
-    setPlayingKey(segKey(f));
+    const key = segKey(f);
+    setPlayingKey(key);
+    playingKeyRef.current = key;
+    setVideoLoading(true);
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    setFileVideoUrl(null);
+    try {
+      const res = await axios.get(
+        `${base}/cameras/cameras/${folderCam.id}/files/${filePath(f.dir, f.name)}`,
+        { headers: authHeaders(), responseType: "blob" },
+      );
+      // Outra gravação foi selecionada enquanto esta baixava: descarta.
+      if (playingKeyRef.current !== key) return;
+      const blobUrl = URL.createObjectURL(res.data as Blob);
+      blobUrlRef.current = blobUrl;
+      setFileVideoUrl(blobUrl);
+    } catch (e: any) {
+      if (playingKeyRef.current !== key) return; // já trocou: ignora erro antigo
+      if (!handleAuthError(e)) flash("Erro ao carregar a gravação.", "err");
+      clearVideo();
+    } finally {
+      if (playingKeyRef.current === key) setVideoLoading(false);
+    }
   };
 
   // Anterior/próximo na ordem cronológica.
@@ -367,12 +410,11 @@ export default function CameraPortal() {
     if (!folderCam) return;
     if (!window.confirm("Apagar esta gravação? Esta ação não pode ser desfeita.")) return;
     try {
-      const url = fileUrl(folderCam.id, f.dir, f.name); // se o vídeo aberto era esse, fecha
       await axios.delete(
         `${base}/cameras/cameras/${folderCam.id}/files/${filePath(f.dir, f.name)}`,
         { headers: authHeaders() },
       );
-      if (fileVideoUrl === url) setFileVideoUrl(null);
+      if (playingKey === segKey(f)) clearVideo(); // se o vídeo aberto era esse, fecha
       setFiles((prev) => prev.filter((x) => !(x.dir === f.dir && x.name === f.name)));
       loadStorage();
     } catch (e: any) {
@@ -480,7 +522,7 @@ export default function CameraPortal() {
       await axios.delete(`${base}/cameras/cameras/${folderCam.id}/folder/${sub}`, {
         headers: authHeaders(),
       });
-      if (fileVideoUrl) setFileVideoUrl(null);
+      if (fileVideoUrl) clearVideo();
       setFiles((prev) => prev.filter((x) => x.dir !== dir));
       loadStorage();
     } catch (e: any) {
@@ -655,6 +697,12 @@ export default function CameraPortal() {
               </div>
             </div>
 
+            {videoLoading && !fileVideoUrl && (
+              <div className="w-full aspect-video bg-black rounded-md mb-3 flex items-center justify-center text-sm text-gray-300">
+                Baixando gravação…
+              </div>
+            )}
+
             {fileVideoUrl && (
               <video
                 key={fileVideoUrl}
@@ -667,7 +715,7 @@ export default function CameraPortal() {
                     "Gravação indisponível — pode ter sido removida pela limpeza por movimento.",
                     "err",
                   );
-                  setFileVideoUrl(null);
+                  clearVideo();
                   if (folderCam) openFolder(folderCam); // recarrega a lista
                 }}
                 className="w-full aspect-video bg-black rounded-md mb-3"
