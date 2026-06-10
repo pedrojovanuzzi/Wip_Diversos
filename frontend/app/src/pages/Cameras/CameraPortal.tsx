@@ -57,6 +57,7 @@ export default function CameraPortal() {
   // add form
   const [nome, setNome] = useState("");
   const [rtsp, setRtsp] = useState("");
+  const [tipo, setTipo] = useState("intelbras"); // só Intelbras/Dahua (detecção)
   const [adding, setAdding] = useState(false);
 
   // editar câmera (nome, ip, porta)
@@ -250,12 +251,13 @@ export default function CameraPortal() {
     try {
       const res = await axios.post(
         `${base}/cameras/cameras`,
-        { nome, rtsp_url: rtsp },
+        { nome, rtsp_url: rtsp, tipo },
         { headers: authHeaders() },
       );
       flash(res.data.warning || "Câmera adicionada.", res.data.warning ? "err" : "ok");
       setNome("");
       setRtsp("");
+      setTipo("intelbras");
       await load();
     } catch (e: any) {
       if (!handleAuthError(e))
@@ -735,7 +737,7 @@ export default function CameraPortal() {
         {/* Adicionar câmera */}
         <form
           onSubmit={addCamera}
-          className="bg-white ring-1 ring-gray-200 rounded-lg p-4 mb-6 grid gap-3 sm:grid-cols-[1fr_2fr_auto] items-end"
+          className="bg-white ring-1 ring-gray-200 rounded-lg p-4 mb-6 grid gap-3 sm:grid-cols-[1fr_auto_2fr_auto] items-end"
         >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
@@ -746,6 +748,18 @@ export default function CameraPortal() {
               placeholder="Portão, Garagem..."
               className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+            <select
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+              className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm bg-white"
+              title="Marcas com suporte à detecção de movimento"
+            >
+              <option value="intelbras">Intelbras</option>
+              <option value="dahua">Dahua</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -431,6 +431,9 @@ class Camera {
       const cid = req.cameraCliente!.id!;
       const nome = String(req.body.nome || "").trim();
       const rtsp_url = String(req.body.rtsp_url || "").trim();
+      // Tipo: só Intelbras/Dahua têm suporte à detecção (CGI Dahua).
+      const tipoRaw = String(req.body.tipo || "intelbras").toLowerCase();
+      const tipo = ["intelbras", "dahua"].includes(tipoRaw) ? tipoRaw : "intelbras";
 
       if (!nome || !rtsp_url) {
         res.status(400).json({ message: "Nome e URL RTSP são obrigatórios." });
@@ -446,6 +449,7 @@ class Camera {
       const cam = repo.create({
         cliente_id: cid,
         nome,
+        tipo,
         rtsp_url,
         path_name,
         ativo: true,
@@ -776,23 +780,61 @@ class Camera {
           }
         }
         if (region) {
-          // Se veio do app, grava também na Window[0]; senão ela já tem a região.
+          // A câmera derruba a conexão (socket hang up) se o URL do setConfig
+          // ficar longo (~1 KB). Por isso a região vai em PEDAÇOS pequenos
+          // (poucos índices por requisição). Escrevemos a mesma região nas 4
+          // janelas (janela com região vazia = quadro inteiro nesse firmware).
+          const CHUNK = 6;
           const windows = regionFromApp ? [0, 1, 2, 3] : [1, 2, 3];
+          let allOk = true;
           for (const w of windows) {
             const win = `${p}.MotionDetectWindow%5B${w}%5D`;
-            const params = [
+            // sensibilidade/limiar (request curto, separado)
+            const rs = await setConfig([
               `${win}.Sensitive=${sensitive}`,
               `${win}.Threshold=${threshold}`,
-            ];
-            for (let i = 0; i < ROWS; i++) {
-              params.push(`${win}.Region%5B${i}%5D=${region[i]}`);
+            ]);
+            if (!(rs.status === 200 && /ok/i.test(rs.body))) allOk = false;
+            // região em blocos de CHUNK índices
+            for (let start = 0; start < ROWS; start += CHUNK) {
+              const params: string[] = [];
+              for (let i = start; i < Math.min(ROWS, start + CHUNK); i++) {
+                params.push(`${win}.Region%5B${i}%5D=${region[i]}`);
+              }
+              const rw = await setConfig(params);
+              if (!(rw.status === 200 && /ok/i.test(rw.body))) allOk = false;
             }
-            const rw = await setConfig(params);
-            if (rw.status === 200 && /ok/i.test(rw.body)) mirroredRegion = true;
           }
+          mirroredRegion = allOk;
         }
       } catch (e: any) {
         console.error("setMotionDetect (region):", e?.message);
+      }
+
+      // Relê a região aplicada na Window[0] (diagnóstico: confirma se persistiu).
+      let regionApplied: number[] | undefined;
+      try {
+        const chk = await digestGet(
+          creds.host,
+          cam.http_port || CAMERA_HTTP_PORT,
+          creds.user,
+          creds.pass,
+          "/cgi-bin/configManager.cgi?action=getConfig&name=MotionDetect",
+        );
+        if (chk.status === 200) {
+          regionApplied = [];
+          for (let i = 0; i < ROWS; i++) {
+            const m = chk.body.match(
+              new RegExp(`MotionDetectWindow\\[0\\]\\.Region\\[${i}\\]=(\\d+)`),
+            );
+            regionApplied.push(m ? Number(m[1]) : 0);
+          }
+          console.log(
+            `setMotionDetect region enviada=[${(region || []).join(",")}] aplicada=[${regionApplied.join(",")}]`,
+          );
+        }
+      } catch {
+        /* diagnóstico apenas */
       }
 
       res.json({
@@ -803,6 +845,7 @@ class Camera {
         sensitive,
         threshold,
         mirroredRegion,
+        regionApplied,
       });
     } catch (e: any) {
       console.error("setMotionDetect:", e?.message);

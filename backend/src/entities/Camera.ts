@@ -20,6 +20,11 @@ export class Camera {
   @Column({ type: "varchar", length: 255 })
   nome!: string;
 
+  // Marca/protocolo da câmera. A detecção de movimento (CGI Dahua) só funciona
+  // em Intelbras/Dahua. Default 'intelbras'.
+  @Column({ type: "varchar", length: 20, default: "intelbras" })
+  tipo!: string;
+
   // Fonte RTSP (pode conter usuário/senha da câmera).
   @Column({ type: "text" })
   rtsp_url!: string;
