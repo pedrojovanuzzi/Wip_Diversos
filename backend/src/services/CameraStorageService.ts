@@ -65,6 +65,7 @@ class CameraStorageService {
   public async getClienteUsage(cid: number): Promise<{
     usedBytes: number;
     quotaBytes: number;
+    perCameraBytes: number;
     cameras: { id: number; nome: string; bytes: number }[];
   }> {
     const repo = AppDataSource.getRepository(Camera);
@@ -83,6 +84,10 @@ class CameraStorageService {
     return {
       usedBytes,
       quotaBytes: STORAGE_QUOTA_BYTES,
+      // Fatia por câmera (mesma conta do enforceQuotaForCliente).
+      perCameraBytes: cameras.length
+        ? Math.floor(STORAGE_QUOTA_BYTES / cameras.length)
+        : STORAGE_QUOTA_BYTES,
       cameras: detalhe,
     };
   }

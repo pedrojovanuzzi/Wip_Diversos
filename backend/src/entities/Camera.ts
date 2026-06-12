@@ -45,6 +45,11 @@ export class Camera {
   @Column({ type: "boolean", default: true })
   gravando!: boolean;
 
+  // Segundos que o MediaMTX continua gravando DEPOIS que o movimento para
+  // (latch). 0 = para na hora que o movimento acaba. Default 8.
+  @Column({ type: "int", default: 8 })
+  record_latch!: number;
+
   // Regiões de interesse da detecção de movimento: JSON com array de retângulos
   // [{x,y,w,h}] normalizado (0..1). NULL = analisa o quadro inteiro.
   @Column({ type: "varchar", length: 1024, nullable: true })

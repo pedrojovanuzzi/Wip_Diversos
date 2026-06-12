@@ -26,6 +26,8 @@ interface RecFile {
 interface Storage {
   usedBytes: number;
   quotaBytes: number;
+  perCameraBytes?: number;
+  cameras?: { id: number; nome: string; bytes: number }[];
 }
 
 // Ferramentas de debug só aparecem quando o portal roda em localhost (dev).
@@ -37,6 +39,15 @@ interface DebugLog {
   state: { connected: boolean; recording: boolean; enabled: boolean };
   entries: { ts: number; type: string; msg: string }[];
 }
+
+// Rótulos e ordem dos ajustes de imagem (VideoColor). Só os que a câmera expõe.
+const IMAGE_LABELS: { key: string; label: string }[] = [
+  { key: "brightness", label: "Brilho" },
+  { key: "contrast", label: "Contraste" },
+  { key: "saturation", label: "Saturação" },
+  { key: "sharpness", label: "Nitidez" },
+  { key: "hue", label: "Matiz" },
+];
 
 export default function CameraPortal() {
   const navigate = useNavigate();
@@ -81,6 +92,8 @@ export default function CameraPortal() {
   const [detect, setDetect] = useState<MotionDetect | null>(null);
   const [detectLoading, setDetectLoading] = useState(false);
   const [detectSaving, setDetectSaving] = useState(false);
+  // Ajustes de imagem (VideoColor): só os campos que a câmera expõe (0..100).
+  const [image, setImage] = useState<Record<string, number>>({});
   // Editor de região: grade de células (linha × coluna) ligada/desligada.
   const GRID_ROWS = 18;
   const GRID_COLS = 14;
@@ -512,9 +525,15 @@ export default function CameraPortal() {
   const openDetect = async (cam: Cam) => {
     setDetectCam(cam);
     setDetect(null);
+    setImage({});
     setRegionGrid([]);
     setSnapTs(Date.now());
     setDetectLoading(true);
+    // Ajustes de imagem (não bloqueiam o modal se falharem).
+    axios
+      .get(`${base}/cameras/cameras/${cam.id}/image`, { headers: authHeaders() })
+      .then((r) => setImage(r.data || {}))
+      .catch(() => setImage({}));
     try {
       const res = await axios.get(
         `${base}/cameras/cameras/${cam.id}/motion-detect`,
@@ -563,6 +582,14 @@ export default function CameraPortal() {
         { ...detect, region },
         { headers: authHeaders() },
       );
+      // Ajustes de imagem (se houver algum campo carregado).
+      if (Object.keys(image).length) {
+        await axios.put(
+          `${base}/cameras/cameras/${detectCam.id}/image`,
+          image,
+          { headers: authHeaders() },
+        );
+      }
       flash(
         res.data?.mirroredRegion
           ? "Salvo na câmera (região aplicada às 4 janelas)."
@@ -649,6 +676,20 @@ export default function CameraPortal() {
   };
 
   const fmtGB = (bytes: number) => (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
+
+  // Adaptativo: MB abaixo de 1 GB, senão GB (para o uso por câmera).
+  const fmtUsage = (bytes: number) =>
+    bytes < 1024 * 1024 * 1024
+      ? (bytes / 1024 / 1024).toFixed(0) + " MB"
+      : (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
+
+  // Uso/limite de armazenamento de uma câmera (fatia da cota do cliente).
+  const camStorage = (id?: number) => {
+    const limit = storage?.perCameraBytes ?? storage?.quotaBytes ?? 0;
+    const used = storage?.cameras?.find((c) => c.id === id)?.bytes ?? 0;
+    const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
+    return { used, limit, pct };
+  };
 
   const logout = () => {
     clearCamSession();
@@ -1054,6 +1095,30 @@ export default function CameraPortal() {
                     </button>
                   </div>
                 </div>
+
+                {/* Armazenamento desta câmera (uso x fatia da cota) */}
+                {storage && (() => {
+                  const { used, limit, pct } = camStorage(cam.id);
+                  return (
+                    <div className="mt-3">
+                      <div className="flex justify-between text-xs text-gray-500 mb-1">
+                        <span>Armazenamento</span>
+                        <span>
+                          {fmtUsage(used)} de {fmtGB(limit)}
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            pct >= 95 ? "bg-red-500" : "bg-indigo-500"
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div className="mt-4 flex gap-2">
                   <button
                     onClick={() => openLive(cam)}
@@ -1265,7 +1330,7 @@ export default function CameraPortal() {
                     </label>
                     <input
                       type="number"
-                      min={1}
+                      min={0}
                       max={600}
                       value={detect.recordLatch}
                       onChange={(e) =>
@@ -1273,8 +1338,44 @@ export default function CameraPortal() {
                       }
                       className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
                     />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Tempo que segue gravando após o movimento parar.{" "}
+                      <b>0 = para na hora.</b>
+                    </p>
                   </div>
                 </div>
+
+                {/* Imagem (VideoColor): só os campos que a câmera expõe. */}
+                {Object.keys(image).length > 0 && (
+                  <div className="border-t pt-3">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Imagem</p>
+                    <div className="space-y-2">
+                      {IMAGE_LABELS.filter((f) => image[f.key] !== undefined).map(
+                        (f) => (
+                          <div key={f.key}>
+                            <label className="flex items-center justify-between text-sm mb-0.5">
+                              <span className="text-gray-700">{f.label}</span>
+                              <span className="text-gray-400">{image[f.key]}</span>
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={image[f.key]}
+                              onChange={(e) =>
+                                setImage((s) => ({
+                                  ...s,
+                                  [f.key]: Number(e.target.value),
+                                }))
+                              }
+                              className="w-full"
+                            />
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Editor de região: clique/arraste sobre a imagem para marcar
                     onde detectar. Verde = detecta; vazio = ignora. */}

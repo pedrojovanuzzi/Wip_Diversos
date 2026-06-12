@@ -669,7 +669,8 @@ class Camera {
       res.json({
         enable: val("Enable") === "true",
         recordEnable: val("EventHandler\\.RecordEnable") === "true",
-        recordLatch: Number(val("EventHandler\\.RecordLatch")) || 10,
+        // Latch do BACKEND (segundos após o movimento). Fonte: entidade.
+        recordLatch: cam.record_latch ?? 8,
         sensitive: Number(val("MotionDetectWindow\\[0\\]\\.Sensitive")) || 40,
         threshold: Number(val("MotionDetectWindow\\[0\\]\\.Threshold")) || 8,
         region, // máscara atual (para o editor de região no app)
@@ -711,7 +712,14 @@ class Camera {
       const recordEnable = b.recordEnable === true || b.recordEnable === "true";
       const sensitive = clamp(b.sensitive, 0, 100, 40);
       const threshold = clamp(b.threshold, 0, 100, 8);
-      const recordLatch = clamp(b.recordLatch, 1, 600, 10);
+      // Latch do backend (segundos que o MediaMTX segue gravando após o
+      // movimento parar). 0 = para na hora. É o que vale de verdade.
+      const recordLatch = clamp(b.recordLatch, 0, 600, 8);
+
+      // Persiste o latch na câmera e aplica ao listener em execução.
+      cam.record_latch = recordLatch;
+      await AppDataSource.getRepository(CameraEntity).save(cam);
+      CameraIvsService.setLatch(cam.path_name, recordLatch);
 
       const ROWS = 18;
       // Região desenhada no app (18 linhas; cada uma um bitmask de 14 colunas,
@@ -740,7 +748,8 @@ class Camera {
       const r1 = await setConfig([
         `${p}.Enable=${enable}`,
         `${p}.EventHandler.RecordEnable=${recordEnable}`,
-        `${p}.EventHandler.RecordLatch=${recordLatch}`,
+        // A câmera (SD) não aceita 0; o latch que vale é o do backend (record_latch).
+        `${p}.EventHandler.RecordLatch=${Math.max(1, recordLatch)}`,
         `${p}.MotionDetectWindow%5B0%5D.Sensitive=${sensitive}`,
         `${p}.MotionDetectWindow%5B0%5D.Threshold=${threshold}`,
       ]);
@@ -854,6 +863,103 @@ class Camera {
         message:
           "Não foi possível salvar na câmera. Verifique o IP e a Porta HTTP em ✏️ Editar câmera.",
       });
+    }
+  }
+
+  // Campos de imagem (VideoColor[0][0]) que expomos. Cada um 0..100.
+  private static readonly IMAGE_FIELDS: { key: string; cam: string }[] = [
+    { key: "brightness", cam: "Brightness" },
+    { key: "contrast", cam: "Contrast" },
+    { key: "saturation", cam: "Saturation" },
+    { key: "hue", cam: "Hue" },
+    { key: "sharpness", cam: "Sharpness" },
+  ];
+
+  /** Lê os ajustes de imagem da câmera (VideoColor) — só os campos existentes. */
+  public async getImage(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      const repo = AppDataSource.getRepository(CameraEntity);
+      const cam = await repo.findOne({ where: { id, cliente_id: cid } });
+      if (!cam) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+      const creds = parseRtspCreds(cam.rtsp_url);
+      if (!creds) {
+        res.status(400).json({ message: "URL da câmera inválida." });
+        return;
+      }
+      const { status, body } = await digestGet(
+        creds.host,
+        cam.http_port || CAMERA_HTTP_PORT,
+        creds.user,
+        creds.pass,
+        "/cgi-bin/configManager.cgi?action=getConfig&name=VideoColor",
+      );
+      if (status !== 200) {
+        res.status(502).json({ message: "Não foi possível ler a imagem da câmera." });
+        return;
+      }
+      const image: Record<string, number> = {};
+      for (const f of Camera.IMAGE_FIELDS) {
+        const m = body.match(
+          new RegExp(`VideoColor\\[0\\]\\[0\\]\\.${f.cam}=(\\d+)`),
+        );
+        if (m) image[f.key] = Number(m[1]);
+      }
+      res.json(image);
+    } catch (e: any) {
+      console.error("getImage:", e?.message);
+      res.status(502).json({ message: "Não foi possível ler a imagem da câmera." });
+    }
+  }
+
+  /** Grava os ajustes de imagem (VideoColor) — só os campos enviados. */
+  public async setImage(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      const repo = AppDataSource.getRepository(CameraEntity);
+      const cam = await repo.findOne({ where: { id, cliente_id: cid } });
+      if (!cam) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+      const creds = parseRtspCreds(cam.rtsp_url);
+      if (!creds) {
+        res.status(400).json({ message: "URL da câmera inválida." });
+        return;
+      }
+      const b = req.body || {};
+      const params: string[] = [];
+      for (const f of Camera.IMAGE_FIELDS) {
+        if (b[f.key] === undefined) continue;
+        const n = Number(b[f.key]);
+        if (!isFinite(n)) continue;
+        const v = Math.min(100, Math.max(0, Math.round(n)));
+        params.push(`VideoColor%5B0%5D%5B0%5D.${f.cam}=${v}`);
+      }
+      if (!params.length) {
+        res.json({ ok: true });
+        return;
+      }
+      const { status, body } = await digestGet(
+        creds.host,
+        cam.http_port || CAMERA_HTTP_PORT,
+        creds.user,
+        creds.pass,
+        `/cgi-bin/configManager.cgi?action=setConfig&${params.join("&")}`,
+      );
+      if (status !== 200 || !/ok/i.test(body)) {
+        res.status(502).json({ message: "A câmera recusou os ajustes de imagem." });
+        return;
+      }
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error("setImage:", e?.message);
+      res.status(502).json({ message: "Não foi possível salvar a imagem na câmera." });
     }
   }
 

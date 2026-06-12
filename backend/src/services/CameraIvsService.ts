@@ -22,8 +22,8 @@ dotenv.config();
  */
 
 const RECONNECT_MS = 5000;
-// Tempo que continua gravando DEPOIS que o movimento para (o "rabo").
-const RECORD_LATCH_MS = 8000;
+// Latch padrão (segundos) caso a câmera não tenha record_latch definido.
+const DEFAULT_RECORD_LATCH_S = 8;
 const EVENT_CODES = "VideoMotion";
 
 const md5 = (s: string) => crypto.createHash("md5").update(s).digest("hex");
@@ -53,6 +53,7 @@ interface CamConn {
   pass: string;
   enabled: boolean; // interruptor mestre (= camera.gravando)
   recording: boolean; // estado atual da gravação no MediaMTX
+  latchMs: number; // quanto continua gravando após o movimento parar (0 = na hora)
   connected: boolean; // stream de eventos da câmera aberto (200)
   req?: http.ClientRequest;
   stopTimer?: NodeJS.Timeout; // desligar a gravação após o latch
@@ -129,15 +130,27 @@ class CameraIvsService {
 
   private onMotionStop(conn: CamConn): void {
     if (conn.stopTimer) clearTimeout(conn.stopTimer);
+    // Latch 0: desliga a gravação assim que o movimento para.
+    if (conn.latchMs <= 0) {
+      this.pushDebug(conn.pathName, "motion", "⚪ movimento parou — desligando gravação");
+      void this.setRecord(conn, false);
+      return;
+    }
     this.pushDebug(
       conn.pathName,
       "motion",
-      `⚪ movimento parou — mantém gravando por ${RECORD_LATCH_MS / 1000}s`,
+      `⚪ movimento parou — mantém gravando por ${conn.latchMs / 1000}s`,
     );
     conn.stopTimer = setTimeout(() => {
       conn.stopTimer = undefined;
       void this.setRecord(conn, false);
-    }, RECORD_LATCH_MS);
+    }, conn.latchMs);
+  }
+
+  /** Atualiza o latch (segundos) de uma câmera em execução, sem reconectar. */
+  public setLatch(pathName: string, seconds: number): void {
+    const conn = this.conns.get(pathName);
+    if (conn) conn.latchMs = Math.max(0, seconds) * 1000;
   }
 
   // ---------------- ciclo de vida ----------------
@@ -172,6 +185,8 @@ class CameraIvsService {
       pass: creds.pass,
       enabled: cam.gravando !== false,
       recording: false,
+      latchMs:
+        Math.max(0, cam.record_latch ?? DEFAULT_RECORD_LATCH_S) * 1000,
       connected: false,
       stopped: false,
     };
@@ -230,6 +245,17 @@ class CameraIvsService {
     if (conn.connected) {
       conn.connected = false;
       this.pushDebug(conn.pathName, "conn", `🔌 desconectado (${reason}) — reconectando…`);
+    }
+    // Proteção: se caiu gravando e SEM latch agendado, o evento de "Stop" pode
+    // ter se perdido. Trata como movimento parado (aplica o latch) para não
+    // ficar gravando indefinidamente até a próxima reconexão.
+    if (conn.recording && !conn.stopTimer) {
+      this.pushDebug(
+        conn.pathName,
+        "conn",
+        "conexão caiu gravando — encerrando pelo latch (Stop pode ter se perdido)",
+      );
+      this.onMotionStop(conn);
     }
     this.scheduleReconnect(conn);
   }
