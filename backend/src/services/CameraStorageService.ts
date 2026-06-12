@@ -10,10 +10,10 @@ dotenv.config();
  * Cota de armazenamento de gravações por cliente-câmera.
  *
  * O MediaMTX grava 24/7 e só faz retenção por TEMPO (recordDeleteAfter). Aqui
- * complementamos com retenção por TAMANHO: cada cliente tem direito a um limite
- * fixo (5 GB) somando todas as suas câmeras. Quando o uso passa do limite,
- * apagamos os segmentos .mp4 mais antigos (entre todas as câmeras do cliente)
- * até voltar abaixo da cota.
+ * complementamos com retenção por TAMANHO: cada cliente tem um limite fixo
+ * (5 GB), dividido em FATIAS IGUAIS entre as câmeras (5 GB / nº de câmeras).
+ * Cada câmera só poda as PRÓPRIAS gravações ao passar da sua fatia — assim uma
+ * câmera movimentada não consome todo o espaço e zera o histórico das outras.
  */
 
 // Pasta no host onde o MediaMTX grava (mesmo valor usado em Camera.ts).
@@ -88,39 +88,44 @@ class CameraStorageService {
   }
 
   /**
-   * Garante que o cliente esteja dentro da cota: se passou do limite, apaga os
-   * segmentos mais antigos (entre todas as suas câmeras) até voltar abaixo.
-   * Retorna quantos bytes foram liberados.
+   * Garante que o cliente esteja dentro da cota, com FATIA JUSTA por câmera:
+   * a cota total é dividida igualmente entre as câmeras e cada câmera só pode
+   * exceder a SUA fatia. Assim uma câmera que grava muito não consome todo o
+   * espaço e zera as gravações das outras — cada câmera mantém seu próprio
+   * rodízio (apaga o mais antigo dela ao passar da fatia).
+   * Retorna quantos bytes foram liberados no total.
    */
   public async enforceQuotaForCliente(cid: number): Promise<number> {
     const repo = AppDataSource.getRepository(Camera);
     const cameras = await repo.find({ where: { cliente_id: cid } });
+    if (!cameras.length) return 0;
 
-    // Junta os segmentos de todas as câmeras do cliente e ordena do mais antigo.
-    let segments: SegmentFile[] = [];
-    for (const cam of cameras) {
-      segments.push(...listSegmentFiles(this.camDir(cam.path_name)));
-    }
-    let used = segments.reduce((acc, f) => acc + f.size, 0);
-    if (used <= STORAGE_QUOTA_BYTES) return 0;
-
-    segments.sort((a, b) => a.mtimeMs - b.mtimeMs); // mais antigo primeiro
-
+    const perCameraQuota = Math.floor(STORAGE_QUOTA_BYTES / cameras.length);
     let freed = 0;
-    for (const seg of segments) {
-      if (used <= STORAGE_QUOTA_BYTES) break;
-      try {
-        fs.rmSync(seg.fullPath, { force: true });
-        used -= seg.size;
-        freed += seg.size;
-      } catch (e: any) {
-        console.error("enforceQuota: falha ao apagar", seg.fullPath, e?.message);
+
+    for (const cam of cameras) {
+      const segments = listSegmentFiles(this.camDir(cam.path_name)).sort(
+        (a, b) => a.mtimeMs - b.mtimeMs, // mais antigo primeiro
+      );
+      let used = segments.reduce((acc, f) => acc + f.size, 0);
+      if (used <= perCameraQuota) continue;
+
+      for (const seg of segments) {
+        if (used <= perCameraQuota) break;
+        try {
+          fs.rmSync(seg.fullPath, { force: true });
+          used -= seg.size;
+          freed += seg.size;
+        } catch (e: any) {
+          console.error("enforceQuota: falha ao apagar", seg.fullPath, e?.message);
+        }
       }
     }
 
     if (freed > 0) {
       console.log(
-        `🗄️  Cota de câmeras: cliente ${cid} excedeu ${STORAGE_QUOTA_GB} GB — ` +
+        `🗄️  Cota de câmeras: cliente ${cid} (${cameras.length} câmera(s), ` +
+          `${(perCameraQuota / 1024 / 1024 / 1024).toFixed(2)} GB cada) — ` +
           `liberados ${(freed / 1024 / 1024).toFixed(1)} MB.`,
       );
     }

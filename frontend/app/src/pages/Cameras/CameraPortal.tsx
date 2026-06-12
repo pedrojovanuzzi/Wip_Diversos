@@ -60,9 +60,9 @@ export default function CameraPortal() {
   const [tipo, setTipo] = useState("intelbras"); // só Intelbras/Dahua (detecção)
   const [adding, setAdding] = useState(false);
 
-  // editar câmera (nome, ip, porta)
+  // editar câmera (nome, URL RTSP completa, porta HTTP)
   const [editCam, setEditCam] = useState<Cam | null>(null);
-  const [editForm, setEditForm] = useState({ nome: "", ip: "", porta: "", httpPort: "" });
+  const [editForm, setEditForm] = useState({ nome: "", rtsp: "", httpPort: "" });
   const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
 
@@ -451,7 +451,7 @@ export default function CameraPortal() {
 
   const openEdit = async (cam: Cam) => {
     setEditCam(cam);
-    setEditForm({ nome: cam.nome, ip: "", porta: "", httpPort: "" });
+    setEditForm({ nome: cam.nome, rtsp: "", httpPort: "" });
     setEditLoading(true);
     try {
       const res = await axios.get(`${base}/cameras/cameras/${cam.id}`, {
@@ -459,8 +459,7 @@ export default function CameraPortal() {
       });
       setEditForm({
         nome: res.data.nome || cam.nome,
-        ip: res.data.host || "",
-        porta: res.data.port ? String(res.data.port) : "",
+        rtsp: res.data.rtsp_url || "",
         httpPort: res.data.http_port ? String(res.data.http_port) : "80",
       });
     } catch (e: any) {
@@ -479,8 +478,7 @@ export default function CameraPortal() {
         `${base}/cameras/cameras/${editCam.id}`,
         {
           nome: editForm.nome,
-          ip: editForm.ip,
-          porta: editForm.porta,
+          rtsp_url: editForm.rtsp,
           http_port: editForm.httpPort,
         },
         { headers: authHeaders() },
@@ -1125,44 +1123,33 @@ export default function CameraPortal() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">IP</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    URL RTSP
+                  </label>
                   <input
-                    value={editForm.ip}
-                    onChange={(e) => setEditForm((s) => ({ ...s, ip: e.target.value }))}
+                    value={editForm.rtsp}
+                    onChange={(e) => setEditForm((s) => ({ ...s, rtsp: e.target.value }))}
                     required
-                    placeholder="192.168.0.10"
+                    placeholder="rtsp://usuario:senha@ip:554/stream"
+                    className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Porta HTTP
+                  </label>
+                  <input
+                    value={editForm.httpPort}
+                    onChange={(e) => setEditForm((s) => ({ ...s, httpPort: e.target.value }))}
+                    inputMode="numeric"
+                    placeholder="80"
                     className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Porta RTSP
-                    </label>
-                    <input
-                      value={editForm.porta}
-                      onChange={(e) => setEditForm((s) => ({ ...s, porta: e.target.value }))}
-                      inputMode="numeric"
-                      placeholder="554"
-                      className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Porta HTTP
-                    </label>
-                    <input
-                      value={editForm.httpPort}
-                      onChange={(e) => setEditForm((s) => ({ ...s, httpPort: e.target.value }))}
-                      inputMode="numeric"
-                      placeholder="80"
-                      className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
-                    />
-                  </div>
-                </div>
                 <p className="text-xs text-gray-400">
-                  Usuário, senha e caminho do stream são mantidos. A Porta HTTP é a da
-                  interface/eventos da câmera (padrão 80; mude se usar port-forward).
+                  A URL inclui usuário, senha, IP, porta RTSP e caminho do stream. A
+                  Porta HTTP é a da interface/eventos da câmera (padrão 80; mude se
+                  usar port-forward).
                 </p>
               </>
             )}

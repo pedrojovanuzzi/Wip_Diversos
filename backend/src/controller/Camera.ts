@@ -497,6 +497,7 @@ class Camera {
         id: cam.id,
         nome: cam.nome,
         ativo: cam.ativo,
+        rtsp_url: cam.rtsp_url, // URL completa (dono da câmera pode editar)
         host: parts?.host || "",
         port: parts?.port || "",
         http_port: cam.http_port || 80,
