@@ -26,7 +26,7 @@ interface RecFile {
 interface Storage {
   usedBytes: number;
   quotaBytes: number;
-  perCameraBytes?: number;
+  reserveBytes?: number; // mínimo garantido por câmera (modelo híbrido)
   cameras?: { id: number; nome: string; bytes: number }[];
 }
 
@@ -684,12 +684,16 @@ export default function CameraPortal() {
       ? (bytes / 1024 / 1024).toFixed(0) + " MB"
       : (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
 
-  // Uso/limite de armazenamento de uma câmera (fatia da cota do cliente).
+  // Uso de armazenamento de uma câmera dentro da cota COMPARTILHADA do cliente.
+  // No modelo híbrido a câmera pode usar mais que a fatia igual (aproveita o
+  // espaço livre); por isso a barra é relativa ao total, e mostramos o mínimo
+  // garantido (reserva).
   const camStorage = (id?: number) => {
-    const limit = storage?.perCameraBytes ?? storage?.quotaBytes ?? 0;
+    const total = storage?.quotaBytes ?? 0;
+    const reserve = storage?.reserveBytes ?? 0;
     const used = storage?.cameras?.find((c) => c.id === id)?.bytes ?? 0;
-    const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
-    return { used, limit, pct };
+    const pct = total ? Math.min(100, (used / total) * 100) : 0;
+    return { used, total, reserve, pct };
   };
 
   // Fecha o modal só em clique DELIBERADO no fundo (mousedown + clique ambos no
@@ -1108,25 +1112,28 @@ export default function CameraPortal() {
                   </div>
                 </div>
 
-                {/* Armazenamento desta câmera (uso x fatia da cota) */}
+                {/* Armazenamento desta câmera (uso na cota compartilhada) */}
                 {storage && (() => {
-                  const { used, limit, pct } = camStorage(cam.id);
+                  const { used, total, reserve, pct } = camStorage(cam.id);
                   return (
                     <div className="mt-3">
                       <div className="flex justify-between text-xs text-gray-500 mb-1">
                         <span>Armazenamento</span>
                         <span>
-                          {fmtUsage(used)} de {fmtGB(limit)}
+                          {fmtUsage(used)} de {fmtGB(total)}
                         </span>
                       </div>
                       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full ${
-                            pct >= 95 ? "bg-red-500" : "bg-indigo-500"
-                          }`}
+                          className="h-full rounded-full bg-indigo-500"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
+                      {reserve > 0 && (
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          mín. garantido: {fmtUsage(reserve)}
+                        </p>
+                      )}
                     </div>
                   );
                 })()}

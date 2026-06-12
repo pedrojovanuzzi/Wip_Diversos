@@ -11,9 +11,10 @@ dotenv.config();
  *
  * O MediaMTX grava 24/7 e só faz retenção por TEMPO (recordDeleteAfter). Aqui
  * complementamos com retenção por TAMANHO: cada cliente tem um limite fixo
- * (5 GB), dividido em FATIAS IGUAIS entre as câmeras (5 GB / nº de câmeras).
- * Cada câmera só poda as PRÓPRIAS gravações ao passar da sua fatia — assim uma
- * câmera movimentada não consome todo o espaço e zera o histórico das outras.
+ * (5 GB), gerido de forma HÍBRIDA — cada câmera tem uma RESERVA garantida
+ * (suas gravações mais recentes) que nunca é apagada, e o excedente mais antigo
+ * de todas vira um POOL compartilhado podado por idade. Assim nenhuma câmera é
+ * zerada E o espaço livre das câmeras quietas é aproveitado pelas movimentadas.
  */
 
 // Pasta no host onde o MediaMTX grava (mesmo valor usado em Camera.ts).
@@ -24,6 +25,10 @@ const RECORDINGS_PATH =
 // Cota fixa por cliente: 5 GB (provisório). Constante pública (sem .env).
 export const STORAGE_QUOTA_GB = 5;
 export const STORAGE_QUOTA_BYTES = STORAGE_QUOTA_GB * 1024 * 1024 * 1024;
+
+// Fração da fatia igual (cota/Nº de câmeras) que cada câmera tem GARANTIDA para
+// suas gravações mais recentes (reserva). O resto é um pool compartilhado.
+const RESERVE_FRACTION = 0.5;
 
 interface SegmentFile {
   fullPath: string;
@@ -65,7 +70,7 @@ class CameraStorageService {
   public async getClienteUsage(cid: number): Promise<{
     usedBytes: number;
     quotaBytes: number;
-    perCameraBytes: number;
+    reserveBytes: number;
     cameras: { id: number; nome: string; bytes: number }[];
   }> {
     const repo = AppDataSource.getRepository(Camera);
@@ -84,20 +89,27 @@ class CameraStorageService {
     return {
       usedBytes,
       quotaBytes: STORAGE_QUOTA_BYTES,
-      // Fatia por câmera (mesma conta do enforceQuotaForCliente).
-      perCameraBytes: cameras.length
-        ? Math.floor(STORAGE_QUOTA_BYTES / cameras.length)
-        : STORAGE_QUOTA_BYTES,
+      // Mínimo garantido por câmera (reserva do modelo híbrido).
+      reserveBytes: this.reserveBytes(cameras.length),
       cameras: detalhe,
     };
   }
 
+  /** Bytes reservados (garantidos) por câmera = fração da fatia igual. */
+  private reserveBytes(cameraCount: number): number {
+    if (cameraCount <= 0) return STORAGE_QUOTA_BYTES;
+    return Math.floor(
+      (STORAGE_QUOTA_BYTES / cameraCount) * RESERVE_FRACTION,
+    );
+  }
+
   /**
-   * Garante que o cliente esteja dentro da cota, com FATIA JUSTA por câmera:
-   * a cota total é dividida igualmente entre as câmeras e cada câmera só pode
-   * exceder a SUA fatia. Assim uma câmera que grava muito não consome todo o
-   * espaço e zera as gravações das outras — cada câmera mantém seu próprio
-   * rodízio (apaga o mais antigo dela ao passar da fatia).
+   * Garante a cota do cliente com modelo HÍBRIDO:
+   *  - Cada câmera tem uma RESERVA (suas gravações mais recentes, até
+   *    `reserveBytes`) que nunca é apagada → nenhuma câmera é zerada.
+   *  - O excedente (mais antigo) de TODAS as câmeras forma um POOL
+   *    compartilhado, podado do mais antigo quando o total passa da cota →
+   *    a câmera movimentada aproveita o espaço que as quietas não usam.
    * Retorna quantos bytes foram liberados no total.
    */
   public async enforceQuotaForCliente(cid: number): Promise<number> {
@@ -105,32 +117,45 @@ class CameraStorageService {
     const cameras = await repo.find({ where: { cliente_id: cid } });
     if (!cameras.length) return 0;
 
-    const perCameraQuota = Math.floor(STORAGE_QUOTA_BYTES / cameras.length);
-    let freed = 0;
+    const reserve = this.reserveBytes(cameras.length);
+    let totalUsed = 0;
+    const deletable: SegmentFile[] = []; // excedente fora da reserva (pool)
 
     for (const cam of cameras) {
-      const segments = listSegmentFiles(this.camDir(cam.path_name)).sort(
-        (a, b) => a.mtimeMs - b.mtimeMs, // mais antigo primeiro
+      const segs = listSegmentFiles(this.camDir(cam.path_name)).sort(
+        (a, b) => b.mtimeMs - a.mtimeMs, // mais NOVO primeiro
       );
-      let used = segments.reduce((acc, f) => acc + f.size, 0);
-      if (used <= perCameraQuota) continue;
-
-      for (const seg of segments) {
-        if (used <= perCameraQuota) break;
-        try {
-          fs.rmSync(seg.fullPath, { force: true });
-          used -= seg.size;
-          freed += seg.size;
-        } catch (e: any) {
-          console.error("enforceQuota: falha ao apagar", seg.fullPath, e?.message);
+      let protectedSize = 0;
+      for (const seg of segs) {
+        totalUsed += seg.size;
+        if (protectedSize < reserve) {
+          protectedSize += seg.size; // protege as gravações recentes da câmera
+        } else {
+          deletable.push(seg); // o resto (mais antigo) vai pro pool compartilhado
         }
+      }
+    }
+
+    if (totalUsed <= STORAGE_QUOTA_BYTES) return 0;
+
+    deletable.sort((a, b) => a.mtimeMs - b.mtimeMs); // mais antigo primeiro (global)
+
+    let freed = 0;
+    for (const seg of deletable) {
+      if (totalUsed <= STORAGE_QUOTA_BYTES) break;
+      try {
+        fs.rmSync(seg.fullPath, { force: true });
+        totalUsed -= seg.size;
+        freed += seg.size;
+      } catch (e: any) {
+        console.error("enforceQuota: falha ao apagar", seg.fullPath, e?.message);
       }
     }
 
     if (freed > 0) {
       console.log(
         `🗄️  Cota de câmeras: cliente ${cid} (${cameras.length} câmera(s), ` +
-          `${(perCameraQuota / 1024 / 1024 / 1024).toFixed(2)} GB cada) — ` +
+          `reserva ${(reserve / 1024 / 1024 / 1024).toFixed(2)} GB cada + pool) — ` +
           `liberados ${(freed / 1024 / 1024).toFixed(1)} MB.`,
       );
     }
