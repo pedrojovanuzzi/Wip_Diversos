@@ -169,15 +169,21 @@ export const TimeClock = () => {
       return;
     }
 
+    // Operador com permissão >= 5 dispensa o CPF (autentica pelo token).
+    if ((user?.permission || 0) >= 5) {
+      doClockIn(type, "");
+      return;
+    }
     setPendingAction({ type });
     setShowCpfModal(true);
   };
 
   const handleConfirmCpf = async (cpf: string) => {
     if (!pendingAction) return;
+    await doClockIn(pendingAction.type, cpf);
+  };
 
-    const { type } = pendingAction;
-
+  const doClockIn = async (type: string, cpf: string) => {
     if (!location) {
       setErrorMessage("Localização perdida. Tente novamente.");
       setShowErrorModal(true);
@@ -198,23 +204,31 @@ export const TimeClock = () => {
       // É a primeira batida do dia? (avaliado antes de atualizar os registros)
       const isFirstPunchOfDay = dailyRecords.length === 0;
 
-      await axios.post(`${process.env.REACT_APP_URL}/time-tracking/clock-in`, {
-        employeeId,
-        lat: location?.lat,
-        lng: location?.lng,
-        photo,
-        type,
-        timestamp: selectedTime,
-        cpf,
-        scale, // Pass the selected scale
-      });
+      await axios.post(
+        `${process.env.REACT_APP_URL}/time-tracking/clock-in`,
+        {
+          employeeId,
+          lat: location?.lat,
+          lng: location?.lng,
+          photo,
+          type,
+          timestamp: selectedTime,
+          cpf,
+          scale, // Pass the selected scale
+        },
+        // Envia o token para o backend reconhecer operador permissão >= 5.
+        user?.token
+          ? { headers: { Authorization: `Bearer ${user.token}` } }
+          : undefined,
+      );
       setMessage(`Ponto registrado com sucesso: ${type}!`);
       fetchDailyRecords();
       setShowCpfModal(false);
 
-      if (isFirstPunchOfDay) {
+      if (isFirstPunchOfDay && cpf) {
         // Na primeira batida do dia, abre a assinatura da folha automaticamente,
         // reaproveitando o CPF já validado (sem precisar do botão "Assinar Dia").
+        // Quando o CPF foi dispensado (permissão >= 5), não abre automaticamente.
         setVerifiedCpf(cpf);
         setShowSigModal(true);
       } else {
