@@ -692,6 +692,17 @@ export default function CameraPortal() {
     return { used, limit, pct };
   };
 
+  // Fecha o modal só em clique DELIBERADO no fundo (mousedown + clique ambos no
+  // overlay). Evita fechar ao arrastar pra selecionar texto e soltar fora.
+  const backdropDownRef = useRef(false);
+  const onBackdropMouseDown = (e: React.MouseEvent) => {
+    backdropDownRef.current = e.target === e.currentTarget;
+  };
+  const backdropClose =
+    (close: () => void) => (e: React.MouseEvent) => {
+      if (backdropDownRef.current && e.target === e.currentTarget) close();
+    };
+
   const logout = () => {
     clearCamSession();
     navigate("/Cameras/Login");
@@ -1162,7 +1173,8 @@ export default function CameraPortal() {
       {editCam && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => !editSaving && setEditCam(null)}
+          onMouseDown={onBackdropMouseDown}
+          onClick={backdropClose(() => !editSaving && setEditCam(null))}
         >
           <form
             onSubmit={saveEdit}
@@ -1245,7 +1257,8 @@ export default function CameraPortal() {
       {detectCam && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => !detectSaving && setDetectCam(null)}
+          onMouseDown={onBackdropMouseDown}
+          onClick={backdropClose(() => !detectSaving && setDetectCam(null))}
         >
           <form
             onSubmit={saveDetect}
@@ -1504,7 +1517,8 @@ export default function CameraPortal() {
       {debugCam && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setDebugCam(null)}
+          onMouseDown={onBackdropMouseDown}
+          onClick={backdropClose(() => setDebugCam(null))}
         >
           <div
             className="bg-white rounded-lg w-full max-w-2xl max-h-[85vh] flex flex-col"
