@@ -671,6 +671,8 @@ class Camera {
         recordEnable: val("EventHandler\\.RecordEnable") === "true",
         // Latch do BACKEND (segundos após o movimento). Fonte: entidade.
         recordLatch: cam.record_latch ?? 8,
+        // Anti-tremor da câmera: segura o evento ativo após o movimento parar.
+        dejitter: Number(val("EventHandler\\.Dejitter")) || 0,
         sensitive: Number(val("MotionDetectWindow\\[0\\]\\.Sensitive")) || 40,
         threshold: Number(val("MotionDetectWindow\\[0\\]\\.Threshold")) || 8,
         region, // máscara atual (para o editor de região no app)
@@ -715,6 +717,9 @@ class Camera {
       // Latch do backend (segundos que o MediaMTX segue gravando após o
       // movimento parar). 0 = para na hora. É o que vale de verdade.
       const recordLatch = clamp(b.recordLatch, 0, 600, 8);
+      // Anti-tremor da câmera (segura o evento ativo após o movimento parar).
+      // Valor alto estica o clipe; baixo encurta. 0..100s.
+      const dejitter = clamp(b.dejitter, 0, 100, 1);
 
       // Persiste o latch na câmera e aplica ao listener em execução.
       cam.record_latch = recordLatch;
@@ -750,6 +755,7 @@ class Camera {
         `${p}.EventHandler.RecordEnable=${recordEnable}`,
         // A câmera (SD) não aceita 0; o latch que vale é o do backend (record_latch).
         `${p}.EventHandler.RecordLatch=${Math.max(1, recordLatch)}`,
+        `${p}.EventHandler.Dejitter=${dejitter}`,
         `${p}.MotionDetectWindow%5B0%5D.Sensitive=${sensitive}`,
         `${p}.MotionDetectWindow%5B0%5D.Threshold=${threshold}`,
       ]);

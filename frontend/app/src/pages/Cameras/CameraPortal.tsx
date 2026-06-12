@@ -81,7 +81,8 @@ export default function CameraPortal() {
   interface MotionDetect {
     enable: boolean;
     recordEnable: boolean;
-    recordLatch: number; // segundos gravando após o movimento
+    recordLatch: number; // segundos gravando após o movimento (backend)
+    dejitter: number; // anti-tremor da câmera: segura o evento após o movimento (s)
     sensitive: number; // 0..100 (maior = mais sensível)
     threshold: number; // 0..100 (área mínima alterada)
     region?: number[]; // 18 linhas, cada uma bitmask de 14 colunas (0..16383)
@@ -1343,6 +1344,26 @@ export default function CameraPortal() {
                       <b>0 = para na hora.</b>
                     </p>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Anti-tremor (s)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={detect.dejitter}
+                    onChange={(e) =>
+                      setDetect({ ...detect, dejitter: Number(e.target.value) })
+                    }
+                    className="w-full ring-1 ring-gray-300 rounded-md px-3 py-2 text-sm"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Quanto a câmera segura o evento ativo DEPOIS que o movimento
+                    para (estica o clipe). <b>Recomendado: 1–2.</b>
+                  </p>
                 </div>
 
                 {/* Imagem (VideoColor): só os campos que a câmera expõe. */}

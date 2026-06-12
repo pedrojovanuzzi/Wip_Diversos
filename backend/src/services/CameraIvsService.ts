@@ -53,6 +53,7 @@ interface CamConn {
   pass: string;
   enabled: boolean; // interruptor mestre (= camera.gravando)
   recording: boolean; // estado atual da gravação no MediaMTX
+  motionActive: boolean; // há movimento em curso (de-dup: as 4 janelas disparam o mesmo evento)
   latchMs: number; // quanto continua gravando após o movimento parar (0 = na hora)
   connected: boolean; // stream de eventos da câmera aberto (200)
   req?: http.ClientRequest;
@@ -116,6 +117,9 @@ class CameraIvsService {
   }
 
   private onMotionStart(conn: CamConn): void {
+    // De-dup: as 4 janelas disparam o mesmo VideoMotion. Só o 1º Start conta.
+    if (conn.motionActive) return;
+    conn.motionActive = true;
     if (conn.stopTimer) {
       clearTimeout(conn.stopTimer);
       conn.stopTimer = undefined;
@@ -129,6 +133,9 @@ class CameraIvsService {
   }
 
   private onMotionStop(conn: CamConn): void {
+    // De-dup: ignora Stops repetidos (já não há movimento em curso).
+    if (!conn.motionActive) return;
+    conn.motionActive = false;
     if (conn.stopTimer) clearTimeout(conn.stopTimer);
     // Latch 0: desliga a gravação assim que o movimento para.
     if (conn.latchMs <= 0) {
@@ -185,6 +192,7 @@ class CameraIvsService {
       pass: creds.pass,
       enabled: cam.gravando !== false,
       recording: false,
+      motionActive: false,
       latchMs:
         Math.max(0, cam.record_latch ?? DEFAULT_RECORD_LATCH_S) * 1000,
       connected: false,
@@ -215,11 +223,12 @@ class CameraIvsService {
     conn.enabled = enabled;
     this.pushDebug(pathName, "record", enabled ? "⏯ gravação por movimento RETOMADA" : "⏸ gravação por movimento PAUSADA");
     if (!enabled) {
-      // Pausado: cancela qualquer latch e desliga a gravação agora.
+      // Pausado: cancela qualquer latch, zera o estado e desliga a gravação.
       if (conn.stopTimer) {
         clearTimeout(conn.stopTimer);
         conn.stopTimer = undefined;
       }
+      conn.motionActive = false;
       void this.setRecord(conn, false);
     }
     // Se reativado, não liga agora — espera o próximo movimento.
