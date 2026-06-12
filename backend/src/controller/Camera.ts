@@ -670,7 +670,7 @@ class Camera {
         enable: val("Enable") === "true",
         recordEnable: val("EventHandler\\.RecordEnable") === "true",
         // Latch do BACKEND (segundos após o movimento). Fonte: entidade.
-        recordLatch: cam.record_latch ?? 8,
+        recordLatch: cam.record_latch ?? 2,
         // Anti-tremor da câmera: segura o evento ativo após o movimento parar.
         dejitter: Number(val("EventHandler\\.Dejitter")) || 0,
         sensitive: Number(val("MotionDetectWindow\\[0\\]\\.Sensitive")) || 40,
@@ -716,7 +716,7 @@ class Camera {
       const threshold = clamp(b.threshold, 0, 100, 8);
       // Latch do backend (segundos que o MediaMTX segue gravando após o
       // movimento parar). 0 = para na hora. É o que vale de verdade.
-      const recordLatch = clamp(b.recordLatch, 0, 600, 8);
+      const recordLatch = clamp(b.recordLatch, 0, 600, 2);
       // Anti-tremor da câmera (segura o evento ativo após o movimento parar).
       // Valor alto estica o clipe; baixo encurta. 0..100s.
       const dejitter = clamp(b.dejitter, 0, 100, 1);

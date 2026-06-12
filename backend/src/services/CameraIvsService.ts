@@ -23,7 +23,7 @@ dotenv.config();
 
 const RECONNECT_MS = 5000;
 // Latch padrão (segundos) caso a câmera não tenha record_latch definido.
-const DEFAULT_RECORD_LATCH_S = 8;
+const DEFAULT_RECORD_LATCH_S = 2;
 const EVENT_CODES = "VideoMotion";
 
 const md5 = (s: string) => crypto.createHash("md5").update(s).digest("hex");

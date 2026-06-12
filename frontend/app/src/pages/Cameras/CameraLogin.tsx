@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import icon from "../../assets/icon.png";
 import { MdVideocam } from "react-icons/md";
-import { saveCamSession } from "./cameraAuth";
+import { getCamToken, saveCamSession } from "./cameraAuth";
 import InstallPWAButton from "./components/InstallPWAButton";
 
 export default function CameraLogin() {
@@ -11,6 +11,11 @@ export default function CameraLogin() {
   const base = process.env.REACT_APP_URL;
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Se já houver sessão salva, vai direto pro portal.
+  useEffect(() => {
+    if (getCamToken()) navigate("/Cameras/Portal", { replace: true });
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
