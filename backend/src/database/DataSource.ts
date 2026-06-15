@@ -104,6 +104,16 @@ AppDataSource.initialize()
     } catch (err) {
       console.error("Falha ao iniciar gravação por movimento:", err);
     }
+
+    // Move as gravações para o servidor remoto e libera o disco local.
+    try {
+      const { default: CameraOffloadService } = await import(
+        "../services/CameraOffloadService"
+      );
+      CameraOffloadService.start();
+    } catch (err) {
+      console.error("Falha ao iniciar offload de gravações:", err);
+    }
   })
   .catch((err) => {
     console.error("Error during Data Source initialization", err);

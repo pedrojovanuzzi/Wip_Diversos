@@ -30,6 +30,14 @@ interface ListResponse {
   valoresUnitarios: Record<string, number>;
 }
 
+// Planos de armazenamento das gravações (espelha o backend: cameraStoragePlans.ts).
+const STORAGE_PLANS = [
+  { gb: 5, price: 20 },
+  { gb: 10, price: 30 },
+  { gb: 15, price: 35 },
+  { gb: 20, price: 40 },
+];
+
 export const SerContratos: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -61,6 +69,8 @@ export const SerContratos: React.FC = () => {
     alreadyConfigured?: boolean;
   } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  // Plano de armazenamento escolhido ao adicionar Câmeras (padrão 5 GB).
+  const [cameraGb, setCameraGb] = useState(5);
 
   const base = process.env.REACT_APP_URL;
   const headers = { Authorization: `Bearer ${user?.token}` };
@@ -124,7 +134,7 @@ export const SerContratos: React.FC = () => {
       showMsg((res.data.message || "Adicionado com sucesso.") + extraMsg, "success");
       await fetchList(loaded.login);
       if (tipo === "CAMERA") {
-        await ensureCameraClient(loaded.login);
+        await ensureCameraClient(loaded.login, extras?.storageGb);
       }
     } catch (e: any) {
       if (
@@ -183,11 +193,11 @@ export const SerContratos: React.FC = () => {
   };
 
   // Garante a conta de câmeras do cliente e abre o popup com o link de cadastro.
-  const ensureCameraClient = async (login: string) => {
+  const ensureCameraClient = async (login: string, storageGb?: number) => {
     try {
       const res = await axios.post(
         `${base}/cameras/admin/clientes/ensure`,
-        { login },
+        { login, storageGb },
         { headers },
       );
       setLinkCopied(false);
@@ -492,8 +502,8 @@ export const SerContratos: React.FC = () => {
                     <h2 className="font-bold text-gray-800">Câmeras</h2>
                   </div>
                   <p className="text-xs text-gray-500 mb-2">
-                    R$ {(loaded.valoresUnitarios.CAMERA ?? 20).toFixed(2)}/mês —
-                    máx. 1 por cliente · câmeras ilimitadas no portal
+                    Plano de armazenamento das gravações — máx. 1 por cliente ·
+                    câmeras ilimitadas no portal
                   </p>
                   {totalCameras > 0 && (
                     <div className="flex items-center bg-blue-50 p-2 rounded mb-2">
@@ -502,10 +512,29 @@ export const SerContratos: React.FC = () => {
                       </span>
                     </div>
                   )}
+                  {totalCameras === 0 && (
+                    <label className="block mb-2">
+                      <span className="text-xs font-medium text-gray-600">
+                        Armazenamento
+                      </span>
+                      <select
+                        value={cameraGb}
+                        onChange={(e) => setCameraGb(Number(e.target.value))}
+                        disabled={adding}
+                        className="mt-1 w-full ring-1 ring-gray-300 rounded px-2 py-1.5 text-sm"
+                      >
+                        {STORAGE_PLANS.map((p) => (
+                          <option key={p.gb} value={p.gb}>
+                            {p.gb} GB — R$ {p.price.toFixed(2)}/mês
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <div className="flex gap-2">
                     {totalCameras === 0 ? (
                       <button
-                        onClick={() => addServico("CAMERA")}
+                        onClick={() => addServico("CAMERA", { storageGb: cameraGb })}
                         disabled={adding}
                         className="flex-1 py-2 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 disabled:bg-gray-400"
                       >

@@ -3,6 +3,9 @@ import path from "path";
 import dotenv from "dotenv";
 import AppDataSource from "../database/DataSource";
 import { Camera } from "../entities/Camera";
+import { CameraCliente } from "../entities/CameraCliente";
+import { DEFAULT_STORAGE_GB } from "../config/cameraStoragePlans";
+import RemoteStorage from "./CameraRemoteStorageService";
 
 dotenv.config();
 
@@ -22,9 +25,7 @@ const RECORDINGS_PATH =
   process.env.MEDIAMTX_RECORDINGS_PATH ||
   "/var/lib/docker/volumes/backend_mediamtx_recordings/_data";
 
-// Cota fixa por cliente: 5 GB (provisório). Constante pública (sem .env).
-export const STORAGE_QUOTA_GB = 5;
-export const STORAGE_QUOTA_BYTES = STORAGE_QUOTA_GB * 1024 * 1024 * 1024;
+const GB = 1024 * 1024 * 1024;
 
 // Fração da fatia igual (cota/Nº de câmeras) que cada câmera tem GARANTIDA para
 // suas gravações mais recentes (reserva). O resto é um pool compartilhado.
@@ -63,6 +64,14 @@ class CameraStorageService {
     return path.join(RECORDINGS_PATH, pathName);
   }
 
+  /** Cota do cliente (bytes) a partir do plano salvo em camera_clientes.storage_gb. */
+  private async quotaBytesForCliente(cid: number): Promise<number> {
+    const repo = AppDataSource.getRepository(CameraCliente);
+    const cliente = await repo.findOne({ where: { id: cid } });
+    const gb = cliente?.storage_gb || DEFAULT_STORAGE_GB;
+    return gb * GB;
+  }
+
   /**
    * Uso em disco de um cliente (soma de todas as suas câmeras), em bytes,
    * mais o detalhamento por câmera.
@@ -75,32 +84,38 @@ class CameraStorageService {
   }> {
     const repo = AppDataSource.getRepository(Camera);
     const cameras = await repo.find({ where: { cliente_id: cid } });
+    const quotaBytes = await this.quotaBytesForCliente(cid);
 
     let usedBytes = 0;
-    const detalhe = cameras.map((cam) => {
-      const bytes = listSegmentFiles(this.camDir(cam.path_name)).reduce(
-        (acc, f) => acc + f.size,
-        0,
-      );
-      usedBytes += bytes;
-      return { id: cam.id!, nome: cam.nome, bytes };
-    });
+    const detalhe = await Promise.all(
+      cameras.map(async (cam) => {
+        const bytes = RemoteStorage.isEnabled()
+          ? (await RemoteStorage.listSegments(cam.path_name)).reduce(
+              (acc, f) => acc + f.size,
+              0,
+            )
+          : listSegmentFiles(this.camDir(cam.path_name)).reduce(
+              (acc, f) => acc + f.size,
+              0,
+            );
+        usedBytes += bytes;
+        return { id: cam.id!, nome: cam.nome, bytes };
+      }),
+    );
 
     return {
       usedBytes,
-      quotaBytes: STORAGE_QUOTA_BYTES,
+      quotaBytes,
       // Mínimo garantido por câmera (reserva do modelo híbrido).
-      reserveBytes: this.reserveBytes(cameras.length),
+      reserveBytes: this.reserveBytes(cameras.length, quotaBytes),
       cameras: detalhe,
     };
   }
 
   /** Bytes reservados (garantidos) por câmera = fração da fatia igual. */
-  private reserveBytes(cameraCount: number): number {
-    if (cameraCount <= 0) return STORAGE_QUOTA_BYTES;
-    return Math.floor(
-      (STORAGE_QUOTA_BYTES / cameraCount) * RESERVE_FRACTION,
-    );
+  private reserveBytes(cameraCount: number, quotaBytes: number): number {
+    if (cameraCount <= 0) return quotaBytes;
+    return Math.floor((quotaBytes / cameraCount) * RESERVE_FRACTION);
   }
 
   /**
@@ -117,14 +132,34 @@ class CameraStorageService {
     const cameras = await repo.find({ where: { cliente_id: cid } });
     if (!cameras.length) return 0;
 
-    const reserve = this.reserveBytes(cameras.length);
+    const remote = RemoteStorage.isEnabled();
+    const quotaBytes = await this.quotaBytesForCliente(cid);
+    const reserve = this.reserveBytes(cameras.length, quotaBytes);
     let totalUsed = 0;
-    const deletable: SegmentFile[] = []; // excedente fora da reserva (pool)
+    // Excedente fora da reserva (pool). `ref` = como apagar: caminho local OU
+    // (pathName, rel) no servidor remoto.
+    const deletable: {
+      size: number;
+      mtimeMs: number;
+      fullPath?: string;
+      pathName?: string;
+      rel?: string;
+    }[] = [];
 
     for (const cam of cameras) {
-      const segs = listSegmentFiles(this.camDir(cam.path_name)).sort(
-        (a, b) => b.mtimeMs - a.mtimeMs, // mais NOVO primeiro
-      );
+      const segs = remote
+        ? (await RemoteStorage.listSegments(cam.path_name)).map((s) => ({
+            size: s.size,
+            mtimeMs: s.mtimeMs,
+            pathName: cam.path_name,
+            rel: s.rel,
+          }))
+        : listSegmentFiles(this.camDir(cam.path_name)).map((s) => ({
+            size: s.size,
+            mtimeMs: s.mtimeMs,
+            fullPath: s.fullPath,
+          }));
+      segs.sort((a, b) => b.mtimeMs - a.mtimeMs); // mais NOVO primeiro
       let protectedSize = 0;
       for (const seg of segs) {
         totalUsed += seg.size;
@@ -136,19 +171,42 @@ class CameraStorageService {
       }
     }
 
-    if (totalUsed <= STORAGE_QUOTA_BYTES) return 0;
+    if (totalUsed <= quotaBytes) return 0;
 
     deletable.sort((a, b) => a.mtimeMs - b.mtimeMs); // mais antigo primeiro (global)
 
-    let freed = 0;
+    // Seleciona, do mais antigo, o que precisa sair para voltar à cota.
+    const toDelete: typeof deletable = [];
     for (const seg of deletable) {
-      if (totalUsed <= STORAGE_QUOTA_BYTES) break;
-      try {
-        fs.rmSync(seg.fullPath, { force: true });
-        totalUsed -= seg.size;
-        freed += seg.size;
-      } catch (e: any) {
-        console.error("enforceQuota: falha ao apagar", seg.fullPath, e?.message);
+      if (totalUsed <= quotaBytes) break;
+      toDelete.push(seg);
+      totalUsed -= seg.size;
+    }
+
+    let freed = 0;
+    if (remote) {
+      // Agrupa por câmera para apagar em lote numa conexão por câmera.
+      const byCam = new Map<string, { rel: string; size: number }[]>();
+      for (const seg of toDelete) {
+        const arr = byCam.get(seg.pathName!) ?? [];
+        arr.push({ rel: seg.rel!, size: seg.size });
+        byCam.set(seg.pathName!, arr);
+      }
+      for (const [pathName, segs] of byCam) {
+        try {
+          freed += await RemoteStorage.deleteSegments(pathName, segs);
+        } catch (e: any) {
+          console.error("enforceQuota (remoto): falha ao apagar", pathName, e?.message);
+        }
+      }
+    } else {
+      for (const seg of toDelete) {
+        try {
+          fs.rmSync(seg.fullPath!, { force: true });
+          freed += seg.size;
+        } catch (e: any) {
+          console.error("enforceQuota: falha ao apagar", seg.fullPath, e?.message);
+        }
       }
     }
 
@@ -160,6 +218,27 @@ class CameraStorageService {
       );
     }
     return freed;
+  }
+
+  /**
+   * Aplica a cota de TODOS os clientes que têm câmeras. Usado por uma varredura
+   * periódica para manter o storage remoto limitado mesmo que ninguém abra a
+   * tela de armazenamento (antes, a retenção por tempo era feita pelo MediaMTX
+   * no disco local — que agora é apenas staging).
+   */
+  public async enforceQuotaAll(): Promise<void> {
+    const repo = AppDataSource.getRepository(Camera);
+    const rows = await repo
+      .createQueryBuilder("c")
+      .select("DISTINCT c.cliente_id", "cid")
+      .getRawMany<{ cid: number }>();
+    for (const { cid } of rows) {
+      try {
+        await this.enforceQuotaForCliente(cid);
+      } catch (e: any) {
+        console.error("enforceQuotaAll: cliente", cid, e?.message);
+      }
+    }
   }
 }
 

@@ -22,10 +22,20 @@ interface ClienteItem {
   login: string;
   email: string | null;
   status: "pendente" | "ativo" | "bloqueado";
+  storageGb: number;
+  storagePriceBRL: number | null;
   setupLink: string | null;
   totalCameras: number;
   created_at: string;
 }
+
+// Planos de armazenamento das gravações (espelha o backend: cameraStoragePlans.ts).
+const STORAGE_PLANS = [
+  { gb: 5, price: 20 },
+  { gb: 10, price: 30 },
+  { gb: 15, price: 35 },
+  { gb: 20, price: 40 },
+];
 
 export const CamerasAdmin: React.FC = () => {
   const { user } = useAuth();
@@ -151,6 +161,34 @@ export const CamerasAdmin: React.FC = () => {
       flash("E-mail atualizado.", "ok");
     } catch (e: any) {
       flash(e?.response?.data?.message || "Erro ao salvar e-mail.", "err");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const mudarPlano = async (c: ClienteItem, storageGb: number) => {
+    if (storageGb === c.storageGb) return;
+    const novo = STORAGE_PLANS.find((p) => p.gb === storageGb);
+    if (
+      !window.confirm(
+        `Mudar o plano de ${c.login} para ${storageGb} GB` +
+          (novo ? ` (R$ ${novo.price.toFixed(2)}/mês)` : "") +
+          "?\nIsto ajusta a cobrança do serviço CAMERA e reaplica a cota " +
+          "(reduzir o plano pode apagar as gravações mais antigas).",
+      )
+    )
+      return;
+    setBusyId(c.id);
+    try {
+      await axios.put(
+        `${base}/cameras/admin/clientes/${c.id}/plano`,
+        { storageGb },
+        { headers },
+      );
+      await load();
+      flash("Plano atualizado.", "ok");
+    } catch (e: any) {
+      flash(e?.response?.data?.message || "Erro ao mudar plano.", "err");
     } finally {
       setBusyId(null);
     }
@@ -287,6 +325,7 @@ export const CamerasAdmin: React.FC = () => {
                   <th className="px-3 py-2">Login</th>
                   <th className="px-3 py-2">E-mail</th>
                   <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Armazenamento</th>
                   <th className="px-3 py-2">Câmeras</th>
                   <th className="px-3 py-2">Ações</th>
                 </tr>
@@ -294,7 +333,7 @@ export const CamerasAdmin: React.FC = () => {
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-gray-400">
+                    <td colSpan={6} className="px-3 py-6 text-center text-gray-400">
                       Nenhum cliente encontrado.
                     </td>
                   </tr>
@@ -341,6 +380,21 @@ export const CamerasAdmin: React.FC = () => {
                       )}
                     </td>
                     <td className="px-3 py-2">{statusBadge(c.status)}</td>
+                    <td className="px-3 py-2">
+                      <select
+                        value={c.storageGb}
+                        disabled={busyId === c.id}
+                        onChange={(e) => mudarPlano(c, Number(e.target.value))}
+                        className="ring-1 ring-gray-300 rounded px-2 py-1 text-sm disabled:opacity-50"
+                        title="Plano de armazenamento (ajusta a cobrança do CAMERA)"
+                      >
+                        {STORAGE_PLANS.map((p) => (
+                          <option key={p.gb} value={p.gb}>
+                            {p.gb} GB — R$ {p.price.toFixed(2)}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="px-3 py-2">{c.totalCameras}</td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">

@@ -33,6 +33,10 @@ export class CameraCliente {
   })
   status!: "pendente" | "ativo" | "bloqueado";
 
+  // Cota de armazenamento (GB) das gravações. Plano: 5 (padrão), 10, 15 ou 20.
+  @Column({ type: "int", default: 5 })
+  storage_gb!: number;
+
   @CreateDateColumn({ type: "timestamp" })
   created_at?: Date;
 

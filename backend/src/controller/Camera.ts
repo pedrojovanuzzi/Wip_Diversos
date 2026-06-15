@@ -12,8 +12,16 @@ import MkauthSource from "../database/MkauthSource";
 import { CameraCliente } from "../entities/CameraCliente";
 import { Camera as CameraEntity } from "../entities/Camera";
 import { ClientesEntities } from "../entities/ClientesEntities";
+import { SisSerContratos } from "../entities/SisSerContratos";
 import MediaMtxService from "../services/MediaMtxService";
 import CameraStorageService from "../services/CameraStorageService";
+import RemoteStorage from "../services/CameraRemoteStorageService";
+import {
+  STORAGE_PLANS,
+  normalizeStorageGb,
+  isValidStorageGb,
+  planFor,
+} from "../config/cameraStoragePlans";
 import {
   digestGet,
   digestGetRaw,
@@ -44,19 +52,24 @@ async function getCameraDir(
   return { cam, dir: path.join(RECORDINGS_PATH, cam.path_name) };
 }
 
-/** Apaga a pasta de gravações de uma câmera no disco (ao remover a câmera). */
+/** Apaga a pasta de gravações de uma câmera (local + remoto) ao remover a câmera. */
 function deleteCameraRecordings(pathName: string): void {
   try {
     if (!pathName) return;
     const dir = path.join(RECORDINGS_PATH, pathName);
     // Garante que estamos dentro do RECORDINGS_PATH (evita remoção indevida).
-    if (!dir.startsWith(RECORDINGS_PATH)) return;
-    if (fs.existsSync(dir)) {
+    if (dir.startsWith(RECORDINGS_PATH) && fs.existsSync(dir)) {
       fs.rmSync(dir, { recursive: true, force: true });
       console.log(`🗑️  Gravações removidas: ${dir}`);
     }
   } catch (e: any) {
     console.error("deleteCameraRecordings:", e?.message);
+  }
+  // Remove também do servidor remoto (onde as gravações realmente vivem).
+  if (RemoteStorage.isEnabled()) {
+    RemoteStorage.deleteCamera(pathName).catch((e) =>
+      console.error("deleteCameraRecordings (remoto):", e?.message),
+    );
   }
 }
 
@@ -132,6 +145,7 @@ class Camera {
         login,
         setup_uuid,
         status: "pendente",
+        storage_gb: normalizeStorageGb(req.body.storageGb),
       });
       await repo.save(novo);
 
@@ -139,6 +153,7 @@ class Camera {
         id: novo.id,
         login: novo.login,
         nome: sisCliente.nome,
+        storageGb: novo.storage_gb,
         setupLink: `${FRONT_URL}/Cameras/Setup/${setup_uuid}`,
       });
     } catch (e: any) {
@@ -163,6 +178,9 @@ class Camera {
       }
       const repo = AppDataSource.getRepository(CameraCliente);
       let cliente = await repo.findOne({ where: { login } });
+      // Plano de armazenamento escolhido ao adicionar o serviço (opcional).
+      const storageGb =
+        req.body.storageGb !== undefined ? normalizeStorageGb(req.body.storageGb) : null;
 
       if (!cliente) {
         const mkRepo = MkauthSource.getRepository(ClientesEntities);
@@ -172,15 +190,27 @@ class Camera {
           return;
         }
         const setup_uuid = uuidv4();
-        cliente = repo.create({ login, setup_uuid, status: "pendente" });
+        cliente = repo.create({
+          login,
+          setup_uuid,
+          status: "pendente",
+          storage_gb: storageGb ?? undefined,
+        });
         await repo.save(cliente);
         res.status(201).json({
           login,
           status: "pendente",
           created: true,
+          storageGb: cliente.storage_gb,
           setupLink: `${FRONT_URL}/Cameras/Setup/${setup_uuid}`,
         });
         return;
+      }
+
+      // Conta já existe: se veio um plano, atualiza a cota.
+      if (storageGb !== null && cliente.storage_gb !== storageGb) {
+        cliente.storage_gb = storageGb;
+        await repo.save(cliente);
       }
 
       if (cliente.status === "pendente" && cliente.setup_uuid) {
@@ -226,6 +256,57 @@ class Camera {
     }
   }
 
+  /**
+   * Troca o plano de armazenamento de um cliente (upgrade/downgrade).
+   * Atualiza a cota (camera_clientes.storage_gb) E o valor cobrado no contrato
+   * CAMERA (sis_sercontratos). Se ainda não houver contrato CAMERA, só a cota muda.
+   */
+  public async updatePlano(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id);
+      const storageGb = Number(req.body.storageGb);
+      if (!isValidStorageGb(storageGb)) {
+        res.status(400).json({
+          message: "Plano inválido. Use 5, 10, 15 ou 20 GB.",
+        });
+        return;
+      }
+      const repo = AppDataSource.getRepository(CameraCliente);
+      const cliente = await repo.findOne({ where: { id } });
+      if (!cliente) {
+        res.status(404).json({ message: "Não encontrado." });
+        return;
+      }
+
+      cliente.storage_gb = storageGb;
+      await repo.save(cliente);
+
+      // Ajusta o valor do contrato CAMERA do cliente (se existir) para o preço do plano.
+      const plano = planFor(storageGb)!;
+      const serRepo = MkauthSource.getRepository(SisSerContratos);
+      const updated = await serRepo
+        .createQueryBuilder()
+        .update(SisSerContratos)
+        .set({ valor: plano.priceBRL })
+        .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: cliente.login })
+        .andWhere("UPPER(TRIM(nome)) = :nome", { nome: "CAMERA" })
+        .execute();
+
+      // Reaplica a cota imediatamente (pode apagar gravações se reduziu o plano).
+      await CameraStorageService.enforceQuotaForCliente(id);
+
+      res.json({
+        ok: true,
+        storageGb: cliente.storage_gb,
+        priceBRL: plano.priceBRL,
+        contratoAtualizado: (updated.affected ?? 0) > 0,
+      });
+    } catch (e: any) {
+      console.error("updatePlano:", e?.message);
+      res.status(500).json({ message: "Erro ao atualizar plano." });
+    }
+  }
+
   /** Lista clientes-câmera com a contagem de câmeras. */
   public async listarClientes(_req: Request, res: Response) {
     try {
@@ -239,6 +320,8 @@ class Camera {
           login: c.login,
           email: c.email,
           status: c.status,
+          storageGb: c.storage_gb,
+          storagePriceBRL: planFor(c.storage_gb)?.priceBRL ?? null,
           setupLink: c.setup_uuid
             ? `${FRONT_URL}/Cameras/Setup/${c.setup_uuid}`
             : null,
@@ -246,7 +329,7 @@ class Camera {
           created_at: c.created_at,
         })),
       );
-      res.json({ total: items.length, items });
+      res.json({ total: items.length, items, plans: STORAGE_PLANS });
     } catch (e: any) {
       console.error("listarClientes:", e?.message);
       res.status(500).json({ message: "Erro ao listar clientes." });
@@ -1183,14 +1266,33 @@ class Camera {
         res.status(404).json({ message: "Câmera não encontrada." });
         return;
       }
-      if (!fs.existsSync(info.dir)) {
-        res.json({ items: [] });
-        return;
-      }
+
       // As gravações ficam em subpastas (recordPath: %path/%Y-%m/%d/...).
       // `dir` é a subpasta relativa, ex: "2026-06/08" ("" para arquivos antigos,
-      // gravados direto na pasta da câmera). Varre recursivamente (qualquer nível).
-      const items: { name: string; dir: string; size: number; mtime: Date }[] = [];
+      // gravados direto na pasta da câmera).
+      type Item = { name: string; dir: string; size: number; mtime: Date };
+      // Chave de deduplicação (mesmo segmento no remoto e ainda no staging local).
+      const byKey = new Map<string, Item>();
+      const relKey = (rel: string) => rel.replace(/\\/g, "/");
+
+      // Fonte da verdade: servidor remoto (quando ligado).
+      if (RemoteStorage.isEnabled()) {
+        try {
+          for (const seg of await RemoteStorage.listSegments(info.cam.path_name)) {
+            const slash = seg.rel.lastIndexOf("/");
+            byKey.set(relKey(seg.rel), {
+              name: slash >= 0 ? seg.rel.slice(slash + 1) : seg.rel,
+              dir: slash >= 0 ? seg.rel.slice(0, slash) : "",
+              size: seg.size,
+              mtime: new Date(seg.mtimeMs),
+            });
+          }
+        } catch (e: any) {
+          console.error("listFiles (remoto):", e?.message);
+        }
+      }
+
+      // Arquivos ainda em staging local (gravados há segundos, ainda não enviados).
       const walk = (absDir: string, relDir: string) => {
         let entries: fs.Dirent[];
         try {
@@ -1205,15 +1307,21 @@ class Camera {
           } else if (entry.isFile() && entry.name.endsWith(".mp4")) {
             try {
               const st = fs.statSync(abs);
-              items.push({ name: entry.name, dir: relDir, size: st.size, mtime: st.mtime });
+              const rel = relDir ? `${relDir}/${entry.name}` : entry.name;
+              if (!byKey.has(relKey(rel))) {
+                byKey.set(relKey(rel), { name: entry.name, dir: relDir, size: st.size, mtime: st.mtime });
+              }
             } catch {
               /* removido entre o readdir e o stat — ignora */
             }
           }
         }
       };
-      walk(info.dir, "");
-      items.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+      if (fs.existsSync(info.dir)) walk(info.dir, "");
+
+      const items = [...byKey.values()].sort(
+        (a, b) => b.mtime.getTime() - a.mtime.getTime(),
+      );
       res.json({ items });
     } catch (e: any) {
       console.error("listFiles:", e?.message);
@@ -1244,7 +1352,28 @@ class Camera {
         res.status(404).json({ message: "Arquivo não encontrado." });
         return;
       }
-      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+
+      const localExists = fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+
+      // Se não está mais local (já foi para o remoto), faz streaming do servidor remoto.
+      if (!localExists) {
+        if (RemoteStorage.isEnabled()) {
+          const relPosix = rel.replace(/\\/g, "/");
+          const size = await RemoteStorage.size(info.cam.path_name, relPosix);
+          if (size < 0) {
+            res.status(404).json({ message: "Arquivo não encontrado." });
+            return;
+          }
+          res.setHeader("Content-Type", "video/mp4");
+          res.setHeader("Content-Length", String(size));
+          try {
+            await RemoteStorage.pipeTo(info.cam.path_name, relPosix, res);
+          } catch (e: any) {
+            console.error("getFile (remoto):", e?.message, relPosix);
+            if (!res.headersSent) res.status(500).json({ message: "Erro ao servir arquivo." });
+          }
+          return;
+        }
         res.status(404).json({ message: "Arquivo não encontrado." });
         return;
       }
@@ -1295,23 +1424,25 @@ class Camera {
         res.status(404).json({ message: "Arquivo não encontrado." });
         return;
       }
-      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-        res.status(404).json({ message: "Arquivo não encontrado." });
-        return;
+
+      // Apaga no remoto (fonte da verdade) e no staging local, se ainda existir.
+      if (RemoteStorage.isEnabled()) {
+        await RemoteStorage.deleteFile(info.cam.path_name, rel.replace(/\\/g, "/"));
       }
 
-      fs.rmSync(filePath, { force: true });
-
-      // Sobe removendo as pastas que ficaram vazias, sem passar da pasta da câmera.
-      let dir = path.dirname(filePath);
-      while (dir !== baseResolved && dir.startsWith(baseResolved + path.sep)) {
-        try {
-          if (fs.readdirSync(dir).length > 0) break;
-          fs.rmdirSync(dir);
-        } catch {
-          break;
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        fs.rmSync(filePath, { force: true });
+        // Sobe removendo as pastas que ficaram vazias, sem passar da pasta da câmera.
+        let dir = path.dirname(filePath);
+        while (dir !== baseResolved && dir.startsWith(baseResolved + path.sep)) {
+          try {
+            if (fs.readdirSync(dir).length > 0) break;
+            fs.rmdirSync(dir);
+          } catch {
+            break;
+          }
+          dir = path.dirname(dir);
         }
-        dir = path.dirname(dir);
       }
 
       res.json({ ok: true });
@@ -1344,23 +1475,26 @@ class Camera {
         res.status(404).json({ message: "Pasta não encontrada." });
         return;
       }
-      if (!fs.existsSync(target) || !fs.statSync(target).isDirectory()) {
-        res.status(404).json({ message: "Pasta não encontrada." });
-        return;
+
+      // Apaga a subpasta no remoto (fonte da verdade).
+      if (RemoteStorage.isEnabled()) {
+        await RemoteStorage.deleteDir(info.cam.path_name, rel.replace(/\\/g, "/"));
       }
 
-      fs.rmSync(target, { recursive: true, force: true });
-
-      // Remove as pastas-pai que ficarem vazias (ex.: o mês, ao apagar o dia).
-      let dir = path.dirname(target);
-      while (dir !== baseResolved && dir.startsWith(baseResolved + path.sep)) {
-        try {
-          if (fs.readdirSync(dir).length > 0) break;
-          fs.rmdirSync(dir);
-        } catch {
-          break;
+      // E o staging local, se a pasta ainda existir lá.
+      if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
+        fs.rmSync(target, { recursive: true, force: true });
+        // Remove as pastas-pai que ficarem vazias (ex.: o mês, ao apagar o dia).
+        let dir = path.dirname(target);
+        while (dir !== baseResolved && dir.startsWith(baseResolved + path.sep)) {
+          try {
+            if (fs.readdirSync(dir).length > 0) break;
+            fs.rmdirSync(dir);
+          } catch {
+            break;
+          }
+          dir = path.dirname(dir);
         }
-        dir = path.dirname(dir);
       }
 
       res.json({ ok: true });

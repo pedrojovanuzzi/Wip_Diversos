@@ -8,6 +8,7 @@ import {
   insertAssinante,
   deleteTicket,
 } from "../services/WatchBrasilService";
+import { planFor, normalizeStorageGb } from "../config/cameraStoragePlans";
 
 const VALORES: Record<string, number> = {
   STREAMER: 39.9,
@@ -66,6 +67,7 @@ class SerContratos {
         email: emailForm,
         phone: phoneForm,
         replace,
+        storageGb,
       } = req.body as {
         login?: string;
         tipo?: string;
@@ -73,6 +75,7 @@ class SerContratos {
         email?: string;
         phone?: string;
         replace?: boolean;
+        storageGb?: number;
       };
       const usuario = (req as any).user?.username || "sistema";
 
@@ -259,7 +262,12 @@ class SerContratos {
 
 
       const qtd = Math.max(1, Math.min(Number(quantidade) || 1, 20));
-      const valorUnitario = VALORES[tipoNorm];
+      // CAMERA: o valor cobrado vem do plano de armazenamento escolhido
+      // (5GB=R$20, 10GB=R$30, 15GB=R$35, 20GB=R$40). Demais tipos: valor fixo.
+      const valorUnitario =
+        tipoNorm === "CAMERA"
+          ? planFor(normalizeStorageGb(storageGb))!.priceBRL
+          : VALORES[tipoNorm];
 
       // STREAMER / STREAMER_COLAB: valida na Watch Brasil ANTES de gravar local
       let streamingInfo: any = null;

@@ -37,6 +37,7 @@ router.post("/admin/clientes/ensure", AuthGuard, Camera.ensureCliente);
 router.get("/admin/clientes", AuthGuard, Camera.listarClientes);
 router.post("/admin/clientes/:id/regenerar", AuthGuard, Camera.regenerarLink);
 router.put("/admin/clientes/:id/status", AuthGuard, Camera.toggleStatusCliente);
+router.put("/admin/clientes/:id/plano", AuthGuard, Camera.updatePlano);
 router.put("/admin/clientes/:id", AuthGuard, Camera.updateCliente);
 router.delete("/admin/clientes/:id", AuthGuard, Camera.removerCliente);
 

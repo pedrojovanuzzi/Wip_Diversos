@@ -354,10 +354,6 @@ export default function CameraPortal() {
     return `${sub}${encodeURIComponent(name)}`;
   };
 
-  // URL do arquivo (token na query, pois <video>/<a> não enviam header).
-  const fileUrl = (camId: number, dir: string, name: string) =>
-    `${base}/cameras/cameras/${camId}/files/${filePath(dir, name)}?token=${getCamToken()}`;
-
   // ---- Linha do tempo / player ----
   const segKey = (f: RecFile) => `${f.dir}/${f.name}`;
 
@@ -405,6 +401,35 @@ export default function CameraPortal() {
       clearVideo();
     } finally {
       if (playingKeyRef.current === key) setVideoLoading(false);
+    }
+  };
+
+  // Baixa o arquivo de fato (em vez de abrir em outra aba). O atributo
+  // `download` do <a> é ignorado em URL de outra origem (o backend), então o
+  // navegador abria o vídeo inline. Buscamos o blob (com auth) e disparamos o
+  // download a partir da memória, garantindo o salvamento com o nome certo.
+  const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
+  const downloadSeg = async (f: RecFile) => {
+    if (!folderCam) return;
+    const key = segKey(f);
+    setDownloadingKey(key);
+    try {
+      const res = await axios.get(
+        `${base}/cameras/cameras/${folderCam.id}/files/${filePath(f.dir, f.name)}`,
+        { headers: authHeaders(), responseType: "blob" },
+      );
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = f.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      if (!handleAuthError(e)) flash("Erro ao baixar a gravação.", "err");
+    } finally {
+      setDownloadingKey(null);
     }
   };
 
@@ -1024,13 +1049,14 @@ export default function CameraPortal() {
                                 >
                                   <MdPlayArrow /> Ver
                                 </button>
-                                <a
-                                  href={fileUrl(folderCam.id, f.dir, f.name)}
-                                  download={f.name}
-                                  className="inline-flex items-center gap-1 text-gray-600 hover:text-gray-900"
+                                <button
+                                  onClick={() => downloadSeg(f)}
+                                  disabled={downloadingKey === segKey(f)}
+                                  className="inline-flex items-center gap-1 text-gray-600 hover:text-gray-900 disabled:opacity-50"
                                 >
-                                  <MdDownload /> Baixar
-                                </a>
+                                  <MdDownload />{" "}
+                                  {downloadingKey === segKey(f) ? "Baixando..." : "Baixar"}
+                                </button>
                                 <button
                                   onClick={() => deleteRecording(f)}
                                   className="inline-flex items-center gap-1 text-red-500 hover:text-red-700"
