@@ -80,6 +80,8 @@ router.get(
   Camera.getRecordingPlayback,
 );
 router.get("/cameras/:id/files", CameraClientGuard, Camera.listFiles);
+// Apaga as gravações MAIS ANTIGAS da câmera até liberar ~N GB.
+router.post("/cameras/:id/files-prune", CameraClientGuard, Camera.pruneOldest);
 // Curinga: aceita o caminho relativo da gravação em qualquer profundidade
 // (ex: "2026-06/08/arquivo.mp4") e também as antigas, planas. O controller
 // valida contra path traversal.

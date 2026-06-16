@@ -221,6 +221,51 @@ class CameraStorageService {
   }
 
   /**
+   * Apaga as gravações MAIS ANTIGAS de UMA câmera até liberar ~`targetBytes`.
+   * Vai do mais antigo para o mais novo e para assim que atinge o alvo (não
+   * apaga mais do que o pedido). Opera no servidor remoto quando ligado, senão
+   * no disco local. Retorna quanto foi liberado e quantos arquivos saíram.
+   */
+  public async deleteOldestBytesForCamera(
+    pathName: string,
+    targetBytes: number,
+  ): Promise<{ freedBytes: number; deletedCount: number }> {
+    if (targetBytes <= 0) return { freedBytes: 0, deletedCount: 0 };
+
+    if (RemoteStorage.isEnabled()) {
+      const segs = (await RemoteStorage.listSegments(pathName)).sort(
+        (a, b) => a.mtimeMs - b.mtimeMs, // mais ANTIGO primeiro
+      );
+      const toDelete: { rel: string; size: number }[] = [];
+      let planned = 0;
+      for (const s of segs) {
+        if (planned >= targetBytes) break;
+        toDelete.push({ rel: s.rel, size: s.size });
+        planned += s.size;
+      }
+      const freedBytes = await RemoteStorage.deleteSegments(pathName, toDelete);
+      return { freedBytes, deletedCount: toDelete.length };
+    }
+
+    const segs = listSegmentFiles(this.camDir(pathName)).sort(
+      (a, b) => a.mtimeMs - b.mtimeMs, // mais ANTIGO primeiro
+    );
+    let freedBytes = 0;
+    let deletedCount = 0;
+    for (const seg of segs) {
+      if (freedBytes >= targetBytes) break;
+      try {
+        fs.rmSync(seg.fullPath, { force: true });
+        freedBytes += seg.size;
+        deletedCount++;
+      } catch (e: any) {
+        console.error("deleteOldestBytes: falha ao apagar", seg.fullPath, e?.message);
+      }
+    }
+    return { freedBytes, deletedCount };
+  }
+
+  /**
    * Aplica a cota de TODOS os clientes que têm câmeras. Usado por uma varredura
    * periódica para manter o storage remoto limitado mesmo que ninguém abra a
    * tela de armazenamento (antes, a retenção por tempo era feita pelo MediaMTX

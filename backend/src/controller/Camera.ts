@@ -1254,6 +1254,36 @@ class Camera {
     }
   }
 
+  /**
+   * Apaga as gravações MAIS ANTIGAS de uma câmera até liberar ~N GB.
+   * Body: { gb: number }. Vai do mais antigo ao mais novo e para ao atingir o alvo.
+   */
+  public async pruneOldest(req: Request, res: Response) {
+    try {
+      const cid = req.cameraCliente!.id!;
+      const id = Number(req.params.id);
+      const gb = Number(req.body.gb);
+      if (!Number.isFinite(gb) || gb <= 0) {
+        res.status(400).json({ message: "Informe quantos GB apagar (maior que 0)." });
+        return;
+      }
+      const info = await getCameraDir(cid, id);
+      if (!info) {
+        res.status(404).json({ message: "Câmera não encontrada." });
+        return;
+      }
+      const targetBytes = gb * 1024 * 1024 * 1024;
+      const result = await CameraStorageService.deleteOldestBytesForCamera(
+        info.cam.path_name,
+        targetBytes,
+      );
+      res.json({ ok: true, ...result });
+    } catch (e: any) {
+      console.error("pruneOldest:", e?.message);
+      res.status(500).json({ message: "Erro ao apagar gravações antigas." });
+    }
+  }
+
   // ===================== PASTA DE GRAVAÇÕES (arquivos no disco) =====================
 
   /** Lista os arquivos .mp4 gravados da câmera (pasta no disco). */

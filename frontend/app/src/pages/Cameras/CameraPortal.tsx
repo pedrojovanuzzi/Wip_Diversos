@@ -679,6 +679,44 @@ export default function CameraPortal() {
     };
   }, [debugCam, base, authHeaders]);
 
+  // Apaga as gravações mais antigas da câmera até liberar ~N GB.
+  const [pruneGb, setPruneGb] = useState("1");
+  const [pruning, setPruning] = useState(false);
+  const pruneOldest = async () => {
+    if (!folderCam) return;
+    const gb = Number(pruneGb.replace(",", "."));
+    if (!Number.isFinite(gb) || gb <= 0) {
+      flash("Informe quantos GB apagar (maior que 0).", "err");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Apagar as gravações MAIS ANTIGAS de ${folderCam.nome} até liberar ~${gb} GB? Esta ação não pode ser desfeita.`,
+      )
+    )
+      return;
+    setPruning(true);
+    try {
+      const res = await axios.post(
+        `${base}/cameras/cameras/${folderCam.id}/files-prune`,
+        { gb },
+        { headers: authHeaders() },
+      );
+      const freedMB = (res.data.freedBytes / 1024 / 1024).toFixed(0);
+      flash(
+        `${res.data.deletedCount} gravação(ões) apagada(s) — ${freedMB} MB liberados.`,
+        "ok",
+      );
+      if (fileVideoUrl) clearVideo();
+      openFolder(folderCam); // recarrega a lista
+      loadStorage();
+    } catch (e: any) {
+      if (!handleAuthError(e)) flash(e?.response?.data?.message || "Erro ao apagar.", "err");
+    } finally {
+      setPruning(false);
+    }
+  };
+
   const clearFolder = async (dir: string, count: number) => {
     if (!folderCam || !dir) return;
     if (!window.confirm(`Apagar TODAS as ${count} gravações de ${dirLabel(dir)}?`))
@@ -902,6 +940,28 @@ export default function CameraPortal() {
                   Fechar
                 </button>
               </div>
+            </div>
+
+            {/* Apagar as gravações mais antigas até liberar N GB */}
+            <div className="flex flex-wrap items-center gap-2 mb-3 text-sm bg-gray-50 rounded-md p-2">
+              <span className="text-gray-600">Liberar espaço — apagar as mais antigas:</span>
+              <input
+                type="number"
+                min={0.1}
+                step={0.5}
+                value={pruneGb}
+                onChange={(e) => setPruneGb(e.target.value)}
+                disabled={pruning}
+                className="w-20 ring-1 ring-gray-300 rounded px-2 py-1 text-sm"
+              />
+              <span className="text-gray-600">GB</span>
+              <button
+                onClick={pruneOldest}
+                disabled={pruning}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded bg-red-100 text-red-700 font-medium hover:bg-red-200 disabled:opacity-50"
+              >
+                <BsTrash /> {pruning ? "Apagando..." : "Apagar"}
+              </button>
             </div>
 
             {videoLoading && !fileVideoUrl && (
