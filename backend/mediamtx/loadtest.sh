@@ -57,6 +57,11 @@ remote_enabled() { [ -n "${CAMERA_STORAGE_HOST:-}" ]; }
 # Parâmetros do stream de teste
 SIZE="640x480"
 FPS="25"
+# Arquivo-fonte gerado UMA vez e republicado com -c copy (sem reencode). Assim
+# cada "câmera" só REMUXA (custo ~zero de CPU) em vez de codificar x264, evitando
+# que o GERADOR sature a CPU e mascare a capacidade real do MediaMTX.
+SRCFILE="/tmp/mediamtx_loadtest_src.mp4"
+SRC_SECONDS="10"
 
 require() {
   command -v "$1" >/dev/null 2>&1 || { echo "❌ '$1' não encontrado. Instale antes."; exit 1; }
@@ -97,15 +102,24 @@ start() {
   done
   echo "   ✔ $n paths criados na API"
 
-  # 2. Sobe os ffmpeg (com -nostdin pra não suspender em background)
+  # 1b. Gera o arquivo-fonte UMA vez (codifica x264 só agora, não por câmera).
+  # Keyframe a cada segundo (-g $FPS) para o loop emendar limpo.
+  if [ ! -f "$SRCFILE" ]; then
+    echo "   ⏺ Gerando arquivo-fonte de teste (${SRC_SECONDS}s, ${SIZE}@${FPS})..."
+    ffmpeg -nostdin -y -f lavfi -i "testsrc=size=${SIZE}:rate=${FPS}" \
+      -t "$SRC_SECONDS" -c:v libx264 -preset ultrafast -tune zerolatency \
+      -pix_fmt yuv420p -g "$FPS" "$SRCFILE" -loglevel error </dev/null
+  fi
+
+  # 2. Sobe os ffmpeg republicando o arquivo em loop com -c copy (só remuxa,
+  # CPU ~zero). -nostdin pra não suspender em background.
   : > "$PIDFILE"
   for i in $(seq 1 "$n"); do
-    ffmpeg -nostdin -re -f lavfi -i "testsrc=size=${SIZE}:rate=${FPS}" \
-      -vf format=yuv420p -c:v libx264 -preset ultrafast -tune zerolatency \
-      -f rtsp "${RTSP}/${PREFIX}${i}" -loglevel quiet </dev/null &
+    ffmpeg -nostdin -re -stream_loop -1 -i "$SRCFILE" \
+      -c copy -f rtsp "${RTSP}/${PREFIX}${i}" -loglevel quiet </dev/null &
     echo $! >> "$PIDFILE"
   done
-  echo "   ✔ $n streams ffmpeg iniciados"
+  echo "   ✔ $n streams ffmpeg iniciados (remux, sem reencode)"
 
   echo "⏳ Aguardando estabilizar..."
   sleep 6
