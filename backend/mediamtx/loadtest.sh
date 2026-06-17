@@ -22,15 +22,27 @@ RTSP="rtsp://localhost:8554"
 PREFIX="test_cam_"
 PIDFILE="/tmp/mediamtx_loadtest.pids"
 
-# Carrega o .env do backend (se existir) para herdar MEDIAMTX_RECORDINGS_PATH e
-# as credenciais do storage remoto, mantendo o script alinhado com os serviços.
+# Lê variáveis do .env do backend SEM sourcing (sourcing executaria valores com
+# espaços/aspas/# e quebraria — ex.: "VAR=texto de coisa"). Lemos só as chaves
+# que este script usa, tirando aspas externas.
 ENV_FILE="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/.env"
-if [ -f "$ENV_FILE" ]; then
-  set -a
-  # shellcheck disable=SC1090
-  . "$ENV_FILE"
-  set +a
-fi
+read_env() {
+  local key="$1" line
+  [ -f "$ENV_FILE" ] || return 0
+  line=$(grep -E "^[[:space:]]*${key}=" "$ENV_FILE" | tail -n 1) || return 0
+  line="${line#*=}"                      # remove "KEY="
+  line="${line%\"}"; line="${line#\"}"   # aspas duplas externas
+  line="${line%\'}"; line="${line#\'}"   # aspas simples externas
+  printf '%s' "$line"
+}
+
+# Env já exportada no shell tem prioridade; senão lê do .env.
+MEDIAMTX_RECORDINGS_PATH="${MEDIAMTX_RECORDINGS_PATH:-$(read_env MEDIAMTX_RECORDINGS_PATH)}"
+CAMERA_STORAGE_HOST="${CAMERA_STORAGE_HOST:-$(read_env CAMERA_STORAGE_HOST)}"
+CAMERA_STORAGE_PORT="${CAMERA_STORAGE_PORT:-$(read_env CAMERA_STORAGE_PORT)}"
+CAMERA_STORAGE_USER="${CAMERA_STORAGE_USER:-$(read_env CAMERA_STORAGE_USER)}"
+CAMERA_STORAGE_PASSWORD="${CAMERA_STORAGE_PASSWORD:-$(read_env CAMERA_STORAGE_PASSWORD)}"
+CAMERA_STORAGE_PATH="${CAMERA_STORAGE_PATH:-$(read_env CAMERA_STORAGE_PATH)}"
 
 # Pasta onde o MediaMTX grava (staging). Respeita a env do backend; fallback pro
 # bind mount atual (backend/storage/recordings), não mais o volume Docker antigo.
@@ -66,7 +78,7 @@ except Exception as e:
 start() {
   local n="${1:-50}"
   require ffmpeg
-  require curl
+  require curl               
   require python3
 
   echo "🎬 Iniciando $n câmeras de teste..."
