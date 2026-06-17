@@ -21,7 +21,26 @@ API="http://localhost:9997"
 RTSP="rtsp://localhost:8554"
 PREFIX="test_cam_"
 PIDFILE="/tmp/mediamtx_loadtest.pids"
-RECORDINGS_DIR="/var/lib/docker/volumes/backend_mediamtx_recordings/_data"
+
+# Carrega o .env do backend (se existir) para herdar MEDIAMTX_RECORDINGS_PATH e
+# as credenciais do storage remoto, mantendo o script alinhado com os serviços.
+ENV_FILE="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/.env"
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
+fi
+
+# Pasta onde o MediaMTX grava (staging). Respeita a env do backend; fallback pro
+# bind mount atual (backend/storage/recordings), não mais o volume Docker antigo.
+RECORDINGS_DIR="${MEDIAMTX_RECORDINGS_PATH:-$(cd "$(dirname "$0")/../storage/recordings" 2>/dev/null && pwd)}"
+RECORDINGS_DIR="${RECORDINGS_DIR:-./storage/recordings}"
+
+# Storage remoto: quando CAMERA_STORAGE_HOST está setado, o offload envia cada
+# segmento finalizado por SFTP e o apaga do disco local (staging). Logo, o disco
+# "real" do teste está no servidor remoto, não localmente.
+remote_enabled() { [ -n "${CAMERA_STORAGE_HOST:-}" ]; }
 
 # Parâmetros do stream de teste
 SIZE="640x480"
@@ -94,8 +113,24 @@ status() {
   free -h | sed 's/^/  /'
   echo ""
   echo "Processos ffmpeg ativos: $(pgrep -c ffmpeg || echo 0)"
-  echo "Disco das gravações:"
+  echo "Disco do staging local ($RECORDINGS_DIR):"
   df -h "$RECORDINGS_DIR" 2>/dev/null | sed 's/^/  /' || df -h / | sed 's/^/  /'
+
+  if remote_enabled; then
+    echo ""
+    echo "⚠ Storage remoto ATIVO (CAMERA_STORAGE_HOST=$CAMERA_STORAGE_HOST):"
+    echo "  as gravações de teste são enviadas por SFTP e apagadas do disco local."
+    if command -v sshpass >/dev/null 2>&1 && [ -n "${CAMERA_STORAGE_PASSWORD:-}" ]; then
+      echo "  Uso das câmeras de teste no remoto:"
+      sshpass -p "$CAMERA_STORAGE_PASSWORD" ssh -o StrictHostKeyChecking=no \
+        -p "${CAMERA_STORAGE_PORT:-22}" \
+        "${CAMERA_STORAGE_USER}@${CAMERA_STORAGE_HOST}" \
+        "du -sh ${CAMERA_STORAGE_PATH%/}/${PREFIX}* 2>/dev/null | tail -n 20" \
+        2>/dev/null | sed 's/^/    /' || echo "    (não foi possível consultar o remoto)"
+    else
+      echo "  (instale 'sshpass' e defina CAMERA_STORAGE_PASSWORD p/ ver o uso remoto)"
+    fi
+  fi
 }
 
 stop() {
@@ -126,9 +161,24 @@ except Exception:
 
 clean() {
   stop
-  echo "🧹 Apagando gravações de teste..."
+  echo "🧹 Apagando gravações de teste (staging local)..."
   rm -rf "${RECORDINGS_DIR}/${PREFIX}"* 2>/dev/null || true
-  echo "   ✔ gravações de teste removidas"
+  echo "   ✔ gravações de teste locais removidas"
+
+  if remote_enabled; then
+    echo "🧹 Apagando gravações de teste no servidor remoto..."
+    if command -v sshpass >/dev/null 2>&1 && [ -n "${CAMERA_STORAGE_PASSWORD:-}" ]; then
+      sshpass -p "$CAMERA_STORAGE_PASSWORD" ssh -o StrictHostKeyChecking=no \
+        -p "${CAMERA_STORAGE_PORT:-22}" \
+        "${CAMERA_STORAGE_USER}@${CAMERA_STORAGE_HOST}" \
+        "rm -rf ${CAMERA_STORAGE_PATH%/}/${PREFIX}*" 2>/dev/null \
+        && echo "   ✔ gravações de teste removidas do remoto" \
+        || echo "   ⚠ falha ao limpar o remoto (apague manualmente ${CAMERA_STORAGE_PATH%/}/${PREFIX}*)"
+    else
+      echo "   ⚠ 'sshpass'/CAMERA_STORAGE_PASSWORD ausentes — apague manualmente:"
+      echo "     ${CAMERA_STORAGE_PATH%/}/${PREFIX}* em ${CAMERA_STORAGE_HOST}"
+    fi
+  fi
 }
 
 case "${1:-}" in
