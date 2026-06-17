@@ -68,7 +68,9 @@ require() {
 }
 
 count_online() {
-  curl -s "$API/v3/paths/list" 2>/dev/null | python3 -c "
+  # itemsPerPage alto: a API do MediaMTX pagina em 100 por padrão; sem isso só
+  # contaríamos a 1ª página (mascarando o total real de câmeras de teste).
+  curl -s "$API/v3/paths/list?itemsPerPage=100000" 2>/dev/null | python3 -c "
 import sys, json
 try:
     d = json.load(sys.stdin)
@@ -168,7 +170,7 @@ stop() {
 
   # Remove os paths de teste da API
   local items
-  items=$(curl -s "$API/v3/config/paths/list" 2>/dev/null | python3 -c "
+  items=$(curl -s "$API/v3/config/paths/list?itemsPerPage=100000" 2>/dev/null | python3 -c "
 import sys, json
 try:
     d = json.load(sys.stdin)
