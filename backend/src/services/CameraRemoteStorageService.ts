@@ -178,6 +178,41 @@ class CameraRemoteStorageService {
   }
 
   /**
+   * Soma os bytes dos .mp4 de VÁRIAS câmeras numa ÚNICA conexão (antes a tela de
+   * armazenamento abria uma conexão por câmera e ainda baixava a lista inteira de
+   * arquivos só pra somar). Aqui o servidor calcula o total por câmera e devolve
+   * só um número por câmera. Retorna um mapa pathName → bytes (0 se sem pasta).
+   */
+  public async usageByCamera(pathNames: string[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    if (!pathNames.length) return out;
+    return this.withClient(async (c) => {
+      // Para cada câmera: imprime "<pathName>\t" e, na sequência, a soma dos
+      // tamanhos dos .mp4 (awk). Uma linha por câmera, mesmo sem arquivos (0).
+      const cmd = pathNames
+        .map((p) => {
+          const dir = shQuote(this.remotePath(p));
+          return (
+            `printf '%s\\t' ${shQuote(p)}; ` +
+            `find ${dir} -type f -name '*.mp4' -printf '%s\\n' 2>/dev/null | ` +
+            `awk '{s+=$1} END{print s+0}'`
+          );
+        })
+        .join("; ");
+      const { stdout } = await this.exec(c, cmd);
+      for (const line of stdout.split("\n")) {
+        if (!line) continue;
+        const tab = line.indexOf("\t");
+        if (tab < 0) continue;
+        const name = line.slice(0, tab);
+        const bytes = Number(line.slice(tab + 1).trim());
+        out.set(name, Number.isFinite(bytes) ? bytes : 0);
+      }
+      return out;
+    });
+  }
+
+  /**
    * Faz streaming do arquivo remoto para um Writable (ex.: res do Express),
    * resolvendo o TAMANHO na MESMA conexão — assim o playback abre apenas UM
    * handshake SSH (antes eram dois: um só pro `stat` e outro pro envio), o que

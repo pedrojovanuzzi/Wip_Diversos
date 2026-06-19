@@ -86,22 +86,23 @@ class CameraStorageService {
     const cameras = await repo.find({ where: { cliente_id: cid } });
     const quotaBytes = await this.quotaBytesForCliente(cid);
 
+    // Remoto: uma ÚNICA conexão calcula o total por câmera no servidor (antes
+    // era uma conexão por câmera + baixar a lista inteira só pra somar).
+    const remoteUsage = RemoteStorage.isEnabled()
+      ? await RemoteStorage.usageByCamera(cameras.map((c) => c.path_name))
+      : null;
+
     let usedBytes = 0;
-    const detalhe = await Promise.all(
-      cameras.map(async (cam) => {
-        const bytes = RemoteStorage.isEnabled()
-          ? (await RemoteStorage.listSegments(cam.path_name)).reduce(
-              (acc, f) => acc + f.size,
-              0,
-            )
-          : listSegmentFiles(this.camDir(cam.path_name)).reduce(
-              (acc, f) => acc + f.size,
-              0,
-            );
-        usedBytes += bytes;
-        return { id: cam.id!, nome: cam.nome, bytes };
-      }),
-    );
+    const detalhe = cameras.map((cam) => {
+      const bytes = remoteUsage
+        ? remoteUsage.get(cam.path_name) ?? 0
+        : listSegmentFiles(this.camDir(cam.path_name)).reduce(
+            (acc, f) => acc + f.size,
+            0,
+          );
+      usedBytes += bytes;
+      return { id: cam.id!, nome: cam.nome, bytes };
+    });
 
     return {
       usedBytes,
