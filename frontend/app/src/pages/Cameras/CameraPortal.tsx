@@ -823,6 +823,17 @@ export default function CameraPortal() {
         )}
 
         {/* Uso de armazenamento (cota por cliente) */}
+        {!storage && storageLoading && (
+          <div className="bg-white ring-1 ring-gray-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+              <AiOutlineLoading3Quarters className="animate-spin" />
+              Carregando armazenamento…
+            </div>
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full w-full bg-indigo-500/70 animate-pulse" />
+            </div>
+          </div>
+        )}
         {storage && (
           <div className="bg-white ring-1 ring-gray-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between text-sm mb-2">
