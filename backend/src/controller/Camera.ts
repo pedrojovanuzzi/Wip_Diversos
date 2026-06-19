@@ -1389,15 +1389,18 @@ class Camera {
       if (!localExists) {
         if (RemoteStorage.isEnabled()) {
           const relPosix = rel.replace(/\\/g, "/");
-          const size = await RemoteStorage.size(info.cam.path_name, relPosix);
-          if (size < 0) {
-            res.status(404).json({ message: "Arquivo não encontrado." });
-            return;
-          }
           res.setHeader("Content-Type", "video/mp4");
-          res.setHeader("Content-Length", String(size));
           try {
-            await RemoteStorage.pipeTo(info.cam.path_name, relPosix, res);
+            // stat + streaming numa única conexão SSH (um handshake só).
+            const ok = await RemoteStorage.streamTo(
+              info.cam.path_name,
+              relPosix,
+              res,
+              (size) => res.setHeader("Content-Length", String(size)),
+            );
+            if (!ok && !res.headersSent) {
+              res.status(404).json({ message: "Arquivo não encontrado." });
+            }
           } catch (e: any) {
             console.error("getFile (remoto):", e?.message, relPosix);
             if (!res.headersSent) res.status(500).json({ message: "Erro ao servir arquivo." });

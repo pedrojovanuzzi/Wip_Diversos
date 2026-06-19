@@ -982,13 +982,21 @@ export default function CameraPortal() {
               <div className="w-full aspect-video bg-black rounded-md mb-3 flex flex-col items-center justify-center gap-3 px-8">
                 <div className="flex items-center gap-2 text-sm text-gray-300">
                   <AiOutlineLoading3Quarters className="animate-spin" />
-                  Baixando gravação… {videoProgress}%
+                  {videoProgress > 0
+                    ? `Baixando gravação… ${videoProgress}%`
+                    : "Conectando ao armazenamento…"}
                 </div>
                 <div className="w-full max-w-md h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-indigo-500 transition-[width] duration-150 ease-out"
-                    style={{ width: `${videoProgress}%` }}
-                  />
+                  {videoProgress > 0 ? (
+                    // Determinada: já estamos recebendo bytes.
+                    <div
+                      className="h-full bg-indigo-500 transition-[width] duration-150 ease-out"
+                      style={{ width: `${videoProgress}%` }}
+                    />
+                  ) : (
+                    // Indeterminada: backend ainda conectando/abrindo o arquivo.
+                    <div className="h-full w-full bg-indigo-500/70 animate-pulse" />
+                  )}
                 </div>
               </div>
             )}
@@ -1038,9 +1046,15 @@ export default function CameraPortal() {
             )}
 
             {filesLoading ? (
-              <p className="flex items-center gap-2 text-gray-500">
-                <AiOutlineLoading3Quarters className="animate-spin" /> Carregando...
-              </p>
+              <div className="space-y-2">
+                <p className="flex items-center gap-2 text-gray-500 text-sm">
+                  <AiOutlineLoading3Quarters className="animate-spin" /> Carregando
+                  gravações…
+                </p>
+                <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-full w-full bg-indigo-500/70 animate-pulse" />
+                </div>
+              </div>
             ) : files.length === 0 ? (
               <p className="text-gray-400 text-sm">
                 Nenhum arquivo gravado ainda. As gravações aparecem aqui conforme o
