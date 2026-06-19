@@ -43,6 +43,22 @@ export interface RemoteSegment {
   mtimeMs: number;
 }
 
+/** Aspas simples seguras para POSIX (escapa aspas simples internas). */
+function shQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+// Forma mínima do client ssh2 (exposto por ssh2-sftp-client em `.client`) usada
+// só para o `exec` da listagem — evita depender de @types/ssh2.
+interface SshExecStream {
+  on(event: "close", cb: (code: number | null) => void): SshExecStream;
+  on(event: "data", cb: (d: Buffer) => void): SshExecStream;
+  stderr: { on(event: "data", cb: (d: Buffer) => void): unknown };
+}
+interface SshClient {
+  exec(cmd: string, cb: (err: Error | undefined, stream: SshExecStream) => void): void;
+}
+
 class CameraRemoteStorageService {
   // Semáforo global de conexões: quantas vagas restam e a fila de quem espera.
   private slots = MAX_CONNECTIONS;
@@ -138,28 +154,61 @@ class CameraRemoteStorageService {
     });
   }
 
-  /** Lista recursivamente os .mp4 da pasta de uma câmera (rel + size + mtime). */
+  /** Roda um comando no servidor remoto e devolve {code, stdout, stderr}. */
+  private exec(
+    c: SftpClient,
+    cmd: string,
+  ): Promise<{ code: number; stdout: string; stderr: string }> {
+    const ssh = (c as unknown as { client: SshClient }).client;
+    return new Promise((resolve, reject) => {
+      ssh.exec(cmd, (err, stream) => {
+        if (err) return reject(err);
+        let stdout = "";
+        let stderr = "";
+        stream
+          .on("close", (code) => resolve({ code: code ?? 0, stdout, stderr }))
+          .on("data", (d) => (stdout += d.toString()))
+          .stderr.on("data", (d) => (stderr += d.toString()));
+      });
+    });
+  }
+
+  /**
+   * Lista recursivamente os .mp4 da pasta de uma câmera (rel + size + mtime).
+   *
+   * Usa UM `find` no servidor em vez de um `list` SFTP por pasta: a árvore
+   * inteira volta em um único round-trip, o que evita dezenas de idas-e-voltas
+   * por câmera (e as rajadas de conexão que isso causava). Requer `find` do GNU
+   * (`-printf`) no servidor de storage. Campos: %s=tamanho, %T@=mtime em
+   * segundos.fração, %P=caminho relativo à base. O rel vai por ÚLTIMO por ser o
+   * único campo que poderia conter espaços.
+   */
   public async listSegments(pathName: string): Promise<RemoteSegment[]> {
     const base = this.remotePath(pathName);
     return this.withClient(async (c) => {
+      const cmd =
+        `find ${shQuote(base)} -type f -name '*.mp4' ` + `-printf '%s\\t%T@\\t%P\\n'`;
+      const { code, stdout, stderr } = await this.exec(c, cmd);
+      if (code !== 0) {
+        // Pasta inexistente (câmera nova/sem gravação) → lista vazia, como antes.
+        // Outro erro real é logado, mas não derruba o caller (uso/cota seguem).
+        if (stderr.trim() && !/No such file or directory/i.test(stderr)) {
+          console.error("listSegments (find):", pathName, stderr.trim());
+        }
+        return [];
+      }
       const out: RemoteSegment[] = [];
-      const walk = async (dir: string, rel: string) => {
-        let entries: SftpClient.FileInfo[];
-        try {
-          entries = await c.list(dir);
-        } catch {
-          return; // pasta inexistente/sem permissão — ignora
-        }
-        for (const e of entries) {
-          const childRel = rel ? `${rel}/${e.name}` : e.name;
-          if (e.type === "d") {
-            await walk(`${dir}/${e.name}`, childRel);
-          } else if (e.type === "-" && e.name.endsWith(".mp4")) {
-            out.push({ rel: childRel, size: e.size, mtimeMs: e.modifyTime });
-          }
-        }
-      };
-      if (await c.exists(base)) await walk(base, "");
+      for (const line of stdout.split("\n")) {
+        if (!line) continue;
+        const tab1 = line.indexOf("\t");
+        const tab2 = line.indexOf("\t", tab1 + 1);
+        if (tab1 < 0 || tab2 < 0) continue;
+        const size = Number(line.slice(0, tab1));
+        const mtime = Number(line.slice(tab1 + 1, tab2)); // segundos (com fração)
+        const rel = line.slice(tab2 + 1);
+        if (!rel || !Number.isFinite(size) || !Number.isFinite(mtime)) continue;
+        out.push({ rel, size, mtimeMs: Math.round(mtime * 1000) });
+      }
       return out;
     });
   }
