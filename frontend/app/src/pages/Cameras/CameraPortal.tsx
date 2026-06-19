@@ -118,6 +118,7 @@ export default function CameraPortal() {
   const [filesLoading, setFilesLoading] = useState(false);
   const [fileVideoUrl, setFileVideoUrl] = useState<string | null>(null); // blob: URL
   const [videoLoading, setVideoLoading] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0); // % baixado (0–100)
   const blobUrlRef = useRef<string | null>(null); // blob: atual (para revogar)
   const [openDirs, setOpenDirs] = useState<Set<string>>(new Set());
   const [playingKey, setPlayingKey] = useState<string | null>(null); // dir/name tocando
@@ -380,6 +381,7 @@ export default function CameraPortal() {
     setPlayingKey(key);
     playingKeyRef.current = key;
     setVideoLoading(true);
+    setVideoProgress(0);
     if (blobUrlRef.current) {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
@@ -388,7 +390,19 @@ export default function CameraPortal() {
     try {
       const res = await axios.get(
         `${base}/cameras/cameras/${folderCam.id}/files/${filePath(f.dir, f.name)}`,
-        { headers: authHeaders(), responseType: "blob" },
+        {
+          headers: authHeaders(),
+          responseType: "blob",
+          // Barra de progresso: usa o Content-Length quando vem, senão o tamanho
+          // conhecido do segmento (f.size). Ignora atualizações de download antigo.
+          onDownloadProgress: (e) => {
+            if (playingKeyRef.current !== key) return;
+            const total = e.total || f.size;
+            if (total > 0) {
+              setVideoProgress(Math.min(100, Math.round((e.loaded / total) * 100)));
+            }
+          },
+        },
       );
       // Outra gravação foi selecionada enquanto esta baixava: descarta.
       if (playingKeyRef.current !== key) return;
@@ -965,8 +979,17 @@ export default function CameraPortal() {
             </div>
 
             {videoLoading && !fileVideoUrl && (
-              <div className="w-full aspect-video bg-black rounded-md mb-3 flex items-center justify-center text-sm text-gray-300">
-                Baixando gravação…
+              <div className="w-full aspect-video bg-black rounded-md mb-3 flex flex-col items-center justify-center gap-3 px-8">
+                <div className="flex items-center gap-2 text-sm text-gray-300">
+                  <AiOutlineLoading3Quarters className="animate-spin" />
+                  Baixando gravação… {videoProgress}%
+                </div>
+                <div className="w-full max-w-md h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 transition-[width] duration-150 ease-out"
+                    style={{ width: `${videoProgress}%` }}
+                  />
+                </div>
               </div>
             )}
 
