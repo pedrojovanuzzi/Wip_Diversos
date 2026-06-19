@@ -26,6 +26,15 @@ const PASSWORD = process.env.CAMERA_STORAGE_PASSWORD || "";
 // Base remota onde a árvore de gravações é espelhada (mesmo layout do local:
 // <base>/<path_name>/<YYYY-MM>/<DD>/<arquivo>.mp4).
 const BASE = (process.env.CAMERA_STORAGE_PATH || "").replace(/\/+$/, "");
+// Teto GLOBAL de conexões SFTP simultâneas. O modelo é "uma conexão curta por
+// operação" (ver withClient), mas vários callers podem disparar em rajada ao
+// mesmo tempo: até MAX_CONCURRENT uploads do offload + um Promise.all por
+// câmera ao abrir a tela de armazenamento + a varredura de cota. Sem teto, uma
+// rajada (ex.: cliente com 15 câmeras) abre 15+ handshakes de uma vez e o sshd
+// derruba os excedentes antes do handshake (MaxStartups, padrão 10:30:100),
+// gerando "Connection lost before handshake" / timeouts. Mantemos 5 (< 10) para
+// ficar folgado abaixo do limite de conexões não autenticadas do servidor.
+const MAX_CONNECTIONS = Math.max(1, Number(process.env.CAMERA_STORAGE_MAX_CONNECTIONS || 5));
 
 export interface RemoteSegment {
   /** Caminho relativo à pasta da câmera, ex: "2026-06/08/14-43-19-000000.mp4". */
@@ -35,9 +44,29 @@ export interface RemoteSegment {
 }
 
 class CameraRemoteStorageService {
+  // Semáforo global de conexões: quantas vagas restam e a fila de quem espera.
+  private slots = MAX_CONNECTIONS;
+  private waiters: (() => void)[] = [];
+
   /** O offload/leitura remota só agem se houver servidor configurado. */
   public isEnabled(): boolean {
     return Boolean(HOST && USER && BASE);
+  }
+
+  /** Reserva uma vaga de conexão (espera em FIFO se todas estiverem ocupadas). */
+  private acquire(): Promise<void> {
+    if (this.slots > 0) {
+      this.slots--;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => this.waiters.push(resolve));
+  }
+
+  /** Libera uma vaga, passando-a ao próximo da fila (se houver) sem abrir folga. */
+  private release(): void {
+    const next = this.waiters.shift();
+    if (next) next();
+    else this.slots++;
   }
 
   private config(): SftpClient.ConnectOptions {
@@ -65,16 +94,23 @@ class CameraRemoteStorageService {
    * volume do CFTV (1 segmento/min por câmera).
    */
   private async withClient<T>(fn: (c: SftpClient) => Promise<T>): Promise<T> {
+    // Espera uma vaga ANTES do handshake e só a devolve após fechar, de modo que
+    // nunca existam mais de MAX_CONNECTIONS sockets SFTP abertos ao mesmo tempo.
+    await this.acquire();
     const client = new SftpClient();
-    await client.connect(this.config());
     try {
-      return await fn(client);
-    } finally {
+      await client.connect(this.config());
       try {
-        await client.end();
-      } catch {
-        /* ignora erro ao encerrar */
+        return await fn(client);
+      } finally {
+        try {
+          await client.end();
+        } catch {
+          /* ignora erro ao encerrar */
+        }
       }
+    } finally {
+      this.release();
     }
   }
 
