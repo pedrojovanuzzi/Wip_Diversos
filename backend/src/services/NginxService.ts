@@ -12,20 +12,6 @@ const END_MARKER = "# === MEDIAMTX_STREAM_END ===";
 
 function buildNginxBlock(): string {
   return `    ${BEGIN_MARKER}
-    # Portal de Câmeras (wip-cams) — backend dedicado na porta 3003, banco wip_cams.
-    # SEM barra final no proxy_pass: preserva o URI /api/cameras/... que o backend
-    # espera (app.ts monta as rotas sob /api/cameras). Como o prefixo é mais
-    # específico que /api/, o nginx o casa antes do proxy do backend antigo.
-    location /api/cameras/ {
-        proxy_pass http://127.0.0.1:3003;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 600s;
-    }
-
     # MediaMTX — playback de gravações (precisa vir antes de /stream/)
     location /stream/playback/ {
         proxy_pass http://127.0.0.1:9996/;
