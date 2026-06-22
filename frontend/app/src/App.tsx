@@ -67,9 +67,6 @@ import { WhatsappTeste } from "./pages/whatsapp/WhatsappTeste";
 import PhoneLocationMap from "./pages/PhoneLocation/PhoneLocationMap";
 import { CamerasAdmin } from "./pages/Cameras/CamerasAdmin";
 import CameraSetup from "./pages/Cameras/CameraSetup";
-import CameraLogin from "./pages/Cameras/CameraLogin";
-import CameraPortal from "./pages/Cameras/CameraPortal";
-import { CameraProtectedRoute } from "./pages/Cameras/CameraProtectedRoute";
 
 const isLocalhost =
   window.location.hostname === "localhost" ||
@@ -604,15 +601,6 @@ function App() {
             }
           />
           <Route path="/Cameras/Setup/:uuid" element={<CameraSetup />} />
-          <Route path="/Cameras/Login" element={<CameraLogin />} />
-          <Route
-            path="/Cameras/Portal"
-            element={
-              <CameraProtectedRoute>
-                <CameraPortal />
-              </CameraProtectedRoute>
-            }
-          />
           <Route path="/TimeTracking/ClockIn" element={<TimeClock />} />
           <Route
             path="/TimeTracking/Admin"

@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import icon from "../../assets/icon.png";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { MdVideocam } from "react-icons/md";
 
 export default function CameraSetup() {
   const { uuid } = useParams();
-  const navigate = useNavigate();
   const base = process.env.REACT_APP_URL;
 
   const [login, setLogin] = useState<string | null>(null);
@@ -48,7 +47,6 @@ export default function CameraSetup() {
     try {
       await axios.post(`${base}/cameras/setup/${uuid}`, { email, password });
       setSucesso(true);
-      setTimeout(() => navigate("/Cameras/Login"), 2500);
     } catch (err: any) {
       const apiErr =
         err?.response?.data?.errors?.[0]?.msg ||
@@ -136,7 +134,7 @@ export default function CameraSetup() {
         {error && <p className="text-red-500 text-sm">{error}</p>}
         {sucesso && (
           <p className="text-green-600 text-sm">
-            Cadastro concluído! Redirecionando para o login...
+            Cadastro concluído! Sua conta de câmeras foi ativada.
           </p>
         )}
 
