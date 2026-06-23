@@ -15,6 +15,7 @@ import {
   normalizeStorageGb,
   isValidStorageGb,
   planFor,
+  maxCamerasFor,
 } from "../config/cameraStoragePlans";
 import NginxService from "../services/NginxService";
 
@@ -184,8 +185,22 @@ class Camera {
       if (req.body.email !== undefined) {
         cliente.email = String(req.body.email).trim() || null;
       }
+      // Limpeza periódica por idade (dias). 0/vazio = desligado (NULL).
+      if (req.body.cleanupDays !== undefined) {
+        const raw = req.body.cleanupDays;
+        if (raw === null || raw === "" || Number(raw) <= 0) {
+          cliente.cleanup_days = null;
+        } else {
+          const n = Math.floor(Number(raw));
+          if (!Number.isFinite(n) || n < 1 || n > 3650) {
+            res.status(400).json({ message: "Dias de limpeza inválidos (1 a 3650)." });
+            return;
+          }
+          cliente.cleanup_days = n;
+        }
+      }
       await repo.save(cliente);
-      res.json({ ok: true, email: cliente.email });
+      res.json({ ok: true, email: cliente.email, cleanupDays: cliente.cleanup_days });
     } catch (e: any) {
       console.error("updateCliente:", e?.message);
       res.status(500).json({ message: "Erro ao atualizar cliente." });
@@ -255,6 +270,8 @@ class Camera {
           status: c.status,
           storageGb: c.storage_gb,
           storagePriceBRL: planFor(c.storage_gb)?.priceBRL ?? null,
+          maxCameras: maxCamerasFor(c.storage_gb),
+          cleanupDays: c.cleanup_days ?? null,
           setupLink: c.setup_uuid
             ? `${FRONT_URL}/Cameras/Setup/${c.setup_uuid}`
             : null,

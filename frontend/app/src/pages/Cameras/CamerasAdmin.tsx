@@ -24,17 +24,20 @@ interface ClienteItem {
   status: "pendente" | "ativo" | "bloqueado";
   storageGb: number;
   storagePriceBRL: number | null;
+  maxCameras: number;
+  cleanupDays: number | null;
   setupLink: string | null;
   totalCameras: number;
   created_at: string;
 }
 
 // Planos de armazenamento das gravações (espelha o backend: cameraStoragePlans.ts).
+// cameras = limite de câmeras do plano (5 GB→1, 10→2, 15→3, 20→4).
 const STORAGE_PLANS = [
-  { gb: 5, price: 20 },
-  { gb: 10, price: 30 },
-  { gb: 15, price: 35 },
-  { gb: 20, price: 40 },
+  { gb: 5, price: 20, cameras: 1 },
+  { gb: 10, price: 30, cameras: 2 },
+  { gb: 15, price: 35, cameras: 3 },
+  { gb: 20, price: 40, cameras: 4 },
 ];
 
 export const CamerasAdmin: React.FC = () => {
@@ -161,6 +164,35 @@ export const CamerasAdmin: React.FC = () => {
       flash("E-mail atualizado.", "ok");
     } catch (e: any) {
       flash(e?.response?.data?.message || "Erro ao salvar e-mail.", "err");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const saveCleanup = async (c: ClienteItem, value: string) => {
+    const trimmed = value.trim();
+    const cleanupDays = trimmed === "" ? null : Number(trimmed);
+    if (cleanupDays === c.cleanupDays) return;
+    if (cleanupDays !== null && (!Number.isFinite(cleanupDays) || cleanupDays < 1)) {
+      flash("Informe um número de dias maior que 0 (ou vazio para desligar).", "err");
+      return;
+    }
+    setBusyId(c.id);
+    try {
+      await axios.put(
+        `${base}/cameras/admin/clientes/${c.id}`,
+        { cleanupDays },
+        { headers },
+      );
+      await load();
+      flash(
+        cleanupDays
+          ? `Limpeza automática: gravações com mais de ${cleanupDays} dia(s) serão apagadas.`
+          : "Limpeza automática desligada.",
+        "ok",
+      );
+    } catch (e: any) {
+      flash(e?.response?.data?.message || "Erro ao salvar limpeza.", "err");
     } finally {
       setBusyId(null);
     }
@@ -327,13 +359,14 @@ export const CamerasAdmin: React.FC = () => {
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Armazenamento</th>
                   <th className="px-3 py-2">Câmeras</th>
+                  <th className="px-3 py-2">Limpeza (dias)</th>
                   <th className="px-3 py-2">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-6 text-center text-gray-400">
+                    <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
                       Nenhum cliente encontrado.
                     </td>
                   </tr>
@@ -390,12 +423,38 @@ export const CamerasAdmin: React.FC = () => {
                       >
                         {STORAGE_PLANS.map((p) => (
                           <option key={p.gb} value={p.gb}>
-                            {p.gb} GB — R$ {p.price.toFixed(2)}
+                            {p.gb} GB · {p.cameras} câm. — R$ {p.price.toFixed(2)}
                           </option>
                         ))}
                       </select>
                     </td>
-                    <td className="px-3 py-2">{c.totalCameras}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={
+                          c.totalCameras >= c.maxCameras ? "text-amber-600 font-medium" : ""
+                        }
+                        title="Câmeras cadastradas / limite do plano"
+                      >
+                        {c.totalCameras} / {c.maxCameras}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={3650}
+                        defaultValue={c.cleanupDays ?? ""}
+                        key={`cleanup-${c.id}-${c.cleanupDays ?? ""}`}
+                        disabled={busyId === c.id}
+                        placeholder="off"
+                        title="Apaga gravações com mais de N dias. Vazio = desligado."
+                        onBlur={(e) => saveCleanup(c, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                        }}
+                        className="w-20 ring-1 ring-gray-300 rounded px-2 py-1 text-sm disabled:opacity-50"
+                      />
+                    </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         {c.setupLink && (

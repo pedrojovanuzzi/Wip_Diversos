@@ -37,6 +37,11 @@ export class CameraCliente {
   @Column({ type: "int", default: 5 })
   storage_gb!: number;
 
+  // Limpeza periódica por idade: apaga gravações com mais de N dias.
+  // NULL ou 0 = desligado. A coluna é criada pela migration do Wip_Cams.
+  @Column({ type: "int", nullable: true })
+  cleanup_days?: number | null;
+
   @CreateDateColumn({ type: "timestamp" })
   created_at?: Date;
 
