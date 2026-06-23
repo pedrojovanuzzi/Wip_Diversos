@@ -478,9 +478,14 @@ class NFEController {
                 },
                 det: equipamentos.map((eq: any, index: number) => {
                   const product = eq.idprod ? productMap.get(eq.idprod) : null;
-                  const valorProduto = product?.precoatual
-                    ? parseFloat(product.precoatual as any).toFixed(2)
-                    : "0.00";
+                  const valorUnitario = product?.precoatual
+                    ? parseFloat(product.precoatual as any)
+                    : 0;
+                  const quantidade =
+                    eq.qtdcli && Number(eq.qtdcli) > 0 ? Number(eq.qtdcli) : 1;
+                  const valorUnCom = valorUnitario.toFixed(2);
+                  const valorProduto = (valorUnitario * quantidade).toFixed(2);
+                  const qComStr = quantidade.toFixed(4);
 
                   return {
                     "@nItem": index + 1,
@@ -495,13 +500,13 @@ class NFEController {
                       NCM: product?.codigo || "85176259",
                       CFOP: cfop,
                       uCom: "UN",
-                      qCom: "1.0000",
-                      vUnCom: valorProduto,
+                      qCom: qComStr,
+                      vUnCom: valorUnCom,
                       vProd: valorProduto,
                       cEANTrib: "SEM GTIN",
                       uTrib: "UN",
-                      qTrib: "1.0000",
-                      vUnTrib: valorProduto,
+                      qTrib: qComStr,
+                      vUnTrib: valorUnCom,
                       indTot: "1",
                     },
                     imposto: {
@@ -548,7 +553,11 @@ class NFEController {
                         const valor = product?.precoatual
                           ? parseFloat(product.precoatual as any)
                           : 0;
-                        return acc + valor;
+                        const qtd =
+                          cur.qtdcli && Number(cur.qtdcli) > 0
+                            ? Number(cur.qtdcli)
+                            : 1;
+                        return acc + valor * qtd;
                       }, 0)
                       .toFixed(2),
                     vFrete: "0.00",
@@ -568,7 +577,11 @@ class NFEController {
                         const valor = product?.precoatual
                           ? parseFloat(product.precoatual as any)
                           : 0;
-                        return acc + valor;
+                        const qtd =
+                          cur.qtdcli && Number(cur.qtdcli) > 0
+                            ? Number(cur.qtdcli)
+                            : 1;
+                        return acc + valor * qtd;
                       }, 0)
                       .toFixed(2),
                   },
@@ -1004,6 +1017,7 @@ class NFEController {
         let originalItems: Array<{
           xProd: string;
           vUnCom: string;
+          qCom: string;
           cProd: string;
           NCM: string;
         }> = [];
@@ -1018,14 +1032,18 @@ class NFEController {
               ? [originalDet]
               : [];
 
-          originalItems = detArray.map((item: any) => ({
-            xProd:
-              item?.prod?.xProd?.toString().trim() ||
-              "DEVOLUCAO DE EQUIPAMENTO",
-            vUnCom: item?.prod?.vUnCom?.toString() || "0.00",
-            cProd: item?.prod?.cProd?.toString() || "0",
-            NCM: item?.prod?.NCM?.toString() || "85176259",
-          }));
+          originalItems = detArray.map((item: any) => {
+            const qComOrig = parseFloat(item?.prod?.qCom?.toString() || "1");
+            return {
+              xProd:
+                item?.prod?.xProd?.toString().trim() ||
+                "DEVOLUCAO DE EQUIPAMENTO",
+              vUnCom: item?.prod?.vUnCom?.toString() || "0.00",
+              qCom: (qComOrig > 0 ? qComOrig : 1).toFixed(4),
+              cProd: item?.prod?.cProd?.toString() || "0",
+              NCM: item?.prod?.NCM?.toString() || "85176259",
+            };
+          });
         } catch {
           console.warn(
             `Aviso: não foi possível parsear XML da NFe origem ${id}`,
@@ -1038,6 +1056,7 @@ class NFEController {
             {
               xProd: "DEVOLUCAO DE EQUIPAMENTO",
               vUnCom: "0.00",
+              qCom: "1.0000",
               cProd: "0",
               NCM: "85176259",
             },
@@ -1167,6 +1186,10 @@ class NFEController {
                       : undefined,
                 },
                 det: originalItems.map((item, index) => {
+                  const qtd = parseFloat(item.qCom || "1") || 1;
+                  const vProdItem = (
+                    parseFloat(item.vUnCom || "0") * qtd
+                  ).toFixed(2);
                   return {
                     "@nItem": index + 1,
                     prod: {
@@ -1176,12 +1199,12 @@ class NFEController {
                       NCM: item.NCM,
                       CFOP: cfop,
                       uCom: "UN",
-                      qCom: "1.0000",
+                      qCom: item.qCom,
                       vUnCom: item.vUnCom,
-                      vProd: item.vUnCom,
+                      vProd: vProdItem,
                       cEANTrib: "SEM GTIN",
                       uTrib: "UN",
-                      qTrib: "1.0000",
+                      qTrib: item.qCom,
                       vUnTrib: item.vUnCom,
                       indTot: "1",
                     },
@@ -1223,7 +1246,10 @@ class NFEController {
                     vFCPSTRet: "0.00",
                     vProd: originalItems
                       .reduce(
-                        (acc, item) => acc + parseFloat(item.vUnCom || "0"),
+                        (acc, item) =>
+                          acc +
+                          parseFloat(item.vUnCom || "0") *
+                            (parseFloat(item.qCom || "1") || 1),
                         0,
                       )
                       .toFixed(2),
@@ -1238,7 +1264,10 @@ class NFEController {
                     vOutro: "0.00",
                     vNF: originalItems
                       .reduce(
-                        (acc, item) => acc + parseFloat(item.vUnCom || "0"),
+                        (acc, item) =>
+                          acc +
+                          parseFloat(item.vUnCom || "0") *
+                            (parseFloat(item.qCom || "1") || 1),
                         0,
                       )
                       .toFixed(2),
