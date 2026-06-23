@@ -309,22 +309,6 @@ export const SerContratos: React.FC = () => {
     }
   };
 
-  const removeAllCameras = async () => {
-    if (!loaded) return;
-    if (!window.confirm("Remover TODAS as câmeras deste cliente?")) return;
-    try {
-      await axios.post(
-        `${base}/sercontratos/remove-by-type`,
-        { login: loaded.login, tipo: "CAMERA" },
-        { headers },
-      );
-      showMsg("Câmeras removidas.", "success");
-      await fetchList(loaded.login);
-    } catch (e: any) {
-      showMsg(e?.response?.data?.message || "Erro ao remover.", "error");
-    }
-  };
-
   const totalStreaming = loaded?.items.filter((i) => i.nome === "STREAMER")
     .length || 0;
   const totalStreamingColab = loaded?.items.filter(
@@ -533,12 +517,10 @@ export const SerContratos: React.FC = () => {
                         {adding ? "Adicionando..." : "Adicionar Câmeras"}
                       </button>
                     ) : (
-                      <button
-                        onClick={removeAllCameras}
-                        className="flex-1 py-2 bg-red-100 text-red-700 rounded font-semibold hover:bg-red-200"
-                      >
-                        Remover Câmeras
-                      </button>
+                      <p className="flex-1 text-xs text-gray-500">
+                        Para remover, acesse <b>Gerenciar Câmeras</b> e exclua o
+                        cliente — isso também remove esta tag do cadastro.
+                      </p>
                     )}
                   </div>
                 </div>
@@ -593,6 +575,10 @@ export const SerContratos: React.FC = () => {
                           <td className="p-2 text-center">
                             {it.nome === "STREAMER" ? (
                               <span className="text-gray-300" title="Streaming pago não pode ser removido por aqui">
+                                —
+                              </span>
+                            ) : it.nome === "CAMERA" ? (
+                              <span className="text-gray-300" title="Para remover, exclua o cliente em Gerenciar Câmeras">
                                 —
                               </span>
                             ) : (

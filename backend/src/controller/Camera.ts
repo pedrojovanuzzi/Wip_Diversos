@@ -329,7 +329,18 @@ class Camera {
 
       await camRepo.delete({ cliente_id: id });
       await repo.delete(id);
-      res.json({ ok: true });
+
+      // Remove também a "tag" do cadastro: o(s) contrato(s) CAMERA em sis_sercontratos.
+      const serRepo = MkauthSource.getRepository(SisSerContratos);
+      const removed = await serRepo
+        .createQueryBuilder()
+        .delete()
+        .from(SisSerContratos)
+        .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: cliente.login })
+        .andWhere("UPPER(TRIM(nome)) = :nome", { nome: "CAMERA" })
+        .execute();
+
+      res.json({ ok: true, contratoRemovido: (removed.affected ?? 0) > 0 });
     } catch (e: any) {
       console.error("removerCliente:", e?.message);
       res.status(500).json({ message: "Erro ao remover cliente." });
