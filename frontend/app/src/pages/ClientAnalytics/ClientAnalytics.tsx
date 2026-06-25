@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   FiSearch,
   FiRefreshCw,
@@ -181,6 +181,7 @@ export const ClientAnalytics = () => {
   const [errorClientList, setErrorClientList] = useState<string | null>(null);
   const [clientlist, setClientList] = useState<ClientList[]>([]);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { user } = useAuth();
   const token = user?.token;
@@ -351,6 +352,17 @@ export const ClientAnalytics = () => {
     fetchClientsList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // Pré-busca quando vindo de outra página (ex.: Clientes sem Queue)
+  useEffect(() => {
+    const pppoeState = (location.state as { pppoe?: string } | null)?.pppoe;
+    if (pppoeState && token) {
+      setPppoe(pppoeState);
+      fetchClientInfo(pppoeState);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, token]);
 
   const servidorAtual = clientlist.find((c) => c.pppoe === pppoe)?.servidor;
 

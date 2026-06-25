@@ -27,6 +27,7 @@ import {
   FaFilePdf,
   FaList,
   FaTerminal,
+  FaNetworkWired,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -362,6 +363,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   }
                   title="Analytics"
                   description="Análise de dados de clientes"
+                />
+                <NavItem
+                  to="/ClientAnalytics/SemQueue"
+                  icon={
+                    <FaNetworkWired className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Sem Queue"
+                  description="Clientes conectados que não possuem fila (queue) no Mikrotik"
                 />
                 <NavItem
                   to="/grafico-instalacoes"

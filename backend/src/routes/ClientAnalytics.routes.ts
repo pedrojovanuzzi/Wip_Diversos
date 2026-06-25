@@ -12,6 +12,7 @@ router.post("/Mikrotik", AuthGuard, ClientAnalytics.mikrotik);
 router.post("/TempoReal", AuthGuard, ClientAnalytics.mikrotikTempoReal);
 router.post("/Reset", AuthGuard, ClientAnalytics.onuReiniciar);
 router.get("/ClientList", AuthGuard, ClientAnalytics.clientList);
+router.get("/ClientsWithoutQueue", AuthGuard, ClientAnalytics.clientsWithoutQueue);
 router.get("/Logs", AuthGuard, ClientAnalytics.pppoesLogs);
 
 export default router;

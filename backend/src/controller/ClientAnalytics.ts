@@ -107,6 +107,79 @@ class ClientAnalytics {
     }
   };
 
+  clientsWithoutQueue = async (req: Request, res: Response) => {
+    try {
+      const resultados: any[] = [];
+
+      for (const servidor of servidores) {
+        try {
+          // 1) Clientes PPPoE conectados
+          const comandoAtivos = `/ppp active print without-paging detail`;
+          const respostaAtivos = await this.executarSSH(
+            servidor.host!,
+            comandoAtivos,
+          );
+
+          const regexAtivos =
+            /name="([^"]+)"\s+service=pppoe\s+caller-id="([0-9A-F:]+)"\s+address=(\d+\.\d+\.\d+\.\d+)\s+uptime=((?:\d+y)?(?:\d+mo)?(?:\d+w)?(?:\d+d)?(?:\d+h)?(?:\d+m)?(?:\d+s)?|\d+)/gim;
+
+          const ativos = [...respostaAtivos.matchAll(regexAtivos)].map(
+            (match) => {
+              let [, pppoe, callerId, ip, upTime] = match;
+              if (/^\d+$/.test(upTime)) upTime = `${upTime}d`;
+              return { pppoe, callerId, ip, upTime };
+            },
+          );
+
+          // 2) Filas (simple queues) existentes no servidor
+          const comandoQueues = `/queue simple print without-paging detail`;
+          const respostaQueues = await this.executarSSH(
+            servidor.host!,
+            comandoQueues,
+          );
+
+          const nomesNaQueue = new Set<string>();
+
+          // As filas PPPoE são dinâmicas e vêm como name="<pppoe-LOGIN>".
+          // Extraímos somente o LOGIN para comparar pelo PPPoE.
+          for (const m of respostaQueues.matchAll(/name="([^"]+)"/gim)) {
+            const bruto = m[1].trim();
+            const login = bruto
+              .replace(/^<pppoe-/i, "")
+              .replace(/>$/, "")
+              .trim()
+              .toLowerCase();
+            if (login) nomesNaQueue.add(login);
+          }
+
+          // 3) Conectados que NÃO possuem fila (comparação somente por PPPoE)
+          for (const cliente of ativos) {
+            const temQueue = nomesNaQueue.has(cliente.pppoe.toLowerCase());
+
+            if (!temQueue) {
+              resultados.push({
+                servidor: servidor.nome,
+                pppoe: cliente.pppoe,
+                callerId: cliente.callerId,
+                ip: cliente.ip,
+                upTime: cliente.upTime,
+              });
+            }
+          }
+        } catch (err: any) {
+          resultados.push({
+            servidor: servidor.nome,
+            erro: err.message || "Erro desconhecido",
+          });
+        }
+      }
+
+      res.status(200).json(resultados);
+    } catch (error) {
+      res.status(500).json(error);
+    }
+  };
+
   pppoesLogs = async (req: Request, res: Response) => {
     try {
       const resultados: any[] = [];
