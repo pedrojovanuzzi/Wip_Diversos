@@ -3,9 +3,11 @@ import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
 import { Request, Response } from "express";
 import { Radacct } from "../entities/Radacct";
-import { Between, LessThanOrEqual } from "typeorm";
+import { Between, In, LessThanOrEqual } from "typeorm";
 import { Telnet } from "telnet-client";
 import { Client } from "ssh2";
+import axios from "axios";
+import crypto from "crypto";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -16,6 +18,143 @@ const servidores = [
   { host: process.env.MIKROTIK_PPPOE3, nome: "PPPOE3" },
   { host: process.env.MIKROTIK_PPPOE4, nome: "PPPOE4" },
 ];
+
+// Integração com o painel do mkauth (botão "Reparar")
+const MKAUTH_URL = process.env.MKAUTH_URL; // ex: https://mk.seudominio.com.br
+const MKAUTH_COOKIE = process.env.MKAUTH_COOKIE; // (opcional) cookie fixo de fallback
+
+// Sessão obtida via login no popup, guardada em memória (não persiste senha).
+let mkauthSession: string | null = null;
+
+function parseSetCookie(setCookie?: string[] | string): Record<string, string> {
+  const map: Record<string, string> = {};
+  if (!setCookie) return map;
+  const arr = Array.isArray(setCookie) ? setCookie : [setCookie];
+  for (const c of arr) {
+    const first = c.split(";")[0];
+    const eq = first.indexOf("=");
+    if (eq > 0) map[first.slice(0, eq).trim()] = first.slice(eq + 1).trim();
+  }
+  return map;
+}
+
+function cookieHeader(map: Record<string, string>): string {
+  return Object.entries(map)
+    .map(([k, v]) => `${k}=${v}`)
+    .join("; ");
+}
+
+// Extrai os campos do form de login (inclui os dinâmicos e o ttoken).
+function extrairCamposLogin(html: string): Record<string, string> {
+  const campos: Record<string, string> = {};
+  let escopo = html;
+  const form = html.match(
+    /<form[^>]*executar_login[\s\S]*?<\/form>/i,
+  );
+  if (form) escopo = form[0];
+  const inputs = escopo.match(/<input\b[^>]*>/gi) || [];
+  for (const tag of inputs) {
+    const name = (tag.match(/name\s*=\s*["']([^"']+)["']/i) || [])[1];
+    if (!name) continue;
+    const value = (tag.match(/value\s*=\s*["']([^"']*)["']/i) || [])[1] ?? "";
+    campos[name] = value;
+  }
+  return campos;
+}
+
+// Extrai os valores do "Sou Ser Humano" (captcha) do script inline da login.
+// No HTML os inputs vêm value="0"; os valores reais ficam no ramo if(checked).
+function extrairCaptchaHuman(html: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const bloco = html.match(
+    /prop\(\s*["']checked["']\s*\)\s*\)\s*\{([\s\S]*?)\}\s*else/i,
+  );
+  if (!bloco) return out;
+  const re = /["']#([^"']+)["']\s*\)\s*\.val\(\s*['"]([^'"]*)['"]\s*\)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(bloco[1])) !== null) {
+    out[m[1]] = m[2];
+  }
+  return out;
+}
+
+// Faz o login no painel do mkauth e retorna o header Cookie autenticado.
+async function fazerLoginMkauth(
+  usuario: string,
+  senha: string,
+  ga: string = "",
+): Promise<string> {
+  if (!MKAUTH_URL) throw new Error("MKAUTH_URL não configurado");
+
+  // 1) Página de login: cookies pré-sessão + campos dinâmicos + ttoken.
+  const getResp = await axios.get(`${MKAUTH_URL}/admin/login.hhvm`, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    timeout: 30000,
+    maxRedirects: 0,
+    validateStatus: (s) => s >= 200 && s < 400,
+  });
+
+  const html = typeof getResp.data === "string" ? getResp.data : "";
+  const cookiesPre = parseSetCookie(getResp.headers["set-cookie"]);
+  const campos = extrairCamposLogin(html);
+
+  // Captcha "Sou Ser Humano": aplica os valores reais dos campos dinâmicos.
+  Object.assign(campos, extrairCaptchaHuman(html));
+
+  // 2) Credenciais: usuário em base64, senha em SHA-256 (como o painel faz).
+  campos["login"] = Buffer.from(usuario).toString("base64");
+  campos["password"] = crypto.createHash("sha256").update(senha).digest("hex");
+  campos["cookie"] = "nao";
+  campos["ga"] = ga || "";
+
+  const body = Object.entries(campos)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join("&");
+
+  // 3) Envia o login.
+  const postResp = await axios.post(
+    `${MKAUTH_URL}/admin/executar_login.hhvm`,
+    body,
+    {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Cookie: cookieHeader(cookiesPre),
+        Origin: MKAUTH_URL,
+        Referer: `${MKAUTH_URL}/admin/login.hhvm`,
+        "User-Agent": "Mozilla/5.0",
+      },
+      timeout: 30000,
+      maxRedirects: 0,
+      validateStatus: () => true,
+    },
+  );
+
+  const cookiesPos = parseSetCookie(postResp.headers["set-cookie"]);
+  const merged = { ...cookiesPre, ...cookiesPos };
+
+  if (!Object.keys(merged).some((k) => k.includes("-MKA"))) {
+    throw new Error("Login não retornou sessão do mkauth");
+  }
+
+  // Valida de verdade: acessa uma página protegida. Se cair no login, falhou.
+  const verif = await axios.get(`${MKAUTH_URL}/admin/clientes.hhvm?tipo=todos`, {
+    headers: { Cookie: cookieHeader(merged), "User-Agent": "Mozilla/5.0" },
+    maxRedirects: 0,
+    validateStatus: () => true,
+    timeout: 30000,
+  });
+  const corpoVerif = typeof verif.data === "string" ? verif.data : "";
+  const caiuNoLogin =
+    verif.status >= 300 ||
+    /executar_login|login\.hhvm|name=["']password["']/i.test(corpoVerif);
+  if (caiuNoLogin) {
+    throw new Error(
+      "Sessão não autenticou (usuário/senha ou esquema de hash incorretos).",
+    );
+  }
+
+  return cookieHeader(merged);
+}
 
 class ClientAnalytics {
   private clientIp: string | undefined;
@@ -174,9 +313,338 @@ class ClientAnalytics {
         }
       }
 
+      // Enriquece com o plano de cada cliente (busca única no sis_cliente).
+      const logins = resultados
+        .filter((r) => r.pppoe)
+        .map((r) => r.pppoe as string);
+
+      if (logins.length > 0) {
+        try {
+          const repo = MkauthSource.getRepository(ClientesEntities);
+          const registros = await repo.find({
+            where: { login: In(logins) },
+            select: ["login", "plano"],
+          });
+
+          const mapa = new Map(
+            registros.map((c) => [String(c.login).toLowerCase(), c.plano ?? ""]),
+          );
+
+          for (const r of resultados) {
+            if (r.pppoe) {
+              r.plano = mapa.get(String(r.pppoe).toLowerCase()) ?? "";
+            }
+          }
+        } catch (errPlano) {
+          // Se falhar a consulta de planos, segue sem o campo.
+        }
+      }
+
       res.status(200).json(resultados);
     } catch (error) {
       res.status(500).json(error);
+    }
+  };
+
+  observacao = async (req: Request, res: Response) => {
+    try {
+      const { pppoe, observar } = req.body;
+
+      if (!pppoe) {
+        res.status(400).json({ error: "pppoe é obrigatório" });
+        return;
+      }
+
+      const repo = MkauthSource.getRepository(ClientesEntities);
+      const user = await repo.findOne({
+        where: { login: pppoe },
+        order: { id: "ASC" },
+      });
+
+      if (!user) {
+        res.status(404).json({ error: "Cliente não encontrado" });
+        return;
+      }
+
+      if (observar) {
+        // Liga a observação. O mkauth trata rem_obs por dia (grava à meia-noite),
+        // então usamos a data de hoje como marca de "em observação".
+        const hoje = new Date();
+        const remObs = `${hoje.getFullYear()}-${String(
+          hoje.getMonth() + 1,
+        ).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
+
+        await repo.update(
+          { id: user.id },
+          { observacao: "sim", rem_obs: remObs as any },
+        );
+
+        res.status(200).json({ observacao: "sim", rem_obs: remObs });
+        return;
+      }
+
+      // Desliga a observação.
+      await repo.update(
+        { id: user.id },
+        { observacao: "nao", rem_obs: null as any },
+      );
+
+      res.status(200).json({ observacao: "nao", rem_obs: null });
+    } catch (error) {
+      res.status(500).json({
+        error: "Erro ao atualizar observação",
+        detalhes: String(error),
+      });
+    }
+  };
+
+  subirCliente = async (req: Request, res: Response) => {
+    try {
+      const { pppoe } = req.body;
+
+      if (!pppoe) {
+        res.status(400).json({ error: "pppoe é obrigatório" });
+        return;
+      }
+
+      const repo = MkauthSource.getRepository(ClientesEntities);
+      const user = await repo.findOne({
+        where: { login: pppoe },
+        order: { id: "ASC" },
+      });
+
+      if (!user) {
+        res.status(404).json({ error: "Cliente não encontrado" });
+        return;
+      }
+
+      // 1) Redução: força o estado para o mkauth re-sincronizar com o MikroTik.
+      await repo.update(
+        { id: user.id },
+        { status_corte: "down", statusdown: "on" },
+      );
+
+      // 2) Aguarda 30s para o cliente cair em redução antes de restaurar.
+      await new Promise((resolve) => setTimeout(resolve, 30000));
+
+      // 3) Observação: volta para velocidade normal e marca em observação.
+      const hoje = new Date();
+      const remObs = `${hoje.getFullYear()}-${String(
+        hoje.getMonth() + 1,
+      ).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
+
+      try {
+        await repo.update(
+          { id: user.id },
+          {
+            status_corte: "full",
+            statusdown: "off",
+            observacao: "sim",
+            rem_obs: remObs as any,
+          },
+        );
+      } catch (errFinal) {
+        // Se a restauração falhar, tenta ao menos tirar o cliente da redução.
+        await repo
+          .update({ id: user.id }, { status_corte: "full", statusdown: "off" })
+          .catch(() => {});
+        throw errFinal;
+      }
+
+      res
+        .status(200)
+        .json({ ok: true, observacao: "sim", rem_obs: remObs });
+    } catch (error) {
+      res.status(500).json({
+        error: "Erro ao subir cliente",
+        detalhes: String(error),
+      });
+    }
+  };
+
+  derrubarPppoe = async (req: Request, res: Response) => {
+    try {
+      if ((req.user?.permission ?? 0) < 5) {
+        res.status(403).json({ error: "Permissão insuficiente" });
+        return;
+      }
+
+      const { pppoe, servidor } = req.body;
+
+      if (!pppoe || !/^[a-zA-Z0-9._-]+$/.test(pppoe)) {
+        res.status(400).json({ error: "pppoe inválido" });
+        return;
+      }
+
+      // Coloca o cliente em observação por 1 dia (rem_obs = amanhã).
+      // Best-effort: se falhar, não impede o desligamento.
+      let observado = false;
+      try {
+        const repo = MkauthSource.getRepository(ClientesEntities);
+        const user = await repo.findOne({
+          where: { login: pppoe },
+          order: { id: "ASC" },
+        });
+        if (user) {
+          const amanha = new Date();
+          amanha.setDate(amanha.getDate() + 1);
+          const remObs = `${amanha.getFullYear()}-${String(
+            amanha.getMonth() + 1,
+          ).padStart(2, "0")}-${String(amanha.getDate()).padStart(2, "0")}`;
+
+          await repo.update(
+            { id: user.id },
+            { observacao: "sim", rem_obs: remObs as any },
+          );
+          observado = true;
+        }
+      } catch (errObs) {
+        observado = false;
+      }
+
+      const comando = `/ppp active remove [find name="${pppoe}"]`;
+
+      // Se souber o servidor, derruba só nele; senão tenta em todos.
+      const alvos = servidor
+        ? servidores.filter((s) => s.nome === servidor)
+        : servidores;
+
+      if (alvos.length === 0) {
+        res.status(404).json({ error: "Servidor não encontrado" });
+        return;
+      }
+
+      const resultados: any[] = [];
+      for (const srv of alvos) {
+        try {
+          await this.executarSSH(srv.host!, comando);
+          resultados.push({ servidor: srv.nome, ok: true });
+        } catch (err: any) {
+          resultados.push({
+            servidor: srv.nome,
+            ok: false,
+            erro: err.message || "Erro desconhecido",
+          });
+        }
+      }
+
+      res.status(200).json({ ok: true, observado, resultados });
+    } catch (error) {
+      res.status(500).json({
+        error: "Erro ao derrubar PPPoE",
+        detalhes: String(error),
+      });
+    }
+  };
+
+  mkauthLogin = async (req: Request, res: Response) => {
+    try {
+      if ((req.user?.permission ?? 0) < 5) {
+        res.status(403).json({ error: "Permissão insuficiente" });
+        return;
+      }
+
+      if (!MKAUTH_URL) {
+        res.status(500).json({
+          error: "Integração mkauth não configurada. Defina MKAUTH_URL no .env.",
+        });
+        return;
+      }
+
+      const { usuario, senha, ga } = req.body;
+      if (!usuario || !senha) {
+        res.status(400).json({ error: "Informe usuário e senha" });
+        return;
+      }
+
+      mkauthSession = await fazerLoginMkauth(
+        String(usuario),
+        String(senha),
+        ga ? String(ga) : "",
+      );
+      res.status(200).json({ ok: true });
+    } catch (error) {
+      mkauthSession = null;
+      res.status(401).json({
+        error: "Falha ao logar no mkauth. Confira usuário e senha.",
+        detalhes: String(error),
+      });
+    }
+  };
+
+  repararMkauth = async (req: Request, res: Response) => {
+    try {
+      if ((req.user?.permission ?? 0) < 5) {
+        res.status(403).json({ error: "Permissão insuficiente" });
+        return;
+      }
+
+      if (!MKAUTH_URL) {
+        res.status(500).json({
+          error: "Integração mkauth não configurada. Defina MKAUTH_URL no .env.",
+        });
+        return;
+      }
+
+      const cookie = mkauthSession || MKAUTH_COOKIE;
+      if (!cookie) {
+        res
+          .status(401)
+          .json({ error: "Faça login no mkauth.", precisaLogin: true });
+        return;
+      }
+
+      const { logins } = req.body;
+
+      if (!Array.isArray(logins) || logins.length === 0) {
+        res.status(400).json({ error: "Informe ao menos um login" });
+        return;
+      }
+
+      const validos = logins.filter(
+        (l: any) => typeof l === "string" && /^[a-zA-Z0-9._-]+$/.test(l),
+      );
+
+      if (validos.length === 0) {
+        res.status(400).json({ error: "Nenhum login válido" });
+        return;
+      }
+
+      // O reparar.hhvm aceita vários: login[]=A&login[]=B
+      const body = validos
+        .map((l: string) => `login[]=${encodeURIComponent(l)}`)
+        .join("&");
+
+      const resp = await axios.post(`${MKAUTH_URL}/admin/reparar.hhvm`, body, {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: cookie,
+          Origin: MKAUTH_URL,
+          Referer: `${MKAUTH_URL}/admin/clientes.hhvm`,
+          "User-Agent": "Mozilla/5.0",
+        },
+        maxRedirects: 0,
+        validateStatus: () => true,
+        timeout: 30000,
+      });
+
+      const corpo = typeof resp.data === "string" ? resp.data : "";
+      // 3xx para o login ou corpo com o form de login = sessão expirada.
+      if (resp.status >= 300 || /login\.hhvm|executar_login/i.test(corpo)) {
+        mkauthSession = null;
+        res.status(401).json({
+          error: "Sessão do mkauth expirada. Faça login novamente.",
+          precisaLogin: true,
+        });
+        return;
+      }
+
+      res.status(200).json({ ok: true, reparados: validos });
+    } catch (error: any) {
+      res.status(500).json({
+        error: "Erro ao reparar no mkauth",
+        detalhes: String(error),
+      });
     }
   };
 

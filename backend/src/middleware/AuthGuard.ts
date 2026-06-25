@@ -33,7 +33,7 @@ async function AuthGuard(req: Request, res: Response, next: NextFunction) {
 
     req.user = await userRepository.findOne({
       where: { id: verified.id },
-      select: ["id", "login", "password"],
+      select: ["id", "login", "password", "permission"],
     });
 
     if (!req.user) {

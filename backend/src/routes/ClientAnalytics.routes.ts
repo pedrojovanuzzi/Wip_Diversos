@@ -13,6 +13,11 @@ router.post("/TempoReal", AuthGuard, ClientAnalytics.mikrotikTempoReal);
 router.post("/Reset", AuthGuard, ClientAnalytics.onuReiniciar);
 router.get("/ClientList", AuthGuard, ClientAnalytics.clientList);
 router.get("/ClientsWithoutQueue", AuthGuard, ClientAnalytics.clientsWithoutQueue);
+router.post("/Observacao", AuthGuard, ClientAnalytics.observacao);
+router.post("/SubirCliente", AuthGuard, ClientAnalytics.subirCliente);
+router.post("/DerrubarPppoe", AuthGuard, ClientAnalytics.derrubarPppoe);
+router.post("/MkauthLogin", AuthGuard, ClientAnalytics.mkauthLogin);
+router.post("/RepararMkauth", AuthGuard, ClientAnalytics.repararMkauth);
 router.get("/Logs", AuthGuard, ClientAnalytics.pppoesLogs);
 
 export default router;
