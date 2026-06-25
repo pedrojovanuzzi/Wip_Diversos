@@ -1,7 +1,15 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
-import { FiAlertTriangle, FiRefreshCw, FiSearch } from "react-icons/fi";
+import {
+  FiAlertTriangle,
+  FiCheck,
+  FiCopy,
+  FiDownload,
+  FiRefreshCw,
+  FiSearch,
+} from "react-icons/fi";
 import { NavBar } from "../../components/navbar/NavBar";
 import { ErrorMessage } from "./components/ErrorMessage";
 import { useAuth } from "../../context/AuthContext";
@@ -39,6 +47,7 @@ export const ClientesSemQueue = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState("");
+  const [copiado, setCopiado] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -82,6 +91,41 @@ export const ClientesSemQueue = () => {
     })
     .sort((a, b) => parseUptime(a.upTime ?? "") - parseUptime(b.upTime ?? ""));
 
+  const copiarNome = async (pppoe: string) => {
+    try {
+      await navigator.clipboard.writeText(pppoe);
+      setCopiado(pppoe);
+      setTimeout(() => setCopiado((atual) => (atual === pppoe ? null : atual)), 1500);
+    } catch {
+      // fallback para navegadores/contexto sem clipboard API
+      const ta = document.createElement("textarea");
+      ta.value = pppoe;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopiado(pppoe);
+      setTimeout(() => setCopiado((atual) => (atual === pppoe ? null : atual)), 1500);
+    }
+  };
+
+  const exportarExcel = () => {
+    const linhas = filtrados.map((c) => ({
+      Servidor: c.servidor,
+      PPPOE: c.pppoe,
+      "Caller ID": c.callerId,
+      IP: c.ip,
+      Uptime: c.upTime,
+    }));
+    const ws = XLSX.utils.json_to_sheet(linhas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sem Queue");
+    XLSX.writeFile(
+      wb,
+      `Clientes_Sem_Queue_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-100">
       <NavBar />
@@ -115,6 +159,15 @@ export const ClientesSemQueue = () => {
                 onChange={(e) => setFiltro(e.target.value)}
               />
             </div>
+            <button
+              onClick={exportarExcel}
+              disabled={loading || filtrados.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Exportar a lista atual para Excel (.xlsx)"
+            >
+              <FiDownload />
+              Exportar Excel
+            </button>
             <button
               onClick={fetchLista}
               disabled={loading}
@@ -187,6 +240,9 @@ export const ClientesSemQueue = () => {
                       <th className="px-3 py-2 text-left font-semibold">
                         Uptime
                       </th>
+                      <th className="px-3 py-2 text-center font-semibold">
+                        Copiar
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -208,6 +264,26 @@ export const ClientesSemQueue = () => {
                         <td className="px-3 py-2 font-mono">{f.callerId}</td>
                         <td className="px-3 py-2 font-mono">{f.ip}</td>
                         <td className="px-3 py-2">{f.upTime}</td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copiarNome(f.pppoe);
+                            }}
+                            title="Copiar PPPoE"
+                            className={`inline-flex items-center justify-center size-7 rounded-lg border transition ${
+                              copiado === f.pppoe
+                                ? "border-emerald-300 bg-emerald-50 text-emerald-600"
+                                : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                            }`}
+                          >
+                            {copiado === f.pppoe ? (
+                              <FiCheck className="size-3.5" />
+                            ) : (
+                              <FiCopy className="size-3.5" />
+                            )}
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
