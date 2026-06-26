@@ -20,6 +20,7 @@ import { PhoneLocation } from "../entities/PhoneLocation";
 import { TotemPixSolicitacao } from "../entities/TotemPixSolicitacao";
 import { StreamingAssinante } from "../entities/StreamingAssinante";
 import { DeclaracaoQuitacao } from "../entities/DeclaracaoQuitacao";
+import { FileShare } from "../entities/FileShare";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -51,6 +52,7 @@ const AppDataSource = new DataSource({
     TotemPixSolicitacao,
     StreamingAssinante,
     DeclaracaoQuitacao,
+    FileShare,
   ],
   migrations: [
     path.join(__dirname, "../migration/*.{ts,js}").replace(/\\/g, "/"),

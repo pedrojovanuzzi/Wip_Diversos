@@ -36,6 +36,7 @@ import PhoneLocationRoutes from "./routes/PhoneLocation.routes";
 import TotemSolicitacaoRoutes from "./routes/TotemSolicitacao.routes";
 import Pm2LogsRoutes from "./routes/Pm2Logs.routes";
 import CameraRoutes from "./routes/Camera.routes";
+import FileShareRoutes from "./routes/FileShare.routes";
 
 // Controllers (for scheduled tasks)
 import BackupController from "./controller/Backup";
@@ -97,6 +98,7 @@ export class App {
     this.server.use("/api/totem-solicitacao", TotemSolicitacaoRoutes);
     this.server.use("/api/pm2-logs", Pm2LogsRoutes);
     this.server.use("/api/cameras", CameraRoutes);
+    this.server.use("/api/files", FileShareRoutes);
   }
 
   private agendarBackup() {

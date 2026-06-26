@@ -28,6 +28,7 @@ import {
   FaList,
   FaTerminal,
   FaNetworkWired,
+  FaCloudUploadAlt,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -230,6 +231,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   }
                   title="Localização"
                   description="Mapa com a localização dos funcionários"
+                />
+                <NavItem
+                  to="/arquivos"
+                  icon={
+                    <FaCloudUploadAlt className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Compartilhar Arquivos"
+                  description="Enviar arquivos e gerar links públicos de download"
                 />
               </>
             )}
