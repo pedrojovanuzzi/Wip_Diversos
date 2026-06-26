@@ -293,6 +293,9 @@ class ClientAnalytics {
 
           // 3) Conectados que NÃO possuem fila (comparação somente por PPPoE)
           for (const cliente of ativos) {
+            // Ignora o login de serviço NOC.
+            if (cliente.pppoe.toUpperCase() === "NOC") continue;
+
             const temQueue = nomesNaQueue.has(cliente.pppoe.toLowerCase());
 
             if (!temQueue) {

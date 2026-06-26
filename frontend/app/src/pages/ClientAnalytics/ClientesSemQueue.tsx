@@ -7,7 +7,6 @@ import {
   FiCheck,
   FiCopy,
   FiDownload,
-  FiPower,
   FiRefreshCw,
   FiSearch,
   FiTool,
@@ -51,12 +50,10 @@ export const ClientesSemQueue = () => {
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState("");
   const [copiado, setCopiado] = useState<string | null>(null);
-  const [derrubando, setDerrubando] = useState<Set<string>>(new Set());
   const [aviso, setAviso] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(
     null,
   );
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
-  const [desligandoTodos, setDesligandoTodos] = useState(false);
   const [reparando, setReparando] = useState<Set<string>>(new Set());
   const [reparandoTodos, setReparandoTodos] = useState(false);
 
@@ -172,71 +169,6 @@ export const ClientesSemQueue = () => {
       wb,
       `Clientes_Sem_Queue_${new Date().toISOString().split("T")[0]}.xlsx`,
     );
-  };
-
-  const derrubarPppoe = async (pppoe: string, servidor: string) => {
-    if (
-      !window.confirm(
-        `Derrubar o PPPoE "${pppoe}"? Ele vai cair e reconectar em seguida.`,
-      )
-    ) {
-      return;
-    }
-    setAviso(null);
-    setDerrubando((s) => new Set(s).add(pppoe));
-    try {
-      await axios.post(
-        process.env.REACT_APP_URL + "/ClientAnalytics/DerrubarPppoe",
-        { pppoe, servidor },
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 30000 },
-      );
-      setAviso({
-        tipo: "ok",
-        texto: `"${pppoe}" derrubado e em observação por 1 dia. Deve reconectar em instantes.`,
-      });
-    } catch (e) {
-      setAviso({ tipo: "erro", texto: `Falha ao derrubar "${pppoe}".` });
-    } finally {
-      setDerrubando((s) => {
-        const n = new Set(s);
-        n.delete(pppoe);
-        return n;
-      });
-    }
-  };
-
-  const desligarSelecionados = async () => {
-    const alvos = filtrados.filter((f) => selecionados.has(idDe(f)));
-    if (alvos.length === 0) return;
-    if (
-      !window.confirm(
-        `Derrubar ${alvos.length} PPPoE selecionado(s)? Eles vão cair e reconectar.`,
-      )
-    ) {
-      return;
-    }
-    setAviso(null);
-    setDesligandoTodos(true);
-    let ok = 0;
-    let falhas = 0;
-    for (const f of alvos) {
-      try {
-        await axios.post(
-          process.env.REACT_APP_URL + "/ClientAnalytics/DerrubarPppoe",
-          { pppoe: f.pppoe, servidor: f.servidor },
-          { headers: { Authorization: `Bearer ${token}` }, timeout: 30000 },
-        );
-        ok++;
-      } catch {
-        falhas++;
-      }
-    }
-    setDesligandoTodos(false);
-    setSelecionados(new Set());
-    setAviso({
-      tipo: falhas === 0 ? "ok" : "erro",
-      texto: `Derrubados: ${ok}. Falhas: ${falhas}. Em observação por 1 dia · devem reconectar em instantes.`,
-    });
   };
 
   // Executa o reparo; se faltar sessão no mkauth, abre o popup de login
@@ -563,38 +495,6 @@ export const ClientesSemQueue = () => {
                       qtdSelecionados > 0 ? ` (${qtdSelecionados})` : ""
                     }`}
               </button>
-              <button
-                onClick={desligarSelecionados}
-                disabled={qtdSelecionados === 0 || desligandoTodos}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Derrubar todos os PPPoE selecionados"
-              >
-                {desligandoTodos ? (
-                  <svg className="animate-spin size-4" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v8z"
-                    />
-                  </svg>
-                ) : (
-                  <FiPower />
-                )}
-                {desligandoTodos
-                  ? "Desligando…"
-                  : `Desligar selecionados${
-                      qtdSelecionados > 0 ? ` (${qtdSelecionados})` : ""
-                    }`}
-              </button>
               </div>
             )}
           </div>
@@ -740,41 +640,6 @@ export const ClientesSemQueue = () => {
                                   </svg>
                                 ) : (
                                   <FiTool className="size-3.5" />
-                                )}
-                              </button>
-                            )}
-                            {podeDesligar && (
-                              <button
-                                disabled={derrubando.has(f.pppoe)}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  derrubarPppoe(f.pppoe, f.servidor);
-                                }}
-                                title="Derrubar PPPoE (cai e reconecta)"
-                                className="inline-flex items-center justify-center size-7 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 transition hover:bg-rose-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                              >
-                                {derrubando.has(f.pppoe) ? (
-                                  <svg
-                                    className="animate-spin size-3.5"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <circle
-                                      className="opacity-25"
-                                      cx="12"
-                                      cy="12"
-                                      r="10"
-                                      stroke="currentColor"
-                                      strokeWidth="4"
-                                      fill="none"
-                                    />
-                                    <path
-                                      className="opacity-75"
-                                      fill="currentColor"
-                                      d="M4 12a8 8 0 018-8v8z"
-                                    />
-                                  </svg>
-                                ) : (
-                                  <FiPower className="size-3.5" />
                                 )}
                               </button>
                             )}
