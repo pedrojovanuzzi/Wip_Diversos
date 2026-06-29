@@ -5,7 +5,6 @@ import cron from "node-cron";
 // Routes
 import Auth from "./routes/Auth.Routes";
 import ChamadosRouter from "./routes/Chamados.Routes";
-import DbChatRoutes from "./routes/DbChat.Routes";
 import SerContratosRoutes from "./routes/SerContratos.Routes";
 import StreamingRoutes from "./routes/Streaming.Routes";
 import WatchBrasilWebhookRoutes from "./routes/WatchBrasilWebhook.routes";
@@ -66,7 +65,6 @@ export class App {
 
   private router() {
     this.server.use("/api/chamados", ChamadosRouter);
-    this.server.use("/api/db-chat", DbChatRoutes);
     this.server.use("/api/sercontratos", SerContratosRoutes);
     this.server.use("/api/streaming", StreamingRoutes);
     this.server.use("/api/watchbrasil/redirect", WatchBrasilWebhookRoutes);

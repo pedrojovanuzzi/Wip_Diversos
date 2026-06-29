@@ -42,51 +42,5 @@ router.get(
   AuthGuard,
   Chamados.getClientesAtivadosMensal,
 );
-router.get(
-  "/analytics/cancelamentos/motivos",
-  AuthGuard,
-  Chamados.analyzeCancellationReasons,
-);
-router.post(
-  "/analytics/cancelamentos/motivos/start",
-  AuthGuard,
-  Chamados.startCancellationAnalysis,
-);
-router.get(
-  "/analytics/cancelamentos/motivos/status",
-  AuthGuard,
-  Chamados.getCancellationAnalysisStatus,
-);
-router.post(
-  "/analytics/cancelamentos/motivos/cancel",
-  AuthGuard,
-  Chamados.cancelCancellationAnalysis,
-);
-router.post(
-  "/analytics/cancelamentos/motivos/ask",
-  AuthGuard,
-  Chamados.askCancellationAnalysis,
-);
-router.post(
-  "/analytics/churn-risk/start",
-  AuthGuard,
-  Chamados.startChurnRiskAnalysis,
-);
-router.get(
-  "/analytics/churn-risk/status",
-  AuthGuard,
-  Chamados.getChurnRiskStatus,
-);
-router.post(
-  "/analytics/churn-risk/cancel",
-  AuthGuard,
-  Chamados.cancelChurnRiskAnalysis,
-);
-router.get(
-  "/analytics/churn-risk/client/:login",
-  AuthGuard,
-  Chamados.getChurnRiskForClient,
-);
-router.get("/analytics/ai/status", AuthGuard, Chamados.ollamaStatus);
 
 export default router;
