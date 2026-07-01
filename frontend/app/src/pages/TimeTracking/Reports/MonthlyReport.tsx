@@ -182,13 +182,9 @@ export const MonthlyReport = () => {
       console.log("Fetching employees from:", url);
       const res = await axios.get(url);
       console.log("Employees fetched:", res.data);
-      const sorted = [...res.data].sort((a: any, b: any) => {
-        const nameA = a.name ? a.name.trim().toUpperCase() : "";
-        const nameB = b.name ? b.name.trim().toUpperCase() : "";
-        if (nameA < nameB) return -1;
-        if (nameA > nameB) return 1;
-        return 0;
-      });
+      const sorted = [...res.data].sort(
+        (a: any, b: any) => Number(a.id) - Number(b.id)
+      );
       setEmployees(sorted);
     } catch (error) {
       console.error("Error fetching employees:", error);
