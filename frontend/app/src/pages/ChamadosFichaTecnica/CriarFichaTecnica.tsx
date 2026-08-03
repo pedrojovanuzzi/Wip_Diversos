@@ -76,6 +76,8 @@ const SERVICOS = [
 const EQUIPAMENTOS_PADRAO: EquipamentoLinha[] = [
   { tipo: "TV SMART", qtd: 0, conexao: null, testado: false },
   { tipo: "TV BOX", qtd: 0, conexao: null, testado: false },
+  { tipo: "APP TV WIP", qtd: 0, conexao: null, testado: false },
+  { tipo: "TV", qtd: 0, conexao: null, testado: false },
   { tipo: "CELULAR", qtd: 0, conexao: null, testado: false },
   { tipo: "NOTEBOOK", qtd: 0, conexao: null, testado: false },
   { tipo: "COMPUTADOR", qtd: 0, conexao: null, testado: false },
@@ -124,6 +126,9 @@ const CriarFichaTecnica: React.FC = () => {
   const [usuario, setUsuario] = useState("");
   const [nomeWifi, setNomeWifi] = useState("");
   const [senhaWifi, setSenhaWifi] = useState("");
+  const [temRedeSecundaria, setTemRedeSecundaria] = useState(false);
+  const [nomeWifiSecundario, setNomeWifiSecundario] = useState("");
+  const [senhaWifiSecundario, setSenhaWifiSecundario] = useState("");
   const [nota, setNota] = useState<number | "">("");
   const [tecExterno, setTecExterno] = useState("NENHUM");
   const [tecInterno, setTecInterno] = useState("NENHUM");
@@ -366,6 +371,8 @@ const CriarFichaTecnica: React.FC = () => {
       usuario: upper(usuario),
       nome_wifi: upper(nomeWifi),
       senha_wifi: upper(senhaWifi),
+      nome_wifi_secundario: temRedeSecundaria ? upper(nomeWifiSecundario) : "",
+      senha_wifi_secundario: temRedeSecundaria ? upper(senhaWifiSecundario) : "",
       nota: Number(nota),
       tec_externo: tecExterno,
       tec_interno: tecInterno,
@@ -542,6 +549,47 @@ const CriarFichaTecnica: React.FC = () => {
                 onChange={(e) => setSenhaWifi(upper(e.target.value))}
               />
             </Grid>
+
+            <Grid item xs={12} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>Tem rede secundária?</InputLabel>
+                <Select
+                  label="Tem rede secundária?"
+                  value={temRedeSecundaria ? "sim" : "nao"}
+                  onChange={(e) =>
+                    setTemRedeSecundaria(e.target.value === "sim")
+                  }
+                >
+                  <MenuItem value="nao">Não</MenuItem>
+                  <MenuItem value="sim">Sim</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {temRedeSecundaria && (
+              <>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Nome do Wifi Secundário (opcional)"
+                    value={nomeWifiSecundario}
+                    onChange={(e) =>
+                      setNomeWifiSecundario(upper(e.target.value))
+                    }
+                  />
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Senha Wifi Secundário (opcional)"
+                    value={senhaWifiSecundario}
+                    onChange={(e) =>
+                      setSenhaWifiSecundario(upper(e.target.value))
+                    }
+                  />
+                </Grid>
+              </>
+            )}
 
             <Grid item xs={12} md={2}>
               <TextField

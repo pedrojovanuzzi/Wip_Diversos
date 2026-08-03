@@ -24,6 +24,10 @@ function montarMensagemFinalizacao(f: ChamadoFichaTecnica): string {
   partes.push(`USUARIO ${f.usuario}`);
   partes.push(`NOME DO WIFI ${f.nome_wifi ?? ""}`);
   partes.push(`SENHA ${f.senha_wifi ?? ""}`);
+  if (f.nome_wifi_secundario || f.senha_wifi_secundario) {
+    partes.push(`NOME DO WIFI SECUNDARIO ${f.nome_wifi_secundario ?? ""}`);
+    partes.push(`SENHA WIFI SECUNDARIO ${f.senha_wifi_secundario ?? ""}`);
+  }
   partes.push(`NOTA ${f.nota ?? ""}`);
   partes.push(`QUEM ASSINOU:${f.responsavel_nome ?? ""}`);
   partes.push(`CPF:${f.responsavel_cpf ?? ""}`);
