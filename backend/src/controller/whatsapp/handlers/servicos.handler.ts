@@ -1343,6 +1343,7 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
 
     // Dados do titular para usar depois na criação do documento
     const dadosTitular = {
+      login: session.login || session.dadosCompleto?.login || "",
       nome: session.dadosCompleto?.nome || session.nome || "Não informado",
       cpf: session.dadosCompleto?.cpf || session.cpf || "Não informado",
       email: session.dadosCompleto?.email || session.email || "financeiro@wiptelecom.com.br",
@@ -1601,10 +1602,21 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
         }
       }
 
-      const msgDados = `*🎭 Alteração de Titularidade - Novo Titular*\n\nNovo Titular: ${dadosFlow.nome}\nCPF: ${dadosFlow.cpf}\nCelular: ${celular}`;
+      const contaOrigem =
+        `\n\n*Conta a alterar:* ${session.dados_titular?.login || "?"}` +
+        `\nEndereço: ${session.dados_titular?.endereco || "?"}`;
+      const msgDados =
+        `*🎭 Alteração de Titularidade - Novo Titular*\n\n` +
+        `Novo Titular: ${dadosFlow.nome}\nCPF: ${dadosFlow.cpf}\nCelular: ${celular}` +
+        contaOrigem;
       logAndEmailFinalize({ msgDadosFinais: msgDados });
       try {
-        await criarChamadoMkauth("ALTERAÇÃO DE TITULARIDADE", session, msgDados);
+        const chamadoOrigem = {
+          login: session.dados_titular?.login || "",
+          nome: session.dados_titular?.nome || "",
+          email: session.dados_titular?.email || "",
+        };
+        await criarChamadoMkauth("ALTERAÇÃO DE TITULARIDADE", chamadoOrigem, msgDados);
       } catch (e) {
         console.error("[Chamado] Erro ao criar chamado:", e);
       }
@@ -1627,10 +1639,21 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
       session.stage = "awaiting_signature_link";
     } catch (zapError) {
       console.error("[ZapSign] Erro ao criar contratos para novo titular:", zapError);
-      const msgDados = `*🎭 Alteração de Titularidade - Novo Titular*\n\nDados: ${JSON.stringify(dadosFlow, null, 2)}`;
+      const contaOrigem =
+        `\n\n*Conta a alterar:* ${session.dados_titular?.login || "?"}` +
+        `\nEndereço: ${session.dados_titular?.endereco || "?"}`;
+      const msgDados =
+        `*🎭 Alteração de Titularidade - Novo Titular*\n\n` +
+        `Dados: ${JSON.stringify(dadosFlow, null, 2)}` +
+        contaOrigem;
       logAndEmailFinalize({ msgDadosFinais: msgDados });
       try {
-        await criarChamadoMkauth("ALTERAÇÃO DE TITULARIDADE", session, msgDados);
+        const chamadoOrigem = {
+          login: session.dados_titular?.login || "",
+          nome: session.dados_titular?.nome || "",
+          email: session.dados_titular?.email || "",
+        };
+        await criarChamadoMkauth("ALTERAÇÃO DE TITULARIDADE", chamadoOrigem, msgDados);
       } catch (e) {
         console.error("[Chamado] Erro ao criar chamado:", e);
       }
