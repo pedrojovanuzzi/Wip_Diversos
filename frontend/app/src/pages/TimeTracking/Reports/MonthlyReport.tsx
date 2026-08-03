@@ -229,7 +229,7 @@ export const MonthlyReport = () => {
 
   const saveDayStatus = async (
     dateBr: string,
-    status: "FOLGA" | "FALTA" | "ATESTADO" | null,
+    status: "FOLGA" | "FALTA" | "ATESTADO" | "FERIAS" | "FERIADO" | null,
   ) => {
     if (!selectedEmployee) return;
     const isoDate = moment(dateBr, "DD/MM/YYYY").format("YYYY-MM-DD");
@@ -573,6 +573,10 @@ export const MonthlyReport = () => {
                                 ? "bg-blue-100 text-blue-800 border border-blue-300"
                                 : dayStatuses[date] === "FALTA"
                                 ? "bg-red-100 text-red-800 border border-red-300"
+                                : dayStatuses[date] === "FERIAS"
+                                ? "bg-green-100 text-green-800 border border-green-300"
+                                : dayStatuses[date] === "FERIADO"
+                                ? "bg-purple-100 text-purple-800 border border-purple-300"
                                 : "bg-yellow-100 text-yellow-800 border border-yellow-300"
                             }`}
                           >
@@ -616,6 +620,20 @@ export const MonthlyReport = () => {
                                   className="text-[9px] px-1.5 py-0.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded disabled:opacity-50"
                                 >
                                   Atestado
+                                </button>
+                                <button
+                                  disabled={savingStatusDate === date}
+                                  onClick={() => saveDayStatus(date, "FERIAS")}
+                                  className="text-[9px] px-1.5 py-0.5 bg-green-100 hover:bg-green-200 text-green-800 rounded disabled:opacity-50"
+                                >
+                                  Férias
+                                </button>
+                                <button
+                                  disabled={savingStatusDate === date}
+                                  onClick={() => saveDayStatus(date, "FERIADO")}
+                                  className="text-[9px] px-1.5 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded disabled:opacity-50"
+                                >
+                                  Feriado
                                 </button>
                               </>
                             )}

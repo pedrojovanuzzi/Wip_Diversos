@@ -120,14 +120,15 @@ class DailyOvertimeController {
         res.status(400).json({ error: "employeeId e date são obrigatórios." });
         return;
       }
-      const allowed = ["FOLGA", "FALTA", "ATESTADO", null, ""];
+      const allowed = ["FOLGA", "FALTA", "ATESTADO", "FERIAS", "FERIADO", null, ""];
       const normalized =
         status === null || status === "" || status === undefined
           ? null
           : String(status).toUpperCase();
       if (!allowed.includes(normalized as any)) {
         res.status(400).json({
-          error: "status inválido. Use FOLGA, FALTA, ATESTADO ou null.",
+          error:
+            "status inválido. Use FOLGA, FALTA, ATESTADO, FERIAS, FERIADO ou null.",
         });
         return;
       }
