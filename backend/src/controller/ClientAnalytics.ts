@@ -718,6 +718,141 @@ class ClientAnalytics {
     }
   };
 
+  // Consumo (download/upload) dos clientes a partir da tabela radacct.
+  // Convenção FreeRADIUS (perspectiva do NAS):
+  //   acctoutputoctets = bytes enviados ao cliente  => DOWNLOAD do cliente
+  //   acctinputoctets  = bytes recebidos do cliente => UPLOAD   do cliente
+  consumo = async (req: Request, res: Response) => {
+    try {
+      const {
+        startDate,
+        endDate,
+        limit,
+        search,
+        order,
+      } = req.query as Record<string, string>;
+
+      const repo = MkauthSource.getRepository(Radacct);
+
+      // Período padrão: últimos 30 dias.
+      const end = endDate ? new Date(`${endDate}T23:59:59`) : new Date();
+      const start = startDate
+        ? new Date(`${startDate}T00:00:00`)
+        : (() => {
+            const d = new Date(end);
+            d.setDate(d.getDate() - 29);
+            d.setHours(0, 0, 0, 0);
+            return d;
+          })();
+
+      const orderCol =
+        order === "download"
+          ? "download"
+          : order === "upload"
+          ? "upload"
+          : "total";
+
+      const take = Math.min(Math.max(Number(limit) || 20, 1), 200);
+
+      const aplicarFiltros = (qb: any) => {
+        qb.where("r.acctstarttime BETWEEN :start AND :end", { start, end })
+          .andWhere("r.username IS NOT NULL")
+          .andWhere("r.username != ''")
+          .andWhere("r.username != 'noc'");
+        if (search) qb.andWhere("r.username LIKE :s", { s: `%${search}%` });
+        return qb;
+      };
+
+      // 1) Top consumidores (agregado por username).
+      const topRaw = await aplicarFiltros(
+        repo
+          .createQueryBuilder("r")
+          .select("r.username", "username")
+          .addSelect("SUM(r.acctoutputoctets)", "download")
+          .addSelect("SUM(r.acctinputoctets)", "upload")
+          .addSelect("SUM(r.acctoutputoctets + r.acctinputoctets)", "total"),
+      )
+        .groupBy("r.username")
+        .orderBy(orderCol, "DESC")
+        .limit(take)
+        .getRawMany();
+
+      // 2) Série temporal diária (download vs upload) do conjunto filtrado.
+      const tsRaw = await aplicarFiltros(
+        repo
+          .createQueryBuilder("r")
+          .select("DATE(r.acctstarttime)", "dia")
+          .addSelect("SUM(r.acctoutputoctets)", "download")
+          .addSelect("SUM(r.acctinputoctets)", "upload"),
+      )
+        .groupBy("dia")
+        .orderBy("dia", "ASC")
+        .getRawMany();
+
+      // 3) Totais gerais do período.
+      const totalsRaw = await aplicarFiltros(
+        repo
+          .createQueryBuilder("r")
+          .select("SUM(r.acctoutputoctets)", "download")
+          .addSelect("SUM(r.acctinputoctets)", "upload"),
+      ).getRawOne();
+
+      // Enriquece com nome e plano do cadastro.
+      const logins = topRaw.map((t: any) => t.username);
+      let infoMap = new Map<string, { nome: string; plano: string }>();
+      if (logins.length) {
+        const clientes = await MkauthSource.getRepository(
+          ClientesEntities,
+        ).find({
+          where: { login: In(logins) },
+          select: ["login", "nome", "plano"],
+        });
+        infoMap = new Map(
+          clientes.map((c) => [
+            String(c.login),
+            { nome: c.nome ?? "", plano: c.plano ?? "" },
+          ]),
+        );
+      }
+
+      const topConsumers = topRaw.map((t: any) => ({
+        username: t.username,
+        nome: infoMap.get(t.username)?.nome ?? "",
+        plano: infoMap.get(t.username)?.plano ?? "",
+        download: Number(t.download) || 0,
+        upload: Number(t.upload) || 0,
+        total: Number(t.total) || 0,
+      }));
+
+      const timeSeries = tsRaw.map((d: any) => ({
+        dia:
+          typeof d.dia === "string"
+            ? d.dia
+            : new Date(d.dia).toISOString().slice(0, 10),
+        download: Number(d.download) || 0,
+        upload: Number(d.upload) || 0,
+      }));
+
+      res.status(200).json({
+        range: { start: start.toISOString(), end: end.toISOString() },
+        totals: {
+          download: Number(totalsRaw?.download) || 0,
+          upload: Number(totalsRaw?.upload) || 0,
+          total:
+            (Number(totalsRaw?.download) || 0) +
+            (Number(totalsRaw?.upload) || 0),
+        },
+        topConsumers,
+        timeSeries,
+      });
+    } catch (error) {
+      console.error("[ClientAnalytics.consumo]", error);
+      res
+        .status(500)
+        .json({ error: "Erro ao buscar consumo dos clientes." });
+    }
+  };
+
   desconections = async (req: Request, res: Response) => {
     try {
       const { pppoe } = req.body;

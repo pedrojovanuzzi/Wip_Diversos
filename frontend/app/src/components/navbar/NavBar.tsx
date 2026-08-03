@@ -29,6 +29,7 @@ import {
   FaTerminal,
   FaNetworkWired,
   FaCloudUploadAlt,
+  FaChartBar,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -380,6 +381,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   }
                   title="Sem Queue"
                   description="Clientes conectados que não possuem fila (queue) no Mikrotik"
+                />
+                <NavItem
+                  to="/ClientAnalytics/Consumo"
+                  icon={
+                    <FaChartBar className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Consumo"
+                  description="Consumo de download/upload dos clientes e ranking dos que mais consomem"
                 />
                 <NavItem
                   to="/grafico-instalacoes"

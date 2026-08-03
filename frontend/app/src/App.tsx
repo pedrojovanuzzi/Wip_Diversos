@@ -32,6 +32,7 @@ import { StreamingAdmin } from "./pages/SerContratos/StreamingAdmin";
 import { OnuSettings } from "./pages/onu/OnuSettings";
 import { LogsClient } from "./pages/ClientAnalytics/LogsClient";
 import { ClientesSemQueue } from "./pages/ClientAnalytics/ClientesSemQueue";
+import { ConsumoClientes } from "./pages/ClientAnalytics/ConsumoClientes";
 import { Create } from "./pages/create_users/Create";
 import { Pix } from "./pages/Pix/Pix";
 import { PixDetalhe } from "./pages/Pix/PixDetalhe";
@@ -316,6 +317,16 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <ClientesSemQueue />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/ClientAnalytics/Consumo"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <ConsumoClientes />
               ) : (
                 <Navigate to="/auth/login" />
               )

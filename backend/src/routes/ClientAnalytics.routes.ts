@@ -19,5 +19,6 @@ router.post("/DerrubarPppoe", AuthGuard, ClientAnalytics.derrubarPppoe);
 router.post("/MkauthLogin", AuthGuard, ClientAnalytics.mkauthLogin);
 router.post("/RepararMkauth", AuthGuard, ClientAnalytics.repararMkauth);
 router.get("/Logs", AuthGuard, ClientAnalytics.pppoesLogs);
+router.get("/Consumo", AuthGuard, ClientAnalytics.consumo);
 
 export default router;
