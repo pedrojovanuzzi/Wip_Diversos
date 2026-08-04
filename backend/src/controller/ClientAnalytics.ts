@@ -727,6 +727,8 @@ class ClientAnalytics {
       const {
         startDate,
         endDate,
+        startTime,
+        endTime,
         limit,
         search,
         order,
@@ -734,10 +736,12 @@ class ClientAnalytics {
 
       const repo = MkauthSource.getRepository(Radacct);
 
-      // Período padrão: últimos 30 dias.
-      const end = endDate ? new Date(`${endDate}T23:59:59`) : new Date();
+      // Período padrão: últimos 30 dias. Horário opcional (default 00:00 / 23:59).
+      const end = endDate
+        ? new Date(`${endDate}T${endTime || "23:59"}:59`)
+        : new Date();
       const start = startDate
-        ? new Date(`${startDate}T00:00:00`)
+        ? new Date(`${startDate}T${startTime || "00:00"}:00`)
         : (() => {
             const d = new Date(end);
             d.setDate(d.getDate() - 29);

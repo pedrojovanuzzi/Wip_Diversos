@@ -13,7 +13,15 @@ import {
 } from "recharts";
 import axios from "axios";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { FaDownload, FaUpload, FaChartBar } from "react-icons/fa";
+import {
+  FaDownload,
+  FaUpload,
+  FaChartBar,
+  FaRegCalendarAlt,
+  FaRegClock,
+  FaSearch,
+  FaSortAmountDown,
+} from "react-icons/fa";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 
@@ -85,6 +93,8 @@ export const ConsumoClientes: React.FC = () => {
 
   const [startDate, setStartDate] = useState(todayStr(-29));
   const [endDate, setEndDate] = useState(todayStr(0));
+  const [startTime, setStartTime] = useState("00:00");
+  const [endTime, setEndTime] = useState("23:59");
   const [limit, setLimit] = useState(20);
   const [search, setSearch] = useState("");
   const [order, setOrder] = useState<"total" | "download" | "upload">("total");
@@ -103,6 +113,8 @@ export const ConsumoClientes: React.FC = () => {
           params: {
             startDate: startDate || undefined,
             endDate: endDate || undefined,
+            startTime: startTime || undefined,
+            endTime: endTime || undefined,
             limit,
             search: search || undefined,
             order,
@@ -121,7 +133,7 @@ export const ConsumoClientes: React.FC = () => {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, startDate, endDate, limit, search, order]);
+  }, [user, startDate, endDate, startTime, endTime, limit, search, order]);
 
   useEffect(() => {
     fetchData();
@@ -161,32 +173,67 @@ export const ConsumoClientes: React.FC = () => {
 
         {/* Filtros */}
         <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-6 shadow-sm">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
-            <div className="flex flex-col">
-              <label className="text-xs font-semibold text-gray-500 mb-1">
-                Data inicial
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-              />
+          {/* Intervalo de data + hora */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+            {/* Início */}
+            <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-green-50 to-white p-3">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-green-700 mb-2">
+                <FaRegCalendarAlt /> Início do período
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex items-center gap-2 flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-green-400">
+                  <FaRegCalendarAlt className="text-gray-400 shrink-0" />
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full bg-transparent text-sm focus:outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-2 sm:w-32 bg-white border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-green-400">
+                  <FaRegClock className="text-gray-400 shrink-0" />
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full bg-transparent text-sm focus:outline-none"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="flex flex-col">
-              <label className="text-xs font-semibold text-gray-500 mb-1">
-                Data final
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-              />
+            {/* Fim */}
+            <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-sky-50 to-white p-3">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-sky-700 mb-2">
+                <FaRegCalendarAlt /> Fim do período
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex items-center gap-2 flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-sky-400">
+                  <FaRegCalendarAlt className="text-gray-400 shrink-0" />
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full bg-transparent text-sm focus:outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-2 sm:w-32 bg-white border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-sky-400">
+                  <FaRegClock className="text-gray-400 shrink-0" />
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full bg-transparent text-sm focus:outline-none"
+                  />
+                </div>
+              </div>
             </div>
+          </div>
+
+          {/* Demais filtros */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
             <div className="flex flex-col">
-              <label className="text-xs font-semibold text-gray-500 mb-1">
-                Ordenar por
+              <label className="text-xs font-semibold text-gray-500 mb-1 flex items-center gap-1">
+                <FaSortAmountDown className="text-gray-400" /> Ordenar por
               </label>
               <select
                 value={order}
@@ -215,24 +262,29 @@ export const ConsumoClientes: React.FC = () => {
               <label className="text-xs font-semibold text-gray-500 mb-1">
                 PPPoE (busca)
               </label>
-              <input
-                type="text"
-                value={search}
-                placeholder="login..."
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && fetchData()}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-              />
+              <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-green-400">
+                <FaSearch className="text-gray-400 shrink-0" />
+                <input
+                  type="text"
+                  value={search}
+                  placeholder="login..."
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && fetchData()}
+                  className="w-full bg-transparent text-sm focus:outline-none"
+                />
+              </div>
             </div>
             <button
               onClick={fetchData}
               disabled={loading}
-              className="bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white font-bold rounded-lg px-4 py-2 text-sm transition-colors flex items-center justify-center gap-2"
+              className="h-[42px] bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white font-bold rounded-lg px-4 text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
             >
               {loading ? (
                 <AiOutlineLoading3Quarters className="animate-spin" />
               ) : (
-                "Filtrar"
+                <>
+                  <FaSearch /> Filtrar
+                </>
               )}
             </button>
           </div>
