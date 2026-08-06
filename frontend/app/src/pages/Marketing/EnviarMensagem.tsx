@@ -30,6 +30,17 @@ export const EnviarMensagem = () => {
   const [messageMode, setMessageMode] = useState<"text" | "template">("text");
   const [messageText, setMessageText] = useState("");
   const [templateName, setTemplateName] = useState("");
+  // Valores das variáveis do template, na ordem: {{1}}, {{2}}, ...
+  const [templateParams, setTemplateParams] = useState<string[]>([]);
+
+  const handleParamChange = (index: number, value: string) => {
+    setTemplateParams((prev) => prev.map((p, i) => (i === index ? value : p)));
+  };
+
+  const handleAddParam = () => setTemplateParams((prev) => [...prev, ""]);
+
+  const handleRemoveParam = (index: number) =>
+    setTemplateParams((prev) => prev.filter((_, i) => i !== index));
 
   const [loading, setLoading] = useState(false);
   const [broadcastResult, setBroadcastResult] = useState<any>(null);
@@ -113,6 +124,14 @@ export const EnviarMensagem = () => {
       return;
     }
 
+    if (
+      messageMode === "template" &&
+      templateParams.some((p) => !p.trim())
+    ) {
+      showError("Preencha todas as variáveis do template.");
+      return;
+    }
+
     try {
       setLoading(true);
       setBroadcastResult(null);
@@ -126,6 +145,10 @@ export const EnviarMensagem = () => {
         status: enviarPonInteira ? searchStatus : undefined,
         message: messageMode === "text" ? messageText : undefined,
         templateName: messageMode === "template" ? templateName : undefined,
+        templateParams:
+          messageMode === "template" && templateParams.length > 0
+            ? templateParams
+            : undefined,
       };
 
       const response = await axios.post(
@@ -418,6 +441,63 @@ export const EnviarMensagem = () => {
                   <p className="text-xs text-gray-500 mt-1">
                     * O template deve estar aprovado no Gerenciador do WhatsApp.
                   </p>
+
+                  <div className="mt-4 border-t pt-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="block text-sm font-medium">
+                        Variáveis do Template
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleAddParam}
+                        className="text-sm bg-gray-200 hover:bg-gray-300 rounded px-3 py-1"
+                      >
+                        + Adicionar variável
+                      </button>
+                    </div>
+
+                    {templateParams.length === 0 ? (
+                      <p className="text-xs text-gray-500">
+                        Template sem variáveis. Se o texto tiver{" "}
+                        <code>{"{{1}}"}</code>, adicione uma variável para cada
+                        uma, na mesma ordem.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {templateParams.map((param, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600 w-12 shrink-0">
+                              {`{{${idx + 1}}}`}
+                            </span>
+                            <input
+                              type="text"
+                              className="flex-1 border rounded p-2"
+                              value={param}
+                              onChange={(e) =>
+                                handleParamChange(idx, e.target.value)
+                              }
+                              placeholder="Valor da variável"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveParam(idx)}
+                              className="text-red-600 hover:text-red-800 px-2"
+                              title="Remover"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="text-xs text-gray-500 mt-2">
+                      * Você pode usar os coringas <code>{"{nome}"}</code>,{" "}
+                      <code>{"{login}"}</code>, <code>{"{slot}"}</code>,{" "}
+                      <code>{"{pon}"}</code> e <code>{"{slotpon}"}</code>, que
+                      são substituídos pelos dados de cada cliente no envio.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

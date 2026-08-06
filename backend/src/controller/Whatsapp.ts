@@ -357,8 +357,23 @@ class WhatsappController {
     recipient_number: string,
     templateName: string,
     languageCode: string = "pt_BR",
+    bodyParams: string[] = [],
   ) => {
     try {
+      // Variáveis do corpo ({{1}}, {{2}}, ...) na ordem informada
+      const components =
+        bodyParams.length > 0
+          ? [
+              {
+                type: "body",
+                parameters: bodyParams.map((text) => ({
+                  type: "text",
+                  text: String(text ?? ""),
+                })),
+              },
+            ]
+          : undefined;
+
       const response = await axios.post(
         url,
         {
@@ -371,6 +386,7 @@ class WhatsappController {
             language: {
               code: languageCode,
             },
+            ...(components ? { components } : {}),
           },
         },
         {
@@ -388,6 +404,27 @@ class WhatsappController {
       );
       throw error;
     }
+  };
+
+  // Substitui tokens do tipo {nome} pelos dados do cliente dentro das variáveis do template
+  private resolveTemplateParams = (client: any, params: string[]) => {
+    const portaOlt = client?.porta_olt ?? "";
+    const tokens: Record<string, string> = {
+      nome: (client?.nome ?? "").trim(),
+      login: client?.login ?? "",
+      slot: portaOlt.substring(0, 2),
+      pon: portaOlt.substring(2, 4),
+      slotpon: portaOlt.substring(0, 4),
+    };
+
+    return params.map((param) => {
+      const resolved = String(param ?? "").replace(
+        /\{(\w+)\}/g,
+        (match, key) => tokens[String(key).toLowerCase()] ?? match,
+      );
+      // A API rejeita parâmetro vazio; usa espaço para não quebrar o envio
+      return resolved.trim() === "" ? " " : resolved;
+    });
   };
 
   // Monta o prefixo de porta_olt a partir de slot/pon (2 dígitos cada, ex: 13 + 14 => "1314")
@@ -412,7 +449,20 @@ class WhatsappController {
       return;
     }
 
-    const { clientIds, message, templateName, slot, pon } = req.body;
+    const {
+      clientIds,
+      message,
+      templateName,
+      slot,
+      pon,
+      templateParams,
+      templateLanguage,
+    } = req.body;
+
+    // Variáveis do template ({{1}}, {{2}}, ...) — podem conter tokens como {nome}
+    const bodyParams: string[] = Array.isArray(templateParams)
+      ? templateParams.map((p: any) => String(p ?? ""))
+      : [];
 
     const portaOltPrefix = this.buildPortaOltPrefix(slot, pon);
     const hasClientIds =
@@ -449,7 +499,8 @@ class WhatsappController {
 
       const clients = await clientRepository.find({
         where,
-        select: ["id", "nome", "celular", "fone"], // Fetching phone numbers
+        // Campos usados nos tokens das variáveis do template ({nome}, {login}, {slot}, {pon})
+        select: ["id", "nome", "celular", "fone", "login", "porta_olt"],
       });
 
       if (clients.length === 0) {
@@ -489,7 +540,12 @@ class WhatsappController {
 
         try {
           if (templateName) {
-            await this.MensagemTemplate(cleanPhone, templateName);
+            await this.MensagemTemplate(
+              cleanPhone,
+              templateName,
+              templateLanguage || "pt_BR",
+              this.resolveTemplateParams(client, bodyParams),
+            );
           } else {
             await this.MensagensComuns(cleanPhone, message);
           }
