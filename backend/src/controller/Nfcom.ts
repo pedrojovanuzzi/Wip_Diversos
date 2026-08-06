@@ -698,22 +698,33 @@ class Nfcom {
           );
 
           // --- ENVIO DE EMAIL COM PDF ---
+          let emailStatus = "nao_enviado";
           try {
-            let emailDestino = item.clientEmail;
+            // Só emitimos email para pessoa jurídica: CNPJ tem 14 dígitos.
+            const docLimpo = String(item.cpf_cnpj || "").replace(/\D/g, "");
+            const isCnpj = docLimpo.length === 14;
+
+            let emailDestino = this.normalizarEmail(item.clientEmail);
 
             // Se for homologação, troca o email
             if (this.homologacao) {
               emailDestino = "suporte_wiptelecom@outlook.com";
             }
 
-            // Verifica se é CNPJ (mais de 11 dígitos numéricos)
-            const isCnpj =
-              item.cpf_cnpj && item.cpf_cnpj.replace(/\D/g, "").length > 11;
-
             if (emailDestino && isCnpj) {
-              // 1. Pega dados para montar o PDF (obs/Chave)
-              const obsData: any = await this.getNfcomByChaveDeOlhoNoImposto();
-              const obsString = obsData?.Chave || "";
+              // 1. Pega dados para montar o PDF (obs/Chave).
+              // Falha na IBPT (IP bloqueado) não pode impedir o envio do email.
+              let obsString = "";
+              try {
+                const obsData: any =
+                  await this.getNfcomByChaveDeOlhoNoImposto();
+                obsString = obsData?.Chave || "";
+              } catch (obsErr) {
+                console.error(
+                  `Olho no Imposto indisponível para a nota ${savedNfcom.numeracao}, seguindo sem a observação:`,
+                  obsErr,
+                );
+              }
 
               // 2. Gera o PDF em memória (Buffer)
               const pdfBuffer = await this.generateXmlPdf(
@@ -741,21 +752,23 @@ class Nfcom {
                   },
                 ],
               );
+              emailStatus = `enviado para ${emailDestino}`;
               console.log(
                 `📧 Email com PDF enviado para: ${emailDestino} (Nota ${savedNfcom.numeracao})`,
               );
+            } else if (!isCnpj) {
+              emailStatus = "nao_enviado: cliente CPF";
+              console.log(
+                `Email não enviado para nota ${savedNfcom.numeracao}: Cliente CPF (${item.cpf_cnpj}).`,
+              );
             } else {
-              if (!isCnpj) {
-                console.log(
-                  `Email não enviado para nota ${savedNfcom.numeracao}: Cliente CPF (${item.cpf_cnpj}).`,
-                );
-              } else {
-                console.warn(
-                  `Clientes sem email cadastrado na nota ${savedNfcom.numeracao}. Email não enviado.`,
-                );
-              }
+              emailStatus = "nao_enviado: CNPJ sem email válido";
+              console.warn(
+                `Nota ${savedNfcom.numeracao}: CNPJ sem email válido cadastrado ("${item.clientEmail}"). Email não enviado.`,
+              );
             }
-          } catch (emailErr) {
+          } catch (emailErr: any) {
+            emailStatus = `falha no envio: ${emailErr?.message || emailErr}`;
             console.error(
               `Erro ao gerar/enviar email da nota ${savedNfcom.numeracao}:`,
               emailErr,
@@ -767,6 +780,7 @@ class Nfcom {
             success: true,
             id: item.nfComData.ide.nNF,
             message: "NFCom autorizada com sucesso",
+            email: emailStatus,
           });
         } else {
           // Erro na autorização da NFCom
@@ -805,6 +819,24 @@ class Nfcom {
       status: "concluido",
       resultado: responses,
     });
+  }
+
+  /**
+   * O cadastro do MKAuth aceita texto livre no campo email: vem com espaços,
+   * mais de um endereço separado por vírgula/ponto-e-vírgula ou lixo digitado.
+   * Retorna o primeiro endereço válido ou "" quando não houver nenhum.
+   */
+  private normalizarEmail(valor?: string | null): string {
+    if (!valor) return "";
+
+    const candidatos = String(valor)
+      .split(/[;,\s]+/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+
+    const valido = candidatos.find((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+
+    return valido ? valido.toLowerCase() : "";
   }
 
   private async inserirDadosBanco(

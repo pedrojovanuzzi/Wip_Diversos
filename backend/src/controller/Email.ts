@@ -27,16 +27,27 @@ class Email {
     attachments?: any[]
   ) {
     try {
-      await transporter.sendMail({
+      const info = await transporter.sendMail({
         from: process.env.MAILGUNNER_USER,
         to,
         subject,
         text,
         attachments,
       });
-      console.log("Email enviado com sucesso!");
+
+      // O Mailgun pode aceitar a conexão mas rejeitar o destinatário.
+      // Sem checar o `rejected`, o envio parece ter dado certo e nunca chega.
+      if (info.rejected?.length) {
+        throw new Error(
+          `Destinatário rejeitado pelo servidor SMTP: ${info.rejected.join(", ")}`,
+        );
+      }
+
+      console.log(`Email enviado com sucesso para ${to} (${info.messageId})`);
+      return info;
     } catch (error) {
       console.error("Erro ao enviar email:", error);
+      throw error;
     }
   }
 }
