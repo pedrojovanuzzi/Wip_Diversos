@@ -17,6 +17,11 @@ export const EnviarMensagem = () => {
   const [searchPlano, setSearchPlano] = useState("");
   const [searchStatus, setSearchStatus] = useState("s"); // Default to Active ('s')
   const [searchCaixaHerm, setSearchCaixaHerm] = useState("");
+  const [searchSlot, setSearchSlot] = useState("");
+  const [searchPon, setSearchPon] = useState("");
+
+  // Envia para todos os clientes da PON, sem depender da seleção da tabela
+  const [enviarPonInteira, setEnviarPonInteira] = useState(false);
 
   const [clientes, setClientes] = useState<any[]>([]);
   const [clientesSelecionados, setClientesSelecionados] = useState<any[]>([]);
@@ -49,6 +54,8 @@ export const EnviarMensagem = () => {
           plano: searchPlano,
           status: searchStatus === "all" ? undefined : searchStatus,
           caixa_herm: searchCaixaHerm,
+          slot: searchSlot,
+          pon: searchPon,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -86,7 +93,12 @@ export const EnviarMensagem = () => {
 
   // --- Send Method ---
   const handleSend = async () => {
-    if (clientesSelecionados.length === 0) {
+    if (enviarPonInteira) {
+      if (!searchSlot.trim() || !searchPon.trim()) {
+        showError("Informe o Slot e a PON para enviar para a PON inteira.");
+        return;
+      }
+    } else if (clientesSelecionados.length === 0) {
       showError("Selecione pelo menos um cliente.");
       return;
     }
@@ -106,7 +118,12 @@ export const EnviarMensagem = () => {
       setBroadcastResult(null);
 
       const payload = {
-        clientIds: clientesSelecionados.map((c) => c.id),
+        clientIds: enviarPonInteira
+          ? undefined
+          : clientesSelecionados.map((c) => c.id),
+        slot: enviarPonInteira ? searchSlot : undefined,
+        pon: enviarPonInteira ? searchPon : undefined,
+        status: enviarPonInteira ? searchStatus : undefined,
         message: messageMode === "text" ? messageText : undefined,
         templateName: messageMode === "template" ? templateName : undefined,
       };
@@ -232,6 +249,34 @@ export const EnviarMensagem = () => {
                     placeholder="Ex: 3-2-5"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Slot
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchSlot}
+                    onChange={(e) =>
+                      setSearchSlot(e.target.value.replace(/\D/g, "").slice(0, 2))
+                    }
+                    placeholder="Ex: 13"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    PON
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchPon}
+                    onChange={(e) =>
+                      setSearchPon(e.target.value.replace(/\D/g, "").slice(0, 2))
+                    }
+                    placeholder="Ex: 14"
+                  />
+                </div>
               </div>
               <div className="mt-4 flex justify-end">
                 <button
@@ -270,6 +315,7 @@ export const EnviarMensagem = () => {
                         <th className="p-3">Nome/Razão</th>
                         <th className="p-3">Login</th>
                         <th className="p-3">Telefone/Celular</th>
+                        <th className="p-3">Slot/PON</th>
                         <th className="p-3">Status</th>
                       </tr>
                     </thead>
@@ -290,6 +336,11 @@ export const EnviarMensagem = () => {
                           <td className="p-3">{c.nome || c.razao_social}</td>
                           <td className="p-3">{c.login}</td>
                           <td className="p-3">{c.celular || c.fone || "-"}</td>
+                          <td className="p-3">
+                            {c.porta_olt
+                              ? `${c.porta_olt.substring(0, 2)}/${c.porta_olt.substring(2, 4)}`
+                              : "-"}
+                          </td>
                           <td className="p-3">
                             {c.cli_ativado === "s" ? (
                               <span className="text-green-600 font-bold">
@@ -374,10 +425,35 @@ export const EnviarMensagem = () => {
             <div className="bg-gray-50 p-4 rounded border flex flex-col justify-between">
               <div>
                 <h2 className="font-semibold text-lg mb-3">Resumo do Envio</h2>
-                <p>
-                  Total de Destinatários:{" "}
-                  <strong>{clientesSelecionados.length}</strong>
-                </p>
+
+                <label className="flex items-center gap-2 cursor-pointer mb-3">
+                  <input
+                    type="checkbox"
+                    checked={enviarPonInteira}
+                    onChange={(e) => setEnviarPonInteira(e.target.checked)}
+                  />
+                  Enviar para a PON inteira (ignora a seleção da tabela)
+                </label>
+
+                {enviarPonInteira ? (
+                  <p>
+                    Destinatários:{" "}
+                    <strong>
+                      Todos os clientes da PON {searchSlot || "?"}/
+                      {searchPon || "?"}
+                      {searchStatus === "all"
+                        ? ""
+                        : searchStatus === "s"
+                          ? " (ativos)"
+                          : " (inativos)"}
+                    </strong>
+                  </p>
+                ) : (
+                  <p>
+                    Total de Destinatários:{" "}
+                    <strong>{clientesSelecionados.length}</strong>
+                  </p>
+                )}
                 <p>
                   Modo:{" "}
                   <strong>
@@ -389,9 +465,17 @@ export const EnviarMensagem = () => {
               <div className="mt-4">
                 <button
                   onClick={handleSend}
-                  disabled={loading || clientesSelecionados.length === 0}
+                  disabled={
+                    loading ||
+                    (enviarPonInteira
+                      ? !searchSlot.trim() || !searchPon.trim()
+                      : clientesSelecionados.length === 0)
+                  }
                   className={`w-full py-3 rounded text-white font-bold transition-all ${
-                    loading || clientesSelecionados.length === 0
+                    loading ||
+                    (enviarPonInteira
+                      ? !searchSlot.trim() || !searchPon.trim()
+                      : clientesSelecionados.length === 0)
                       ? "bg-gray-400 cursor-not-allowed"
                       : "bg-green-600 hover:bg-green-700 shadow-lg"
                   }`}

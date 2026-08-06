@@ -390,10 +390,35 @@ class WhatsappController {
     }
   };
 
-  sendBroadcast = async (req: Request, res: Response) => {
-    const { clientIds, message, templateName } = req.body;
+  // Monta o prefixo de porta_olt a partir de slot/pon (2 dígitos cada, ex: 13 + 14 => "1314")
+  private buildPortaOltPrefix = (slot?: any, pon?: any) => {
+    const norm = (v: any) => {
+      if (v === undefined || v === null || String(v).trim() === "") return null;
+      const digits = String(v).replace(/\D/g, "");
+      if (!digits) return null;
+      return digits.padStart(2, "0").slice(-2);
+    };
 
-    if (!clientIds || !Array.isArray(clientIds) || clientIds.length === 0) {
+    const s = norm(slot);
+    const p = norm(pon);
+
+    if (!s) return null;
+    return p ? `${s}${p}` : s;
+  };
+
+  sendBroadcast = async (req: Request, res: Response) => {
+    if ((req.user?.permission ?? 0) < 5) {
+      res.status(403).json({ message: "Permissão insuficiente" });
+      return;
+    }
+
+    const { clientIds, message, templateName, slot, pon } = req.body;
+
+    const portaOltPrefix = this.buildPortaOltPrefix(slot, pon);
+    const hasClientIds =
+      clientIds && Array.isArray(clientIds) && clientIds.length > 0;
+
+    if (!hasClientIds && !portaOltPrefix) {
       res.status(400).json({ message: "No clients selected." });
       return;
     }
@@ -411,12 +436,30 @@ class WhatsappController {
     const errors: any[] = [];
 
     try {
+      // Envio por seleção manual OU por PON inteira (slot + pon => porta_olt)
+      const where: any = hasClientIds
+        ? { id: In(clientIds) }
+        : { porta_olt: Like(`${portaOltPrefix}%`) };
+
+      // No envio por PON, restringe a ativos por padrão (evita disparo em massa para inativos)
+      if (!hasClientIds) {
+        where.cli_ativado = req.body.status === "all" ? undefined : req.body.status || "s";
+        if (where.cli_ativado === undefined) delete where.cli_ativado;
+      }
+
       const clients = await clientRepository.find({
-        where: {
-          id: In(clientIds),
-        },
+        where,
         select: ["id", "nome", "celular", "fone"], // Fetching phone numbers
       });
+
+      if (clients.length === 0) {
+        res.status(404).json({
+          message: hasClientIds
+            ? "Nenhum cliente encontrado."
+            : `Nenhum cliente encontrado na PON ${portaOltPrefix}.`,
+        });
+        return;
+      }
 
       for (const client of clients) {
         // Prioritize cellphone, then landline, clean up non-digits
@@ -483,10 +526,20 @@ class WhatsappController {
 
   searchClients = async (req: Request, res: Response) => {
     try {
-      const { cpf, nome, cidade, plano, status, caixa_herm } = req.body;
+      if ((req.user?.permission ?? 0) < 5) {
+        res.status(403).json({ message: "Permissão insuficiente" });
+        return;
+      }
+
+      const { cpf, nome, cidade, plano, status, caixa_herm, slot, pon } =
+        req.body;
       const ClientRepository = MkauthSource.getRepository(ClientesEntities);
 
       const where: any = {};
+
+      // Filtro por PON: porta_olt = slot (2 dígitos) + pon (2 dígitos) + resto
+      const portaOltPrefix = this.buildPortaOltPrefix(slot, pon);
+      if (portaOltPrefix) where.porta_olt = Like(`${portaOltPrefix}%`);
 
       // Basic filters
       if (cpf) where.cpf_cnpj = Like(`%${cpf}%`);
@@ -524,6 +577,7 @@ class WhatsappController {
           cidade: true,
           plano: true,
           caixa_herm: true,
+          porta_olt: true,
         },
         order: { nome: "ASC" },
         take: 5000, // Increased limit for broadcast search
