@@ -32,15 +32,73 @@ export const EnviarMensagem = () => {
   const [templateName, setTemplateName] = useState("");
   // Valores das variáveis do template, na ordem: {{1}}, {{2}}, ...
   const [templateParams, setTemplateParams] = useState<string[]>([]);
+  const [templateHeaderParams, setTemplateHeaderParams] = useState<string[]>(
+    [],
+  );
 
-  const handleParamChange = (index: number, value: string) => {
-    setTemplateParams((prev) => prev.map((p, i) => (i === index ? value : p)));
-  };
+  type ParamSetter = React.Dispatch<React.SetStateAction<string[]>>;
 
-  const handleAddParam = () => setTemplateParams((prev) => [...prev, ""]);
+  const handleParamChange = (
+    setter: ParamSetter,
+    index: number,
+    value: string,
+  ) => setter((prev) => prev.map((p, i) => (i === index ? value : p)));
 
-  const handleRemoveParam = (index: number) =>
-    setTemplateParams((prev) => prev.filter((_, i) => i !== index));
+  const handleAddParam = (setter: ParamSetter) =>
+    setter((prev) => [...prev, ""]);
+
+  const handleRemoveParam = (setter: ParamSetter, index: number) =>
+    setter((prev) => prev.filter((_, i) => i !== index));
+
+  const renderParamSection = (
+    titulo: string,
+    params: string[],
+    setter: ParamSetter,
+  ) => (
+    <div className="mb-3">
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-sm text-gray-700">{titulo}</span>
+        <button
+          type="button"
+          onClick={() => handleAddParam(setter)}
+          className="text-sm bg-gray-200 hover:bg-gray-300 rounded px-3 py-1"
+        >
+          + Variável
+        </button>
+      </div>
+
+      {params.length === 0 ? (
+        <p className="text-xs text-gray-500">Sem variáveis.</p>
+      ) : (
+        <div className="space-y-2">
+          {params.map((param, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 w-12 shrink-0">
+                {`{{${idx + 1}}}`}
+              </span>
+              <input
+                type="text"
+                className="flex-1 border rounded p-2"
+                value={param}
+                onChange={(e) =>
+                  handleParamChange(setter, idx, e.target.value)
+                }
+                placeholder="Valor da variável"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveParam(setter, idx)}
+                className="text-red-600 hover:text-red-800 px-2"
+                title="Remover"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   const [loading, setLoading] = useState(false);
   const [broadcastResult, setBroadcastResult] = useState<any>(null);
@@ -126,7 +184,7 @@ export const EnviarMensagem = () => {
 
     if (
       messageMode === "template" &&
-      templateParams.some((p) => !p.trim())
+      [...templateHeaderParams, ...templateParams].some((p) => !p.trim())
     ) {
       showError("Preencha todas as variáveis do template.");
       return;
@@ -148,6 +206,10 @@ export const EnviarMensagem = () => {
         templateParams:
           messageMode === "template" && templateParams.length > 0
             ? templateParams
+            : undefined,
+        templateHeaderParams:
+          messageMode === "template" && templateHeaderParams.length > 0
+            ? templateHeaderParams
             : undefined,
       };
 
@@ -443,53 +505,16 @@ export const EnviarMensagem = () => {
                   </p>
 
                   <div className="mt-4 border-t pt-3">
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="block text-sm font-medium">
-                        Variáveis do Template
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleAddParam}
-                        className="text-sm bg-gray-200 hover:bg-gray-300 rounded px-3 py-1"
-                      >
-                        + Adicionar variável
-                      </button>
-                    </div>
+                    <label className="block text-sm font-medium mb-2">
+                      Variáveis do Template
+                    </label>
 
-                    {templateParams.length === 0 ? (
-                      <p className="text-xs text-gray-500">
-                        Template sem variáveis. Se o texto tiver{" "}
-                        <code>{"{{1}}"}</code>, adicione uma variável para cada
-                        uma, na mesma ordem.
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {templateParams.map((param, idx) => (
-                          <div key={idx} className="flex items-center gap-2">
-                            <span className="text-sm text-gray-600 w-12 shrink-0">
-                              {`{{${idx + 1}}}`}
-                            </span>
-                            <input
-                              type="text"
-                              className="flex-1 border rounded p-2"
-                              value={param}
-                              onChange={(e) =>
-                                handleParamChange(idx, e.target.value)
-                              }
-                              placeholder="Valor da variável"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveParam(idx)}
-                              className="text-red-600 hover:text-red-800 px-2"
-                              title="Remover"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                    {renderParamSection(
+                      "Cabeçalho",
+                      templateHeaderParams,
+                      setTemplateHeaderParams,
                     )}
+                    {renderParamSection("Corpo", templateParams, setTemplateParams)}
 
                     <p className="text-xs text-gray-500 mt-2">
                       * Você pode usar os coringas <code>{"{nome}"}</code>,{" "}

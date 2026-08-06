@@ -358,21 +358,26 @@ class WhatsappController {
     templateName: string,
     languageCode: string = "pt_BR",
     bodyParams: string[] = [],
+    headerParams: string[] = [],
   ) => {
     try {
-      // Variáveis do corpo ({{1}}, {{2}}, ...) na ordem informada
-      const components =
-        bodyParams.length > 0
-          ? [
-              {
-                type: "body",
-                parameters: bodyParams.map((text) => ({
-                  type: "text",
-                  text: String(text ?? ""),
-                })),
-              },
-            ]
-          : undefined;
+      // Variáveis de cabeçalho e corpo ({{1}}, {{2}}, ...) na ordem informada
+      const buildComponent = (type: "header" | "body", params: string[]) => ({
+        type,
+        parameters: params.map((text) => ({
+          type: "text",
+          text: String(text ?? ""),
+        })),
+      });
+
+      const componentList = [
+        ...(headerParams.length > 0
+          ? [buildComponent("header", headerParams)]
+          : []),
+        ...(bodyParams.length > 0 ? [buildComponent("body", bodyParams)] : []),
+      ];
+
+      const components = componentList.length > 0 ? componentList : undefined;
 
       const response = await axios.post(
         url,
@@ -456,13 +461,16 @@ class WhatsappController {
       slot,
       pon,
       templateParams,
+      templateHeaderParams,
       templateLanguage,
     } = req.body;
 
     // Variáveis do template ({{1}}, {{2}}, ...) — podem conter tokens como {nome}
-    const bodyParams: string[] = Array.isArray(templateParams)
-      ? templateParams.map((p: any) => String(p ?? ""))
-      : [];
+    const toParams = (value: any): string[] =>
+      Array.isArray(value) ? value.map((p: any) => String(p ?? "")) : [];
+
+    const bodyParams = toParams(templateParams);
+    const headerParams = toParams(templateHeaderParams);
 
     const portaOltPrefix = this.buildPortaOltPrefix(slot, pon);
     const hasClientIds =
@@ -545,6 +553,7 @@ class WhatsappController {
               templateName,
               templateLanguage || "pt_BR",
               this.resolveTemplateParams(client, bodyParams),
+              this.resolveTemplateParams(client, headerParams),
             );
           } else {
             await this.MensagensComuns(cleanPhone, message);
