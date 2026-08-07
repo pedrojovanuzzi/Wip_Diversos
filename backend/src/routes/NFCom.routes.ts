@@ -17,6 +17,7 @@ router.post("/generatePdfFromNfXML", AuthGuard, nfcom.generatePdfFromNfXML);
 router.post("/NfComPages", AuthGuard, nfcom.NFComPages);
 router.post("/buscarNFComAll", AuthGuard, nfcom.buscarNFComAll);
 router.post("/downloadZipXMLs", AuthGuard, nfcom.baixarZipXml);
+router.post("/enviarEmailNFCom", AuthGuard, nfcom.enviarEmailNFCom);
 router.get(
   "/getNfcomByChaveDeOlhoNoImposto",
   AuthGuard,

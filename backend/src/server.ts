@@ -3,6 +3,17 @@ import "reflect-metadata";
 import { App } from "./app"
 import { initQueues } from "./controller/whatsapp/index";
 
+// Handler async de rota que rejeita derruba o processo inteiro no Node >= 15
+// (unhandled rejection = throw). Um erro de API externa não pode tirar o
+// backend do ar: registramos e seguimos.
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection] Promise rejeitada sem tratamento:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[uncaughtException] Exceção não tratada:", error);
+});
+
 const app = new App();
 app.server.listen(3000, () => {
   initQueues();

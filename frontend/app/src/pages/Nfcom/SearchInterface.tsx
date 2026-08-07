@@ -6,9 +6,14 @@ import { BiCalendar, BiUser, BiReceipt } from "react-icons/bi";
 import { useAuth } from "../../context/AuthContext";
 import PopUpCancelNFCom from "./Components/PopUpCancelNFCom";
 import PopUpReportPassword from "./Components/PopUpReportPassword";
+import PopUpConfirmEmailCpf from "./Components/PopUpConfirmEmailCpf";
 import { GoNumber } from "react-icons/go";
 import { VscSymbolBoolean } from "react-icons/vsc";
-import { MdMergeType, MdOutlineConfirmationNumber } from "react-icons/md";
+import {
+  MdMergeType,
+  MdOutlineConfirmationNumber,
+  MdOutlineEmail,
+} from "react-icons/md";
 import { useNotification } from "../../context/NotificationContext";
 import { FaFileSignature } from "react-icons/fa";
 
@@ -70,6 +75,12 @@ export default function SearchInterface() {
   const [cpf_cnpj, setCpfCnpj] = useState<string>("");
   const [clientType, setClientType] = useState<"SVA" | "SCM" | "" | string>("");
   const [totalClients, setTotalClients] = useState<number>(0);
+  const [enviandoEmail, setEnviandoEmail] = useState<boolean>(false);
+  const [showConfirmEmailCpf, setShowConfirmEmailCpf] =
+    useState<boolean>(false);
+  const [notasCpfPendentes, setNotasCpfPendentes] = useState<
+    { id: number; numeracao: number; motivo: string }[]
+  >([]);
   let [value, setValue] = useState<number>(0);
 
   const { user } = useAuth();
@@ -156,6 +167,90 @@ export default function SearchInterface() {
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * Envia as notas por e-mail (PDF + XML). O envio automático da emissão vale
+   * só para CNPJ; aqui, notas de pessoa física voltam com `tipo: "cpf"` e o
+   * operador decide no popup se envia mesmo assim (`forcar`).
+   */
+  const enviarEmailNFCom = async (ids: number[], forcar = false) => {
+    if (ids.length === 0) return;
+
+    try {
+      setEnviandoEmail(true);
+      const resposta = await axios.post(
+        `${process.env.REACT_APP_URL_SEMTIMEOUT}/NFCom/enviarEmailNFCom`,
+        {
+          id: ids,
+          forcar,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 360000,
+          timeoutErrorMessage: "Timeout de 6 minutos atingido.",
+        }
+      );
+
+      const {
+        enviados = 0,
+        total = ids.length,
+        resultados = [],
+      } = resposta.data || {};
+
+      // Pessoa física é pendência de confirmação, não erro.
+      const pendentesCpf = forcar
+        ? []
+        : resultados.filter((r: any) => r.tipo === "cpf");
+      const falhas = resultados.filter(
+        (r: any) => !r.enviado && r.tipo !== "cpf"
+      );
+
+      if (enviados > 0) {
+        showSuccess(`${enviados} de ${total} nota(s) enviada(s) por e-mail.`);
+      }
+
+      if (falhas.length > 0) {
+        const detalhes = falhas
+          .slice(0, 3)
+          .map((r: any) => `Nº ${r.numeracao} (${r.motivo})`)
+          .join("; ");
+        showError(
+          `${falhas.length} nota(s) não enviada(s): ${detalhes}${
+            falhas.length > 3 ? "..." : ""
+          }`
+        );
+      }
+
+      if (pendentesCpf.length > 0) {
+        setNotasCpfPendentes(pendentesCpf);
+        setShowConfirmEmailCpf(true);
+      }
+    } catch (erro) {
+      console.error("Erro ao enviar notas por e-mail:", erro);
+      showError("Erro ao enviar as notas por e-mail.");
+    } finally {
+      setEnviandoEmail(false);
+    }
+  };
+
+  const handleBulkEmail = () => {
+    let idsToSend = selectedIds;
+    if (isSelectAllMode && excludedIds.length > 0) {
+      idsToSend = selectedIds.filter((id) => !excludedIds.includes(id));
+    }
+    enviarEmailNFCom(idsToSend);
+  };
+
+  /** Reenvia só as notas de CPF que o operador acabou de confirmar. */
+  const confirmarEnvioCpf = () => {
+    const ids = notasCpfPendentes.map((nota) => nota.id);
+    setShowConfirmEmailCpf(false);
+    setNotasCpfPendentes([]);
+    enviarEmailNFCom(ids, true);
   };
 
   const confirmCancellation = async () => {
@@ -538,8 +633,9 @@ export default function SearchInterface() {
   };
 
   useEffect(() => {
-    try {
-      const exec = async () => {
+    // O try/catch síncrono não pegava a rejeição do await de dentro do exec().
+    const exec = async () => {
+      try {
         const response = await axios.get(
           `${process.env.REACT_APP_URL}/NFCom/getNfcomByChaveDeOlhoNoImposto`,
           {
@@ -549,22 +645,15 @@ export default function SearchInterface() {
             },
           }
         );
-        console.log(response.data);
-        setChaveDeOlhoNoImposto(response.data.Chave);
-      };
-      exec();
-    } catch (error) {
-      console.error("Erro ao buscar NFCom:", error);
-      if (axios.isAxiosError(error) && error.response) {
-        showError(
-          `Erro ao buscar NFCom: ${
-            error.response.data.erro || "Erro desconhecido."
-          }`
-        );
-      } else {
-        showError("Erro de rede. Verifique sua conexão e tente novamente.");
+        setChaveDeOlhoNoImposto(response.data?.Chave || "");
+      } catch (error) {
+        // A observação do Olho no Imposto é opcional: sem ela a tela segue
+        // funcionando, então não vale poluir o usuário com um alerta.
+        console.error("Erro ao buscar a chave do Olho no Imposto:", error);
+        setChaveDeOlhoNoImposto("");
       }
-    }
+    };
+    exec();
   }, []);
 
   return (
@@ -847,6 +936,19 @@ export default function SearchInterface() {
                     </button>
                   )}
                   <button
+                    onClick={handleBulkEmail}
+                    disabled={enviandoEmail}
+                    className="px-5 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-all font-medium flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    <MdOutlineEmail className="text-xl" />
+                    {enviandoEmail
+                      ? "Enviando..."
+                      : `Enviar por E-mail (${
+                          selectedIds.length -
+                          (isSelectAllMode ? excludedIds.length : 0)
+                        })`}
+                  </button>
+                  <button
                     onClick={downloadZipXMLs}
                     disabled={loading}
                     className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all font-medium flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
@@ -873,6 +975,13 @@ export default function SearchInterface() {
             setPassword={setReportPassword}
             password={reportPassword}
             generateReport={generateReportPdf}
+          />
+
+          <PopUpConfirmEmailCpf
+            showPopUp={showConfirmEmailCpf}
+            setShowPopUp={setShowConfirmEmailCpf}
+            notas={notasCpfPendentes}
+            confirmar={confirmarEnvioCpf}
           />
 
           <SelectAllPopUp
@@ -944,6 +1053,7 @@ export default function SearchInterface() {
                         Status
                       </th>
                       {/* Empty Headers for Action Buttons */}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
                     </tr>
@@ -1047,6 +1157,17 @@ export default function SearchInterface() {
                             className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-all"
                           >
                             PDF
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-left whitespace-nowrap">
+                          <button
+                            onClick={() => enviarEmailNFCom([Number(nfcom.id)])}
+                            disabled={enviandoEmail}
+                            title="Enviar a nota por e-mail (apenas CNPJ)"
+                            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-all flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                          >
+                            <MdOutlineEmail className="text-lg" />
+                            E-mail
                           </button>
                         </td>
                       </tr>

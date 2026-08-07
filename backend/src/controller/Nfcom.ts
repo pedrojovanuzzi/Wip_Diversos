@@ -585,40 +585,68 @@ class Nfcom {
     null;
   private static olhoNoImpostoInflight: Promise<any> | null = null;
   private static readonly OLHO_NO_IMPOSTO_TTL_MS = 60 * 60 * 1000;
+  // Quando a IBPT está fora do ar, guardamos a falha por um tempo curto para não
+  // pendurar cada nota do lote nos ~20s de timeout de conexão.
+  private static readonly OLHO_NO_IMPOSTO_TTL_ERRO_MS = 5 * 60 * 1000;
+  private static readonly OLHO_NO_IMPOSTO_TIMEOUT_MS = 10 * 1000;
 
-  public async getNfcomByChaveDeOlhoNoImposto(req?: Request, res?: Response) {
+  /**
+   * A observação do Olho no Imposto é um "nice to have" do PDF: a API da IBPT
+   * cai e bloqueia IP com frequência. Nunca lança — devolve null quando falha,
+   * para não derrubar emissão, envio de email nem o processo.
+   */
+  public getNfcomByChaveDeOlhoNoImposto = async (
+    req?: Request,
+    res?: Response,
+  ) => {
     const now = Date.now();
     const cache = Nfcom.olhoNoImpostoCache;
 
-    let data: any;
-    if (cache && cache.expiresAt > now) {
-      data = cache.data;
-    } else if (Nfcom.olhoNoImpostoInflight) {
-      data = await Nfcom.olhoNoImpostoInflight;
-    } else {
-      Nfcom.olhoNoImpostoInflight = (async () => {
-        const response = await axios.get(
-          `https://apidoni.ibpt.org.br/api/v1/servicos?token=${process.env.OLHO_NO_IMPOSTO_TOKEN}&cnpj=${process.env.OLHO_NO_IMPOSTO_CNPJ}&codigo=${process.env.OLHO_NO_IMPOSTO_CODIGO}&uf=${process.env.OLHO_NO_IMPOSTO_UF}&descricao=${process.env.OLHO_NO_IMPOSTO_DESCRICAO}&unidadeMedida=${process.env.OLHO_NO_IMPOSTO_UNIDADEMEDIDA}&valor=${process.env.OLHO_NO_IMPOSTO_VALOR}`,
-        );
-        Nfcom.olhoNoImpostoCache = {
-          data: response.data,
-          expiresAt: Date.now() + Nfcom.OLHO_NO_IMPOSTO_TTL_MS,
-        };
-        return response.data;
-      })();
-      try {
+    let data: any = null;
+    try {
+      if (cache && cache.expiresAt > now) {
+        data = cache.data;
+      } else if (Nfcom.olhoNoImpostoInflight) {
         data = await Nfcom.olhoNoImpostoInflight;
-      } finally {
-        Nfcom.olhoNoImpostoInflight = null;
+      } else {
+        Nfcom.olhoNoImpostoInflight = (async () => {
+          const response = await axios.get(
+            `https://apidoni.ibpt.org.br/api/v1/servicos?token=${process.env.OLHO_NO_IMPOSTO_TOKEN}&cnpj=${process.env.OLHO_NO_IMPOSTO_CNPJ}&codigo=${process.env.OLHO_NO_IMPOSTO_CODIGO}&uf=${process.env.OLHO_NO_IMPOSTO_UF}&descricao=${process.env.OLHO_NO_IMPOSTO_DESCRICAO}&unidadeMedida=${process.env.OLHO_NO_IMPOSTO_UNIDADEMEDIDA}&valor=${process.env.OLHO_NO_IMPOSTO_VALOR}`,
+            { timeout: Nfcom.OLHO_NO_IMPOSTO_TIMEOUT_MS },
+          );
+          Nfcom.olhoNoImpostoCache = {
+            data: response.data,
+            expiresAt: Date.now() + Nfcom.OLHO_NO_IMPOSTO_TTL_MS,
+          };
+          return response.data;
+        })();
+        try {
+          data = await Nfcom.olhoNoImpostoInflight;
+        } finally {
+          Nfcom.olhoNoImpostoInflight = null;
+        }
       }
+    } catch (error: any) {
+      // Cache negativo: evita repetir a chamada quebrada nota a nota.
+      Nfcom.olhoNoImpostoCache = {
+        data: null,
+        expiresAt: Date.now() + Nfcom.OLHO_NO_IMPOSTO_TTL_ERRO_MS,
+      };
+      console.error(
+        "Olho no Imposto (IBPT) indisponível:",
+        error?.code || error?.message || error,
+      );
+      data = null;
     }
 
     if (req || res) {
-      res?.status(200).json(data);
-    } else {
-      return data;
+      // Responde 200 mesmo sem dado: a tela só perde a observação do PDF.
+      res?.status(200).json(data ?? { Chave: "", indisponivel: true });
+      return;
     }
-  }
+
+    return data;
+  };
 
   private async processarFilaBackground(
     dadosFinaisNFCom: any[],
@@ -698,81 +726,30 @@ class Nfcom {
           );
 
           // --- ENVIO DE EMAIL COM PDF ---
-          let emailStatus = "nao_enviado";
-          try {
-            // Só emitimos email para pessoa jurídica: CNPJ tem 14 dígitos.
-            const docLimpo = String(item.cpf_cnpj || "").replace(/\D/g, "");
-            const isCnpj = docLimpo.length === 14;
+          let emailStatus: string;
+          const destinatario = this.resolverDestinatarioNfcom(
+            item.cpf_cnpj,
+            item.clientEmail,
+            this.homologacao,
+          );
 
-            let emailDestino = this.normalizarEmail(item.clientEmail);
-
-            // Se for homologação, troca o email
-            if (this.homologacao) {
-              emailDestino = "suporte_wiptelecom@outlook.com";
-            }
-
-            if (emailDestino && isCnpj) {
-              // 1. Pega dados para montar o PDF (obs/Chave).
-              // Falha na IBPT (IP bloqueado) não pode impedir o envio do email.
-              let obsString = "";
-              try {
-                const obsData: any =
-                  await this.getNfcomByChaveDeOlhoNoImposto();
-                obsString = obsData?.Chave || "";
-              } catch (obsErr) {
-                console.error(
-                  `Olho no Imposto indisponível para a nota ${savedNfcom.numeracao}, seguindo sem a observação:`,
-                  obsErr,
-                );
-              }
-
-              // 2. Gera o PDF em memória (Buffer)
-              const pdfBuffer = await this.generateXmlPdf(
-                savedNfcom,
-                obsString,
-              );
-
-              // 3. Envia Email
-              const emailService = new Email();
-              const nomeArquivo = `NFCom_${savedNfcom.numeracao}.pdf`;
-
-              // O método sendEmail espera optional attachments: any[]
-              await emailService.sendEmail(
-                emailDestino,
-                `Nota Fiscal de Comunicação (NFCom) - Nº ${savedNfcom.numeracao}`,
-                `Olá,\n\nSegue em anexo a Nota Fiscal de Comunicação (NFCom) modelo 62, referente à sua fatura.\nNúmero: ${savedNfcom.numeracao}\nSérie: ${savedNfcom.serie}\n\nAtenciosamente,\nWIP Telecom`,
-                [
-                  {
-                    filename: nomeArquivo,
-                    content: pdfBuffer,
-                  },
-                  {
-                    filename: `NFCom_${savedNfcom.numeracao}.xml`,
-                    content: Buffer.from(savedNfcom.xml, "utf-8"),
-                  },
-                ],
-              );
-              emailStatus = `enviado para ${emailDestino}`;
+          if (!destinatario.ok) {
+            emailStatus = destinatario.motivo;
+            console.log(`Nota ${savedNfcom.numeracao}: ${destinatario.motivo}`);
+          } else {
+            try {
+              await this.enviarNotaPorEmail(savedNfcom, destinatario.email);
+              emailStatus = `enviado para ${destinatario.email}`;
               console.log(
-                `📧 Email com PDF enviado para: ${emailDestino} (Nota ${savedNfcom.numeracao})`,
+                `📧 Email com PDF enviado para: ${destinatario.email} (Nota ${savedNfcom.numeracao})`,
               );
-            } else if (!isCnpj) {
-              emailStatus = "nao_enviado: cliente CPF";
-              console.log(
-                `Email não enviado para nota ${savedNfcom.numeracao}: Cliente CPF (${item.cpf_cnpj}).`,
-              );
-            } else {
-              emailStatus = "nao_enviado: CNPJ sem email válido";
-              console.warn(
-                `Nota ${savedNfcom.numeracao}: CNPJ sem email válido cadastrado ("${item.clientEmail}"). Email não enviado.`,
+            } catch (emailErr: any) {
+              emailStatus = `falha no envio: ${emailErr?.message || emailErr}`;
+              console.error(
+                `Erro ao gerar/enviar email da nota ${savedNfcom.numeracao}:`,
+                emailErr,
               );
             }
-          } catch (emailErr: any) {
-            emailStatus = `falha no envio: ${emailErr?.message || emailErr}`;
-            console.error(
-              `Erro ao gerar/enviar email da nota ${savedNfcom.numeracao}:`,
-              emailErr,
-            );
           }
           // ------------------------------
 
@@ -820,6 +797,187 @@ class Nfcom {
       resultado: responses,
     });
   }
+
+  /**
+   * Aplica a regra de destinatário da NFCom: a nota só é enviada por email para
+   * pessoa jurídica (CNPJ, 14 dígitos). Em homologação o destino é sempre a
+   * caixa de teste, para não disparar nota de teste ao cliente real.
+   *
+   * `permitirCpf` libera o envio para pessoa física e só é usado no envio
+   * manual, depois de o operador confirmar na tela. A emissão automática
+   * nunca passa esse flag.
+   *
+   * Devolve `email` quando pode enviar, ou `motivo`/`tipo` explicando por que não.
+   */
+  private resolverDestinatarioNfcom(
+    cpf_cnpj: string | null | undefined,
+    emailCadastro: string | null | undefined,
+    homologacao: boolean,
+    permitirCpf = false,
+  ):
+    | { ok: true; email: string }
+    | { ok: false; motivo: string; tipo: "cpf" | "sem_email" } {
+    const docLimpo = String(cpf_cnpj || "").replace(/\D/g, "");
+
+    if (docLimpo.length !== 14 && !permitirCpf) {
+      return {
+        ok: false,
+        tipo: "cpf",
+        motivo: `não enviado: cliente CPF (${cpf_cnpj || "sem documento"})`,
+      };
+    }
+
+    if (homologacao) {
+      return { ok: true, email: "suporte_wiptelecom@outlook.com" };
+    }
+
+    const email = this.normalizarEmail(emailCadastro);
+    if (!email) {
+      return {
+        ok: false,
+        tipo: "sem_email",
+        motivo: `não enviado: cliente sem email válido cadastrado ("${emailCadastro || ""}")`,
+      };
+    }
+
+    return { ok: true, email };
+  }
+
+  /**
+   * Monta e envia o email da nota (PDF + XML anexos). Lança se o envio falhar —
+   * quem chama decide o que fazer com o erro.
+   */
+  private async enviarNotaPorEmail(nfcom: NFCom, emailDestino: string) {
+    // A observação do Olho no Imposto é opcional no PDF: se a IBPT estiver fora
+    // ou com o IP bloqueado, a nota sai sem ela em vez de travar o envio.
+    let obsString = "";
+    try {
+      const obsData: any = await this.getNfcomByChaveDeOlhoNoImposto();
+      obsString = obsData?.Chave || "";
+    } catch (obsErr) {
+      console.error(
+        `Olho no Imposto indisponível para a nota ${nfcom.numeracao}, seguindo sem a observação:`,
+        obsErr,
+      );
+    }
+
+    const pdfBuffer = await this.generateXmlPdf(nfcom, obsString);
+
+    await new Email().sendEmail(
+      emailDestino,
+      `Nota Fiscal de Comunicação (NFCom) - Nº ${nfcom.numeracao}`,
+      `Olá,\n\nSegue em anexo a Nota Fiscal de Comunicação (NFCom) modelo 62, referente à sua fatura.\nNúmero: ${nfcom.numeracao}\nSérie: ${nfcom.serie}\n\nAtenciosamente,\nWIP Telecom`,
+      [
+        {
+          filename: `NFCom_${nfcom.numeracao}.pdf`,
+          content: pdfBuffer,
+        },
+        {
+          filename: `NFCom_${nfcom.numeracao}.xml`,
+          content: Buffer.from(nfcom.xml, "utf-8"),
+        },
+      ],
+    );
+  }
+
+  /**
+   * Envia por email as notas selecionadas na tela de busca (PDF + XML).
+   * Segue a mesma regra da emissão: só sai email para CNPJ.
+   */
+  public enviarEmailNFCom = async (req: Request, res: Response) => {
+    try {
+      const { id, forcar } = req.body;
+      // `forcar` vem do popup de confirmação da tela: libera pessoa física.
+      const permitirCpf = forcar === true;
+      const ids = (Array.isArray(id) ? id : [id])
+        .map((v: any) => Number(v))
+        .filter((v: number) => Number.isFinite(v));
+
+      if (!ids.length) {
+        res.status(400).json({ message: "Nenhuma nota informada." });
+        return;
+      }
+
+      const nfcoms = await DataSource.getRepository(NFCom).find({
+        where: { id: In(ids) },
+      });
+
+      if (!nfcoms.length) {
+        res.status(404).json({ message: "Nenhuma nota encontrada." });
+        return;
+      }
+
+      const ClientRepository = MkauthSource.getRepository(ClientesEntities);
+      const resultados: any[] = [];
+      let enviados = 0;
+
+      // Sequencial de propósito: o transporter do Mailgun usa pool de 1 conexão.
+      for (const nfcom of nfcoms) {
+        const base = { id: nfcom.id, numeracao: nfcom.numeracao };
+
+        try {
+          if (nfcom.status !== "autorizada") {
+            resultados.push({
+              ...base,
+              enviado: false,
+              tipo: "status",
+              motivo: `não enviado: nota ${nfcom.status}`,
+            });
+            continue;
+          }
+
+          const cliente = nfcom.pppoe
+            ? await ClientRepository.findOne({ where: { login: nfcom.pppoe } })
+            : null;
+
+          const destinatario = this.resolverDestinatarioNfcom(
+            nfcom.cpf_cnpj,
+            cliente?.email,
+            nfcom.tpAmb === 2,
+            permitirCpf,
+          );
+
+          if (!destinatario.ok) {
+            resultados.push({
+              ...base,
+              enviado: false,
+              tipo: destinatario.tipo,
+              motivo: destinatario.motivo,
+            });
+            continue;
+          }
+
+          await this.enviarNotaPorEmail(nfcom, destinatario.email);
+          enviados++;
+          resultados.push({
+            ...base,
+            enviado: true,
+            email: destinatario.email,
+          });
+          console.log(
+            `📧 Reenvio: nota ${nfcom.numeracao} enviada para ${destinatario.email}`,
+          );
+        } catch (err: any) {
+          console.error(`Erro ao reenviar email da nota ${nfcom.id}:`, err);
+          resultados.push({
+            ...base,
+            enviado: false,
+            tipo: "falha",
+            motivo: `falha no envio: ${err?.message || err}`,
+          });
+        }
+      }
+
+      res.status(200).json({
+        enviados,
+        total: nfcoms.length,
+        resultados,
+      });
+    } catch (error) {
+      console.error("Erro ao enviar NFCom por email:", error);
+      res.status(500).json({ message: "Erro ao enviar as notas por email." });
+    }
+  };
 
   /**
    * O cadastro do MKAuth aceita texto livre no campo email: vem com espaços,
