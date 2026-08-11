@@ -16,6 +16,7 @@ import {
   FiExternalLink,
   FiActivity,
   FiUser,
+  FiClock,
 } from "react-icons/fi";
 import { NavBar } from "../../components/navbar/NavBar";
 import { ErrorMessage } from "./components/ErrorMessage";
@@ -177,6 +178,10 @@ export const ClientAnalytics = () => {
   const [loadingReset, setLoadingReset] = useState(false);
   const [errorLoading, setErrorLoading] = useState<string | null>(null);
 
+  const [horasMonitor, setHorasMonitor] = useState(6);
+  const [loadingMonitor, setLoadingMonitor] = useState(false);
+  const [errorMonitor, setErrorMonitor] = useState<string | null>(null);
+
   const [loadingClientList, setLoadingClientList] = useState(false);
   const [errorClientList, setErrorClientList] = useState<string | null>(null);
   const [clientlist, setClientList] = useState<ClientList[]>([]);
@@ -189,6 +194,27 @@ export const ClientAnalytics = () => {
   function redirectLogs() {
     navigate("/ClientAnalytics/Logs");
   }
+
+  // Inicia o monitoramento em segundo plano e abre a página de registros.
+  const iniciarMonitoramento = async () => {
+    if (!pppoe) return;
+    setErrorMonitor(null);
+    setLoadingMonitor(true);
+    try {
+      const response = await axios.post(
+        process.env.REACT_APP_URL + "/ClientAnalytics/Monitor/Start",
+        { pppoe, horas: horasMonitor },
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 },
+      );
+      navigate(`/ClientAnalytics/Monitor/${response.data.monitor.id}`);
+    } catch (e: any) {
+      setErrorMonitor(
+        e.response?.data?.error || "Erro ao iniciar o monitoramento.",
+      );
+    } finally {
+      setLoadingMonitor(false);
+    }
+  };
 
   const fetchClientInfo = async (pppoe: string) => {
     setLoadingInfo(true);
@@ -661,6 +687,44 @@ export const ClientAnalytics = () => {
                 <p className="text-sm text-slate-400">Sem dados ainda.</p>
               )}
             </SectionCard>
+
+            {/* Monitorar cliente por X horas */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-slate-800">
+                  Monitorar cliente
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Registra a conexão do cliente em segundo plano durante o
+                  período escolhido.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={horasMonitor}
+                  onChange={(e) => setHorasMonitor(Number(e.target.value))}
+                  className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                >
+                  {[1, 2, 3, 6, 12, 24, 48].map((h) => (
+                    <option key={h} value={h}>
+                      {h} hora{h > 1 ? "s" : ""}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={iniciarMonitoramento}
+                  disabled={!pppoe || loadingMonitor}
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-indigo-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FiClock />
+                  {loadingMonitor
+                    ? "Iniciando…"
+                    : `Monitorar por ${horasMonitor}h`}
+                </button>
+              </div>
+            </div>
+
+            {errorMonitor && <ErrorMessage message={errorMonitor} />}
 
             {/* Acessar roteador */}
             {desconexoes.length > 0 && (

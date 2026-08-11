@@ -1,13 +1,22 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import axios from "axios";
 import {
   Box,
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   Divider,
   FormControl,
+  FormControlLabel,
   Grid,
   IconButton,
   InputAdornment,
@@ -87,7 +96,193 @@ const EQUIPAMENTOS_PADRAO: EquipamentoLinha[] = [
   { tipo: "OUTROS", qtd: 0, conexao: null, testado: false },
 ];
 
+type AprEquipamentoLinha = { item: string; qtd: number; livre?: boolean };
+type AprEtapaLinha = { etapa: string; riscos: string; medidas: string };
+type AprTrabalhadorLinha = { nome: string; cargo: string; rg: string };
+
+const APR_EQUIPAMENTOS: string[] = [
+  "Escada de Fibra",
+  "Luvas",
+  "Botas de Borracha",
+  "Talabarte Corda Regul 02 Mosq",
+  "Capacete Seg com Jugular",
+  'Cabo Espia tipo "y" com Absorção 55m',
+  "Cinto Paraquedista 04 pontos",
+  "Óculos de Proteção",
+  "Cone de Sinalização",
+  "Veículo Pequeno Porte",
+  "Corda",
+  "Suporte p/ Bobina de Fibra Portátil",
+  "Suporte Carreta p/ Bobina de Fibra",
+  "Notebook",
+  "Uniforme Refletivo",
+];
+
+const APR_SERVICOS: string[] = [
+  "Instalação de sinal de internet em rádio e/ou fibra",
+  "Mudança de local na residência",
+  "Cancelamento de serviço",
+  "Manutenção de rotina",
+];
+
+const APR_EQUIPAMENTOS_PADRAO: AprEquipamentoLinha[] = [
+  ...APR_EQUIPAMENTOS.map((item) => ({ item, qtd: 0 })),
+  { item: "", qtd: 0, livre: true },
+  { item: "", qtd: 0, livre: true },
+];
+
+const APR_ETAPAS_PADRAO: AprEtapaLinha[] = [
+  { etapa: "", riscos: "", medidas: "" },
+  { etapa: "", riscos: "", medidas: "" },
+  { etapa: "", riscos: "", medidas: "" },
+];
+
+const APR_TRABALHADORES_PADRAO: AprTrabalhadorLinha[] = Array.from(
+  { length: 5 },
+  () => ({ nome: "", cargo: "", rg: "" }),
+);
+
 const upper = (v: string) => (v ?? "").toUpperCase();
+
+type AssinaturaHandle = {
+  reiniciar: () => void;
+  assinou: () => boolean;
+  toDataUrl: () => string | null;
+};
+
+/** Canvas de assinatura reutilizável (cliente e responsável pela APR). */
+const PainelAssinatura = forwardRef<AssinaturaHandle>((_props, ref) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const desenhandoRef = useRef(false);
+  const assinouRef = useRef(false);
+
+  const inicializarCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const origW = 800;
+    const origH = 400;
+    canvas.width = origW;
+    canvas.height = origH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, origW, origH);
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+
+    const linhaY = origH * 0.75;
+    const comp = origW * 0.5;
+    const ini = (origW - comp) / 2;
+    ctx.beginPath();
+    ctx.moveTo(ini, linhaY);
+    ctx.lineTo(ini + comp, linhaY);
+    ctx.stroke();
+    assinouRef.current = false;
+  };
+
+  useEffect(() => {
+    inicializarCanvas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    reiniciar: inicializarCanvas,
+    assinou: () => assinouRef.current,
+    toDataUrl: () => canvasRef.current?.toDataURL("image/png") ?? null,
+  }));
+
+  const getCanvasPoint = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+  ) => {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX =
+      "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY =
+      "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  };
+
+  const iniciarDesenho = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+  ) => {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    desenhandoRef.current = true;
+    const { x, y } = getCanvasPoint(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const continuarDesenho = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+  ) => {
+    if (!desenhandoRef.current) return;
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    const { x, y } = getCanvasPoint(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    assinouRef.current = true;
+  };
+
+  const pararDesenho = () => {
+    desenhandoRef.current = false;
+  };
+
+  return (
+    <>
+      <Box
+        sx={{
+          border: "1px dashed",
+          borderColor: "divider",
+          borderRadius: 2,
+          p: 1,
+          bgcolor: "#fff",
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          onMouseDown={iniciarDesenho}
+          onMouseMove={continuarDesenho}
+          onMouseUp={pararDesenho}
+          onMouseLeave={pararDesenho}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            iniciarDesenho(e);
+          }}
+          onTouchMove={(e) => {
+            e.preventDefault();
+            continuarDesenho(e);
+          }}
+          onTouchEnd={pararDesenho}
+          style={{
+            display: "block",
+            width: "100%",
+            height: "220px",
+            touchAction: "none",
+          }}
+        />
+      </Box>
+      <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+        <Button
+          variant="outlined"
+          startIcon={<MdRestartAlt />}
+          onClick={inicializarCanvas}
+        >
+          Reiniciar assinatura
+        </Button>
+      </Stack>
+    </>
+  );
+});
 
 const SectionCard: React.FC<{
   title: string;
@@ -154,6 +349,23 @@ const CriarFichaTecnica: React.FC = () => {
   const [observacao, setObservacao] = useState("");
   const [responsavelNome, setResponsavelNome] = useState("");
   const [responsavelCpf, setResponsavelCpf] = useState("");
+
+  const [aprProcesso, setAprProcesso] = useState("");
+  const [aprArea, setAprArea] = useState("");
+  const [aprAtividade, setAprAtividade] = useState("");
+  const [aprData, setAprData] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [aprTrabalhadores, setAprTrabalhadores] = useState<
+    AprTrabalhadorLinha[]
+  >(APR_TRABALHADORES_PADRAO);
+  const [aprServicos, setAprServicos] = useState<string[]>([]);
+  const [aprServicoOutro, setAprServicoOutro] = useState("");
+  const [aprEquipamentos, setAprEquipamentos] = useState<AprEquipamentoLinha[]>(
+    APR_EQUIPAMENTOS_PADRAO,
+  );
+  const [aprEtapas, setAprEtapas] = useState<AprEtapaLinha[]>(APR_ETAPAS_PADRAO);
+  const [aprResponsavel, setAprResponsavel] = useState("");
 
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -237,87 +449,8 @@ const CriarFichaTecnica: React.FC = () => {
     )}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   }, []);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const desenhandoRef = useRef(false);
-  const assinouRef = useRef(false);
-
-  const inicializarCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const scale = 2;
-    const origW = 800;
-    const origH = 400;
-    canvas.width = origW;
-    canvas.height = origH;
-    canvas.style.width = "100%";
-    canvas.style.height = "220px";
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, origW, origH);
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-
-    const linhaY = origH * 0.75;
-    const comp = origW * 0.5;
-    const ini = (origW - comp) / 2;
-    ctx.beginPath();
-    ctx.moveTo(ini, linhaY);
-    ctx.lineTo(ini + comp, linhaY);
-    ctx.stroke();
-    assinouRef.current = false;
-  };
-
-  useEffect(() => {
-    inicializarCanvas();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const getCanvasPoint = (
-    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
-  ) => {
-    const canvas = canvasRef.current!;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const clientX =
-      "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY =
-      "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-    return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
-    };
-  };
-
-  const iniciarDesenho = (
-    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
-  ) => {
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    desenhandoRef.current = true;
-    const { x, y } = getCanvasPoint(e);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  };
-
-  const continuarDesenho = (
-    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
-  ) => {
-    if (!desenhandoRef.current) return;
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    const { x, y } = getCanvasPoint(e);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    assinouRef.current = true;
-  };
-
-  const pararDesenho = () => {
-    desenhandoRef.current = false;
-  };
+  const assinaturaClienteRef = useRef<AssinaturaHandle>(null);
+  const assinaturaAprRef = useRef<AssinaturaHandle>(null);
 
   const atualizarEquip = (
     idx: number,
@@ -325,6 +458,38 @@ const CriarFichaTecnica: React.FC = () => {
   ) => {
     setEquipamentos((prev) =>
       prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)),
+    );
+  };
+
+  const atualizarAprTrabalhador = (
+    idx: number,
+    patch: Partial<AprTrabalhadorLinha>,
+  ) => {
+    setAprTrabalhadores((prev) =>
+      prev.map((t, i) => (i === idx ? { ...t, ...patch } : t)),
+    );
+  };
+
+  const atualizarAprEquip = (
+    idx: number,
+    patch: Partial<AprEquipamentoLinha>,
+  ) => {
+    setAprEquipamentos((prev) =>
+      prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)),
+    );
+  };
+
+  const atualizarAprEtapa = (idx: number, patch: Partial<AprEtapaLinha>) => {
+    setAprEtapas((prev) =>
+      prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)),
+    );
+  };
+
+  const alternarAprServico = (servico: string) => {
+    setAprServicos((prev) =>
+      prev.includes(servico)
+        ? prev.filter((s) => s !== servico)
+        : [...prev, servico],
     );
   };
 
@@ -338,7 +503,7 @@ const CriarFichaTecnica: React.FC = () => {
     if (!placaCarro) return "Informe a placa do carro.";
     if (nota === "" || Number(nota) < 0 || Number(nota) > 5)
       return "Nota precisa ser entre 0 e 5.";
-    if (!assinouRef.current)
+    if (!assinaturaClienteRef.current?.assinou())
       return "O cliente precisa assinar antes de enviar.";
     return null;
   };
@@ -353,8 +518,10 @@ const CriarFichaTecnica: React.FC = () => {
       return;
     }
 
-    const canvas = canvasRef.current;
-    const assinaturaBase64 = canvas ? canvas.toDataURL("image/png") : null;
+    const assinaturaBase64 = assinaturaClienteRef.current?.toDataUrl() ?? null;
+    const assinaturaAprBase64 = assinaturaAprRef.current?.assinou()
+      ? assinaturaAprRef.current.toDataUrl()
+      : null;
 
     const equipamentosPayload = equipamentos
       .filter((e) => Number(e.qtd) > 0)
@@ -396,6 +563,33 @@ const CriarFichaTecnica: React.FC = () => {
       responsavel_nome: upper(responsavelNome),
       responsavel_cpf: upper(responsavelCpf),
       assinatura_base64: assinaturaBase64,
+      apr: {
+        processo: upper(aprProcesso),
+        area: upper(aprArea),
+        atividade: upper(aprAtividade),
+        data: aprData ? aprData.split("-").reverse().join("/") : "",
+        servicos: aprServicos,
+        servico_outro: aprServicoOutro,
+        responsavel_apr: upper(aprResponsavel),
+        trabalhadores: aprTrabalhadores
+          .filter((t) => t.nome.trim() || t.cargo.trim() || t.rg.trim())
+          .map((t) => ({
+            nome: upper(t.nome),
+            cargo: upper(t.cargo),
+            rg: t.rg,
+          })),
+        equipamentos: aprEquipamentos
+          .filter((e) => e.item.trim() && Number(e.qtd) > 0)
+          .map((e) => ({ item: e.item.trim(), qtd: Number(e.qtd) })),
+        etapas: aprEtapas
+          .filter((e) => e.etapa.trim() || e.riscos.trim() || e.medidas.trim())
+          .map((e) => ({
+            etapa: upper(e.etapa),
+            riscos: upper(e.riscos),
+            medidas: upper(e.medidas),
+          })),
+      },
+      apr_assinatura_base64: assinaturaAprBase64,
     };
 
     setEnviando(true);
@@ -872,47 +1066,7 @@ const CriarFichaTecnica: React.FC = () => {
         </SectionCard>
 
         <SectionCard title="Assinatura digital do cliente">
-          <Box
-            sx={{
-              border: "1px dashed",
-              borderColor: "divider",
-              borderRadius: 2,
-              p: 1,
-              bgcolor: "#fff",
-            }}
-          >
-            <canvas
-              ref={canvasRef}
-              onMouseDown={iniciarDesenho}
-              onMouseMove={continuarDesenho}
-              onMouseUp={pararDesenho}
-              onMouseLeave={pararDesenho}
-              onTouchStart={(e) => {
-                e.preventDefault();
-                iniciarDesenho(e);
-              }}
-              onTouchMove={(e) => {
-                e.preventDefault();
-                continuarDesenho(e);
-              }}
-              onTouchEnd={pararDesenho}
-              style={{
-                display: "block",
-                width: "100%",
-                height: "220px",
-                touchAction: "none",
-              }}
-            />
-          </Box>
-          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-            <Button
-              variant="outlined"
-              startIcon={<MdRestartAlt />}
-              onClick={inicializarCanvas}
-            >
-              Reiniciar assinatura
-            </Button>
-          </Stack>
+          <PainelAssinatura ref={assinaturaClienteRef} />
 
           <Typography variant="subtitle2" sx={{ mt: 3, mb: 1 }}>
             Caso não seja o titular, preencher abaixo:
@@ -935,6 +1089,206 @@ const CriarFichaTecnica: React.FC = () => {
               />
             </Grid>
           </Grid>
+        </SectionCard>
+
+        <SectionCard title="APR - Análise Preliminar de Risco">
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Preencha a APR do atendimento. Os dados abaixo saem no PDF da ficha.
+          </Typography>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Processo"
+                value={aprProcesso}
+                onChange={(e) => setAprProcesso(upper(e.target.value))}
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                label="Área"
+                value={aprArea}
+                onChange={(e) => setAprArea(upper(e.target.value))}
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                label="Atividade"
+                value={aprAtividade}
+                onChange={(e) => setAprAtividade(upper(e.target.value))}
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <TextField
+                fullWidth
+                type="date"
+                label="Data"
+                value={aprData}
+                onChange={(e) => setAprData(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+          </Grid>
+
+          <Typography variant="subtitle2" sx={{ mt: 3, mb: 1 }}>
+            Trabalhadores envolvidos
+          </Typography>
+          {aprTrabalhadores.map((t, idx) => (
+            <Grid container spacing={1} key={idx} sx={{ mb: 1 }}>
+              <Grid item xs={12} md={5}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  label={`Nome ${idx + 1}`}
+                  value={t.nome}
+                  onChange={(e) =>
+                    atualizarAprTrabalhador(idx, { nome: upper(e.target.value) })
+                  }
+                />
+              </Grid>
+              <Grid item xs={6} md={4}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  label="Cargo"
+                  value={t.cargo}
+                  onChange={(e) =>
+                    atualizarAprTrabalhador(idx, {
+                      cargo: upper(e.target.value),
+                    })
+                  }
+                />
+              </Grid>
+              <Grid item xs={6} md={3}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  label="RG"
+                  value={t.rg}
+                  onChange={(e) =>
+                    atualizarAprTrabalhador(idx, { rg: e.target.value })
+                  }
+                />
+              </Grid>
+            </Grid>
+          ))}
+
+          <Typography variant="subtitle2" sx={{ mt: 3, mb: 1 }}>
+            Serviços
+          </Typography>
+          <Stack>
+            {APR_SERVICOS.map((s) => (
+              <FormControlLabel
+                key={s}
+                control={
+                  <Checkbox
+                    checked={aprServicos.includes(s)}
+                    onChange={() => alternarAprServico(s)}
+                  />
+                }
+                label={s}
+              />
+            ))}
+          </Stack>
+          <TextField
+            fullWidth
+            sx={{ mt: 1 }}
+            label="Outro serviço"
+            value={aprServicoOutro}
+            onChange={(e) => setAprServicoOutro(upper(e.target.value))}
+          />
+
+          <Typography variant="subtitle2" sx={{ mt: 3, mb: 1 }}>
+            Equipamentos — informe a quantidade utilizada
+          </Typography>
+          <Grid container spacing={1}>
+            {aprEquipamentos.map((e, idx) => (
+              <Grid item xs={12} md={6} key={idx}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <TextField
+                    size="small"
+                    type="number"
+                    inputProps={{ min: 0 }}
+                    label="Qtd"
+                    value={e.qtd}
+                    onChange={(ev) =>
+                      atualizarAprEquip(idx, { qtd: Number(ev.target.value) })
+                    }
+                    sx={{ width: 90 }}
+                  />
+                  {e.livre ? (
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="Outro equipamento"
+                      value={e.item}
+                      onChange={(ev) =>
+                        atualizarAprEquip(idx, { item: upper(ev.target.value) })
+                      }
+                    />
+                  ) : (
+                    <Typography variant="body2">{e.item}</Typography>
+                  )}
+                </Stack>
+              </Grid>
+            ))}
+          </Grid>
+
+          <Typography variant="subtitle2" sx={{ mt: 3, mb: 1 }}>
+            Etapas da tarefa
+          </Typography>
+          {aprEtapas.map((e, idx) => (
+            <Grid container spacing={1} key={idx} sx={{ mb: 2 }}>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  label={`${String(idx + 1).padStart(2, "0")} - Etapa da tarefa`}
+                  value={e.etapa}
+                  onChange={(ev) =>
+                    atualizarAprEtapa(idx, { etapa: upper(ev.target.value) })
+                  }
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  label="Riscos"
+                  value={e.riscos}
+                  onChange={(ev) =>
+                    atualizarAprEtapa(idx, { riscos: upper(ev.target.value) })
+                  }
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  label="Medidas de controle"
+                  value={e.medidas}
+                  onChange={(ev) =>
+                    atualizarAprEtapa(idx, { medidas: upper(ev.target.value) })
+                  }
+                />
+              </Grid>
+            </Grid>
+          ))}
+
+          <Typography variant="subtitle2" sx={{ mt: 3, mb: 1 }}>
+            Responsável pela APR
+          </Typography>
+          <TextField
+            fullWidth
+            sx={{ mb: 2 }}
+            label="Nome do responsável pela APR"
+            value={aprResponsavel}
+            onChange={(e) => setAprResponsavel(upper(e.target.value))}
+          />
+          <PainelAssinatura ref={assinaturaAprRef} />
         </SectionCard>
 
         <Stack

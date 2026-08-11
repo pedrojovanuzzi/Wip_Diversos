@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { App } from "./app"
 import { initQueues } from "./controller/whatsapp/index";
+import ClientMonitorService from "./services/ClientMonitorService";
 
 // Handler async de rota que rejeita derruba o processo inteiro no Node >= 15
 // (unhandled rejection = throw). Um erro de API externa não pode tirar o
@@ -17,4 +18,8 @@ process.on("uncaughtException", (error) => {
 const app = new App();
 app.server.listen(3000, () => {
   initQueues();
+  // Retoma os monitoramentos de clientes que ficaram ativos antes do restart.
+  ClientMonitorService.start().catch((error) =>
+    console.error("[ClientMonitorService] Falha ao iniciar:", error),
+  );
 });

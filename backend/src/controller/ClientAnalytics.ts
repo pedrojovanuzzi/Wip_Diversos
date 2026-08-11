@@ -9,6 +9,7 @@ import { Client } from "ssh2";
 import axios from "axios";
 import crypto from "crypto";
 import dotenv from "dotenv";
+import ClientMonitorService from "../services/ClientMonitorService";
 
 dotenv.config();
 
@@ -854,6 +855,89 @@ class ClientAnalytics {
       res
         .status(500)
         .json({ error: "Erro ao buscar consumo dos clientes." });
+    }
+  };
+
+  // ── Monitoramento contínuo de um cliente por uma janela de horas ──────────
+
+  monitorStart = async (req: Request, res: Response) => {
+    try {
+      const { pppoe, horas, intervalo } = req.body;
+
+      if (!pppoe || String(pppoe).trim() === "") {
+        res.status(400).json({ error: "Informe o PPPoE do cliente." });
+        return;
+      }
+
+      const monitor = await ClientMonitorService.criar(
+        String(pppoe).trim(),
+        Number(horas) || 1,
+        req.user?.login ?? null,
+        Number(intervalo) || undefined,
+      );
+
+      res.status(200).json({ monitor });
+    } catch (error: any) {
+      console.error("[ClientAnalytics.monitorStart]", error);
+      res
+        .status(500)
+        .json({ error: error?.message || "Erro ao iniciar monitoramento." });
+    }
+  };
+
+  monitorStop = async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id ?? req.body?.id);
+      if (!id) {
+        res.status(400).json({ error: "Monitoramento inválido." });
+        return;
+      }
+
+      const monitor = await ClientMonitorService.encerrar(id);
+      if (!monitor) {
+        res.status(404).json({ error: "Monitoramento não encontrado." });
+        return;
+      }
+
+      res.status(200).json({ monitor });
+    } catch (error: any) {
+      console.error("[ClientAnalytics.monitorStop]", error);
+      res
+        .status(500)
+        .json({ error: error?.message || "Erro ao encerrar monitoramento." });
+    }
+  };
+
+  monitorList = async (req: Request, res: Response) => {
+    try {
+      const monitores = await ClientMonitorService.listar(
+        Number(req.query.limite) || 30,
+      );
+      res.status(200).json({ monitores });
+    } catch (error: any) {
+      console.error("[ClientAnalytics.monitorList]", error);
+      res.status(500).json({ error: "Erro ao listar monitoramentos." });
+    }
+  };
+
+  monitorDetail = async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      const monitor = await ClientMonitorService.buscar(id);
+      if (!monitor) {
+        res.status(404).json({ error: "Monitoramento não encontrado." });
+        return;
+      }
+
+      const eventos = await ClientMonitorService.eventos(id, {
+        apenasMudancas: req.query.apenasMudancas === "true",
+        limite: Number(req.query.limite) || 500,
+      });
+
+      res.status(200).json({ monitor, eventos });
+    } catch (error: any) {
+      console.error("[ClientAnalytics.monitorDetail]", error);
+      res.status(500).json({ error: "Erro ao buscar monitoramento." });
     }
   };
 

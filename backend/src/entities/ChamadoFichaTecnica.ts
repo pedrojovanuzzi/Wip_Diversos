@@ -5,6 +5,23 @@ import {
   CreateDateColumn,
 } from "typeorm";
 
+export type AprEquipamento = { item: string; qtd: number };
+export type AprEtapa = { etapa: string; riscos: string; medidas: string };
+export type AprTrabalhador = { nome: string; cargo: string; rg: string };
+
+export type AprDados = {
+  processo?: string;
+  area?: string;
+  atividade?: string;
+  data?: string;
+  equipamentos?: AprEquipamento[];
+  etapas?: AprEtapa[];
+  trabalhadores?: AprTrabalhador[];
+  servicos?: string[];
+  servico_outro?: string;
+  responsavel_apr?: string;
+};
+
 @Entity("chamados_ficha_tecnica")
 export class ChamadoFichaTecnica {
   @PrimaryGeneratedColumn()
@@ -89,6 +106,12 @@ export class ChamadoFichaTecnica {
     conexao: "CABO" | "WIFI" | null;
     testado: boolean;
   }>;
+
+  @Column({ type: "json", nullable: true })
+  apr?: AprDados;
+
+  @Column({ type: "longtext", nullable: true })
+  apr_assinatura_base64?: string;
 
   @Column({ type: "text", nullable: true })
   motivo?: string;

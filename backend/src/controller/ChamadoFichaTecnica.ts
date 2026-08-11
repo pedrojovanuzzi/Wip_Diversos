@@ -1,11 +1,13 @@
 import { Request, Response } from "express";
 import { Between, LessThanOrEqual, Like, MoreThanOrEqual } from "typeorm";
 import moment from "moment-timezone";
+import PDFDocument from "pdfkit";
 import AppDataSource from "../database/DataSource";
 import MkauthSource from "../database/MkauthSource";
-import { ChamadoFichaTecnica } from "../entities/ChamadoFichaTecnica";
+import { AprDados, ChamadoFichaTecnica } from "../entities/ChamadoFichaTecnica";
 import { ChamadosEntities } from "../entities/ChamadosEntities";
 import { SisMsg } from "../entities/SisMsg";
+import { montarPdfFichaTecnica } from "../services/FichaTecnicaPdf";
 
 type Equipamento = {
   tipo: string;
@@ -13,6 +15,65 @@ type Equipamento = {
   conexao: "CABO" | "WIFI" | null;
   testado: boolean;
 };
+
+const texto = (v: unknown) => String(v ?? "").trim();
+
+/** Remove linhas em branco da APR e normaliza tipos antes de persistir. */
+function normalizarApr(bruto: unknown): AprDados | undefined {
+  if (!bruto || typeof bruto !== "object") return undefined;
+  const a = bruto as AprDados;
+
+  const equipamentos = (Array.isArray(a.equipamentos) ? a.equipamentos : [])
+    .map((e) => ({ item: texto(e?.item), qtd: Number(e?.qtd) || 0 }))
+    .filter((e) => e.item && e.qtd > 0);
+
+  const etapas = (Array.isArray(a.etapas) ? a.etapas : [])
+    .map((e) => ({
+      etapa: texto(e?.etapa),
+      riscos: texto(e?.riscos),
+      medidas: texto(e?.medidas),
+    }))
+    .filter((e) => e.etapa || e.riscos || e.medidas);
+
+  const trabalhadores = (Array.isArray(a.trabalhadores) ? a.trabalhadores : [])
+    .map((t) => ({
+      nome: texto(t?.nome),
+      cargo: texto(t?.cargo),
+      rg: texto(t?.rg),
+    }))
+    .filter((t) => t.nome || t.cargo || t.rg);
+
+  const servicos = (Array.isArray(a.servicos) ? a.servicos : [])
+    .map((s) => texto(s))
+    .filter(Boolean);
+
+  const normalizada: AprDados = {
+    processo: texto(a.processo),
+    area: texto(a.area),
+    atividade: texto(a.atividade),
+    data: texto(a.data),
+    servico_outro: texto(a.servico_outro),
+    responsavel_apr: texto(a.responsavel_apr),
+    equipamentos,
+    etapas,
+    trabalhadores,
+    servicos,
+  };
+
+  const vazia =
+    !normalizada.processo &&
+    !normalizada.area &&
+    !normalizada.atividade &&
+    !normalizada.data &&
+    !normalizada.servico_outro &&
+    !normalizada.responsavel_apr &&
+    equipamentos.length === 0 &&
+    etapas.length === 0 &&
+    trabalhadores.length === 0 &&
+    servicos.length === 0;
+
+  return vazia ? undefined : normalizada;
+}
 
 function montarMensagemFinalizacao(f: ChamadoFichaTecnica): string {
   const partes: string[] = [];
@@ -154,6 +215,7 @@ class ChamadoFichaTecnicaController {
         ...body,
         usuario,
         equipamentos,
+        apr: normalizarApr(body.apr),
         horario_registro:
           body.horario_registro ||
           moment().tz("America/Sao_Paulo").format("DD/MM/YYYY HH:mm:ss"),
@@ -343,6 +405,36 @@ class ChamadoFichaTecnicaController {
       res
         .status(500)
         .json({ errors: [{ msg: "Erro ao buscar chamado no MKAUTH." }] });
+    }
+  };
+
+  public gerarPdf = async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      const repo = AppDataSource.getRepository(ChamadoFichaTecnica);
+      const ficha = await repo.findOne({ where: { id } });
+      if (!ficha) {
+        res.status(404).json({ errors: [{ msg: "Ficha não encontrada." }] });
+        return;
+      }
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=ficha_tecnica_${ficha.chamado_number || ficha.id}.pdf`,
+      );
+
+      const doc = new PDFDocument({ margin: 36, size: "A4" });
+      doc.pipe(res);
+      montarPdfFichaTecnica(doc, ficha);
+      doc.end();
+    } catch (error) {
+      console.error("[ChamadoFichaTecnica.gerarPdf]", error);
+      if (!res.headersSent) {
+        res.status(500).json({ errors: [{ msg: "Erro ao gerar PDF." }] });
+      } else {
+        res.end();
+      }
     }
   };
 

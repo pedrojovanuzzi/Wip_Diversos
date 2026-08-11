@@ -13,6 +13,9 @@ router.get("/", AuthGuard, (req, res) =>
 router.get("/by-login/:login", AuthGuard, (req, res) =>
   ChamadoFichaTecnicaController.buscarChamadoPorLogin(req, res),
 );
+router.get("/:id/pdf", AuthGuard, (req, res) =>
+  ChamadoFichaTecnicaController.gerarPdf(req, res),
+);
 router.get("/:id", AuthGuard, (req, res) =>
   ChamadoFichaTecnicaController.getById(req, res),
 );

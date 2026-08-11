@@ -20,5 +20,9 @@ router.post("/MkauthLogin", AuthGuard, ClientAnalytics.mkauthLogin);
 router.post("/RepararMkauth", AuthGuard, ClientAnalytics.repararMkauth);
 router.get("/Logs", AuthGuard, ClientAnalytics.pppoesLogs);
 router.get("/Consumo", AuthGuard, ClientAnalytics.consumo);
+router.post("/Monitor/Start", AuthGuard, ClientAnalytics.monitorStart);
+router.post("/Monitor/:id/Stop", AuthGuard, ClientAnalytics.monitorStop);
+router.get("/Monitor", AuthGuard, ClientAnalytics.monitorList);
+router.get("/Monitor/:id", AuthGuard, ClientAnalytics.monitorDetail);
 
 export default router;

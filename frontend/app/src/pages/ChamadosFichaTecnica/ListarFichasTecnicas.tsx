@@ -18,7 +18,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { MdAdd, MdRefresh, MdSync } from "react-icons/md";
+import { MdAdd, MdPictureAsPdf, MdRefresh, MdSync } from "react-icons/md";
 import moment from "moment";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
@@ -51,6 +51,7 @@ const ListarFichasTecnicas: React.FC = () => {
   const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroUsuario, setFiltroUsuario] = useState("");
   const [loadingAction, setLoadingAction] = useState<number | null>(null);
+  const [loadingPdf, setLoadingPdf] = useState<number | null>(null);
 
   const fetchFichas = useCallback(
     async (pageNum = 1) => {
@@ -105,6 +106,34 @@ const ListarFichasTecnicas: React.FC = () => {
       );
     } finally {
       setLoadingAction(null);
+    }
+  };
+
+  const handleGerarPdf = async (f: Ficha) => {
+    setLoadingPdf(f.id);
+    try {
+      const response = await axios.get(
+        `${process.env.REACT_APP_URL}/chamados-ficha/${f.id}/pdf`,
+        {
+          responseType: "blob",
+          headers: { Authorization: `Bearer ${user?.token}` },
+        },
+      );
+      const url = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `ficha_tecnica_${f.chamado_number || f.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Erro ao gerar PDF:", err);
+      alert("Erro ao gerar o PDF da ficha.");
+    } finally {
+      setLoadingPdf(null);
     }
   };
 
@@ -285,16 +314,38 @@ const ListarFichasTecnicas: React.FC = () => {
                     )}
                   </TableCell>
                   <TableCell align="right">
-                    {!f.mkauth_sincronizado && (
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => handleRessincronizar(f.id)}
-                        disabled={loadingAction === f.id}
-                      >
-                        <MdSync />
-                      </IconButton>
-                    )}
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      justifyContent="flex-end"
+                      alignItems="center"
+                    >
+                      <Tooltip title="Gerar PDF da ficha">
+                        <span>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            startIcon={<MdPictureAsPdf />}
+                            onClick={() => handleGerarPdf(f)}
+                            disabled={loadingPdf === f.id}
+                            sx={{ fontWeight: 700, whiteSpace: "nowrap" }}
+                          >
+                            PDF
+                          </Button>
+                        </span>
+                      </Tooltip>
+                      {!f.mkauth_sincronizado && (
+                        <IconButton
+                          size="small"
+                          color="primary"
+                          onClick={() => handleRessincronizar(f.id)}
+                          disabled={loadingAction === f.id}
+                        >
+                          <MdSync />
+                        </IconButton>
+                      )}
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
