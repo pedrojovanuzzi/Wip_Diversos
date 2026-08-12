@@ -62,7 +62,15 @@ export async function gerarLancamentoInstalacaoPaga(login: string, nome: string)
   }
 }
 
-export async function gerarLancamentoServico(session: any, tipoServico: string) {
+/**
+ * @param opcoes.valor Preço combinado no atendimento; sem ele vale a tabela.
+ * @param opcoes.nomeServico Descrição do lançamento, para serviços fora da tabela.
+ */
+export async function gerarLancamentoServico(
+  session: any,
+  tipoServico: string,
+  opcoes?: { valor?: number; nomeServico?: string },
+) {
   try {
     const valoresServico: { [key: string]: number } = {
       instalacao: process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 350,
@@ -70,7 +78,10 @@ export async function gerarLancamentoServico(session: any, tipoServico: string) 
       mudanca_comodo: process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 200,
     };
 
-    const valor = valoresServico[tipoServico];
+    const valor =
+      opcoes?.valor && opcoes.valor > 0
+        ? opcoes.valor
+        : valoresServico[tipoServico];
     if (!valor) {
       console.error(`Tipo de serviço desconhecido para lançamento: ${tipoServico}`);
       return;
@@ -104,11 +115,12 @@ export async function gerarLancamentoServico(session: any, tipoServico: string) 
 
     const login = cliente.login;
     const nomeServico =
-      tipoServico === "instalacao"
+      opcoes?.nomeServico ||
+      (tipoServico === "instalacao"
         ? "Instalação"
         : tipoServico === "mudanca_endereco"
           ? "Mudança de Endereço"
-          : "Mudança de Cômodo";
+          : "Mudança de Cômodo");
 
     const FaturasRepository = MkauthDataSource.getRepository(Record);
     const novoLancamento = await FaturasRepository.save({

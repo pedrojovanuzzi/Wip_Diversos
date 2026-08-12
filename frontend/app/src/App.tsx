@@ -70,6 +70,8 @@ import PhoneLocationMap from "./pages/PhoneLocation/PhoneLocationMap";
 import { CamerasAdmin } from "./pages/Cameras/CamerasAdmin";
 import CameraSetup from "./pages/Cameras/CameraSetup";
 import FileShareManager from "./pages/FileShare/FileShareManager";
+import GerarLinksServico from "./pages/ServicosWeb/GerarLinksServico";
+import SolicitacaoServicoPublica from "./pages/ServicosWeb/SolicitacaoServicoPublica";
 
 const isLocalhost =
   window.location.hostname === "localhost" ||
@@ -198,6 +200,17 @@ function App() {
             }
           />
           <Route path="/arquivos" element={<FileShareManager />} />
+          <Route path="/s/:token" element={<SolicitacaoServicoPublica />} />
+          <Route
+            path="/servicos/links"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <GerarLinksServico />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
           <Route path="/feedback/Opnion" element={<Opnion />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />
           <Route path="/feedback/:technician/:id" element={<FeedbackPage />} />

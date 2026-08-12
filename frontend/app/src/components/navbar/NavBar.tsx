@@ -30,6 +30,7 @@ import {
   FaNetworkWired,
   FaCloudUploadAlt,
   FaChartBar,
+  FaLink,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -240,6 +241,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   }
                   title="Compartilhar Arquivos"
                   description="Enviar arquivos e gerar links públicos de download"
+                />
+                <NavItem
+                  to="/servicos/links"
+                  icon={
+                    <FaLink className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Gerar Link de Serviço"
+                  description="Link para o cliente solicitar serviços pelo navegador"
                 />
               </>
             )}

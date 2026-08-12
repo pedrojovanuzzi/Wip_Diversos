@@ -18,6 +18,9 @@ import ApiMkDataSource from "../database/API_MK";
 import Mensagens from "../entities/APIMK/Mensagens";
 import PeopleConversations from "../entities/APIMK/People_Conversations";
 import ConversationsUsers from "../entities/APIMK/Conversation_Users";
+import { ServiceLink } from "../entities/ServiceLink";
+import { listarServicos } from "./servicoWeb/catalogo";
+import { etapaAtual } from "./servicoWeb/ServiceLink";
 
 class SolicitacaoServicoController {
   private isConsultaCpfConcluida(solicitacao: SolicitacaoServico): boolean {
@@ -134,13 +137,102 @@ class SolicitacaoServicoController {
         chamadoStatusMap = Object.fromEntries(chamados.map((c) => [c.chamado!, c.status || "aberto"]));
       }
 
-      const enrichedList = list.map((s) => ({
-        ...s,
-        status_chamado: s.id_chamado ? (chamadoStatusMap[s.id_chamado] ?? null) : null,
-      }));
+      // Vincula o link web que originou cada solicitação, para a listagem
+      // oferecer copiar/cancelar sem precisar de uma segunda tela.
+      const linkRepo = AppDataSource.getRepository(ServiceLink);
+      const links = list.length
+        ? await linkRepo.find({
+            where: { solicitacao_id: In(list.map((s) => s.id!)) },
+          })
+        : [];
+      const linkPorSolicitacao = new Map(
+        links.map((l) => [l.solicitacao_id, l]),
+      );
+
+      const enrichedList = list.map((s) => {
+        const link = linkPorSolicitacao.get(s.id);
+        return {
+          ...s,
+          status_chamado: s.id_chamado
+            ? (chamadoStatusMap[s.id_chamado] ?? null)
+            : null,
+          origem: s.dados?.origem === "web" ? "web" : "bot",
+          link: link
+            ? {
+                id: link.id,
+                token: link.token,
+                status: link.status,
+                expira_em: link.expira_em,
+              }
+            : null,
+        };
+      });
+
+      // Links já enviados ao cliente que ainda não viraram solicitação. Ficam
+      // no topo da primeira página das abas que mostram pendentes.
+      const mostrarAbertos =
+        pageNum === 1 &&
+        (finalizado === undefined ||
+          finalizado === null ||
+          finalizado === "false" ||
+          finalizado === "0" ||
+          finalizado === "all");
+
+      let linksAbertos: any[] = [];
+      if (mostrarAbertos) {
+        const qbLinks = linkRepo
+          .createQueryBuilder("l")
+          .where("l.status IN (:...status)", {
+            status: ["pendente", "em_andamento"],
+          })
+          .orderBy("l.criado_em", "DESC")
+          .take(50);
+
+        if (startDate) {
+          qbLinks.andWhere("l.criado_em >= :start", {
+            start: moment(startDate as string).startOf("day").toDate(),
+          });
+        }
+        if (endDate) {
+          qbLinks.andWhere("l.criado_em <= :end", {
+            end: moment(endDate as string).endOf("day").toDate(),
+          });
+        }
+        if (search && typeof search === "string" && search.trim()) {
+          const termo = `%${search.trim()}%`;
+          qbLinks.andWhere(
+            "(l.nome_cliente LIKE :termo OR l.login_cliente LIKE :termo OR l.cpf LIKE :termo)",
+            { termo },
+          );
+        }
+
+        const abertos = await qbLinks.getMany();
+        const servicosWeb = await listarServicos();
+        const porId = new Map(servicosWeb.map((s) => [s.id, s]));
+
+        linksAbertos = abertos.map((l) => {
+          const servicoWeb = porId.get(l.servico);
+          return {
+            link_id: l.id,
+            token: l.token,
+            servico: servicoWeb?.nome ?? l.servico,
+            // Em que ponto o cliente parou: cada serviço tem etapas diferentes.
+            etapa: servicoWeb ? etapaAtual(l, servicoWeb) : null,
+            cliente: l.nome_cliente || l.login_cliente || null,
+            criado_em: l.criado_em,
+            criado_por: l.criado_por,
+            expira_em: l.expira_em,
+            expirado:
+              !!l.expira_em && new Date(l.expira_em).getTime() < Date.now(),
+            status: l.status,
+            origem: "web",
+          };
+        });
+      }
 
       res.status(200).json({
         data: enrichedList,
+        links_abertos: linksAbertos,
         total: count,
         page: pageNum,
         totalPages: Math.ceil(count / limitNum),

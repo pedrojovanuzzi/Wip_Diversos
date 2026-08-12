@@ -15,6 +15,7 @@ import LocalDataSource from "../database/DataSource";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { whatsappOutgoingQueue } from "./whatsapp/index";
 import ZapSign from "./ZapSign";
+import { liberarContratoPosPagamento } from "./servicoWeb/contrato";
 
 dotenv.config();
 
@@ -423,7 +424,22 @@ class Pix {
 
             // Cria ZapSign se houver solicitação com dados
             let zapSignUrl = "";
-            if (solicitacao?.dados) {
+            // Solicitações que já têm contrato (webhook repetido) não geram um
+            // segundo documento.
+            if (solicitacao?.dados && !solicitacao.token_zapsign) {
+              try {
+                // Origem web: o serviço e o valor combinado estão no link, e a
+                // página pública precisa ver o contrato no resultado.
+                const urlWeb = await liberarContratoPosPagamento(solicitacao);
+                if (urlWeb) zapSignUrl = urlWeb;
+              } catch (errWeb) {
+                console.error(
+                  "[Webhook PIX] Erro ao liberar contrato do link web:",
+                  errWeb,
+                );
+              }
+            }
+            if (solicitacao?.dados && !solicitacao.token_zapsign) {
               try {
                 let zapResponse;
                 if (solicitacao.servico === "Instalação" && solicitacao.dados.dificuldade_acesso) {

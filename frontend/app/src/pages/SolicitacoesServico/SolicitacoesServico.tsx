@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { NavBar } from "../../components/navbar/NavBar";
 import axios from "axios";
 import {
@@ -24,6 +24,7 @@ import {
   DialogActions,
   Alert,
   Chip,
+  Stack,
   Tooltip,
   Menu,
   ListItemText,
@@ -31,8 +32,21 @@ import {
 import moment from "moment";
 import { useAuth } from "../../context/AuthContext";
 
+// Em que ponto do link o cliente parou. Serviços de cliente novo (Instalação)
+// não passam por CPF nem por forma de pagamento.
+const ETAPA_LABEL: Record<string, string> = {
+  identificar: "Aguardando o cliente informar o CPF",
+  selecionar: "Escolhendo o cadastro",
+  termos: "Lendo os termos",
+  pagamento: "Escolhendo a forma de pagamento",
+  formulario: "Preenchendo o formulário",
+};
+
 const SolicitacoesServico = () => {
   const [services, setServices] = useState([]);
+  // Links enviados ao cliente que ainda não viraram solicitação.
+  const [linksAbertos, setLinksAbertos] = useState<any[]>([]);
+  const [tokenCopiado, setTokenCopiado] = useState<string | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [page, setPage] = useState(1);
@@ -88,6 +102,7 @@ const SolicitacoesServico = () => {
           },
         );
         setServices(response.data.data);
+        setLinksAbertos(response.data.links_abertos || []);
         setTotalPages(response.data.totalPages);
         setPage(response.data.page);
       } catch (error) {
@@ -96,6 +111,54 @@ const SolicitacoesServico = () => {
     },
     [user, statusFilter, startDate, endDate, search],
   );
+
+  // Links enviados e solicitações na mesma tabela, do mais recente para o mais
+  // antigo — o link não fica preso no topo.
+  const linhas = useMemo(
+    () =>
+      [
+        ...linksAbertos.map((l: any) => ({
+          tipo: "link" as const,
+          data: l.criado_em,
+          item: l,
+        })),
+        ...(services as any[]).map((s: any) => ({
+          tipo: "servico" as const,
+          data: s.data_solicitacao,
+          item: s,
+        })),
+      ].sort(
+        (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime(),
+      ),
+    [linksAbertos, services],
+  );
+
+  const copiarLink = async (token: string) => {
+    await navigator.clipboard.writeText(`${window.location.origin}/s/${token}`);
+    setTokenCopiado(token);
+    setTimeout(() => setTokenCopiado(null), 2000);
+  };
+
+  const cancelarLink = async (linkId: number) => {
+    if (
+      !window.confirm(
+        "Cancelar este link? O cliente não conseguirá mais usá-lo.",
+      )
+    )
+      return;
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_URL}/service-links/${linkId}/cancelar`,
+        {},
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+      );
+      fetchServices(page);
+    } catch (error: any) {
+      alert(
+        error?.response?.data?.errors?.[0]?.msg || "Erro ao cancelar o link.",
+      );
+    }
+  };
 
   const handleConsultarCpf = async (id: number) => {
     if (!window.confirm("Deseja realizar a consulta de CPF agora?")) return;
@@ -599,6 +662,7 @@ const SolicitacoesServico = () => {
               <TableRow>
                 <TableCell className="text-white font-bold">ID</TableCell>
                 <TableCell className="text-white font-bold">Serviço</TableCell>
+                <TableCell className="text-white font-bold">Origem</TableCell>
                 <TableCell className="text-white font-bold">
                   Status de Pagamento
                 </TableCell>
@@ -615,7 +679,103 @@ const SolicitacoesServico = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {services.map((service: any) => (
+              {linhas.map((linha) => {
+                if (linha.tipo === "link") {
+                  const l: any = linha.item;
+                  return (
+                <TableRow key={`link-${l.link_id}`} hover>
+                  <TableCell>
+                    <Chip
+                      label="Link enviado"
+                      size="small"
+                      color="info"
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell>{l.servico}</TableCell>
+                  <TableCell>
+                    <Chip label="web" size="small" variant="outlined" />
+                  </TableCell>
+                  <TableCell>
+                    <span className="px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-gray-100 text-gray-600">
+                      —
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {l.cliente || (
+                      <Typography variant="caption" color="text.secondary">
+                        {ETAPA_LABEL[l.etapa] ?? "Aguardando o cliente"}
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {moment(l.criado_em).format("DD/MM/YYYY HH:mm")}
+                    {l.criado_por && (
+                      <Typography
+                        variant="caption"
+                        display="block"
+                        color="text.secondary"
+                      >
+                        por {l.criado_por}
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>—</TableCell>
+                  <TableCell>—</TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      color={l.expirado ? "error" : "warning"}
+                      label={
+                        l.expirado
+                          ? "Link expirado"
+                          : l.status === "em_andamento"
+                            ? "Preenchendo"
+                            : "Aguardando cliente"
+                      }
+                    />
+                    {!l.expirado && ETAPA_LABEL[l.etapa] && (
+                      <Typography
+                        variant="caption"
+                        display="block"
+                        color="text.secondary"
+                      >
+                        {ETAPA_LABEL[l.etapa]}
+                      </Typography>
+                    )}
+                    <Typography
+                      variant="caption"
+                      display="block"
+                      color="text.secondary"
+                    >
+                      vale até {moment(l.expira_em).format("DD/MM HH:mm")}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => copiarLink(l.token)}
+                      >
+                        {tokenCopiado === l.token ? "Copiado!" : "Copiar link"}
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="error"
+                        onClick={() => cancelarLink(l.link_id)}
+                      >
+                        Cancelar
+                      </Button>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+                  );
+                }
+
+                const service: any = linha.item;
+                return (
                 <TableRow key={service.id} hover>
                   <TableCell>
                     {service.id}
@@ -637,6 +797,14 @@ const SolicitacoesServico = () => {
                     )}
                   </TableCell>
                   <TableCell>{service.servico}</TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={service.origem === "web" ? "web" : "bot"}
+                      color={service.origem === "web" ? "primary" : "default"}
+                    />
+                  </TableCell>
                   <TableCell>
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
@@ -847,10 +1015,11 @@ const SolicitacoesServico = () => {
                     </Box>
                   </TableCell>
                 </TableRow>
-              ))}
-              {services.length === 0 && (
+                );
+              })}
+              {linhas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} align="center">
+                  <TableCell colSpan={10} align="center">
                     Nenhum serviço solicitado encontrado.
                   </TableCell>
                 </TableRow>
