@@ -8,6 +8,7 @@ import { AprDados, ChamadoFichaTecnica } from "../entities/ChamadoFichaTecnica";
 import { ChamadosEntities } from "../entities/ChamadosEntities";
 import { SisMsg } from "../entities/SisMsg";
 import { montarPdfFichaTecnica } from "../services/FichaTecnicaPdf";
+import { enviarAvaliacaoDaFicha } from "../services/AvaliacaoTecnica";
 
 type Equipamento = {
   tipo: string;
@@ -243,6 +244,10 @@ class ChamadoFichaTecnicaController {
         salva.mkauth_chamado_id = ultimoChamado.chamado;
         salva.mkauth_erro = undefined as any;
         await repo.save(salva);
+
+        // Chamado concluído: o cliente recebe a pesquisa de satisfação de cada
+        // técnico que atendeu. Falha aqui não invalida a ficha.
+        void enviarAvaliacaoDaFicha(salva);
       } catch (mkErr: any) {
         salva.mkauth_sincronizado = false;
         salva.mkauth_erro =
@@ -455,6 +460,9 @@ class ChamadoFichaTecnicaController {
         ficha.mkauth_sincronizado = true;
         ficha.mkauth_chamado_id = resultado.chamadoId;
         ficha.mkauth_erro = undefined as any;
+        // Cobre a ficha cujo envio original falhou; o carimbo de data evita
+        // mandar a pesquisa duas vezes.
+        void enviarAvaliacaoDaFicha(ficha);
       } else {
         ficha.mkauth_sincronizado = false;
         ficha.mkauth_erro = resultado.erro;
