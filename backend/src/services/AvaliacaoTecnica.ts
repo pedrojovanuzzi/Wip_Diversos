@@ -1,8 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import AppDataSource from "../database/DataSource";
-import MkauthSource from "../database/MkauthSource";
 import { Feedback } from "../entities/NotaColaboradores";
-import { ClientesEntities } from "../entities/ClientesEntities";
 import { ChamadoFichaTecnica } from "../entities/ChamadoFichaTecnica";
 import Whatsapp from "../controller/Whatsapp";
 
@@ -62,12 +60,11 @@ export async function enviarAvaliacaoDaFicha(
     const tecnicos = tecnicosDaFicha(ficha);
     if (tecnicos.length === 0) return { enviados: 0 };
 
-    const cliente = await MkauthSource.getRepository(ClientesEntities).findOne({
-      where: { login: ficha.usuario },
-    });
-    const celular = normalizarCelular(cliente?.celular || cliente?.fone);
+    // O número vem do formulário da ficha: quem assina o atendimento nem
+    // sempre é o titular do cadastro.
+    const celular = normalizarCelular(ficha.celular_avaliacao);
     if (!celular) {
-      const erro = `Cliente ${ficha.usuario} sem celular válido no cadastro.`;
+      const erro = `Ficha ${ficha.id} sem celular válido para a avaliação.`;
       console.error(`[AvaliacaoTecnica] ${erro}`);
       return { enviados: 0, erro };
     }

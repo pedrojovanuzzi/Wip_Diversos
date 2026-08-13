@@ -190,6 +190,23 @@ class ChamadoFichaTecnicaController {
         return;
       }
 
+      // Destino da pesquisa de satisfação: obrigatório e sempre informado na
+      // hora do atendimento, não herdado do cadastro.
+      const celularAvaliacao = String(body.celular_avaliacao ?? "").replace(
+        /\D/g,
+        "",
+      );
+      if (celularAvaliacao.length < 10 || celularAvaliacao.length > 13) {
+        res.status(400).json({
+          errors: [
+            {
+              msg: "Informe o celular para a avaliação, com DDD (ex.: 14999999999).",
+            },
+          ],
+        });
+        return;
+      }
+
       const usuario = String(body.usuario).trim();
       const chamadosRepo = MkauthSource.getRepository(ChamadosEntities);
       const ultimoChamado = await chamadosRepo.findOne({
@@ -215,6 +232,7 @@ class ChamadoFichaTecnicaController {
       const nova = repo.create({
         ...body,
         usuario,
+        celular_avaliacao: celularAvaliacao,
         equipamentos,
         apr: normalizarApr(body.apr),
         horario_registro:

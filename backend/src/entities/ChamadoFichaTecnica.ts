@@ -137,6 +137,10 @@ export class ChamadoFichaTecnica {
   @CreateDateColumn({ type: "timestamp" })
   criado_em?: Date;
 
+  /** Celular informado por quem vai avaliar os técnicos; destino da pesquisa. */
+  @Column({ type: "varchar", length: 32, nullable: true })
+  celular_avaliacao?: string | null;
+
   /** Quando a pesquisa de satisfação foi enviada ao cliente (uma vez só). */
   @Column({ type: "timestamp", nullable: true })
   avaliacao_enviada_em?: Date | null;

@@ -31,7 +31,7 @@ import {
   Alert,
   CircularProgress,
 } from "@mui/material";
-import { MdRefresh, MdRestartAlt, MdSave } from "react-icons/md";
+import { MdRefresh, MdRestartAlt, MdSave, MdStar } from "react-icons/md";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -349,6 +349,8 @@ const CriarFichaTecnica: React.FC = () => {
   const [observacao, setObservacao] = useState("");
   const [responsavelNome, setResponsavelNome] = useState("");
   const [responsavelCpf, setResponsavelCpf] = useState("");
+  // Número de quem vai avaliar os técnicos; recebe a pesquisa de satisfação.
+  const [celularAvaliacao, setCelularAvaliacao] = useState("");
 
   const [aprProcesso, setAprProcesso] = useState("");
   const [aprArea, setAprArea] = useState("");
@@ -503,6 +505,8 @@ const CriarFichaTecnica: React.FC = () => {
     if (!placaCarro) return "Informe a placa do carro.";
     if (nota === "" || Number(nota) < 0 || Number(nota) > 5)
       return "Nota precisa ser entre 0 e 5.";
+    if (celularAvaliacao.length < 10)
+      return "Informe o celular para avaliação, com DDD.";
     if (!assinaturaClienteRef.current?.assinou())
       return "O cliente precisa assinar antes de enviar.";
     return null;
@@ -560,6 +564,7 @@ const CriarFichaTecnica: React.FC = () => {
       equipamentos: equipamentosPayload,
       motivo: upper(motivo),
       observacao: upper(observacao),
+      celular_avaliacao: celularAvaliacao,
       responsavel_nome: upper(responsavelNome),
       responsavel_cpf: upper(responsavelCpf),
       assinatura_base64: assinaturaBase64,
@@ -1089,6 +1094,66 @@ const CriarFichaTecnica: React.FC = () => {
               />
             </Grid>
           </Grid>
+
+          <Paper
+            variant="outlined"
+            sx={{
+              mt: 3,
+              p: 2.5,
+              borderRadius: 2,
+              borderWidth: 2,
+              borderColor: "warning.main",
+              bgcolor: (t) =>
+                t.palette.mode === "dark"
+                  ? "rgba(255,167,38,0.12)"
+                  : "rgba(255,167,38,0.10)",
+            }}
+          >
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ mb: 0.5 }}
+            >
+              <MdStar size={22} color="#ed6c02" />
+              <Typography variant="h6" fontWeight={800}>
+                Avaliação dos técnicos
+              </Typography>
+              <Chip
+                size="small"
+                color="warning"
+                label="Obrigatório"
+                sx={{ fontWeight: 700 }}
+              />
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Confirme com o cliente o número que vai receber a pesquisa de
+              satisfação por WhatsApp — é nele que a avaliação dos técnicos
+              deste atendimento será enviada.
+            </Typography>
+            <TextField
+              fullWidth
+              required
+              label="Celular para avaliação (com DDD)"
+              placeholder="14999999999"
+              value={celularAvaliacao}
+              onChange={(e) =>
+                setCelularAvaliacao(e.target.value.replace(/\D/g, ""))
+              }
+              inputProps={{
+                inputMode: "numeric",
+                maxLength: 13,
+                style: { fontSize: "1.25rem", fontWeight: 700 },
+              }}
+              error={celularAvaliacao.length > 0 && celularAvaliacao.length < 10}
+              helperText={
+                celularAvaliacao.length > 0 && celularAvaliacao.length < 10
+                  ? "Número incompleto: informe DDD + número."
+                  : " "
+              }
+              sx={{ maxWidth: 360, bgcolor: "background.paper" }}
+            />
+          </Paper>
         </SectionCard>
 
         <SectionCard title="APR - Análise Preliminar de Risco">
