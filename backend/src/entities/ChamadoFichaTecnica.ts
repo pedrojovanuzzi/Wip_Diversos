@@ -137,6 +137,10 @@ export class ChamadoFichaTecnica {
   @CreateDateColumn({ type: "timestamp" })
   criado_em?: Date;
 
+  /** Quando a pesquisa de satisfação foi enviada ao cliente (uma vez só). */
+  @Column({ type: "timestamp", nullable: true })
+  avaliacao_enviada_em?: Date | null;
+
   @Column({ type: "varchar", length: 64, nullable: true })
   mkauth_chamado_id?: string;
 
