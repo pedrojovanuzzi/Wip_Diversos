@@ -72,9 +72,14 @@ type Resultado = {
     link: string;
     copia_e_cola: string;
   } | null;
-  zapsign: { url: string | null } | null;
+  zapsign: { url: string | null; url_novo_titular?: string | null } | null;
   /** Opção paga: o contrato só é gerado depois do Pix confirmado. */
   contrato_apos_pagamento?: boolean;
+  /** Troca de titularidade: termo de adesão do novo titular. */
+  adesao?: { url: string | null } | null;
+  /** Titular atual esperando o novo titular preencher os dados dele. */
+  aguardando_novo_titular?: boolean;
+  nome_novo_titular?: string;
 };
 
 const ETAPAS_CLIENTE: Array<{ id: Etapa; label: string }> = [
@@ -170,6 +175,21 @@ const SolicitacaoServicoPublica: React.FC = () => {
     }, 10000);
     return () => clearInterval(timer);
   }, [resultado, pagoConfirmado, aguardandoContrato, base]);
+
+  // Titular da troca de titularidade: o contrato dele só existe depois que o
+  // novo titular preenche os dados, então a página fica conferindo.
+  useEffect(() => {
+    if (!resultado?.aguardando_novo_titular) return;
+    const timer = setInterval(async () => {
+      try {
+        const { data } = await axios.get(`${base}/status`);
+        if (data.resultado) setResultado(data.resultado);
+      } catch {
+        /* mantém o polling silencioso */
+      }
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [resultado, base]);
 
   // Enquanto o contrato não for assinado, confere a assinatura periodicamente.
   useEffect(() => {
@@ -664,6 +684,27 @@ const SolicitacaoServicoPublica: React.FC = () => {
                   </>
                 )}
 
+                {resultado.aguardando_novo_titular && (
+                  <>
+                    <Divider sx={{ my: 3 }} />
+                    <Typography variant="subtitle1" fontWeight={700}>
+                      Aguardando o novo titular
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Enviamos o formulário para{" "}
+                      <b>{resultado.nome_novo_titular || "o novo titular"}</b>.
+                      Assim que os dados forem preenchidos, o Termo de Alteração
+                      de Titularidade aparece aqui para você assinar. Pode
+                      deixar esta página aberta ou voltar a ela pelo mesmo link.
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label="Aguardando o preenchimento..."
+                      sx={{ mt: 2 }}
+                    />
+                  </>
+                )}
+
                 {aguardandoContrato && (
                   <>
                     <Divider sx={{ my: 3 }} />
@@ -684,7 +725,9 @@ const SolicitacaoServicoPublica: React.FC = () => {
                       Contrato para assinatura
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Assine o termo para formalizarmos o serviço.
+                      {resultado.adesao?.url
+                        ? "Assine os dois documentos para concluir a transferência: o Termo de Alteração de Titularidade e o Termo de Adesão."
+                        : "Assine o termo para formalizarmos o serviço."}
                     </Typography>
                     {assinadoConfirmado ? (
                       <Alert severity="success">
@@ -700,8 +743,34 @@ const SolicitacaoServicoPublica: React.FC = () => {
                           target="_blank"
                           rel="noreferrer"
                         >
-                          Assinar contrato
+                          {resultado.zapsign.url_novo_titular
+                            ? "Assinar — titular atual"
+                            : "Assinar contrato"}
                         </Button>
+                        {resultado.zapsign.url_novo_titular && (
+                          <Button
+                            variant="outlined"
+                            color="success"
+                            startIcon={<MdOpenInNew />}
+                            href={resultado.zapsign.url_novo_titular}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Assinar — novo titular
+                          </Button>
+                        )}
+                        {resultado.adesao?.url && (
+                          <Button
+                            variant="contained"
+                            color="success"
+                            startIcon={<MdOpenInNew />}
+                            href={resultado.adesao.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Assinar termo de adesão
+                          </Button>
+                        )}
                         <Chip
                           size="small"
                           label="Aguardando assinatura do contrato..."
@@ -713,6 +782,7 @@ const SolicitacaoServicoPublica: React.FC = () => {
 
                 {!resultado.analise_manual &&
                   !aguardandoContrato &&
+                  !resultado.aguardando_novo_titular &&
                   (!resultado.zapsign?.url || assinadoConfirmado) && (
                     <>
                       <Divider sx={{ my: 3 }} />

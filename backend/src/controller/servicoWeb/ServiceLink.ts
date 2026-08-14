@@ -17,8 +17,10 @@ import { sendServiceEmail } from "../whatsapp/services/email.service";
 import { verificarDebitosClienteDesativado } from "../whatsapp/services/debitoAnterior.service";
 import { validarCPF, validarRG } from "../whatsapp/utils/validation";
 import { limparNomeRua } from "../whatsapp/utils/helpers";
+import ZapSign from "../ZapSign";
 import {
   buscarServico,
+  camposDoPapel,
   listarServicos,
   resolverServico,
   formasPagamento,
@@ -73,18 +75,24 @@ function linkExpirado(link: ServiceLink) {
   return !!link.expira_em && new Date(link.expira_em).getTime() < Date.now();
 }
 
+/** O novo titular não tem cadastro no MKAUTH: preenche como cliente novo. */
+function ehLinkDeNovoTitular(link: ServiceLink) {
+  return link.papel === "novo_titular";
+}
+
 /** Em que ponto do preenchimento o link está. */
 export function etapaAtual(link: ServiceLink, servico: ServicoWeb): Etapa {
   if (link.status === "concluido") return "concluido";
   const dados = link.dados || {};
   // Quem ainda não é cliente não tem cadastro no MKAUTH para consultar nem
   // forma de pagamento a escolher agora: só os termos e o formulário.
-  if (servico.clienteNovo) {
+  if (servico.clienteNovo || ehLinkDeNovoTitular(link)) {
     return dados.aceite ? "formulario" : "termos";
   }
   if (!dados.cliente) return dados.cadastros ? "selecionar" : "identificar";
   if (!dados.aceite) return "termos";
-  if (!dados.forma_pagamento) return "pagamento";
+  // No par de links não há o que cobrar: o titular vai direto ao formulário.
+  if (!dados.forma_pagamento && !servico.parDeLinks) return "pagamento";
   return "formulario";
 }
 
@@ -92,9 +100,14 @@ export function etapaAtual(link: ServiceLink, servico: ServicoWeb): Etapa {
  * Há etapa anterior para desfazer? A primeira etapa de cada tipo de serviço
  * e a conclusão não voltam.
  */
-function podeVoltar(etapa: Etapa, servico: ServicoWeb): boolean {
+function podeVoltar(
+  etapa: Etapa,
+  servico: ServicoWeb,
+  link?: ServiceLink,
+): boolean {
   if (etapa === "concluido") return false;
-  if (servico.clienteNovo) return etapa === "formulario";
+  if (servico.clienteNovo || (link && ehLinkDeNovoTitular(link)))
+    return etapa === "formulario";
   return etapa !== "identificar";
 }
 
@@ -162,15 +175,20 @@ function resumoCliente(cliente: any) {
   };
 }
 
-function servicoPublico(servico: ServicoWeb) {
+function servicoPublico(servico: ServicoWeb, link?: ServiceLink) {
+  const novoTitular = !!link && ehLinkDeNovoTitular(link);
   return {
     id: servico.id,
     nome: servico.nome,
-    descricao: servico.descricao,
+    descricao: novoTitular
+      ? "Preencha os seus dados para assumir a titularidade do contrato."
+      : servico.descricao,
     termos: termosDoServico(servico),
     valor: servico.valor,
-    clienteNovo: !!servico.clienteNovo,
+    // O novo titular ainda não tem cadastro: mesma jornada de cliente novo.
+    clienteNovo: !!servico.clienteNovo || novoTitular,
     analiseManual: !!servico.analiseManual,
+    papel: link?.papel ?? null,
   };
 }
 
@@ -188,6 +206,7 @@ class ServiceLinkController {
           ...servicoPublico(s),
           permiteGratisFidelidade: s.permiteGratisFidelidade,
           permiteValorCustomizado: !!s.permiteValorCustomizado,
+          parDeLinks: !!s.parDeLinks,
           formas_pagamento: formasPagamento(s),
         })),
       );
@@ -237,6 +256,19 @@ class ServiceLinkController {
         valorLink = numero.toFixed(2);
       }
 
+      // No par de links o cadastro precisa estar definido desde o começo: é
+      // dele que sai o titular atual do contrato.
+      if (catalogo.parDeLinks && !login) {
+        res.status(400).json({
+          errors: [
+            {
+              msg: `Informe o login PPPoE: ${catalogo.nome} gera um link para o titular atual e outro para o novo titular.`,
+            },
+          ],
+        });
+        return;
+      }
+
       let cliente: Sis_Cliente | null = null;
       if (login) {
         cliente = await MkauthDataSource.getRepository(Sis_Cliente).findOne({
@@ -253,8 +285,7 @@ class ServiceLinkController {
         }
       }
 
-      const link = await this.repo().save({
-        token: gerarToken(),
+      const base = {
         servico: catalogo.id,
         login_cliente: cliente?.login ?? null,
         cpf: cliente?.cpf_cnpj ?? null,
@@ -266,7 +297,41 @@ class ServiceLinkController {
         criado_por: req.user?.login ?? null,
         observacao: observacao ? String(observacao).slice(0, 255) : null,
         valor: valorLink,
-      });
+      };
+
+      if (catalogo.parDeLinks) {
+        const tokenTitular = gerarToken();
+        const tokenNovo = gerarToken();
+        const [titular, novoTitular] = await this.repo().save([
+          {
+            ...base,
+            token: tokenTitular,
+            papel: "titular" as const,
+            par_token: tokenNovo,
+          },
+          {
+            ...base,
+            token: tokenNovo,
+            papel: "novo_titular" as const,
+            par_token: tokenTitular,
+          },
+        ]);
+
+        res.status(201).json({
+          ...titular,
+          links: [
+            { papel: "titular", rotulo: "Titular atual", token: titular.token },
+            {
+              papel: "novo_titular",
+              rotulo: "Novo titular",
+              token: novoTitular.token,
+            },
+          ],
+        });
+        return;
+      }
+
+      const link = await this.repo().save({ ...base, token: gerarToken() });
 
       res.status(201).json(link);
     } catch (error) {
@@ -426,15 +491,18 @@ class ServiceLinkController {
   private async montarEstado(link: ServiceLink, servico: ServicoWeb) {
     const etapa = etapaAtual(link, servico);
     return {
-      servico: servicoPublico(servico),
+      servico: servicoPublico(servico, link),
       etapa,
       vinculado: !!link.login_cliente,
       cliente: link.dados?.cliente ? resumoCliente(link.dados.cliente) : null,
       cadastros: link.dados?.cadastros ?? null,
       formas_pagamento: formasPagamento(servico),
-      campos: etapa === "formulario" ? await resolverCampos(servico) : null,
+      campos:
+        etapa === "formulario"
+          ? await resolverCampos(servico, link.papel)
+          : null,
       resultado: link.status === "concluido" ? link.resultado : null,
-      pode_voltar: podeVoltar(etapa, servico),
+      pode_voltar: podeVoltar(etapa, servico, link),
     };
   }
 
@@ -449,7 +517,7 @@ class ServiceLinkController {
       const { link, servico } = ctx;
 
       const etapa = etapaAtual(link, servico);
-      if (!podeVoltar(etapa, servico)) {
+      if (!podeVoltar(etapa, servico, link)) {
         res.status(400).json({
           errors: [{ msg: "Não há etapa anterior para voltar." }],
         });
@@ -459,8 +527,14 @@ class ServiceLinkController {
       const dados = { ...(link.dados || {}) };
       switch (etapa) {
         case "formulario":
-          // Cliente novo só tem termos atrás; os demais voltam ao pagamento.
-          if (servico.clienteNovo) delete dados.aceite;
+          // Cliente novo e novo titular só têm os termos atrás; no par de
+          // links não existe etapa de pagamento; os demais voltam para ela.
+          if (
+            servico.clienteNovo ||
+            ehLinkDeNovoTitular(link) ||
+            servico.parDeLinks
+          )
+            delete dados.aceite;
           else delete dados.forma_pagamento;
           break;
         case "pagamento":
@@ -628,7 +702,11 @@ class ServiceLinkController {
       if (!ctx) return;
       const { link, servico } = ctx;
 
-      if (!servico.clienteNovo && !link.dados?.cliente) {
+      if (
+        !servico.clienteNovo &&
+        !ehLinkDeNovoTitular(link) &&
+        !link.dados?.cliente
+      ) {
         res
           .status(400)
           .json({ errors: [{ msg: "Identifique o cadastro antes de continuar." }] });
@@ -664,18 +742,22 @@ class ServiceLinkController {
       };
       await this.repo().save(link);
 
-      const proxima: Etapa = servico.clienteNovo
-        ? "formulario"
-        : link.dados.forma_pagamento
+      const proxima: Etapa =
+        servico.clienteNovo || ehLinkDeNovoTitular(link) || servico.parDeLinks
           ? "formulario"
-          : formasPagamento(servico).length > 0
-            ? "pagamento"
-            : "formulario";
+          : link.dados.forma_pagamento
+            ? "formulario"
+            : formasPagamento(servico).length > 0
+              ? "pagamento"
+              : "formulario";
 
       res.status(200).json({
         etapa: proxima,
         formas_pagamento: formasPagamento(servico),
-        campos: proxima === "formulario" ? await resolverCampos(servico) : null,
+        campos:
+          proxima === "formulario"
+            ? await resolverCampos(servico, link.papel)
+            : null,
       });
     } catch (error) {
       console.error("[ServiceLink.aceitarTermos]", error);
@@ -746,7 +828,12 @@ class ServiceLinkController {
 
       const cliente = link.dados?.cliente;
       const formaPagamento = link.dados?.forma_pagamento;
-      if (!servico.clienteNovo && (!cliente || !formaPagamento)) {
+      const novoTitular = ehLinkDeNovoTitular(link);
+      if (
+        !servico.clienteNovo &&
+        !novoTitular &&
+        (!cliente || (!formaPagamento && !servico.parDeLinks))
+      ) {
         res.status(400).json({
           errors: [{ msg: "Complete as etapas anteriores antes de enviar." }],
         });
@@ -760,7 +847,7 @@ class ServiceLinkController {
       }
 
       const formulario = (req.body?.formulario || {}) as Record<string, any>;
-      const faltando = servico.campos
+      const faltando = camposDoPapel(servico, link.papel)
         .filter((c) => c.required && !String(formulario[c.name] ?? "").trim())
         .map((c) => c.label);
       if (faltando.length > 0) {
@@ -770,15 +857,31 @@ class ServiceLinkController {
         return;
       }
 
-      const resultado = servico.clienteNovo
-        ? await this.processarCadastroNovo(link, servico, formulario)
-        : await this.processarSolicitacao(
-            link,
-            servico,
-            cliente,
-            String(formaPagamento),
-            formulario,
-          );
+      let resultado: any;
+      if (link.papel === "titular") {
+        resultado = await this.processarTitularidadeTitular(
+          link,
+          servico,
+          cliente,
+          formulario,
+        );
+      } else if (novoTitular) {
+        resultado = await this.processarTitularidadeNovoTitular(
+          link,
+          servico,
+          formulario,
+        );
+      } else if (servico.clienteNovo) {
+        resultado = await this.processarCadastroNovo(link, servico, formulario);
+      } else {
+        resultado = await this.processarSolicitacao(
+          link,
+          servico,
+          cliente,
+          String(formaPagamento),
+          formulario,
+        );
+      }
 
       link.dados = { ...link.dados, formulario };
       link.resultado = resultado;
@@ -801,6 +904,247 @@ class ServiceLinkController {
       });
     }
   };
+
+  /**
+   * Troca de titularidade, parte 1 (titular atual): igual ao flow de contato
+   * do bot — ele só indica quem assume. Nenhum contrato sai aqui; o documento
+   * é criado quando o novo titular preenche os dados dele.
+   */
+  private async processarTitularidadeTitular(
+    link: ServiceLink,
+    servico: ServicoWeb,
+    cliente: any,
+    formulario: Record<string, any>,
+  ) {
+    const planoRecord = cliente.plano
+      ? await MkauthDataSource.getRepository(SisPlano).findOne({
+          where: { nome: cliente.plano },
+        })
+      : null;
+
+    const dadosTitular: Record<string, any> = {
+      origem: "web",
+      token_link: link.token,
+      servico: servico.id,
+      aceite_termos: link.dados?.aceite ?? null,
+      nome: cliente.nome,
+      cpf: cliente.cpf_cnpj,
+      rg: cliente.rg,
+      email: cliente.email,
+      telefone: cliente.celular,
+      celular: cliente.celular,
+      login: cliente.login,
+      endereco: cliente.endereco,
+      numero: cliente.numero,
+      bairro: cliente.bairro,
+      cidade: cliente.cidade,
+      estado: cliente.estado,
+      cep: cliente.cep,
+      vencimento: cliente.venc,
+      termo: cliente.termo || "",
+      plano: cliente.plano || "",
+      valor_plano: planoRecord?.valor || "",
+      observacao: formulario.observacao || "",
+      nome_novo_titular: String(formulario.nome_novo_titular || "").trim(),
+      celular_novo_titular: String(formulario.celular_novo_titular || "").replace(
+        /\D/g,
+        "",
+      ),
+    };
+
+    const solicitacaoRepo = AppDataSource.getRepository(SolicitacaoServico);
+    const solicitacao = await solicitacaoRepo.save({
+      servico: "Alteração de Titularidade Titular",
+      login_cliente: cliente.login,
+      pago: false,
+      gratis: 1,
+      dados: dadosTitular,
+      finalizado: false,
+    });
+
+    try {
+      sendServiceEmail(
+        `<h3>Alteração de Titularidade — titular autorizou (site)</h3>` +
+          `<p><b>Cliente:</b> ${cliente.nome} (${cliente.login})</p>` +
+          `<p><b>Novo titular indicado:</b> ${dadosTitular.nome_novo_titular}</p>` +
+          `<p><b>Celular do novo titular:</b> ${dadosTitular.celular_novo_titular}</p>`,
+      );
+    } catch (e) {
+      console.error("[ServiceLink] Erro ao enviar e-mail da titularidade:", e);
+    }
+
+    return {
+      solicitacao_id: solicitacao.id,
+      chamado: null,
+      pix: null,
+      zapsign: null,
+      // A página do titular fica aguardando o outro lado; o link de assinatura
+      // aparece aqui assim que o novo titular concluir.
+      aguardando_novo_titular: true,
+      nome_novo_titular: dadosTitular.nome_novo_titular,
+      protocolo: `SOL-${solicitacao.id}`,
+    };
+  }
+
+  /**
+   * Troca de titularidade, parte 2 (novo titular): cria o Termo de Alteração
+   * de Titularidade (assinado pelos dois) e o Termo de Adesão do novo titular,
+   * exatamente como o bot faz ao fim do flow de contratação.
+   */
+  private async processarTitularidadeNovoTitular(
+    link: ServiceLink,
+    servico: ServicoWeb,
+    formulario: Record<string, any>,
+  ) {
+    const linkTitular = link.par_token
+      ? await this.repo().findOne({ where: { token: link.par_token } })
+      : null;
+
+    if (!linkTitular || linkTitular.status !== "concluido") {
+      throw new Error(
+        "O titular atual ainda não autorizou a transferência. Assim que ele concluir a parte dele, volte a esta página.",
+      );
+    }
+
+    const solicitacaoRepo = AppDataSource.getRepository(SolicitacaoServico);
+    const solicitacaoTitular = linkTitular.solicitacao_id
+      ? await solicitacaoRepo.findOne({
+          where: { id: linkTitular.solicitacao_id },
+        })
+      : null;
+    const dadosTitular: Record<string, any> = solicitacaoTitular?.dados || {};
+
+    const celularNovo = String(formulario.celular || "").replace(/\D/g, "");
+    const payloadTitularidade = {
+      ...dadosTitular,
+      nome_novo_titular: formulario.nome,
+      cpf_novo_titular: String(formulario.cpf || ""),
+      rg_novo_titular: String(formulario.rg || ""),
+      email_novo_titular: formulario.email || "",
+      celular_novo_titular: celularNovo,
+      celular2_novo_titular: String(formulario.celularSecundario || ""),
+      endereco_novo_titular: formulario.rua || "",
+      numero_novo_titular: String(formulario.numero || ""),
+      bairro_novo_titular: formulario.bairro || "",
+      termo2: "Alteração de Titularidade",
+    };
+
+    const zapTitularidade =
+      await ZapSign.createContractTrocaTitularidadeTitular(payloadTitularidade);
+    const urlTitular = zapTitularidade?.signers?.[0]?.sign_url ?? null;
+    const urlNovoTitular = zapTitularidade?.second_signer?.sign_url ?? null;
+
+    // Termo de Adesão do novo titular, com os dados da contratação dele.
+    const dadosAdesao: Record<string, any> = {
+      origem: "web",
+      token_link: link.token,
+      servico: servico.id,
+      aceite_termos: link.dados?.aceite ?? null,
+      nome: formulario.nome,
+      cpf: String(formulario.cpf || "Não informado"),
+      rg: formulario.rg || "Não informado",
+      email: formulario.email || "financeiro@wiptelecom.com.br",
+      telefone: celularNovo,
+      celular: celularNovo,
+      celular2: String(formulario.celularSecundario || ""),
+      dataNascimento: formulario.dataNascimento || "",
+      endereco: formulario.rua || "",
+      rua: formulario.rua || "",
+      numero: String(formulario.numero || ""),
+      bairro: formulario.bairro || "",
+      cidade: formulario.cidade || "",
+      estado: formulario.estado || "",
+      cep: String(formulario.cep || ""),
+      plano: formulario.plano_escolhido || dadosTitular.plano || "A definir",
+      vencimento: formulario.vencimento || "",
+      observacao: formulario.observacao || "",
+      valor: "0.00",
+      termo: "",
+      login_titular_atual: dadosTitular.login || linkTitular.login_cliente || "",
+      solicitacao_id_titular: solicitacaoTitular?.id ?? null,
+    };
+
+    const zapAdesao = await ZapSign.createContractInstalacao(dadosAdesao);
+    const urlAdesao = zapAdesao?.signers?.[0]?.sign_url ?? null;
+
+    const solicitacaoNovo = await solicitacaoRepo.save({
+      servico: "Alteração de Titularidade Novo Titular",
+      login_cliente: String(formulario.nome || "Novo Titular"),
+      pago: false,
+      gratis: 1,
+      token_zapsign: zapAdesao?.token,
+      dados: { ...dadosAdesao, sign_url_titularidade: urlNovoTitular },
+      finalizado: false,
+    });
+
+    // Vínculo cruzado entre as duas solicitações, igual ao bot.
+    if (solicitacaoTitular) {
+      solicitacaoTitular.token_zapsign = zapTitularidade?.token;
+      solicitacaoTitular.dados = {
+        ...solicitacaoTitular.dados,
+        ...payloadTitularidade,
+        sign_url_novo_titular: urlNovoTitular,
+        solicitacao_id_novo_titular: solicitacaoNovo.id,
+      };
+      await solicitacaoRepo.save(solicitacaoTitular);
+    }
+
+    const resumo =
+      `*Alteração de Titularidade* (solicitado pelo site)\n` +
+      `Conta: ${dadosTitular.login || linkTitular.login_cliente}\n` +
+      `Titular atual: ${dadosTitular.nome || "-"}\n` +
+      `Novo titular: ${formulario.nome} — CPF ${formulario.cpf}\n` +
+      `Celular: ${celularNovo}\n` +
+      `Plano: ${dadosAdesao.plano} — vencimento dia ${dadosAdesao.vencimento}`;
+
+    let chamadoId: string | null = null;
+    try {
+      chamadoId = await criarChamadoMkauth(
+        servico.assuntoChamado,
+        {
+          nome: dadosTitular.nome,
+          login: dadosTitular.login || linkTitular.login_cliente,
+          email: dadosTitular.email,
+        },
+        resumo,
+        solicitacaoTitular ?? undefined,
+      );
+    } catch (e) {
+      console.error("[ServiceLink] Erro ao abrir chamado da titularidade:", e);
+    }
+
+    try {
+      sendServiceEmail(
+        `<h3>Alteração de Titularidade — novo titular preencheu (site)</h3>` +
+          `<p><b>Conta:</b> ${dadosTitular.login || linkTitular.login_cliente}</p>` +
+          `<p><b>Titular atual:</b> ${dadosTitular.nome || "-"}</p>` +
+          `<p><b>Novo titular:</b> ${formulario.nome}</p>` +
+          `<p><b>CPF:</b> ${formulario.cpf}</p>` +
+          `<p><b>Celular:</b> ${celularNovo}</p>` +
+          `<p><b>Plano:</b> ${dadosAdesao.plano}</p>`,
+      );
+    } catch (e) {
+      console.error("[ServiceLink] Erro ao enviar e-mail da titularidade:", e);
+    }
+
+    // O titular reabre o link dele e encontra o contrato para assinar.
+    linkTitular.resultado = {
+      ...(linkTitular.resultado || {}),
+      aguardando_novo_titular: false,
+      zapsign: { url: urlTitular, token: zapTitularidade?.token },
+      chamado: chamadoId,
+    };
+    await this.repo().save(linkTitular);
+
+    return {
+      solicitacao_id: solicitacaoNovo.id,
+      chamado: chamadoId,
+      pix: null,
+      zapsign: { url: urlNovoTitular, token: zapTitularidade?.token },
+      adesao: { url: urlAdesao, token: zapAdesao?.token },
+      protocolo: chamadoId || `SOL-${solicitacaoNovo.id}`,
+    };
+  }
 
   /**
    * Instalação: o solicitante ainda não é cliente, então nada é cobrado nem
@@ -986,7 +1330,36 @@ class ServiceLinkController {
       valor: planoRecord?.valor || "0.00",
       valor_plano: planoRecord?.valor || "0.00",
       ...formulario,
-    };
+    } as Record<string, any>;
+
+    // Troca de titularidade: o formulário é do novo titular, mas o contrato é
+    // assinado pelos dois. Os campos do cadastro atual voltam ao lugar e os do
+    // formulário viram os do segundo signatário.
+    if (servico.id === "troca_titularidade") {
+      Object.assign(dadosSolicitacao, {
+        nome: cliente.nome,
+        cpf: cliente.cpf_cnpj,
+        rg: cliente.rg,
+        email: cliente.email,
+        celular: cliente.celular,
+        telefone: cliente.celular,
+        endereco: cliente.endereco,
+        numero: cliente.numero,
+        bairro: cliente.bairro,
+        cidade: cliente.cidade,
+        estado: cliente.estado,
+        cep: cliente.cep,
+        nome_novo_titular: formulario.nome || "",
+        cpf_novo_titular: formulario.cpf || "",
+        rg_novo_titular: formulario.rg || "",
+        email_novo_titular: formulario.email || "",
+        celular_novo_titular: formulario.celular || "",
+        celular2_novo_titular: formulario.celularSecundario || "",
+        endereco_novo_titular: formulario.rua || "",
+        numero_novo_titular: formulario.numero || "",
+        bairro_novo_titular: formulario.bairro || "",
+      });
+    }
 
     const solicitacaoRepo = AppDataSource.getRepository(SolicitacaoServico);
     const solicitacao = await solicitacaoRepo.save({

@@ -27,11 +27,13 @@ type ServicoCatalogo = {
   valor: number;
   permiteGratisFidelidade: boolean;
   permiteValorCustomizado: boolean;
+  parDeLinks: boolean;
   clienteNovo: boolean;
   analiseManual: boolean;
 };
 
-type LinkGerado = { id: number; token: string };
+type LinkDoPar = { papel: string; rotulo: string; token: string };
+type LinkGerado = { id: number; token: string; links?: LinkDoPar[] };
 
 const urlPublica = (token: string) => `${window.location.origin}/s/${token}`;
 
@@ -48,7 +50,7 @@ const GerarLinksServico: React.FC = () => {
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [gerado, setGerado] = useState<LinkGerado | null>(null);
-  const [copiado, setCopiado] = useState(false);
+  const [copiado, setCopiado] = useState<string | null>(null);
 
   useEffect(() => {
     axios
@@ -74,8 +76,8 @@ const GerarLinksServico: React.FC = () => {
 
   const copiar = async (token: string) => {
     await navigator.clipboard.writeText(urlPublica(token));
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2000);
+    setCopiado(token);
+    setTimeout(() => setCopiado(null), 2000);
   };
 
   const handleGerar = async () => {
@@ -83,6 +85,12 @@ const GerarLinksServico: React.FC = () => {
     setGerado(null);
     if (!servico) {
       setErro("Escolha o serviço.");
+      return;
+    }
+    if (servicoSelecionado?.parDeLinks && !login.trim()) {
+      setErro(
+        "Informe o login PPPoE: este serviço gera um link para o titular atual e outro para o novo titular.",
+      );
       return;
     }
     setGerando(true);
@@ -182,11 +190,18 @@ const GerarLinksServico: React.FC = () => {
             <Grid item xs={12} md={3}>
               <TextField
                 fullWidth
-                label="Login PPPoE (opcional)"
+                required={!!servicoSelecionado?.parDeLinks}
+                label={
+                  servicoSelecionado?.parDeLinks
+                    ? "Login PPPoE"
+                    : "Login PPPoE (opcional)"
+                }
                 placeholder={
                   servicoSelecionado?.clienteNovo
                     ? "Não se aplica a clientes novos"
-                    : "Trava o link em um cadastro"
+                    : servicoSelecionado?.parDeLinks
+                      ? "Cadastro que será transferido"
+                      : "Trava o link em um cadastro"
                 }
                 value={servicoSelecionado?.clienteNovo ? "" : login}
                 disabled={!!servicoSelecionado?.clienteNovo}
@@ -257,27 +272,65 @@ const GerarLinksServico: React.FC = () => {
             </Typography>
           )}
 
-          {gerado && (
-            <Alert
-              severity="success"
-              sx={{ mt: 3 }}
-              action={
-                <Button
-                  size="small"
-                  startIcon={<MdContentCopy />}
-                  onClick={() => copiar(gerado.token)}
-                >
-                  {copiado ? "Copiado!" : "Copiar"}
-                </Button>
-              }
-            >
-              <Typography variant="body2" fontWeight={700}>
-                Link gerado — envie para o cliente:
+          {gerado?.links && gerado.links.length > 0 ? (
+            <Alert severity="success" sx={{ mt: 3 }}>
+              <Typography variant="body2" fontWeight={700} sx={{ mb: 1 }}>
+                Dois links gerados — envie cada um para a pessoa certa:
               </Typography>
-              <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
-                {urlPublica(gerado.token)}
+              <Stack spacing={1.5}>
+                {gerado.links.map((l) => (
+                  <Box key={l.token}>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ mb: 0.5 }}
+                    >
+                      <Typography variant="body2" fontWeight={700}>
+                        {l.rotulo}
+                      </Typography>
+                      <Button
+                        size="small"
+                        startIcon={<MdContentCopy />}
+                        onClick={() => copiar(l.token)}
+                      >
+                        {copiado === l.token ? "Copiado!" : "Copiar"}
+                      </Button>
+                    </Stack>
+                    <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
+                      {urlPublica(l.token)}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+              <Typography variant="caption" display="block" sx={{ mt: 1.5 }}>
+                O novo titular só consegue enviar os dados depois que o titular
+                atual concluir a parte dele.
               </Typography>
             </Alert>
+          ) : (
+            gerado && (
+              <Alert
+                severity="success"
+                sx={{ mt: 3 }}
+                action={
+                  <Button
+                    size="small"
+                    startIcon={<MdContentCopy />}
+                    onClick={() => copiar(gerado.token)}
+                  >
+                    {copiado === gerado.token ? "Copiado!" : "Copiar"}
+                  </Button>
+                }
+              >
+                <Typography variant="body2" fontWeight={700}>
+                  Link gerado — envie para o cliente:
+                </Typography>
+                <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
+                  {urlPublica(gerado.token)}
+                </Typography>
+              </Alert>
+            )
           )}
         </Paper>
 

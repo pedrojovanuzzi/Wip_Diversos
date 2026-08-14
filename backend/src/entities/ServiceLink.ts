@@ -11,6 +11,12 @@ export type ServiceLinkStatus =
   | "concluido"
   | "cancelado";
 
+/**
+ * Serviços assinados por duas pessoas (troca de titularidade) geram um par de
+ * links: cada papel preenche a sua parte.
+ */
+export type ServiceLinkPapel = "titular" | "novo_titular";
+
 @Entity("service_links")
 export class ServiceLink {
   @PrimaryGeneratedColumn()
@@ -23,6 +29,14 @@ export class ServiceLink {
   /** Id do serviço no catálogo (mudanca_comodo, wifi_extendido, ...). */
   @Column({ type: "varchar", length: 64 })
   servico!: string;
+
+  /** Papel de quem preenche, nos serviços com par de links. */
+  @Column({ type: "varchar", length: 16, nullable: true })
+  papel?: ServiceLinkPapel | null;
+
+  /** Token do outro link do par. */
+  @Column({ type: "varchar", length: 64, nullable: true })
+  par_token?: string | null;
 
   /** Cliente pré-vinculado ao gerar o link (opcional). */
   @Column({ type: "varchar", length: 255, nullable: true })

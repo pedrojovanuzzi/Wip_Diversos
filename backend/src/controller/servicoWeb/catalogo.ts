@@ -82,6 +82,12 @@ export type ServicoWeb = {
    */
   permiteValorCustomizado?: boolean;
   /**
+   * Serviço assinado por duas pessoas: ao gerar, saem dois links. O titular
+   * atual usa `camposTitular` e o novo titular usa `campos`.
+   */
+  parDeLinks?: boolean;
+  camposTitular?: CampoServico[];
+  /**
    * Na opção paga não há contrato a assinar — mesma regra do bot para a
    * Mudança de Cômodo. O termo continua saindo na opção grátis.
    */
@@ -322,6 +328,25 @@ export const CATALOGO: ServicoWeb[] = [
     ],
     valor: 0,
     permiteGratisFidelidade: false,
+    // Mesmo encadeamento do bot: o titular indica quem assume e o novo titular
+    // preenche a própria contratação.
+    parDeLinks: true,
+    camposTitular: [
+      {
+        name: "nome_novo_titular",
+        label: "Nome completo do novo titular",
+        type: "text",
+        required: true,
+        ajuda: "Quem vai assumir o contrato daqui em diante.",
+      },
+      {
+        name: "celular_novo_titular",
+        label: "Celular do novo titular (com DDD)",
+        type: "phone",
+        required: true,
+      },
+      CAMPO_OBSERVACAO,
+    ],
     campos: [
       { name: "nome", label: "Nome completo do novo titular", type: "text", required: true },
       { name: "cpf", label: "CPF ou CNPJ do novo titular", type: "number", required: true },
@@ -409,12 +434,22 @@ export function termosDoServico(servico: ServicoWeb): Termo[] {
   return [...TERMOS_GERAIS, ...(servico.termos ?? [])];
 }
 
+/** Campos do formulário conforme o papel de quem preenche. */
+export function camposDoPapel(
+  servico: ServicoWeb,
+  papel?: string | null,
+): CampoServico[] {
+  if (papel === "titular" && servico.camposTitular) return servico.camposTitular;
+  return servico.campos;
+}
+
 /** Resolve as listas dinâmicas (planos, estados) para o formulário do cliente. */
 export async function resolverCampos(
   servico: ServicoWeb,
+  papel?: string | null,
 ): Promise<CampoServico[]> {
   const campos: CampoServico[] = [];
-  for (const campo of servico.campos) {
+  for (const campo of camposDoPapel(servico, papel)) {
     if (!campo.fonte) {
       campos.push(campo);
       continue;

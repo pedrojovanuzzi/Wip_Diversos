@@ -26,7 +26,12 @@ export async function gerarContrato(
   solicitacao: SolicitacaoServico,
   dados: Record<string, any>,
   pago: boolean,
-): Promise<{ url: string | null; token: string } | null> {
+): Promise<{
+  url: string | null;
+  token: string;
+  /** Troca de titularidade: link do segundo signatário (novo titular). */
+  url_novo_titular?: string | null;
+} | null> {
   if (!servico.criarContrato) return null;
   try {
     const valorContrato = pago
@@ -39,9 +44,18 @@ export async function gerarContrato(
       valor: valorContrato,
     });
     const url = zapResponse?.signers?.[0]?.sign_url ?? null;
+    // O segundo signatário só existe na troca de titularidade.
+    const urlNovoTitular = zapResponse?.second_signer?.sign_url ?? null;
+
     solicitacao.token_zapsign = zapResponse?.token;
+    if (urlNovoTitular) {
+      solicitacao.dados = {
+        ...(solicitacao.dados || {}),
+        sign_url_novo_titular: urlNovoTitular,
+      };
+    }
     await AppDataSource.getRepository(SolicitacaoServico).save(solicitacao);
-    return { url, token: zapResponse?.token };
+    return { url, token: zapResponse?.token, url_novo_titular: urlNovoTitular };
   } catch (e: any) {
     console.error(
       "[ServiceLink] Erro ao gerar contrato ZapSign:",
