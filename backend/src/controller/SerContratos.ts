@@ -11,7 +11,7 @@ import {
 import { planFor, normalizeStorageGb } from "../config/cameraStoragePlans";
 
 const VALORES: Record<string, number> = {
-  STREAMER: 39.9,
+  STREAMER: 44.9,
   STREAMER_COLAB: 0,
   CAMERA: 20.0,
 };

@@ -352,7 +352,6 @@ const CriarFichaTecnica: React.FC = () => {
   // Número de quem vai avaliar os técnicos; recebe a pesquisa de satisfação.
   const [celularAvaliacao, setCelularAvaliacao] = useState("");
 
-  const [aprProcesso, setAprProcesso] = useState("");
   const [aprArea, setAprArea] = useState("");
   const [aprAtividade, setAprAtividade] = useState("");
   const [aprData, setAprData] = useState(() =>
@@ -569,7 +568,8 @@ const CriarFichaTecnica: React.FC = () => {
       responsavel_cpf: upper(responsavelCpf),
       assinatura_base64: assinaturaBase64,
       apr: {
-        processo: upper(aprProcesso),
+        // O processo da APR é sempre o próprio chamado.
+        processo: upper(chamadoNumber),
         area: upper(aprArea),
         atividade: upper(aprAtividade),
         data: aprData ? aprData.split("-").reverse().join("/") : "",
@@ -1166,8 +1166,10 @@ const CriarFichaTecnica: React.FC = () => {
               <TextField
                 fullWidth
                 label="Processo"
-                value={aprProcesso}
-                onChange={(e) => setAprProcesso(upper(e.target.value))}
+                value={chamadoNumber}
+                InputProps={{ readOnly: true }}
+                InputLabelProps={{ shrink: true }}
+                helperText="Sempre igual ao número do chamado."
               />
             </Grid>
             <Grid item xs={12} md={3}>

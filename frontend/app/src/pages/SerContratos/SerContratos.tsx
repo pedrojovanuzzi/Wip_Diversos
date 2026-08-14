@@ -410,7 +410,7 @@ export const SerContratos: React.FC = () => {
                     <h2 className="font-bold text-gray-800">Streaming</h2>
                   </div>
                   <p className="text-xs text-gray-500 mb-2">
-                    Pago R$ {(loaded.valoresUnitarios.STREAMER ?? 39.9).toFixed(2)} ·
+                    Pago R$ {(loaded.valoresUnitarios.STREAMER ?? 44.9).toFixed(2)} ·
                     Colaborador grátis — máx. 1 por cliente
                   </p>
                   {temStreaming && (
