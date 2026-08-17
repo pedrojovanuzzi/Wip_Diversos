@@ -42,6 +42,27 @@ const ETAPA_LABEL: Record<string, string> = {
   formulario: "Preenchendo o formulário",
 };
 
+/**
+ * Nem toda solicitação tem cobrança: sem fatura e sem Pix escolhido não há o
+ * que ficar pendente. A instalação é caso à parte — o valor sai na análise.
+ */
+const rotuloPagamento = (service: any): string => {
+  if (service.gratis) return "Grátis";
+  if (service.pago) return "Pago";
+  if (service.id_fatura || service.dados?.forma_pagamento === "pix")
+    return "Pendente";
+  if (service.servico === "Instalação") return "A definir";
+  return "Sem cobrança";
+};
+
+const PAGAMENTO_CLASSE: Record<string, string> = {
+  Grátis: "bg-blue-100 text-blue-800",
+  Pago: "bg-green-100 text-green-800",
+  Pendente: "bg-red-100 text-red-800",
+  "A definir": "bg-amber-100 text-amber-800",
+  "Sem cobrança": "bg-gray-100 text-gray-600",
+};
+
 const SolicitacoesServico = () => {
   const [services, setServices] = useState([]);
   // Links enviados ao cliente que ainda não viraram solicitação.
@@ -808,18 +829,10 @@ const SolicitacoesServico = () => {
                   <TableCell>
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                        service.gratis
-                          ? "bg-blue-100 text-blue-800"
-                          : service.pago
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
+                        PAGAMENTO_CLASSE[rotuloPagamento(service)]
                       }`}
                     >
-                      {service.gratis
-                        ? "Grátis"
-                        : service.pago
-                          ? "Pago"
-                          : "Pendente"}
+                      {rotuloPagamento(service)}
                     </span>
                   </TableCell>
                   <TableCell>{service.login_cliente}</TableCell>

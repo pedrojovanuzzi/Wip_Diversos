@@ -3,6 +3,7 @@ import "./App.css";
 import { HomePage } from "./pages/home/HomePage";
 import { AuthPage } from "./pages/auth/AuthPage";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { TituloDaPagina } from "./components/TituloDaPagina";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { GoAlert } from "react-icons/go";
 import FeedbackLinkGenerator from "./pages/feedback/FeedBackLinkGenerator";
@@ -91,7 +92,7 @@ function LocalhostBanner() {
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23f59e0b"/><text x="50" y="68" text-anchor="middle" font-size="50" font-weight="bold" fill="white">D</text></svg>'
       );
     document.head.appendChild(link);
-    document.title = "[DEV] Wip Diversos";
+    // O título fica por conta de <TituloDaPagina />, que já marca o [DEV].
   }, []);
 
   if (!isLocalhost) return null;
@@ -146,6 +147,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <TituloDaPagina />
       <LocalhostBanner />
       <div className="App" style={isLocalhost ? { paddingTop: "22px" } : undefined}>
         <Routes>
