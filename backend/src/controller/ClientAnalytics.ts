@@ -1063,6 +1063,8 @@ class ClientAnalytics {
 
       if (!snCliente) {
         ////console.log("Procurando ONU com MAC normalizado:", snCliente);
+        // Fecha a sessao: OLT tem limite de usuarios VTY simultaneos.
+        await conn.end();
         res.status(500).json({ respostaTelnet: "Sem Onu" });
         return;
       }
@@ -1131,6 +1133,7 @@ class ClientAnalytics {
       ////console.log(output);
 
       if (!onuId || !output) {
+        await conn.end();
         res.status(500).json({ respostaTelnet: "Sem Onu" });
         return;
       }

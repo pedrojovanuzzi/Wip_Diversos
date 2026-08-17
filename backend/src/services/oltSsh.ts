@@ -13,6 +13,8 @@ import { ServidorConexao } from "./servidorAcesso.service";
 export class SessaoOlt extends EventEmitter {
   private conn = new Client();
   private canal: ClientChannel | null = null;
+  /** Falso depois que o equipamento fecha o canal. */
+  viva = true;
 
   /** Fim de resposta: prompt do equipamento, ex.: "Admin\onu#" ou "OLT>". */
   private static PROMPT = /[#>]\s*$/;
@@ -33,19 +35,29 @@ export class SessaoOlt extends EventEmitter {
               }
               sessao.emit("data", dados);
             });
-            canal.on("close", () => sessao.emit("close"));
+            canal.on("close", () => {
+              sessao.viva = false;
+              sessao.emit("close");
+            });
             // O equipamento cospe banner e prompt ao abrir a sessão; espera
             // isso terminar para não confundir com a resposta do 1º comando.
             sessao.aguardarSilencio(canal, 800).then(() => resolve(sessao));
           });
         })
-        .on("error", (err) => reject(err))
+        .on("error", (err) => {
+          sessao.viva = false;
+          reject(err);
+        })
         .connect({
           host: olt.host,
           port: olt.porta,
           username: olt.login,
           password: olt.senha,
           readyTimeout: timeout,
+          // Equipamento derruba sessão ociosa; o keepalive segura o canal
+          // enquanto a fila de comandos ainda tem trabalho.
+          keepaliveInterval: 15000,
+          keepaliveCountMax: 4,
           // OLTs costumam anunciar algoritmos antigos.
           algorithms: {
             kex: [
@@ -155,6 +167,7 @@ export class SessaoOlt extends EventEmitter {
   }
 
   async end(): Promise<void> {
+    this.viva = false;
     try {
       this.canal?.end();
       this.conn.end();
@@ -162,4 +175,86 @@ export class SessaoOlt extends EventEmitter {
       /* encerramento é best-effort */
     }
   }
+}
+
+
+/**
+ * Uma sessão por equipamento, reaproveitada entre chamadas.
+ *
+ * Abrir um SSH por comando estourava o limite de VTYs do Huawei — daí os
+ * "Unable to open shell" e ECONNRESET. Aqui as chamadas entram em fila,
+ * dividem a mesma sessão e ela fica aberta por um tempo curto depois do
+ * último uso.
+ */
+const OCIOSA_MS = 30000;
+
+type Aberta = {
+  sessao: SessaoOlt;
+  fila: Promise<unknown>;
+  ocioso: NodeJS.Timeout | null;
+};
+
+const abertas = new Map<string, Aberta>();
+
+const chaveDe = (servidor: ServidorConexao) =>
+  `${servidor.host}:${servidor.porta}:${servidor.login}`;
+
+function agendarFechamento(chave: string) {
+  const atual = abertas.get(chave);
+  if (!atual) return;
+  if (atual.ocioso) clearTimeout(atual.ocioso);
+  atual.ocioso = setTimeout(() => {
+    abertas.delete(chave);
+    atual.sessao.end().catch(() => undefined);
+  }, OCIOSA_MS);
+}
+
+/** Executa na sessão do equipamento, serializando com quem já está usando. */
+export async function comSessaoOlt<T>(
+  servidor: ServidorConexao,
+  tarefa: (sessao: SessaoOlt) => Promise<T>,
+): Promise<T> {
+  const chave = chaveDe(servidor);
+
+  const executar = async (tentativa = 1): Promise<T> => {
+    let atual = abertas.get(chave);
+    if (atual && !atual.sessao.viva) {
+      abertas.delete(chave);
+      atual = undefined;
+    }
+
+    if (!atual) {
+      const sessao = await SessaoOlt.abrir(servidor);
+      atual = { sessao, fila: Promise.resolve(), ocioso: null };
+      abertas.set(chave, atual);
+    }
+    if (atual.ocioso) {
+      clearTimeout(atual.ocioso);
+      atual.ocioso = null;
+    }
+
+    const emFila = atual.fila.then(
+      () => tarefa(atual!.sessao),
+      () => tarefa(atual!.sessao),
+    );
+    atual.fila = emFila.catch(() => undefined);
+
+    try {
+      return await emFila;
+    } catch (erro: any) {
+      // Sessão caiu no meio: derruba o cache e tenta uma vez com uma nova.
+      const caiu =
+        /ECONNRESET|Unable to open shell|not connected|closed/i.test(
+          String(erro?.message || erro),
+        );
+      abertas.delete(chave);
+      await atual.sessao.end().catch(() => undefined);
+      if (caiu && tentativa === 1) return executar(2);
+      throw erro;
+    } finally {
+      agendarFechamento(chave);
+    }
+  };
+
+  return executar();
 }

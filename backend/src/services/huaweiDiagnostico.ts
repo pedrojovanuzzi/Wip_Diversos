@@ -1,4 +1,4 @@
-import { SessaoOlt } from "./oltSsh";
+import { comSessaoOlt } from "./oltSsh";
 import { ServidorConexao } from "./servidorAcesso.service";
 
 export type ClienteHuawei = { userId: string; ip: string };
@@ -16,16 +16,13 @@ export async function localizarClienteHuawei(
   servidor: ServidorConexao,
   pppoe: string,
 ): Promise<ClienteHuawei | null> {
-  const conn = await SessaoOlt.abrir(servidor);
-  try {
+  return comSessaoOlt(servidor, async (conn) => {
     const saida = await conn.exec(`display access-user username ${pppoe}`, {
       execTimeout: 30000,
       silencio: 1500,
     });
     return extrairSessao(saida);
-  } finally {
-    await conn.end();
-  }
+  });
 }
 
 export function extrairSessao(saida: string): ClienteHuawei | null {
@@ -92,8 +89,7 @@ export async function testesRedeHuawei(
   servidor: ServidorConexao,
   cliente: ClienteHuawei,
 ): Promise<{ testes: TestesRede; conectado: boolean }> {
-  const conn = await SessaoOlt.abrir(servidor);
-  try {
+  return comSessaoOlt(servidor, async (conn) => {
     await conn
       .exec("screen-length 0 temporary", { execTimeout: 10000 })
       .catch(() => undefined);
@@ -124,9 +120,7 @@ export async function testesRedeHuawei(
       // Se o detalhe respondeu, a sessão está de pé no BRAS.
       conectado: /User name/i.test(detalhe),
     };
-  } finally {
-    await conn.end();
-  }
+  });
 }
 
 /** Consumo instantâneo, em bits por segundo, para o gráfico em tempo real. */
@@ -134,14 +128,11 @@ export async function consumoTempoRealHuawei(
   servidor: ServidorConexao,
   userId: string,
 ): Promise<{ txBps: number; rxBps: number }> {
-  const conn = await SessaoOlt.abrir(servidor);
-  try {
+  return comSessaoOlt(servidor, async (conn) => {
     const detalhe = await conn.exec(`display access-user user-id ${userId}`, {
       execTimeout: 20000,
       silencio: 800,
     });
     return parseVelocidade(detalhe);
-  } finally {
-    await conn.end();
-  }
+  });
 }

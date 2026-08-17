@@ -1,4 +1,4 @@
-import { SessaoOlt } from "./oltSsh";
+import { comSessaoOlt } from "./oltSsh";
 import { ServidorConexao } from "./servidorAcesso.service";
 
 export type ClienteAtivo = {
@@ -100,31 +100,29 @@ export async function uptimeClienteHuawei(
   servidor: ServidorConexao,
   userId: string,
 ): Promise<string> {
-  const conn = await SessaoOlt.abrir(servidor);
-  try {
+  return comSessaoOlt(servidor, async (conn) => {
     const detalhe = await conn.exec(`display access-user user-id ${userId}`, {
       execTimeout: 20000,
       silencio: 800,
     });
     // O rótulo é "Online time (h:min:sec)  : 19:23:09" — o parêntese tem
     // dois-pontos, então a captura precisa vir do fim da linha.
-    const online = detalhe.match(/Online time[^\n]*?:\s*(\d+:\d{2}:\d{2})/i)?.[1];
+    const online = detalhe.match(
+      /Online time[^\n]*?:\s*(\d+:\d{2}:\d{2})/i,
+    )?.[1];
     return online ? formatarTempoOnline(online) : "";
-  } finally {
-    await conn.end();
-  }
+  });
 }
 
 /** Sessões PPPoE ativas em um equipamento Huawei. */
 export async function listarClientesHuawei(
   servidor: ServidorConexao,
 ): Promise<ClienteAtivo[]> {
-  const conn = await SessaoOlt.abrir(servidor);
-  try {
+  return comSessaoOlt(servidor, async (conn) => {
     // Desliga a paginação para a saída vir inteira de uma vez.
-    await conn.exec("screen-length 0 temporary", { execTimeout: 10000 }).catch(
-      () => undefined,
-    );
+    await conn
+      .exec("screen-length 0 temporary", { execTimeout: 10000 })
+      .catch(() => undefined);
     // O comando varia por instalacao (dominio, filtros); o cadastro manda.
     const comando = servidor.comandoClientes?.trim() || "display access-user";
     const saida = await conn.exec(comando, {
@@ -134,7 +132,5 @@ export async function listarClientesHuawei(
     // O tempo de conexão não vem no resumo: é um comando por cliente, então
     // fica sob demanda (botão na listagem) para não pesar o carregamento.
     return parseAccessUser(saida, servidor.nome);
-  } finally {
-    await conn.end();
-  }
+  });
 }
