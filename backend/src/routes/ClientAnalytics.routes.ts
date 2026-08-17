@@ -12,6 +12,7 @@ router.post("/Mikrotik", AuthGuard, ClientAnalytics.mikrotik);
 router.post("/TempoReal", AuthGuard, ClientAnalytics.mikrotikTempoReal);
 router.post("/Reset", AuthGuard, ClientAnalytics.onuReiniciar);
 router.get("/ClientList", AuthGuard, ClientAnalytics.clientList);
+router.post("/HuaweiUptime", AuthGuard, ClientAnalytics.huaweiUptime);
 router.get("/ClientsWithoutQueue", AuthGuard, ClientAnalytics.clientsWithoutQueue);
 router.post("/Observacao", AuthGuard, ClientAnalytics.observacao);
 router.post("/SubirCliente", AuthGuard, ClientAnalytics.subirCliente);

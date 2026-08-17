@@ -83,7 +83,13 @@ type ClientList = {
   ip: string;
   upTime: string;
   callerId: string;
+  /** Só nos clientes do Huawei: identifica a sessão no BRAS. */
+  userId?: string;
 };
+
+/** O backend envia bits por segundo; o gráfico mostra em Mbps. */
+const emMbps = (bps: number) => Number(bps || 0) / 1_000_000;
+const rotuloMbps = (bps: number) => `${emMbps(bps).toFixed(2)} Mbps`;
 
 const Spinner: React.FC<{ text?: string; inline?: boolean }> = ({
   text,
@@ -185,6 +191,9 @@ export const ClientAnalytics = () => {
   const [loadingClientList, setLoadingClientList] = useState(false);
   const [errorClientList, setErrorClientList] = useState<string | null>(null);
   const [clientlist, setClientList] = useState<ClientList[]>([]);
+  // Uptime do Huawei é medido sob demanda: um comando por cliente.
+  const [uptimeHuawei, setUptimeHuawei] = useState<Record<string, string>>({});
+  const [medindoUptime, setMedindoUptime] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -354,6 +363,31 @@ export const ClientAnalytics = () => {
       setErrorSinal("Erro ao consultar ONU");
     } finally {
       setLoadingSinal(false);
+    }
+  };
+
+  /** Consulta o tempo de conexão de um cliente do Huawei, sob demanda. */
+  const medirUptimeHuawei = async (cliente: ClientList) => {
+    if (!cliente.userId) return;
+    setMedindoUptime(cliente.userId);
+    try {
+      const response = await axios.post(
+        process.env.REACT_APP_URL + "/ClientAnalytics/HuaweiUptime",
+        { servidor: cliente.servidor, userId: cliente.userId },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setUptimeHuawei((atual) => ({
+        ...atual,
+        [cliente.userId as string]: response.data.upTime,
+      }));
+    } catch (error: any) {
+      setUptimeHuawei((atual) => ({
+        ...atual,
+        [cliente.userId as string]:
+          error?.response?.data?.error || "indisponível",
+      }));
+    } finally {
+      setMedindoUptime(null);
     }
   };
 
@@ -652,10 +686,14 @@ export const ClientAnalytics = () => {
                       <YAxis
                         stroke="#94a3b8"
                         fontSize={11}
+                        width={70}
                         domain={[
                           0,
-                          (dataMax: number) => Math.max(5, dataMax),
+                          (dataMax: number) => Math.max(1_000_000, dataMax),
                         ]}
+                        tickFormatter={(v: number) =>
+                          `${emMbps(v).toFixed(emMbps(v) >= 10 ? 0 : 1)} Mb`
+                        }
                       />
                       <Tooltip
                         contentStyle={{
@@ -663,6 +701,7 @@ export const ClientAnalytics = () => {
                           border: "1px solid #e2e8f0",
                           fontSize: 12,
                         }}
+                        formatter={(valor: any) => rotuloMbps(Number(valor))}
                       />
                       <Line
                         type="monotone"
@@ -820,7 +859,27 @@ export const ClientAnalytics = () => {
                           </td>
                           <td className="px-3 py-2 font-mono">{f.callerId}</td>
                           <td className="px-3 py-2 font-mono">{f.ip}</td>
-                          <td className="px-3 py-2">{f.upTime}</td>
+                          <td className="px-3 py-2">
+                            {f.upTime || uptimeHuawei[f.userId ?? ""] ? (
+                              f.upTime || uptimeHuawei[f.userId ?? ""]
+                            ) : f.userId ? (
+                              <button
+                                type="button"
+                                className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                                disabled={medindoUptime === f.userId}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  medirUptimeHuawei(f);
+                                }}
+                              >
+                                {medindoUptime === f.userId
+                                  ? "Medindo…"
+                                  : "Medir uptime"}
+                              </button>
+                            ) : (
+                              ""
+                            )}
+                          </td>
                         </tr>
                       ))}
                   </tbody>

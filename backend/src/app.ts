@@ -17,6 +17,7 @@ import Whatsapp from "./routes/Whatsapp.Routes";
 import WhatsappWebHook from "./routes/WhatsappWebHook.routes";
 import Prefeitura from "./routes/PrefeituraUser.routes";
 import ClientAnalytics from "./routes/ClientAnalytics.routes";
+import ServidorAcessoRoutes from "./routes/ServidorAcesso.routes";
 import DosProtect from "./routes/DosProtect.Routes";
 import ServerLogs from "./routes/ServerLogs.Routes";
 import PowerDNS from "./routes/PowerDns.routes";
@@ -79,6 +80,7 @@ export class App {
     this.server.use("/api/whatsappWebHook", WhatsappWebHook);
     this.server.use("/api/Prefeitura", Prefeitura);
     this.server.use("/api/ClientAnalytics", ClientAnalytics);
+    this.server.use("/api/servidores-acesso", ServidorAcessoRoutes);
     this.server.use("/api/DosProtect", DosProtect);
     this.server.use("/api/ServerLogs", ServerLogs);
     this.server.use("/api/PowerDns", PowerDNS);

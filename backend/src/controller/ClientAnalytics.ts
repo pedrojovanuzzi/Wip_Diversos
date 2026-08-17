@@ -4,21 +4,34 @@ import { Faturas } from "../entities/Faturas";
 import { Request, Response } from "express";
 import { Radacct } from "../entities/Radacct";
 import { Between, In, LessThanOrEqual } from "typeorm";
-import { Telnet } from "telnet-client";
 import { Client } from "ssh2";
 import axios from "axios";
 import crypto from "crypto";
 import dotenv from "dotenv";
 import ClientMonitorService from "../services/ClientMonitorService";
+import {
+  credenciaisMikrotik,
+  listarHuaweis,
+  listarMikrotiks,
+  obterOlt,
+} from "../services/servidorAcesso.service";
+import { SessaoOlt } from "../services/oltSsh";
+import {
+  listarClientesHuawei,
+  uptimeClienteHuawei,
+} from "../services/huaweiAcessUser";
+import {
+  ClienteHuawei,
+  consumoTempoRealHuawei,
+  localizarClienteHuawei,
+  testesRedeHuawei,
+} from "../services/huaweiDiagnostico";
 
 dotenv.config();
 
-const servidores = [
-  { host: process.env.MIKROTIK_PPPOE1, nome: "PPPOE1" },
-  { host: process.env.MIKROTIK_PPPOE2, nome: "PPPOE2" },
-  { host: process.env.MIKROTIK_PPPOE3, nome: "PPPOE3" },
-  { host: process.env.MIKROTIK_PPPOE4, nome: "PPPOE4" },
-];
+// Os servidores vêm da tela de gerenciamento (tabela servidores_acesso); o
+// .env continua valendo enquanto nada estiver cadastrado.
+const servidores = () => listarMikrotiks();
 
 // Integração com o painel do mkauth (botão "Reparar")
 const MKAUTH_URL = process.env.MKAUTH_URL; // ex: https://mk.seudominio.com.br
@@ -160,6 +173,8 @@ async function fazerLoginMkauth(
 class ClientAnalytics {
   private clientIp: string | undefined;
   private serverIp: string | undefined;
+  /** Última sessão diagnosticada em BRAS Huawei, usada no tempo real. */
+  private huaweiAtual: { servidor: string; cliente: ClienteHuawei } | undefined;
   private versao: string | undefined | number;
   private onuId: string | undefined;
 
@@ -208,7 +223,7 @@ class ClientAnalytics {
     try {
       const resultados = [];
 
-      for (const servidor of servidores) {
+      for (const servidor of await servidores()) {
         try {
           const comando = `/ppp active print without-paging detail`;
           const resposta = await this.executarSSH(servidor.host!, comando);
@@ -241,9 +256,59 @@ class ClientAnalytics {
         }
       }
 
+      // Huawei fala outra CLI: as sessões saem de `display access-user`.
+      for (const servidor of await listarHuaweis()) {
+        try {
+          resultados.push(...(await listarClientesHuawei(servidor)));
+        } catch (err: any) {
+          resultados.push({
+            servidor: servidor.nome,
+            erro: err.message || "Erro desconhecido",
+          });
+        }
+      }
+
       res.status(200).json(resultados);
     } catch (error) {
       res.status(500).json(error);
+    }
+  };
+
+  /**
+   * POST /HuaweiUptime { servidor, userId }
+   * Tempo de conexao de uma sessao no BRAS Huawei. Fica fora da listagem
+   * porque exige um comando por cliente.
+   */
+  huaweiUptime = async (req: Request, res: Response) => {
+    try {
+      const { servidor, userId } = req.body || {};
+      const id = String(userId ?? "").trim();
+      if (!id) {
+        res.status(400).json({ error: "Informe o userId da sessao." });
+        return;
+      }
+
+      const huaweis = await listarHuaweis();
+      const alvo = servidor
+        ? huaweis.find((h) => h.nome === String(servidor))
+        : huaweis[0];
+      if (!alvo) {
+        res.status(404).json({ error: "Servidor Huawei nao encontrado." });
+        return;
+      }
+
+      const upTime = await uptimeClienteHuawei(alvo, id);
+      if (!upTime) {
+        res.status(404).json({ error: "Sessao sem tempo de conexao." });
+        return;
+      }
+
+      res.status(200).json({ upTime });
+    } catch (error: any) {
+      console.error("[ClientAnalytics.huaweiUptime]", error);
+      res
+        .status(500)
+        .json({ error: error?.message || "Erro ao consultar o tempo." });
     }
   };
 
@@ -251,7 +316,7 @@ class ClientAnalytics {
     try {
       const resultados: any[] = [];
 
-      for (const servidor of servidores) {
+      for (const servidor of await servidores()) {
         try {
           // 1) Clientes PPPoE conectados
           const comandoAtivos = `/ppp active print without-paging detail`;
@@ -509,9 +574,10 @@ class ClientAnalytics {
       const comando = `/ppp active remove [find name="${pppoe}"]`;
 
       // Se souber o servidor, derruba só nele; senão tenta em todos.
+      const cadastrados = await servidores();
       const alvos = servidor
-        ? servidores.filter((s) => s.nome === servidor)
-        : servidores;
+        ? cadastrados.filter((s) => s.nome === servidor)
+        : cadastrados;
 
       if (alvos.length === 0) {
         res.status(404).json({ error: "Servidor não encontrado" });
@@ -656,7 +722,7 @@ class ClientAnalytics {
     try {
       const resultados: any[] = [];
 
-      for (const servidor of servidores) {
+      for (const servidor of await servidores()) {
         try {
           const comando = `log print without-paging detail`;
           const resposta = await this.executarSSH(servidor.host!, comando);
@@ -973,45 +1039,18 @@ class ClientAnalytics {
         order: { id: "ASC" },
       });
 
-      const ip = String(process.env.OLT_IP);
-      const login = String(process.env.OLT_LOGIN);
-      const password = String(process.env.OLT_PASSWORD);
+      // OLT vem do cadastro de servidores (tipo huawei); sem cadastro, do .env.
+      const olt = await obterOlt();
+      if (!olt) {
+        res.status(500).json({ error: "Nenhuma OLT cadastrada em Servidores." });
+        return;
+      }
+      const ip = olt.host;
+      const login = olt.login;
+      const password = olt.senha;
 
-      let buffer = "";
-
-      const conn = new Telnet();
-
-      // 🟡 Eventos para log no terminal
-      conn.removeAllListeners("data");
-      conn.on("data", async (data) => {
-        const chunk = data.toString();
-        buffer += chunk;
-        console.log(chunk);
-
-        // se a OLT pedir "Press any key", manda Enter
-        if (chunk.includes("Press any key")) {
-          await conn?.send("\n").catch(console.error);
-        }
-      });
-
-      const params = {
-        host: ip,
-        port: 23,
-        timeout: 10000,
-        sendTimeout: 2000,
-        debug: true,
-        shellPrompt: /Admin\\onu#\s*$/,
-        stripShellPrompt: true,
-        negotiationMandatory: false,
-        disableLogon: true,
-      };
-
-      await conn.connect(params);
-
-      await conn.send(login);
-
-      await conn.send(password);
-
+      // A OLT autentica no proprio SSH; resta subir para o modo enable.
+      const conn = await SessaoOlt.abrir({ ...olt, host: ip, login });
       await conn.send("en");
       await conn.send(password);
 
@@ -1099,9 +1138,9 @@ class ClientAnalytics {
       res.status(200).json({ respostaTelnet: output });
       await conn.end();
     } catch (error) {
-      console.error("❌ Erro Telnet:", error);
+      console.error("[OLT] Erro na sessao SSH:", error);
       res.status(500).json({
-        respostaTelnet: "Falha ao executar comando Telnet",
+        respostaTelnet: "Falha ao executar o comando na OLT",
         detalhes: String(error),
       });
     }
@@ -1119,38 +1158,17 @@ class ClientAnalytics {
         order: { id: "ASC" },
       });
 
-      const ip = String(process.env.OLT_IP);
-      const login = String(process.env.OLT_LOGIN);
-      const password = String(process.env.OLT_PASSWORD);
+      // OLT vem do cadastro de servidores (tipo huawei); sem cadastro, do .env.
+      const olt = await obterOlt();
+      if (!olt) {
+        res.status(500).json({ error: "Nenhuma OLT cadastrada em Servidores." });
+        return;
+      }
+      const ip = olt.host;
+      const login = olt.login;
+      const password = olt.senha;
 
-      const conn = new Telnet();
-
-      // 🟡 Eventos para log no terminal
-      conn.on("data", (data) => {
-        buffer = data.toString();
-        console.log(buffer);
-      });
-
-      let buffer = "";
-
-      const params = {
-        host: ip,
-        port: 23,
-        timeout: 10000,
-        sendTimeout: 200,
-        debug: true,
-        shellPrompt: /[#>]\s*$/,
-        stripShellPrompt: true,
-        negotiationMandatory: false,
-        disableLogon: true,
-      };
-
-      await conn.connect(params);
-
-      await conn.send(login);
-
-      await conn.send(password);
-
+      const conn = await SessaoOlt.abrir({ ...olt, host: ip, login });
       await conn.send("en");
       await conn.send(password);
       await conn.send("cd onu");
@@ -1209,6 +1227,9 @@ class ClientAnalytics {
 
   executarSSH = async (host: string, comando: string): Promise<string> => {
     try {
+      // Usuário, senha e porta saem do cadastro do servidor; sem cadastro,
+      // continuam vindo do .env.
+      const acesso = await credenciaisMikrotik(host);
       return new Promise((resolve, reject) => {
         const conn = new Client();
         let output = "";
@@ -1256,9 +1277,9 @@ class ClientAnalytics {
           })
           .connect({
             host,
-            port: 2004,
-            username: process.env.MIKROTIK_LOGIN!,
-            password: process.env.MIKROTIK_PASSWORD!,
+            port: acesso.porta,
+            username: acesso.login,
+            password: acesso.senha,
             readyTimeout: 5000,
           });
       });
@@ -1269,7 +1290,7 @@ class ClientAnalytics {
   };
 
   async buscarOnuIdPorMac(
-    conn: Telnet,
+    conn: SessaoOlt,
     comando: string,
     snClienteRaw: string,
   ): Promise<string> {
@@ -1359,7 +1380,7 @@ class ClientAnalytics {
       let ipCliente = "";
       const resultados = [];
 
-      for (const servidor of servidores) {
+      for (const servidor of await servidores()) {
         try {
           //console.log("VERIFICANDO PPPoE ATIVO NO SERVIDOR:", servidor.nome);
 
@@ -1407,6 +1428,33 @@ class ClientAnalytics {
 
       const primeiro = resultados.find((r) => r.encontrado);
 
+      // Nao esta em Mikrotik nenhum: pode ser um cliente do BRAS Huawei, que
+      // tem CLI propria para ping, fragmentacao e velocidade.
+      if (!primeiro || !primeiro.host) {
+        for (const huawei of await listarHuaweis()) {
+          try {
+            const cliente = await localizarClienteHuawei(huawei, pppoe);
+            if (!cliente) continue;
+
+            const { testes: testesHuawei, conectado } = await testesRedeHuawei(
+              huawei,
+              cliente,
+            );
+            this.clientIp = cliente.ip;
+            this.serverIp = undefined;
+            this.huaweiAtual = { servidor: huawei.nome, cliente };
+
+            res.status(200).json({ tests: testesHuawei, conectado });
+            return;
+          } catch (e: any) {
+            console.error(
+              `[ClientAnalytics] Falha no diagnostico Huawei (${huawei.nome}):`,
+              e?.message || e,
+            );
+          }
+        }
+      }
+
       if (!primeiro || !primeiro.host) {
         res.status(500).json();
       }
@@ -1415,6 +1463,7 @@ class ClientAnalytics {
         this.clientIp = ipCliente;
         const ipDoServidor = primeiro.host;
         this.serverIp = ipDoServidor;
+        this.huaweiAtual = undefined;
 
         //console.log("VERSAO");
         const versaoMikrotik = `/system resource print`;
@@ -1568,6 +1617,25 @@ class ClientAnalytics {
         tmp_tx: 0,
         tmp_rx: 0,
       };
+
+      // Cliente diagnosticado em BRAS Huawei: a velocidade vem do detalhe da
+      // sessao, ja que nao existe monitor-traffic por interface PPPoE.
+      if (this.huaweiAtual) {
+        const huawei = (await listarHuaweis()).find(
+          (h) => h.nome === this.huaweiAtual?.servidor,
+        );
+        if (!huawei) {
+          res.status(500).json({ erro: "Servidor Huawei nao encontrado." });
+          return;
+        }
+
+        const { txBps, rxBps } = await consumoTempoRealHuawei(
+          huawei,
+          this.huaweiAtual.cliente.userId,
+        );
+        res.status(200).json({ tmp: { tmp_tx: txBps, tmp_rx: rxBps } });
+        return;
+      }
 
       if (this.serverIp) {
         ("TEMPO REAL");

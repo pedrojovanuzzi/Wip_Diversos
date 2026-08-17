@@ -22,6 +22,7 @@ import { StreamingAssinante } from "../entities/StreamingAssinante";
 import { DeclaracaoQuitacao } from "../entities/DeclaracaoQuitacao";
 import { FileShare } from "../entities/FileShare";
 import { ServiceLink } from "../entities/ServiceLink";
+import { ServidorAcesso } from "../entities/ServidorAcesso";
 import { ClientMonitor } from "../entities/ClientMonitor";
 import { ClientMonitorEvent } from "../entities/ClientMonitorEvent";
 
@@ -58,6 +59,7 @@ const AppDataSource = new DataSource({
     FileShare,
     ClientMonitor,
     ClientMonitorEvent,
+    ServidorAcesso,
     ServiceLink,
   ],
   migrations: [

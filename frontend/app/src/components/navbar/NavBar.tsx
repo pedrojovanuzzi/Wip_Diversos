@@ -31,6 +31,7 @@ import {
   FaCloudUploadAlt,
   FaChartBar,
   FaLink,
+  FaServer,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -382,6 +383,14 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
                   }
                   title="Analytics"
                   description="Análise de dados de clientes"
+                />
+                <NavItem
+                  to="/ClientAnalytics/Servidores"
+                  icon={
+                    <FaServer className="text-white size-8 transition-all hover:text-green-400" />
+                  }
+                  title="Servidores"
+                  description="Cadastro de Mikrotiks e OLTs usados nas consultas"
                 />
                 <NavItem
                   to="/ClientAnalytics/SemQueue"

@@ -78,6 +78,7 @@ const TITULOS: Record<string, string> = {
   "/ClientAnalytics/Logs": "Logs dos Clientes",
   "/ClientAnalytics/Monitor/:id": "Monitoramento do Cliente",
   "/ClientAnalytics/SemQueue": "Clientes sem Queue",
+  "/ClientAnalytics/Servidores": "Servidores",
   "/ClientLogsSearch": "Busca de Logs",
 
   "/Cameras/Admin": "Câmeras",
