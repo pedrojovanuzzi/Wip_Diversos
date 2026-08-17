@@ -5,8 +5,9 @@ import { ChamadoFichaTecnica } from "../entities/ChamadoFichaTecnica";
 import Whatsapp from "../controller/Whatsapp";
 
 /**
- * Template aprovado na Meta. O corpo recebe, nesta ordem:
- * {{1}} nome do técnico, {{2}} link da pesquisa.
+ * Template aprovado na Meta: corpo com {{1}} = nome do técnico e botão "Nota de
+ * Satisfação" de URL dinâmica. A base do botão é a raiz do site, então o que
+ * enviamos é o caminho "feedback/Tecnico/uuid".
  */
 const TEMPLATE = "avaliacao_tecnica";
 
@@ -81,15 +82,19 @@ export async function enviarAvaliacaoDaFicha(
         }),
       );
 
-      const link = `${FRONT_URL}/feedback/${encodeURIComponent(tecnico)}/${identificador}`;
+      const caminho = `feedback/${encodeURIComponent(tecnico)}/${identificador}`;
       try {
-        await Whatsapp.MensagemTemplate(celular, TEMPLATE, "pt_BR", [
-          tecnico,
-          link,
-        ]);
+        await Whatsapp.MensagemTemplate(
+          celular,
+          TEMPLATE,
+          "pt_BR",
+          [tecnico],
+          [],
+          caminho,
+        );
         enviados += 1;
         console.log(
-          `[AvaliacaoTecnica] Pesquisa do técnico ${tecnico} enviada para ${celular} (chamado ${ficha.chamado_number}): ${link}`,
+          `[AvaliacaoTecnica] Pesquisa do técnico ${tecnico} enviada para ${celular} (chamado ${ficha.chamado_number}): ${FRONT_URL}/${caminho}`,
         );
       } catch (e: any) {
         // O link já existe no banco: o atendimento consegue reenviar pela tela

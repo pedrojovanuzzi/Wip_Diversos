@@ -359,6 +359,8 @@ class WhatsappController {
     languageCode: string = "pt_BR",
     bodyParams: string[] = [],
     headerParams: string[] = [],
+    // Botão de URL dinâmica: este trecho é concatenado à URL base do template.
+    buttonUrlParam?: string,
   ) => {
     try {
       // Variáveis de cabeçalho e corpo ({{1}}, {{2}}, ...) na ordem informada
@@ -370,11 +372,21 @@ class WhatsappController {
         })),
       });
 
-      const componentList = [
+      const componentList: any[] = [
         ...(headerParams.length > 0
           ? [buildComponent("header", headerParams)]
           : []),
         ...(bodyParams.length > 0 ? [buildComponent("body", bodyParams)] : []),
+        ...(buttonUrlParam
+          ? [
+              {
+                type: "button",
+                sub_type: "url",
+                index: "0",
+                parameters: [{ type: "text", text: String(buttonUrlParam) }],
+              },
+            ]
+          : []),
       ];
 
       const components = componentList.length > 0 ? componentList : undefined;
