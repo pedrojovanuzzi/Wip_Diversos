@@ -1,8 +1,10 @@
 import { Request, Response } from "express";
 import { Client } from "ssh2";
 import AppDataSource from "../database/DataSource";
+import { Telnet } from "telnet-client";
 import {
   FuncaoServidor,
+  ProtocoloServidor,
   ServidorAcesso,
   TipoServidor,
 } from "../entities/ServidorAcesso";
@@ -10,6 +12,7 @@ import { cifrarSenha, decifrarSenha } from "../services/servidorAcesso.service";
 
 const TIPOS: TipoServidor[] = ["mikrotik", "huawei"];
 const FUNCOES: FuncaoServidor[] = ["pppoe", "olt"];
+const PROTOCOLOS: ProtocoloServidor[] = ["ssh", "telnet"];
 
 /** Porta usual de cada fabricante quando o cadastro não informa. */
 const PORTA_PADRAO: Record<TipoServidor, number> = {
@@ -123,6 +126,7 @@ class ServidorAcessoController {
           nome: s.nome,
           tipo: s.tipo,
           funcao: s.funcao,
+          protocolo: s.protocolo,
           host: s.host,
           porta: s.porta,
           login: s.login,
@@ -183,6 +187,11 @@ class ServidorAcessoController {
               : FUNCOES.includes(funcaoBruta)
                 ? funcaoBruta
                 : ("pppoe" as FuncaoServidor),
+          protocolo: PROTOCOLOS.includes(
+            String(bruto?.protocolo ?? "").trim() as ProtocoloServidor,
+          )
+            ? (String(bruto.protocolo).trim() as ProtocoloServidor)
+            : ("ssh" as ProtocoloServidor),
           host,
           porta: Number(bruto?.porta) || PORTA_PADRAO[tipo],
           login,
@@ -227,8 +236,12 @@ class ServidorAcessoController {
         return;
       }
 
-      // Mikrotik e Huawei são acessados por SSH; muda só a porta.
-      await this.testarSsh(servidor, decifrarSenha(servidor.senha));
+      const senha = decifrarSenha(servidor.senha);
+      if (servidor.protocolo === "telnet") {
+        await this.testarTelnet(servidor);
+      } else {
+        await this.testarSsh(servidor, senha);
+      }
 
       res.status(200).json({ ok: true, message: "Conexão estabelecida." });
     } catch (error: any) {
@@ -259,6 +272,21 @@ class ServidorAcessoController {
     });
   }
 
+  /** No Telnet o login é conversado no shell; aqui só a porta é checada. */
+  private async testarTelnet(servidor: ServidorAcesso) {
+    const conn = new Telnet();
+    try {
+      await conn.connect({
+        host: servidor.host,
+        port: servidor.porta,
+        timeout: 8000,
+        negotiationMandatory: false,
+      } as any);
+    } finally {
+      await conn.end().catch(() => undefined);
+    }
+  }
+
   /** Campos comuns de criação e edição; responde 400 e devolve null se inválido. */
   private validar(req: Request, res: Response, exigeSenha: boolean) {
     const nome = String(req.body?.nome ?? "").trim();
@@ -270,6 +298,12 @@ class ServidorAcessoController {
     const funcao: FuncaoServidor = FUNCOES.includes(funcaoBruta)
       ? funcaoBruta
       : "pppoe";
+    const protocoloBruto = String(
+      req.body?.protocolo ?? "",
+    ).trim() as ProtocoloServidor;
+    const protocolo: ProtocoloServidor = PROTOCOLOS.includes(protocoloBruto)
+      ? protocoloBruto
+      : "ssh";
 
     if (!nome || !host || !login) {
       res.status(400).json({ message: "Informe nome, host e login." });
@@ -294,6 +328,7 @@ class ServidorAcessoController {
       nome,
       tipo,
       funcao: tipo === "mikrotik" ? "pppoe" : funcao,
+      protocolo: tipo === "mikrotik" ? "ssh" : protocolo,
       host,
       porta,
       login,

@@ -1,6 +1,27 @@
 import { EventEmitter } from "events";
 import { Client, ClientChannel } from "ssh2";
+import { Telnet } from "telnet-client";
 import { ServidorConexao } from "./servidorAcesso.service";
+
+/**
+ * Canal bruto do equipamento. Serve tanto o shell do SSH quanto o socket do
+ * Telnet: o resto da classe só precisa escrever texto e ouvir bytes.
+ */
+type Canal = {
+  escrever(texto: string): void;
+  ouvir(cb: (dados: Buffer) => void): void;
+  parar(cb: (dados: Buffer) => void): void;
+  fechar(): void;
+};
+
+function canalDoSsh(canal: ClientChannel): Canal {
+  return {
+    escrever: (texto) => canal.write(texto),
+    ouvir: (cb) => canal.on("data", cb),
+    parar: (cb) => canal.removeListener("data", cb),
+    fechar: () => canal.end(),
+  };
+}
 
 /**
  * Sessão de CLI da OLT por SSH.
@@ -12,30 +33,42 @@ import { ServidorConexao } from "./servidorAcesso.service";
  */
 export class SessaoOlt extends EventEmitter {
   private conn = new Client();
-  private canal: ClientChannel | null = null;
+  private telnet: Telnet | null = null;
+  private canal: Canal | null = null;
   /** Falso depois que o equipamento fecha o canal. */
   viva = true;
 
   /** Fim de resposta: prompt do equipamento, ex.: "Admin\onu#" ou "OLT>". */
   private static PROMPT = /[#>]\s*$/;
 
+  /** Abre por SSH ou Telnet, conforme o cadastro do equipamento. */
   static abrir(olt: ServidorConexao, timeout = 15000): Promise<SessaoOlt> {
+    return olt.protocolo === "telnet"
+      ? SessaoOlt.abrirTelnet(olt, timeout)
+      : SessaoOlt.abrirSsh(olt, timeout);
+  }
+
+  private static abrirSsh(
+    olt: ServidorConexao,
+    timeout: number,
+  ): Promise<SessaoOlt> {
     const sessao = new SessaoOlt();
     return new Promise((resolve, reject) => {
       sessao.conn
         .on("ready", () => {
-          sessao.conn.shell({ term: "vt100" }, (err, canal) => {
+          sessao.conn.shell({ term: "vt100" }, (err, canalSsh) => {
             if (err) return reject(err);
+            const canal = canalDoSsh(canalSsh);
             sessao.canal = canal;
-            canal.on("data", (dados: Buffer) => {
+            canalSsh.on("data", (dados: Buffer) => {
               const texto = dados.toString();
               // Paginação da Huawei: segue a listagem sem intervenção.
               if (/Press any key|---- More/i.test(texto)) {
-                canal.write(" ");
+                canal.escrever(" ");
               }
               sessao.emit("data", dados);
             });
-            canal.on("close", () => {
+            canalSsh.on("close", () => {
               sessao.viva = false;
               sessao.emit("close");
             });
@@ -82,11 +115,61 @@ export class SessaoOlt extends EventEmitter {
     });
   }
 
+  /**
+   * Telnet do equipamento antigo (OLT). A autenticação é conversada no próprio
+   * shell, então mandamos usuário e senha depois de conectar.
+   */
+  private static async abrirTelnet(
+    olt: ServidorConexao,
+    timeout: number,
+  ): Promise<SessaoOlt> {
+    const sessao = new SessaoOlt();
+    const telnet = new Telnet();
+    sessao.telnet = telnet;
+
+    await telnet.connect({
+      host: olt.host,
+      port: olt.porta,
+      timeout,
+      negotiationMandatory: false,
+      // O login vai a seguir, no próprio fluxo do shell.
+      shellPrompt: undefined,
+      execTimeout: timeout,
+    } as any);
+
+    const socket = telnet.getSocket();
+    if (!socket) throw new Error("Telnet conectou mas não expôs o socket.");
+
+    const canal: Canal = {
+      escrever: (texto) => socket.write(texto),
+      ouvir: (cb) => socket.on("data", cb),
+      parar: (cb) => socket.removeListener("data", cb),
+      fechar: () => socket.destroy(),
+    };
+    sessao.canal = canal;
+
+    socket.on("data", (dados: Buffer) => {
+      if (/Press any key|---- More/i.test(dados.toString())) {
+        canal.escrever(String.fromCharCode(10));
+      }
+      sessao.emit("data", dados);
+    });
+    socket.on("close", () => {
+      sessao.viva = false;
+      sessao.emit("close");
+    });
+
+    await sessao.aguardarSilencio(canal, 800);
+    await sessao.send(olt.login);
+    await sessao.send(olt.senha, 600);
+    return sessao;
+  }
+
   /** Envia uma linha e devolve o controle sem esperar a resposta completa. */
   async send(texto: string, espera = 300): Promise<void> {
     if (!this.canal) throw new Error("Sessão da OLT não está aberta.");
     // Ctrl+C não leva Enter junto.
-    this.canal.write(texto === "\x03" ? texto : `${texto}\n`);
+    this.canal.escrever(texto === "\x03" ? texto : `${texto}\n`);
     await new Promise((resolve) => setTimeout(resolve, espera));
   }
 
@@ -120,7 +203,7 @@ export class SessaoOlt extends EventEmitter {
       const encerrar = () => {
         if (ocioso) clearTimeout(ocioso);
         clearTimeout(limite);
-        canal.removeListener("data", aoReceber);
+        canal.parar(aoReceber);
         // Remove o eco do comando, como o stripShellPrompt do Telnet fazia.
         const semEco = buffer.replace(/\r/g, "");
         const quebra = semEco.indexOf("\n");
@@ -140,18 +223,18 @@ export class SessaoOlt extends EventEmitter {
       };
 
       const limite = setTimeout(() => {
-        canal.removeListener("data", aoReceber);
+        canal.parar(aoReceber);
         if (ocioso) clearTimeout(ocioso);
         reject(new Error(`Tempo esgotado ao executar "${comando}" na OLT.`));
       }, execTimeout);
 
-      canal.on("data", aoReceber);
-      canal.write(`${comando}\n`);
+      canal.ouvir(aoReceber);
+      canal.escrever(`${comando}\n`);
     });
   }
 
   /** Espera o equipamento parar de escrever (banner, prompt, paginação). */
-  private aguardarSilencio(canal: ClientChannel, ms: number): Promise<void> {
+  private aguardarSilencio(canal: Canal, ms: number): Promise<void> {
     return new Promise((resolve) => {
       let ocioso = setTimeout(finalizar, ms);
       function aoReceber() {
@@ -159,18 +242,19 @@ export class SessaoOlt extends EventEmitter {
         ocioso = setTimeout(finalizar, ms);
       }
       function finalizar() {
-        canal.removeListener("data", aoReceber);
+        canal.parar(aoReceber);
         resolve();
       }
-      canal.on("data", aoReceber);
+      canal.ouvir(aoReceber);
     });
   }
 
   async end(): Promise<void> {
     this.viva = false;
     try {
-      this.canal?.end();
-      this.conn.end();
+      this.canal?.fechar();
+      if (this.telnet) await this.telnet.end().catch(() => undefined);
+      else this.conn.end();
     } catch {
       /* encerramento é best-effort */
     }

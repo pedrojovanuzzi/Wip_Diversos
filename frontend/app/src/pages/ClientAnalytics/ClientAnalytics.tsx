@@ -79,6 +79,8 @@ type TempoReal = {
 
 type ClientList = {
   servidor: string;
+  /** Preenchido quando o servidor não respondeu à varredura. */
+  erro?: string;
   pppoe: string;
   ip: string;
   upTime: string;
@@ -844,7 +846,17 @@ export const ClientAnalytics = () => {
                           parseUptime(a.upTime ?? "") -
                           parseUptime(b.upTime ?? ""),
                       )
-                      .map((f, i) => (
+                      .map((f, i) =>
+                        f.erro ? (
+                          <tr key={`erro-${f.servidor}-${i}`} className="bg-red-50">
+                            <td className="px-3 py-2 font-medium text-red-700">
+                              {f.servidor}
+                            </td>
+                            <td className="px-3 py-2 text-red-700" colSpan={4}>
+                              Falha ao consultar: {f.erro}
+                            </td>
+                          </tr>
+                        ) : (
                         <tr
                           key={`${f.pppoe}-${i}`}
                           className="hover:bg-slate-50 cursor-pointer"
@@ -881,7 +893,8 @@ export const ClientAnalytics = () => {
                             )}
                           </td>
                         </tr>
-                      ))}
+                        ),
+                      )}
                   </tbody>
                 </table>
               </div>

@@ -42,12 +42,14 @@ import { useAuth } from "../../context/AuthContext";
 
 type Tipo = "mikrotik" | "huawei";
 type Funcao = "pppoe" | "olt";
+type Protocolo = "ssh" | "telnet";
 
 type Servidor = {
   id: number;
   nome: string;
   tipo: Tipo;
   funcao: Funcao;
+  protocolo: Protocolo;
   host: string;
   porta: number;
   login: string;
@@ -71,6 +73,7 @@ const VAZIO = {
   nome: "",
   tipo: "mikrotik" as Tipo,
   funcao: "pppoe" as Funcao,
+  protocolo: "ssh" as Protocolo,
   host: "",
   porta: 2004,
   login: "",
@@ -131,6 +134,7 @@ const ServidoresAcesso: React.FC = () => {
       nome: s.nome,
       tipo: s.tipo,
       funcao: s.funcao || "pppoe",
+      protocolo: s.protocolo || "ssh",
       host: s.host,
       porta: s.porta,
       login: s.login,
@@ -365,6 +369,9 @@ const ServidoresAcesso: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         {s.funcao === "olt" ? "OLT" : "PPPoE"}
+                        <Typography variant="caption" display="block" color="text.secondary">
+                          {(s.protocolo || "ssh").toUpperCase()}
+                        </Typography>
                       </TableCell>
                       <TableCell>{s.host}</TableCell>
                       <TableCell>{s.porta}</TableCell>
@@ -507,6 +514,34 @@ const ServidoresAcesso: React.FC = () => {
                 </FormControl>
               </Grid>
             )}
+            {form.tipo === "huawei" && (
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Protocolo</InputLabel>
+                  <Select
+                    label="Protocolo"
+                    value={form.protocolo}
+                    onChange={(e) => {
+                      const protocolo = e.target.value as Protocolo;
+                      // Porta padrão de cada protocolo, se ainda não mexeram.
+                      setForm((f) => ({
+                        ...f,
+                        protocolo,
+                        porta:
+                          f.porta === 22 || f.porta === 23
+                            ? protocolo === "telnet"
+                              ? 23
+                              : 22
+                            : f.porta,
+                      }));
+                    }}
+                  >
+                    <MenuItem value="ssh">SSH (porta 22)</MenuItem>
+                    <MenuItem value="telnet">Telnet (porta 23)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
             <Grid item xs={12} md={8}>
               <TextField
                 fullWidth
@@ -528,7 +563,11 @@ const ServidoresAcesso: React.FC = () => {
                   })
                 }
                 helperText={
-                  form.tipo === "mikrotik" ? "Padrão SSH: 2004" : "Padrão SSH: 22"
+                  form.tipo === "mikrotik"
+                    ? "Padrão SSH: 2004"
+                    : form.protocolo === "telnet"
+                      ? "Padrão Telnet: 23"
+                      : "Padrão SSH: 22"
                 }
               />
             </Grid>

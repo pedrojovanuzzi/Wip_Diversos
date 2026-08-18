@@ -15,6 +15,9 @@ export type TipoServidor = "mikrotik" | "huawei";
  */
 export type FuncaoServidor = "pppoe" | "olt";
 
+/** Como o equipamento é acessado. OLTs antigas ainda só falam Telnet. */
+export type ProtocoloServidor = "ssh" | "telnet";
+
 /**
  * Servidores consultados pelo Client Analytics (concentradores PPPoE e OLTs).
  * Antes vinham do .env; agora são cadastrados pela tela de gerenciamento.
@@ -33,6 +36,9 @@ export class ServidorAcesso {
 
   @Column({ type: "varchar", length: 16, default: "pppoe" })
   funcao!: FuncaoServidor;
+
+  @Column({ type: "varchar", length: 16, default: "ssh" })
+  protocolo!: ProtocoloServidor;
 
   @Column({ type: "varchar", length: 128 })
   host!: string;

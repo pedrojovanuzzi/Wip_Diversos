@@ -2,6 +2,7 @@ import crypto from "crypto";
 import AppDataSource from "../database/DataSource";
 import {
   FuncaoServidor,
+  ProtocoloServidor,
   ServidorAcesso,
   TipoServidor,
 } from "../entities/ServidorAcesso";
@@ -53,6 +54,7 @@ export type ServidorConexao = {
   nome: string;
   tipo: TipoServidor;
   funcao: FuncaoServidor;
+  protocolo: ProtocoloServidor;
   host: string;
   porta: number;
   login: string;
@@ -77,6 +79,7 @@ export async function listarServidores(
     nome: s.nome,
     tipo: s.tipo,
     funcao: s.funcao,
+    protocolo: s.protocolo || "ssh",
     host: s.host,
     porta: s.porta,
     login: s.login,
@@ -102,6 +105,7 @@ export async function listarMikrotiks(): Promise<ServidorConexao[]> {
       nome: s.nome,
       tipo: "mikrotik" as const,
       funcao: "pppoe" as const,
+      protocolo: "ssh" as const,
       host: String(s.host),
       porta,
       login: process.env.MIKROTIK_LOGIN || "",
@@ -146,8 +150,10 @@ export async function obterOlt(): Promise<ServidorConexao | null> {
     nome: "OLT",
     tipo: "huawei",
     funcao: "olt",
+    // A OLT do .env sempre foi Telnet na 23; o cadastro é que permite mudar.
+    protocolo: (process.env.OLT_PROTOCOLO as ProtocoloServidor) || "telnet",
     host: String(process.env.OLT_IP),
-    porta: Number(process.env.OLT_PORTA || 22),
+    porta: Number(process.env.OLT_PORTA || 23),
     login: String(process.env.OLT_LOGIN || ""),
     senha: String(process.env.OLT_PASSWORD || ""),
   };
