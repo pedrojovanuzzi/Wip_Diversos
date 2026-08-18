@@ -3,6 +3,7 @@ import axios from "axios";
 import {
   Alert,
   Box,
+  Tooltip,
   Button,
   Chip,
   CircularProgress,
@@ -91,6 +92,10 @@ const ServidoresAcesso: React.FC = () => {
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [testando, setTestando] = useState<number | null>(null);
+  // Resultado do último teste de cada servidor, mostrado na própria linha.
+  const [resultadoTeste, setResultadoTeste] = useState<
+    Record<number, { ok: boolean; message: string }>
+  >({});
 
   const [dialogo, setDialogo] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -223,13 +228,21 @@ const ServidoresAcesso: React.FC = () => {
   const testar = async (s: Servidor) => {
     setTestando(s.id);
     setAviso(null);
+    setErro(null);
     try {
       const { data } = await axios.post(`${base}/${s.id}/testar`, {}, auth);
-      setAviso(`${s.nome}: ${data.message}`);
-      setErro(data.ok ? null : `${s.nome}: ${data.message}`);
-      if (data.ok) setErro(null);
+      setResultadoTeste((atual) => ({
+        ...atual,
+        [s.id]: { ok: !!data.ok, message: data.message },
+      }));
     } catch (e: any) {
-      setErro(e?.response?.data?.message || "Erro ao testar a conexão.");
+      setResultadoTeste((atual) => ({
+        ...atual,
+        [s.id]: {
+          ok: false,
+          message: e?.response?.data?.message || "Erro ao testar a conexão.",
+        },
+      }));
     } finally {
       setTestando(null);
     }
@@ -357,11 +370,29 @@ const ServidoresAcesso: React.FC = () => {
                       <TableCell>{s.porta}</TableCell>
                       <TableCell>{s.login}</TableCell>
                       <TableCell>
-                        <Chip
-                          size="small"
-                          color={s.ativo ? "success" : "default"}
-                          label={s.ativo ? "Ativo" : "Inativo"}
-                        />
+                        <Stack spacing={0.5} alignItems="flex-start">
+                          <Chip
+                            size="small"
+                            color={s.ativo ? "success" : "default"}
+                            label={s.ativo ? "Ativo" : "Inativo"}
+                          />
+                          {resultadoTeste[s.id] && (
+                            <Tooltip title={resultadoTeste[s.id].message}>
+                              <Chip
+                                size="small"
+                                variant="outlined"
+                                color={
+                                  resultadoTeste[s.id].ok ? "success" : "error"
+                                }
+                                label={
+                                  resultadoTeste[s.id].ok
+                                    ? "Conexão OK"
+                                    : "Falhou"
+                                }
+                              />
+                            </Tooltip>
+                          )}
+                        </Stack>
                       </TableCell>
                       <TableCell align="right">
                         <Stack
