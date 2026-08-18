@@ -54,11 +54,17 @@ export function parseAccessUser(saida: string, servidor: string): ClienteAtivo[]
   for (const linhaBruta of saida.split("\n")) {
     const linha = linhaBruta.replace(/\r/g, "").trim();
     if (!linha || /^[-=+\s]+$/.test(linha)) continue;
-    // Cabeçalhos, totais e paginação não são sessões.
+    // Cabeçalhos, totais, paginação e o banner de login não são sessões — o
+    // banner do SSH tem IP ("last login ... from 1.2.3.4") e enganava o parser.
     if (/^(UserID|Total|Info|Error|---)/i.test(linha)) continue;
+    if (/login time|VTY users|through SSH/i.test(linha)) continue;
 
     const ip = linha.match(RE_IP)?.[0];
     if (!ip) continue;
+
+    // Toda sessão começa pelo UserID numérico; sem isso é texto solto.
+    const primeiro = linha.split(/\s+/)[0];
+    if (!/^\d+$/.test(primeiro)) continue;
 
     const mac = linha.match(RE_MAC)?.[0] ?? "";
     // Tira o MAC antes de procurar o tempo: "00:11:22:33:44:66" contém algo

@@ -35,6 +35,13 @@ export class SessaoOlt extends EventEmitter {
   private conn = new Client();
   private telnet: Telnet | null = null;
   private canal: Canal | null = null;
+  /**
+   * "shell" é a sessão interativa; "exec" roda um comando por canal, usado
+   * quando o equipamento recusa o shell (comum em VTY restrita).
+   */
+  private modo: "shell" | "exec" = "shell";
+  /** Guardado para o modo exec, que abre uma conexão por comando. */
+  private config: ServidorConexao | null = null;
   /** Falso depois que o equipamento fecha o canal. */
   viva = true;
 
@@ -53,11 +60,39 @@ export class SessaoOlt extends EventEmitter {
     timeout: number,
   ): Promise<SessaoOlt> {
     const sessao = new SessaoOlt();
+    sessao.config = olt;
     return new Promise((resolve, reject) => {
       sessao.conn
         .on("ready", () => {
-          sessao.conn.shell({ term: "vt100" }, (err, canalSsh) => {
-            if (err) return reject(err);
+          // Alguns equipamentos recusam o pseudo-terminal ("Unable to open
+          // shell"); nesse caso tentamos de novo sem PTY antes de desistir.
+          const abrirShell = (
+            comPty: boolean,
+            cb: (err: Error | undefined, canal: ClientChannel) => void,
+          ) =>
+            comPty
+              ? sessao.conn.shell({ term: "vt100" }, cb as any)
+              : (sessao.conn.shell as any)(false, cb);
+
+          abrirShell(true, (erroPty, canalPty) => {
+            if (!erroPty) return montar(canalPty);
+            console.warn(
+              `[OLT] ${olt.nome}: shell com PTY recusado (${erroPty.message}); tentando sem PTY.`,
+            );
+            abrirShell(false, (erroSemPty, canalSemPty) => {
+              if (erroSemPty) {
+                // Último recurso: um canal por comando, sem shell nenhum.
+                console.warn(
+                  `[OLT] ${olt.nome}: shell recusado (${erroSemPty.message}); usando um canal por comando.`,
+                );
+                sessao.modo = "exec";
+                return resolve(sessao);
+              }
+              montar(canalSemPty);
+            });
+          });
+
+          function montar(canalSsh: ClientChannel) {
             const canal = canalDoSsh(canalSsh);
             sessao.canal = canal;
             canalSsh.on("data", (dados: Buffer) => {
@@ -75,7 +110,7 @@ export class SessaoOlt extends EventEmitter {
             // O equipamento cospe banner e prompt ao abrir a sessão; espera
             // isso terminar para não confundir com a resposta do 1º comando.
             sessao.aguardarSilencio(canal, 800).then(() => resolve(sessao));
-          });
+          }
         })
         .on("error", (err) => {
           sessao.viva = false;
@@ -167,6 +202,11 @@ export class SessaoOlt extends EventEmitter {
 
   /** Envia uma linha e devolve o controle sem esperar a resposta completa. */
   async send(texto: string, espera = 300): Promise<void> {
+    if (this.modo === "exec") {
+      // Sem shell não existe sessão contínua: comandos de contexto ("en",
+      // "cd onu") não fazem sentido aqui e são ignorados.
+      return;
+    }
     if (!this.canal) throw new Error("Sessão da OLT não está aberta.");
     // Ctrl+C não leva Enter junto.
     this.canal.escrever(texto === "\x03" ? texto : `${texto}\n`);
@@ -190,7 +230,10 @@ export class SessaoOlt extends EventEmitter {
   ): Promise<string> {
     const { silencio = 1200 } = opcoes;
     const execTimeout = opcoes.execTimeout ?? opcoes.timeout ?? 30000;
-    if (!this.canal) return Promise.reject(new Error("Sessão da OLT não está aberta."));
+
+    if (this.modo === "exec") return this.execCanalUnico(comando, execTimeout);
+    if (!this.canal)
+      return Promise.reject(new Error("Sessão da OLT não está aberta."));
     const canal = this.canal;
 
     return new Promise((resolve, reject) => {
@@ -230,6 +273,57 @@ export class SessaoOlt extends EventEmitter {
 
       canal.ouvir(aoReceber);
       canal.escrever(`${comando}\n`);
+    });
+  }
+
+  /**
+   * Roda o comando em um canal próprio. Sem shell não há prompt para esperar:
+   * a saída termina quando o equipamento fecha o canal.
+   */
+  private execCanalUnico(comando: string, execTimeout: number): Promise<string> {
+    const olt = this.config;
+    if (!olt) {
+      return Promise.reject(new Error("Sessão sem configuração do servidor."));
+    }
+
+    // O equipamento só aceita um canal exec por conexão: o segundo comando
+    // trava. Por isso cada comando abre e fecha a sua própria conexão.
+    return new Promise((resolve, reject) => {
+      const conn = new Client();
+      const limite = setTimeout(() => {
+        conn.end();
+        reject(new Error(`Tempo esgotado ao executar "${comando}".`));
+      }, execTimeout);
+
+      const encerrar = (erro?: Error, saida?: string) => {
+        clearTimeout(limite);
+        conn.end();
+        erro ? reject(erro) : resolve(saida ?? "");
+      };
+
+      conn
+        .on("ready", () => {
+          conn.exec(comando, (err, stream) => {
+            if (err) return encerrar(err);
+            let saida = "";
+            stream.on("data", (dados: Buffer) => (saida += dados.toString()));
+            stream.stderr?.on(
+              "data",
+              (dados: Buffer) => (saida += dados.toString()),
+            );
+            stream.on("close", () =>
+              encerrar(undefined, saida.split(String.fromCharCode(13)).join("")),
+            );
+          });
+        })
+        .on("error", (err) => encerrar(err))
+        .connect({
+          host: olt.host,
+          port: olt.porta,
+          username: olt.login,
+          password: olt.senha,
+          readyTimeout: 15000,
+        });
     });
   }
 
