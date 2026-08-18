@@ -37,6 +37,13 @@ export class StreamingAssinante {
   @Column({ type: "boolean", default: true })
   ativo!: boolean;
 
+  /**
+   * Assinatura de teste: quando chega esta data, o cadastro é removido da
+   * Watch Brasil automaticamente. Nulo = assinatura normal, sem prazo.
+   */
+  @Column({ type: "timestamp", nullable: true })
+  teste_expira_em!: Date | null;
+
   @Column({ type: "text", nullable: true })
   last_response!: string;
 

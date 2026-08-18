@@ -27,6 +27,8 @@ interface ListResponse {
   items: ContratoItem[];
   total: number;
   valoresUnitarios: Record<string, number>;
+  /** Preenchido quando a assinatura em curso é um teste com prazo. */
+  streamingTesteExpiraEm?: string | null;
 }
 
 // Planos de armazenamento das gravações (espelha o backend: cameraStoragePlans.ts).
@@ -53,6 +55,9 @@ export const SerContratos: React.FC = () => {
     email: "",
     phone: "",
   });
+  // Assinatura de teste: prazo em dias/horas/minutos (0 = sem prazo).
+  const [testeAtivo, setTesteAtivo] = useState(false);
+  const [teste, setTeste] = useState({ dias: 7, horas: 0, minutos: 0 });
   const [streamingFormError, setStreamingFormError] = useState<string | null>(
     null,
   );
@@ -246,6 +251,7 @@ export const SerContratos: React.FC = () => {
     await addServico(streamingFormTipo, {
       email: streamingForm.email.trim(),
       phone: streamingForm.phone.replace(/\D/g, ""),
+      ...(testeAtivo ? { teste } : {}),
     });
     setShowStreamingForm(false);
     setStreamingForm({ email: "", phone: "" });
@@ -255,6 +261,8 @@ export const SerContratos: React.FC = () => {
     setStreamingFormError(null);
     setStreamingFormTipo(tipo);
     setStreamingForm({ email: "", phone: "" });
+    setTesteAtivo(false);
+    setTeste({ dias: 7, horas: 0, minutos: 0 });
     setShowStreamingForm(true);
   };
 
@@ -413,6 +421,15 @@ export const SerContratos: React.FC = () => {
                     Pago R$ {(loaded.valoresUnitarios.STREAMER ?? 44.9).toFixed(2)} ·
                     Colaborador grátis — máx. 1 por cliente
                   </p>
+                  {loaded.streamingTesteExpiraEm && (
+                    <div className="mb-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                      <b>Teste até</b>{" "}
+                      {new Date(loaded.streamingTesteExpiraEm).toLocaleString(
+                        "pt-BR",
+                      )}
+                      . Depois disso o cadastro sai da Watch Brasil sozinho.
+                    </div>
+                  )}
                   {temStreaming && (
                     <div className="flex items-center bg-purple-50 p-2 rounded mb-2">
                       <span className="text-sm text-purple-800 font-semibold">
@@ -647,6 +664,47 @@ export const SerContratos: React.FC = () => {
                     className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
+              </div>
+
+              <div className="mt-4 rounded border border-amber-300 bg-amber-50 p-3">
+                <label className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                  <input
+                    type="checkbox"
+                    checked={testeAtivo}
+                    onChange={(e) => setTesteAtivo(e.target.checked)}
+                  />
+                  Liberar como período de teste
+                </label>
+                {testeAtivo && (
+                  <>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {(["dias", "horas", "minutos"] as const).map((campo) => (
+                        <div key={campo}>
+                          <label className="block text-xs font-medium text-amber-900 mb-1 capitalize">
+                            {campo}
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={teste[campo]}
+                            onChange={(e) =>
+                              setTeste((t) => ({
+                                ...t,
+                                [campo]: Math.max(0, Number(e.target.value) || 0),
+                              }))
+                            }
+                            className="w-full p-2 border border-amber-300 rounded focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-amber-800">
+                      Sem cobrança na mensalidade. Quando o prazo acabar, o
+                      cadastro é removido da Watch Brasil e o serviço sai do
+                      contrato automaticamente.
+                    </p>
+                  </>
+                )}
               </div>
 
               {streamingFormError && (

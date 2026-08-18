@@ -46,11 +46,18 @@ class SerContratos {
         order: { id: "ASC" },
       });
       const total = items.reduce((a, c) => a + Number(c.valor || 0), 0);
+
+      // Assinatura de teste em andamento, para a tela mostrar o prazo.
+      const assinante = await AppDataSource.getRepository(
+        StreamingAssinante,
+      ).findOne({ where: { login } });
+
       res.json({
         login,
         items,
         total: Number(total.toFixed(2)),
         valoresUnitarios: VALORES,
+        streamingTesteExpiraEm: assinante?.teste_expira_em ?? null,
       });
     } catch (error: any) {
       console.error("Erro ao listar sercontratos:", error);
@@ -68,6 +75,7 @@ class SerContratos {
         phone: phoneForm,
         replace,
         storageGb,
+        teste,
       } = req.body as {
         login?: string;
         tipo?: string;
@@ -76,6 +84,8 @@ class SerContratos {
         phone?: string;
         replace?: boolean;
         storageGb?: number;
+        /** Assinatura de teste: prazo em dias/horas/minutos. */
+        teste?: { dias?: number; horas?: number; minutos?: number };
       };
       const usuario = (req as any).user?.username || "sistema";
 
@@ -93,6 +103,22 @@ class SerContratos {
         });
         return;
       }
+
+      // Assinatura de teste: some sozinha quando o prazo acaba.
+      const minutosTeste =
+        (Math.max(0, Number(teste?.dias) || 0) * 24 * 60) +
+        (Math.max(0, Number(teste?.horas) || 0) * 60) +
+        Math.max(0, Number(teste?.minutos) || 0);
+      if (minutosTeste > 0 && !STREAMING_TYPES.has(tipoNorm)) {
+        res.status(400).json({
+          message: "Período de teste só vale para os serviços de streaming.",
+        });
+        return;
+      }
+      const expiraTeste =
+        minutosTeste > 0
+          ? new Date(Date.now() + minutosTeste * 60_000)
+          : null;
 
       const ClientRepo = MkauthSource.getRepository(ClientesEntities);
       const cliente = await ClientRepo.findOne({ where: { login } });
@@ -264,8 +290,11 @@ class SerContratos {
       const qtd = Math.max(1, Math.min(Number(quantidade) || 1, 20));
       // CAMERA: o valor cobrado vem do plano de armazenamento escolhido
       // (5GB=R$20, 10GB=R$30, 15GB=R$35, 20GB=R$40). Demais tipos: valor fixo.
-      const valorUnitario =
-        tipoNorm === "CAMERA"
+      const valorUnitario = expiraTeste
+        ? // Teste não entra na mensalidade; se o cliente ficar, o serviço é
+          // recadastrado depois pelo valor cheio.
+          0
+        : tipoNorm === "CAMERA"
           ? planFor(normalizeStorageGb(storageGb))!.priceBRL
           : VALORES[tipoNorm];
 
@@ -324,6 +353,7 @@ class SerContratos {
           assinante.ticket = ticket || assinante.ticket;
           assinante.chave = chave || assinante.chave;
           assinante.ativo = true;
+          assinante.teste_expira_em = expiraTeste;
           assinante.last_response = JSON.stringify(apiResp).slice(0, 2000);
           await streamingRepo.save(assinante);
           streamingInfo = { ticket, chave, assinante };
@@ -394,9 +424,12 @@ class SerContratos {
 
       const faturasLimpeza = (res as any).locals?.faturasLimpeza;
       res.status(201).json({
-        message: `${saved.length} item(ns) adicionado(s).`,
+        message: expiraTeste
+          ? `Teste liberado até ${expiraTeste.toLocaleString("pt-BR")}.`
+          : `${saved.length} item(ns) adicionado(s).`,
         items: saved,
         streaming: streamingInfo,
+        teste_expira_em: expiraTeste,
         ...(faturasLimpeza ? { faturasLimpeza } : {}),
       });
     } catch (error: any) {
