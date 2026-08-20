@@ -166,6 +166,16 @@ class SolicitacaoServicoController {
             ? (chamadoStatusMap[s.id_chamado] ?? null)
             : null,
           origem: s.dados?.origem === "web" ? "web" : "bot",
+          // Solicitação do site não recebe WhatsApp: o atendente copia os
+          // links direto da linha e envia como preferir.
+          links_envio:
+            s.dados?.origem === "web"
+              ? {
+                  assinatura: s.dados?.sign_url ?? null,
+                  pix: s.dados?.pix_link ?? null,
+                  valor: s.dados?.pix_valor ?? null,
+                }
+              : null,
           link: link
             ? {
                 id: link.id,
@@ -362,6 +372,12 @@ class SolicitacaoServicoController {
 
           links.pix = pixData.link;
           links.valor = String(lancamento.valor);
+          solicitacao.dados = {
+            ...solicitacao.dados,
+            pix_link: pixData.link,
+            pix_valor: String(lancamento.valor),
+          };
+          await repository.save(solicitacao);
 
           if (!origemWeb) {
             await MensagensComuns(
@@ -383,6 +399,9 @@ class SolicitacaoServicoController {
         await repository.save(solicitacao);
 
         links.assinatura = zapSignUrl;
+        // Fica salvo para a listagem oferecer o link depois.
+        solicitacao.dados = { ...solicitacao.dados, sign_url: zapSignUrl };
+        await repository.save(solicitacao);
 
         if (!origemWeb) {
           await MensagensComuns(
@@ -612,6 +631,9 @@ class SolicitacaoServicoController {
       await repository.save(solicitacao);
 
       links.assinatura = zapSignUrl;
+      // Fica salvo para a listagem oferecer o link depois.
+      solicitacao.dados = { ...solicitacao.dados, sign_url: zapSignUrl };
+      await repository.save(solicitacao);
 
       if (!origemWeb) {
         await MensagensComuns(
@@ -705,6 +727,12 @@ class SolicitacaoServicoController {
 
       links.pix = pixData.link;
       links.valor = valorFormatado;
+      solicitacao.dados = {
+        ...solicitacao.dados,
+        pix_link: pixData.link,
+        pix_valor: valorFormatado,
+      };
+      await repository.save(solicitacao);
 
       // Enviar mensagens ao cliente
       if (!origemWeb) {
@@ -1079,6 +1107,8 @@ class SolicitacaoServicoController {
 
       solicitacao.dados = {
         ...dados,
+        // Guardado para a listagem oferecer o link ao atendente.
+        sign_url: zapSignUrl,
         enviadoManualmente: {
           data: new Date().toISOString(),
           usuario: req.user?.login || null,
@@ -1248,6 +1278,8 @@ class SolicitacaoServicoController {
 
       solicitacao.dados = {
         ...(solicitacao.dados || {}),
+        // Guardado para a listagem oferecer o link ao atendente.
+        sign_url: zapSignUrl,
         geradoManualmente: {
           data: new Date().toISOString(),
           usuario: req.user?.login || null,

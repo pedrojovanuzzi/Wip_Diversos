@@ -447,7 +447,7 @@ const SolicitacoesServico = () => {
         { criarCadastro },
         { headers: { Authorization: `Bearer ${user?.token}` } },
       );
-      alert(response.data?.message || "Contrato enviado com sucesso!");
+      tratarResposta(response.data, "Contrato enviado com sucesso!");
       fetchServices(page);
     } catch (error: any) {
       console.error("Erro ao enviar assinatura:", error);
@@ -889,6 +889,40 @@ const SolicitacoesServico = () => {
                       <span className="px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-gray-100 text-gray-800">
                         Pendente
                       </span>
+                    )}
+
+                    {/* Solicitação do site: o cliente não recebe WhatsApp, então
+                        o link fica aqui para o atendente enviar. */}
+                    {service.links_envio?.assinatura && !service.assinado && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        sx={{ mt: 0.5, display: "block", textTransform: "none" }}
+                        onClick={() =>
+                          copiarLinkWeb(service.links_envio.assinatura)
+                        }
+                      >
+                        {linkCopiado === service.links_envio.assinatura
+                          ? "Copiado!"
+                          : "Copiar contrato"}
+                      </Button>
+                    )}
+                    {service.links_envio?.pix && !service.pago && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="success"
+                        sx={{ mt: 0.5, display: "block", textTransform: "none" }}
+                        onClick={() => copiarLinkWeb(service.links_envio.pix)}
+                      >
+                        {linkCopiado === service.links_envio.pix
+                          ? "Copiado!"
+                          : `Copiar Pix${
+                              service.links_envio.valor
+                                ? ` (R$ ${service.links_envio.valor})`
+                                : ""
+                            }`}
+                      </Button>
                     )}
                   </TableCell>
                   <TableCell>
