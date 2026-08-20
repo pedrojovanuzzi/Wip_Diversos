@@ -96,6 +96,14 @@ const SolicitacoesServico = () => {
   const [manualContratoReaproveitado, setManualContratoReaproveitado] = useState(false);
   const [manualContratoLastService, setManualContratoLastService] = useState<any | null>(null);
   const [manualRegenerarPendente, setManualRegenerarPendente] = useState(false);
+  // Solicitações do site não recebem WhatsApp: os links ficam aqui para o
+  // atendente copiar e enviar pelo canal que combinar com o cliente.
+  const [linksWeb, setLinksWeb] = useState<{
+    pix?: string;
+    assinatura?: string;
+    valor?: string;
+  } | null>(null);
+  const [linkCopiado, setLinkCopiado] = useState<string | null>(null);
   const { user } = useAuth();
 
   const fetchServices = useCallback(
@@ -181,6 +189,22 @@ const SolicitacoesServico = () => {
     }
   };
 
+  /** Abre o quadro de links quando a solicitação veio do site. */
+  const tratarResposta = (data: any, mensagemPadrao: string) => {
+    const temLink = data?.links?.pix || data?.links?.assinatura;
+    if (data?.origemWeb && temLink) {
+      setLinksWeb(data.links);
+      return;
+    }
+    alert(data?.message || mensagemPadrao);
+  };
+
+  const copiarLinkWeb = async (link: string) => {
+    await navigator.clipboard.writeText(link);
+    setLinkCopiado(link);
+    setTimeout(() => setLinkCopiado(null), 2000);
+  };
+
   const handleConsultarCpf = async (id: number) => {
     if (!window.confirm("Deseja realizar a consulta de CPF agora?")) return;
     setLoadingAction(id);
@@ -190,9 +214,9 @@ const SolicitacoesServico = () => {
         {},
         { headers: { Authorization: `Bearer ${user?.token}` } },
       );
-      alert(
-        response.data?.message ||
-          "Consulta finalizada com sucesso! O cliente receberá o retorno no WhatsApp.",
+      tratarResposta(
+        response.data,
+        "Consulta finalizada com sucesso! O cliente receberá o retorno no WhatsApp.",
       );
       fetchServices(page);
     } catch (error: any) {
@@ -211,12 +235,13 @@ const SolicitacoesServico = () => {
       return;
     setLoadingAction(id);
     try {
-      await axios.post(
+      const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/solicitacao-servico/ignorar-consulta/${id}`,
         {},
         { headers: { Authorization: `Bearer ${user?.token}` } },
       );
-      alert(
+      tratarResposta(
+        resposta.data,
         "Solicitação aprovada como GRÁTIS! O contrato foi enviado ao cliente.",
       );
       fetchServices(page);
@@ -272,7 +297,8 @@ const SolicitacoesServico = () => {
       );
 
       const devePagar = response.data?.devePagar;
-      alert(
+      tratarResposta(
+        response.data,
         devePagar
           ? "Consulta manual concluída. O cliente foi avisado sobre a cobrança e receberá o PIX."
           : "Consulta manual concluída. O cliente foi avisado e recebeu o link para assinatura.",
@@ -581,12 +607,15 @@ const SolicitacoesServico = () => {
 
     setLoadingAction(instalacaoPagaTarget.id);
     try {
-      await axios.post(
+      const resposta = await axios.post(
         `${process.env.REACT_APP_URL}/solicitacao-servico/instalacao-paga/${instalacaoPagaTarget.id}`,
         { valor: instalacaoPagaValor },
         { headers: { Authorization: `Bearer ${user?.token}` } },
       );
-      alert("PIX de instalação enviado ao cliente com sucesso!");
+      tratarResposta(
+        resposta.data,
+        "PIX de instalação enviado ao cliente com sucesso!",
+      );
       handleCloseInstalacaoPaga();
       fetchServices(page);
     } catch (error: any) {
@@ -1258,6 +1287,63 @@ const SolicitacoesServico = () => {
             >
               Gerar Contrato
             </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={!!linksWeb}
+          onClose={() => setLinksWeb(null)}
+          fullWidth
+          maxWidth="sm"
+        >
+          <DialogTitle>Links para enviar ao cliente</DialogTitle>
+          <DialogContent dividers>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Esta solicitação veio do site, então o bot não enviou nada pelo
+              WhatsApp. Copie os links abaixo e encaminhe ao cliente.
+            </Alert>
+
+            {linksWeb?.pix && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" fontWeight={700}>
+                  Pagamento via Pix
+                  {linksWeb.valor ? ` — R$ ${linksWeb.valor}` : ""}
+                </Typography>
+                <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
+                  {linksWeb.pix}
+                </Typography>
+                <Button
+                  size="small"
+                  sx={{ mt: 0.5 }}
+                  onClick={() => copiarLinkWeb(linksWeb.pix as string)}
+                >
+                  {linkCopiado === linksWeb.pix ? "Copiado!" : "Copiar link do Pix"}
+                </Button>
+              </Box>
+            )}
+
+            {linksWeb?.assinatura && (
+              <Box>
+                <Typography variant="body2" fontWeight={700}>
+                  Contrato para assinatura
+                </Typography>
+                <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
+                  {linksWeb.assinatura}
+                </Typography>
+                <Button
+                  size="small"
+                  sx={{ mt: 0.5 }}
+                  onClick={() => copiarLinkWeb(linksWeb.assinatura as string)}
+                >
+                  {linkCopiado === linksWeb.assinatura
+                    ? "Copiado!"
+                    : "Copiar link do contrato"}
+                </Button>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setLinksWeb(null)}>Fechar</Button>
           </DialogActions>
         </Dialog>
 

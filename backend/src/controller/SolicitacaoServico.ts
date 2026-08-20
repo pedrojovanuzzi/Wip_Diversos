@@ -22,6 +22,15 @@ import { ServiceLink } from "../entities/ServiceLink";
 import { listarServicos } from "./servicoWeb/catalogo";
 import { etapaAtual } from "./servicoWeb/ServiceLink";
 
+/**
+ * Solicitação vinda do site não tem conversa aberta no WhatsApp: o bot não
+ * deve falar com o cliente. Os links voltam na resposta para o atendente
+ * enviar pelo canal que quiser.
+ */
+function veioDaWeb(solicitacao: SolicitacaoServico): boolean {
+  return (solicitacao.dados as any)?.origem === "web";
+}
+
 class SolicitacaoServicoController {
   private isConsultaCpfConcluida(solicitacao: SolicitacaoServico): boolean {
     return Boolean(
@@ -304,6 +313,10 @@ class SolicitacaoServicoController {
         },
       };
 
+      // Web: nada de WhatsApp; os links voltam para o atendente enviar.
+      const origemWeb = veioDaWeb(solicitacao);
+      const links: { pix?: string; assinatura?: string; valor?: string } = {};
+
       if (consulta.devePagar) {
         // Fluxo Pago
         solicitacao.pago = false;
@@ -323,10 +336,12 @@ class SolicitacaoServicoController {
         }
         await repository.save(solicitacao);
 
-        await MensagensComuns(
-          celular,
-          `🔍 *Após análise*, informamos que no momento não foi liberada a instalação na modalidade *grátis*.\n💰 Caso tenha interesse em dar continuidade, a instalação pode ser realizada na forma *paga*.\n*Taxa de Instalação:* R$ 350,00`,
-        );
+        if (!origemWeb) {
+          await MensagensComuns(
+            celular,
+            `🔍 *Após análise*, informamos que no momento não foi liberada a instalação na modalidade *grátis*.\n💰 Caso tenha interesse em dar continuidade, a instalação pode ser realizada na forma *paga*.\n*Taxa de Instalação:* R$ 350,00`,
+          );
+        }
 
         // Gerar lançamento no MKAuth
         const lancamento = await gerarLancamentoServico(
@@ -345,10 +360,15 @@ class SolicitacaoServicoController {
             cpf: cpf,
           });
 
-          await MensagensComuns(
-            celular,
-            `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}`,
-          );
+          links.pix = pixData.link;
+          links.valor = String(lancamento.valor);
+
+          if (!origemWeb) {
+            await MensagensComuns(
+              celular,
+              `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}`,
+            );
+          }
         }
       } else {
         // Fluxo Grátis
@@ -362,20 +382,31 @@ class SolicitacaoServicoController {
         solicitacao.token_zapsign = zapResponse.token;
         await repository.save(solicitacao);
 
-        await MensagensComuns(
-          celular,
-          `✅ *Parabéns!* Sua instalação será *Isenta* de taxa de adesão! 🚀`,
-        );
+        links.assinatura = zapSignUrl;
+
+        if (!origemWeb) {
+          await MensagensComuns(
+            celular,
+            `✅ *Parabéns!* Sua instalação será *Isenta* de taxa de adesão! 🚀`,
+          );
+        }
 
         if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
 
-        await MensagensComuns(
-          celular,
-          `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
-        );
+        if (!origemWeb) {
+          await MensagensComuns(
+            celular,
+            `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
+          );
+        }
       }
 
-      res.status(200).json({ success: true, devePagar: consulta.devePagar });
+      res.status(200).json({
+        success: true,
+        devePagar: consulta.devePagar,
+        origemWeb,
+        links,
+      });
     } catch (error) {
       console.error("Erro ao consultar CPF manualmente:", error);
       res.status(500).json({ message: "Erro interno ao processar consulta" });
@@ -424,6 +455,9 @@ class SolicitacaoServicoController {
 
       const dados = (solicitacao.dados || {}) as any;
       const celular = dados.telefone_conversa;
+      // Solicitação do site: os links vão para a tela, não para o WhatsApp.
+      const origemWeb = veioDaWeb(solicitacao);
+      const links: { pix?: string; assinatura?: string; valor?: string } = {};
 
       const consultCenter = new ConsultCenterService();
       const consulta = await consultCenter.consultarDebitos(cpf);
@@ -469,10 +503,12 @@ class SolicitacaoServicoController {
         }
         await repository.save(solicitacao);
 
-        await MensagensComuns(
-          celular,
-          `🔍 *Após análise*, informamos que no momento não foi liberada a instalação na modalidade *grátis*.\n💰 Caso tenha interesse em dar continuidade, a instalação pode ser realizada na forma *paga*.\n*Taxa de Instalação:* R$ 350,00`,
-        );
+        if (!origemWeb) {
+          await MensagensComuns(
+            celular,
+            `🔍 *Após análise*, informamos que no momento não foi liberada a instalação na modalidade *grátis*.\n💰 Caso tenha interesse em dar continuidade, a instalação pode ser realizada na forma *paga*.\n*Taxa de Instalação:* R$ 350,00`,
+          );
+        }
 
         const lancamento = await gerarLancamentoServico(
           { cpf: cpf, login: solicitacao.login_cliente },
@@ -490,10 +526,12 @@ class SolicitacaoServicoController {
             cpf: cpf,
           });
 
-          await MensagensComuns(
-            celular,
-            `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}`,
-          );
+          if (!origemWeb) {
+            await MensagensComuns(
+              celular,
+              `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${lancamento.valor}\n\n🔗 *Link para QR Code:* ${pixData.link}`,
+            );
+          }
         }
       } else {
         solicitacao.pago = true;
@@ -512,20 +550,29 @@ class SolicitacaoServicoController {
         solicitacao.token_zapsign = zapResponse.token;
         await repository.save(solicitacao);
 
-        await MensagensComuns(
-          celular,
-          `✅ *Ótima notícia!* Sua instalação foi aprovada com *Isenção* de taxa! 🚀`,
-        );
+        if (!origemWeb) {
+          await MensagensComuns(
+            celular,
+            `✅ *Ótima notícia!* Sua instalação foi aprovada com *Isenção* de taxa! 🚀`,
+          );
+        }
 
         if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
 
-        await MensagensComuns(
-          celular,
-          `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
-        );
+        if (!origemWeb) {
+          await MensagensComuns(
+            celular,
+            `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
+          );
+        }
       }
 
-      res.status(200).json({ success: true, devePagar: consulta.devePagar });
+      res.status(200).json({
+        success: true,
+        devePagar: consulta.devePagar,
+        origemWeb,
+        links,
+      });
     } catch (error) {
       console.error("Erro ao consultar CPF manualmente com nome:", error);
       res.status(500).json({ message: "Erro interno ao processar consulta" });
@@ -550,6 +597,9 @@ class SolicitacaoServicoController {
 
       const dados = solicitacao.dados as any;
       const celular = dados.telefone_conversa;
+      // Solicitação do site: os links vão para a tela, não para o WhatsApp.
+      const origemWeb = veioDaWeb(solicitacao);
+      const links: { pix?: string; assinatura?: string; valor?: string } = {};
 
       // Marcar como grátis
       solicitacao.pago = true;
@@ -561,19 +611,25 @@ class SolicitacaoServicoController {
       solicitacao.token_zapsign = zapResponse.token;
       await repository.save(solicitacao);
 
-      await MensagensComuns(
-        celular,
-        `✅ *Ótima notícia!* Sua instalação foi aprovada com *Isenção* de taxa! 🚀`,
-      );
+      links.assinatura = zapSignUrl;
+
+      if (!origemWeb) {
+        await MensagensComuns(
+          celular,
+          `✅ *Ótima notícia!* Sua instalação foi aprovada com *Isenção* de taxa! 🚀`,
+        );
+      }
 
       if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
 
-      await MensagensComuns(
-        celular,
-        `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
-      );
+      if (!origemWeb) {
+        await MensagensComuns(
+          celular,
+          `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`,
+        );
+      }
 
-      res.status(200).json({ success: true });
+      res.status(200).json({ success: true, origemWeb, links });
     } catch (error) {
       console.error("Erro ao ignorar consulta:", error);
       res.status(500).json({ message: "Erro interno ao processar" });
@@ -600,6 +656,9 @@ class SolicitacaoServicoController {
 
       const dados = (solicitacao.dados || {}) as any;
       const celular = dados.telefone_conversa;
+      // Solicitação do site: os links vão para a tela, não para o WhatsApp.
+      const origemWeb = veioDaWeb(solicitacao);
+      const links: { pix?: string; assinatura?: string; valor?: string } = {};
       const cpf = (dados.cpf || "").replace(/\D/g, "");
       const loginCliente = solicitacao.login_cliente || dados.login || "novo_cliente";
       const nomeCliente = dados.nome || loginCliente;
@@ -644,20 +703,27 @@ class SolicitacaoServicoController {
         cpf: cpf,
       });
 
-      // Enviar mensagens ao cliente
-      await MensagensComuns(
-        celular,
-        `📋 *Olá ${dados.nome || ""}!* Após análise da sua solicitação de instalação, identificamos que a sua região possui *dificuldade de acesso*, o que gera uma taxa adicional.\n\n💰 *Taxa de Instalação:* R$ ${valorFormatado}\n\nCaso tenha interesse em prosseguir, realize o pagamento via PIX abaixo e o contrato será enviado automaticamente após a confirmação.`,
-      );
+      links.pix = pixData.link;
+      links.valor = valorFormatado;
 
-      await MensagensComuns(
-        celular,
-        `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${valorFormatado}\n\n🔗 *Link para QR Code:* ${pixData.link}`,
-      );
+      // Enviar mensagens ao cliente
+      if (!origemWeb) {
+        await MensagensComuns(
+          celular,
+          `📋 *Olá ${dados.nome || ""}!* Após análise da sua solicitação de instalação, identificamos que a sua região possui *dificuldade de acesso*, o que gera uma taxa adicional.\n\n💰 *Taxa de Instalação:* R$ ${valorFormatado}\n\nCaso tenha interesse em prosseguir, realize o pagamento via PIX abaixo e o contrato será enviado automaticamente após a confirmação.`,
+        );
+      }
+
+      if (!origemWeb) {
+        await MensagensComuns(
+          celular,
+          `✨ *Aqui está seu PIX para pagamento da Taxa de Instalação:*\n\n💰 *Valor:* R$ ${valorFormatado}\n\n🔗 *Link para QR Code:* ${pixData.link}`,
+        );
+      }
 
       if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
 
-      res.status(200).json({ success: true });
+      res.status(200).json({ success: true, origemWeb, links });
     } catch (error) {
       console.error("Erro ao processar instalação paga:", error);
       res.status(500).json({ message: "Erro interno ao processar instalação paga." });
@@ -1023,8 +1089,10 @@ class SolicitacaoServicoController {
       await repository.save(solicitacao);
 
       // Envia o link de assinatura ao cliente via WhatsApp
+      // Solicitação do site não tem conversa no WhatsApp: o link volta na resposta.
+      const origemWebAssinatura = veioDaWeb(solicitacao);
       const msgAssinatura = `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`;
-      await MensagensComuns(celular, msgAssinatura);
+      if (!origemWebAssinatura) await MensagensComuns(celular, msgAssinatura);
 
       // Salva a mensagem no histórico de conversas
       try {
@@ -1066,8 +1134,12 @@ class SolicitacaoServicoController {
 
       res.status(200).json({
         success: true,
-        message: `${partes.join(" e ")} com sucesso.`,
+        message: origemWebAssinatura
+          ? `${partes.join(" e ")}. Envie o link ao cliente.`
+          : `${partes.join(" e ")} com sucesso.`,
         login_cliente: solicitacao.login_cliente,
+        origemWeb: origemWebAssinatura,
+        links: { assinatura: zapSignUrl },
       });
     } catch (error: any) {
       console.error("Erro ao enviar assinatura:", error);
