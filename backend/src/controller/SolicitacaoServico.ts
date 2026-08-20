@@ -262,6 +262,70 @@ class SolicitacaoServicoController {
     }
   };
 
+  /**
+   * GET /:id/links
+   * Links guardados da solicitação para o atendente enviar ao cliente. Se o
+   * contrato existe no ZapSign mas o link não foi salvo (solicitações
+   * anteriores a este recurso), busca lá e guarda.
+   */
+  public linksEnvio = async (req: Request, res: Response) => {
+    try {
+      const repository = AppDataSource.getRepository(SolicitacaoServico);
+      const solicitacao = await repository.findOne({
+        where: { id: Number(req.params.id) },
+      });
+      if (!solicitacao) {
+        res.status(404).json({ message: "Solicitação não encontrada" });
+        return;
+      }
+
+      const dados = (solicitacao.dados || {}) as any;
+      const links: { assinatura?: string; pix?: string; valor?: string } = {};
+
+      if (dados.pix_link) {
+        links.pix = dados.pix_link;
+        links.valor = dados.pix_valor;
+      }
+
+      if (dados.sign_url) {
+        links.assinatura = dados.sign_url;
+      } else if (solicitacao.token_zapsign) {
+        const baseUrl =
+          process.env.SERVIDOR_HOMOLOGACAO === "true"
+            ? "https://sandbox.api.zapsign.com.br"
+            : "https://api.zapsign.com.br";
+        try {
+          const doc = await axios.get(
+            `${baseUrl}/api/v1/docs/${solicitacao.token_zapsign}/`,
+            {
+              headers: { Authorization: `Bearer ${process.env.ZAPSIGN_TOKEN}` },
+            },
+          );
+          const url = doc.data?.signers?.[0]?.sign_url;
+          if (url) {
+            links.assinatura = url;
+            solicitacao.dados = { ...dados, sign_url: url };
+            await repository.save(solicitacao);
+          }
+        } catch (e: any) {
+          console.error(
+            "[LinksEnvio] Falha ao buscar o contrato no ZapSign:",
+            e?.response?.data || e?.message,
+          );
+        }
+      }
+
+      res.status(200).json({
+        links,
+        assinado: !!solicitacao.assinado,
+        pago: !!solicitacao.pago,
+      });
+    } catch (error) {
+      console.error("Erro ao buscar links da solicitação:", error);
+      res.status(500).json({ message: "Erro ao buscar os links." });
+    }
+  };
+
   public consultarCpf = async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     try {

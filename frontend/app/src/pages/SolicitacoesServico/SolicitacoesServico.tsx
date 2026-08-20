@@ -199,6 +199,29 @@ const SolicitacoesServico = () => {
     alert(data?.message || mensagemPadrao);
   };
 
+  /** Abre os links guardados da solicitação (origem web). */
+  const abrirLinksSalvos = async (service: any) => {
+    setLoadingAction(service.id);
+    try {
+      const { data } = await axios.get(
+        `${process.env.REACT_APP_URL}/solicitacao-servico/${service.id}/links`,
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+      );
+      const temLink = data?.links?.pix || data?.links?.assinatura;
+      if (!temLink) {
+        alert(
+          "Nenhum link foi gerado ainda para esta solicitação. Faça a consulta de CPF ou gere o contrato manualmente.",
+        );
+        return;
+      }
+      setLinksWeb(data.links);
+    } catch (e: any) {
+      alert(e?.response?.data?.message || "Erro ao buscar os links.");
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
   const copiarLinkWeb = async (link: string) => {
     await navigator.clipboard.writeText(link);
     setLinkCopiado(link);
@@ -977,6 +1000,22 @@ const SolicitacoesServico = () => {
                           Info
                         </Button>
                       </Tooltip>
+                      {service.origem === "web" && (
+                        <Tooltip title="Mostrar os links de contrato e Pix para enviar ao cliente" arrow>
+                          <span>
+                            <Button
+                              variant="outlined"
+                              color="secondary"
+                              size="small"
+                              sx={{ textTransform: "none" }}
+                              disabled={loadingAction === service.id}
+                              onClick={() => abrirLinksSalvos(service)}
+                            >
+                              Links
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      )}
                       {service.servico === "Instalação" && !service.pago && !service.gratis && (
                         <>
                           {!service.consulta_cpf_realizada && (
