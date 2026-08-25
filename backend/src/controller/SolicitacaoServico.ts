@@ -235,6 +235,8 @@ class SolicitacaoServicoController {
             link_id: l.id,
             token: l.token,
             servico: servicoWeb?.nome ?? l.servico,
+            // Serviços com par de links: a tela mostra de quem é cada link.
+            papel: l.papel ?? null,
             // Em que ponto o cliente parou: cada serviço tem etapas diferentes.
             etapa: servicoWeb ? etapaAtual(l, servicoWeb) : null,
             cliente: l.nome_cliente || l.login_cliente || null,

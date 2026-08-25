@@ -55,6 +55,12 @@ const rotuloPagamento = (service: any): string => {
   return "Sem cobrança";
 };
 
+/** Serviços com par de links: identifica de quem é cada link. */
+const PAPEL_LABEL: Record<string, string> = {
+  titular: "titular atual",
+  novo_titular: "novo titular",
+};
+
 const PAGAMENTO_CLASSE: Record<string, string> = {
   Grátis: "bg-blue-100 text-blue-800",
   Pago: "bg-green-100 text-green-800",
@@ -765,7 +771,18 @@ const SolicitacoesServico = () => {
                       variant="outlined"
                     />
                   </TableCell>
-                  <TableCell>{l.servico}</TableCell>
+                  <TableCell>
+                    {l.servico}
+                    {PAPEL_LABEL[l.papel] && (
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        color={l.papel === "titular" ? "default" : "secondary"}
+                        label={PAPEL_LABEL[l.papel]}
+                        sx={{ ml: 0.5, height: 20, fontSize: "0.7rem" }}
+                      />
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Chip label="web" size="small" variant="outlined" />
                   </TableCell>
