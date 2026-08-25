@@ -61,6 +61,21 @@ const PAPEL_LABEL: Record<string, string> = {
   novo_titular: "novo titular",
 };
 
+/**
+ * A tabela mistura links e solicitações, cada um com textos de tamanhos bem
+ * diferentes. Altura fixa e truncamento com tooltip mantêm todas as linhas do
+ * mesmo tamanho sem perder informação.
+ */
+const LINHA_FIXA = { height: 72 } as const;
+
+const TRUNCAR = {
+  display: "block",
+  maxWidth: 200,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+} as const;
+
 const PAGAMENTO_CLASSE: Record<string, string> = {
   Grátis: "bg-blue-100 text-blue-800",
   Pago: "bg-green-100 text-green-800",
@@ -735,26 +750,54 @@ const SolicitacoesServico = () => {
           </FormControl>
         </Box>
 
-        <TableContainer component={Paper} elevation={3}>
-          <Table>
-            <TableHead className="bg-slate-200">
+        <TableContainer
+          component={Paper}
+          elevation={3}
+          // Lista longa rola dentro do quadro, com o cabeçalho sempre visível.
+          sx={{ maxHeight: "calc(100vh - 320px)" }}
+        >
+          <Table
+            size="small"
+            stickyHeader
+            sx={{
+              // Altura uniforme: o conteúdo de cada célula fica centralizado e
+              // nenhuma linha estica por causa de um texto maior.
+              "& .MuiTableCell-root": {
+                py: 1,
+                verticalAlign: "middle",
+              },
+              // Zebra ajuda a seguir a linha até a coluna de ações.
+              "& tbody tr:nth-of-type(odd)": {
+                backgroundColor: "action.hover",
+              },
+              "& tbody tr:hover": {
+                backgroundColor: "action.selected",
+              },
+              // Cabeçalho fixo precisa de fundo próprio, senão as linhas
+              // aparecem por baixo ao rolar.
+              "& thead th": {
+                backgroundColor: "background.paper",
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+              },
+            }}
+          >
+            <TableHead>
               <TableRow>
-                <TableCell className="text-white font-bold">ID</TableCell>
-                <TableCell className="text-white font-bold">Serviço</TableCell>
-                <TableCell className="text-white font-bold">Origem</TableCell>
-                <TableCell className="text-white font-bold">
-                  Status de Pagamento
+                <TableCell>ID</TableCell>
+                <TableCell>Serviço</TableCell>
+                <TableCell>Origem</TableCell>
+                <TableCell>
+                  Pagamento
                 </TableCell>
-                <TableCell className="text-white font-bold">Cliente</TableCell>
-                <TableCell className="text-white font-bold">
-                  Data Solicitação
+                <TableCell>Cliente</TableCell>
+                <TableCell>Data</TableCell>
+                <TableCell>
+                  Assinatura
                 </TableCell>
-                <TableCell className="text-white font-bold">
-                  Status de Assinatura
-                </TableCell>
-                <TableCell className="text-white font-bold">Consulta CPF</TableCell>
-                <TableCell className="text-white font-bold">Status</TableCell>
-                <TableCell className="text-white font-bold">Ações</TableCell>
+                <TableCell>CPF</TableCell>
+                <TableCell>Chamado</TableCell>
+                <TableCell>Ações</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -762,7 +805,7 @@ const SolicitacoesServico = () => {
                 if (linha.tipo === "link") {
                   const l: any = linha.item;
                   return (
-                <TableRow key={`link-${l.link_id}`} hover>
+                <TableRow key={`link-${l.link_id}`} hover sx={LINHA_FIXA}>
                   <TableCell>
                     <Chip
                       label="Link enviado"
@@ -772,14 +815,18 @@ const SolicitacoesServico = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    {l.servico}
+                    <Tooltip title={l.servico}>
+                      <Box component="span" sx={{ ...TRUNCAR, maxWidth: 150 }}>
+                        {l.servico}
+                      </Box>
+                    </Tooltip>
                     {PAPEL_LABEL[l.papel] && (
                       <Chip
                         size="small"
                         variant="outlined"
                         color={l.papel === "titular" ? "default" : "secondary"}
                         label={PAPEL_LABEL[l.papel]}
-                        sx={{ ml: 0.5, height: 20, fontSize: "0.7rem" }}
+                        sx={{ height: 18, fontSize: "0.65rem" }}
                       />
                     )}
                   </TableCell>
@@ -792,22 +839,30 @@ const SolicitacoesServico = () => {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {l.cliente || (
-                      <Typography variant="caption" color="text.secondary">
-                        {ETAPA_LABEL[l.etapa] ?? "Aguardando o cliente"}
-                      </Typography>
-                    )}
+                    <Tooltip title={l.cliente || ETAPA_LABEL[l.etapa] || ""}>
+                      <Box component="span" sx={TRUNCAR}>
+                        {l.cliente || (
+                          <Typography variant="caption" color="text.secondary">
+                            {ETAPA_LABEL[l.etapa] ?? "Aguardando o cliente"}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Tooltip>
                   </TableCell>
                   <TableCell>
-                    {moment(l.criado_em).format("DD/MM/YYYY HH:mm")}
+                    <Box sx={{ whiteSpace: "nowrap" }}>
+                      {moment(l.criado_em).format("DD/MM/YYYY HH:mm")}
+                    </Box>
                     {l.criado_por && (
-                      <Typography
-                        variant="caption"
-                        display="block"
-                        color="text.secondary"
-                      >
-                        por {l.criado_por}
-                      </Typography>
+                      <Tooltip title={`por ${l.criado_por}`}>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ ...TRUNCAR, maxWidth: 140 }}
+                        >
+                          por {l.criado_por}
+                        </Typography>
+                      </Tooltip>
                     )}
                   </TableCell>
                   <TableCell>—</TableCell>
@@ -824,28 +879,31 @@ const SolicitacoesServico = () => {
                             : "Aguardando cliente"
                       }
                     />
-                    {!l.expirado && ETAPA_LABEL[l.etapa] && (
+                    <Tooltip
+                      title={`${
+                        !l.expirado && ETAPA_LABEL[l.etapa]
+                          ? `${ETAPA_LABEL[l.etapa]} · `
+                          : ""
+                      }vale até ${moment(l.expira_em).format("DD/MM HH:mm")}`}
+                    >
                       <Typography
                         variant="caption"
-                        display="block"
                         color="text.secondary"
+                        sx={{ ...TRUNCAR, maxWidth: 170 }}
                       >
-                        {ETAPA_LABEL[l.etapa]}
+                        {!l.expirado && ETAPA_LABEL[l.etapa]
+                          ? `${ETAPA_LABEL[l.etapa]} · `
+                          : ""}
+                        vale até {moment(l.expira_em).format("DD/MM HH:mm")}
                       </Typography>
-                    )}
-                    <Typography
-                      variant="caption"
-                      display="block"
-                      color="text.secondary"
-                    >
-                      vale até {moment(l.expira_em).format("DD/MM HH:mm")}
-                    </Typography>
+                    </Tooltip>
                   </TableCell>
                   <TableCell>
-                    <Stack direction="row" spacing={1}>
+                    <Stack direction="row" spacing={1} flexWrap="nowrap">
                       <Button
                         size="small"
                         variant="outlined"
+                        sx={{ whiteSpace: "nowrap" }}
                         onClick={() => copiarLink(l.token)}
                       >
                         {tokenCopiado === l.token ? "Copiado!" : "Copiar link"}
@@ -866,7 +924,7 @@ const SolicitacoesServico = () => {
 
                 const service: any = linha.item;
                 return (
-                <TableRow key={service.id} hover>
+                <TableRow key={service.id} hover sx={LINHA_FIXA}>
                   <TableCell>
                     {service.id}
                     {service.dados?.alertaDebitoAnterior?.temDebito && (
@@ -886,7 +944,13 @@ const SolicitacoesServico = () => {
                       />
                     )}
                   </TableCell>
-                  <TableCell>{service.servico}</TableCell>
+                  <TableCell>
+                    <Tooltip title={service.servico}>
+                      <Box component="span" sx={{ ...TRUNCAR, maxWidth: 150 }}>
+                        {service.servico}
+                      </Box>
+                    </Tooltip>
+                  </TableCell>
                   <TableCell>
                     <Chip
                       size="small"
@@ -904,8 +968,14 @@ const SolicitacoesServico = () => {
                       {rotuloPagamento(service)}
                     </span>
                   </TableCell>
-                  <TableCell>{service.login_cliente}</TableCell>
                   <TableCell>
+                    <Tooltip title={service.login_cliente || ""}>
+                      <Box component="span" sx={TRUNCAR}>
+                        {service.login_cliente}
+                      </Box>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>
                     {moment(service.data_solicitacao).format(
                       "DD/MM/YYYY HH:mm",
                     )}
@@ -933,37 +1003,52 @@ const SolicitacoesServico = () => {
 
                     {/* Solicitação do site: o cliente não recebe WhatsApp, então
                         o link fica aqui para o atendente enviar. */}
-                    {service.links_envio?.assinatura && !service.assinado && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        sx={{ mt: 0.5, display: "block", textTransform: "none" }}
-                        onClick={() =>
-                          copiarLinkWeb(service.links_envio.assinatura)
-                        }
-                      >
-                        {linkCopiado === service.links_envio.assinatura
-                          ? "Copiado!"
-                          : "Copiar contrato"}
-                      </Button>
-                    )}
-                    {service.links_envio?.pix && !service.pago && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="success"
-                        sx={{ mt: 0.5, display: "block", textTransform: "none" }}
-                        onClick={() => copiarLinkWeb(service.links_envio.pix)}
-                      >
-                        {linkCopiado === service.links_envio.pix
-                          ? "Copiado!"
-                          : `Copiar Pix${
-                              service.links_envio.valor
-                                ? ` (R$ ${service.links_envio.valor})`
-                                : ""
-                            }`}
-                      </Button>
-                    )}
+                    {/* Solicitação do site: cópia rápida sem esticar a linha. */}
+                    <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
+                      {service.links_envio?.assinatura && !service.assinado && (
+                        <Tooltip title="Copiar link do contrato">
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            clickable
+                            label={
+                              linkCopiado === service.links_envio.assinatura
+                                ? "Copiado!"
+                                : "Contrato"
+                            }
+                            onClick={() =>
+                              copiarLinkWeb(service.links_envio.assinatura)
+                            }
+                            sx={{ height: 20, fontSize: "0.65rem" }}
+                          />
+                        </Tooltip>
+                      )}
+                      {service.links_envio?.pix && !service.pago && (
+                        <Tooltip
+                          title={`Copiar link do Pix${
+                            service.links_envio.valor
+                              ? ` (R$ ${service.links_envio.valor})`
+                              : ""
+                          }`}
+                        >
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            color="success"
+                            clickable
+                            label={
+                              linkCopiado === service.links_envio.pix
+                                ? "Copiado!"
+                                : "Pix"
+                            }
+                            onClick={() =>
+                              copiarLinkWeb(service.links_envio.pix)
+                            }
+                            sx={{ height: 20, fontSize: "0.65rem" }}
+                          />
+                        </Tooltip>
+                      )}
+                    </Stack>
                   </TableCell>
                   <TableCell>
                     {service.dados?.consultaConsultCenter ? (
@@ -980,9 +1065,19 @@ const SolicitacoesServico = () => {
                             : "Sem restrição"}
                         </span>
                         {service.dados.consultaConsultCenter.nome && (
-                          <Typography variant="caption" display="block" sx={{ mt: 0.5, color: "text.secondary" }}>
-                            {service.dados.consultaConsultCenter.nome}
-                          </Typography>
+                          <Tooltip title={service.dados.consultaConsultCenter.nome}>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                ...TRUNCAR,
+                                maxWidth: 160,
+                                mt: 0.5,
+                                color: "text.secondary",
+                              }}
+                            >
+                              {service.dados.consultaConsultCenter.nome}
+                            </Typography>
+                          </Tooltip>
                         )}
                       </Box>
                     ) : (
@@ -1011,7 +1106,13 @@ const SolicitacoesServico = () => {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Box display="flex" gap={0.5} alignItems="center" flexWrap="wrap">
+                    <Box
+                      display="flex"
+                      gap={0.5}
+                      alignItems="center"
+                      flexWrap="nowrap"
+                      sx={{ whiteSpace: "nowrap" }}
+                    >
                       <Tooltip title="Visualizar todos os dados enviados pelo cliente" arrow>
                         <Button variant="outlined" size="small" sx={{ textTransform: "none" }} onClick={() => handleOpenDetails(service)}>
                           Info
