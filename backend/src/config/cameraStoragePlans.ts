@@ -14,13 +14,30 @@ export interface StoragePlan {
   maxCameras: number;
 }
 
-// Cada degrau de plano libera uma câmera a mais: 5 GB → 1, 10 GB → 2, 15 GB → 3,
-// 20 GB → 4. (maxCameras = gb / 5.)
+// Cada degrau de plano libera uma câmera a mais: 5 GB → 1, 10 GB → 2, ... 80 GB → 16.
+// (maxCameras = gb / 5.)
+//
+// Preço: até 4 câmeras vale a tabela histórica (20/30/35/40). Daí em diante cada
+// câmera extra soma entre R$ 10 e R$ 20, com o degrau afinando conforme o plano
+// cresce (+20 até 8 câmeras, +15 até 12, +10 até 16). Os valores são únicos por
+// plano — servicosAdicionaisNomes identifica o plano pelo valor do contrato.
 export const STORAGE_PLANS: StoragePlan[] = [
   { gb: 5, priceBRL: 20, maxCameras: 1 }, // plano base (valor atual do serviço CAMERA)
   { gb: 10, priceBRL: 30, maxCameras: 2 },
   { gb: 15, priceBRL: 35, maxCameras: 3 },
   { gb: 20, priceBRL: 40, maxCameras: 4 },
+  { gb: 25, priceBRL: 60, maxCameras: 5 },
+  { gb: 30, priceBRL: 80, maxCameras: 6 },
+  { gb: 35, priceBRL: 100, maxCameras: 7 },
+  { gb: 40, priceBRL: 120, maxCameras: 8 },
+  { gb: 45, priceBRL: 135, maxCameras: 9 },
+  { gb: 50, priceBRL: 150, maxCameras: 10 },
+  { gb: 55, priceBRL: 165, maxCameras: 11 },
+  { gb: 60, priceBRL: 180, maxCameras: 12 },
+  { gb: 65, priceBRL: 190, maxCameras: 13 },
+  { gb: 70, priceBRL: 200, maxCameras: 14 },
+  { gb: 75, priceBRL: 210, maxCameras: 15 },
+  { gb: 80, priceBRL: 220, maxCameras: 16 },
 ];
 
 /** Plano padrão quando nenhum é escolhido. */

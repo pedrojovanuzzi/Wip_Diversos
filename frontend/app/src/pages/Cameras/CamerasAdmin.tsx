@@ -32,12 +32,24 @@ interface ClienteItem {
 }
 
 // Planos de armazenamento das gravações (espelha o backend: cameraStoragePlans.ts).
-// cameras = limite de câmeras do plano (5 GB→1, 10→2, 15→3, 20→4).
+// cameras = limite de câmeras do plano (5 GB→1, 10→2, ... 80→16).
 const STORAGE_PLANS = [
   { gb: 5, price: 20, cameras: 1 },
   { gb: 10, price: 30, cameras: 2 },
   { gb: 15, price: 35, cameras: 3 },
   { gb: 20, price: 40, cameras: 4 },
+  { gb: 25, price: 60, cameras: 5 },
+  { gb: 30, price: 80, cameras: 6 },
+  { gb: 35, price: 100, cameras: 7 },
+  { gb: 40, price: 120, cameras: 8 },
+  { gb: 45, price: 135, cameras: 9 },
+  { gb: 50, price: 150, cameras: 10 },
+  { gb: 55, price: 165, cameras: 11 },
+  { gb: 60, price: 180, cameras: 12 },
+  { gb: 65, price: 190, cameras: 13 },
+  { gb: 70, price: 200, cameras: 14 },
+  { gb: 75, price: 210, cameras: 15 },
+  { gb: 80, price: 220, cameras: 16 },
 ];
 
 export const CamerasAdmin: React.FC = () => {
