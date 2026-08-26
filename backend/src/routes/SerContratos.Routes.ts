@@ -4,6 +4,8 @@ import AuthGuard from "../middleware/AuthGuard";
 
 const router: Router = Router();
 
+// Antes de "/:login", senão "clientes" seria tratado como um login.
+router.get("/clientes", AuthGuard, SerContratos.listarClientes);
 router.get("/:login", AuthGuard, SerContratos.listByLogin);
 router.post("/", AuthGuard, SerContratos.add);
 router.delete("/:id", AuthGuard, SerContratos.remove);

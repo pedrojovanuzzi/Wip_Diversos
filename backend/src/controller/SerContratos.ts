@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import MkauthSource from "../database/MkauthSource";
 import AppDataSource from "../database/DataSource";
+import { In } from "typeorm";
 import { SisSerContratos } from "../entities/SisSerContratos";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { StreamingAssinante } from "../entities/StreamingAssinante";
@@ -42,6 +43,64 @@ const UNIQUE_PER_LOGIN = new Set(["STREAMER", "STREAMER_COLAB", "CAMERA"]);
 const STREAMING_TYPES = new Set(["STREAMER", "STREAMER_COLAB"]);
 
 class SerContratos {
+  /**
+   * GET /clientes — quem já tem streaming ou câmera contratados.
+   *
+   * A tela abre com essa lista para o atendente não precisar saber o login de
+   * cor; a busca por login continua existindo para casos pontuais.
+   */
+  public async listarClientes(req: Request, res: Response) {
+    try {
+      const busca = String(req.query.busca || "").trim();
+      const limite = Math.min(Number(req.query.limite) || 100, 300);
+
+      const repo = MkauthSource.getRepository(SisSerContratos);
+      const qb = repo
+        .createQueryBuilder("s")
+        .select("s.login", "login")
+        .addSelect("GROUP_CONCAT(DISTINCT UPPER(TRIM(s.nome)))", "servicos")
+        .addSelect("SUM(s.valor)", "total")
+        .addSelect("MAX(s.data)", "ultima")
+        .where("UPPER(TRIM(s.nome)) IN (:...tipos)", {
+          tipos: Object.keys(VALORES),
+        })
+        .groupBy("s.login")
+        .orderBy("ultima", "DESC")
+        .limit(limite);
+
+      if (busca) {
+        qb.andWhere("s.login LIKE :busca", { busca: `%${busca}%` });
+      }
+
+      const linhas = await qb.getRawMany();
+      if (linhas.length === 0) {
+        res.json({ clientes: [] });
+        return;
+      }
+
+      // Nome do cliente vem do cadastro; um SELECT só para todos os logins.
+      const clientes = await MkauthSource.getRepository(ClientesEntities).find({
+        select: { login: true, nome: true, cli_ativado: true },
+        where: { login: In(linhas.map((l) => l.login)) },
+      });
+      const porLogin = new Map(clientes.map((c) => [c.login, c]));
+
+      res.json({
+        clientes: linhas.map((l) => ({
+          login: l.login,
+          nome: porLogin.get(l.login)?.nome ?? null,
+          ativo: porLogin.get(l.login)?.cli_ativado === "s",
+          servicos: String(l.servicos || "").split(",").filter(Boolean),
+          total: Number(Number(l.total || 0).toFixed(2)),
+          ultima: l.ultima,
+        })),
+      });
+    } catch (error: any) {
+      console.error("Erro ao listar clientes com serviços:", error);
+      res.status(500).json({ message: "Erro ao listar os clientes." });
+    }
+  }
+
   public async listByLogin(req: Request, res: Response) {
     try {
       const login = String(req.params.login || "").trim();

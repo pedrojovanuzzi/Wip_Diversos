@@ -29,6 +29,13 @@ interface PendingAuth {
 let pendingAuth: PendingAuth | null = null;
 const CALLBACK_TIMEOUT_MS = 60000;
 
+/**
+ * Autenticação em andamento. Sem isso, duas ações simultâneas (dois cadastros
+ * de streaming ao mesmo tempo) disputavam o mesmo callback e a segunda morria
+ * com "Já existe uma autenticação em andamento".
+ */
+let autenticacaoEmCurso: Promise<string> | null = null;
+
 export function deliverAuthCode(code: string): boolean {
   if (!pendingAuth) return false;
   const p = pendingAuth;
@@ -36,6 +43,16 @@ export function deliverAuthCode(code: string): boolean {
   clearTimeout(p.timer);
   p.resolve(code);
   return true;
+}
+
+/** Encerra a espera do callback quando o fluxo termina por outro caminho. */
+function cancelarEspera(motivo?: Error) {
+  if (!pendingAuth) return;
+  const p = pendingAuth;
+  pendingAuth = null;
+  clearTimeout(p.timer);
+  // Rejeitar (em vez de deixar pendente) evita promessa pendurada para sempre.
+  p.reject(motivo ?? new Error("Espera do callback cancelada"));
 }
 
 function waitForAuthCode(): Promise<string> {
@@ -66,6 +83,24 @@ function form(params: Record<string, any>): string {
 }
 
 export async function authenticate(force = false): Promise<string> {
+  if (
+    !force &&
+    cachedToken &&
+    Date.now() - cachedToken.fetchedAt < cachedToken.ttlMs
+  ) {
+    return cachedToken.token;
+  }
+
+  // Chamadas simultâneas esperam a mesma autenticação.
+  if (autenticacaoEmCurso) return autenticacaoEmCurso;
+
+  autenticacaoEmCurso = autenticarAgora(force).finally(() => {
+    autenticacaoEmCurso = null;
+  });
+  return autenticacaoEmCurso;
+}
+
+async function autenticarAgora(force = false): Promise<string> {
   const TTL = 50 * 60 * 1000;
   if (
     !force &&
@@ -82,6 +117,9 @@ export async function authenticate(force = false): Promise<string> {
     throw new Error("WATCH_BRASIL_REDIRECT_URL não configurado");
 
   const codePromise = waitForAuthCode();
+  // O await só acontece lá embaixo; sem este handler o timeout do callback
+  // vira "unhandledRejection" no log.
+  codePromise.catch(() => undefined);
 
   let authData: any;
   try {
@@ -100,10 +138,7 @@ export async function authenticate(force = false): Promise<string> {
     );
     authData = authRes.data;
   } catch (e) {
-    if (pendingAuth) {
-      clearTimeout(pendingAuth.timer);
-      pendingAuth = null;
-    }
+    cancelarEspera(e as Error);
     throw e;
   }
 
@@ -113,10 +148,7 @@ export async function authenticate(force = false): Promise<string> {
     authData?.auth_code ||
     authData?.value;
   if (inlineCode && typeof inlineCode === "string") {
-    if (pendingAuth) {
-      clearTimeout(pendingAuth.timer);
-      pendingAuth = null;
-    }
+    cancelarEspera(new Error("Código veio na própria resposta"));
     return exchangeCodeForToken(inlineCode, TTL);
   }
 

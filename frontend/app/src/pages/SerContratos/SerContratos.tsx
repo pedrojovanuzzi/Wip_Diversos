@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { NavBar } from "../../components/navbar/NavBar";
@@ -22,6 +22,15 @@ interface ContratoItem {
   login: string;
   /** Descrição completa montada pelo backend ("WatchTV Brasil R$ 49,90"...). */
   nomeExibicao?: string;
+}
+
+interface ClienteComServico {
+  login: string;
+  nome: string | null;
+  ativo: boolean;
+  servicos: string[];
+  total: number;
+  ultima: string;
 }
 
 interface ListResponse {
@@ -103,6 +112,10 @@ export const SerContratos: React.FC = () => {
   const [linkCopied, setLinkCopied] = useState(false);
   // Plano de armazenamento escolhido ao adicionar Câmeras (padrão 5 GB).
   const [cameraGb, setCameraGb] = useState(5);
+  // Clientes que já têm streaming/câmera: a tela abre com eles listados.
+  const [clientes, setClientes] = useState<ClienteComServico[] | null>(null);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [filtroClientes, setFiltroClientes] = useState("");
 
   const base = process.env.REACT_APP_URL;
   const headers = { Authorization: `Bearer ${user?.token}` };
@@ -111,6 +124,37 @@ export const SerContratos: React.FC = () => {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 4000);
   };
+
+  const fetchClientes = useCallback(async () => {
+    setLoadingClientes(true);
+    try {
+      const res = await axios.get<{ clientes: ClienteComServico[] }>(
+        `${base}/sercontratos/clientes`,
+        { headers },
+      );
+      setClientes(res.data.clientes);
+    } catch (e) {
+      console.error("Erro ao carregar clientes com serviços:", e);
+      setClientes([]);
+    } finally {
+      setLoadingClientes(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  useEffect(() => {
+    fetchClientes();
+  }, [fetchClientes]);
+
+  const clientesFiltrados = useMemo(() => {
+    const termo = filtroClientes.trim().toUpperCase();
+    if (!termo) return clientes ?? [];
+    return (clientes ?? []).filter(
+      (c) =>
+        c.login.toUpperCase().includes(termo) ||
+        (c.nome || "").toUpperCase().includes(termo),
+    );
+  }, [clientes, filtroClientes]);
 
   const fetchList = async (login?: string) => {
     const target = (login ?? loginInput).trim();
@@ -414,6 +458,19 @@ export const SerContratos: React.FC = () => {
                 placeholder="Ex: PEDROJOVANUZZI"
                 className="flex-1 p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
               />
+              {loaded && (
+                <button
+                  onClick={() => {
+                    setLoaded(null);
+                    setLoginInput("");
+                    fetchClientes();
+                  }}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded font-semibold hover:bg-gray-300"
+                  title="Voltar para a lista de clientes"
+                >
+                  Ver lista
+                </button>
+              )}
               <button
                 onClick={() => fetchList()}
                 disabled={loading || !loginInput.trim()}
@@ -427,6 +484,105 @@ export const SerContratos: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Clientes que já têm serviço contratado: evita ter que saber o
+              login de cor. Some quando um cliente está aberto na tela. */}
+          {!loaded && (
+            <div className="bg-white p-4 rounded-lg shadow-md mb-4">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h2 className="font-bold text-gray-800">
+                  Clientes com serviço
+                  {clientes && (
+                    <span className="ml-2 text-xs font-normal text-gray-500">
+                      {clientesFiltrados.length} de {clientes.length}
+                    </span>
+                  )}
+                </h2>
+                <input
+                  type="text"
+                  value={filtroClientes}
+                  onChange={(e) => setFiltroClientes(e.target.value)}
+                  placeholder="Filtrar por login ou nome"
+                  className="w-64 p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {loadingClientes ? (
+                <div className="flex items-center gap-2 text-gray-500 text-sm p-4">
+                  <AiOutlineLoading3Quarters className="animate-spin" />
+                  Carregando clientes…
+                </div>
+              ) : clientesFiltrados.length === 0 ? (
+                <p className="text-sm text-gray-500 p-2">
+                  {clientes && clientes.length > 0
+                    ? "Nenhum cliente encontrado com esse filtro."
+                    : "Nenhum cliente com streaming ou câmera contratados."}
+                </p>
+              ) : (
+                <div className="max-h-96 overflow-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 sticky top-0 text-gray-600 text-xs uppercase">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold">Login</th>
+                        <th className="px-3 py-2 text-left font-semibold">Cliente</th>
+                        <th className="px-3 py-2 text-left font-semibold">Serviços</th>
+                        <th className="px-3 py-2 text-right font-semibold">Mensal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {clientesFiltrados.map((c) => (
+                        <tr
+                          key={c.login}
+                          className="hover:bg-indigo-50 cursor-pointer"
+                          onClick={() => {
+                            setLoginInput(c.login);
+                            fetchList(c.login);
+                          }}
+                        >
+                          <td className="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">
+                            {c.login}
+                            {!c.ativo && (
+                              <span className="ml-2 px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-semibold">
+                                inativo
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {c.nome || "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-1 flex-wrap">
+                              {c.servicos.map((sv) => (
+                                <span
+                                  key={sv}
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                    sv === "CAMERA"
+                                      ? "bg-indigo-100 text-indigo-800"
+                                      : sv === "STREAMER_COLAB"
+                                        ? "bg-blue-100 text-blue-800"
+                                        : "bg-purple-100 text-purple-800"
+                                  }`}
+                                >
+                                  {sv === "CAMERA"
+                                    ? "Câmera"
+                                    : sv === "STREAMER_COLAB"
+                                      ? "Streaming colab."
+                                      : "Streaming"}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-right whitespace-nowrap">
+                            R$ {formatBRL(c.total)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           {message && (
             <div
