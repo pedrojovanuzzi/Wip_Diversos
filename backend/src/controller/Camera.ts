@@ -17,6 +17,10 @@ import {
   planFor,
   maxCamerasFor,
 } from "../config/cameraStoragePlans";
+import {
+  nomeContratoParaGravar,
+  sqlTagServico,
+} from "../services/servicosAdicionaisNomes";
 import NginxService from "../services/NginxService";
 
 dotenv.config();
@@ -218,7 +222,9 @@ class Camera {
       const storageGb = Number(req.body.storageGb);
       if (!isValidStorageGb(storageGb)) {
         res.status(400).json({
-          message: "Plano inválido. Use 5, 10, 15 ou 20 GB.",
+          message:
+            "Plano inválido. Use: " +
+            STORAGE_PLANS.map((p) => `${p.gb} GB`).join(", ") + ".",
         });
         return;
       }
@@ -235,12 +241,17 @@ class Camera {
       // Ajusta o valor do contrato CAMERA do cliente (se existir) para o preço do plano.
       const plano = planFor(storageGb)!;
       const serRepo = MkauthSource.getRepository(SisSerContratos);
+      // O nome do contrato descreve o plano (câmeras + GB) e é o texto impresso
+      // no boleto, então muda junto com o valor.
       const updated = await serRepo
         .createQueryBuilder()
         .update(SisSerContratos)
-        .set({ valor: plano.priceBRL })
+        .set({
+          valor: plano.priceBRL,
+          nome: nomeContratoParaGravar("CAMERA", plano.priceBRL, storageGb),
+        })
         .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: cliente.login })
-        .andWhere("UPPER(TRIM(nome)) = :nome", { nome: "CAMERA" })
+        .andWhere(`${sqlTagServico("nome")} = :nome`, { nome: "CAMERA" })
         .execute();
 
       res.json({
@@ -354,7 +365,7 @@ class Camera {
         .delete()
         .from(SisSerContratos)
         .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: cliente.login })
-        .andWhere("UPPER(TRIM(nome)) = :nome", { nome: "CAMERA" })
+        .andWhere(`${sqlTagServico("nome")} = :nome`, { nome: "CAMERA" })
         .execute();
 
       res.json({ ok: true, contratoRemovido: (removed.affected ?? 0) > 0 });

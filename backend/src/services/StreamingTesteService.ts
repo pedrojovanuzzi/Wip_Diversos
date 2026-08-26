@@ -3,6 +3,7 @@ import AppDataSource from "../database/DataSource";
 import MkauthSource from "../database/MkauthSource";
 import { StreamingAssinante } from "../entities/StreamingAssinante";
 import { SisSerContratos } from "../entities/SisSerContratos";
+import { sqlTagServico } from "./servicosAdicionaisNomes";
 import { deleteTicket } from "./WatchBrasilService";
 
 /** Tags de streaming em sis_ser_contratos. */
@@ -78,7 +79,9 @@ class StreamingTesteService {
       .where("UPPER(TRIM(s.login)) = UPPER(TRIM(:login))", {
         login: assinante.login,
       })
-      .andWhere("UPPER(TRIM(s.nome)) IN (:...tipos)", { tipos: TIPOS_STREAMING })
+      .andWhere(`${sqlTagServico("s.nome")} IN (:...tipos)`, {
+        tipos: TIPOS_STREAMING,
+      })
       .getMany();
 
     if (remover.length > 0) {

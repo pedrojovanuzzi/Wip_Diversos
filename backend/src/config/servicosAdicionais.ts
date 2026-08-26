@@ -34,7 +34,8 @@ export function nomeStreamingColab(): string {
  * e a cota de armazenamento compartilhada entre eles.
  */
 export function nomeCamera(canais: number, storageGb: number): string {
-  return `${Number(canais || 0)} Canais de Gravação em Nuvem ${Number(
+  const qtd = Number(canais || 0);
+  return `${qtd} ${qtd === 1 ? "Canal" : "Canais"} de Gravação em Nuvem ${Number(
     storageGb || 0,
   )} Gb de Armazenamento compartilhado`;
 }

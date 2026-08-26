@@ -6,6 +6,8 @@ const router: Router = Router();
 
 // Antes de "/:login", senão "clientes" seria tratado como um login.
 router.get("/clientes", AuthGuard, SerContratos.listarClientes);
+// Idem: rota fixa antes de "/:login".
+router.post("/detalhar-nomes", AuthGuard, SerContratos.detalharNomes);
 router.get("/:login", AuthGuard, SerContratos.listByLogin);
 router.post("/", AuthGuard, SerContratos.add);
 router.delete("/:id", AuthGuard, SerContratos.remove);

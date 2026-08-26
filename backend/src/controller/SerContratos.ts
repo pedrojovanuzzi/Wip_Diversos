@@ -19,6 +19,11 @@ import {
 import {
   buscarResumoCameraDeUmLogin,
   nomeServicoContrato,
+  buscarResumoCameras,
+  nomeContratoParaGravar,
+  storageGbDoValor,
+  tagDoServico,
+  sqlTagServico,
 } from "../services/servicosAdicionaisNomes";
 
 /** Rótulo curto do serviço para mensagens de erro (nunca a tag crua). */
@@ -58,10 +63,10 @@ class SerContratos {
       const qb = repo
         .createQueryBuilder("s")
         .select("s.login", "login")
-        .addSelect("GROUP_CONCAT(DISTINCT UPPER(TRIM(s.nome)))", "servicos")
+        .addSelect(`GROUP_CONCAT(DISTINCT ${sqlTagServico("s.nome")})`, "servicos")
         .addSelect("SUM(s.valor)", "total")
         .addSelect("MAX(s.data)", "ultima")
-        .where("UPPER(TRIM(s.nome)) IN (:...tipos)", {
+        .where(`${sqlTagServico("s.nome")} IN (:...tipos)`, {
           tipos: Object.keys(VALORES),
         })
         .groupBy("s.login")
@@ -133,7 +138,7 @@ class SerContratos {
       // gravando e a cota compartilhada montam o nome comercial do serviço.
       const resumoCamera = await buscarResumoCameraDeUmLogin(login);
       const valorCameraContrato = items
-        .filter((i) => String(i.nome).trim().toUpperCase() === "CAMERA")
+        .filter((i) => tagDoServico(i.nome) === "CAMERA")
         .reduce((a, c) => a + Number(c.valor || 0), 0);
 
       res.json({
@@ -141,6 +146,9 @@ class SerContratos {
         // Cada item já vem com a descrição completa pronta para exibir.
         items: items.map((i) => ({
           ...i,
+          // `tag` é o tipo do serviço; `nome` agora guarda a descrição que sai
+          // no boleto, então a tela não pode mais comparar por ele.
+          tag: tagDoServico(i.nome),
           nomeExibicao: nomeServicoContrato(i.nome, Number(i.valor || 0), resumoCamera),
         })),
         total: Number(total.toFixed(2)),
@@ -315,7 +323,7 @@ class SerContratos {
         repo
           .createQueryBuilder("s")
           .where("UPPER(TRIM(s.login)) = UPPER(TRIM(:l))", { l })
-          .andWhere("UPPER(TRIM(s.nome)) = :tipo", { tipo })
+          .andWhere(`${sqlTagServico("s.nome")} = :tipo`, { tipo })
           .getCount();
 
       // Streamer e Streamer Colaborador são mutuamente exclusivos.
@@ -325,14 +333,14 @@ class SerContratos {
         const existing = await repo
           .createQueryBuilder("s")
           .where("UPPER(TRIM(s.login)) = UPPER(TRIM(:l))", { l: login })
-          .andWhere("UPPER(TRIM(s.nome)) IN (:...tipos)", {
+          .andWhere(`${sqlTagServico("s.nome")} IN (:...tipos)`, {
             tipos: Array.from(STREAMING_TYPES),
           })
           .getMany();
 
         if (existing.length > 0) {
           if (!replace) {
-            const atual = (existing[0].nome || "").toUpperCase();
+            const atual = tagDoServico(existing[0].nome);
             res.status(409).json({
               message: `Cliente já possui ${atual}. Confirme a substituição.`,
               code: "STREAMING_REPLACE_REQUIRED",
@@ -365,7 +373,7 @@ class SerContratos {
             .delete()
             .from(SisSerContratos)
             .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: login })
-            .andWhere("UPPER(TRIM(nome)) IN (:...tipos)", {
+            .andWhere(`${sqlTagServico("nome")} IN (:...tipos)`, {
               tipos: Array.from(STREAMING_TYPES),
             })
             .execute();
@@ -391,6 +399,15 @@ class SerContratos {
         : tipoNorm === "CAMERA"
           ? planFor(normalizeStorageGb(storageGb))!.priceBRL
           : VALORES[tipoNorm];
+
+      // O boleto do mkauth imprime este campo literalmente ("Valor adicional:
+      // <nome>"), então o que vai gravado é a descrição comercial — a tag do
+      // tipo continua sendo deduzida dela por `tagDoServico`.
+      const nomeContrato = nomeContratoParaGravar(
+        tipoNorm,
+        valorUnitario,
+        tipoNorm === "CAMERA" ? normalizeStorageGb(storageGb) : undefined,
+      );
 
       // STREAMER / STREAMER_COLAB: valida na Watch Brasil ANTES de gravar local
       let streamingInfo: any = null;
@@ -479,11 +496,11 @@ class SerContratos {
             .createQueryBuilder("s")
             .where("UPPER(TRIM(s.login)) = UPPER(TRIM(:l))", { l: login });
           if (STREAMING_TYPES.has(tipoNorm)) {
-            qb.andWhere("UPPER(TRIM(s.nome)) IN (:...tipos)", {
+            qb.andWhere(`${sqlTagServico("s.nome")} IN (:...tipos)`, {
               tipos: Array.from(STREAMING_TYPES),
             });
           } else {
-            qb.andWhere("UPPER(TRIM(s.nome)) = :tipo", { tipo: tipoNorm });
+            qb.andWhere(`${sqlTagServico("s.nome")} = :tipo`, { tipo: tipoNorm });
           }
           const recheck = await qb.getCount();
           if (recheck > 0) {
@@ -495,7 +512,7 @@ class SerContratos {
         for (let i = 0; i < qtd; i++) {
           const item = trxRepo.create({
             cfop_serc: CFOP_DEFAULT,
-            nome: tipoNorm,
+            nome: nomeContrato,
             valor: valorUnitario,
             incluir: "sim",
             data: new Date(),
@@ -554,7 +571,7 @@ class SerContratos {
 
       // Se for STREAMER ou STREAMER_COLAB, derruba na Watch Brasil também
       let streamingNote: string | null = null;
-      if (STREAMING_TYPES.has((item.nome || "").toUpperCase())) {
+      if (STREAMING_TYPES.has(tagDoServico(item.nome))) {
         try {
           const streamingRepo =
             AppDataSource.getRepository(StreamingAssinante);
@@ -602,7 +619,7 @@ class SerContratos {
       const atuais = await repo
         .createQueryBuilder("s")
         .where("UPPER(TRIM(s.login)) = UPPER(TRIM(:l))", { l: login })
-        .andWhere("UPPER(TRIM(s.nome)) IN (:...tipos)", {
+        .andWhere(`${sqlTagServico("s.nome")} IN (:...tipos)`, {
           tipos: Array.from(STREAMING_TYPES),
         })
         .getMany();
@@ -613,7 +630,7 @@ class SerContratos {
         });
         return;
       }
-      const ja = atuais.find((a) => (a.nome || "").toUpperCase() === novoTipoRaw);
+      const ja = atuais.find((a) => tagDoServico(a.nome) === novoTipoRaw);
       if (ja && atuais.length === 1) {
         res.status(409).json({
           message: `Cliente já está como ${novoTipoRaw}.`,
@@ -625,9 +642,12 @@ class SerContratos {
       const result = await repo
         .createQueryBuilder()
         .update(SisSerContratos)
-        .set({ nome: novoTipoRaw, valor: novoValor })
+        .set({
+          nome: nomeContratoParaGravar(novoTipoRaw, novoValor),
+          valor: novoValor,
+        })
         .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: login })
-        .andWhere("UPPER(TRIM(nome)) IN (:...tipos)", {
+        .andWhere(`${sqlTagServico("nome")} IN (:...tipos)`, {
           tipos: Array.from(STREAMING_TYPES),
         })
         .execute();
@@ -644,6 +664,64 @@ class SerContratos {
     }
   }
 
+  /**
+   * Regrava os contratos antigos que ainda guardam a tag crua ("CAMERA",
+   * "STREAMER") com o nome comercial completo — é esse campo que o boleto do
+   * mkauth imprime. Sem `?aplicar=1` a chamada só mostra o que mudaria.
+   */
+  public async detalharNomes(req: Request, res: Response) {
+    try {
+      const aplicar = String(req.query.aplicar || "") === "1";
+      const repo = MkauthSource.getRepository(SisSerContratos);
+      const itens = await repo
+        .createQueryBuilder("s")
+        .where(`${sqlTagServico("s.nome")} IN (:...tipos)`, {
+          tipos: Object.keys(VALORES),
+        })
+        .getMany();
+
+      // A cota de cada cliente vem da conta de câmeras; sem ela, é deduzida
+      // do valor cobrado no próprio contrato.
+      const resumos = await buscarResumoCameras(itens.map((i) => i.login));
+
+      const mudancas: {
+        id: number;
+        login: string;
+        de: string;
+        para: string;
+      }[] = [];
+      for (const item of itens) {
+        const tag = tagDoServico(item.nome);
+        const valor = Number(item.valor || 0);
+        const gb =
+          tag === "CAMERA"
+            ? (resumos.get(String(item.login || "").trim().toUpperCase())
+                ?.storageGb ?? storageGbDoValor(valor))
+            : undefined;
+        const novo = nomeContratoParaGravar(tag, valor, gb);
+        if (novo && novo !== String(item.nome || "").trim()) {
+          mudancas.push({ id: item.id, login: item.login, de: item.nome, para: novo });
+        }
+      }
+
+      if (aplicar) {
+        for (const m of mudancas) {
+          await repo.update(m.id, { nome: m.para });
+        }
+      }
+
+      res.json({
+        analisados: itens.length,
+        alteracoes: mudancas.length,
+        aplicado: aplicar,
+        itens: mudancas.slice(0, 300),
+      });
+    } catch (error: any) {
+      console.error("Erro ao detalhar nomes dos serviços:", error);
+      res.status(500).json({ message: "Erro ao detalhar os nomes." });
+    }
+  }
+
   public async removeAllOfTypeForLogin(req: Request, res: Response) {
     try {
       const login = String(req.body?.login || "").trim();
@@ -653,7 +731,13 @@ class SerContratos {
         return;
       }
       const repo = MkauthSource.getRepository(SisSerContratos);
-      const result = await repo.delete({ login, nome: tipo });
+      const result = await repo
+        .createQueryBuilder()
+        .delete()
+        .from(SisSerContratos)
+        .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: login })
+        .andWhere(`${sqlTagServico("nome")} = :tipo`, { tipo })
+        .execute();
       res.json({ removed: result.affected || 0 });
     } catch (error: any) {
       console.error("Erro ao remover em lote:", error);

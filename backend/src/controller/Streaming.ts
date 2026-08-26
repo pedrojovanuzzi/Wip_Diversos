@@ -3,6 +3,7 @@ import AppDataSource from "../database/DataSource";
 import MkauthSource from "../database/MkauthSource";
 import { StreamingAssinante } from "../entities/StreamingAssinante";
 import { SisSerContratos } from "../entities/SisSerContratos";
+import { sqlTagServico } from "../services/servicosAdicionaisNomes";
 import {
   editPhone,
   updateTicketStatus,
@@ -156,7 +157,7 @@ class Streaming {
           .delete()
           .from(SisSerContratos)
           .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: assinante.login })
-          .andWhere("UPPER(TRIM(nome)) = :tipo", { tipo: "STREAMER" })
+          .andWhere(`${sqlTagServico("nome")} = :tipo`, { tipo: "STREAMER" })
           .execute();
         contratosRemoved = result.affected || 0;
       } catch (e: any) {

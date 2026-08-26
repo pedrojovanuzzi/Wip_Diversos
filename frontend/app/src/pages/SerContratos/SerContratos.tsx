@@ -22,6 +22,12 @@ interface ContratoItem {
   login: string;
   /** Descrição completa montada pelo backend ("WatchTV Brasil R$ 49,90"...). */
   nomeExibicao?: string;
+  /**
+   * Tipo do serviço ("STREAMER" | "STREAMER_COLAB" | "CAMERA"), deduzido pelo
+   * backend. `nome` guarda a descrição que sai no boleto, então não serve mais
+   * para comparar tipo.
+   */
+  tag?: string;
 }
 
 interface ClienteComServico {
@@ -63,7 +69,8 @@ const nomeStreaming = (valor: number = VALOR_STREAMER_PADRAO) =>
   `WatchTV Brasil R$ ${formatBRL(valor)}`;
 const nomeStreamingColab = () => "WatchTV Brasil Colaborador (grátis)";
 const nomeCamera = (canais: number, gb: number) =>
-  `${canais} Canais de Gravação em Nuvem ${gb} Gb de Armazenamento compartilhado`;
+  `${canais} ${canais === 1 ? "Canal" : "Canais"} de Gravação em Nuvem ` +
+  `${gb} Gb de Armazenamento compartilhado`;
 
 // Planos de armazenamento das gravações (espelha o backend: cameraStoragePlans.ts).
 const STORAGE_PLANS = [
@@ -128,6 +135,7 @@ export const SerContratos: React.FC = () => {
   const [clientes, setClientes] = useState<ClienteComServico[] | null>(null);
   const [loadingClientes, setLoadingClientes] = useState(false);
   const [filtroClientes, setFiltroClientes] = useState("");
+  const [detalhando, setDetalhando] = useState(false);
 
   const base = process.env.REACT_APP_URL;
   const headers = { Authorization: `Bearer ${user?.token}` };
@@ -157,6 +165,47 @@ export const SerContratos: React.FC = () => {
   useEffect(() => {
     fetchClientes();
   }, [fetchClientes]);
+
+  /**
+   * Regrava os contratos antigos que ainda guardam a tag crua ("CAMERA",
+   * "STREAMER") com o nome comercial — é esse campo que o boleto imprime em
+   * "Valor adicional: ...". Roda primeiro em prévia e só aplica se confirmado.
+   */
+  const detalharNomes = async () => {
+    setDetalhando(true);
+    try {
+      const previa = await axios.post<{ analisados: number; alteracoes: number }>(
+        `${base}/sercontratos/detalhar-nomes`,
+        {},
+        { headers },
+      );
+      if (previa.data.alteracoes === 0) {
+        showMsg("Todos os contratos já estão com a descrição completa.", "success");
+        return;
+      }
+      const ok = window.confirm(
+        `${previa.data.alteracoes} contrato(s) de ${previa.data.analisados} ainda ` +
+          `mostram só a tag no boleto.
+
+Regravar com a descrição completa?`,
+      );
+      if (!ok) return;
+      const res = await axios.post<{ alteracoes: number }>(
+        `${base}/sercontratos/detalhar-nomes?aplicar=1`,
+        {},
+        { headers },
+      );
+      showMsg(`${res.data.alteracoes} contrato(s) atualizado(s).`, "success");
+      fetchClientes();
+    } catch (e: any) {
+      showMsg(
+        e?.response?.data?.message || "Erro ao detalhar os nomes.",
+        "error",
+      );
+    } finally {
+      setDetalhando(false);
+    }
+  };
 
   const clientesFiltrados = useMemo(() => {
     const termo = filtroClientes.trim().toUpperCase();
@@ -401,10 +450,13 @@ export const SerContratos: React.FC = () => {
     }
   };
 
-  const totalStreaming = loaded?.items.filter((i) => i.nome === "STREAMER")
-    .length || 0;
+  const tagDoItem = (i: ContratoItem) =>
+    i.tag ?? String(i.nome || "").toUpperCase();
+  const totalStreaming = loaded?.items.filter(
+    (i) => tagDoItem(i) === "STREAMER",
+  ).length || 0;
   const totalStreamingColab = loaded?.items.filter(
-    (i) => i.nome === "STREAMER_COLAB",
+    (i) => tagDoItem(i) === "STREAMER_COLAB",
   ).length || 0;
   const temStreaming = totalStreaming > 0 || totalStreamingColab > 0;
   const valorStreamerUnit =
@@ -413,8 +465,9 @@ export const SerContratos: React.FC = () => {
     loaded?.nomesServicos?.STREAMER ?? nomeStreaming(valorStreamerUnit);
   const nomeStreamingColabAtual =
     loaded?.nomesServicos?.STREAMER_COLAB ?? nomeStreamingColab();
-  const totalCameras = loaded?.items.filter((i) => i.nome === "CAMERA").length ||
-    0;
+  const totalCameras = loaded?.items.filter(
+    (i) => tagDoItem(i) === "CAMERA",
+  ).length || 0;
   const nomeCameraAtual =
     totalCameras > 0
       ? (loaded?.nomesServicos?.CAMERA ??
@@ -510,13 +563,23 @@ export const SerContratos: React.FC = () => {
                     </span>
                   )}
                 </h2>
-                <input
-                  type="text"
-                  value={filtroClientes}
-                  onChange={(e) => setFiltroClientes(e.target.value)}
-                  placeholder="Filtrar por login ou nome"
-                  className="w-64 p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={detalharNomes}
+                    disabled={detalhando}
+                    title="Regrava contratos antigos que ainda saem no boleto como CAMERA/STREAMER"
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded text-sm font-semibold hover:bg-gray-200 disabled:text-gray-400"
+                  >
+                    {detalhando ? "Verificando…" : "Detalhar no boleto"}
+                  </button>
+                  <input
+                    type="text"
+                    value={filtroClientes}
+                    onChange={(e) => setFiltroClientes(e.target.value)}
+                    placeholder="Filtrar por login ou nome"
+                    className="w-64 p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
               </div>
 
               {loadingClientes ? (
@@ -790,11 +853,11 @@ export const SerContratos: React.FC = () => {
                           <td className="p-2 text-gray-500">{it.id}</td>
                           <td className="p-2 font-semibold">
                             {it.nomeExibicao ??
-                              (it.nome === "STREAMER_COLAB"
+                              (tagDoItem(it) === "STREAMER_COLAB"
                                 ? nomeStreamingColabAtual
-                                : it.nome === "STREAMER"
+                                : tagDoItem(it) === "STREAMER"
                                   ? nomeStreaming(Number(it.valor))
-                                  : it.nome === "CAMERA"
+                                  : tagDoItem(it) === "CAMERA"
                                     ? nomeCameraAtual
                                     : it.nome)}
                           </td>
@@ -808,11 +871,11 @@ export const SerContratos: React.FC = () => {
                           </td>
                           <td className="p-2 text-gray-600">{it.insuser}</td>
                           <td className="p-2 text-center">
-                            {it.nome === "STREAMER" ? (
+                            {tagDoItem(it) === "STREAMER" ? (
                               <span className="text-gray-300" title="Streaming pago não pode ser removido por aqui">
                                 —
                               </span>
-                            ) : it.nome === "CAMERA" ? (
+                            ) : tagDoItem(it) === "CAMERA" ? (
                               <span className="text-gray-300" title="Para remover, exclua o cliente em Gerenciar Câmeras">
                                 —
                               </span>

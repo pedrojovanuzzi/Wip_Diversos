@@ -1,10 +1,14 @@
 /**
  * Monta o nome comercial (descrição completa) dos serviços adicionais.
  *
- * O cadastro grava só a "tag" do serviço em sis_sercontratos ("STREAMER",
- * "STREAMER_COLAB", "CAMERA"). Nenhuma tela ou documento deve exibir a tag crua:
- * tudo passa por aqui para virar "WatchTV Brasil R$ 49,90" ou
- * "4 Canais de Gravação em Nuvem 20 Gb de Armazenamento compartilhado".
+ * O boleto do mkauth imprime literalmente sis_sercontratos.nome ("Valor
+ * adicional: <nome>"), então o cadastro grava ali o nome comercial completo
+ * ("WatchTV Brasil R$ 49,90", "4 Canais de Gravação em Nuvem 20 Gb de
+ * Armazenamento compartilhado") em vez da tag crua.
+ *
+ * Como o mesmo campo continua sendo o único identificador do tipo de serviço,
+ * toda consulta passa por `tagDoServico` (TypeScript) ou `sqlTagServico` (SQL),
+ * que reconhecem tanto o nome novo quanto as tags antigas ainda gravadas.
  */
 import { In } from "typeorm";
 
@@ -34,6 +38,11 @@ function planoPorValor(valor: number): number {
   const v = Number(valor || 0);
   const plano = STORAGE_PLANS.find((p) => Math.abs(p.priceBRL - v) < 0.005);
   return plano?.gb ?? DEFAULT_STORAGE_GB;
+}
+
+/** Cota do plano deduzida do valor cobrado, quando não há conta no wip_cams. */
+export function storageGbDoValor(valor: number): number {
+  return planoPorValor(valor);
 }
 
 /**
@@ -116,4 +125,63 @@ export function nomeServicoContrato(
   if (tag === "STREAMER_COLAB") return nomeStreamingColab();
   if (tag === "CAMERA") return nomeServicoCamera(resumoCamera, Number(valor || 0));
   return nome;
+}
+
+/** Tags gravadas historicamente (e ainda aceitas) em sis_sercontratos.nome. */
+export const TAGS_SERVICO = ["STREAMER", "STREAMER_COLAB", "CAMERA"] as const;
+export type TagServico = (typeof TAGS_SERVICO)[number];
+
+/**
+ * Descobre o tipo de serviço a partir do que está gravado em
+ * sis_sercontratos.nome — aceita a tag antiga e o nome comercial novo.
+ * Nomes desconhecidos voltam como estão (em maiúsculas), para serviços
+ * cadastrados direto no mkauth continuarem intactos.
+ */
+export function tagDoServico(nome: string): string {
+  const t = String(nome || "").trim().toUpperCase();
+  if ((TAGS_SERVICO as readonly string[]).includes(t)) return t;
+  if (t.startsWith("WATCHTV BRASIL COLABORADOR")) return "STREAMER_COLAB";
+  if (t.startsWith("WATCHTV BRASIL")) return "STREAMER";
+  if (t.includes("CANAIS DE GRAVA") || t.includes("CANAL DE GRAVA")) {
+    return "CAMERA";
+  }
+  return t;
+}
+
+/**
+ * Versão SQL de `tagDoServico`, para usar no lugar de `UPPER(TRIM(nome))` nas
+ * consultas. Recebe a coluna (ex.: "s.nome") e devolve a expressão que
+ * normaliza o valor gravado de volta para a tag.
+ */
+export function sqlTagServico(coluna: string): string {
+  const c = `UPPER(TRIM(${coluna}))`;
+  return (
+    `CASE` +
+    ` WHEN ${c} LIKE 'WATCHTV BRASIL COLABORADOR%' THEN 'STREAMER_COLAB'` +
+    ` WHEN ${c} LIKE 'WATCHTV BRASIL%' THEN 'STREAMER'` +
+    ` WHEN ${c} LIKE '%CANAIS DE GRAVA%' THEN 'CAMERA'` +
+    ` WHEN ${c} LIKE '%CANAL DE GRAVA%' THEN 'CAMERA'` +
+    ` ELSE ${c} END`
+  );
+}
+
+/**
+ * Nome a gravar em sis_sercontratos.nome — é exatamente o texto que sai no
+ * boleto. Para câmeras usa o limite do plano (e não quantas câmeras estão
+ * cadastradas no portal), para o nome não envelhecer a cada câmera adicionada:
+ * ele só muda quando o plano muda.
+ */
+export function nomeContratoParaGravar(
+  tag: string,
+  valor: number,
+  storageGb?: number,
+): string {
+  const t = tagDoServico(tag);
+  if (t === "STREAMER") return nomeStreaming(Number(valor || 0));
+  if (t === "STREAMER_COLAB") return nomeStreamingColab();
+  if (t === "CAMERA") {
+    const gb = storageGb ?? DEFAULT_STORAGE_GB;
+    return nomeCamera(maxCamerasFor(gb), gb);
+  }
+  return String(tag || "").trim();
 }

@@ -21,6 +21,7 @@ import {
   buscarResumoCameras,
   buscarResumoCameraDeUmLogin,
   nomeServicoCamera,
+  sqlTagServico,
 } from "../services/servicosAdicionaisNomes";
 
 import { NfseXmlFactory } from "../services/nfse/NfseXmlFactory";
@@ -1789,9 +1790,7 @@ export class NFSEController {
 
       const params: any[] = [];
       const where: string[] = [];
-      where.push(
-        "(UPPER(TRIM(sc.nome)) = 'STREAMER' OR UPPER(TRIM(sc.nome)) = 'CAMERA')",
-      );
+      where.push(`${sqlTagServico("sc.nome")} IN ('STREAMER', 'CAMERA')`);
       if (cpf) {
         const cpfDigits = String(cpf).replace(/\D/g, "");
         if (cpfDigits) {
@@ -1818,10 +1817,10 @@ export class NFSEController {
           c.cidade,
           c.cpf_cnpj,
           c.cli_ativado,
-          SUM(CASE WHEN UPPER(TRIM(sc.nome)) = 'STREAMER' THEN 1 ELSE 0 END) AS qtd_streamer,
-          SUM(CASE WHEN UPPER(TRIM(sc.nome)) = 'CAMERA'   THEN 1 ELSE 0 END) AS qtd_camera,
-          SUM(CASE WHEN UPPER(TRIM(sc.nome)) = 'STREAMER' THEN sc.valor ELSE 0 END) AS valor_streamer,
-          SUM(CASE WHEN UPPER(TRIM(sc.nome)) = 'CAMERA'   THEN sc.valor ELSE 0 END) AS valor_camera,
+          SUM(CASE WHEN ${sqlTagServico("sc.nome")} = 'STREAMER' THEN 1 ELSE 0 END) AS qtd_streamer,
+          SUM(CASE WHEN ${sqlTagServico("sc.nome")} = 'CAMERA'   THEN 1 ELSE 0 END) AS qtd_camera,
+          SUM(CASE WHEN ${sqlTagServico("sc.nome")} = 'STREAMER' THEN sc.valor ELSE 0 END) AS valor_streamer,
+          SUM(CASE WHEN ${sqlTagServico("sc.nome")} = 'CAMERA'   THEN sc.valor ELSE 0 END) AS valor_camera,
           SUM(sc.valor) AS valor_total
         FROM sis_sercontratos sc
         INNER JOIN sis_cliente c ON UPPER(TRIM(c.login)) = UPPER(TRIM(sc.login))
@@ -2121,9 +2120,9 @@ export class NFSEController {
       const results: any[] = [];
       for (const login of logins) {
         const rows = (await MkauthSource.query(
-          `SELECT UPPER(TRIM(nome)) AS nome, valor FROM sis_sercontratos
+          `SELECT ${sqlTagServico("nome")} AS nome, valor FROM sis_sercontratos
            WHERE UPPER(TRIM(login)) = UPPER(TRIM(?))
-             AND (UPPER(TRIM(nome)) = 'STREAMER' OR UPPER(TRIM(nome)) = 'CAMERA')`,
+             AND ${sqlTagServico("nome")} IN ('STREAMER', 'CAMERA')`,
           [login],
         )) as { nome: string; valor: any }[];
 

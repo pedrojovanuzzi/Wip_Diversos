@@ -10,6 +10,7 @@ import { SignedXml } from "xml-crypto";
 import axios from "axios";
 import * as https from "https";
 import { gunzipSync, gzipSync } from "zlib";
+import { sqlTagServico } from "../services/servicosAdicionaisNomes";
 import { processarCertificado } from "../utils/certUtils";
 import MkauthSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
@@ -268,7 +269,7 @@ class Nfcom {
           `SELECT COALESCE(SUM(valor), 0) AS total
            FROM sis_sercontratos
            WHERE UPPER(TRIM(login)) = UPPER(TRIM(?))
-             AND (UPPER(TRIM(nome)) = 'STREAMER' OR UPPER(TRIM(nome)) = 'CAMERA')
+             AND ${sqlTagServico("nome")} IN ('STREAMER', 'CAMERA')
              AND (data IS NULL OR DATE(data) <= ?)`,
           [ClientData.login, dataLimite],
         )) as { total: any }[];
