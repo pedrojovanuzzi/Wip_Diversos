@@ -9,10 +9,20 @@ import {
   deleteTicket,
 } from "../services/WatchBrasilService";
 import { planFor, normalizeStorageGb } from "../config/cameraStoragePlans";
+import {
+  VALOR_STREAMER,
+  VALOR_STREAMER_COLAB,
+  nomeStreaming,
+  nomeStreamingColab,
+  nomeCamera,
+} from "../config/servicosAdicionais";
+import CamsSource from "../database/CamsSource";
+import { CameraCliente } from "../entities/CameraCliente";
+import { Camera } from "../entities/Camera";
 
 const VALORES: Record<string, number> = {
-  STREAMER: 44.9,
-  STREAMER_COLAB: 0,
+  STREAMER: VALOR_STREAMER,
+  STREAMER_COLAB: VALOR_STREAMER_COLAB,
   CAMERA: 20.0,
 };
 
@@ -52,12 +62,43 @@ class SerContratos {
         StreamingAssinante,
       ).findOne({ where: { login } });
 
+      // Conta de câmeras do cliente (banco wip_cams): a quantidade de canais
+      // gravando e a cota compartilhada montam o nome comercial do serviço.
+      let camera: {
+        storageGb: number;
+        canais: number;
+        nome: string;
+      } | null = null;
+      try {
+        const camCliente = await CamsSource.getRepository(
+          CameraCliente,
+        ).findOne({ where: { login } });
+        if (camCliente) {
+          const canais = await CamsSource.getRepository(Camera).count({
+            where: { cliente_id: Number(camCliente.id) },
+          });
+          camera = {
+            storageGb: camCliente.storage_gb,
+            canais,
+            nome: nomeCamera(canais, camCliente.storage_gb),
+          };
+        }
+      } catch (e: any) {
+        console.warn("Erro ao consultar conta de câmeras:", e?.message);
+      }
+
       res.json({
         login,
         items,
         total: Number(total.toFixed(2)),
         valoresUnitarios: VALORES,
         streamingTesteExpiraEm: assinante?.teste_expira_em ?? null,
+        camera,
+        nomesServicos: {
+          STREAMER: nomeStreaming(VALORES.STREAMER),
+          STREAMER_COLAB: nomeStreamingColab(),
+          CAMERA: camera?.nome ?? null,
+        },
       });
     } catch (error: any) {
       console.error("Erro ao listar sercontratos:", error);

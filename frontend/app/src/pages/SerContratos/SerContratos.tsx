@@ -29,7 +29,30 @@ interface ListResponse {
   valoresUnitarios: Record<string, number>;
   /** Preenchido quando a assinatura em curso é um teste com prazo. */
   streamingTesteExpiraEm?: string | null;
+  /** Conta de câmeras do cliente (null quando ainda não existe). */
+  camera?: {
+    storageGb: number;
+    canais: number;
+    nome: string;
+  } | null;
+  /** Nomes comerciais dos serviços, montados pelo backend. */
+  nomesServicos?: {
+    STREAMER: string;
+    STREAMER_COLAB: string;
+    CAMERA: string | null;
+  };
 }
+
+const VALOR_STREAMER_PADRAO = 49.9;
+
+const formatBRL = (v: number) => Number(v || 0).toFixed(2).replace(".", ",");
+
+// Nomes comerciais (espelham o backend: config/servicosAdicionais.ts).
+const nomeStreaming = (valor: number = VALOR_STREAMER_PADRAO) =>
+  `WatchTV Brasil R$ ${formatBRL(valor)}`;
+const nomeStreamingColab = () => "WatchTV Brasil Colaborador (grátis)";
+const nomeCamera = (canais: number, gb: number) =>
+  `${canais} Canais de Gravação em Nuvem ${gb} Gb de Armazenamento compartilhado`;
 
 // Planos de armazenamento das gravações (espelha o backend: cameraStoragePlans.ts).
 const STORAGE_PLANS = [
@@ -323,6 +346,17 @@ export const SerContratos: React.FC = () => {
     (i) => i.nome === "STREAMER_COLAB",
   ).length || 0;
   const temStreaming = totalStreaming > 0 || totalStreamingColab > 0;
+  const valorStreamerUnit =
+    loaded?.valoresUnitarios.STREAMER ?? VALOR_STREAMER_PADRAO;
+  const nomeStreamingAtual =
+    loaded?.nomesServicos?.STREAMER ?? nomeStreaming(valorStreamerUnit);
+  const nomeStreamingColabAtual =
+    loaded?.nomesServicos?.STREAMER_COLAB ?? nomeStreamingColab();
+  const nomeCameraAtual =
+    loaded?.nomesServicos?.CAMERA ??
+    (loaded?.camera
+      ? nomeCamera(loaded.camera.canais, loaded.camera.storageGb)
+      : null);
   const totalCameras = loaded?.items.filter((i) => i.nome === "CAMERA").length ||
     0;
 
@@ -415,11 +449,13 @@ export const SerContratos: React.FC = () => {
                 <div className="bg-white p-4 rounded-lg shadow-md">
                   <div className="flex items-center gap-2 mb-3">
                     <BsCollectionPlay className="text-2xl text-purple-600" />
-                    <h2 className="font-bold text-gray-800">Streaming</h2>
+                    <h2 className="font-bold text-gray-800">
+                      {nomeStreamingAtual}
+                    </h2>
                   </div>
                   <p className="text-xs text-gray-500 mb-2">
-                    Pago R$ {(loaded.valoresUnitarios.STREAMER ?? 44.9).toFixed(2)} ·
-                    Colaborador grátis — máx. 1 por cliente
+                    Pago R$ {valorStreamerUnit.toFixed(2)} · Colaborador grátis —
+                    máx. 1 por cliente
                   </p>
                   {loaded.streamingTesteExpiraEm && (
                     <div className="mb-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
@@ -435,8 +471,8 @@ export const SerContratos: React.FC = () => {
                       <span className="text-sm text-purple-800 font-semibold">
                         ✓ Cliente possui{" "}
                         {totalStreamingColab > 0
-                          ? "Streaming Colaborador (grátis)"
-                          : "Streaming"}
+                          ? nomeStreamingColabAtual
+                          : nomeStreamingAtual}
                       </span>
                     </div>
                   )}
@@ -492,7 +528,9 @@ export const SerContratos: React.FC = () => {
                 <div className="bg-white p-4 rounded-lg shadow-md">
                   <div className="flex items-center gap-2 mb-3">
                     <BsCamera className="text-2xl text-blue-600" />
-                    <h2 className="font-bold text-gray-800">Câmeras</h2>
+                    <h2 className="font-bold text-gray-800">
+                      {nomeCameraAtual ?? "Gravação em Nuvem"}
+                    </h2>
                   </div>
                   <p className="text-xs text-gray-500 mb-2">
                     Plano de armazenamento das gravações — máx. 1 por cliente ·
@@ -577,8 +615,12 @@ export const SerContratos: React.FC = () => {
                           <td className="p-2 text-gray-500">{it.id}</td>
                           <td className="p-2 font-semibold">
                             {it.nome === "STREAMER_COLAB"
-                              ? "STREAMING COLABORADOR"
-                              : it.nome}
+                              ? nomeStreamingColabAtual
+                              : it.nome === "STREAMER"
+                                ? nomeStreaming(Number(it.valor))
+                                : it.nome === "CAMERA"
+                                  ? (nomeCameraAtual ?? it.nome)
+                                  : it.nome}
                           </td>
                           <td className="p-2 text-right">
                             R$ {Number(it.valor).toFixed(2)}

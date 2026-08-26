@@ -16,6 +16,15 @@ import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
 import { Jobs } from "../entities/Jobs";
 
+import CamsSource from "../database/CamsSource";
+import { CameraCliente } from "../entities/CameraCliente";
+import { Camera } from "../entities/Camera";
+import {
+  formatBRL,
+  nomeStreaming,
+  nomeCamera,
+} from "../config/servicosAdicionais";
+
 import { NfseXmlFactory } from "../services/nfse/NfseXmlFactory";
 import { FiorilliProvider } from "../services/nfse/FiorilliProvider";
 
@@ -2114,18 +2123,39 @@ export class NFSEController {
           .reduce((s, r) => s + Number(r.valor || 0), 0);
         const valorTotal = valorStreamer + valorCamera;
 
+        // Câmeras: o nome do serviço traz os canais gravando na nuvem e a cota
+        // de armazenamento compartilhada, lidos do banco das câmeras.
+        let camCanais = 0;
+        let camStorageGb = 0;
+        if (qtdCamera > 0) {
+          try {
+            const camCliente = await CamsSource.getRepository(
+              CameraCliente,
+            ).findOne({ where: { login } });
+            if (camCliente) {
+              camStorageGb = camCliente.storage_gb;
+              camCanais = await CamsSource.getRepository(Camera).count({
+                where: { cliente_id: Number(camCliente.id) },
+              });
+            }
+          } catch (e: any) {
+            console.warn(
+              `Erro ao consultar conta de cameras de ${login}:`,
+              e?.message,
+            );
+          }
+        }
+
         const partes: string[] = [];
         if (qtdStreamer > 0)
           partes.push(
-            `Streaming (${qtdStreamer}x): R$ ${valorStreamer.toFixed(2).replace(".", ",")}`,
+            `${nomeStreaming(valorStreamer / qtdStreamer)} (${qtdStreamer}x): R$ ${formatBRL(valorStreamer)}`,
           );
         if (qtdCamera > 0)
           partes.push(
-            `Camera (${qtdCamera}x): R$ ${valorCamera.toFixed(2).replace(".", ",")}`,
+            `${nomeCamera(camCanais, camStorageGb)}: R$ ${formatBRL(valorCamera)}`,
           );
-        const descricao = `Servicos adicionais - ${partes.join(" / ")} - Total: R$ ${valorTotal
-          .toFixed(2)
-          .replace(".", ",")}`;
+        const descricao = `Servicos adicionais - ${partes.join(" / ")} - Total: R$ ${formatBRL(valorTotal)}`;
 
         const r = await this._emitirNfseServicoUnico({
           login,
