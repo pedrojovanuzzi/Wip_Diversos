@@ -16,6 +16,9 @@ interface ClienteServico {
   valor_streamer: number | string;
   valor_camera: number | string;
   valor_total: number | string;
+  /** Descrições completas montadas pelo backend (null quando não tem o serviço). */
+  nome_streamer?: string | null;
+  nome_camera?: string | null;
 }
 
 export const NFSEServicosAdicionais: React.FC = () => {
@@ -134,7 +137,7 @@ export const NFSEServicosAdicionais: React.FC = () => {
       <NavBar />
       <div className="max-w-6xl mx-auto p-6">
         <h1 className="text-2xl font-bold mb-4">
-          NFSE — Serviços Adicionais (Streaming / Câmera)
+          NFSE — Serviços Adicionais (WatchTV Brasil / Gravação em Nuvem)
         </h1>
 
         <form
@@ -198,15 +201,14 @@ export const NFSEServicosAdicionais: React.FC = () => {
                 <th className="p-2 text-left">Login</th>
                 <th className="p-2 text-left">Nome</th>
                 <th className="p-2 text-left">Cidade</th>
-                <th className="p-2 text-center">Streaming</th>
-                <th className="p-2 text-center">Câmera</th>
+                <th className="p-2 text-left">Serviços</th>
                 <th className="p-2 text-right">Total</th>
               </tr>
             </thead>
             <tbody>
               {clientes.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-4 text-center text-gray-500">
+                  <td colSpan={6} className="p-4 text-center text-gray-500">
                     Nenhum cliente com serviços adicionais.
                   </td>
                 </tr>
@@ -223,15 +225,28 @@ export const NFSEServicosAdicionais: React.FC = () => {
                     <td className="p-2 font-mono">{c.login}</td>
                     <td className="p-2">{c.nome}</td>
                     <td className="p-2">{c.cidade}</td>
-                    <td className="p-2 text-center">
-                      {Number(c.qtd_streamer) > 0
-                        ? `${c.qtd_streamer}x (R$ ${Number(c.valor_streamer).toFixed(2)})`
-                        : "-"}
-                    </td>
-                    <td className="p-2 text-center">
-                      {Number(c.qtd_camera) > 0
-                        ? `${c.qtd_camera}x (R$ ${Number(c.valor_camera).toFixed(2)})`
-                        : "-"}
+                    <td className="p-2">
+                      <ul className="space-y-0.5">
+                        {Number(c.qtd_streamer) > 0 && (
+                          <li>
+                            {c.nome_streamer ?? "WatchTV Brasil"} —{" "}
+                            <span className="text-gray-600">
+                              {c.qtd_streamer}x R${" "}
+                              {Number(c.valor_streamer).toFixed(2)}
+                            </span>
+                          </li>
+                        )}
+                        {Number(c.qtd_camera) > 0 && (
+                          <li>
+                            {c.nome_camera ?? "Gravação em Nuvem"} —{" "}
+                            <span className="text-gray-600">
+                              R$ {Number(c.valor_camera).toFixed(2)}
+                            </span>
+                          </li>
+                        )}
+                        {Number(c.qtd_streamer) === 0 &&
+                          Number(c.qtd_camera) === 0 && <li>-</li>}
+                      </ul>
                     </td>
                     <td className="p-2 text-right font-semibold">
                       R$ {Number(c.valor_total).toFixed(2)}
@@ -243,7 +258,7 @@ export const NFSEServicosAdicionais: React.FC = () => {
             {clientes.length > 0 && (
               <tfoot>
                 <tr className="bg-gray-50 font-bold">
-                  <td className="p-2" colSpan={6}>
+                  <td className="p-2" colSpan={5}>
                     {selecionados.length} selecionado(s) — Total
                   </td>
                   <td className="p-2 text-right text-green-700">

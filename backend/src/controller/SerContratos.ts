@@ -14,11 +14,19 @@ import {
   VALOR_STREAMER_COLAB,
   nomeStreaming,
   nomeStreamingColab,
-  nomeCamera,
 } from "../config/servicosAdicionais";
-import CamsSource from "../database/CamsSource";
-import { CameraCliente } from "../entities/CameraCliente";
-import { Camera } from "../entities/Camera";
+import {
+  buscarResumoCameraDeUmLogin,
+  nomeServicoContrato,
+} from "../services/servicosAdicionaisNomes";
+
+/** Rótulo curto do serviço para mensagens de erro (nunca a tag crua). */
+const rotuloServico = (tipo: string): string =>
+  tipo === "CAMERA"
+    ? "Gravação em Nuvem"
+    : tipo === "STREAMER_COLAB"
+      ? "WatchTV Brasil Colaborador"
+      : "WatchTV Brasil";
 
 const VALORES: Record<string, number> = {
   STREAMER: VALOR_STREAMER,
@@ -64,40 +72,26 @@ class SerContratos {
 
       // Conta de câmeras do cliente (banco wip_cams): a quantidade de canais
       // gravando e a cota compartilhada montam o nome comercial do serviço.
-      let camera: {
-        storageGb: number;
-        canais: number;
-        nome: string;
-      } | null = null;
-      try {
-        const camCliente = await CamsSource.getRepository(
-          CameraCliente,
-        ).findOne({ where: { login } });
-        if (camCliente) {
-          const canais = await CamsSource.getRepository(Camera).count({
-            where: { cliente_id: Number(camCliente.id) },
-          });
-          camera = {
-            storageGb: camCliente.storage_gb,
-            canais,
-            nome: nomeCamera(canais, camCliente.storage_gb),
-          };
-        }
-      } catch (e: any) {
-        console.warn("Erro ao consultar conta de câmeras:", e?.message);
-      }
+      const resumoCamera = await buscarResumoCameraDeUmLogin(login);
+      const valorCameraContrato = items
+        .filter((i) => String(i.nome).trim().toUpperCase() === "CAMERA")
+        .reduce((a, c) => a + Number(c.valor || 0), 0);
 
       res.json({
         login,
-        items,
+        // Cada item já vem com a descrição completa pronta para exibir.
+        items: items.map((i) => ({
+          ...i,
+          nomeExibicao: nomeServicoContrato(i.nome, Number(i.valor || 0), resumoCamera),
+        })),
         total: Number(total.toFixed(2)),
         valoresUnitarios: VALORES,
         streamingTesteExpiraEm: assinante?.teste_expira_em ?? null,
-        camera,
+        camera: resumoCamera,
         nomesServicos: {
           STREAMER: nomeStreaming(VALORES.STREAMER),
           STREAMER_COLAB: nomeStreamingColab(),
-          CAMERA: camera?.nome ?? null,
+          CAMERA: nomeServicoContrato("CAMERA", valorCameraContrato, resumoCamera),
         },
       });
     } catch (error: any) {
@@ -321,7 +315,7 @@ class SerContratos {
         const total = await countExisting(login, tipoNorm);
         if (total > 0) {
           res.status(409).json({
-            message: `Cliente já possui ${tipoNorm}. Esse serviço é único por cliente.`,
+            message: `Cliente já possui ${rotuloServico(tipoNorm)}. Esse serviço é único por cliente.`,
           });
           return;
         }
@@ -457,7 +451,7 @@ class SerContratos {
         if (e?.message === "UNIQUE_VIOLATION") {
           throw {
             status: 409,
-            message: `Cliente já possui ${tipoNorm}. Esse serviço é único por cliente.`,
+            message: `Cliente já possui ${rotuloServico(tipoNorm)}. Esse serviço é único por cliente.`,
           };
         }
         throw e;

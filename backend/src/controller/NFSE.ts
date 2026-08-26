@@ -16,14 +16,12 @@ import { ClientesEntities } from "../entities/ClientesEntities";
 import { Faturas } from "../entities/Faturas";
 import { Jobs } from "../entities/Jobs";
 
-import CamsSource from "../database/CamsSource";
-import { CameraCliente } from "../entities/CameraCliente";
-import { Camera } from "../entities/Camera";
+import { formatBRL, nomeStreaming } from "../config/servicosAdicionais";
 import {
-  formatBRL,
-  nomeStreaming,
-  nomeCamera,
-} from "../config/servicosAdicionais";
+  buscarResumoCameras,
+  buscarResumoCameraDeUmLogin,
+  nomeServicoCamera,
+} from "../services/servicosAdicionaisNomes";
 
 import { NfseXmlFactory } from "../services/nfse/NfseXmlFactory";
 import { FiorilliProvider } from "../services/nfse/FiorilliProvider";
@@ -1832,8 +1830,29 @@ export class NFSEController {
         ORDER BY c.nome ASC
       `;
 
-      const rows = await MkauthSource.query(sql, params);
-      res.json(rows);
+      const rows = (await MkauthSource.query(sql, params)) as any[];
+
+      // Nome comercial completo de cada serviço, no lugar das tags cruas.
+      const resumos = await buscarResumoCameras(rows.map((r) => r.login));
+      const enriquecidas = rows.map((r) => {
+        const qtdStreamer = Number(r.qtd_streamer || 0);
+        const qtdCamera = Number(r.qtd_camera || 0);
+        const valorStreamer = Number(r.valor_streamer || 0);
+        const valorCamera = Number(r.valor_camera || 0);
+        const resumo =
+          resumos.get(String(r.login || "").trim().toUpperCase()) ?? null;
+        return {
+          ...r,
+          nome_streamer:
+            qtdStreamer > 0
+              ? nomeStreaming(valorStreamer / qtdStreamer)
+              : null,
+          nome_camera:
+            qtdCamera > 0 ? nomeServicoCamera(resumo, valorCamera) : null,
+        };
+      });
+
+      res.json(enriquecidas);
     } catch (error: any) {
       console.error("Erro BuscarClientesServicos:", error?.message);
       res.status(500).json({ error: "Erro ao buscar clientes." });
@@ -2125,26 +2144,8 @@ export class NFSEController {
 
         // Câmeras: o nome do serviço traz os canais gravando na nuvem e a cota
         // de armazenamento compartilhada, lidos do banco das câmeras.
-        let camCanais = 0;
-        let camStorageGb = 0;
-        if (qtdCamera > 0) {
-          try {
-            const camCliente = await CamsSource.getRepository(
-              CameraCliente,
-            ).findOne({ where: { login } });
-            if (camCliente) {
-              camStorageGb = camCliente.storage_gb;
-              camCanais = await CamsSource.getRepository(Camera).count({
-                where: { cliente_id: Number(camCliente.id) },
-              });
-            }
-          } catch (e: any) {
-            console.warn(
-              `Erro ao consultar conta de cameras de ${login}:`,
-              e?.message,
-            );
-          }
-        }
+        const resumoCamera =
+          qtdCamera > 0 ? await buscarResumoCameraDeUmLogin(login) : null;
 
         const partes: string[] = [];
         if (qtdStreamer > 0)
@@ -2153,7 +2154,7 @@ export class NFSEController {
           );
         if (qtdCamera > 0)
           partes.push(
-            `${nomeCamera(camCanais, camStorageGb)}: R$ ${formatBRL(valorCamera)}`,
+            `${nomeServicoCamera(resumoCamera, valorCamera)}: R$ ${formatBRL(valorCamera)}`,
           );
         const descricao = `Servicos adicionais - ${partes.join(" / ")} - Total: R$ ${formatBRL(valorTotal)}`;
 

@@ -20,6 +20,8 @@ interface ContratoItem {
   data: string;
   insuser: string;
   login: string;
+  /** Descrição completa montada pelo backend ("WatchTV Brasil R$ 49,90"...). */
+  nomeExibicao?: string;
 }
 
 interface ListResponse {
@@ -56,11 +58,14 @@ const nomeCamera = (canais: number, gb: number) =>
 
 // Planos de armazenamento das gravações (espelha o backend: cameraStoragePlans.ts).
 const STORAGE_PLANS = [
-  { gb: 5, price: 20 },
-  { gb: 10, price: 30 },
-  { gb: 15, price: 35 },
-  { gb: 20, price: 40 },
+  { gb: 5, price: 20, cameras: 1 },
+  { gb: 10, price: 30, cameras: 2 },
+  { gb: 15, price: 35, cameras: 3 },
+  { gb: 20, price: 40, cameras: 4 },
 ];
+
+const maxCamerasFor = (gb: number) =>
+  STORAGE_PLANS.find((p) => p.gb === gb)?.cameras ?? STORAGE_PLANS[0].cameras;
 
 export const SerContratos: React.FC = () => {
   const { user } = useAuth();
@@ -352,13 +357,15 @@ export const SerContratos: React.FC = () => {
     loaded?.nomesServicos?.STREAMER ?? nomeStreaming(valorStreamerUnit);
   const nomeStreamingColabAtual =
     loaded?.nomesServicos?.STREAMER_COLAB ?? nomeStreamingColab();
-  const nomeCameraAtual =
-    loaded?.nomesServicos?.CAMERA ??
-    (loaded?.camera
-      ? nomeCamera(loaded.camera.canais, loaded.camera.storageGb)
-      : null);
   const totalCameras = loaded?.items.filter((i) => i.nome === "CAMERA").length ||
     0;
+  const nomeCameraAtual =
+    totalCameras > 0
+      ? (loaded?.nomesServicos?.CAMERA ??
+        (loaded?.camera
+          ? nomeCamera(loaded.camera.canais, loaded.camera.storageGb)
+          : nomeCamera(maxCamerasFor(cameraGb), cameraGb)))
+      : nomeCamera(maxCamerasFor(cameraGb), cameraGb);
 
   return (
     <>
@@ -529,7 +536,7 @@ export const SerContratos: React.FC = () => {
                   <div className="flex items-center gap-2 mb-3">
                     <BsCamera className="text-2xl text-blue-600" />
                     <h2 className="font-bold text-gray-800">
-                      {nomeCameraAtual ?? "Gravação em Nuvem"}
+                      {nomeCameraAtual}
                     </h2>
                   </div>
                   <p className="text-xs text-gray-500 mb-2">
@@ -614,13 +621,14 @@ export const SerContratos: React.FC = () => {
                         >
                           <td className="p-2 text-gray-500">{it.id}</td>
                           <td className="p-2 font-semibold">
-                            {it.nome === "STREAMER_COLAB"
-                              ? nomeStreamingColabAtual
-                              : it.nome === "STREAMER"
-                                ? nomeStreaming(Number(it.valor))
-                                : it.nome === "CAMERA"
-                                  ? (nomeCameraAtual ?? it.nome)
-                                  : it.nome}
+                            {it.nomeExibicao ??
+                              (it.nome === "STREAMER_COLAB"
+                                ? nomeStreamingColabAtual
+                                : it.nome === "STREAMER"
+                                  ? nomeStreaming(Number(it.valor))
+                                  : it.nome === "CAMERA"
+                                    ? nomeCameraAtual
+                                    : it.nome)}
                           </td>
                           <td className="p-2 text-right">
                             R$ {Number(it.valor).toFixed(2)}
