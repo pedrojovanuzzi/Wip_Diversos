@@ -16,7 +16,9 @@ import {
   isValidStorageGb,
   planFor,
   maxCamerasFor,
+  carregarPlanosDoBanco,
 } from "../config/cameraStoragePlans";
+import { CameraPlano } from "../entities/CameraPlano";
 import {
   nomeContratoParaGravar,
   sqlTagServico,
@@ -208,6 +210,96 @@ class Camera {
     } catch (e: any) {
       console.error("updateCliente:", e?.message);
       res.status(500).json({ message: "Erro ao atualizar cliente." });
+    }
+  }
+
+  /**
+   * Planos de armazenamento cadastrados (tabela camera_planos, banco wip_cams).
+   * Relê do banco antes de responder para a tela nunca mostrar cache velho.
+   */
+  public async listarPlanos(_req: Request, res: Response) {
+    try {
+      await carregarPlanosDoBanco();
+      res.json({ plans: STORAGE_PLANS });
+    } catch (e: any) {
+      console.error("listarPlanos:", e?.message);
+      res.status(500).json({ message: "Erro ao listar os planos." });
+    }
+  }
+
+  /**
+   * Cria ou atualiza um plano. A cota (GB) é a chave: repetir um GB existente
+   * altera o plano em vez de duplicar.
+   */
+  public async salvarPlano(req: Request, res: Response) {
+    try {
+      const storageGb = Math.trunc(Number(req.body.storageGb));
+      const precoBRL = Number(req.body.precoBRL);
+      const maxCameras = Math.trunc(Number(req.body.maxCameras));
+      const ativo = req.body.ativo === undefined ? true : !!req.body.ativo;
+
+      if (!Number.isFinite(storageGb) || storageGb <= 0) {
+        res.status(400).json({ message: "Cota (GB) inválida." });
+        return;
+      }
+      if (!Number.isFinite(precoBRL) || precoBRL < 0) {
+        res.status(400).json({ message: "Valor inválido." });
+        return;
+      }
+      if (!Number.isFinite(maxCameras) || maxCameras <= 0) {
+        res.status(400).json({ message: "Limite de câmeras inválido." });
+        return;
+      }
+
+      const repo = CamsSource.getRepository(CameraPlano);
+      const existente = await repo.findOne({ where: { storage_gb: storageGb } });
+      const plano = existente ?? repo.create({ storage_gb: storageGb });
+      plano.preco_brl = precoBRL;
+      plano.max_cameras = maxCameras;
+      plano.ativo = ativo;
+      await repo.save(plano);
+
+      await carregarPlanosDoBanco();
+      res.json({ ok: true, criado: !existente, plans: STORAGE_PLANS });
+    } catch (e: any) {
+      console.error("salvarPlano:", e?.message);
+      res.status(500).json({ message: "Erro ao salvar o plano." });
+    }
+  }
+
+  /**
+   * Remove um plano pela cota. Bloqueia se algum cliente estiver nele — apagar
+   * deixaria a cota órfã, e o limite de câmeras passaria a ser derivado.
+   * Para tirar de venda sem afetar quem já tem, use `ativo: false`.
+   */
+  public async removerPlano(req: Request, res: Response) {
+    try {
+      const storageGb = Math.trunc(Number(req.params.gb));
+      if (!Number.isFinite(storageGb) || storageGb <= 0) {
+        res.status(400).json({ message: "Cota (GB) inválida." });
+        return;
+      }
+
+      const emUso = await CamsSource.getRepository(CameraCliente).count({
+        where: { storage_gb: storageGb },
+      });
+      if (emUso > 0) {
+        res.status(409).json({
+          message:
+            `${emUso} cliente(s) estão nesse plano. ` +
+            "Desative-o em vez de apagar.",
+        });
+        return;
+      }
+
+      const result = await CamsSource.getRepository(CameraPlano).delete({
+        storage_gb: storageGb,
+      });
+      await carregarPlanosDoBanco();
+      res.json({ ok: true, removido: (result.affected ?? 0) > 0, plans: STORAGE_PLANS });
+    } catch (e: any) {
+      console.error("removerPlano:", e?.message);
+      res.status(500).json({ message: "Erro ao remover o plano." });
     }
   }
 

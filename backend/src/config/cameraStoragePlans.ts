@@ -1,9 +1,14 @@
 /**
  * Planos de armazenamento das gravações de câmeras (cota por cliente).
  *
- * A cota em GB fica salva em `camera_clientes.storage_gb`. O plano escolhido ao
- * adicionar o serviço CAMERA define tanto a cota quanto o VALOR cobrado no
- * contrato (SisSerContratos). Fonte única usada pelo backend e refletida no front.
+ * A cota em GB fica salva em `camera_clientes.storage_gb`. O plano define tanto
+ * a cota quanto o VALOR cobrado no contrato (SisSerContratos).
+ *
+ * A fonte da verdade é a tabela `camera_planos` (banco wip_cams) — o único
+ * banco que os dois sistemas alcançam. A lista abaixo é só o ponto de partida:
+ * `carregarPlanosDoBanco()` troca o conteúdo de STORAGE_PLANS assim que o banco
+ * responde e mantém o array atualizado. Com o banco fora ou a tabela vazia, o
+ * serviço continua de pé com esta lista.
  */
 export interface StoragePlan {
   /** Cota de armazenamento em gigabytes. */
@@ -12,19 +17,14 @@ export interface StoragePlan {
   priceBRL: number;
   /** Máximo de câmeras que o cliente pode cadastrar nesse plano. */
   maxCameras: number;
+  /** Plano ainda oferecido? Desativado continua valendo para quem já o tem. */
+  ativo?: boolean;
 }
 
 // Cada degrau de plano libera uma câmera a mais: 5 GB → 1, 10 GB → 2, ... 80 GB → 16.
-// (maxCameras = gb / 5.)
-//
-// Preço: até 4 câmeras vale a tabela histórica (20/30/35/40). Daí em diante cada
-// câmera extra soma entre R$ 10 e R$ 20, com o degrau afinando conforme o plano
-// cresce (+20 até 8 câmeras, +15 até 12, +10 até 16). Os valores são únicos por
-// plano — servicosAdicionaisNomes identifica o plano pelo valor do contrato.
-// ATENÇÃO: o portal Wip_Cams tem um espelho desta lista
-// (backend/src/config/cameraStoragePlans.ts lá). As duas precisam mudar juntas.
-export const STORAGE_PLANS: StoragePlan[] = [
-  { gb: 5, priceBRL: 20, maxCameras: 1 }, // plano base (valor atual do serviço CAMERA)
+// (maxCameras = gb / 5.) Espelha o seed da migration CreateCameraPlanos.
+const PLANOS_PADRAO: StoragePlan[] = [
+  { gb: 5, priceBRL: 20, maxCameras: 1 }, // plano base
   { gb: 10, priceBRL: 30, maxCameras: 2 },
   { gb: 15, priceBRL: 35, maxCameras: 3 },
   { gb: 20, priceBRL: 40, maxCameras: 4 },
@@ -42,15 +42,92 @@ export const STORAGE_PLANS: StoragePlan[] = [
   { gb: 80, priceBRL: 220, maxCameras: 16 },
 ];
 
+/**
+ * Lista viva dos planos. É sempre o mesmo array (o conteúdo é trocado no
+ * lugar), então quem importou continua enxergando o valor atual.
+ */
+export const STORAGE_PLANS: StoragePlan[] = PLANOS_PADRAO.map((p) => ({
+  ...p,
+  ativo: true,
+}));
+
 /** Plano padrão quando nenhum é escolhido. */
 export const DEFAULT_STORAGE_GB = 5;
+
+/** De quanto em quanto tempo os planos são relidos do banco. */
+const INTERVALO_RECARGA_MS = 5 * 60_000;
+
+let timerRecarga: NodeJS.Timeout | null = null;
+
+/**
+ * Relê `camera_planos` e atualiza STORAGE_PLANS no lugar. Devolve quantos
+ * planos vieram do banco (0 = seguiu com a lista que já estava em memória).
+ *
+ * Import dinâmico para não criar dependência circular com o DataSource.
+ */
+export async function carregarPlanosDoBanco(): Promise<number> {
+  try {
+    const { default: CamsSource } = await import("../database/CamsSource");
+    // Conexão ainda subindo: sai quieto e deixa a próxima recarga pegar — sem
+    // isso o TypeORM estoura um "No metadata" que não diz nada.
+    if (!CamsSource.isInitialized) return 0;
+    const { CameraPlano } = await import("../entities/CameraPlano");
+
+    const linhas = await CamsSource.getRepository(CameraPlano).find({
+      order: { storage_gb: "ASC" },
+    });
+    // Tabela vazia (migration ainda não rodou): mantém o que está em memória em
+    // vez de zerar a lista e travar todo mundo no plano base.
+    if (linhas.length === 0) return 0;
+
+    const novos: StoragePlan[] = linhas.map((l) => ({
+      gb: Number(l.storage_gb),
+      priceBRL: Number(l.preco_brl),
+      maxCameras: Number(l.max_cameras),
+      ativo: Boolean(l.ativo),
+    }));
+    STORAGE_PLANS.splice(0, STORAGE_PLANS.length, ...novos);
+    return novos.length;
+  } catch (e: any) {
+    console.error(
+      "[camera_planos] Falha ao ler os planos do banco; usando a lista em memória:",
+      e?.message || e,
+    );
+    return 0;
+  }
+}
+
+/**
+ * Carrega os planos e agenda as releituras. Chamado no boot — assim uma
+ * alteração de plano chega ao serviço sem reiniciar nada.
+ */
+export async function iniciarPlanosDeArmazenamento(): Promise<void> {
+  const total = await carregarPlanosDoBanco();
+  console.log(
+    total > 0
+      ? `[camera_planos] ${total} plano(s) carregado(s) do banco.`
+      : "[camera_planos] Nenhum plano lido do banco; usando a lista embutida.",
+  );
+  if (!timerRecarga) {
+    timerRecarga = setInterval(() => {
+      carregarPlanosDoBanco().catch(() => undefined);
+    }, INTERVALO_RECARGA_MS);
+    timerRecarga.unref?.();
+  }
+}
+
+/** Planos ainda oferecidos, para montar as opções de contratação. */
+export function planosAtivos(): StoragePlan[] {
+  return STORAGE_PLANS.filter((p) => p.ativo !== false);
+}
 
 /**
  * Máximo de câmeras permitido para uma cota.
  *
- * Cotas fora da tabela (plano antigo ou ajuste manual no banco) derivam do
- * próprio GB — uma câmera a cada 5 GB. Sem isso um valor desconhecido cairia
- * no plano base e travaria o cliente em 1 câmera.
+ * Cotas fora da tabela (ajuste manual no banco, ou um plano criado enquanto os
+ * planos ainda não tinham sido lidos) derivam do próprio GB — uma câmera a cada
+ * 5 GB. Sem isso um valor desconhecido cairia no plano base e travaria o
+ * cliente em 1 câmera mesmo tendo contratado bem mais.
  */
 export function maxCamerasFor(gb: number): number {
   const plano = planFor(gb);

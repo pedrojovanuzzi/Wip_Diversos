@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { CameraCliente } from "../entities/CameraCliente";
 import { Camera } from "../entities/Camera";
+import { CameraPlano } from "../entities/CameraPlano";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -18,7 +19,7 @@ const CamsSource = new DataSource({
   username: process.env.DATABASE_USERNAME_CAMS,
   password: process.env.DATABASE_PASSWORD_CAMS,
   database: process.env.DATABASE_CAMS,
-  entities: [CameraCliente, Camera],
+  entities: [CameraCliente, Camera, CameraPlano],
   synchronize: false,
   extra: {
     connectTimeout: 60_000,
@@ -28,8 +29,14 @@ const CamsSource = new DataSource({
 });
 
 CamsSource.initialize()
-  .then(() => {
+  .then(async () => {
     console.log("Cams Source (wip_cams) has been initialized!");
+    // Planos de armazenamento: tabela camera_planos, compartilhada com o
+    // portal Wip_Cams. Sem isso a lista embutida seria a única referência.
+    const { iniciarPlanosDeArmazenamento } = await import(
+      "../config/cameraStoragePlans"
+    );
+    await iniciarPlanosDeArmazenamento();
   })
   .catch((err) => {
     console.error("Error during Cams Source initialization", err);

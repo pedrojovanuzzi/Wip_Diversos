@@ -13,6 +13,10 @@ router.post("/setup/:uuid", Camera.definirSenha);
 router.get("/admin/nginx/status", AuthGuard, Camera.nginxStatus);
 router.post("/admin/nginx/apply", AuthGuard, Camera.nginxApply);
 router.get("/admin/sis-clientes", AuthGuard, Camera.buscarSisClientes);
+// Planos de armazenamento (tabela camera_planos, compartilhada com o portal).
+router.get("/admin/planos", AuthGuard, Camera.listarPlanos);
+router.post("/admin/planos", AuthGuard, Camera.salvarPlano);
+router.delete("/admin/planos/:gb", AuthGuard, Camera.removerPlano);
 router.post("/admin/clientes", AuthGuard, Camera.criarCliente);
 router.post("/admin/clientes/ensure", AuthGuard, Camera.ensureCliente);
 router.get("/admin/clientes", AuthGuard, Camera.listarClientes);

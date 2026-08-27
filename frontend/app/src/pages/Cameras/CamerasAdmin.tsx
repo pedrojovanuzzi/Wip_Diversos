@@ -31,26 +31,16 @@ interface ClienteItem {
   created_at: string;
 }
 
-// Planos de armazenamento das gravações (espelha o backend: cameraStoragePlans.ts).
-// cameras = limite de câmeras do plano (5 GB→1, 10→2, ... 80→16).
-const STORAGE_PLANS = [
-  { gb: 5, price: 20, cameras: 1 },
-  { gb: 10, price: 30, cameras: 2 },
-  { gb: 15, price: 35, cameras: 3 },
-  { gb: 20, price: 40, cameras: 4 },
-  { gb: 25, price: 60, cameras: 5 },
-  { gb: 30, price: 80, cameras: 6 },
-  { gb: 35, price: 100, cameras: 7 },
-  { gb: 40, price: 120, cameras: 8 },
-  { gb: 45, price: 135, cameras: 9 },
-  { gb: 50, price: 150, cameras: 10 },
-  { gb: 55, price: 165, cameras: 11 },
-  { gb: 60, price: 180, cameras: 12 },
-  { gb: 65, price: 190, cameras: 13 },
-  { gb: 70, price: 200, cameras: 14 },
-  { gb: 75, price: 210, cameras: 15 },
-  { gb: 80, price: 220, cameras: 16 },
-];
+/**
+ * Planos vêm da tabela camera_planos (banco wip_cams), compartilhada com o
+ * portal — não há mais lista fixa no código.
+ */
+interface Plano {
+  gb: number;
+  priceBRL: number;
+  maxCameras: number;
+  ativo?: boolean;
+}
 
 export const CamerasAdmin: React.FC = () => {
   const { user } = useAuth();
@@ -58,6 +48,7 @@ export const CamerasAdmin: React.FC = () => {
   const headers = { Authorization: `Bearer ${user?.token}` };
 
   const [items, setItems] = useState<ClienteItem[]>([]);
+  const [planos, setPlanos] = useState<Plano[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [filter, setFilter] = useState("");
@@ -102,6 +93,18 @@ export const CamerasAdmin: React.FC = () => {
     }
   };
 
+  const carregarPlanos = async () => {
+    try {
+      const res = await axios.get<{ plans: Plano[] }>(
+        `${base}/cameras/admin/planos`,
+        { headers },
+      );
+      setPlanos(res.data.plans || []);
+    } catch (e: any) {
+      flash("Erro ao carregar os planos de armazenamento.", "err");
+    }
+  };
+
   const load = async () => {
     setLoading(true);
     try {
@@ -116,6 +119,7 @@ export const CamerasAdmin: React.FC = () => {
 
   useEffect(() => {
     load();
+    carregarPlanos();
     // eslint-disable-next-line
   }, []);
 
@@ -212,11 +216,11 @@ export const CamerasAdmin: React.FC = () => {
 
   const mudarPlano = async (c: ClienteItem, storageGb: number) => {
     if (storageGb === c.storageGb) return;
-    const novo = STORAGE_PLANS.find((p) => p.gb === storageGb);
+    const novo = planos.find((p) => p.gb === storageGb);
     if (
       !window.confirm(
         `Mudar o plano de ${c.login} para ${storageGb} GB` +
-          (novo ? ` (R$ ${novo.price.toFixed(2)}/mês)` : "") +
+          (novo ? ` (R$ ${Number(novo.priceBRL).toFixed(2)}/mês)` : "") +
           "?\nIsto ajusta a cobrança do serviço CAMERA e reaplica a cota " +
           "(reduzir o plano pode apagar as gravações mais antigas).",
       )
@@ -433,11 +437,14 @@ export const CamerasAdmin: React.FC = () => {
                         className="ring-1 ring-gray-300 rounded px-2 py-1 text-sm disabled:opacity-50"
                         title="Plano de armazenamento (ajusta a cobrança do CAMERA)"
                       >
-                        {STORAGE_PLANS.map((p) => (
-                          <option key={p.gb} value={p.gb}>
-                            {p.gb} GB · {p.cameras} câm. — R$ {p.price.toFixed(2)}
-                          </option>
-                        ))}
+                        {planos
+                          .filter((p) => p.ativo !== false || p.gb === c.storageGb)
+                          .map((p) => (
+                            <option key={p.gb} value={p.gb}>
+                              {p.gb} GB · {p.maxCameras} câm. — R${" "}
+                              {Number(p.priceBRL).toFixed(2)}
+                            </option>
+                          ))}
                       </select>
                     </td>
                     <td className="px-3 py-2">
