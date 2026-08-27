@@ -21,6 +21,8 @@ export interface StoragePlan {
 // câmera extra soma entre R$ 10 e R$ 20, com o degrau afinando conforme o plano
 // cresce (+20 até 8 câmeras, +15 até 12, +10 até 16). Os valores são únicos por
 // plano — servicosAdicionaisNomes identifica o plano pelo valor do contrato.
+// ATENÇÃO: o portal Wip_Cams tem um espelho desta lista
+// (backend/src/config/cameraStoragePlans.ts lá). As duas precisam mudar juntas.
 export const STORAGE_PLANS: StoragePlan[] = [
   { gb: 5, priceBRL: 20, maxCameras: 1 }, // plano base (valor atual do serviço CAMERA)
   { gb: 10, priceBRL: 30, maxCameras: 2 },
@@ -43,9 +45,18 @@ export const STORAGE_PLANS: StoragePlan[] = [
 /** Plano padrão quando nenhum é escolhido. */
 export const DEFAULT_STORAGE_GB = 5;
 
-/** Máximo de câmeras permitido para uma cota (cai no plano base se o GB for inválido). */
+/**
+ * Máximo de câmeras permitido para uma cota.
+ *
+ * Cotas fora da tabela (plano antigo ou ajuste manual no banco) derivam do
+ * próprio GB — uma câmera a cada 5 GB. Sem isso um valor desconhecido cairia
+ * no plano base e travaria o cliente em 1 câmera.
+ */
 export function maxCamerasFor(gb: number): number {
-  return planFor(gb)?.maxCameras ?? STORAGE_PLANS[0].maxCameras;
+  const plano = planFor(gb);
+  if (plano) return plano.maxCameras;
+  const derivado = Math.floor(Number(gb || 0) / 5);
+  return derivado > 0 ? derivado : STORAGE_PLANS[0].maxCameras;
 }
 
 /** Retorna o plano de uma cota, ou undefined se o GB não for um plano válido. */
