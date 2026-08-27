@@ -239,9 +239,12 @@ export const BuscarNfseGerada = () => {
       setShowCertPasswordPopUp(false);
       setCertPassword("");
       setArquivo(null);
-    } catch (erro) {
+    } catch (erro: any) {
       console.error("Erro ao enviar o certificado:", erro);
-      setError("Não foi possível enviar o certificado.");
+      // Mostra o motivo que o backend apurou (senha incorreta, arquivo inválido).
+      setError(
+        erro?.response?.data?.erro || "Não foi possível enviar o certificado.",
+      );
       setShowCertPasswordPopUp(false);
     } finally {
       setLoading(false);

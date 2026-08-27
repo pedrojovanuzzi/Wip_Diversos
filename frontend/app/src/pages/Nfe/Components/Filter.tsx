@@ -61,8 +61,10 @@ export default function Filter({
 
   const setSessionPassword = async () => {
     try {
+      // A rota vive em /api/nfse; o prefixo /Nfe dava 404 e o catch vazio
+      // abaixo escondia a falha — a senha de sessão nunca era definida.
       await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/setSessionPassword`,
+        `${process.env.REACT_APP_URL}/nfse/setSessionPassword`,
         { password: password },
         {
           headers: {
@@ -72,7 +74,9 @@ export default function Filter({
         },
       );
       window.location.reload();
-    } catch {
+    } catch (erro) {
+      console.error("Erro ao definir a senha do certificado:", erro);
+      alert("Não foi possível definir a senha do certificado.");
     } finally {
       setShowPasswordPopUp(false);
     }

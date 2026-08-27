@@ -138,8 +138,11 @@ export default function Nfcom() {
       formData.append("arquivo", arquivo);
       formData.append("password", certPassword);
 
+      // NFCom, NFSE e NFE leem o MESMO arquivo (files/certificado.pfx), então o
+      // upload é único. A rota /Nfe/upload nunca existiu — dava 404 e o
+      // certificado jamais era gravado.
       const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/Nfe/upload`,
+        `${process.env.REACT_APP_URL}/nfse/upload`,
         formData,
         {
           headers: {
@@ -152,9 +155,12 @@ export default function Nfcom() {
       showSuccess("Certificado enviado com sucesso!");
       setShowCertPasswordPopUp(false);
       setCertPassword("");
-    } catch (erro) {
+    } catch (erro: any) {
       console.error("Erro ao enviar o certificado:", erro);
-      showError("Não foi possível enviar o certificado.");
+      // O backend valida o PFX com a senha e diz o que deu errado.
+      showError(
+        erro?.response?.data?.erro || "Não foi possível enviar o certificado.",
+      );
       setShowCertPasswordPopUp(false);
     }
   };

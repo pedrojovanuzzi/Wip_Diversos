@@ -5,29 +5,30 @@ import AuthGuard from "../middleware/AuthGuard";
 import multer from "multer";
 import path from "path";
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "../files"));
-  },
-  filename: (req, file, cb) => {
-    cb(null, "certificado.pfx");
-  },
-});
+// O certificado fica em memória (são poucos KB) e o controller mesmo grava o
+// arquivo temporário que vai validar. Com diskStorage, no Windows, o multer
+// chama o handler no evento "finish" — antes de o descritor fechar — e a
+// validação esbarrava em "O arquivo já está sendo usado por outro processo".
+// De quebra, nada toca o disco antes de o arquivo ser aprovado.
+const storage = multer.memoryStorage();
 
 const fileFilter = (
   req: Express.Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) => {
-  // Verifica se a extensão do arquivo é .pfx
-  if (path.extname(file.originalname).toLowerCase() === ".pfx") {
+  // .pfx e .p12 são o mesmo formato (PKCS#12); as certificadoras entregam ora
+  // com uma extensão, ora com a outra.
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ext === ".pfx" || ext === ".p12") {
     cb(null, true);
   } else {
-    cb(new Error("Apenas arquivos com extensão .pfx são permitidos."));
+    cb(new Error("Envie o certificado A1 em .pfx ou .p12."));
   }
 };
 
-const upload = multer({ storage, fileFilter });
+// 5 MB é folga larga para um A1 (costuma ter poucos KB).
+const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
 
 const router: Router = Router();
 
@@ -50,6 +51,8 @@ router.post("/imprimirNFSE", AuthGuard, NFSE.imprimirNFSE);
 
 router.post("/setSessionPassword", AuthGuard, NFSE.setPassword);
 
-router.post("/upload", upload.any(), AuthGuard, NFSE.uploadCertificado);
+// AuthGuard ANTES do multer — na ordem anterior o arquivo era gravado em disco
+// mesmo sem token válido.
+router.post("/upload", AuthGuard, upload.any(), NFSE.uploadCertificado);
 
 export default router;

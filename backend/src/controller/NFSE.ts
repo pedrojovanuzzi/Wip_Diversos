@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as tls from "tls";
 import * as dotenv from "dotenv";
 import { Request, Response } from "express";
 import { DOMParser } from "xmldom";
@@ -25,11 +26,12 @@ import {
 } from "../services/servicosAdicionaisNomes";
 
 import { NfseXmlFactory } from "../services/nfse/NfseXmlFactory";
+import { validarCertificadoPfx } from "../utils/certUtils";
 import { FiorilliProvider } from "../services/nfse/FiorilliProvider";
 
 dotenv.config();
 
-export class NFSEController {
+class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
   private TEMP_DIR = path.resolve(__dirname, "../files");
   private homologacao: boolean = false;
@@ -84,10 +86,69 @@ export class NFSEController {
     );
   }
 
+  /**
+   * Recebe o certificado A1 e só o coloca em uso depois de abrir o PKCS#12 com a
+   * senha informada.
+   *
+   * Antes esta rota respondia "enviado com sucesso" sem olhar nada: um arquivo
+   * recusado pelo filtro, ou a senha errada, só apareciam muito depois, na
+   * emissão, como um "mac verify failure" sem contexto — e o certificado que
+   * estava funcionando já tinha sido sobrescrito.
+   */
   public async uploadCertificado(req: Request, res: Response) {
+    const arquivo = (req.files as Express.Multer.File[] | undefined)?.[0];
+    const tempDir = path.join(__dirname, "..", "temp");
+    // Arquivo temporário gravado por nós: writeFileSync fecha o descritor antes
+    // de retornar, então a validação (que abre o arquivo pelo caminho) não
+    // esbarra em lock no Windows.
+    let temporario: string | null = null;
+
+    const limpar = () => {
+      if (!temporario) return;
+      try {
+        fs.unlinkSync(temporario);
+      } catch {
+        /* já removido */
+      }
+      temporario = null;
+    };
+
     try {
-      res.status(200).json({ mensagem: "Certificado enviado com sucesso." });
-    } catch (error) {
+      if (!arquivo?.buffer?.length) {
+        res.status(400).json({
+          erro: "Nenhum arquivo recebido. Selecione o certificado .pfx (ou .p12).",
+        });
+        return;
+      }
+
+      const senha = String(req.body?.password ?? "");
+      if (!senha) {
+        res.status(400).json({ erro: "Informe a senha do certificado." });
+        return;
+      }
+
+      fs.mkdirSync(tempDir, { recursive: true });
+      temporario = path.join(tempDir, `upload_certificado_${Date.now()}.pfx`);
+      fs.writeFileSync(temporario, arquivo.buffer);
+
+      const falha = validarCertificadoPfx(temporario, senha, tempDir);
+      if (falha) {
+        limpar();
+        res.status(400).json({ erro: `${falha} O certificado anterior foi mantido.` });
+        return;
+      }
+
+      const destino = path.join(__dirname, "..", "files", "certificado.pfx");
+      fs.mkdirSync(path.dirname(destino), { recursive: true });
+      fs.writeFileSync(destino, arquivo.buffer);
+      limpar();
+
+      res.status(200).json({
+        mensagem: "Certificado enviado e validado com sucesso.",
+      });
+    } catch (error: any) {
+      limpar();
+      console.error("Erro no upload do certificado:", error?.message || error);
       res
         .status(500)
         .json({ erro: "Erro ao processar o upload do certificado." });

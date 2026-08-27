@@ -171,9 +171,14 @@ export const NFSE = () => {
       showSuccess("Certificado enviado com sucesso!");
       setShowCertPasswordPopUp(false);
       setCertPassword("");
-    } catch (erro) {
+    } catch (erro: any) {
       console.error("Erro ao enviar o certificado:", erro);
-      showError("Não foi possível enviar o certificado.");
+      // O backend valida o PFX com a senha e explica o que deu errado
+      // (senha incorreta, arquivo inválido) — sem isso o motivo só apareceria
+      // depois, na emissão, como "mac verify failure".
+      showError(
+        erro?.response?.data?.erro || "Não foi possível enviar o certificado.",
+      );
       setShowCertPasswordPopUp(false);
     }
   };

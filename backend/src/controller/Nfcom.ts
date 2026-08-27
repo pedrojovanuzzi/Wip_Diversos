@@ -10,7 +10,6 @@ import { SignedXml } from "xml-crypto";
 import axios from "axios";
 import * as https from "https";
 import { gunzipSync, gzipSync } from "zlib";
-import { sqlTagServico } from "../services/servicosAdicionaisNomes";
 import { processarCertificado } from "../utils/certUtils";
 import MkauthSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
@@ -258,33 +257,18 @@ class Nfcom {
       const now = new Date();
       const dhEmi = formatDate(now);
 
-      // Soma serviços agregados (STREAMER + CAMERA) ATIVOS no momento em que a
-      // fatura foi gerada. Considera só contratos cuja data <= vencimento da fatura.
-      let valorServicosAgregados = 0;
-      try {
-        const dataLimite = FaturasData.datavenc
-          ? new Date(FaturasData.datavenc).toISOString().slice(0, 10)
-          : new Date().toISOString().slice(0, 10);
-        const agregados = (await MkauthSource.query(
-          `SELECT COALESCE(SUM(valor), 0) AS total
-           FROM sis_sercontratos
-           WHERE UPPER(TRIM(login)) = UPPER(TRIM(?))
-             AND ${sqlTagServico("nome")} IN ('STREAMER', 'CAMERA')
-             AND (data IS NULL OR DATE(data) <= ?)`,
-          [ClientData.login, dataLimite],
-        )) as { total: any }[];
-        valorServicosAgregados = Number(agregados?.[0]?.total || 0);
-      } catch (e) {
-        console.warn("Erro ao calcular serviços agregados:", (e as any)?.message);
-      }
-
+      // A NFCom cobre só a mensalidade. `sis_lanc.valor` já é exatamente isso:
+      // guarda o valor BRUTO do plano, sem desconto e sem os serviços adicionais
+      // (o mkauth aplica o desconto e soma as linhas "Valor adicional" só na hora
+      // de montar o boleto). Por isso aqui se desconta apenas o desconto do
+      // cliente — os adicionais NÃO entram nesta conta: eles nunca estiveram no
+      // valor da fatura e são faturados à parte, pela NFSE de produtos.
+      // Subtraí-los zerava a nota de quem tem serviço adicional caro.
       const valorBruto =
-        Number(FaturasData.valor) -
-        Number(ClientData.desconto || 0) -
-        valorServicosAgregados;
+        Number(FaturasData.valor) - Number(ClientData.desconto || 0);
       const value = valorBruto > 0 ? valorBruto : 0;
       console.log(
-        `NFCom valor: fatura=${FaturasData.valor} desconto=${ClientData.desconto || 0} agregados=${valorServicosAgregados} final=${value}`,
+        `NFCom valor: fatura=${FaturasData.valor} desconto=${ClientData.desconto || 0} final=${value}`,
       );
 
       const vProd = (value * (1 - reducao)).toFixed(2);
