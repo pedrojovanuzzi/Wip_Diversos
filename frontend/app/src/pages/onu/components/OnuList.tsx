@@ -1,93 +1,135 @@
 import { useEffect, useState } from "react";
 import { OnuData } from "../../../types";
 
+/** "1104" → "11/04". Tolera valores curtos ou ausentes vindos da OLT. */
+function formatarSlotPon(valor?: string): string {
+  const bruto = String(valor || "").trim();
+  if (bruto.length < 3) return bruto || "—";
+  return `${bruto.slice(0, 2)}/${bruto.slice(2)}`;
+}
 
-export default function OnuList({ list, title }: { list: OnuData[], title? : string  }) {
+interface Props {
+  list: OnuData[];
+  title?: string;
+  /** Avisa o pai a cada mudança, para ele habilitar as ações. */
+  onSelecaoChange?: (sns: string[]) => void;
+}
 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+export default function OnuList({ list, title, onSelecaoChange }: Props) {
+  const [selecionados, setSelecionados] = useState<string[]>([]);
 
-  const handleCheckboxChange = (sn: string) => {
-    setSelectedIds((prev) => {
-      if(prev.includes(sn)){
-        return prev.filter((itemId) => itemId !== sn);
-      }
+  const alternar = (sn: string) =>
+    setSelecionados((anterior) =>
+      anterior.includes(sn)
+        ? anterior.filter((item) => item !== sn)
+        : [...anterior, sn],
+    );
 
-      return [...prev, sn];
-    })
-  }
+  const todosMarcados = list.length > 0 && selecionados.length === list.length;
 
+  const alternarTodos = () =>
+    setSelecionados(todosMarcados ? [] : list.map((onu) => onu.sn));
+
+  // A seleção é lida pelas telas de autorizar/desautorizar.
   useEffect(() => {
     try {
-      localStorage.setItem("sn", JSON.stringify(selectedIds));
+      localStorage.setItem("sn", JSON.stringify(selecionados));
     } catch (error) {
       console.error(error);
     }
-  }, [selectedIds])
+    onSelecaoChange?.(selecionados);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selecionados]);
 
+  // Lista nova (outra PON, outra busca): a seleção antiga não vale mais.
+  // Mantém o mesmo array quando já está vazia: se o pai montar `list` inline,
+  // criar um array novo aqui realimentaria o ciclo de renderização.
+  useEffect(() => {
+    setSelecionados((atual) => (atual.length ? [] : atual));
+  }, [list]);
 
-
+  if (list.length === 0) return null;
 
   return (
-    <div className="">
-      <div className="">
-        <div className="sm:flex-auto">
-          <h1 className="text-base font-semibold text-gray-900">Lista de Onu's</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            {title ?? <>Uma lista de Todas as Onu Online<br></br> na Pon digitada</>}
+    <div className="rounded-xl border border-stone-800 bg-stone-900 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800 px-4 py-3">
+        <div>
+          <h2 className="text-sm font-bold text-white">
+            {title ?? "ONUs encontradas"}
+          </h2>
+          <p className="text-xs text-gray-400">
+            {list.length} ONU{list.length > 1 ? "s" : ""}
+            {selecionados.length > 0 && ` · ${selecionados.length} selecionada${selecionados.length > 1 ? "s" : ""}`}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={alternarTodos}
+          className="rounded-md border border-stone-600 px-3 py-1.5 text-xs text-gray-300 hover:bg-stone-800"
+        >
+          {todosMarcados ? "Limpar seleção" : "Selecionar todas"}
+        </button>
       </div>
-      <div className="mt-8 flex justify-center">
-        <div className="overflow-x-auto w-1/2">
-          <div className="inline-block min-w-full max-h-72 py-2 align-middle sm:px-6 lg:px-8">
-            <table className="relative min-w-full divide-y divide-gray-300">
-              <thead>
-                <tr>
-                  <th
-                    scope="col"
-                    className="py-3 pl-4 pr-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500 sm:pl-0"
-                  >
-                    ID
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500"
-                  >
-                    Slot Pon
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500"
-                  >
-                    Modelo
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wide text-gray-500"
-                  >
-                    Sn
-                  </th>
-                  <th>
-                  </th>
+
+      <div className="max-h-96 overflow-auto">
+        <table className="min-w-full text-sm">
+          <thead className="sticky top-0 bg-stone-800">
+            <tr>
+              <th className="w-10 px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={todosMarcados}
+                  onChange={alternarTodos}
+                  aria-label="Selecionar todas"
+                  className="cursor-pointer"
+                />
+              </th>
+              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                ID
+              </th>
+              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Slot/PON
+              </th>
+              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Modelo
+              </th>
+              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+                SN
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((onu, indice) => {
+              const marcada = selecionados.includes(onu.sn);
+              return (
+                <tr
+                  key={onu.sn || indice}
+                  onClick={() => alternar(onu.sn)}
+                  className={`cursor-pointer border-t border-stone-800 transition-colors ${
+                    marcada ? "bg-indigo-950/50" : "hover:bg-stone-800/60"
+                  }`}
+                >
+                  <td className="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={marcada}
+                      onChange={() => alternar(onu.sn)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="cursor-pointer"
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-gray-200">{onu.onuid || "—"}</td>
+                  <td className="px-3 py-2 text-gray-400">
+                    {formatarSlotPon(onu.slotPon)}
+                  </td>
+                  <td className="px-3 py-2 text-gray-400">{onu.model || "—"}</td>
+                  <td className="px-3 py-2 font-mono text-gray-200">{onu.sn}</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {list.map((list) => (
-                  <tr key={list.sn}>
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-0">
-                      {list.onuid}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{list.slotPon.slice(0,2)}/{list.slotPon.slice(2)}</td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{list.model}</td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{list.sn}</td>
-                    <td><input checked={selectedIds.includes(list.sn)} onChange={() => handleCheckboxChange(list.sn)} type="checkbox" name="" id="" /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
-  )
+  );
 }

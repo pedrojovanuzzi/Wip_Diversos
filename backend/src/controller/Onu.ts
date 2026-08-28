@@ -15,6 +15,16 @@ class Onu {
   private login = String(process.env.OLT_LOGIN);
   private password = String(process.env.OLT_PASSWORD);
 
+  /**
+   * Erro legível para a tela. `res.json(error)` serializa um Error como `{}`,
+   * então o operador via "Erro:" sem motivo nenhum.
+   */
+  private mensagemErro(error: unknown): string {
+    if (typeof error === "string") return error;
+    const msg = (error as any)?.message;
+    return msg ? String(msg) : "Erro inesperado na OLT.";
+  }
+
   public onuAuthenticationBridge = async (req: Request, res: Response) => {
     let { sn, vlan, cos } = req.body;
     const conn = await this.telnetStart(this.ip, this.login, this.password);
@@ -85,46 +95,80 @@ class Onu {
       res.status(200).json("Onu Autorizada!");
     } catch (error) {
       console.error(error);
-      res.status(500).json(error);
+      res.status(500).json(this.mensagemErro(error));
     } finally {
       conn.end();
     }
   };
 
+  /**
+   * Desautoriza uma ou várias ONUs (SNs separados por vírgula, como na
+   * autorização em bridge — a tela preenche o campo com a seleção da lista).
+   *
+   * Antes tratava um SN só e, quando ele não era encontrado, dava `return` sem
+   * responder nada: a requisição ficava pendurada até o timeout do navegador.
+   */
   public Desautorize = async (req: Request, res: Response) => {
-    let { sn } = req.body;
+    const lista = String(req.body?.sn || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (lista.length === 0) {
+      res.status(400).json("Informe ao menos um SN.");
+      return;
+    }
+
     const conn = await this.telnetStart(this.ip, this.login, this.password);
     if (!conn) {
       res.status(500).json("Erro No Telnet");
       return;
     }
+
+    const desautorizadas: string[] = [];
+    const falhas: string[] = [];
+
     try {
       await conn.send("cd onu");
 
-      // consulta informações para cada SN
-      const onuInfo = await this.querySnHelper(sn);
+      for (const item of lista) {
+        const onuInfo = await this.querySnHelper(item);
 
-      if (!onuInfo?.slot || !onuInfo?.pon) {
-        console.warn("SN inválido ou não encontrado:", sn);
+        if (!onuInfo?.slot || !onuInfo?.pon) {
+          console.warn("SN inválido ou não encontrado:", item);
+          falhas.push(`${item} (não encontrado na OLT)`);
+          continue;
+        }
+
+        const onuAuth = await this.filterByMacOnu(
+          conn,
+          item,
+          onuInfo.slot,
+          onuInfo.pon
+        );
+
+        await conn.exec(
+          `set whitelist phy_addr address ${onuInfo.sn} password null action delete slot ${onuInfo.slot} pon ${onuInfo.pon} onu ${onuAuth?.onuid} type ${onuInfo.model}`,
+          { execTimeout: 30000 }
+        );
+        desautorizadas.push(item);
+      }
+
+      if (desautorizadas.length === 0) {
+        res.status(422).json(`Nenhuma ONU desautorizada: ${falhas.join("; ")}`);
         return;
       }
 
-      const onuAuth = await this.filterByMacOnu(
-        conn,
-        sn, // passa só o SN individual
-        onuInfo.slot,
-        onuInfo.pon
-      );
-
-      await conn.exec(
-        `set whitelist phy_addr address ${onuInfo?.sn} password null action delete slot ${onuInfo?.slot} pon ${onuInfo?.pon} onu ${onuAuth?.onuid} type ${onuInfo?.model}`,
-        { execTimeout: 30000 }
-      );
-
-      res.status(200).json("Onu Desautorizada!");
+      const resumo =
+        desautorizadas.length === 1
+          ? "Onu Desautorizada!"
+          : `${desautorizadas.length} ONUs desautorizadas.`;
+      res
+        .status(200)
+        .json(falhas.length ? `${resumo} Falhas: ${falhas.join("; ")}` : resumo);
     } catch (error) {
       console.error(error);
-      res.status(500).json(error);
+      res.status(500).json(this.mensagemErro(error));
     } finally {
       conn.end();
     }
@@ -267,7 +311,7 @@ class Onu {
       res.status(200).json("Onu Autorizada!");
     } catch (error) {
       console.error(error);
-      res.status(500).json(error);
+      res.status(500).json(this.mensagemErro(error));
     } finally {
       conn.end();
     }
@@ -360,7 +404,7 @@ class Onu {
       res.status(200).json(allOnus);
     } catch (error) {
       console.error(error);
-      res.status(500).json(error);
+      res.status(500).json(this.mensagemErro(error));
     } finally {
       conn.end();
     }
@@ -443,7 +487,7 @@ class Onu {
       res.status(200).json(onus);
     } catch (error) {
       console.error(error);
-      res.status(500).json(error);
+      res.status(500).json(this.mensagemErro(error));
     } finally {
       conn.end();
     }
@@ -556,7 +600,7 @@ class Onu {
       res.status(200).json(onus);
     } catch (error) {
       console.error(error);
-      res.status(500).json(error);
+      res.status(500).json(this.mensagemErro(error));
     } finally {
       conn.end();
     }
@@ -626,7 +670,7 @@ class Onu {
       });
     } catch (error) {
       console.error(error);
-      res.status(500).json(error);
+      res.status(500).json(this.mensagemErro(error));
     } finally {
       conn.end();
     }
