@@ -1,15 +1,27 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import Stacked from "./Components/Stacked";
 import Filter from "./Components/Filter";
 
 import { BsFiletypeDoc } from "react-icons/bs";
+import { HiDocumentText } from "react-icons/hi2";
 import PopUpButton from "./Components/PopUpButton";
 import { useAuth } from "../../context/AuthContext";
 
 import { Link } from "react-router-dom";
 import { useNotification } from "../../context/NotificationContext";
+
+const CAMPO =
+  "mt-1 block w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
+const ROTULO = "text-xs font-medium text-gray-600";
+
+/** Formata em real, para os totais e a coluna de valor. */
+const moeda = (v: number) =>
+  Number(v || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
 
 export const NFSE = () => {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -51,7 +63,19 @@ export const NFSE = () => {
 
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>(""); // senha para emitir nf
-  let [valueSome, setValueSome] = useState<number>(0);
+  // Somas derivadas da lista. Antes o total era acumulado DURANTE a
+  // renderização, mutando o estado dentro de uma <td> escondida.
+  const valorTotal = useMemo(
+    () => clientes.reduce((s, c) => s + Number(c.fatura?.valor || 0), 0),
+    [clientes],
+  );
+  const valorSelecionado = useMemo(
+    () =>
+      clientes
+        .filter((c) => clientesSelecionados.includes(c.fatura?.titulo))
+        .reduce((s, c) => s + Number(c.fatura?.valor || 0), 0),
+    [clientes, clientesSelecionados],
+  );
   const { user } = useAuth();
   const token = user?.token;
   const { addJob, showError, showSuccess } = useNotification();
@@ -229,24 +253,32 @@ export const NFSE = () => {
   };
 
   return (
-    <div>
+    <div className="min-h-screen bg-slate-100 pb-10">
       <NavBar />
+      <div className="mx-auto max-w-6xl px-4 pt-6">
+        <h1 className="text-2xl font-bold text-gray-800">
+          NFSe — Nota Fiscal de Serviço
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Busque as mensalidades, selecione os títulos e emita as notas.
+        </p>
+      </div>
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
-      <div className="flex flex-wrap justify-center sm:justify-start">
-        <Link to="/BuscarNfseGerada">
-          <button
-            className="bg-violet-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
-          >
-            NF-es Geradas
-          </button>
-        </Link>
-        <Link to="/NFSE/ServicosAdicionais">
-          <button
-            className="bg-emerald-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-12 m-5 rounded hover:bg-emerald-600 transition-all"
-          >
-            Serviços Adicionais (Streaming/Câmera)
-          </button>
-        </Link>
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="flex flex-wrap gap-3">
+          <Link to="/BuscarNfseGerada">
+            <button className="flex items-center gap-2 rounded-lg bg-violet-700 px-5 py-3 font-medium text-white shadow-md transition-colors hover:bg-violet-800">
+              <HiDocumentText className="text-xl" />
+              NF-es Geradas
+            </button>
+          </Link>
+          <Link to="/NFSE/ServicosAdicionais">
+            <button className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-3 font-medium text-white shadow-md transition-colors hover:bg-emerald-700">
+              <BsFiletypeDoc className="text-xl" />
+              Serviços Adicionais (Streaming/Câmera)
+            </button>
+          </Link>
+        </div>
       </div>
       <Filter
         setActiveFilters={setActiveFilters}
@@ -254,184 +286,249 @@ export const NFSE = () => {
         setArquivo={setArquivo}
         enviarCertificado={handleEnviarCertificado}
       />
-      {clientes.length > 0 && (
-        <>
-          <h1 className="text-center mt-2 self-center text-2xl font-semibold text-gray-900">
-            Total de Resultados: {clientes.length}
-          </h1>
-          {loading && (
-            <>
-              <h1 className="text-center mt-2 self-center text-2xl text-gray-500">
-                Carregando ...
-              </h1>
-            </>
-          )}
-        </>
-      )}
-      {clientes.length > 0 ? (
-        <div className="mt-5 sm:mt-2">
-          <div className="flex justify-center">
-            <table className="block  overflow-auto sm:rounded-md ring-1 ring-black ring-opacity-30 h-[40vh] divide-y bg-gray-50 ">
-              <thead className="bg-gray-50 w-full text-center">
-                <tr>
-                  <th className="">
-                    <input
-                      className="cursor-pointer"
-                      type="checkbox"
-                      checked={
-                        clientesSelecionados.length > 0 &&
-                        clientesSelecionados.length === clientes.length
-                      }
-                      onChange={handleSelectAll}
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900" />
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Titulo
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Login
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Vencimento
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Tipo
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Valor
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {clientes.map((cliente) => (
-                  <tr key={cliente.id}>
-                    <td className="px-4 py-4">
+      <div className="mx-auto max-w-6xl px-4 mt-4">
+        {loading && <p className="mb-2 text-sm text-gray-500">Carregando…</p>}
+
+        {clientes.length === 0 ? (
+          <p className="rounded-lg bg-white p-8 text-center text-sm text-gray-500 shadow-md">
+            Nenhum cliente encontrado. Use a busca ou os filtros acima.
+          </p>
+        ) : (
+          <div className="overflow-hidden rounded-lg bg-white shadow-md">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+              <div>
+                <h2 className="font-bold text-gray-800">
+                  {clientes.length} título(s) encontrado(s)
+                </h2>
+                <p className="text-xs text-gray-500">
+                  {clientesSelecionados.length} selecionado(s) · clique na linha
+                  para marcar
+                </p>
+              </div>
+              <div className="flex gap-6 text-right">
+                <div>
+                  <p className="text-xs text-gray-500">Total listado</p>
+                  <p className="font-semibold text-gray-800">
+                    {moeda(valorTotal)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Selecionado</p>
+                  <p className="font-semibold text-green-600">
+                    {moeda(valorSelecionado)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="max-h-[45vh] overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="w-10 px-3 py-2">
                       <input
                         className="cursor-pointer"
                         type="checkbox"
-                        checked={clientesSelecionados.includes(
-                          cliente.fatura.titulo,
-                        )}
-                        onChange={() =>
+                        checked={
+                          clientesSelecionados.length > 0 &&
+                          clientesSelecionados.length === clientes.length
+                        }
+                        onChange={handleSelectAll}
+                      />
+                    </th>
+                    <th className="px-3 py-2 text-left">Título</th>
+                    <th className="px-3 py-2 text-left">Login</th>
+                    <th className="px-3 py-2 text-left">Vencimento</th>
+                    <th className="px-3 py-2 text-left">Tipo</th>
+                    <th className="px-3 py-2 text-right">Valor</th>
+                    <th className="px-3 py-2 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientes.map((cliente) => {
+                    const marcado = clientesSelecionados.includes(
+                      cliente.fatura.titulo,
+                    );
+                    return (
+                      <tr
+                        key={cliente.id}
+                        onClick={() =>
                           handleCheckboxChange(cliente.fatura.titulo)
                         }
-                      />
-                    </td>
-                    <td className="px-6 py-4" />
-                    <td className="px-6 py-4">{cliente.fatura.titulo}</td>
-                    <td className="px-6 py-4">{cliente.login}</td>
-                    <td className="px-6 py-4">{cliente.fatura.datavenc}</td>
-                    <td className="px-6 py-4">{cliente.fatura.tipo}</td>
-                    <td className="px-6 py-4">{cliente.fatura.valor}</td>
-                    <td className="px-6 py-4">
-                      {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
-                    </td>
-                    <td className="px-6 py-4 hidden">
-                      {(valueSome += Number(cliente.fatura.valor))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        className={`cursor-pointer border-t border-gray-100 ${
+                          marcado ? "bg-indigo-50" : "hover:bg-gray-50"
+                        }`}
+                      >
+                        <td className="px-3 py-2">
+                          <input
+                            className="cursor-pointer"
+                            type="checkbox"
+                            checked={marcado}
+                            onChange={() =>
+                              handleCheckboxChange(cliente.fatura.titulo)
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </td>
+                        <td className="px-3 py-2">{cliente.fatura.titulo}</td>
+                        <td className="px-3 py-2 font-medium text-gray-800">
+                          {cliente.login}
+                        </td>
+                        <td className="px-3 py-2">{cliente.fatura.datavenc}</td>
+                        <td className="px-3 py-2 text-gray-500">
+                          {cliente.fatura.tipo}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {moeda(Number(cliente.fatura.valor))}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              cliente.cli_ativado === "s"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-200 text-gray-600"
+                            }`}
+                          >
+                            {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      ) : (
-        <p className="text-center mt-10 text-gray-500">
-          Nenhum cliente encontrado
-        </p>
-      )}
-
-      <main className="flex justify-center mt-2" />
-      <h1>
-        Valores Somados das mensalidades:{" "}
-        <span className="text-green-500">
-          R${valueSome.toFixed(2).replace(".", ",")}
-        </span>
-      </h1>
-      <div className="flex flex-col justify-center sm:flex-row">
-        <div className="relative">
-          <span className="absolute translate-x-8 top-11 text-gray-200 -translate-y-1/2 text-4xl">
-            <BsFiletypeDoc
-              className="cursor-pointer"
-              onClick={handleOpenPopup}
-            />
-          </span>
-          <button
-            className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
-            onClick={handleOpenPopup}
-          >
-            Emitir NF-e
-          </button>
-        </div>
-        <select
-          onChange={(e) => setAmbiente(e.target.value)}
-          className="bg-slate-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-600 transition-all"
-        >
-          <option value="homologacao">Homologação</option>
-          <option value="producao">Produção</option>
-        </select>
-        <input
-          type="text"
-          onChange={(e) => {
-            setAliquota(e.target.value);
-          }}
-          placeholder="Exemplo 5,0000%"
-          className="ring-2 ring-gray-500 p-2 rounded m-5"
-        />
+        )}
       </div>
 
-      <div className="relative">
-        <input
-          type="text"
-          onChange={(e) => {
-            setService(
-              e.target.value
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-zA-Z0-9 ]/g, ""),
-            );
-          }}
-          placeholder="Servico de Manutencao"
-          className="ring-2 ring-gray-500 p-2 rounded m-5"
-        />
-        <input
-          type="text"
-          onChange={(e) => {
-            setReducao(
-              e.target.value
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-zA-Z0-9 ]/g, ""),
-            );
-          }}
-          placeholder="Redução Ex: 60%"
-          className="ring-2 ring-gray-500 p-2 rounded m-5"
-        />
-        <input
-          type="text"
-          required
-          onChange={(e) => {
-            setLastNfe(
-              e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, ""),
-            );
-          }}
-          placeholder="Ultimo Numero NF-e"
-          className="ring-2 ring-red-500 p-2 rounded m-5 placeholder:text-red-500"
-        />
-        <input
-          type="text"
-          onChange={(e) => {
-            setRpsNumber(
-              e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, ""),
-            );
-          }}
-          placeholder="Número RPS (Opcional)"
-          className="ring-2 ring-blue-500 p-2 rounded m-5 placeholder:text-blue-500"
-        />
+      {/* Parâmetros da emissão. Antes eram campos soltos, sem rótulo, só com
+          placeholder e anéis coloridos — em tela fiscal isso é pedir erro. */}
+      <div className="mx-auto max-w-6xl px-4 mt-4">
+        <div className="rounded-lg bg-white p-4 shadow-md">
+          <h2 className="font-bold text-gray-800">Parâmetros da emissão</h2>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label className={ROTULO}>Ambiente</label>
+              <select
+                value={ambiente}
+                onChange={(e) => setAmbiente(e.target.value)}
+                className={CAMPO}
+              >
+                <option value="homologacao">Homologação</option>
+                <option value="producao">Produção</option>
+              </select>
+              {ambiente === "producao" && (
+                <p className="mt-1 text-xs font-semibold text-red-600">
+                  Produção: as notas valem de verdade.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className={ROTULO}>Alíquota</label>
+              <input
+                type="text"
+                value={aliquota}
+                onChange={(e) => setAliquota(e.target.value)}
+                placeholder="Exemplo 5,0000%"
+                className={CAMPO}
+              />
+            </div>
+
+            <div>
+              <label className={ROTULO}>Serviço</label>
+              <input
+                type="text"
+                value={service}
+                onChange={(e) => {
+                  setService(
+                    e.target.value
+                      .normalize("NFD")
+                      .replace(/[\u0300-\u036f]/g, "")
+                      .replace(/[^a-zA-Z0-9 ]/g, ""),
+                  );
+                }}
+                placeholder="Servico de Manutencao"
+                className={CAMPO}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Sem acentos: o campo já remove automaticamente.
+              </p>
+            </div>
+
+            <div>
+              <label className={ROTULO}>Redução</label>
+              <input
+                type="text"
+                value={reducao}
+                onChange={(e) => {
+                  setReducao(
+                    e.target.value
+                      .normalize("NFD")
+                      .replace(/[\u0300-\u036f]/g, "")
+                      .replace(/[^a-zA-Z0-9 ]/g, ""),
+                  );
+                }}
+                placeholder="Ex: 60%"
+                className={CAMPO}
+              />
+            </div>
+
+            <div>
+              <label className={ROTULO}>
+                Último número NF-e <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={lastNfe}
+                onChange={(e) => {
+                  setLastNfe(
+                    e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, ""),
+                  );
+                }}
+                placeholder="Obrigatório"
+                className={`${CAMPO} ${
+                  lastNfe ? "" : "border-red-400 focus:ring-red-500"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className={ROTULO}>Número RPS</label>
+              <input
+                type="text"
+                value={rpsNumber}
+                onChange={(e) => {
+                  setRpsNumber(
+                    e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, ""),
+                  );
+                }}
+                placeholder="Opcional"
+                className={CAMPO}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">
+            <button
+              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white shadow-md transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
+              onClick={handleOpenPopup}
+              disabled={clientesSelecionados.length === 0}
+            >
+              <BsFiletypeDoc className="text-xl" />
+              Emitir NF-e
+              {clientesSelecionados.length > 0 &&
+                ` (${clientesSelecionados.length})`}
+            </button>
+            {clientesSelecionados.length === 0 && (
+              <span className="text-sm text-gray-500">
+                Selecione ao menos um título na lista.
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {arquivo && (

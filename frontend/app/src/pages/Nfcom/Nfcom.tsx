@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import Stacked from "./Components/Stacked";
@@ -10,6 +10,17 @@ import { CiSearch } from "react-icons/ci";
 import PopUpButton from "./Components/PopUpButton";
 import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
+
+const CAMPO =
+  "mt-1 block w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
+const ROTULO = "text-xs font-medium text-gray-600";
+
+/** Formata em real, para os totais e a coluna de valor. */
+const moeda = (v: number) =>
+  Number(v || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
 
 export default function Nfcom() {
   const [dadosNFe, setDadosNFe] = useState({});
@@ -50,7 +61,19 @@ export default function Nfcom() {
 
   const [showPopUp, setShowPopUp] = useState(false);
   const [password, setPassword] = useState<string>(""); // senha para emitir nf
-  let [valueSome, setValueSome] = useState<number>(0);
+  // Somas derivadas da lista. Antes o total era acumulado DURANTE a
+  // renderização, mutando o estado dentro de uma <td> escondida.
+  const valorTotal = useMemo(
+    () => clientes.reduce((s, c) => s + Number(c.fatura?.valor || 0), 0),
+    [clientes],
+  );
+  const valorSelecionado = useMemo(
+    () =>
+      clientes
+        .filter((c) => clientesSelecionados.includes(c.fatura?.titulo))
+        .reduce((s, c) => s + Number(c.fatura?.valor || 0), 0),
+    [clientes, clientesSelecionados],
+  );
   const { user } = useAuth();
   const token = user?.token;
   const permissions = user?.permission;
@@ -209,10 +232,18 @@ export default function Nfcom() {
   };
 
   return (
-    <div>
+    <div className="min-h-screen bg-slate-100 pb-10">
       <NavBar />
+      <div className="mx-auto max-w-6xl px-4 pt-6">
+        <h1 className="text-2xl font-bold text-gray-800">
+          NFCom — Nota Fiscal de Telecomunicações
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Busque as mensalidades, selecione os títulos e emita as notas.
+        </p>
+      </div>
       <Stacked setSearchCpf={setSearchCpf} onSearch={handleSearch} />
-      <div className="flex flex-wrap justify-center sm:justify-start sm:ml-2 px-4 pb-6 sm:px-6 lg:px-8 gap-3">
+      <div className="mx-auto flex max-w-6xl flex-wrap gap-3 px-4 pb-6">
         <button
           onClick={() => navigate("/Nfcom/Buscar")}
           className="bg-blue-600 text-white py-5 sm:py-4 px-6 rounded-lg hover:bg-blue-700 transition-all font-medium shadow-md flex items-center gap-2"
@@ -234,204 +265,230 @@ export default function Nfcom() {
         setArquivo={setArquivo}
         enviarCertificado={handleEnviarCertificado}
       />
-      {clientes.length > 0 && (
-        <>
-          <h1 className="text-center mt-2 self-center text-2xl font-semibold text-gray-900">
-            Total de Resultados: {clientes.length}
-          </h1>
-          {loading && (
-            <>
-              <h1 className="text-center mt-2 self-center text-2xl text-gray-500">
-                Carregando ...
-              </h1>
-            </>
-          )}
-        </>
-      )}
-      {clientes.length > 0 ? (
-        <div className="mt-5 sm:mt-2">
-          <div className="flex justify-center">
-            <table className="block  overflow-auto sm:rounded-md ring-1 ring-black ring-opacity-30 h-[40vh] divide-y bg-gray-50 ">
-              <thead className="bg-gray-50 w-full text-center">
-                <tr>
-                  <th className="">
-                    <input
-                      className="cursor-pointer"
-                      type="checkbox"
-                      checked={
-                        clientesSelecionados.length > 0 &&
-                        clientesSelecionados.length === clientes.length
-                      }
-                      onChange={handleSelectAll}
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900" />
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Titulo
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Login
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Vencimento
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Tipo
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Valor
-                  </th>
-                  <th className="px-6 py-3 text-sm font-semibold text-gray-900">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {clientes.map((cliente) => (
-                  <tr key={cliente.id}>
-                    <td className="px-4 py-4">
+      <div className="mx-auto max-w-6xl px-4">
+        {loading && <p className="mb-2 text-sm text-gray-500">Carregando…</p>}
+
+        {clientes.length === 0 ? (
+          <p className="rounded-lg bg-white p-8 text-center text-sm text-gray-500 shadow-md">
+            Nenhum cliente encontrado. Use a busca ou os filtros acima.
+          </p>
+        ) : (
+          <div className="overflow-hidden rounded-lg bg-white shadow-md">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+              <div>
+                <h2 className="font-bold text-gray-800">
+                  {clientes.length} título(s) encontrado(s)
+                </h2>
+                <p className="text-xs text-gray-500">
+                  {clientesSelecionados.length} selecionado(s) · clique na linha
+                  para marcar
+                </p>
+              </div>
+              <div className="flex gap-6 text-right">
+                <div>
+                  <p className="text-xs text-gray-500">Total listado</p>
+                  <p className="font-semibold text-gray-800">
+                    {moeda(valorTotal)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Selecionado</p>
+                  <p className="font-semibold text-green-600">
+                    {moeda(valorSelecionado)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="max-h-[45vh] overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="w-10 px-3 py-2">
                       <input
                         className="cursor-pointer"
                         type="checkbox"
-                        checked={clientesSelecionados.includes(
-                          cliente.fatura.titulo,
-                        )}
-                        onChange={() =>
+                        checked={
+                          clientesSelecionados.length > 0 &&
+                          clientesSelecionados.length === clientes.length
+                        }
+                        onChange={handleSelectAll}
+                      />
+                    </th>
+                    <th className="px-3 py-2 text-left">Título</th>
+                    <th className="px-3 py-2 text-left">Login</th>
+                    <th className="px-3 py-2 text-left">Vencimento</th>
+                    <th className="px-3 py-2 text-left">Tipo</th>
+                    <th className="px-3 py-2 text-right">Valor</th>
+                    <th className="px-3 py-2 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientes.map((cliente) => {
+                    const marcado = clientesSelecionados.includes(
+                      cliente.fatura.titulo,
+                    );
+                    return (
+                      <tr
+                        key={cliente.id}
+                        onClick={() =>
                           handleCheckboxChange(cliente.fatura.titulo)
                         }
-                      />
-                    </td>
-                    <td className="px-6 py-4" />
-                    <td className="px-6 py-4">{cliente.fatura.titulo}</td>
-                    <td className="px-6 py-4">{cliente.login}</td>
-                    <td className="px-6 py-4">{cliente.fatura.datavenc}</td>
-                    <td className="px-6 py-4">{cliente.fatura.tipo}</td>
-                    <td className="px-6 py-4">{cliente.fatura.valor}</td>
-                    <td className="px-6 py-4">
-                      {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
-                    </td>
-                    <td className="px-6 py-4 hidden">
-                      {(valueSome += Number(cliente.fatura.valor))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        <p className="text-center mt-10 text-gray-500">
-          Nenhum cliente encontrado
-        </p>
-      )}
-
-      <main className="flex justify-center mt-2" />
-      <div>
-        <h1>
-          Valores Somados das mensalidades:{" "}
-          <span className="text-green-500">
-            R${valueSome.toFixed(2).replace(".", ",")}
-          </span>
-        </h1>
-      </div>
-      <div className="flex flex-col justify-center sm:flex-row">
-        <div className="relative">
-          <span className="absolute translate-x-8 top-11 text-gray-200 -translate-y-1/2 text-4xl">
-            <BsFiletypeDoc
-              className="cursor-pointer"
-              onClick={() => setShowPopUp(true)}
-            />
-          </span>
-          <button
-            className="bg-slate-500 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-400 transition-all"
-            onClick={() => setShowPopUp(true)}
-          >
-            Emitir NF-e
-          </button>
-        </div>
-        <select
-          onChange={(e) => setAmbiente(e.target.value)}
-          className="bg-slate-700 ring-1 ring-black ring-opacity-5 text-gray-200 py-3 px-16 m-5 rounded hover:bg-slate-600 transition-all"
-        >
-          <option value="homologacao">Homologação</option>
-          <option value="producao">Produção</option>
-        </select>
-      </div>
-
-      <div className="relative">
-        <div className="flex  justify-center items-center gap-5 mb-5">
-          <input
-            type="text"
-            value={reducao} // Adicionado value para controle visual
-            onChange={(e) => {
-              setReducao(
-                e.target.value
-                  .normalize("NFD")
-                  .replace(/[\u0300-\u036f]/g, "")
-                  .replace(/[^a-zA-Z0-9,.]/g, ""), // Permite números e separadores (vírgula/ponto)
-              );
-            }}
-            placeholder={
-              isReducaoActive ? "Redução Ex: 40%" : "Redução Desativada: 1.0"
-            }
-            className={`ring-2 ring-gray-500 p-2 rounded ${
-              !isReducaoActive ? "bg-gray-200 cursor-not-allowed" : ""
-            }`}
-            disabled={!isReducaoActive} // Desabilita o input se a redução não estiver ativa
-          />
-        </div>
-
-        {isReducaoActive &&
-          (() => {
-            const exemplo = 89.9;
-            const reducaoNum = Number(
-              reducao.replace(",", ".").replace("%", ""),
-            );
-            const fracao = Number.isFinite(reducaoNum) ? reducaoNum / 100 : 0;
-            const valorFinal = exemplo * (1 - fracao);
-            const percentEfetivo = fracao * 100;
-            return (
-              <div className="flex justify-center mb-5">
-                <div className="text-sm text-gray-700 bg-yellow-50 ring-1 ring-yellow-300 rounded p-3 text-center">
-                  <div>
-                    Pré-visualização para uma nota de <strong>R$ 89,90</strong>:
-                  </div>
-                  <div>
-                    Redução aplicada:{" "}
-                    <strong>
-                      {percentEfetivo.toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 4,
-                      })}
-                      %
-                    </strong>
-                  </div>
-                  <div>
-                    Valor final:{" "}
-                    <strong className="text-green-600">
-                      R${" "}
-                      {valorFinal.toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </strong>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-        {permissions! >= 5 && (
-          <div className="flex justify-center items-center gap-5 mb-5">
-            <input
-              type="text"
-              value={lastNfcomId}
-              onChange={(e) => setLastNfcomId(e.target.value)}
-              placeholder="Último Nfcom ID"
-              className="ring-2 ring-gray-500 p-2 rounded"
-            />
+                        className={`cursor-pointer border-t border-gray-100 ${
+                          marcado ? "bg-indigo-50" : "hover:bg-gray-50"
+                        }`}
+                      >
+                        <td className="px-3 py-2">
+                          <input
+                            className="cursor-pointer"
+                            type="checkbox"
+                            checked={marcado}
+                            onChange={() =>
+                              handleCheckboxChange(cliente.fatura.titulo)
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </td>
+                        <td className="px-3 py-2">{cliente.fatura.titulo}</td>
+                        <td className="px-3 py-2 font-medium text-gray-800">
+                          {cliente.login}
+                        </td>
+                        <td className="px-3 py-2">{cliente.fatura.datavenc}</td>
+                        <td className="px-3 py-2 text-gray-500">
+                          {cliente.fatura.tipo}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {moeda(Number(cliente.fatura.valor))}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              cliente.cli_ativado === "s"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-200 text-gray-600"
+                            }`}
+                          >
+                            {cliente.cli_ativado === "s" ? "Ativo" : "Inativo"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
+      </div>
+
+      <div className="mx-auto max-w-6xl px-4 mt-4">
+        <div className="rounded-lg bg-white p-4 shadow-md">
+          <h2 className="font-bold text-gray-800">Parâmetros da emissão</h2>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label className={ROTULO}>Ambiente</label>
+              <select
+                value={ambiente}
+                onChange={(e) => setAmbiente(e.target.value)}
+                className={CAMPO}
+              >
+                <option value="homologacao">Homologação</option>
+                <option value="producao">Produção</option>
+              </select>
+              {ambiente === "producao" && (
+                <p className="mt-1 text-xs font-semibold text-red-600">
+                  Produção: as notas valem de verdade.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className={ROTULO}>
+                Redução de base
+                {!isReducaoActive && (
+                  <span className="ml-1 font-normal text-gray-400">
+                    (desativada para este filtro)
+                  </span>
+                )}
+              </label>
+              <input
+                type="text"
+                value={reducao}
+                onChange={(e) => {
+                  setReducao(
+                    e.target.value
+                      .normalize("NFD")
+                      .replace(/[\u0300-\u036f]/g, "")
+                      .replace(/[^a-zA-Z0-9,.]/g, ""),
+                  );
+                }}
+                placeholder={
+                  isReducaoActive ? "Ex: 40%" : "Redução Desativada: 1.0"
+                }
+                className={`${CAMPO} ${
+                  !isReducaoActive ? "cursor-not-allowed bg-gray-100" : ""
+                }`}
+                disabled={!isReducaoActive}
+              />
+            </div>
+
+            {permissions! >= 5 && (
+              <div>
+                <label className={ROTULO}>Último NFCom ID</label>
+                <input
+                  type="text"
+                  value={lastNfcomId}
+                  onChange={(e) => setLastNfcomId(e.target.value)}
+                  placeholder="Somente administradores"
+                  className={CAMPO}
+                />
+              </div>
+            )}
+          </div>
+
+          {isReducaoActive &&
+            (() => {
+              const exemplo = 89.9;
+              const reducaoNum = Number(
+                reducao.replace(",", ".").replace("%", ""),
+              );
+              const fracao = Number.isFinite(reducaoNum) ? reducaoNum / 100 : 0;
+              const valorFinal = exemplo * (1 - fracao);
+              return (
+                <div className="mt-3 rounded border border-yellow-300 bg-yellow-50 p-3 text-sm text-gray-700">
+                  Numa nota de <strong>R$ 89,90</strong>, com redução de{" "}
+                  <strong>
+                    {(fracao * 100).toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 4,
+                    })}
+                    %
+                  </strong>
+                  , sai por{" "}
+                  <strong className="text-green-600">{moeda(valorFinal)}</strong>
+                  .
+                </div>
+              );
+            })()}
+
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">
+            <button
+              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white shadow-md transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
+              onClick={() => setShowPopUp(true)}
+              disabled={clientesSelecionados.length === 0}
+            >
+              <BsFiletypeDoc className="text-xl" />
+              Emitir NFCom
+              {clientesSelecionados.length > 0 &&
+                ` (${clientesSelecionados.length})`}
+            </button>
+            {clientesSelecionados.length === 0 && (
+              <span className="text-sm text-gray-500">
+                Selecione ao menos um título na lista.
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {arquivo && (

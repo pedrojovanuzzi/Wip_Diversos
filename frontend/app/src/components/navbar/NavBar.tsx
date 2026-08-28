@@ -32,6 +32,7 @@ import {
   FaChartBar,
   FaLink,
   FaServer,
+  FaCalculator,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -158,6 +159,14 @@ const SECOES: SecaoMenu[] = [
         icon: ico(FaPix),
         title: "Pix",
         description: "Gestão de pagamentos via Pix",
+        visivel: (p) => p >= 2,
+      },
+      {
+        to: "/calculadora-debitos",
+        icon: ico(FaCalculator),
+        title: "Calculadora de Débitos",
+        description:
+          "Dias a cobrar na próxima fatura de quem ficou suspenso e reativou o sinal",
         visivel: (p) => p >= 2,
       },
       {

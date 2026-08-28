@@ -25,6 +25,7 @@ import { LogViewer } from "./pages/logs/LogViewer";
 import { Pm2Logs } from "./pages/logs/Pm2Logs";
 import { PowerDns } from "./pages/powerdns/PowerDns";
 import { OnuHome } from "./pages/onu/OnuHome";
+import { CalculadoraDebitos } from "./pages/CalculadoraDebitos/CalculadoraDebitos";
 import { AutorizarOnu } from "./pages/onu/AutorizarOnu";
 import { DesautorizaOnu } from "./pages/onu/DesautorizaOnu";
 import { useAuth } from "./context/AuthContext";
@@ -475,6 +476,16 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <Pix />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/calculadora-debitos"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <CalculadoraDebitos />
               ) : (
                 <Navigate to="/auth/login" />
               )
