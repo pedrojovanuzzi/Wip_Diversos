@@ -14,6 +14,7 @@ import { SisPlano } from "../entities/SisPlano";
 import { v4 as uuidv4 } from "uuid";
 import { deleteSession } from "./whatsapp/services/session.service";
 import { criarChamadoMkauth } from "./whatsapp/services/chamado.service";
+import { reservarLoginUnico } from "../services/loginCliente";
 
 dotenv.config();
 
@@ -1164,16 +1165,9 @@ class ZapSign {
       console.error("Erro ao buscar IBGE da API externa:");
     }
 
-    // Garante login único
-    let finalLogin =
-      dados.login || (dados.nome || "").trim().replace(/\s/g, "").toUpperCase();
-    const findLogin = await ClientesRepository.findOne({
-      where: { login: finalLogin },
-    });
-
-    if (findLogin) {
-      finalLogin = `${finalLogin}${Math.floor(Math.random() * 1000)}`;
-    }
+    // Garante login único. Normalmente `dados.login` já vem reservado desde a
+    // geração do link/flow; aqui é só a última conferência antes de gravar.
+    const finalLogin = await reservarLoginUnico(dados.login || dados.nome || "");
 
     const celularFormatado = (dados.telefone || dados.celular || "").replace(
       /\D/g,

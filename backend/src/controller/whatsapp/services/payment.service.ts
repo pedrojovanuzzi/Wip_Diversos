@@ -95,20 +95,29 @@ export async function gerarLancamentoServico(
     let cliente;
 
     if (loginSessao) {
+      // O login identifica o CADASTRO (coluna única). Quando ele é informado,
+      // não existe busca alternativa: cair no CPF aqui lançaria a cobrança em
+      // outro cadastro do mesmo cliente — quase sempre o antigo.
       cliente = await ClientesRepository.findOne({
-        where: { login: loginSessao, cli_ativado: "s" },
+        where: { login: loginSessao },
       });
-    }
-
-    if (!cliente && cpf) {
+      if (!cliente) {
+        console.error(
+          `Login "${loginSessao}" não encontrado no MKAuth; lançamento não gerado.`,
+        );
+        return;
+      }
+    } else if (cpf) {
+      // Sem login: um CPF pode ter vários cadastros, então vale o mais recente.
       cliente = await ClientesRepository.findOne({
-        where: { cpf_cnpj: cpf.trim().replace(/\s/g, ""), cli_ativado: "s" },
+        where: { cpf_cnpj: cpf.replace(/\D/g, ""), cli_ativado: "s" },
+        order: { id: "DESC" },
       });
     }
 
     if (!cliente) {
       console.error(
-        `Cliente (Ativo) com Login "${loginSessao || ""}" ou CPF "${cpf || ""}" não encontrado no MKAuth para gerar lançamento.`,
+        `Cliente (Ativo) com CPF "${cpf || ""}" não encontrado no MKAuth para gerar lançamento.`,
       );
       return;
     }

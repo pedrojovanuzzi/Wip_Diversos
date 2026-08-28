@@ -13,6 +13,7 @@ import { Faturas } from "../../entities/Faturas";
 import Pix from "../Pix";
 import { criarChamadoMkauth } from "../whatsapp/services/chamado.service";
 import { gerarLancamentoServico } from "../whatsapp/services/payment.service";
+import { reservarLoginUnico } from "../../services/loginCliente";
 import { sendServiceEmail } from "../whatsapp/services/email.service";
 import { verificarDebitosClienteDesativado } from "../whatsapp/services/debitoAnterior.service";
 import { validarCPF, validarRG } from "../whatsapp/utils/validation";
@@ -1207,7 +1208,10 @@ class ServiceLinkController {
       }
     }
 
-    const login = nome.replace(/\s+/g, "").toUpperCase();
+    // Reserva antes de gravar a solicitação: se este cliente já tem cadastro,
+    // o login derivado do nome seria o DELE, e a cobrança da instalação cairia
+    // no cadastro antigo em vez do novo.
+    const login = await reservarLoginUnico(nome);
     const dados: Record<string, any> = {
       ...formulario,
       origem: "web",

@@ -10,6 +10,7 @@ import { limparEndereco, limparNomeRua } from "../utils/helpers";
 import { writeMessageLog } from "../utils/logging";
 import { sendServiceEmail } from "../services/email.service";
 import { getPlanosDoSistema } from "../services/plano.service";
+import { reservarLoginUnico } from "../../../services/loginCliente";
 
 import { verificarDebitosClienteDesativado } from "../services/debitoAnterior.service";
 import {
@@ -183,7 +184,10 @@ export async function handleAwaitingFlowCadastro(
       }
 
       dadosFlow.nome = nomeLimpo;
-      dadosFlow.login = nomeLimpo.replace(/\s+/g, "").toUpperCase();
+      // Reservado já aqui: um cliente que volta para contratar de novo teria,
+      // senão, o login do próprio cadastro antigo — e a cobrança do serviço
+      // acabaria lançada lá.
+      dadosFlow.login = await reservarLoginUnico(nomeLimpo);
 
       const cepLimpo = (dadosFlow.cep || "").replace(/\D/g, "");
       const celLimpo = (dadosFlow.celular || "").replace(/\D/g, "");
@@ -520,23 +524,17 @@ async function saveClienteToMkAuth(dados: any, plano: string, vencimento?: strin
   const ibgeCode = await getIbgeCode(dados.estado, dados.cidade);
 
   try {
-    const loginBase = dados.login || (dados.nome || "").trim().replace(/\s/g, "").toUpperCase();
-    const findLogin = await ClientesRepository.findOne({
-      where: { login: loginBase },
-    });
-
-    if (findLogin) {
-      console.log("Login já existe:", findLogin);
-      dados.nome = dados.nome + " " + findLogin.id;
-      if (dados.login) dados.login = dados.login + " " + findLogin.id;
-    }
+    // Segunda barreira: o login normalmente já vem reservado do início do flow,
+    // mas outro cadastro pode ter ocupado a base nesse meio-tempo.
+    // (O código anterior concatenava " " + id, criando login com espaço.)
+    dados.login = await reservarLoginUnico(dados.login || dados.nome || "");
 
     const celularFormatado = (dados.celular || "").replace(/\D/g, "");
     const celular2Formatado = (dados.celularSecundario || "").replace(/\D/g, "");
 
     const addClient = await ClientesRepository.save({
       nome: (dados.nome || "").toUpperCase(),
-      login: dados.login || (dados.nome || "").trim().replace(/\s/g, "").toUpperCase(),
+      login: dados.login,
       rg: (dados.rg || "").trim().replace(/\s/g, ""),
       cpf_cnpj: (dados.cpf || "").trim().replace(/\s/g, ""),
       uuid_cliente: `019b${uuidv4().slice(0, 32)}`,
