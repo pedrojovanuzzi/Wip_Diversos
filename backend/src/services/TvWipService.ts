@@ -40,6 +40,22 @@ class TvWipService {
   private rodando = false;
 
   /**
+   * Espera os dois bancos ficarem prontos.
+   *
+   * `start()` roda dentro do callback do `listen`, que dispara antes de o
+   * TypeORM terminar de conectar — e aí a consulta estoura um "No metadata for
+   * ClientesEntities", que não diz nada sobre a causa real.
+   */
+  private async aguardarBancos(timeoutMs = 60_000): Promise<boolean> {
+    const limite = Date.now() + timeoutMs;
+    while (Date.now() < limite) {
+      if (AppDataSource.isInitialized && MkauthSource.isInitialized) return true;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return false;
+  }
+
+  /**
    * Agenda a varredura diária (03:10) e roda uma vez no boot, para a lista já
    * subir coerente depois de um restart demorado.
    */
@@ -58,9 +74,20 @@ class TvWipService {
 
     console.log("[TvWip] Varredura diária agendada para 03:10.");
 
-    this.sincronizar().catch((e) =>
-      console.error("[TvWip] Falha na varredura inicial:", e?.message || e),
-    );
+    this.aguardarBancos()
+      .then((pronto) => {
+        if (!pronto) {
+          console.warn(
+            "[TvWip] Bancos não ficaram prontos a tempo; a varredura inicial " +
+              "foi pulada. A próxima roda no horário agendado.",
+          );
+          return;
+        }
+        return this.sincronizar();
+      })
+      .catch((e) =>
+        console.error("[TvWip] Falha na varredura inicial:", e?.message || e),
+      );
   }
 
   stop(): void {
@@ -82,6 +109,12 @@ class TvWipService {
     const inicio = Date.now();
 
     try {
+      // Vale também para a execução agendada: se o processo tiver acabado de
+      // reiniciar, as conexões podem ainda estar subindo.
+      if (!(await this.aguardarBancos())) {
+        throw new Error("Bancos de dados indisponíveis no momento.");
+      }
+
       const repo = AppDataSource.getRepository(TvWipConta);
 
       const ativos = await MkauthSource.getRepository(ClientesEntities).find({
