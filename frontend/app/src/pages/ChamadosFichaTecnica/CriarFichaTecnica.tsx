@@ -26,6 +26,7 @@ import {
   Select,
   Stack,
   TextField,
+  TextFieldProps,
   Tooltip,
   Typography,
   Alert,
@@ -143,6 +144,79 @@ const APR_TRABALHADORES_PADRAO: AprTrabalhadorLinha[] = Array.from(
 );
 
 const upper = (v: string) => (v ?? "").toUpperCase();
+const soDigitos = (v: string) => (v ?? "").replace(/\D/g, "");
+
+/**
+ * Campo de texto que não briga com o teclado do celular.
+ *
+ * O teclado do Android mantém um buffer próprio da palavra que está sendo
+ * composta (é dele que saem autocorreção e sugestão). Todo input controlado do
+ * React reescreve o `value` do DOM a cada tecla; quando esse valor não é
+ * exatamente o que o teclado digitou, o buffer dessincroniza e o teclado
+ * reinjeta o que ele achava que estava compondo — as letras aparecem
+ * repetidas. Encostar em duas teclas ao mesmo tempo é o caso que mais expõe
+ * isso, porque manda a composição inteira de uma vez.
+ *
+ * Aqui a composição corre solta: enquanto ela está ativa o valor sobe cru,
+ * igual ao que o teclado tem, então não há o que o React reescrever. Só no
+ * fim da composição o valor normalizado (ex.: caixa alta) entra no estado. O
+ * maiúsculo continua aparecendo o tempo todo, mas via CSS, que não toca no
+ * conteúdo do input.
+ */
+type CampoTextoProps = Omit<TextFieldProps, "value" | "onChange"> & {
+  value: string;
+  onValueChange: (v: string) => void;
+  /** Normalização aplicada ao sair da composição (ex.: `upper`). */
+  transformar?: (v: string) => string;
+};
+
+const CampoTexto: React.FC<CampoTextoProps> = ({
+  value,
+  onValueChange,
+  transformar,
+  inputProps,
+  sx,
+  ...rest
+}) => {
+  const compondo = useRef(false);
+  // Só o maiúsculo tem equivalente visual em CSS; um filtro de dígitos, não.
+  const caixaAlta = transformar === upper;
+
+  const emitir = (bruto: string) => {
+    onValueChange(
+      transformar && !compondo.current ? transformar(bruto) : bruto,
+    );
+  };
+
+  return (
+    <TextField
+      {...rest}
+      value={value}
+      onChange={(e) => emitir(e.target.value)}
+      onCompositionStart={() => {
+        compondo.current = true;
+      }}
+      onCompositionEnd={(e) => {
+        compondo.current = false;
+        emitir((e.target as HTMLInputElement | HTMLTextAreaElement).value);
+      }}
+      inputProps={{
+        autoCorrect: "off",
+        autoCapitalize: caixaAlta ? "characters" : "off",
+        spellCheck: false,
+        ...inputProps,
+      }}
+      sx={
+        caixaAlta
+          ? {
+              "& input, & textarea": { textTransform: "uppercase" },
+              ...sx,
+            }
+          : sx
+      }
+    />
+  );
+};
 
 type AssinaturaHandle = {
   reiniciar: () => void;
@@ -710,42 +784,46 @@ const CriarFichaTecnica: React.FC = () => {
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Nome do cliente"
                 value={cliente}
-                onChange={(e) => setCliente(upper(e.target.value))}
+                onValueChange={setCliente}
                 required
+                transformar={upper}
               />
             </Grid>
             <Grid item xs={12} md={2}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Usuário (PPPoE)"
                 value={usuario}
-                onChange={(e) => setUsuario(upper(e.target.value))}
+                onValueChange={setUsuario}
                 onBlur={(e) => {
                   const v = e.target.value;
                   buscarSinalOnu(v);
                   buscarChamadoPorLogin(v);
                 }}
                 required
+                transformar={upper}
               />
             </Grid>
             <Grid item xs={12} md={2}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Nome do Wi-Fi"
                 value={nomeWifi}
-                onChange={(e) => setNomeWifi(upper(e.target.value))}
+                onValueChange={setNomeWifi}
+                transformar={upper}
               />
             </Grid>
             <Grid item xs={12} md={2}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Senha Wifi"
                 value={senhaWifi}
-                onChange={(e) => setSenhaWifi(upper(e.target.value))}
+                onValueChange={setSenhaWifi}
+                transformar={upper}
               />
             </Grid>
 
@@ -768,23 +846,21 @@ const CriarFichaTecnica: React.FC = () => {
             {temRedeSecundaria && (
               <>
                 <Grid item xs={12} md={3}>
-                  <TextField
+                  <CampoTexto
                     fullWidth
                     label="Nome do Wifi Secundário (opcional)"
                     value={nomeWifiSecundario}
-                    onChange={(e) =>
-                      setNomeWifiSecundario(upper(e.target.value))
-                    }
+                    onValueChange={setNomeWifiSecundario}
+                    transformar={upper}
                   />
                 </Grid>
                 <Grid item xs={12} md={3}>
-                  <TextField
+                  <CampoTexto
                     fullWidth
                     label="Senha Wifi Secundário (opcional)"
                     value={senhaWifiSecundario}
-                    onChange={(e) =>
-                      setSenhaWifiSecundario(upper(e.target.value))
-                    }
+                    onValueChange={setSenhaWifiSecundario}
+                    transformar={upper}
                   />
                 </Grid>
               </>
@@ -852,12 +928,13 @@ const CriarFichaTecnica: React.FC = () => {
               </FormControl>
             </Grid>
             <Grid item xs={12} md={2}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Placa do carro"
                 value={placaCarro}
-                onChange={(e) => setPlacaCarro(upper(e.target.value))}
+                onValueChange={setPlacaCarro}
                 required
+                transformar={upper}
               />
             </Grid>
           </Grid>
@@ -866,51 +943,51 @@ const CriarFichaTecnica: React.FC = () => {
         <SectionCard title="Infraestrutura">
           <Grid container spacing={2}>
             <Grid item xs={6} md={3}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Porta OLT"
                 value={portaOlt}
-                onChange={(e) => setPortaOlt(e.target.value)}
+                onValueChange={setPortaOlt}
               />
             </Grid>
             <Grid item xs={6} md={3}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="OLT"
                 value={olt}
-                onChange={(e) => setOlt(e.target.value)}
+                onValueChange={setOlt}
               />
             </Grid>
             <Grid item xs={6} md={3}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Caixa"
                 value={caixa}
-                onChange={(e) => setCaixa(e.target.value)}
+                onValueChange={setCaixa}
               />
             </Grid>
             <Grid item xs={6} md={3}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Splitter"
                 value={splitter}
-                onChange={(e) => setSplitter(e.target.value)}
+                onValueChange={setSplitter}
               />
             </Grid>
             <Grid item xs={6} md={4}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Sinal Power Meter"
                 value={sinalPowerMeter}
-                onChange={(e) => setSinalPowerMeter(e.target.value)}
+                onValueChange={setSinalPowerMeter}
               />
             </Grid>
             <Grid item xs={6} md={4}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Sinal ONU / Antena"
                 value={sinalOnuAntena}
-                onChange={(e) => setSinalOnuAntena(e.target.value)}
+                onValueChange={setSinalOnuAntena}
                 required
                 InputProps={{
                   endAdornment: (
@@ -936,38 +1013,40 @@ const CriarFichaTecnica: React.FC = () => {
               />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Sinal CCQ / Caixa"
                 value={sinalCcqCaixa}
-                onChange={(e) => setSinalCcqCaixa(e.target.value)}
+                onValueChange={setSinalCcqCaixa}
               />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="SSID"
                 value={ssid}
-                onChange={(e) => setSsid(e.target.value)}
+                onValueChange={setSsid}
                 required
               />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="MAC"
                 value={mac}
-                onChange={(e) => setMac(e.target.value.toUpperCase())}
+                onValueChange={setMac}
                 required
+                transformar={upper}
               />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="SN"
                 value={sn}
-                onChange={(e) => setSn(e.target.value.toUpperCase())}
+                onValueChange={setSn}
                 required
+                transformar={upper}
               />
             </Grid>
           </Grid>
@@ -1050,23 +1129,25 @@ const CriarFichaTecnica: React.FC = () => {
             </Grid>
           ))}
 
-          <TextField
+          <CampoTexto
             fullWidth
             sx={{ mt: 3 }}
             label="Motivo pelo qual não foi testado os demais equipamentos"
             value={motivo}
-            onChange={(e) => setMotivo(upper(e.target.value))}
+            onValueChange={setMotivo}
+            transformar={upper}
           />
         </SectionCard>
 
         <SectionCard title="Observação">
-          <TextField
+          <CampoTexto
             fullWidth
             multiline
             minRows={5}
             label="Observação (MAC caso não tenha anotado e outras informações)"
             value={observacao}
-            onChange={(e) => setObservacao(upper(e.target.value))}
+            onValueChange={setObservacao}
+            transformar={upper}
           />
         </SectionCard>
 
@@ -1078,19 +1159,21 @@ const CriarFichaTecnica: React.FC = () => {
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Nome do responsável"
                 value={responsavelNome}
-                onChange={(e) => setResponsavelNome(upper(e.target.value))}
+                onValueChange={setResponsavelNome}
+                transformar={upper}
               />
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="CPF do responsável"
                 value={responsavelCpf}
-                onChange={(e) => setResponsavelCpf(upper(e.target.value))}
+                onValueChange={setResponsavelCpf}
+                transformar={upper}
               />
             </Grid>
           </Grid>
@@ -1131,15 +1214,14 @@ const CriarFichaTecnica: React.FC = () => {
               satisfação por WhatsApp — é nele que a avaliação dos técnicos
               deste atendimento será enviada.
             </Typography>
-            <TextField
+            <CampoTexto
               fullWidth
               required
               label="Celular para avaliação (com DDD)"
               placeholder="14999999999"
               value={celularAvaliacao}
-              onChange={(e) =>
-                setCelularAvaliacao(e.target.value.replace(/\D/g, ""))
-              }
+              onValueChange={setCelularAvaliacao}
+              transformar={soDigitos}
               inputProps={{
                 inputMode: "numeric",
                 maxLength: 13,
@@ -1173,19 +1255,21 @@ const CriarFichaTecnica: React.FC = () => {
               />
             </Grid>
             <Grid item xs={12} md={3}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Área"
                 value={aprArea}
-                onChange={(e) => setAprArea(upper(e.target.value))}
+                onValueChange={setAprArea}
+                transformar={upper}
               />
             </Grid>
             <Grid item xs={12} md={3}>
-              <TextField
+              <CampoTexto
                 fullWidth
                 label="Atividade"
                 value={aprAtividade}
-                onChange={(e) => setAprAtividade(upper(e.target.value))}
+                onValueChange={setAprAtividade}
+                transformar={upper}
               />
             </Grid>
             <Grid item xs={12} md={2}>
@@ -1206,37 +1290,37 @@ const CriarFichaTecnica: React.FC = () => {
           {aprTrabalhadores.map((t, idx) => (
             <Grid container spacing={1} key={idx} sx={{ mb: 1 }}>
               <Grid item xs={12} md={5}>
-                <TextField
+                <CampoTexto
                   size="small"
                   fullWidth
                   label={`Nome ${idx + 1}`}
                   value={t.nome}
-                  onChange={(e) =>
-                    atualizarAprTrabalhador(idx, { nome: upper(e.target.value) })
+                  onValueChange={(v) =>
+                    atualizarAprTrabalhador(idx, { nome: v })
                   }
+                  transformar={upper}
                 />
               </Grid>
               <Grid item xs={6} md={4}>
-                <TextField
+                <CampoTexto
                   size="small"
                   fullWidth
                   label="Cargo"
                   value={t.cargo}
-                  onChange={(e) =>
-                    atualizarAprTrabalhador(idx, {
-                      cargo: upper(e.target.value),
-                    })
+                  onValueChange={(v) =>
+                    atualizarAprTrabalhador(idx, { cargo: v })
                   }
+                  transformar={upper}
                 />
               </Grid>
               <Grid item xs={6} md={3}>
-                <TextField
+                <CampoTexto
                   size="small"
                   fullWidth
                   label="RG"
                   value={t.rg}
-                  onChange={(e) =>
-                    atualizarAprTrabalhador(idx, { rg: e.target.value })
+                  onValueChange={(v) =>
+                    atualizarAprTrabalhador(idx, { rg: v })
                   }
                 />
               </Grid>
@@ -1260,12 +1344,13 @@ const CriarFichaTecnica: React.FC = () => {
               />
             ))}
           </Stack>
-          <TextField
+          <CampoTexto
             fullWidth
             sx={{ mt: 1 }}
             label="Outro serviço"
             value={aprServicoOutro}
-            onChange={(e) => setAprServicoOutro(upper(e.target.value))}
+            onValueChange={setAprServicoOutro}
+            transformar={upper}
           />
 
           <Typography variant="subtitle2" sx={{ mt: 3, mb: 1 }}>
@@ -1287,14 +1372,15 @@ const CriarFichaTecnica: React.FC = () => {
                     sx={{ width: 90 }}
                   />
                   {e.livre ? (
-                    <TextField
+                    <CampoTexto
                       size="small"
                       fullWidth
                       label="Outro equipamento"
                       value={e.item}
-                      onChange={(ev) =>
-                        atualizarAprEquip(idx, { item: upper(ev.target.value) })
+                      onValueChange={(v) =>
+                        atualizarAprEquip(idx, { item: v })
                       }
+                      transformar={upper}
                     />
                   ) : (
                     <Typography variant="body2">{e.item}</Typography>
@@ -1310,36 +1396,39 @@ const CriarFichaTecnica: React.FC = () => {
           {aprEtapas.map((e, idx) => (
             <Grid container spacing={1} key={idx} sx={{ mb: 2 }}>
               <Grid item xs={12} md={4}>
-                <TextField
+                <CampoTexto
                   size="small"
                   fullWidth
                   label={`${String(idx + 1).padStart(2, "0")} - Etapa da tarefa`}
                   value={e.etapa}
-                  onChange={(ev) =>
-                    atualizarAprEtapa(idx, { etapa: upper(ev.target.value) })
+                  onValueChange={(v) =>
+                    atualizarAprEtapa(idx, { etapa: v })
                   }
+                  transformar={upper}
                 />
               </Grid>
               <Grid item xs={12} md={4}>
-                <TextField
+                <CampoTexto
                   size="small"
                   fullWidth
                   label="Riscos"
                   value={e.riscos}
-                  onChange={(ev) =>
-                    atualizarAprEtapa(idx, { riscos: upper(ev.target.value) })
+                  onValueChange={(v) =>
+                    atualizarAprEtapa(idx, { riscos: v })
                   }
+                  transformar={upper}
                 />
               </Grid>
               <Grid item xs={12} md={4}>
-                <TextField
+                <CampoTexto
                   size="small"
                   fullWidth
                   label="Medidas de controle"
                   value={e.medidas}
-                  onChange={(ev) =>
-                    atualizarAprEtapa(idx, { medidas: upper(ev.target.value) })
+                  onValueChange={(v) =>
+                    atualizarAprEtapa(idx, { medidas: v })
                   }
+                  transformar={upper}
                 />
               </Grid>
             </Grid>
@@ -1348,12 +1437,13 @@ const CriarFichaTecnica: React.FC = () => {
           <Typography variant="subtitle2" sx={{ mt: 3, mb: 1 }}>
             Responsável pela APR
           </Typography>
-          <TextField
+          <CampoTexto
             fullWidth
             sx={{ mb: 2 }}
             label="Nome do responsável pela APR"
             value={aprResponsavel}
-            onChange={(e) => setAprResponsavel(upper(e.target.value))}
+            onValueChange={setAprResponsavel}
+            transformar={upper}
           />
           <PainelAssinatura ref={assinaturaAprRef} />
         </SectionCard>
