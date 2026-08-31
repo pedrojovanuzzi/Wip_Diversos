@@ -26,6 +26,7 @@ import { Pm2Logs } from "./pages/logs/Pm2Logs";
 import { PowerDns } from "./pages/powerdns/PowerDns";
 import { OnuHome } from "./pages/onu/OnuHome";
 import { CalculadoraDebitos } from "./pages/CalculadoraDebitos/CalculadoraDebitos";
+import { TvWipLista } from "./pages/TvWip/TvWipLista";
 import { AutorizarOnu } from "./pages/onu/AutorizarOnu";
 import { DesautorizaOnu } from "./pages/onu/DesautorizaOnu";
 import { useAuth } from "./context/AuthContext";
@@ -486,6 +487,16 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <CalculadoraDebitos />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/tv-wip"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <TvWipLista />
               ) : (
                 <Navigate to="/auth/login" />
               )

@@ -25,6 +25,7 @@ import { ServiceLink } from "../entities/ServiceLink";
 import { ServidorAcesso } from "../entities/ServidorAcesso";
 import { ClientMonitor } from "../entities/ClientMonitor";
 import { ClientMonitorEvent } from "../entities/ClientMonitorEvent";
+import { TvWipConta } from "../entities/TvWipConta";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -59,6 +60,7 @@ const AppDataSource = new DataSource({
     FileShare,
     ClientMonitor,
     ClientMonitorEvent,
+    TvWipConta,
     ServidorAcesso,
     ServiceLink,
   ],

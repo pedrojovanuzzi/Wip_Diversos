@@ -44,7 +44,7 @@ import { FaFlask } from "react-icons/fa";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Cookies from "js-cookie";
-import { BsFillSendPlusFill, BsCameraVideoFill } from "react-icons/bs";
+import { BsFillSendPlusFill, BsCameraVideoFill, BsTv } from "react-icons/bs";
 
 type Color = {
   color?: string;
@@ -221,6 +221,14 @@ const SECOES: SecaoMenu[] = [
         icon: ico(BsCameraVideoFill),
         title: "Streaming / Câmeras",
         description: "Contratar serviços adicionais de streaming e câmeras",
+        visivel: (p) => p >= 2,
+      },
+      {
+        to: "/tv-wip",
+        icon: ico(BsTv),
+        title: "TV WIP Grátis",
+        description:
+          "Clientes com a TV gratuita e a opção de desativar o acesso",
         visivel: (p) => p >= 2,
       },
       {

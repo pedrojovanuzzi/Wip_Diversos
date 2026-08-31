@@ -9,6 +9,7 @@ import {
   BsCamera,
   BsCollectionPlay,
   BsGearFill,
+  BsTv,
 } from "react-icons/bs";
 
 interface ContratoItem {
@@ -485,17 +486,19 @@ Regravar com a descrição completa?`,
   return (
     <>
       <NavBar />
-      <div className="min-h-screen bg-gray-100 p-6">
+      <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold text-gray-800">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">
               Serviços Adicionais — Streaming e Câmeras
             </h1>
-            <div className="flex items-center gap-2">
+            {/* No celular os botões viram uma grade: em linha única o
+                último era cortado fora da tela. */}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
               {(user?.permission ?? 0) >= 5 && (
                 <button
                   onClick={() => navigate("/Cameras/Admin")}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded font-semibold hover:bg-indigo-700"
+                  className="flex items-center justify-center gap-2 whitespace-nowrap rounded bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 sm:px-4"
                   title="Gerenciar câmeras (CFTV) dos clientes"
                 >
                   <BsCamera /> Gerenciar Câmeras
@@ -503,10 +506,17 @@ Regravar com a descrição completa?`,
               )}
               <button
                 onClick={() => navigate("/Streaming")}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded font-semibold hover:bg-gray-900"
+                className="flex items-center justify-center gap-2 whitespace-nowrap rounded bg-gray-800 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-900 sm:px-4"
                 title="Gerenciar assinantes do Watch Brasil"
               >
                 <BsGearFill /> Admin Streaming
+              </button>
+              <button
+                onClick={() => navigate("/tv-wip")}
+                className="col-span-2 flex items-center justify-center gap-2 whitespace-nowrap rounded bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 sm:col-span-1 sm:px-4"
+                title="Clientes com a TV WIP grátis (não é o streaming da Watch Brasil)"
+              >
+                <BsTv /> TV WIP Grátis
               </button>
             </div>
           </div>
@@ -515,7 +525,9 @@ Regravar com a descrição completa?`,
             <label className="block text-sm font-semibold text-gray-700 mb-1">
               Login do cliente
             </label>
-            <div className="flex gap-2">
+            {/* flex-wrap: com os dois botões ao lado, o campo ficava
+                estreito demais numa tela de celular. */}
+            <div className="flex flex-wrap gap-2">
               <input
                 type="text"
                 value={loginInput}
@@ -527,7 +539,7 @@ Regravar com a descrição completa?`,
                   if (e.key === "Enter") fetchList();
                 }}
                 placeholder="Ex: PEDROJOVANUZZI"
-                className="flex-1 p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
+                className="min-w-[12rem] flex-1 rounded border border-gray-300 p-2 uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               {loaded && (
                 <button
@@ -560,7 +572,7 @@ Regravar com a descrição completa?`,
               login de cor. Some quando um cliente está aberto na tela. */}
           {!loaded && (
             <div className="bg-white p-4 rounded-lg shadow-md mb-4">
-              <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="font-bold text-gray-800">
                   Clientes com serviço
                   {clientes && (
@@ -569,12 +581,12 @@ Regravar com a descrição completa?`,
                     </span>
                   )}
                 </h2>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={detalharNomes}
                     disabled={detalhando}
                     title="Regrava contratos antigos que ainda saem no boleto como CAMERA/STREAMER"
-                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded text-sm font-semibold hover:bg-gray-200 disabled:text-gray-400"
+                    className="whitespace-nowrap rounded bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:text-gray-400"
                   >
                     {detalhando ? "Verificando…" : "Detalhar no boleto"}
                   </button>
@@ -583,7 +595,7 @@ Regravar com a descrição completa?`,
                     value={filtroClientes}
                     onChange={(e) => setFiltroClientes(e.target.value)}
                     placeholder="Filtrar por login ou nome"
-                    className="w-64 p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:w-64"
                   />
                 </div>
               </div>
