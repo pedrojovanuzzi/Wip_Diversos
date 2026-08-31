@@ -9,7 +9,7 @@ import moment from "moment-timezone";
 import { ConsultCenterService } from "../services/ConsultCenterService";
 import { MensagensComuns, enviarNotificacaoServico, gerarLancamentoServico } from "./whatsapp/index";
 import { Faturas } from "../entities/Faturas";
-import { ClientesEntities } from "../entities/ClientesEntities";
+import { buscarCadastroMaisNovoPorCpf } from "../services/cadastroCliente";
 import { v4 as uuidv4 } from "uuid";
 import Pix from "./Pix";
 import ZapSign from "./ZapSign";
@@ -962,9 +962,9 @@ class SolicitacaoServicoController {
         if (loginInvalido) {
           const cpfLimpo = (dados.cpf || "").toString().replace(/\D/g, "");
           if (cpfLimpo) {
-            const clienteExistente = await MkauthSource
-              .getRepository(ClientesEntities)
-              .findOne({ where: { cpf_cnpj: cpfLimpo } });
+            // O mesmo CPF costuma ter cadastros antigos: vale o mais novo,
+            // senão o chamado abre no cadastro errado.
+            const clienteExistente = await buscarCadastroMaisNovoPorCpf(cpfLimpo);
             if (clienteExistente?.login) {
               loginCliente = clienteExistente.login;
               solicitacao.login_cliente = loginCliente;

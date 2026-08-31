@@ -15,6 +15,10 @@ import { v4 as uuidv4 } from "uuid";
 import { deleteSession } from "./whatsapp/services/session.service";
 import { criarChamadoMkauth } from "./whatsapp/services/chamado.service";
 import { reservarLoginUnico } from "../services/loginCliente";
+import {
+  buscarCadastroPorLoginOuCpf,
+  loginCadastroValido,
+} from "../services/cadastroCliente";
 
 dotenv.config();
 
@@ -829,7 +833,7 @@ class ZapSign {
       const dadosTitular = solicitacaoTitular.dados;
       const dadosNovoTitular = solicitacaoNovoTitular.dados;
 
-      // 1. Criar chamado no cadastro do titular original (pelo CPF)
+      // 1. Criar chamado no cadastro do titular original
       try {
         if (dadosTitular?.criadoSemAssinatura) {
           console.log(
@@ -837,13 +841,20 @@ class ZapSign {
           );
         } else {
         const cpfOriginal = (dadosTitular?.cpf || "").replace(/\D/g, "");
-        if (cpfOriginal) {
-          const clienteOriginal = await MkauthDataSource.getRepository(ClientesEntities).findOne({
-            where: { cpf_cnpj: cpfOriginal },
-          });
+        const loginOriginal = solicitacaoTitular.login_cliente || dadosTitular?.login || "";
+        if (cpfOriginal || loginOriginal) {
+          // O login escolhido no atendimento manda; o CPF é o plano B e, nele,
+          // vale o cadastro mais novo — o mesmo CPF costuma ter cadastros
+          // antigos e o chamado ia parar no errado.
+          const clienteOriginal = await buscarCadastroPorLoginOuCpf(
+            loginOriginal,
+            cpfOriginal,
+          );
 
           const sessionFake = {
-            login: clienteOriginal?.login || dadosTitular?.login || "",
+            login:
+              clienteOriginal?.login ||
+              (loginCadastroValido(loginOriginal) ? loginOriginal : ""),
             nome: clienteOriginal?.nome || dadosTitular?.nome || "",
             email: clienteOriginal?.email || dadosTitular?.email || "",
           };
@@ -857,10 +868,18 @@ class ZapSign {
             `E-mail: ${dadosNovoTitular?.email || "Não informado"}\n` +
             `Celular: ${dadosNovoTitular?.celular || dadosNovoTitular?.telefone_conversa || "Não informado"}`;
 
-          await criarChamadoMkauth("ALTERAÇÃO DE TITULARIDADE", sessionFake, mensagemChamado, solicitacaoTitular);
-          console.log(`[AlteraçãoTitularidade] Chamado criado para CPF ${cpfOriginal}.`);
+          if (!sessionFake.login) {
+            console.warn(
+              `[AlteraçãoTitularidade] Cadastro do titular original não localizado (login "${loginOriginal}", CPF "${cpfOriginal}"). Chamado não criado.`,
+            );
+          } else {
+            await criarChamadoMkauth("ALTERAÇÃO DE TITULARIDADE", sessionFake, mensagemChamado, solicitacaoTitular);
+            console.log(
+              `[AlteraçãoTitularidade] Chamado criado no cadastro ${sessionFake.login} (CPF ${cpfOriginal || "-"}).`,
+            );
+          }
         } else {
-          console.warn("[AlteraçãoTitularidade] CPF do titular original não encontrado nos dados.");
+          console.warn("[AlteraçãoTitularidade] CPF e login do titular original não encontrados nos dados.");
         }
         }
       } catch (e) {
