@@ -27,6 +27,7 @@ import { PowerDns } from "./pages/powerdns/PowerDns";
 import { OnuHome } from "./pages/onu/OnuHome";
 import { CalculadoraDebitos } from "./pages/CalculadoraDebitos/CalculadoraDebitos";
 import { TvWipLista } from "./pages/TvWip/TvWipLista";
+import { Codef } from "./pages/Codef/Codef";
 import { AutorizarOnu } from "./pages/onu/AutorizarOnu";
 import { DesautorizaOnu } from "./pages/onu/DesautorizaOnu";
 import { useAuth } from "./context/AuthContext";
@@ -487,6 +488,16 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <CalculadoraDebitos />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/codef"
+            element={
+              user?.token && user.permission >= 5 ? (
+                <Codef />
               ) : (
                 <Navigate to="/auth/login" />
               )

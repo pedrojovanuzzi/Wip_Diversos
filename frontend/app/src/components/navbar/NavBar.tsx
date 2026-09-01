@@ -33,6 +33,7 @@ import {
   FaLink,
   FaServer,
   FaCalculator,
+  FaBalanceScale,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -168,6 +169,14 @@ const SECOES: SecaoMenu[] = [
         description:
           "Dias a cobrar na próxima fatura de quem ficou suspenso e reativou o sinal",
         visivel: (p) => p >= 2,
+      },
+      {
+        to: "/codef",
+        icon: ico(FaBalanceScale),
+        title: "Coleta CODEF",
+        description:
+          "Os cinco valores econômico-financeiros que a Anatel pede todo mês",
+        visivel: (p) => p >= 5,
       },
       {
         to: "/NFSE",

@@ -39,6 +39,7 @@ import CameraRoutes from "./routes/Camera.routes";
 import TvWipRoutes from "./routes/TvWip.routes";
 import FileShareRoutes from "./routes/FileShare.routes";
 import ServiceLinkRoutes from "./routes/ServiceLink.routes";
+import CodefRoutes from "./routes/Codef.routes";
 
 // Controllers (for scheduled tasks)
 import BackupController from "./controller/Backup";
@@ -103,6 +104,7 @@ export class App {
     this.server.use("/api/tv-wip", TvWipRoutes);
     this.server.use("/api/files", FileShareRoutes);
     this.server.use("/api/service-links", ServiceLinkRoutes);
+    this.server.use("/api/codef", CodefRoutes);
   }
 
   private agendarBackup() {
