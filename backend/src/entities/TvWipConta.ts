@@ -35,6 +35,19 @@ export class TvWipConta {
   @Column({ type: "varchar", length: 255, nullable: true })
   nome!: string | null;
 
+  /**
+   * Conta criada à mão, sem cadastro no MKAuth.
+   *
+   * A varredura diária pula essas contas: não existe cliente para comparar, e
+   * sem isso ela as desativaria por "cliente inativo" logo na primeira noite.
+   */
+  @Column({ type: "boolean", default: false })
+  avulso!: boolean;
+
+  /** Anotação livre — usada para registrar por que a conta avulsa existe. */
+  @Column({ type: "varchar", length: 255, nullable: true })
+  observacao!: string | null;
+
   /** Conta liberada no aplicativo? */
   @Column({ type: "boolean", default: true })
   ativo!: boolean;

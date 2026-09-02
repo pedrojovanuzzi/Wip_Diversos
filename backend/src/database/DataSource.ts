@@ -26,6 +26,10 @@ import { ServidorAcesso } from "../entities/ServidorAcesso";
 import { ClientMonitor } from "../entities/ClientMonitor";
 import { ClientMonitorEvent } from "../entities/ClientMonitorEvent";
 import { TvWipConta } from "../entities/TvWipConta";
+import { TvWipPacote } from "../entities/TvWipPacote";
+import { TvWipPacoteCanal } from "../entities/TvWipPacoteCanal";
+import { TvWipContaPacote } from "../entities/TvWipContaPacote";
+import { TvWipContaCanal } from "../entities/TvWipContaCanal";
 import { CodefPlanoConta } from "../entities/CodefPlanoConta";
 import { CodefCompetencia } from "../entities/CodefCompetencia";
 
@@ -63,6 +67,10 @@ const AppDataSource = new DataSource({
     ClientMonitor,
     ClientMonitorEvent,
     TvWipConta,
+    TvWipPacote,
+    TvWipPacoteCanal,
+    TvWipContaPacote,
+    TvWipContaCanal,
     CodefPlanoConta,
     CodefCompetencia,
     ServidorAcesso,

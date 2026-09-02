@@ -30,7 +30,30 @@ export interface ResultadoSincronizacao {
   desativadas: number;
   /** Contas cuja senha/nome mudou no cadastro e foi atualizada aqui. */
   atualizadas: number;
+  /** Contas avulsas ignoradas por não terem cadastro no MKAuth. */
+  avulsasIgnoradas: number;
   duracaoMs: number;
+}
+
+/** Por que o acesso foi liberado ou recusado. */
+export type MotivoAutenticacao =
+  | "OK"
+  | "DADOS_INCOMPLETOS"
+  | "NAO_ENCONTRADO"
+  | "SENHA_INCORRETA"
+  | "DESATIVADA";
+
+export interface ResultadoAutenticacao {
+  /** Pode entrar no aplicativo? */
+  permitido: boolean;
+  motivo: MotivoAutenticacao;
+  /** O login existe na lista? */
+  existe: boolean;
+  /** A conta está ativa? (independente da senha estar certa) */
+  ativo: boolean;
+  /** Texto pronto para o aplicativo exibir. */
+  mensagem: string;
+  conta?: { login: string; nome: string | null; avulso: boolean };
 }
 
 class TvWipService {
@@ -135,10 +158,18 @@ class TvWipService {
       let reativadas = 0;
       let desativadas = 0;
       let atualizadas = 0;
+      let avulsasIgnoradas = 0;
 
       const paraSalvar: TvWipConta[] = [];
 
       for (const conta of contas) {
+        // Conta avulsa não tem cadastro para comparar: sai da varredura inteira,
+        // inclusive da atualização de senha e da desativação automática.
+        if (conta.avulso) {
+          avulsasIgnoradas += 1;
+          continue;
+        }
+
         const cliente = porLogin.get(conta.login.trim().toUpperCase());
         conta.verificado_em = agora;
 
@@ -203,6 +234,7 @@ class TvWipService {
         reativadas,
         desativadas,
         atualizadas,
+        avulsasIgnoradas,
         duracaoMs: Date.now() - inicio,
       };
 
@@ -210,13 +242,193 @@ class TvWipService {
         `[TvWip] Sincronizado: ${resultado.clientesAtivos} cliente(s) ativo(s) | ` +
           `+${criadas} nova(s) | ${reativadas} reativada(s) | ` +
           `${desativadas} desativada(s) | ${atualizadas} atualizada(s) | ` +
-          `${resultado.duracaoMs}ms`,
+          `${avulsasIgnoradas} avulsa(s) ignorada(s) | ${resultado.duracaoMs}ms`,
       );
 
       return resultado;
     } finally {
       this.rodando = false;
     }
+  }
+
+  /**
+   * Valida o acesso de um usuário no aplicativo da TV.
+   *
+   * Distingue os casos de propósito (não existe / senha errada / desativada),
+   * porque a tela do aplicativo precisa dizer ao cliente o que houve. Como isso
+   * revela se um login existe, a rota que chama este método é protegida por
+   * chave de API.
+   */
+  async autenticar(
+    login: string,
+    senha: string,
+  ): Promise<ResultadoAutenticacao> {
+    const usuario = String(login || "").trim();
+    const chave = String(senha ?? "");
+
+    if (!usuario || !chave) {
+      return {
+        permitido: false,
+        motivo: "DADOS_INCOMPLETOS",
+        existe: false,
+        ativo: false,
+        mensagem: "Informe usuário e senha.",
+      };
+    }
+
+    const conta = await AppDataSource.getRepository(TvWipConta)
+      .createQueryBuilder("c")
+      .where("UPPER(TRIM(c.login)) = UPPER(TRIM(:l))", { l: usuario })
+      .getOne();
+
+    if (!conta) {
+      return {
+        permitido: false,
+        motivo: "NAO_ENCONTRADO",
+        existe: false,
+        ativo: false,
+        mensagem: "Usuário não encontrado.",
+      };
+    }
+
+    // Comparação direta: a senha vem do cadastro do MKAuth, que a guarda em
+    // texto puro — não há hash para conferir.
+    if ((conta.senha ?? "") !== chave) {
+      return {
+        permitido: false,
+        motivo: "SENHA_INCORRETA",
+        existe: true,
+        ativo: conta.ativo,
+        mensagem: "Senha incorreta.",
+      };
+    }
+
+    if (!conta.ativo) {
+      return {
+        permitido: false,
+        motivo: "DESATIVADA",
+        existe: true,
+        ativo: false,
+        mensagem: conta.motivo_desativacao
+          ? `Acesso desativado: ${conta.motivo_desativacao}.`
+          : "Acesso desativado.",
+        conta: { login: conta.login, nome: conta.nome, avulso: conta.avulso },
+      };
+    }
+
+    return {
+      permitido: true,
+      motivo: "OK",
+      existe: true,
+      ativo: true,
+      mensagem: "Acesso liberado.",
+      conta: { login: conta.login, nome: conta.nome, avulso: conta.avulso },
+    };
+  }
+
+  /**
+   * Cria uma conta avulsa — acesso à TV para quem não é cliente cadastrado.
+   *
+   * Recusa um login que exista no MKAuth: nesse caso a conta tem que ser a
+   * normal, sincronizada, e não uma paralela que a varredura nunca tocaria.
+   */
+  async criarAvulso(dados: {
+    login: string;
+    senha: string;
+    nome?: string;
+    observacao?: string;
+    criadoPor?: string;
+  }): Promise<TvWipConta> {
+    const login = String(dados.login || "").trim();
+    const senha = String(dados.senha || "").trim();
+
+    if (!login) throw new Error("Informe o login.");
+    if (!senha) throw new Error("Informe a senha.");
+    if (/\s/.test(login)) throw new Error("O login não pode conter espaços.");
+
+    const repo = AppDataSource.getRepository(TvWipConta);
+
+    const jaExiste = await repo
+      .createQueryBuilder("c")
+      .where("UPPER(TRIM(c.login)) = UPPER(TRIM(:l))", { l: login })
+      .getOne();
+    if (jaExiste) {
+      throw new Error(
+        jaExiste.avulso
+          ? `Já existe uma conta avulsa com o login ${jaExiste.login}.`
+          : `O login ${jaExiste.login} já está na lista como cliente do MKAuth.`,
+      );
+    }
+
+    const cliente = await MkauthSource.getRepository(ClientesEntities)
+      .createQueryBuilder("c")
+      .where("UPPER(TRIM(c.login)) = UPPER(TRIM(:l))", { l: login })
+      .getOne();
+    if (cliente) {
+      throw new Error(
+        `${cliente.login} tem cadastro no MKAuth. Use "Sincronizar agora" ` +
+          "para trazer a conta normal em vez de criar uma avulsa.",
+      );
+    }
+
+    return repo.save(
+      repo.create({
+        login,
+        senha,
+        nome: String(dados.nome || "").trim() || null,
+        observacao: String(dados.observacao || "").trim() || null,
+        avulso: true,
+        ativo: true,
+        desativado_por: dados.criadoPor || null,
+      }),
+    );
+  }
+
+  /**
+   * Remove uma conta avulsa. As sincronizadas não são apagadas: elas voltariam
+   * na varredura seguinte, então para essas o certo é desativar.
+   */
+  async removerAvulso(login: string): Promise<void> {
+    const repo = AppDataSource.getRepository(TvWipConta);
+    const conta = await repo
+      .createQueryBuilder("c")
+      .where("UPPER(TRIM(c.login)) = UPPER(TRIM(:l))", { l: login })
+      .getOne();
+
+    if (!conta) throw new Error("Conta não encontrada.");
+    if (!conta.avulso) {
+      throw new Error(
+        "Essa conta vem do MKAuth e voltaria na próxima sincronização. " +
+          "Use Desativar.",
+      );
+    }
+    await repo.remove(conta);
+  }
+
+  /**
+   * Resolve "todas as contas do filtro atual" em uma lista de logins.
+   *
+   * A tela mostra 50 por vez; sem isso, "selecionar todos" mandaria só a
+   * página visível — ou milhares de logins no corpo da requisição.
+   */
+  async loginsDoFiltro(filtro: {
+    situacao?: string;
+    busca?: string;
+  }): Promise<string[]> {
+    const qb = AppDataSource.getRepository(TvWipConta)
+      .createQueryBuilder("c")
+      .select("c.login", "login");
+
+    if (filtro.situacao === "ativas") qb.andWhere("c.ativo = true");
+    if (filtro.situacao === "desativadas") qb.andWhere("c.ativo = false");
+
+    const busca = String(filtro.busca || "").trim();
+    if (busca) {
+      qb.andWhere("(c.login LIKE :b OR c.nome LIKE :b)", { b: `%${busca}%` });
+    }
+
+    const linhas = await qb.getRawMany();
+    return linhas.map((l) => l.login);
   }
 
   /** Desativa contas escolhidas na tela. */
@@ -263,7 +475,8 @@ class TvWipService {
     const paraSalvar: TvWipConta[] = [];
 
     for (const conta of contas) {
-      if (!ativos.has(conta.login.trim().toUpperCase())) {
+      // Avulsa não tem cadastro para conferir: a liberação é sempre manual.
+      if (!conta.avulso && !ativos.has(conta.login.trim().toUpperCase())) {
         recusadas.push(conta.login);
         continue;
       }
