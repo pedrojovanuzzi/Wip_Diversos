@@ -57,6 +57,11 @@ function ChaveDoApp(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+// A logo passa por aqui porque o servidor da TV só fala HTTP e o painel roda
+// em HTTPS: sem esse desvio o navegador bloqueia a imagem (conteúdo misto).
+// Pública porque <img> não manda cabeçalho de autorização.
+router.get("/logo/:arquivo", TvWip.logoDoCanal);
+
 // ---- Aplicativo da TV ----
 router.post("/auth", ChaveDoApp, TvWip.autenticar);
 

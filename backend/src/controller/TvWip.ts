@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import axios from "axios";
 import { Brackets } from "typeorm";
 
 import AppDataSource from "../database/DataSource";
@@ -225,6 +226,63 @@ class TvWip {
     } catch (error: any) {
       console.error("[TvWip] Erro ao listar canais:", error?.message || error);
       res.status(500).json({ message: "Erro ao listar os canais." });
+    }
+  };
+
+  /**
+   * Devolve a logo de um canal passando por este backend.
+   *
+   * O servidor da TV só responde em HTTP; como o painel roda em HTTPS, o
+   * navegador bloqueia a imagem por conteúdo misto. Buscando aqui, ela chega
+   * pela mesma origem segura do painel.
+   *
+   * Sem AuthGuard de propósito: uma tag <img> não envia cabeçalho de
+   * autorização. Em compensação o nome do arquivo é validado e o caminho
+   * remoto é fixo — não dá para apontar a rota para outro endereço.
+   */
+  public logoDoCanal = async (req: Request, res: Response) => {
+    try {
+      const arquivo = decodeURIComponent(String(req.params.arquivo || ""));
+
+      // Nada de subir de diretório nem escapar da pasta das logos.
+      if (
+        !arquivo ||
+        arquivo.includes("/") ||
+        arquivo.includes("\\") ||
+        arquivo.includes("..")
+      ) {
+        res.status(400).send("Arquivo inválido.");
+        return;
+      }
+
+      const raiz = (process.env.TVWIP_LOGO_URL_BASE || "").replace(/\/$/, "");
+      if (!raiz) {
+        res.status(503).send("TVWIP_LOGO_URL_BASE não configurada.");
+        return;
+      }
+
+      const alvo = `${raiz}/canais/logo/${encodeURIComponent(arquivo)}`;
+      const resposta = await axios.get<ArrayBuffer>(alvo, {
+        responseType: "arraybuffer",
+        timeout: 15000,
+        validateStatus: () => true,
+      });
+
+      if (resposta.status !== 200) {
+        res.status(404).send("Logo não encontrada.");
+        return;
+      }
+
+      res.setHeader(
+        "Content-Type",
+        String(resposta.headers["content-type"] || "image/png"),
+      );
+      // Logo de canal quase nunca muda; evita repetir a busca a cada rolagem.
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.send(Buffer.from(resposta.data));
+    } catch (error: any) {
+      console.error("[TvWip] Erro ao buscar a logo:", error?.message || error);
+      res.status(502).send("Erro ao buscar a logo.");
     }
   };
 

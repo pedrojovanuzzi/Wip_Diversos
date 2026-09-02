@@ -49,18 +49,15 @@ export const TvWipCanais: React.FC<Props> = ({ avisar }) => {
     arquivo: File | null;
   } | null>(null);
   const [criando, setCriando] = useState(false);
-  /** Endereço público do servidor da TV, para montar a URL da logo. */
-  const [logoBase, setLogoBase] = useState("");
 
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const res = await axios.get<{ canais: CanalTv[]; logoBase: string }>(
+      const res = await axios.get<{ canais: CanalTv[] }>(
         `${base}/tv-wip/canais`,
         { headers },
       );
       setCanais(res.data.canais || []);
-      setLogoBase(res.data.logoBase || "");
     } catch (e: any) {
       avisar(e?.response?.data?.message || "Erro ao carregar os canais.", "erro");
     } finally {
@@ -147,14 +144,19 @@ export const TvWipCanais: React.FC<Props> = ({ avisar }) => {
     }
   }
 
-  /** URL pública da logo. Vazio quando o canal não tem imagem. */
+  /**
+   * URL da logo servida pelo próprio backend.
+   *
+   * O servidor da TV só responde em HTTP e o painel roda em HTTPS: apontar
+   * direto para lá faz o navegador bloquear a imagem por conteúdo misto. Por
+   * isso a imagem vem por /tv-wip/logo/<arquivo>, na mesma origem segura.
+   */
   const urlDaLogo = (imagens: string) => {
     const caminho = String(imagens || "").trim();
     if (!caminho) return "";
-    // Já veio como URL completa (algumas foram cadastradas assim no PHP).
-    if (/^https?:\/\//i.test(caminho)) return caminho;
-    if (!logoBase) return "";
-    return logoBase.replace(/\/$/, "") + "/" + caminho.replace(/^\//, "");
+    const arquivo = caminho.split("/").pop() || "";
+    if (!arquivo) return "";
+    return `${base}/tv-wip/logo/${encodeURIComponent(arquivo)}`;
   };
 
   const filtrados = canais.filter((c) =>
