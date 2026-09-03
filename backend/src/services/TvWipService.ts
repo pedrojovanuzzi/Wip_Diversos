@@ -406,6 +406,37 @@ class TvWipService {
   }
 
   /**
+   * Situação resumida de uma conta, sem conferir senha.
+   *
+   * Usada pela API do aplicativo a cada requisição: o token diz quem é, mas
+   * quem decide se pode assistir é a conta agora, não quando o token foi
+   * emitido.
+   */
+  async situacaoDaConta(login: string): Promise<{
+    existe: boolean;
+    ativo: boolean;
+    nome: string | null;
+    avulso: boolean;
+    motivo: string | null;
+  }> {
+    const conta = await AppDataSource.getRepository(TvWipConta)
+      .createQueryBuilder("c")
+      .where("UPPER(TRIM(c.login)) = UPPER(TRIM(:l))", { l: String(login || "") })
+      .getOne();
+
+    if (!conta) {
+      return { existe: false, ativo: false, nome: null, avulso: false, motivo: null };
+    }
+    return {
+      existe: true,
+      ativo: conta.ativo,
+      nome: conta.nome,
+      avulso: conta.avulso,
+      motivo: conta.motivo_desativacao,
+    };
+  }
+
+  /**
    * Resolve "todas as contas do filtro atual" em uma lista de logins.
    *
    * A tela mostra 50 por vez; sem isso, "selecionar todos" mandaria só a

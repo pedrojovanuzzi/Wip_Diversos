@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import TvWip from "../controller/TvWip";
+import TvWipApp from "../controller/TvWipApp";
 import AuthGuard from "../middleware/AuthGuard";
 import multer from "multer";
 
@@ -63,7 +64,15 @@ function ChaveDoApp(req: Request, res: Response, next: NextFunction) {
 router.get("/logo/:arquivo", TvWip.logoDoCanal);
 
 // ---- Aplicativo da TV ----
+// Verificação simples, sem sessão (mantida para quem já usa).
 router.post("/auth", ChaveDoApp, TvWip.autenticar);
+
+// API do aplicativo: login devolve token + grade; as demais exigem o token e
+// reconferem, a cada chamada, se a conta continua ativa.
+router.post("/app/login", ChaveDoApp, TvWipApp.login);
+router.get("/app/canais", TvWipApp.sessao, TvWipApp.canais);
+router.get("/app/perfil", TvWipApp.sessao, TvWipApp.perfil);
+router.get("/app/playlist.m3u", TvWipApp.sessao, TvWipApp.playlist);
 
 // ---- Painel interno ----
 router.get("/", AuthGuard, TvWip.listar);
