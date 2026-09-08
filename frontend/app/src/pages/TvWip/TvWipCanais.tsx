@@ -2,7 +2,15 @@ import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { BsPencil, BsCheck2, BsX, BsPlusLg, BsTrash, BsImage } from "react-icons/bs";
+import {
+  BsPencil,
+  BsCheck2,
+  BsX,
+  BsPlusLg,
+  BsTrash,
+  BsImage,
+  BsCalendar3,
+} from "react-icons/bs";
 
 export interface CanalTv {
   idcanal: number;
@@ -21,9 +29,33 @@ type EdicaoCanal = {
   ativo?: boolean;
 };
 
+interface ProgramaEpg {
+  titulo: string;
+  descricao: string;
+  inicio: string | null;
+  fim: string | null;
+  agora: boolean;
+}
+
+interface EpgDoCanal {
+  idcanal: number;
+  temEpg: boolean;
+  erro?: string;
+  programas: ProgramaEpg[];
+}
+
 interface Props {
   avisar: (texto: string, tipo: "ok" | "erro") => void;
 }
+
+/** "2026-09-08T13:35:00Z" -> "13:35" no fuso do navegador. */
+const hora = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "--:--";
 
 /**
  * Canais da TV WIP — lê e grava direto na tabela do sistema antigo em PHP
@@ -50,6 +82,10 @@ export const TvWipCanais: React.FC<Props> = ({ avisar }) => {
   } | null>(null);
   const [criando, setCriando] = useState(false);
 
+  // Guia de programação, buscada no XUI a partir da própria URL do canal.
+  const [epg, setEpg] = useState<Record<number, ProgramaEpg[]>>({});
+  const [carregandoEpg, setCarregandoEpg] = useState(false);
+
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
@@ -69,6 +105,40 @@ export const TvWipCanais: React.FC<Props> = ({ avisar }) => {
   useEffect(() => {
     carregar();
   }, [carregar]);
+
+  /**
+   * Busca a programação de todos os canais numa chamada só. O backend faz as
+   * consultas ao XUI em paralelo limitado e guarda em cache por 10 minutos.
+   */
+  const carregarEpg = useCallback(async () => {
+    if (canais.length === 0) return;
+    setCarregandoEpg(true);
+    try {
+      const ids = canais.map((c) => c.idcanal).join(",");
+      const res = await axios.get<{ canais: EpgDoCanal[] }>(
+        `${base}/tv-wip/canais/epg`,
+        { headers, params: { ids, limite: 2 }, timeout: 60000 },
+      );
+      const mapa: Record<number, ProgramaEpg[]> = {};
+      for (const c of res.data.canais || []) mapa[c.idcanal] = c.programas;
+      setEpg(mapa);
+    } catch (e: any) {
+      avisar(
+        e?.response?.data?.message || "Erro ao buscar a programação.",
+        "erro",
+      );
+    } finally {
+      setCarregandoEpg(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canais, user]);
+
+  // Busca a programação assim que os canais chegam. É uma chamada só, e o
+  // backend guarda o resultado por 10 minutos — não vale deixar o operador
+  // clicar num botão para ver algo que ele sempre quer ver.
+  useEffect(() => {
+    carregarEpg();
+  }, [carregarEpg]);
 
   async function salvar(idcanal: number, dados: EdicaoCanal) {
     setSalvando(true);
@@ -186,6 +256,19 @@ export const TvWipCanais: React.FC<Props> = ({ avisar }) => {
           >
             <BsPlusLg /> {form ? "Fechar" : "Novo canal"}
           </button>
+          <button
+            onClick={carregarEpg}
+            disabled={carregandoEpg || canais.length === 0}
+            title="Busca no XUI o que está passando em cada canal"
+            className="flex items-center justify-center gap-2 rounded border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:text-gray-400"
+          >
+            {carregandoEpg ? (
+              <AiOutlineLoading3Quarters className="animate-spin" />
+            ) : (
+              <BsCalendar3 />
+            )}
+            {carregandoEpg ? "Buscando…" : "Atualizar programação"}
+          </button>
           <input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
@@ -275,6 +358,7 @@ export const TvWipCanais: React.FC<Props> = ({ avisar }) => {
                 <th className="px-3 py-2 text-left">#</th>
                 <th className="px-3 py-2 text-left">Canal</th>
                 <th className="px-3 py-2 text-left">URL</th>
+                <th className="px-3 py-2 text-left">No ar agora</th>
                 <th className="px-3 py-2 text-left">Logo</th>
                 <th className="px-3 py-2 text-center">No ar</th>
                 <th className="px-3 py-2 text-right">Views</th>
@@ -319,6 +403,38 @@ export const TvWipCanais: React.FC<Props> = ({ avisar }) => {
                           {c.url}
                         </span>
                       )}
+                    </td>
+                    <td className="max-w-[16rem] px-3 py-2">
+                      {(() => {
+                        const grade = epg[c.idcanal];
+                        if (!grade) {
+                          return (
+                            <span className="text-xs text-gray-400">
+                              {carregandoEpg ? "buscando…" : "—"}
+                            </span>
+                          );
+                        }
+                        if (grade.length === 0) {
+                          return (
+                            <span className="text-xs text-gray-400">
+                              sem guia
+                            </span>
+                          );
+                        }
+                        const atual = grade.find((p) => p.agora) || grade[0];
+                        const proximo = grade.find((p) => p !== atual);
+                        return (
+                          <div title={atual.descricao || undefined}>
+                            <span className="block truncate font-medium text-gray-800">
+                              {atual.titulo || "(sem título)"}
+                            </span>
+                            <span className="block text-xs text-gray-500">
+                              {hora(atual.inicio)}–{hora(atual.fim)}
+                              {proximo && ` · depois: ${proximo.titulo}`}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="max-w-[12rem] px-3 py-2">
                       {!emEdicao && (

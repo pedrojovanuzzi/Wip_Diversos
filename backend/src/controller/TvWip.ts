@@ -6,6 +6,7 @@ import AppDataSource from "../database/DataSource";
 import { TvWipConta } from "../entities/TvWipConta";
 import TvWipService from "../services/TvWipService";
 import TvWipCanaisService from "../services/TvWipCanaisService";
+import TvWipEpgService from "../services/TvWipEpgService";
 import { salvarLogo } from "../services/TvWipLogoService";
 
 /**
@@ -340,6 +341,33 @@ class TvWip {
       res.json({ ok: true, message: "Canal removido." });
     } catch (error: any) {
       res.status(400).json({ message: error?.message || "Erro ao remover." });
+    }
+  };
+
+  /** Guia de programação de um canal, buscada no XUI. */
+  public epgDoCanal = async (req: Request, res: Response) => {
+    try {
+      const limite = Math.min(Number(req.query.limite) || 8, 50);
+      res.json(
+        await TvWipEpgService.doCanal(Number(req.params.idcanal), limite),
+      );
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Erro ao buscar EPG." });
+    }
+  };
+
+  /** Guia de vários canais de uma vez (?ids=1,2,3). */
+  public epgDeVarios = async (req: Request, res: Response) => {
+    try {
+      const ids = String(req.query.ids || "")
+        .split(",")
+        .map((i) => Number(i.trim()))
+        .filter((i) => Number.isFinite(i));
+      const limite = Math.min(Number(req.query.limite) || 4, 20);
+      res.json({ canais: await TvWipEpgService.deVarios(ids, limite) });
+    } catch (error: any) {
+      console.error("[TvWip] Erro no EPG:", error?.message || error);
+      res.status(500).json({ message: "Erro ao buscar a programação." });
     }
   };
 

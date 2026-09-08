@@ -6,6 +6,7 @@ import TvWipService from "../services/TvWipService";
 import TvWipCanaisService, {
   CanalResolvido,
 } from "../services/TvWipCanaisService";
+import TvWipEpgService from "../services/TvWipEpgService";
 
 dotenv.config();
 
@@ -208,6 +209,39 @@ class TvWipApp {
     } catch (error: any) {
       console.error("[TvWipApp] Erro no perfil:", error?.message || error);
       res.status(500).json({ ok: false, mensagem: "Erro ao consultar." });
+    }
+  };
+
+  /**
+   * Guia de programação dos canais do cliente.
+   *
+   * Sem `ids`, devolve a grade de todos os canais que ele tem — é o que a
+   * tela inicial do aplicativo precisa para mostrar "o que está passando".
+   */
+  public epg = async (req: Request, res: Response) => {
+    try {
+      const login = String(res.locals.loginTv);
+      const canais = await TvWipCanaisService.canaisDaConta(login);
+      const permitidos = new Set(canais.map((c) => c.idcanal));
+
+      const pedidos = String(req.query.ids || "")
+        .split(",")
+        .map((i) => Number(i.trim()))
+        .filter((i) => Number.isFinite(i));
+
+      // Um canal fora do pacote do cliente não entra, nem para consultar a
+      // programação: a grade seguiria revelando o que ele não assina.
+      const alvos = pedidos.length
+        ? pedidos.filter((id) => permitidos.has(id))
+        : canais.map((c) => c.idcanal);
+
+      const limite = Math.min(Number(req.query.limite) || 3, 20);
+      const grade = await TvWipEpgService.deVarios(alvos, limite);
+
+      res.json({ ok: true, total: grade.length, canais: grade });
+    } catch (error: any) {
+      console.error("[TvWipApp] Erro no EPG:", error?.message || error);
+      res.status(500).json({ ok: false, mensagem: "Erro ao carregar a guia." });
     }
   };
 

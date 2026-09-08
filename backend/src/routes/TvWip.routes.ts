@@ -73,6 +73,7 @@ router.post("/app/login", ChaveDoApp, TvWipApp.login);
 router.get("/app/canais", TvWipApp.sessao, TvWipApp.canais);
 router.get("/app/perfil", TvWipApp.sessao, TvWipApp.perfil);
 router.get("/app/playlist.m3u", TvWipApp.sessao, TvWipApp.playlist);
+router.get("/app/epg", TvWipApp.sessao, TvWipApp.epg);
 
 // ---- Painel interno ----
 router.get("/", AuthGuard, TvWip.listar);
@@ -84,6 +85,8 @@ router.post("/sincronizar", AuthGuard, TvWip.sincronizar);
 
 // ---- Canais e pacotes ----
 router.get("/canais", AuthGuard, TvWip.listarCanais);
+router.get("/canais/epg", AuthGuard, TvWip.epgDeVarios);
+router.get("/canais/:idcanal/epg", AuthGuard, TvWip.epgDoCanal);
 router.post("/canais", AuthGuard, logo.any(), TvWip.criarCanal);
 router.post("/canais/:idcanal/logo", AuthGuard, logo.any(), TvWip.enviarLogo);
 router.delete("/canais/:idcanal", AuthGuard, TvWip.removerCanal);
