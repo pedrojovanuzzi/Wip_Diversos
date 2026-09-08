@@ -34,12 +34,61 @@ interface PayloadApp extends JwtPayload {
   escopo: string;
 }
 
+/**
+ * Nome do canal como está no cadastro, já limpo.
+ *
+ * Devolve vazio quando não há nome utilizável — inclusive quando o campo tem
+ * só dígitos, que é o cadastro antigo repetindo o número do stream. Nos dois
+ * casos o aplicativo não tem o que escrever no card.
+ */
+function nomeDoCadastro(canal: CanalResolvido): string {
+  const limpo = String(canal.canal ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return /^[0-9]+$/.test(limpo) ? "" : limpo;
+}
+
+/**
+ * Nome de cada canal, pronto para a tela.
+ *
+ * O cadastro antigo tem canal sem nome, e era isso que chegava ao aplicativo
+ * como um `#EXTINF` terminando na vírgula: sem texto ali, o app caía no último
+ * pedaço da URL — o número do stream do XUI. Era o "canal 35, canal 41" na
+ * grade.
+ *
+ * Quando o cadastro não ajuda, o nome vem de quem realmente sabe: o servidor
+ * que entrega o canal. A consulta é a mesma do painel e fica em cache por
+ * servidor, então isto custa uma requisição, não uma por canal. Se nem o XUI
+ * responder, sobra `Canal <id>` — feio, mas identifica.
+ */
+async function nomesDosCanais(
+  canais: CanalResolvido[],
+): Promise<Map<number, string>> {
+  const nomes = new Map<number, string>();
+  const semNome: CanalResolvido[] = [];
+
+  for (const canal of canais) {
+    const doCadastro = nomeDoCadastro(canal);
+    if (doCadastro) nomes.set(canal.idcanal, doCadastro);
+    else semNome.push(canal);
+  }
+
+  // Em sequência de propósito: o primeiro busca a listagem do servidor e os
+  // demais aproveitam o cache dela.
+  for (const canal of semNome) {
+    const doXui = await TvWipEpgService.nomeNoXui(canal.url);
+    nomes.set(canal.idcanal, doXui || `Canal ${canal.idcanal}`);
+  }
+
+  return nomes;
+}
+
 /** Junta o que o app precisa de um canal, com a logo já em HTTPS. */
-function paraApp(canal: CanalResolvido, origem: string) {
+function paraApp(canal: CanalResolvido, origem: string, nome: string) {
   const arquivo = String(canal.imagens || "").split("/").pop() || "";
   return {
     id: canal.idcanal,
-    nome: canal.canal,
+    nome,
     stream: canal.url,
     // A logo passa pelo backend: o servidor de imagens só fala HTTP, e um app
     // em HTTPS (ou com política de rede estrita) recusaria a imagem.
@@ -99,6 +148,7 @@ class TvWipApp {
         resultado.conta.login,
       );
       const origem = origemDaRequisicao(req);
+      const nomes = await nomesDosCanais(canais);
 
       res.json({
         ok: true,
@@ -109,7 +159,7 @@ class TvWipApp {
           nome: resultado.conta.nome,
         },
         total: canais.length,
-        canais: canais.map((c) => paraApp(c, origem)),
+        canais: canais.map((c) => paraApp(c, origem, nomes.get(c.idcanal) || `Canal ${c.idcanal}`)),
       });
     } catch (error: any) {
       console.error("[TvWipApp] Erro no login:", error?.message || error);
@@ -176,12 +226,13 @@ class TvWipApp {
       const login = String(res.locals.loginTv);
       const canais = await TvWipCanaisService.canaisDaConta(login);
       const origem = origemDaRequisicao(req);
+      const nomes = await nomesDosCanais(canais);
 
       res.json({
         ok: true,
         login,
         total: canais.length,
-        canais: canais.map((c) => paraApp(c, origem)),
+        canais: canais.map((c) => paraApp(c, origem, nomes.get(c.idcanal) || `Canal ${c.idcanal}`)),
       });
     } catch (error: any) {
       console.error("[TvWipApp] Erro ao listar canais:", error?.message || error);
@@ -254,14 +305,20 @@ class TvWipApp {
       const login = String(res.locals.loginTv);
       const canais = await TvWipCanaisService.canaisDaConta(login);
       const origem = origemDaRequisicao(req);
+      const nomes = await nomesDosCanais(canais);
 
       const linhas = ["#EXTM3U"];
       for (const c of canais) {
-        const item = paraApp(c, origem);
+        const item = paraApp(c, origem, nomes.get(c.idcanal) || `Canal ${c.idcanal}`);
+        // As aspas delimitam o atributo: se sobrar uma no nome, o resto da
+        // linha é lido errado. `tvg-name` é redundante de propósito — é por
+        // onde os players (o nosso inclusive) recuperam o nome quando o texto
+        // depois da vírgula não serve.
+        const nome = item.nome.replace(/"/g, "'");
         linhas.push(
-          `#EXTINF:-1 tvg-id="${item.id}"` +
+          `#EXTINF:-1 tvg-id="${item.id}" tvg-name="${nome}"` +
             (item.logo ? ` tvg-logo="${item.logo}"` : "") +
-            ` group-title="TV WIP",${item.nome}`,
+            ` group-title="TV WIP",${nome}`,
         );
         linhas.push(item.stream);
       }
