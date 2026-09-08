@@ -275,10 +275,15 @@ class TvWipApp {
       const canais = await TvWipCanaisService.canaisDaConta(login);
       const permitidos = new Set(canais.map((c) => c.idcanal));
 
-      const pedidos = String(req.query.ids || "")
+      // Sem `ids` na query, `"".split(",")` devolve [""] e `Number("")` é 0 —
+      // que é finito e passava pelo filtro. Com isso a lista de pedidos vinha
+      // com um item, o código entendia "o cliente pediu canais específicos",
+      // o canal 0 não pertence a conta nenhuma e a guia saía vazia. Era esse o
+      // EPG que nunca aparecia no aplicativo, que justamente não manda `ids`.
+      const pedidos = String(req.query.ids ?? "")
         .split(",")
         .map((i) => Number(i.trim()))
-        .filter((i) => Number.isFinite(i));
+        .filter((i) => Number.isInteger(i) && i > 0);
 
       // Um canal fora do pacote do cliente não entra, nem para consultar a
       // programação: a grade seguiria revelando o que ele não assina.

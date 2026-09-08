@@ -359,10 +359,12 @@ class TvWip {
   /** Guia de vários canais de uma vez (?ids=1,2,3). */
   public epgDeVarios = async (req: Request, res: Response) => {
     try {
-      const ids = String(req.query.ids || "")
+      // `Number("")` é 0 e passa por `isFinite`: sem este corte, uma query
+      // sem `ids` viraria um pedido pelo canal 0.
+      const ids = String(req.query.ids ?? "")
         .split(",")
         .map((i) => Number(i.trim()))
-        .filter((i) => Number.isFinite(i));
+        .filter((i) => Number.isInteger(i) && i > 0);
       const limite = Math.min(Number(req.query.limite) || 4, 20);
       res.json({ canais: await TvWipEpgService.deVarios(ids, limite) });
     } catch (error: any) {
