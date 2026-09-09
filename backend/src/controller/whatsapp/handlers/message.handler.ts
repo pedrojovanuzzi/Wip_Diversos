@@ -64,10 +64,17 @@ import {
 import { iniciarMudanca } from "./mudanca-endereco.handler";
 
 
-async function LGPD(celular: any) {
+/**
+ * Termos exibidos antes de iniciar um serviço.
+ *
+ * `apenasScm` pula o termo de LGPD — usado pela Watch TV, onde o cliente já
+ * é cadastrado e só o contrato do provedor precisa ser lido.
+ */
+async function LGPD(celular: any, apenasScm = false) {
   const { MensagemTermos, MensagemBotao } = await import(
     "../services/messaging.service"
   );
+  if (!apenasScm) {
   await MensagemTermos(
     celular,
     "Termos LGPD",
@@ -75,6 +82,7 @@ async function LGPD(celular: any) {
     "Ler Termos",
     "https://wipdiversos.wiptelecomunicacoes.com.br/doc/privacidade",
   );
+  }
   await MensagemTermos(
     celular,
     "Termos SCM",
@@ -307,7 +315,7 @@ export async function handleMessage(
           session.stage = "lgpd_request";
           session.service = "wifi_extendido";
         } else if (t === "watch tv") {
-          await LGPD(celular);
+          await LGPD(celular, true);
           session.stage = "lgpd_request";
           session.service = "watch_tv";
         } else if (t === "wifi estendido") {

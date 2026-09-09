@@ -264,10 +264,17 @@ export async function MensagemLista(
               sections: campos.sections.map(
                 (section: { title: any; rows: any[] }) => ({
                   title: section.title,
-                  rows: section.rows.map((row: { id: any; title: any }) => ({
-                    id: row.id,
-                    title: row.title,
-                  })),
+                  rows: section.rows.map(
+                    (row: { id: any; title: any; description?: any }) => ({
+                      id: row.id,
+                      title: row.title,
+                      // O WhatsApp corta a descrição em 72 caracteres e recusa a
+                      // mensagem inteira se vier maior.
+                      ...(row.description
+                        ? { description: String(row.description).slice(0, 72) }
+                        : {}),
+                    }),
+                  ),
                 }),
               ),
             },

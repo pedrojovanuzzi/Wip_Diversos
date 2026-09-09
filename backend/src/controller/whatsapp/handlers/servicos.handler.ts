@@ -411,9 +411,13 @@ export async function iniciarWatchTv(
 ) {
   if (!session.watchTvStep) {
     session.watchTvStep = "ask_cpf";
+    // O preço vem antes do CPF: o cliente decide se quer seguir sabendo
+    // quanto custa, em vez de descobrir só no fim.
     await MensagensComuns(
       celular,
-      "📺 *Watch TV*\n\nPara contratar, digite o *CPF/CNPJ* do titular do cadastro.",
+      `📺 *Watch TV*\n\nO streaming da Wip por *R$ ${VALOR_STREAMER.toFixed(2).replace(".", ",")}* ` +
+        `por mês, cobrado junto da sua mensalidade.\n\n` +
+        `Para contratar, digite o *CPF/CNPJ* do titular do cadastro.`,
     );
     return;
   }
@@ -452,6 +456,9 @@ export async function iniciarWatchTv(
       let indice = 1;
       session.structuredDataWatchTv = cadastros.map((c) => ({
         index: indice++,
+        // O título é o que volta do WhatsApp quando o cliente toca na opção,
+        // e o limite dele é 24 caracteres — por isso é o identificador.
+        titulo: String(c.login || "").slice(0, 24),
         nome: c.nome, endereco: c.endereco, login: c.login, numero: c.numero,
         bairro: c.bairro, cidade: c.cidade, estado: c.estado, cep: c.cep,
         venc: c.venc, termo: c.termo, plano: c.plano, email: c.email,
@@ -459,14 +466,24 @@ export async function iniciarWatchTv(
       }));
       session.watchTvStep = "select_address";
 
-      let mensagem =
-        "🔍 Encontramos mais de um *Cadastro!* Digite o *Número* daquele em que deseja a *Watch TV* 👇🏻\n\n";
-      for (const c of session.structuredDataWatchTv) {
-        mensagem += `*${c.index}* PPPoE: ${c.login}\n   ${c.endereco}, N: ${c.numero} - ${c.bairro}\n\n`;
-      }
-      mensagem += "👉🏻 Caso queira cancelar digite *início*";
+      // A lista de 10 é o teto do WhatsApp; acima disso a mensagem é recusada.
+      const linhas = session.structuredDataWatchTv
+        .slice(0, 10)
+        .map((c: any) => ({
+          id: `watchtv_${c.index}`,
+          title: c.titulo,
+          description: `${c.endereco || ""}, ${c.numero || ""} - ${c.bairro || ""}`,
+        }));
 
-      await MensagensComuns(celular, mensagem);
+      await MensagemLista(
+        celular,
+        "🔍 Encontramos mais de um cadastro. Toque abaixo e escolha em qual deseja a *Watch TV*.",
+        { sections: [{ title: "Seus cadastros", rows: linhas }] },
+      );
+      await MensagensComuns(
+        celular,
+        "👉🏻 Caso queira cancelar digite *início*",
+      );
       return;
     }
 
@@ -483,14 +500,20 @@ export async function iniciarWatchTv(
       return;
     }
 
-    const escolha = Number(String(texto).trim());
     const lista = session.structuredDataWatchTv || [];
-    const cadastro = lista.find((c: any) => c.index === escolha);
+    const escolhido = String(texto || "").trim();
+
+    // A resposta da lista chega como o título da linha (o PPPoE). O número
+    // digitado continua valendo para quem responde por texto.
+    const cadastro =
+      lista.find(
+        (c: any) => String(c.titulo).toUpperCase() === escolhido.toUpperCase(),
+      ) || lista.find((c: any) => c.index === Number(escolhido));
 
     if (!cadastro) {
       await MensagensComuns(
         celular,
-        `❌ Opção inválida. Digite um número de *1* a *${lista.length}*, ou *início* para cancelar.`,
+        "❌ Não identifiquei esse cadastro. Toque em *Ver opções* na mensagem acima e escolha um da lista, ou digite *início* para cancelar.",
       );
       return;
     }
