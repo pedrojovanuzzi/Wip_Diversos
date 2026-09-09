@@ -1,4 +1,5 @@
 import ZapSign from "../ZapSign";
+import { VALOR_STREAMER } from "../../config/servicosAdicionais";
 import ApiMkDataSource from "../../database/API_MK";
 import ZapSignTemplates from "../../entities/APIMK/ZapSignTemplates";
 import {
@@ -310,6 +311,45 @@ export const CATALOGO: ServicoWeb[] = [
       CAMPO_OBSERVACAO,
     ],
     criarContrato: (params) => ZapSign.createContractWifiExtendido(params),
+  },
+  {
+    id: "watch_tv",
+    nomeServicoTemplate: "Termo de Adesão SVA",
+    nome: "Watch TV",
+    descricao:
+      "Contratação da Watch TV, o serviço de streaming da Wip. Assinatura " +
+      "mensal cobrada junto da mensalidade.",
+    assuntoChamado: "CONTRATACAO WATCH TV",
+    termos: [
+      {
+        id: "sva",
+        titulo: "Termo de Adesão SVA",
+        texto:
+          "Li e aceito o Termo de Adesão e o Contrato de Serviço de Valor " +
+          "Adicionado (SVA).",
+        url: "/doc/sva",
+      },
+    ],
+    // O valor sai de servicosAdicionais para não divergir do que é lançado no
+    // contrato do cliente e do nome comercial que aparece no boleto.
+    valor: VALOR_STREAMER,
+    permiteGratisFidelidade: false,
+    campos: [
+      {
+        name: "email_watch",
+        label: "E-mail para acessar a Watch TV",
+        type: "text",
+        required: true,
+      },
+      {
+        name: "celular_watch",
+        label: "Celular para acessar a Watch TV",
+        type: "text",
+        required: true,
+      },
+      CAMPO_OBSERVACAO,
+    ],
+    criarContrato: (params) => ZapSign.createContractSva(params),
   },
   {
     id: "troca_titularidade",

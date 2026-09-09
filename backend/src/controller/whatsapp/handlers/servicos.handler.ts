@@ -33,6 +33,7 @@ import {
 import { url as waUrl, token as waToken } from "../config";
 import { getPlanosDoSistema, getPlanosWifiExtendido } from "../services/plano.service";
 import { criarChamadoMkauth } from "../services/chamado.service";
+import { VALOR_STREAMER } from "../../../config/servicosAdicionais";
 
 const FLOW_TROCA_TITULARIDADE_CONTATO =
   process.env.WA_FLOW_TROCA_TITULARIDADE_CONTATO ||
@@ -290,6 +291,214 @@ async function salvarSolicitacaoWifiExtendido(
   };
 
   return await repo.save(novaSolicitacao);
+}
+
+
+// --- Watch TV (SVA) ---
+
+/**
+ * Solicitação de contratação da Watch TV.
+ *
+ * Nasce sem contrato: o termo de adesão do SVA é gerado depois, pela tela de
+ * solicitações — é lá que o atendimento confere os dados antes de mandar o
+ * cliente assinar.
+ */
+async function salvarSolicitacaoWatchTv(session: any, celularConversa: string) {
+  const repo = AppDataSource.getRepository(SolicitacaoServico);
+  const nova = new SolicitacaoServico();
+
+  nova.servico = "Watch TV";
+  nova.login_cliente = session.login || "Desconhecido";
+  nova.data_solicitacao = new Date();
+  nova.assinado = false;
+  nova.pago = false;
+  nova.gratis = 0;
+  nova.dados = {
+    nome: session.nome || "Não informado",
+    cpf: session.cpf || "Não informado",
+    email: session.email || "",
+    telefone: session.celularCliente || celularConversa,
+    telefone_conversa: celularConversa,
+    login: session.login || "Não informado",
+    endereco: session.endereco_watch_tv || "Não informado",
+    numero: session.numero_watch_tv || "",
+    bairro: session.bairro_watch_tv || "",
+    cidade: session.cidade_watch_tv || "",
+    estado: session.estado_watch_tv || "",
+    cep: session.cep_watch_tv || "",
+    vencimento: session.venc_watch_tv || "",
+    termo: session.contrato_cliente || "",
+    rg: session.rg || "Não informado",
+    plano: session.plano_watch_tv || "Não informado",
+    // Contato do aplicativo: por padrão o mesmo do cadastro, e o atendimento
+    // ajusta na tela se o cliente pedir outro.
+    email_watch: session.email || "",
+    celular_watch: session.celularCliente || celularConversa,
+    valor: VALOR_STREAMER.toFixed(2),
+    valor_plano: session.valor_plano_atual || "",
+  };
+
+  return repo.save(nova);
+}
+
+/** Guarda os dados do cadastro escolhido na sessão. */
+function aplicarCadastroWatchTv(session: any, cliente: any, cpf: string) {
+  session.login = cliente.login;
+  session.nome = cliente.nome;
+  session.email = cliente.email;
+  session.rg = cliente.rg;
+  session.celularCliente = cliente.celular;
+  session.endereco_watch_tv = cliente.endereco || "";
+  session.numero_watch_tv = cliente.numero || "";
+  session.bairro_watch_tv = cliente.bairro || "";
+  session.cidade_watch_tv = cliente.cidade || "";
+  session.estado_watch_tv = cliente.estado || "";
+  session.cep_watch_tv = cliente.cep || "";
+  session.venc_watch_tv = cliente.venc || "";
+  session.contrato_cliente = cliente.termo || "";
+  session.plano_watch_tv = cliente.plano || "";
+  session.dadosCompleto = {
+    nome: cliente.nome,
+    cpf,
+    email: cliente.email,
+    rg: cliente.rg,
+    celular: cliente.celular,
+    login: cliente.login,
+    endereco: `${cliente.endereco}, ${cliente.numero}`,
+  };
+}
+
+/** Fecha o pedido: grava a solicitação e abre o chamado no cadastro. */
+async function concluirWatchTv(celular: any, session: any) {
+  const solicitacao = await salvarSolicitacaoWatchTv(session, celular);
+
+  const resumo =
+    `Contratação da Watch TV solicitada pelo WhatsApp.\n\n` +
+    `Cliente: ${session.nome || "-"}\n` +
+    `Login: ${session.login || "-"}\n` +
+    `CPF/CNPJ: ${session.cpf || "-"}\n` +
+    `Endereço: ${session.endereco_watch_tv || "-"}, ${session.numero_watch_tv || "-"}\n` +
+    `Valor da assinatura: R$ ${VALOR_STREAMER.toFixed(2).replace(".", ",")}\n\n` +
+    `O termo de adesão do SVA será enviado para assinatura pelo atendimento.`;
+
+  try {
+    await criarChamadoMkauth("CONTRATACAO WATCH TV", session, resumo, solicitacao);
+  } catch (e: any) {
+    // A solicitação já está salva: o atendimento vê na tela mesmo sem chamado.
+    console.error("[WatchTV] Falha ao abrir o chamado:", e?.message || e);
+  }
+
+  await MensagensComuns(
+    celular,
+    `✅ *Pedido registrado!*\n\nSua contratação da *Watch TV* foi enviada para a ` +
+      `nossa equipe. Em breve você recebe o *termo de adesão* para assinar.\n\n` +
+      `💰 Assinatura: *R$ ${VALOR_STREAMER.toFixed(2).replace(".", ",")}* por mês, ` +
+      `cobrada junto da sua mensalidade.`,
+  );
+
+  deleteSession(celular);
+}
+
+/**
+ * Watch TV: pede o CPF, mostra os cadastros para o cliente escolher em qual
+ * quer o serviço e envia o pedido para a tela de solicitações.
+ */
+export async function iniciarWatchTv(
+  celular: any,
+  texto: any,
+  session: any,
+  _type: any,
+) {
+  if (!session.watchTvStep) {
+    session.watchTvStep = "ask_cpf";
+    await MensagensComuns(
+      celular,
+      "📺 *Watch TV*\n\nPara contratar, digite o *CPF/CNPJ* do titular do cadastro.",
+    );
+    return;
+  }
+
+  if (session.watchTvStep === "ask_cpf") {
+    const cpf = texto.replace(/[^\d]+/g, "");
+
+    if (!validarCPF(texto) && cpf.length !== 14 && cpf.length !== 11) {
+      await MensagensComuns(
+        celular,
+        "❌ *CPF/CNPJ* inválido. Por favor, verifique e digite novamente.",
+      );
+      return;
+    }
+
+    session.cpf = cpf;
+    const cadastros = await MkauthDataSource.getRepository(Sis_Cliente).find({
+      select: {
+        id: true, nome: true, endereco: true, login: true, numero: true,
+        bairro: true, cidade: true, estado: true, cep: true, venc: true,
+        termo: true, email: true, rg: true, cpf_cnpj: true, celular: true,
+        plano: true,
+      },
+      where: { cpf_cnpj: cpf, cli_ativado: "s" },
+    });
+
+    if (cadastros.length === 0) {
+      await MensagensComuns(
+        celular,
+        "🙁 Seu cadastro *não* foi *encontrado*, verifique se digitou corretamente o seu *CPF/CNPJ* ou digite *início* para voltar.",
+      );
+      return;
+    }
+
+    if (cadastros.length > 1) {
+      let indice = 1;
+      session.structuredDataWatchTv = cadastros.map((c) => ({
+        index: indice++,
+        nome: c.nome, endereco: c.endereco, login: c.login, numero: c.numero,
+        bairro: c.bairro, cidade: c.cidade, estado: c.estado, cep: c.cep,
+        venc: c.venc, termo: c.termo, plano: c.plano, email: c.email,
+        rg: c.rg, celular: c.celular,
+      }));
+      session.watchTvStep = "select_address";
+
+      let mensagem =
+        "🔍 Encontramos mais de um *Cadastro!* Digite o *Número* daquele em que deseja a *Watch TV* 👇🏻\n\n";
+      for (const c of session.structuredDataWatchTv) {
+        mensagem += `*${c.index}* PPPoE: ${c.login}\n   ${c.endereco}, N: ${c.numero} - ${c.bairro}\n\n`;
+      }
+      mensagem += "👉🏻 Caso queira cancelar digite *início*";
+
+      await MensagensComuns(celular, mensagem);
+      return;
+    }
+
+    aplicarCadastroWatchTv(session, cadastros[0], cpf);
+    await concluirWatchTv(celular, session);
+    return;
+  }
+
+  if (session.watchTvStep === "select_address") {
+    const t = String(texto || "").toLowerCase();
+    if (t === "inicio" || t === "início") {
+      deleteSession(celular);
+      await MensagensComuns(celular, "Tudo bem, voltamos ao início. 👋");
+      return;
+    }
+
+    const escolha = Number(String(texto).trim());
+    const lista = session.structuredDataWatchTv || [];
+    const cadastro = lista.find((c: any) => c.index === escolha);
+
+    if (!cadastro) {
+      await MensagensComuns(
+        celular,
+        `❌ Opção inválida. Digite um número de *1* a *${lista.length}*, ou *início* para cancelar.`,
+      );
+      return;
+    }
+
+    aplicarCadastroWatchTv(session, cadastro, session.cpf);
+    await concluirWatchTv(celular, session);
+    return;
+  }
 }
 
 // --- Mudança de Cômodo ---

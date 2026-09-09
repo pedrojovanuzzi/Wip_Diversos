@@ -53,6 +53,7 @@ import {
   handleChooseTypeTrocaPlano,
   handleAwaitingTrocaPlanoFlow,
   iniciarWifiExtendido,
+  iniciarWatchTv,
   handleChooseTypeWifiExtendido,
   handleAwaitingWifiExtendidoFlow,
   handleSelectPlanTroca,
@@ -236,6 +237,7 @@ export async function handleMessage(
                   { id: "option_4", title: "Alteração Titularidade" },
                   { id: "option_5", title: "Alteração de Plano" },
                   { id: "option_6", title: "Wifi Extendido" },
+                  { id: "option_7", title: "Watch TV" },
                   // { id: "option_7", title: "Renovação Contratual" },
                   // { id: "option_8", title: "Wifi Estendido" },
                 ],
@@ -304,6 +306,10 @@ export async function handleMessage(
           await LGPD(celular);
           session.stage = "lgpd_request";
           session.service = "wifi_extendido";
+        } else if (t === "watch tv") {
+          await LGPD(celular);
+          session.stage = "lgpd_request";
+          session.service = "watch_tv";
         } else if (t === "wifi estendido") {
           await LGPD(celular);
           session.stage = "lgpd_request";
@@ -355,6 +361,9 @@ export async function handleMessage(
           } else if (session.service === "troca_plano") {
             session.stage = "troca_plano";
             await iniciarTrocaPlano(celular, texto, session, type);
+          } else if (session.service === "watch_tv") {
+            session.stage = "watch_tv";
+            await iniciarWatchTv(celular, texto, session, type);
           } else if (session.service === "wifi_extendido") {
             session.stage = "wifi_extendido";
             await iniciarWifiExtendido(celular, texto, session, type);
@@ -570,6 +579,10 @@ export async function handleMessage(
 
     case "wifi_extendido":
       await iniciarWifiExtendido(celular, texto, session, type);
+      break;
+
+    case "watch_tv":
+      await iniciarWatchTv(celular, texto, session, type);
       break;
 
     case "choose_type_wifi_extendido":

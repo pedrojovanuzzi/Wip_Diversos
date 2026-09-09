@@ -1131,6 +1131,57 @@ class ZapSign {
     }
   }
 
+  /**
+   * Termo de Adesão do Serviço de Valor Adicionado — usado na contratação do
+   * Watch TV e dos demais SVA (Res. 777/2025).
+   *
+   * Tipo fixo "pago": o documento não muda conforme haja cobrança; o campo
+   * existe só porque compõe a chave da tabela de templates.
+   */
+  createContractSva = async (params: Record<string, any>) => {
+    try {
+      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+        where: { nome_servico: "Termo de Adesão SVA", tipo: "pago" },
+      });
+      if (!template?.token_id) {
+        throw new Error(
+          "Template 'Termo de Adesão SVA' sem token no ZapSign. Envie o .docx " +
+            "pela tela de configuração antes de gerar o termo.",
+        );
+      }
+
+      const zapData = await buildUniversalZapSignData(params);
+
+      const response = await axios.post(
+        isSandbox
+          ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
+          : "https://api.zapsign.com.br/api/v1/models/create-doc/",
+        {
+          template_id: template.token_id,
+          signer_name: params.nome || "",
+          send_automatic_email: false,
+          send_automatic_whatsapp: false,
+          lang: "pt-br",
+          external_id: null,
+          data: zapData,
+          signature_placement: "<<assinatura>>",
+          rubrica_placement: "<<visto>>",
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.ZAPSIGN_TOKEN}`,
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Error in createContractSva:", error);
+      throw error;
+    }
+  }
+
   createContractTrocaTitularidadeTitular = async (params: Record<string, any>) => {
     try {
       const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
