@@ -214,7 +214,37 @@ class ChamadoFichaTecnicaController {
         order: { abertura: "DESC" },
       });
 
-      if (!ultimoChamado || !ultimoChamado.chamado) {
+      // A tela deixa trocar o número do chamado à mão. Quando isso acontece, a
+      // resposta precisa ir para o chamado informado — antes ela ia sempre para
+      // o último aberto, e a ficha ficaria apontando um número e a resposta
+      // aparecendo em outro.
+      const numeroInformado = String(body.chamado_number ?? "").trim();
+      let chamadoAlvo = ultimoChamado;
+
+      if (
+        numeroInformado &&
+        numeroInformado !== String(ultimoChamado?.chamado ?? "")
+      ) {
+        // Restrito ao mesmo login: sem isso, um número digitado errado lançaria
+        // a resposta no chamado de outro cliente.
+        const escolhido = await chamadosRepo.findOne({
+          where: { login: usuario, chamado: numeroInformado },
+        });
+
+        if (!escolhido) {
+          res.status(404).json({
+            errors: [
+              {
+                msg: `O chamado ${numeroInformado} não existe para o login ${usuario}. Confira o número informado.`,
+              },
+            ],
+          });
+          return;
+        }
+        chamadoAlvo = escolhido;
+      }
+
+      if (!chamadoAlvo || !chamadoAlvo.chamado) {
         res.status(404).json({
           errors: [
             {
@@ -250,7 +280,7 @@ class ChamadoFichaTecnicaController {
 
       try {
         await MkauthSource.getRepository(SisMsg).save({
-          chamado: ultimoChamado.chamado,
+          chamado: chamadoAlvo.chamado,
           msg: mensagem,
           tipo: "provedor",
           login: usuario,
@@ -259,7 +289,7 @@ class ChamadoFichaTecnicaController {
         });
 
         salva.mkauth_sincronizado = true;
-        salva.mkauth_chamado_id = ultimoChamado.chamado;
+        salva.mkauth_chamado_id = chamadoAlvo.chamado;
         salva.mkauth_erro = undefined as any;
         await repo.save(salva);
 

@@ -31,8 +31,19 @@ import {
   Typography,
   Alert,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
 } from "@mui/material";
-import { MdRefresh, MdRestartAlt, MdSave, MdStar } from "react-icons/md";
+import {
+  MdEdit,
+  MdRefresh,
+  MdRestartAlt,
+  MdSave,
+  MdStar,
+} from "react-icons/md";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -391,6 +402,15 @@ const CriarFichaTecnica: React.FC = () => {
   const navigate = useNavigate();
 
   const [chamadoNumber, setChamadoNumber] = useState("");
+  /** Número que veio do MKAUTH, para saber se houve troca manual. */
+  const [chamadoAutomatico, setChamadoAutomatico] = useState("");
+  /** A edição só abre depois do aviso ser aceito. */
+  const [chamadoEditavel, setChamadoEditavel] = useState(false);
+  const [avisoChamadoAberto, setAvisoChamadoAberto] = useState(false);
+
+  /** O número em uso difere do que veio do MKAUTH? */
+  const chamadoTrocado =
+    !!chamadoAutomatico && chamadoNumber.trim() !== chamadoAutomatico.trim();
   const [cliente, setCliente] = useState("");
   const [usuario, setUsuario] = useState("");
   const [nomeWifi, setNomeWifi] = useState("");
@@ -461,6 +481,10 @@ const CriarFichaTecnica: React.FC = () => {
         { headers: { Authorization: `Bearer ${user?.token}` } },
       );
       setChamadoNumber(String(response.data?.chamado ?? ""));
+      // PPPoE novo recomeça o ciclo: volta ao número automático e fecha a
+      // edição, para uma troca feita antes não valer para outro cliente.
+      setChamadoAutomatico(String(response.data?.chamado ?? ""));
+      setChamadoEditavel(false);
       if (response.data?.nome && !cliente) {
         setCliente(upper(String(response.data.nome)));
       }
@@ -754,14 +778,56 @@ const CriarFichaTecnica: React.FC = () => {
                 fullWidth
                 label="Número do chamado"
                 value={chamadoNumber}
+                onChange={(e) =>
+                  chamadoEditavel && setChamadoNumber(e.target.value)
+                }
                 placeholder="Preenchido ao informar o PPPoE"
+                color={chamadoTrocado ? "warning" : undefined}
+                focused={chamadoTrocado || undefined}
+                helperText={
+                  chamadoTrocado
+                    ? `Trocado à mão — o automático era ${chamadoAutomatico}.`
+                    : chamadoEditavel
+                      ? "Edição liberada."
+                      : undefined
+                }
                 InputProps={{
-                  readOnly: true,
+                  readOnly: !chamadoEditavel,
                   endAdornment: buscandoChamado ? (
                     <InputAdornment position="end">
                       <CircularProgress size={18} />
                     </InputAdornment>
-                  ) : undefined,
+                  ) : (
+                    <InputAdornment position="end">
+                      {chamadoEditavel ? (
+                        <Tooltip title="Voltar ao número do MKAUTH">
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setChamadoNumber(chamadoAutomatico);
+                                setChamadoEditavel(false);
+                              }}
+                            >
+                              <MdRestartAlt />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      ) : (
+                        <Tooltip title="Editar o número do chamado">
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={!chamadoAutomatico}
+                              onClick={() => setAvisoChamadoAberto(true)}
+                            >
+                              <MdEdit />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
+                    </InputAdornment>
+                  ),
                 }}
                 required
               />
@@ -1478,6 +1544,51 @@ const CriarFichaTecnica: React.FC = () => {
             {enviando ? "Enviando..." : "Salvar e enviar ao MKAUTH"}
           </Button>
         </Stack>
+
+        {/* Aviso obrigatório antes de liberar a troca: o número decide onde a
+            resposta entra no MKAUTH e o que sai no PDF e na APR. */}
+        <Dialog
+          open={avisoChamadoAberto}
+          onClose={() => setAvisoChamadoAberto(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Trocar o número do chamado?</DialogTitle>
+          <DialogContent>
+            <DialogContentText component="div">
+              <p>
+                O número <b>{chamadoAutomatico || "—"}</b> foi preenchido
+                automaticamente a partir do último chamado <b>ABERTO</b> deste
+                cliente no MKAUTH.
+              </p>
+              <p>Trocando por outro, passa a valer o número que você digitar:</p>
+              <ul>
+                <li>a resposta da ficha será inserida <b>nesse outro chamado</b>;</li>
+                <li>o PDF e o <b>Processo da APR</b> sairão com ele;</li>
+                <li>
+                  se o número não existir <b>para este cliente</b>, o envio será
+                  recusado.
+                </li>
+              </ul>
+              <p>Confira o número antes de salvar.</p>
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setAvisoChamadoAberto(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="contained"
+              color="warning"
+              onClick={() => {
+                setChamadoEditavel(true);
+                setAvisoChamadoAberto(false);
+              }}
+            >
+              Entendi, quero editar
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </div>
   );

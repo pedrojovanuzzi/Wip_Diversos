@@ -14,6 +14,11 @@ import { SisPlano } from "../entities/SisPlano";
 import { v4 as uuidv4 } from "uuid";
 import { deleteSession } from "./whatsapp/services/session.service";
 import { criarChamadoMkauth } from "./whatsapp/services/chamado.service";
+import { SisSerContratos } from "../entities/SisSerContratos";
+import {
+  tagDoServico,
+  nomeServicoContrato,
+} from "../services/servicosAdicionaisNomes";
 import { reservarLoginUnico } from "../services/loginCliente";
 import {
   buscarCadastroPorLoginOuCpf,
@@ -47,6 +52,62 @@ const formatCnpj = (raw: string): string => {
  * o array {de, para}[] preenchendo TODAS as variáveis possíveis.
  * Variáveis sem valor ficam como string vazia.
  */
+/** Linhas da tabela de SVA do Termo de Adesão. */
+interface LinhaSva {
+  tipo: string;
+  servico: string;
+  quantidade: number;
+}
+
+/**
+ * Serviços de valor adicionado do cliente, para a tabela do Termo de Adesão.
+ *
+ * Vem de `sis_sercontratos`, a mesma origem que o boleto usa — assim o que o
+ * cliente assina bate com o que ele paga. Agrupa por serviço porque o cadastro
+ * guarda uma linha por item contratado, e a tabela pede quantidade.
+ *
+ * O Termo tem um primeiro campo fixo de STREAMING e mais nove linhas livres;
+ * o que passar disso fica de fora do documento.
+ */
+async function servicosSvaDoCliente(login: string): Promise<{
+  streaming: number;
+  linhas: LinhaSva[];
+}> {
+  const vazio = { streaming: 0, linhas: [] as LinhaSva[] };
+  if (!login) return vazio;
+
+  try {
+    const itens = await MkauthDataSource.getRepository(SisSerContratos)
+      .createQueryBuilder("s")
+      .where("UPPER(TRIM(s.login)) = UPPER(TRIM(:l))", { l: login })
+      .getMany();
+
+    let streaming = 0;
+    const porServico = new Map<string, LinhaSva>();
+
+    for (const item of itens) {
+      const tag = tagDoServico(item.nome);
+
+      // O streaming tem campo próprio no documento.
+      if (tag === "STREAMER" || tag === "STREAMER_COLAB") {
+        streaming += 1;
+        continue;
+      }
+
+      const servico = nomeServicoContrato(item.nome, Number(item.valor || 0));
+      const atual = porServico.get(servico);
+      if (atual) atual.quantidade += 1;
+      else porServico.set(servico, { tipo: "SVA", servico, quantidade: 1 });
+    }
+
+    return { streaming, linhas: Array.from(porServico.values()) };
+  } catch (e: any) {
+    // Sem os serviços o contrato ainda é válido: a tabela fica em branco.
+    console.error("[ZapSign] Erro ao ler os SVA do cliente:", e?.message || e);
+    return vazio;
+  }
+}
+
 async function buildUniversalZapSignData(params: Record<string, any>): Promise<Array<{de: string; para: string}>> {
   const s = (key: string, ...fallbacks: string[]): string => {
     let val = params[key];
@@ -83,6 +144,29 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
   const enderecoCompleto = [endereco, numero, complemento].filter(Boolean).join(", ");
   const enderecoSemNumero = [endereco, complemento].filter(Boolean).join(", ");
   const valorPlano = s("valor_plano") || planoRecord?.valor || "";
+
+  // --- Taxa de instalação (Termo de Adesão SVA) ---
+  const valorInstalacao = s("valor_instalacao", "valorinstalacao", "valor");
+  const parcelas = Math.max(1, Number(s("parcelas_instalacao")) || 1);
+  const numeroInstalacao = Number(String(valorInstalacao).replace(",", "."));
+  // Só divide quando o valor é um número: "0,00" e vazio passam adiante como
+  // estão, e um texto qualquer não vira NaN dentro do contrato.
+  const valorParcela = Number.isFinite(numeroInstalacao)
+    ? (numeroInstalacao / parcelas).toFixed(2).replace(".", ",")
+    : valorInstalacao;
+
+  // --- Tabela de SVA (Termo de Adesão) ---
+  const sva = await servicosSvaDoCliente(s("login"));
+  const linhasSva: Array<{ de: string; para: string }> = [];
+  // O documento tem lugar para nove linhas além do streaming fixo.
+  for (let i = 2; i <= 10; i++) {
+    const linha = sva.linhas[i - 2];
+    linhasSva.push(
+      { de: `{{tiposva${i}}}`, para: linha?.tipo ?? "" },
+      { de: `{{servicosva${i}}}`, para: linha?.servico ?? "" },
+      { de: `{{qtdsva${i}}}`, para: linha ? String(linha.quantidade) : "" },
+    );
+  }
   const velocidade = formatVelocidade(planoRecord?.velup, planoRecord?.veldown);
   const uploadStr = planoRecord?.velup ? `${planoRecord.velup} Kbps` : "";
   const downloadStr = planoRecord?.veldown ? `${planoRecord.veldown} Kbps` : "";
@@ -92,6 +176,17 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
     { de: "{{provedornome}}", para: "Wip Telecom" },
     { de: "{{provedorcnpj}}", para: formatCnpj(CNPJ_PROVEDOR) },
     { de: "{{provedoremail}}", para: "financeiro@wiptelecom.com.br" },
+    // Dados que só o Contrato de SVA usa. Ficam no .env porque são cadastrais
+    // do provedor, não do cliente — e antes eram "XXXXXXXXXX" no documento.
+    { de: "{{provedorie}}", para: process.env.PROVEDOR_IE || "" },
+    { de: "{{provedoranatel}}", para: process.env.PROVEDOR_ANATEL || "" },
+    { de: "{{provedorfone}}", para: process.env.PROVEDOR_FONE || "(14) 3296-1608" },
+    { de: "{{provedorsac}}", para: process.env.PROVEDOR_SAC || "0800 7741608" },
+    { de: "{{provedorsite}}", para: process.env.PROVEDOR_SITE || "" },
+    // Foro eleito no Contrato de SVA. Campo jurídico: fica no .env para ser
+    // conferido por quem responde por ele, e não chutado no código.
+    { de: "{{forocomarca}}", para: process.env.PROVEDOR_FORO_COMARCA || "" },
+    { de: "{{foroestado}}", para: process.env.PROVEDOR_FORO_ESTADO || "SP" },
     // --- Dados do documento ---
     { de: "{{termo}}", para: termo },
     { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
@@ -148,6 +243,19 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
     { de: "{{cidadecliente2}}", para: s("novo_cidade") },
     { de: "{{estadocliente2}}", para: s("novo_estado") },
     { de: "{{cepcliente2}}", para: s("novo_cep") },
+    // --- Termo de Adesão SVA: taxa de instalação ---
+    // `valorinstalacao` (sem underscore) é o nome usado no documento; mantidos
+    // os dois para não depender de uma edição do .docx.
+    { de: "{{valorinstalacao}}", para: valorInstalacao },
+    { de: "{{parcelasinstalacao}}", para: String(parcelas) },
+    { de: "{{valorparcelainstalacao}}", para: valorParcela },
+    {
+      de: "{{vencimentoinstalacao}}",
+      para: s("vencimento_instalacao") || s("vencimento", "venc"),
+    },
+    // --- Termo de Adesão SVA: serviços contratados ---
+    { de: "{{qtdstreaming}}", para: sva.streaming ? String(sva.streaming) : "" },
+    ...linhasSva,
   ];
 }
 
