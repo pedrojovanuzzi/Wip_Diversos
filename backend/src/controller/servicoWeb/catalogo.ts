@@ -1,5 +1,10 @@
 import ZapSign from "../ZapSign";
 import { VALOR_STREAMER } from "../../config/servicosAdicionais";
+import {
+  cobrancaProporcional,
+  reais,
+  textoCobrancaProporcional,
+} from "../../services/cobrancaProporcional";
 import ApiMkDataSource from "../../database/API_MK";
 import ZapSignTemplates from "../../entities/APIMK/ZapSignTemplates";
 import {
@@ -68,6 +73,12 @@ export type ServicoWeb = {
    */
   nomeServicoTemplate: string;
   nome: string;
+  /**
+   * Mantém o nome comercial mesmo que o template se chame diferente. Serve a
+   * quem usa o documento como chave (a Watch TV depende do "Termo de Adesão
+   * SVA"), para o cliente não ver o nome do papel no lugar do serviço.
+   */
+  nomeFixo?: boolean;
   descricao: string;
   /** Assunto usado ao abrir o chamado no MKAUTH. */
   assuntoChamado: string;
@@ -75,6 +86,12 @@ export type ServicoWeb = {
   termos?: Termo[];
   /** Valor cobrado quando o cliente escolhe pagar. 0 = serviço sem cobrança. */
   valor: number;
+  /**
+   * Serviço que passa a compor a mensalidade em vez de virar cobrança avulsa:
+   * não gera Pix, e o que se mostra é o proporcional aos dias de uso até o
+   * próximo vencimento, lançado depois pelo atendimento.
+   */
+  cobrancaNaFatura?: boolean;
   /** Permite a opção "grátis" com renovação contratual de 12 meses. */
   permiteGratisFidelidade: boolean;
   /**
@@ -314,25 +331,32 @@ export const CATALOGO: ServicoWeb[] = [
   },
   {
     id: "watch_tv",
-    nomeServicoTemplate: "Termo de Adesão SVA",
+    // A Watch TV avulsa gera o Contrato de SVA. O Termo de Adesão SVA não
+    // entra aqui: ele acompanha o plano combo no cadastro, junto do contrato
+    // do plano (instalação, troca de plano).
+    nomeServicoTemplate: "Contrato de SVA",
     nome: "Watch TV",
+    // "Contrato de SVA" é o nome do documento, não o do serviço.
+    nomeFixo: true,
     descricao:
       "Contratação da Watch TV, o serviço de streaming da Wip. Assinatura " +
       "mensal cobrada junto da mensalidade.",
     assuntoChamado: "CONTRATACAO WATCH TV",
     termos: [
       {
-        id: "sva",
-        titulo: "Termo de Adesão SVA",
+        id: "contrato_sva",
+        titulo: "Contrato de SVA",
         texto:
-          "Li e aceito o Termo de Adesão e o Contrato de Serviço de Valor " +
-          "Adicionado (SVA).",
-        url: "/doc/sva",
+          "Li e aceito o Contrato de Serviço de Valor Adicionado, conforme a " +
+          "Resolução 777/2025.",
+        url: "/doc/contrato_sva",
       },
     ],
     // O valor sai de servicosAdicionais para não divergir do que é lançado no
     // contrato do cliente e do nome comercial que aparece no boleto.
     valor: VALOR_STREAMER,
+    // Entra na mensalidade: nada de Pix, só o proporcional dos dias de uso.
+    cobrancaNaFatura: true,
     permiteGratisFidelidade: false,
     campos: [
       {
@@ -349,7 +373,7 @@ export const CATALOGO: ServicoWeb[] = [
       },
       CAMPO_OBSERVACAO,
     ],
-    criarContrato: (params) => ZapSign.createContractSva(params),
+    criarContrato: (params) => ZapSign.createContratoSva(params),
   },
   {
     id: "troca_titularidade",
@@ -450,7 +474,9 @@ export async function listarServicos(): Promise<ServicoWeb[]> {
       nomes.has(s.nomeServicoTemplate.toLowerCase()),
     ).map((s) => ({
       ...s,
-      nome: nomes.get(s.nomeServicoTemplate.toLowerCase()) ?? s.nome,
+      nome: s.nomeFixo
+        ? s.nome
+        : (nomes.get(s.nomeServicoTemplate.toLowerCase()) ?? s.nome),
     }));
   } catch (error) {
     console.error(
@@ -504,14 +530,42 @@ export async function resolverCampos(
   return campos;
 }
 
+export type FormaPagamento = {
+  id: string;
+  titulo: string;
+  valor: number;
+  /** Explicação sob o título, quando o valor precisa de contexto. */
+  descricao?: string;
+};
+
 /** Formas de pagamento disponíveis para o serviço. */
-export function formasPagamento(servico: ServicoWeb) {
+export function formasPagamento(
+  servico: ServicoWeb,
+  /** Cadastro do cliente, quando já identificado: dá o dia do vencimento. */
+  cliente?: { venc?: any } | null,
+): FormaPagamento[] {
   // A cobrança da instalação só é definida depois da análise interna.
   if (servico.analiseManual) return [];
+  // Serviço que entra na mensalidade: não há o que escolher, só confirmar. O
+  // que aparece é quanto entra na próxima fatura pelos dias de uso.
+  if (servico.cobrancaNaFatura) {
+    const proporcional = cobrancaProporcional(
+      servico.valor,
+      Number(cliente?.venc) || 1,
+    );
+    return [
+      {
+        id: "proxima_fatura",
+        titulo: `Cobrado na sua fatura — R$ ${reais(proporcional.valor)} agora`,
+        descricao: textoCobrancaProporcional(proporcional),
+        valor: proporcional.valor,
+      },
+    ];
+  }
   if (servico.valor <= 0) {
     return [{ id: "sem_custo", titulo: "Sem custo adicional", valor: 0 }];
   }
-  const formas: Array<{ id: string; titulo: string; valor: number }> = [];
+  const formas: FormaPagamento[] = [];
   if (servico.permiteGratisFidelidade) {
     formas.push({
       id: "gratis",

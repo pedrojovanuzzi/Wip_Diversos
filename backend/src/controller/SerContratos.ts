@@ -5,10 +5,8 @@ import { In } from "typeorm";
 import { SisSerContratos } from "../entities/SisSerContratos";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { StreamingAssinante } from "../entities/StreamingAssinante";
-import {
-  insertAssinante,
-  deleteTicket,
-} from "../services/WatchBrasilService";
+import { deleteTicket } from "../services/WatchBrasilService";
+import { registrarAssinanteStreaming } from "../services/streamingCadastro";
 import { planFor, normalizeStorageGb } from "../config/cameraStoragePlans";
 import {
   VALOR_STREAMER,
@@ -229,42 +227,20 @@ class SerContratos {
         return;
       }
 
-      // STREAMER pago: bloqueia se houver mensalidade vencida (status aberto + datavenc < hoje).
-      // E, após passar, limpa títulos em aberto fora do mês atual — mas só os "seguros"
-      // (sem remessa CNAB e sem chave de gateway). Os registrados são listados pra
-      // tratamento manual. Não se aplica ao COLAB (grátis não altera valor de fatura).
+      // STREAMER pago: limpa títulos em aberto fora do mês atual — mas só os
+      // "seguros" (sem remessa CNAB e sem chave de gateway). Os registrados são
+      // listados pra tratamento manual. Não se aplica ao COLAB (grátis não
+      // altera valor de fatura).
+      //
+      // Cliente com mensalidade vencida não é mais barrado aqui: a regra saiu
+      // a pedido do negócio.
       if (tipoNorm === "STREAMER") {
         const hoje = new Date();
         const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
         const inicioProx = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
         const fmt = (d: Date) => d.toISOString().slice(0, 10);
-        const dataHoje = fmt(hoje);
         const dataIniMes = fmt(inicioMes);
         const dataIniProx = fmt(inicioProx);
-
-        const vencidas = (await MkauthSource.query(
-          `SELECT id, datavenc, valor, nossonum
-             FROM sis_lanc
-            WHERE UPPER(TRIM(login)) = UPPER(TRIM(?))
-              AND status = 'aberto'
-              AND (deltitulo = 0 OR deltitulo IS NULL)
-              AND DATE(datavenc) < ?`,
-          [login, dataHoje],
-        )) as any[];
-
-        if (vencidas.length > 0) {
-          res.status(409).json({
-            message: `Cliente possui ${vencidas.length} mensalidade(s) vencida(s). Regularize antes de adicionar streaming.`,
-            code: "OVERDUE_INVOICES",
-            vencidas: vencidas.map((v) => ({
-              id: v.id,
-              datavenc: v.datavenc,
-              valor: v.valor,
-              nossonum: v.nossonum,
-            })),
-          });
-          return;
-        }
 
         // Lista títulos em aberto fora do mês atual
         const abertosForaMes = (await MkauthSource.query(
@@ -423,51 +399,15 @@ class SerContratos {
           res.status(400).json({ message: "Celular é obrigatório para streaming." });
           return;
         }
-        const assinanteIDIntegracao = String(cliente.id);
         try {
-          const apiResp = await insertAssinante({
+          // Mesmo registro usado quando o cliente assina o Contrato de SVA
+          // sozinho, pelo bot ou pelo site.
+          streamingInfo = await registrarAssinanteStreaming({
+            cliente,
             email: emailUse,
-            assinanteIDIntegracao,
             phone: phoneUse,
+            expiraTeste,
           });
-          console.log("[WatchBrasil][insertAssinante] resposta:", apiResp);
-          if (apiResp?.HasError === true) {
-            throw new Error(
-              "Watch Brasil HasError: " +
-                (apiResp?.ErrorMessage || JSON.stringify(apiResp).slice(0, 300)),
-            );
-          }
-          const ticket =
-            apiResp?.ticket ||
-            apiResp?.pTicket ||
-            apiResp?.data?.ticket ||
-            apiResp?.Result?.ticket ||
-            apiResp?.Result?.[0]?.ticket ||
-            null;
-          const chave =
-            apiResp?.chave ||
-            apiResp?.Result?.chave ||
-            apiResp?.Result?.[0]?.chave ||
-            null;
-
-          const streamingRepo =
-            AppDataSource.getRepository(StreamingAssinante);
-          let assinante = await streamingRepo.findOne({
-            where: { login: cliente.login },
-          });
-          if (!assinante) {
-            assinante = streamingRepo.create({ login: cliente.login });
-          }
-          assinante.email = emailUse;
-          assinante.phone = phoneUse;
-          assinante.assinante_id_integracao = assinanteIDIntegracao;
-          assinante.ticket = ticket || assinante.ticket;
-          assinante.chave = chave || assinante.chave;
-          assinante.ativo = true;
-          assinante.teste_expira_em = expiraTeste;
-          assinante.last_response = JSON.stringify(apiResp).slice(0, 2000);
-          await streamingRepo.save(assinante);
-          streamingInfo = { ticket, chave, assinante };
         } catch (e: any) {
           console.error(
             "Erro ao criar assinante Watch Brasil:",

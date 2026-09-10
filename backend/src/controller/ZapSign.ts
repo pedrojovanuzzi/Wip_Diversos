@@ -20,6 +20,11 @@ import {
   nomeServicoContrato,
 } from "../services/servicosAdicionaisNomes";
 import { reservarLoginUnico } from "../services/loginCliente";
+import { planoTemSva } from "../config/planosComSva";
+import {
+  contratarStreamingAposAssinatura,
+  contratarStreamingDoPlano,
+} from "../services/streamingCadastro";
 import {
   buscarCadastroPorLoginOuCpf,
   loginCadastroValido,
@@ -190,6 +195,16 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
     // --- Dados do documento ---
     { de: "{{termo}}", para: termo },
     { de: "{{data}}", para: moment().format("DD/MM/YYYY") },
+    // Data do registro em cartório, usada no fecho do Contrato de SVA. É uma
+    // data do documento, não da assinatura: fica no .env para valer igual em
+    // todas as vias, e cai na data de hoje se ninguém definir.
+    {
+      de: "{{dataregistro}}",
+      para:
+        s("data_registro") ||
+        process.env.PROVEDOR_DATA_REGISTRO ||
+        moment().format("DD/MM/YYYY"),
+    },
     // --- Dados do cliente ---
     { de: "{{nomecliente}}", para: s("nome") },
     { de: "{{cpfcliente}}", para: s("cpf") },
@@ -256,6 +271,11 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
     // --- Termo de Adesão SVA: serviços contratados ---
     { de: "{{qtdstreaming}}", para: sva.streaming ? String(sva.streaming) : "" },
     ...linhasSva,
+    // --- SVA: mensalidade e o proporcional do primeiro mês ---
+    { de: "{{valorsva}}", para: s("valor_sva", "valor") },
+    { de: "{{valorsvaproporcional}}", para: s("valor_proporcional") },
+    { de: "{{diassvaproporcional}}", para: s("dias_proporcional") },
+    { de: "{{vencimentosva}}", para: s("vencimento_proporcional") },
   ];
 }
 
@@ -269,6 +289,83 @@ const waUrl = isSandbox
 
 // Todas as funções createContract* aceitam Record<string, any> e usam
 // buildUniversalZapSignData() para resolver as variáveis do documento.
+
+/** Cria um documento a partir do template cadastrado para o serviço. */
+async function criarDocumentoZapSign(
+  nomeServico: string,
+  params: Record<string, any>,
+  tipo: string = "pago",
+) {
+  const template = await ApiMkDataSource.getRepository(
+    ZapSignTemplates,
+  ).findOne({ where: { nome_servico: nomeServico, tipo } });
+  if (!template?.token_id) {
+    throw new Error(
+      `Template '${nomeServico}' sem token no ZapSign. Envie o .docx pela ` +
+        "tela de configuração antes de gerar o documento.",
+    );
+  }
+
+  const zapData = await buildUniversalZapSignData(params);
+
+  const response = await axios.post(
+    isSandbox
+      ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
+      : "https://api.zapsign.com.br/api/v1/models/create-doc/",
+    {
+      template_id: template.token_id,
+      signer_name: params.nome || "",
+      send_automatic_email: false,
+      send_automatic_whatsapp: false,
+      lang: "pt-br",
+      external_id: null,
+      data: zapData,
+      signature_placement: "<<assinatura>>",
+      rubrica_placement: "<<visto>>",
+    },
+    {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.ZAPSIGN_TOKEN}`,
+      },
+    },
+  );
+
+  return response.data;
+}
+
+/**
+ * Segundo documento que acompanha o contrato do plano.
+ *
+ * Plano com SVA (combo 800M) obriga o Termo de Adesão SVA junto — vale para
+ * troca de plano, instalação e qualquer fluxo que grave o plano no cadastro.
+ * Falha aqui não derruba o contrato principal: sem o termo o atendimento
+ * ainda tem o que enviar, e o reenvio gera o que faltou.
+ */
+async function documentoExtraDoPlano(params: Record<string, any>) {
+  const plano = params.plano_escolhido || params.novo_plano || params.plano;
+  if (!planoTemSva(plano)) return {};
+
+  try {
+    const doc = await criarDocumentoZapSign("Termo de Adesão SVA", {
+      ...params,
+      plano,
+    });
+    return {
+      documento_extra: {
+        nome: "Termo de Adesão SVA",
+        token: doc?.token,
+        sign_url: doc?.signers?.[0]?.sign_url ?? null,
+      },
+    };
+  } catch (e: any) {
+    console.error(
+      "[SVA] Contrato do plano criado, mas o Termo de Adesão SVA falhou:",
+      e?.response?.data || e?.message || e,
+    );
+    return {};
+  }
+}
 
 class ZapSign {
   createContractInstalacao = async (params: Record<string, any>) => {
@@ -307,7 +404,9 @@ class ZapSign {
         },
       );
 
-      return response.data;
+      // Plano com SVA leva o Termo de Adesão junto do contrato.
+      const extra = await documentoExtraDoPlano(params);
+      return { ...response.data, ...extra };
     } catch (error) {
       console.error("Error in createContractInstalacao:", error);
       throw error;
@@ -359,7 +458,9 @@ class ZapSign {
         },
       );
 
-      return response.data;
+      // Plano com SVA leva o Termo de Adesão junto do contrato.
+      const extra = await documentoExtraDoPlano(params);
+      return { ...response.data, ...extra };
     } catch (error) {
       console.error("Error in createContractInstalacaoDificuldadeAcesso:", error);
       throw error;
@@ -812,6 +913,28 @@ class ZapSign {
                   } catch (eChamado) {
                     console.error("[ZapSign Webhook] Erro ao criar chamado de instalação:", eChamado);
                   }
+                  // Instalou no plano combo: a Watch TV vem junto, por R$ 0,00.
+                  try {
+                    const rInst = await contratarStreamingDoPlano({
+                      login: loginCriado,
+                      plano: dados.plano,
+                      email: dados.email,
+                      phone: dados.celular || dados.telefone,
+                    });
+                    if (rInst.status !== "nao_aplica") {
+                      console.log(
+                        `[ZapSign Webhook] Watch TV do plano de ${loginCriado}: ${rInst.status}` +
+                          (rInst.motivo ? ` — ${rInst.motivo}` : ""),
+                      );
+                      solicitacao.dados = {
+                        ...solicitacao.dados,
+                        servico_cadastro: { ...rInst, em: new Date().toISOString() },
+                      };
+                      await repo.save(solicitacao);
+                    }
+                  } catch (eSva) {
+                    console.error("[ZapSign Webhook] Erro ao ativar a Watch TV do plano:", eSva);
+                  }
                   break;
                 case "mudança de endereço":
                 case "mudanca_endereco":
@@ -846,12 +969,58 @@ class ZapSign {
                     console.log(
                       `[ZapSign Webhook] Plano do cliente ${loginPlano} atualizado no MKAuth (Serviço: ${solicitacao.servico}).`,
                     );
+                    // Plano combo traz a Watch TV embutida: cria o acesso na
+                    // Watch Brasil e registra o serviço por R$ 0,00.
+                    const rPlano = await contratarStreamingDoPlano({
+                      login: loginPlano,
+                      plano: dados.plano,
+                      email: dados.email,
+                      phone: dados.celular || dados.telefone,
+                    });
+                    if (rPlano.status !== "nao_aplica") {
+                      console.log(
+                        `[ZapSign Webhook] Watch TV do plano de ${loginPlano}: ${rPlano.status}` +
+                          (rPlano.motivo ? ` — ${rPlano.motivo}` : ""),
+                      );
+                      solicitacao.dados = {
+                        ...solicitacao.dados,
+                        servico_cadastro: { ...rPlano, em: new Date().toISOString() },
+                      };
+                      await repo.save(solicitacao);
+                    }
                   } else {
                     console.warn(
                       `[ZapSign Webhook] Login não identificado para atualização de plano: ${solicitacao.id}`,
                     );
                   }
                   break;
+                case "watch tv":
+                case "contrato de sva": {
+                  // Assinou o Contrato de SVA: o streaming entra no cadastro
+                  // e passa a compor a mensalidade.
+                  const loginWatch = dados.login || solicitacao.login_cliente;
+                  const r = await contratarStreamingAposAssinatura({
+                    login: loginWatch,
+                    email: dados.email_watch || dados.email,
+                    phone: dados.celular_watch || dados.telefone,
+                    usuario: "assinatura",
+                  });
+                  console.log(
+                    `[ZapSign Webhook] Watch TV de ${loginWatch}: ${r.status}` +
+                      (r.motivo ? ` — ${r.motivo}` : ""),
+                  );
+                  // Fica registrado na solicitação: é por ali que o
+                  // atendimento vê o que ficou pendente.
+                  solicitacao.dados = {
+                    ...solicitacao.dados,
+                    servico_cadastro: {
+                      ...r,
+                      em: new Date().toISOString(),
+                    },
+                  };
+                  await repo.save(solicitacao);
+                  break;
+                }
                 case "alteração de titularidade titular":
                 case "troca de titularidade titular":   // legado
                 case "troca_titularidade_titular":       // legado
@@ -1085,7 +1254,9 @@ class ZapSign {
         },
       );
 
-      return response.data;
+      // Plano com SVA leva o Termo de Adesão junto do contrato.
+      const extra = await documentoExtraDoPlano(params);
+      return { ...response.data, ...extra };
     } catch (error) {
       console.error("Error in createContractAlteracaoPlano:", error);
       throw error;
@@ -1138,46 +1309,31 @@ class ZapSign {
    * Tipo fixo "pago": o documento não muda conforme haja cobrança; o campo
    * existe só porque compõe a chave da tabela de templates.
    */
-  createContractSva = async (params: Record<string, any>) => {
+  /**
+   * Contrato de SVA (Resolução 777/2025): é o documento da Watch TV, o serviço
+   * de valor adicionado contratado à parte do acesso.
+   *
+   * O Termo de Adesão SVA não sai daqui — ele acompanha o plano combo no
+   * cadastro, e vem junto do contrato do plano (ver `documentoExtraDoPlano`).
+   */
+  createContratoSva = async (params: Record<string, any>) => {
     try {
-      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
-        where: { nome_servico: "Termo de Adesão SVA", tipo: "pago" },
-      });
-      if (!template?.token_id) {
-        throw new Error(
-          "Template 'Termo de Adesão SVA' sem token no ZapSign. Envie o .docx " +
-            "pela tela de configuração antes de gerar o termo.",
-        );
-      }
-
-      const zapData = await buildUniversalZapSignData(params);
-
-      const response = await axios.post(
-        isSandbox
-          ? "https://sandbox.api.zapsign.com.br/api/v1/models/create-doc/"
-          : "https://api.zapsign.com.br/api/v1/models/create-doc/",
-        {
-          template_id: template.token_id,
-          signer_name: params.nome || "",
-          send_automatic_email: false,
-          send_automatic_whatsapp: false,
-          lang: "pt-br",
-          external_id: null,
-          data: zapData,
-          signature_placement: "<<assinatura>>",
-          rubrica_placement: "<<visto>>",
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.ZAPSIGN_TOKEN}`,
-          },
-        },
-      );
-
-      return response.data;
+      return await criarDocumentoZapSign("Contrato de SVA", params);
     } catch (error) {
-      console.error("Error in createContractSva:", error);
+      console.error("Error in createContratoSva:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Termo de Adesão SVA: sai quando o plano com serviço de valor adicionado
+   * entra no cadastro (combo 800M), seja por troca de plano ou instalação.
+   */
+  createTermoAdesaoSva = async (params: Record<string, any>) => {
+    try {
+      return await criarDocumentoZapSign("Termo de Adesão SVA", params);
+    } catch (error) {
+      console.error("Error in createTermoAdesaoSva:", error);
       throw error;
     }
   }
@@ -1292,7 +1448,9 @@ class ZapSign {
         },
       );
 
-      return response.data;
+      // Plano com SVA leva o Termo de Adesão junto do contrato.
+      const extra = await documentoExtraDoPlano(params);
+      return { ...response.data, ...extra };
     } catch (error) {
       console.error("Error in createContractTrocaTitularidadeNovoTitular:", error);
       throw error;

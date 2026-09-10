@@ -123,6 +123,11 @@ const SolicitacoesServico = () => {
     pix?: string;
     assinatura?: string;
     valor?: string;
+    /** Segundo documento a assinar (Termo de Adesão SVA nos planos combo). */
+    documento_extra?: string;
+    documento_extra_nome?: string;
+    /** Serviço que entra na mensalidade: o que lançar na próxima fatura. */
+    cobranca?: string;
   } | null>(null);
   const [linkCopiado, setLinkCopiado] = useState<string | null>(null);
   const { user } = useAuth();
@@ -1323,6 +1328,27 @@ const SolicitacoesServico = () => {
           <DialogTitle>Dados da Solicitação</DialogTitle>
           <DialogContent>
             <Box display="flex" flexDirection="column" gap={1} mt={1}>
+              {/* Serviço que entrou no cadastro sozinho após a assinatura:
+                  quando a ativação não completa, o atendente precisa saber. */}
+              {detailsTarget?.dados?.servico_cadastro && (
+                <Alert
+                  severity={
+                    detailsTarget.dados.servico_cadastro.status === "adicionado"
+                      ? "success"
+                      : detailsTarget.dados.servico_cadastro.status ===
+                          "ja_tinha"
+                        ? "info"
+                        : "warning"
+                  }
+                >
+                  {detailsTarget.dados.servico_cadastro.status === "adicionado"
+                    ? `${detailsTarget.dados.servico_cadastro.servico} adicionado ao cadastro e ativado.`
+                    : detailsTarget.dados.servico_cadastro.status === "ja_tinha"
+                      ? "O cliente já tinha o serviço no cadastro."
+                      : detailsTarget.dados.servico_cadastro.motivo ||
+                        "Não foi possível adicionar o serviço ao cadastro."}
+                </Alert>
+              )}
               <Typography variant="body2">
                 <strong>Serviço:</strong> {detailsTarget?.servico || "-"}
               </Typography>
@@ -1356,7 +1382,10 @@ const SolicitacoesServico = () => {
                       <strong>{key.replace(/_/g, " ")}:</strong>{" "}
                       {value === null || value === undefined || value === ""
                         ? "-"
-                        : String(value)}
+                        : typeof value === "object"
+                          ? // Sem isso, um objeto vira "[object Object]".
+                            JSON.stringify(value)
+                          : String(value)}
                     </Typography>
                   ))
                 ) : (
@@ -1513,6 +1542,13 @@ const SolicitacoesServico = () => {
               </Box>
             )}
 
+            {linksWeb?.cobranca && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                <b>Sem Pix:</b> {linksWeb.cobranca} Lance o proporcional na
+                próxima fatura do cliente.
+              </Alert>
+            )}
+
             {linksWeb?.assinatura && (
               <Box>
                 <Typography variant="body2" fontWeight={700}>
@@ -1529,6 +1565,29 @@ const SolicitacoesServico = () => {
                   {linkCopiado === linksWeb.assinatura
                     ? "Copiado!"
                     : "Copiar link do contrato"}
+                </Button>
+              </Box>
+            )}
+
+            {linksWeb?.documento_extra && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" fontWeight={700}>
+                  {linksWeb.documento_extra_nome || "Documento adicional"} — o
+                  cliente assina os dois
+                </Typography>
+                <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
+                  {linksWeb.documento_extra}
+                </Typography>
+                <Button
+                  size="small"
+                  sx={{ mt: 0.5 }}
+                  onClick={() =>
+                    copiarLinkWeb(linksWeb.documento_extra as string)
+                  }
+                >
+                  {linkCopiado === linksWeb.documento_extra
+                    ? "Copiado!"
+                    : "Copiar link do documento"}
                 </Button>
               </Box>
             )}

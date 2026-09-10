@@ -282,11 +282,29 @@ class SolicitacaoServicoController {
       }
 
       const dados = (solicitacao.dados || {}) as any;
-      const links: { assinatura?: string; pix?: string; valor?: string } = {};
+      const links: {
+        assinatura?: string;
+        pix?: string;
+        valor?: string;
+        documento_extra?: string;
+        documento_extra_nome?: string;
+        cobranca?: string;
+      } = {};
 
       if (dados.pix_link) {
         links.pix = dados.pix_link;
         links.valor = dados.pix_valor;
+      }
+
+      // Serviço que entra na mensalidade: no lugar do Pix, o atendente vê o
+      // proporcional que precisa lançar na próxima fatura.
+      if (dados.cobranca_proporcional) {
+        links.cobranca = dados.cobranca_proporcional;
+      }
+
+      if (dados.sign_url_documento_extra) {
+        links.documento_extra = dados.sign_url_documento_extra;
+        links.documento_extra_nome = dados.nome_documento_extra || "Documento adicional";
       }
 
       if (dados.sign_url) {
@@ -1093,6 +1111,10 @@ class SolicitacaoServicoController {
       console.log(`[EnviarAssinatura] ID: ${id}, Serviço: ${solicitacao.servico}, Celular: ${celular}, Token existente: ${!!solicitacao.token_zapsign}, CriarCadastro: ${!!criarCadastro}`);
 
       let zapSignUrl: string;
+      // Documento que acompanha o contrato (Termo de Adesão SVA nos planos
+      // combo). Fica guardado nos dados para a tela oferecer os dois links.
+      let urlDocumentoExtra: string | null = dados.sign_url_documento_extra ?? null;
+      let nomeDocumentoExtra: string | null = dados.nome_documento_extra ?? null;
       let loginCriado: string | null = null;
       let contratoJaExistia = false;
 
@@ -1130,6 +1152,10 @@ class SolicitacaoServicoController {
           zapResponse = await ZapSign.createContractTrocaTitularidadeTitular(dados);
         } else if (servicoNorm.includes("titularidade") && servicoNorm.includes("novo titular")) {
           zapResponse = await ZapSign.createContractTrocaTitularidadeNovoTitular(dados);
+        } else if (servicoNorm === "watch tv" || servicoNorm.includes("sva")) {
+          // Watch TV avulsa: só o Contrato de SVA. O Termo de Adesão vem com
+          // o plano combo, junto do contrato do plano.
+          zapResponse = await ZapSign.createContratoSva(dados);
         } else {
           res.status(400).json({ message: `Tipo de serviço "${solicitacao.servico}" não possui modelo de contrato configurado.` });
           return;
@@ -1137,6 +1163,8 @@ class SolicitacaoServicoController {
 
         zapSignUrl = zapResponse.signers[0].sign_url;
         solicitacao.token_zapsign = zapResponse.token;
+        urlDocumentoExtra = zapResponse?.documento_extra?.sign_url ?? null;
+        nomeDocumentoExtra = zapResponse?.documento_extra?.nome ?? null;
       }
 
       // Cria cadastro no MKAuth se solicitado pelo usuário
@@ -1175,6 +1203,12 @@ class SolicitacaoServicoController {
         ...dados,
         // Guardado para a listagem oferecer o link ao atendente.
         sign_url: zapSignUrl,
+        ...(urlDocumentoExtra
+          ? {
+              sign_url_documento_extra: urlDocumentoExtra,
+              nome_documento_extra: nomeDocumentoExtra,
+            }
+          : {}),
         enviadoManualmente: {
           data: new Date().toISOString(),
           usuario: req.user?.login || null,
@@ -1187,7 +1221,12 @@ class SolicitacaoServicoController {
       // Envia o link de assinatura ao cliente via WhatsApp
       // Solicitação do site não tem conversa no WhatsApp: o link volta na resposta.
       const origemWebAssinatura = veioDaWeb(solicitacao);
-      const msgAssinatura = `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`;
+      const msgAssinatura = urlDocumentoExtra
+        ? `📄 *Aqui estão os seus links de assinatura:*\n\n` +
+          `1) Contrato: ${zapSignUrl}\n` +
+          `2) ${nomeDocumentoExtra || "Documento adicional"}: ${urlDocumentoExtra}\n\n` +
+          `Por favor, *assine os dois* para formalizarmos sua contratação! 🚀`
+        : `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`;
       if (!origemWebAssinatura) await MensagensComuns(celular, msgAssinatura);
 
       // Salva a mensagem no histórico de conversas
@@ -1235,7 +1274,15 @@ class SolicitacaoServicoController {
           : `${partes.join(" e ")} com sucesso.`,
         login_cliente: solicitacao.login_cliente,
         origemWeb: origemWebAssinatura,
-        links: { assinatura: zapSignUrl },
+        links: {
+          assinatura: zapSignUrl,
+          ...(urlDocumentoExtra
+            ? {
+                documento_extra: urlDocumentoExtra,
+                documento_extra_nome: nomeDocumentoExtra,
+              }
+            : {}),
+        },
       });
     } catch (error: any) {
       console.error("Erro ao enviar assinatura:", error);

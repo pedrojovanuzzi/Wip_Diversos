@@ -31,6 +31,9 @@ export async function gerarContrato(
   token: string;
   /** Troca de titularidade: link do segundo signatário (novo titular). */
   url_novo_titular?: string | null;
+  /** Documento que acompanha o contrato (hoje, o Termo de Adesão SVA). */
+  url_documento_extra?: string | null;
+  nome_documento_extra?: string | null;
 } | null> {
   if (!servico.criarContrato) return null;
   try {
@@ -46,16 +49,32 @@ export async function gerarContrato(
     const url = zapResponse?.signers?.[0]?.sign_url ?? null;
     // O segundo signatário só existe na troca de titularidade.
     const urlNovoTitular = zapResponse?.second_signer?.sign_url ?? null;
+    // Documento que vem junto do contrato: o plano combo leva o Termo de
+    // Adesão SVA, e o cliente assina os dois.
+    const extra = zapResponse?.documento_extra ?? null;
 
     solicitacao.token_zapsign = zapResponse?.token;
-    if (urlNovoTitular) {
+    if (urlNovoTitular || extra?.sign_url) {
       solicitacao.dados = {
         ...(solicitacao.dados || {}),
-        sign_url_novo_titular: urlNovoTitular,
+        ...(urlNovoTitular ? { sign_url_novo_titular: urlNovoTitular } : {}),
+        ...(extra?.sign_url
+          ? {
+              sign_url_documento_extra: extra.sign_url,
+              nome_documento_extra: extra.nome,
+              token_zapsign_documento_extra: extra.token,
+            }
+          : {}),
       };
     }
     await AppDataSource.getRepository(SolicitacaoServico).save(solicitacao);
-    return { url, token: zapResponse?.token, url_novo_titular: urlNovoTitular };
+    return {
+      url,
+      token: zapResponse?.token,
+      url_novo_titular: urlNovoTitular,
+      url_documento_extra: extra?.sign_url ?? null,
+      nome_documento_extra: extra?.nome ?? null,
+    };
   } catch (e: any) {
     console.error(
       "[ServiceLink] Erro ao gerar contrato ZapSign:",

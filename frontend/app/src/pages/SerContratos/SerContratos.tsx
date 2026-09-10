@@ -283,20 +283,6 @@ Regravar com a descrição completa?`,
     } catch (e: any) {
       if (
         e?.response?.status === 409 &&
-        e?.response?.data?.code === "OVERDUE_INVOICES"
-      ) {
-        const vs = e.response.data.vencidas || [];
-        const lista = vs
-          .map(
-            (v: any) =>
-              `#${v.id} — venc ${new Date(v.datavenc).toLocaleDateString("pt-BR")} — R$ ${Number(v.valor).toFixed(2)}`,
-          )
-          .join("\n");
-        window.alert(
-          `${e.response.data.message}\n\nFaturas vencidas:\n${lista}`,
-        );
-      } else if (
-        e?.response?.status === 409 &&
         e?.response?.data?.code === "STREAMING_REPLACE_REQUIRED"
       ) {
         const atual = e.response.data.currentType || "STREAMING";

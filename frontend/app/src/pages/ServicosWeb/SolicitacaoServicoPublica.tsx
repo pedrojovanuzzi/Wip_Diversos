@@ -61,7 +61,13 @@ type Cadastro = {
   plano: string;
 };
 
-type FormaPagamento = { id: string; titulo: string; valor: number };
+type FormaPagamento = {
+  id: string;
+  titulo: string;
+  valor: number;
+  /** Explicacao sob o titulo, quando o valor precisa de contexto. */
+  descricao?: string;
+};
 
 type Resultado = {
   protocolo: string;
@@ -72,7 +78,15 @@ type Resultado = {
     link: string;
     copia_e_cola: string;
   } | null;
-  zapsign: { url: string | null; url_novo_titular?: string | null } | null;
+  zapsign: {
+    url: string | null;
+    url_novo_titular?: string | null;
+    /** Documento que acompanha o contrato (Termo de Adesao SVA). */
+    url_documento_extra?: string | null;
+    nome_documento_extra?: string | null;
+  } | null;
+  /** Servico que entra na mensalidade: o que sera somado a proxima fatura. */
+  cobranca?: string | null;
   /** Opção paga: o contrato só é gerado depois do Pix confirmado. */
   contrato_apos_pagamento?: boolean;
   /** Troca de titularidade: termo de adesão do novo titular. */
@@ -528,10 +542,16 @@ const SolicitacaoServicoPublica: React.FC = () => {
                       onClick={() => !enviando && handlePagamento(f.id)}
                     >
                       <Typography fontWeight={700}>{f.titulo}</Typography>
-                      {f.valor === 0 && (
+                      {f.descricao ? (
                         <Typography variant="caption" color="text.secondary">
-                          Sem cobrança
+                          {f.descricao}
                         </Typography>
+                      ) : (
+                        f.valor === 0 && (
+                          <Typography variant="caption" color="text.secondary">
+                            Sem cobrança
+                          </Typography>
+                        )
                       )}
                     </Paper>
                   ))}
@@ -684,6 +704,18 @@ const SolicitacaoServicoPublica: React.FC = () => {
                   </>
                 )}
 
+                {resultado.cobranca && (
+                  <>
+                    <Divider sx={{ my: 3 }} />
+                    <Typography variant="subtitle1" fontWeight={700}>
+                      Cobrança
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Nada a pagar agora: {resultado.cobranca}
+                    </Typography>
+                  </>
+                )}
+
                 {resultado.aguardando_novo_titular && (
                   <>
                     <Divider sx={{ my: 3 }} />
@@ -727,7 +759,12 @@ const SolicitacaoServicoPublica: React.FC = () => {
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                       {resultado.adesao?.url
                         ? "Assine os dois documentos para concluir a transferência: o Termo de Alteração de Titularidade e o Termo de Adesão."
-                        : "Assine o termo para formalizarmos o serviço."}
+                        : resultado.zapsign.url_documento_extra
+                          ? `Assine os dois documentos para formalizarmos o serviço: o contrato e o ${
+                              resultado.zapsign.nome_documento_extra ||
+                              "documento adicional"
+                            }.`
+                          : "Assine o termo para formalizarmos o serviço."}
                     </Typography>
                     {assinadoConfirmado ? (
                       <Alert severity="success">
@@ -769,6 +806,20 @@ const SolicitacaoServicoPublica: React.FC = () => {
                             rel="noreferrer"
                           >
                             Assinar termo de adesão
+                          </Button>
+                        )}
+                        {resultado.zapsign.url_documento_extra && (
+                          <Button
+                            variant="contained"
+                            color="success"
+                            startIcon={<MdOpenInNew />}
+                            href={resultado.zapsign.url_documento_extra}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Assinar{" "}
+                            {resultado.zapsign.nome_documento_extra ||
+                              "documento adicional"}
                           </Button>
                         )}
                         <Chip

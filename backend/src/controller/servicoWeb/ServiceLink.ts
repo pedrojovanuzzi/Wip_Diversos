@@ -34,6 +34,12 @@ import {
   gerarContrato,
   liberarContratoPosPagamento,
 } from "./contrato";
+import {
+  cobrancaProporcional,
+  dataBR,
+  reais,
+  textoCobrancaProporcional,
+} from "../../services/cobrancaProporcional";
 
 const MAX_TENTATIVAS_CPF = 5;
 
@@ -137,6 +143,15 @@ function rotuloPagamento(
   }
   if (forma === "sem_custo") {
     return { texto: "Sem custo", tom: "ok" };
+  }
+  // Entra na mensalidade: não há Pix a acompanhar, e o proporcional fica
+  // registrado nos dados da solicitação para o atendimento lançar.
+  if (forma === "proxima_fatura") {
+    const valor = solicitacao?.dados?.valor_proporcional;
+    return {
+      texto: valor ? `Na fatura (R$ ${valor})` : "Na fatura",
+      tom: "ok",
+    };
   }
   if (forma === "pix") {
     return solicitacao?.pago
@@ -497,7 +512,7 @@ class ServiceLinkController {
       vinculado: !!link.login_cliente,
       cliente: link.dados?.cliente ? resumoCliente(link.dados.cliente) : null,
       cadastros: link.dados?.cadastros ?? null,
-      formas_pagamento: formasPagamento(servico),
+      formas_pagamento: formasPagamento(servico, link.dados?.cliente),
       campos:
         etapa === "formulario"
           ? await resolverCampos(servico, link.papel)
@@ -748,13 +763,13 @@ class ServiceLinkController {
           ? "formulario"
           : link.dados.forma_pagamento
             ? "formulario"
-            : formasPagamento(servico).length > 0
+            : formasPagamento(servico, link.dados?.cliente).length > 0
               ? "pagamento"
               : "formulario";
 
       res.status(200).json({
         etapa: proxima,
-        formas_pagamento: formasPagamento(servico),
+        formas_pagamento: formasPagamento(servico, link.dados?.cliente),
         campos:
           proxima === "formulario"
             ? await resolverCampos(servico, link.papel)
@@ -789,7 +804,7 @@ class ServiceLinkController {
       }
 
       const escolhida = String(req.body?.forma_pagamento || "");
-      const formas = formasPagamento(servico);
+      const formas = formasPagamento(servico, link.dados?.cliente);
       if (!formas.some((f) => f.id === escolhida)) {
         res
           .status(400)
@@ -1336,6 +1351,24 @@ class ServiceLinkController {
       ...formulario,
     } as Record<string, any>;
 
+    // Serviço que entra na mensalidade: o valor do documento é o da assinatura
+    // (não o do plano), e o proporcional fica registrado para o atendimento
+    // lançar na próxima fatura.
+    if (servico.cobrancaNaFatura) {
+      const proporcional = cobrancaProporcional(
+        servico.valor,
+        Number(cliente.venc) || 1,
+      );
+      Object.assign(dadosSolicitacao, {
+        valor: reais(servico.valor),
+        valor_sva: reais(servico.valor),
+        valor_proporcional: reais(proporcional.valor),
+        dias_proporcional: String(proporcional.dias),
+        vencimento_proporcional: dataBR(proporcional.vencimento),
+        cobranca_proporcional: textoCobrancaProporcional(proporcional),
+      });
+    }
+
     // Troca de titularidade: o formulário é do novo titular, mas o contrato é
     // assinado pelos dois. Os campos do cadastro atual voltam ao lugar e os do
     // formulário viram os do segundo signatário.
@@ -1375,6 +1408,18 @@ class ServiceLinkController {
       finalizado: false,
     });
 
+    // O chamado e o e-mail leem a cobrança em português; "proxima_fatura" é
+    // chave interna e não diz nada a quem atende.
+    const formaTexto =
+      dadosSolicitacao.cobranca_proporcional ||
+      (formaPagamento === "pix"
+        ? `Pix de R$ ${reais(servico.valor)}`
+        : formaPagamento === "gratis"
+          ? "Grátis com renovação contratual"
+          : formaPagamento === "sem_custo"
+            ? "Sem custo adicional"
+            : formaPagamento);
+
     const linhas = servico.campos
       .map((c) => `<p><b>${c.label}:</b> ${formulario[c.name] ?? "-"}</p>`)
       .join("");
@@ -1384,7 +1429,7 @@ class ServiceLinkController {
       `<p><b>Login:</b> ${cliente.login}</p>` +
       `<p><b>CPF/CNPJ:</b> ${cliente.cpf_cnpj}</p>` +
       `<p><b>Celular:</b> ${cliente.celular || "-"}</p>` +
-      `<p><b>Forma:</b> ${formaPagamento}</p>` +
+      `<p><b>Cobrança:</b> ${formaTexto}</p>` +
       linhas;
 
     try {
@@ -1397,7 +1442,7 @@ class ServiceLinkController {
       `*${servico.nome}* (solicitado pelo site)\n` +
       `Cliente: ${cliente.nome}\n` +
       `Login: ${cliente.login}\n` +
-      `Forma: ${formaPagamento}\n` +
+      `Cobrança: ${formaTexto}\n` +
       servico.campos
         .map((c) => `${c.label}: ${formulario[c.name] ?? "-"}`)
         .join("\n");
@@ -1463,6 +1508,9 @@ class ServiceLinkController {
       solicitacao_id: solicitacao.id,
       chamado: chamadoId,
       pix,
+      // Serviço que entra na mensalidade: o cliente vê o que será somado à
+      // próxima fatura no lugar de um Pix.
+      cobranca: dadosSolicitacao.cobranca_proporcional ?? null,
       zapsign,
       contrato_apos_pagamento: contratoAposPagamento,
       protocolo: chamadoId || `SOL-${solicitacao.id}`,

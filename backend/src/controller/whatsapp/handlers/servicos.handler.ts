@@ -34,6 +34,12 @@ import { url as waUrl, token as waToken } from "../config";
 import { getPlanosDoSistema, getPlanosWifiExtendido } from "../services/plano.service";
 import { criarChamadoMkauth } from "../services/chamado.service";
 import { VALOR_STREAMER } from "../../../config/servicosAdicionais";
+import {
+  cobrancaProporcional,
+  dataBR,
+  reais,
+  textoCobrancaProporcional,
+} from "../../../services/cobrancaProporcional";
 
 const FLOW_TROCA_TITULARIDADE_CONTATO =
   process.env.WA_FLOW_TROCA_TITULARIDADE_CONTATO ||
@@ -297,15 +303,29 @@ async function salvarSolicitacaoWifiExtendido(
 // --- Watch TV (SVA) ---
 
 /**
+ * Quanto entra na próxima fatura pela Watch TV contratada agora.
+ *
+ * Mesma função usada pelo site: o cliente ouve o mesmo valor nos dois canais.
+ */
+function cobrancaWatchTv(session: any) {
+  return cobrancaProporcional(
+    VALOR_STREAMER,
+    Number(session.venc_watch_tv) || 1,
+  );
+}
+
+/**
  * Solicitação de contratação da Watch TV.
  *
- * Nasce sem contrato: o termo de adesão do SVA é gerado depois, pela tela de
+ * Nasce sem contrato: o Contrato de SVA é gerado depois, pela tela de
  * solicitações — é lá que o atendimento confere os dados antes de mandar o
- * cliente assinar.
+ * cliente assinar. O Termo de Adesão SVA não entra aqui: ele acompanha o
+ * plano combo no cadastro, junto do contrato do plano.
  */
 async function salvarSolicitacaoWatchTv(session: any, celularConversa: string) {
   const repo = AppDataSource.getRepository(SolicitacaoServico);
   const nova = new SolicitacaoServico();
+  const proporcional = cobrancaWatchTv(session);
 
   nova.servico = "Watch TV";
   nova.login_cliente = session.login || "Desconhecido";
@@ -334,7 +354,16 @@ async function salvarSolicitacaoWatchTv(session: any, celularConversa: string) {
     // ajusta na tela se o cliente pedir outro.
     email_watch: session.email || "",
     celular_watch: session.celularCliente || celularConversa,
-    valor: VALOR_STREAMER.toFixed(2),
+    // Sem Pix: a assinatura entra na mensalidade. O que se registra é o
+    // proporcional aos dias até o próximo vencimento, para o atendimento
+    // lançar na fatura — mesma conta que o site faz.
+    forma_pagamento: "proxima_fatura",
+    valor: reais(VALOR_STREAMER),
+    valor_sva: reais(VALOR_STREAMER),
+    valor_proporcional: reais(proporcional.valor),
+    dias_proporcional: String(proporcional.dias),
+    vencimento_proporcional: dataBR(proporcional.vencimento),
+    cobranca_proporcional: textoCobrancaProporcional(proporcional),
     valor_plano: session.valor_plano_atual || "",
   };
 
@@ -371,6 +400,7 @@ function aplicarCadastroWatchTv(session: any, cliente: any, cpf: string) {
 /** Fecha o pedido: grava a solicitação e abre o chamado no cadastro. */
 async function concluirWatchTv(celular: any, session: any) {
   const solicitacao = await salvarSolicitacaoWatchTv(session, celular);
+  const proporcional = cobrancaWatchTv(session);
 
   const resumo =
     `Contratação da Watch TV solicitada pelo WhatsApp.\n\n` +
@@ -378,8 +408,10 @@ async function concluirWatchTv(celular: any, session: any) {
     `Login: ${session.login || "-"}\n` +
     `CPF/CNPJ: ${session.cpf || "-"}\n` +
     `Endereço: ${session.endereco_watch_tv || "-"}, ${session.numero_watch_tv || "-"}\n` +
-    `Valor da assinatura: R$ ${VALOR_STREAMER.toFixed(2).replace(".", ",")}\n\n` +
-    `O termo de adesão do SVA será enviado para assinatura pelo atendimento.`;
+    `Assinatura: R$ ${reais(VALOR_STREAMER)} por mês, na mensalidade.\n` +
+    `Cobrança: ${textoCobrancaProporcional(proporcional)}\n\n` +
+    `O Contrato de SVA será enviado para assinatura pelo atendimento, e o ` +
+    `proporcional lançado na fatura.`;
 
   try {
     await criarChamadoMkauth("CONTRATACAO WATCH TV", session, resumo, solicitacao);
@@ -391,9 +423,12 @@ async function concluirWatchTv(celular: any, session: any) {
   await MensagensComuns(
     celular,
     `✅ *Pedido registrado!*\n\nSua contratação da *Watch TV* foi enviada para a ` +
-      `nossa equipe. Em breve você recebe o *termo de adesão* para assinar.\n\n` +
-      `💰 Assinatura: *R$ ${VALOR_STREAMER.toFixed(2).replace(".", ",")}* por mês, ` +
-      `cobrada junto da sua mensalidade.`,
+      `nossa equipe. Em breve você recebe o *Contrato de SVA* para assinar.\n\n` +
+      `💰 Não há nada a pagar agora: a assinatura entra na sua mensalidade.\n` +
+      `📅 Na fatura de *${dataBR(proporcional.vencimento)}* entram ` +
+      `*R$ ${reais(proporcional.valor)}*, referentes aos ` +
+      `*${proporcional.dias} ${proporcional.dias === 1 ? "dia" : "dias"}* de uso ` +
+      `até o vencimento. Depois disso, *R$ ${reais(VALOR_STREAMER)}* por mês.`,
   );
 
   deleteSession(celular);
