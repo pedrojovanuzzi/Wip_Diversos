@@ -12,7 +12,10 @@ import MkauthDataSource from "../database/MkauthSource";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { SisPlano } from "../entities/SisPlano";
 import { v4 as uuidv4 } from "uuid";
-import { deleteSession } from "./whatsapp/services/session.service";
+import {
+  deleteSession,
+  saveSession,
+} from "./whatsapp/services/session.service";
 import { criarChamadoMkauth } from "./whatsapp/services/chamado.service";
 import { SisSerContratos } from "../entities/SisSerContratos";
 import {
@@ -286,6 +289,48 @@ const waToken = isSandbox
 const waUrl = isSandbox
   ? `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID_TEST}/messages`
   : `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
+
+/** Solicitação feita pelo site não tem conversa aberta no WhatsApp. */
+function veioDaWeb(solicitacao: SolicitacaoServico): boolean {
+  return (solicitacao.dados as any)?.origem === "web";
+}
+
+/**
+ * Abre a conversa para colher o contato de acesso da Watch TV.
+ *
+ * Deixa a sessão do bot parada nessa pergunta: a resposta do cliente cai em
+ * `coletarContatoWatchTv`, que cria a conta na Watch Brasil.
+ */
+async function pedirContatoWatchTvPeloBot(
+  solicitacao: SolicitacaoServico,
+  login: string,
+) {
+  const dados = (solicitacao.dados || {}) as any;
+  const bruto = String(
+    dados.telefone_conversa || dados.telefone || dados.celular || "",
+  ).replace(/\D/g, "");
+  if (!bruto) {
+    console.warn(
+      `[WatchTV] Solicitação ${solicitacao.id} sem telefone: não dá para pedir o contato.`,
+    );
+    return;
+  }
+  const celular = bruto.startsWith("55") ? bruto : `55${bruto}`;
+
+  await saveSession(celular, {
+    stage: "watch_tv_contato",
+    watchTvContatoStep: "ask_email",
+    watchTvLogin: login,
+    watchTvSolicitacaoId: solicitacao.id,
+    nome: dados.nome || "",
+  });
+
+  await Whatsapp.MensagensComuns(
+    celular,
+    `✅ *Contrato assinado!*\n\nFalta só liberar o seu acesso à *Watch TV*.\n\n` +
+      `📧 Me diga o *e-mail* que você quer usar para entrar no aplicativo.`,
+  );
+}
 
 // Todas as funções createContract* aceitam Record<string, any> e usam
 // buildUniversalZapSignData() para resolver as variáveis do documento.
@@ -997,14 +1042,21 @@ class ZapSign {
                 case "watch tv":
                 case "contrato de sva": {
                   // Assinou o Contrato de SVA: o streaming entra no cadastro
-                  // e passa a compor a mensalidade.
+                  // e passa a compor a mensalidade. A conta de acesso, não —
+                  // ela é criada com o e-mail e o celular que o cliente ainda
+                  // vai informar, porque é ela que dispara o e-mail da Watch.
                   const loginWatch = dados.login || solicitacao.login_cliente;
                   const r = await contratarStreamingAposAssinatura({
                     login: loginWatch,
-                    email: dados.email_watch || dados.email,
-                    phone: dados.celular_watch || dados.telefone,
                     usuario: "assinatura",
+                    ativarAcesso: false,
                   });
+
+                  // No bot a conversa está aberta: dá para perguntar ali
+                  // mesmo. No site quem pergunta é a própria página.
+                  if (r.status === "aguardando_contato" && !veioDaWeb(solicitacao)) {
+                    await pedirContatoWatchTvPeloBot(solicitacao, loginWatch);
+                  }
                   console.log(
                     `[ZapSign Webhook] Watch TV de ${loginWatch}: ${r.status}` +
                       (r.motivo ? ` — ${r.motivo}` : ""),
