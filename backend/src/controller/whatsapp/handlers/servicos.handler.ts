@@ -41,6 +41,10 @@ import {
   textoCobrancaProporcional,
 } from "../../../services/cobrancaProporcional";
 import {
+  pedirAceiteTermoSva,
+  precisaAceitarTermoSva,
+} from "./termoSva.handler";
+import {
   celularValido,
   emailValido,
   impedimentoPlanoComSva,
@@ -305,6 +309,23 @@ async function salvarSolicitacaoWifiExtendido(
   return await repo.save(novaSolicitacao);
 }
 
+
+/**
+ * Manda o link do documento que acompanha o contrato, quando existir.
+ *
+ * O plano combo gera dois documentos no ZapSign — o contrato do plano e o
+ * Termo de Adesão SVA — e o cliente assina os dois. Sem esta mensagem ele
+ * receberia só o primeiro link, e o termo ficaria pendente para sempre.
+ */
+async function enviarLinkDocumentoExtra(celular: any, zapResponse: any) {
+  const extra = zapResponse?.documento_extra;
+  if (!extra?.sign_url) return;
+  await MensagensComuns(
+    celular,
+    `📄 *${extra.nome || "Documento adicional"}:* ${extra.sign_url}\n\n` +
+      `Assine também este documento para concluirmos. 🚀`,
+  );
+}
 
 // --- Watch TV (SVA) ---
 
@@ -2014,6 +2035,9 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
         celular,
         `📄 *Termo de Cadastro (Adesão):*\n${urlCadastro}\n\nPor favor, assine *ambos* os documentos para formalizar a sua contratação! 🚀`,
       );
+      // Novo titular que escolheu o plano combo assina também o Termo de
+      // Adesão SVA, que sai junto do cadastro.
+      await enviarLinkDocumentoExtra(celular, zapCadastro);
       session.stage = "awaiting_signature_link";
     } catch (zapError) {
       console.error("[ZapSign] Erro ao criar contratos para novo titular:", zapError);
@@ -2193,6 +2217,15 @@ export async function handleAwaitingTrocaPlanoFlow(
       return;
     }
 
+    // Plano com SVA: o termo de adesão é aceito antes de o pedido ser
+    // fechado. Depois do aceite este mesmo passo roda de novo.
+    if (precisaAceitarTermoSva(session, planoEscolhido)) {
+      session.planoEscolhido = planoEscolhido;
+      session.observacaoTrocaPlano = payload.observacao || "";
+      await pedirAceiteTermoSva(celular, session, "troca_plano", texto);
+      return;
+    }
+
     session.planoEscolhido = planoEscolhido;
     session.observacaoTrocaPlano = payload.observacao || "";
     session.trocaPlanoStep = null;
@@ -2294,6 +2327,8 @@ export async function handleAwaitingTrocaPlanoFlow(
         celular,
         `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
       );
+      // Plano combo: o Termo de Adesão SVA sai junto e também é assinado.
+      await enviarLinkDocumentoExtra(celular, zapResponse);
       session.stage = "awaiting_signature_link";
     } catch (error) {
       console.error(

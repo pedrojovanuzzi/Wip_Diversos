@@ -48,7 +48,8 @@ type Campo = {
   required?: boolean;
   maxChars?: number;
   ajuda?: string;
-  opcoes?: Array<{ id: string; title: string }>;
+  /** `sva` marca o plano que inclui Servico de Valor Adicionado. */
+  opcoes?: Array<{ id: string; title: string; sva?: boolean }>;
 };
 
 type Cadastro = {
@@ -231,6 +232,16 @@ const SolicitacaoServicoPublica: React.FC = () => {
     }, 10000);
     return () => clearInterval(timer);
   }, [resultado, assinadoConfirmado, aguardandoAcesso, base]);
+
+  /**
+   * Plano com SVA escolhido no formulario: o cliente precisa aceitar o Termo
+   * de Adesao antes de enviar, como o bot pede na conversa.
+   */
+  const planoComSva = campos.some(
+    (c) =>
+      c.type === "select" &&
+      (c.opcoes || []).some((o) => o.sva && o.id === valores[c.name]),
+  );
 
   const chamar = async (caminho: string, corpo: any) => {
     setErro(null);
@@ -496,16 +507,23 @@ const SolicitacaoServicoPublica: React.FC = () => {
                               {t.titulo}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                              {t.texto}{" "}
-                              <a
-                                href={encodeURI(t.url)}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{ fontWeight: 700 }}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                leia mais
-                              </a>
+                              {t.texto}
+                              {/* Nem todo termo tem PDF para ler: o SVA é
+                                  gerado no ZapSign e vai para assinatura. */}
+                              {t.url && (
+                                <>
+                                  {" "}
+                                  <a
+                                    href={encodeURI(t.url)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{ fontWeight: 700 }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    leia mais
+                                  </a>
+                                </>
+                              )}
                             </Typography>
                           </Box>
                         }
@@ -637,12 +655,40 @@ const SolicitacaoServicoPublica: React.FC = () => {
                       />
                     ),
                   )}
+                  {/* O Termo de Adesão SVA não é um PDF para ler: sai no
+                      ZapSign junto do contrato do plano. Aqui o cliente
+                      confirma que aceita recebê-lo para assinar. */}
+                  {planoComSva && (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={valores.aceite_sva === "true"}
+                          onChange={(e) =>
+                            setValores((v) => ({
+                              ...v,
+                              aceite_sva: e.target.checked ? "true" : "",
+                            }))
+                          }
+                        />
+                      }
+                      label={
+                        <Typography variant="body2" color="text.secondary">
+                          Este plano inclui a <b>Watch TV</b>, um Serviço de
+                          Valor Adicionado. Aceito receber o{" "}
+                          <b>Termo de Adesão SVA</b> para assinar junto do
+                          contrato do plano.
+                        </Typography>
+                      }
+                    />
+                  )}
                   <Button
                     size="large"
                     variant="contained"
                     color="success"
                     onClick={handleEnviar}
-                    disabled={enviando}
+                    disabled={
+                      enviando || (planoComSva && valores.aceite_sva !== "true")
+                    }
                     startIcon={
                       enviando ? (
                         <CircularProgress size={18} color="inherit" />

@@ -9,6 +9,7 @@ import {
   impedimentoPlanoComSva,
   impedimentoWatchTv,
 } from "../../services/streamingCadastro";
+import { planoTemSva } from "../../config/planosComSva";
 import ApiMkDataSource from "../../database/API_MK";
 import ZapSignTemplates from "../../entities/APIMK/ZapSignTemplates";
 import {
@@ -33,7 +34,7 @@ export type CampoServico = {
   maxChars?: number;
   ajuda?: string;
   /** Opções fixas; para listas dinâmicas use `fonte`. */
-  opcoes?: Array<{ id: string; title: string }>;
+  opcoes?: Array<{ id: string; title: string; sva?: boolean }>;
   /** Lista resolvida no servidor na hora de montar o formulário. */
   fonte?: "planos" | "planos_wifi" | "estados" | "vencimentos";
 };
@@ -43,8 +44,11 @@ export type Termo = {
   titulo: string;
   /** Texto do aceite, no mesmo tom das mensagens do bot. */
   texto: string;
-  /** Rota do PDF no site (/doc/:arquivo). */
-  url: string;
+  /**
+   * Rota do PDF no site (/doc/:arquivo). Fica vazio quando não há o que ler
+   * antes: o documento do SVA é gerado no ZapSign e vai para assinatura.
+   */
+  url?: string;
 };
 
 /**
@@ -370,9 +374,8 @@ export const CATALOGO: ServicoWeb[] = [
         id: "contrato_sva",
         titulo: "Contrato de SVA",
         texto:
-          "Li e aceito o Contrato de Serviço de Valor Adicionado, conforme a " +
-          "Resolução 777/2025.",
-        url: "/doc/contrato_sva",
+          "Aceito receber para assinatura o Contrato de Serviço de Valor " +
+          "Adicionado, conforme a Resolução 777/2025.",
       },
     ],
     // O valor sai de servicosAdicionais para não divergir do que é lançado no
@@ -471,6 +474,25 @@ export const CATALOGO: ServicoWeb[] = [
   },
 ];
 
+/**
+ * Recusa o formulário quando o plano escolhido inclui SVA e o cliente não
+ * marcou o aceite do Termo de Adesão. Mesma exigência que o bot faz na
+ * conversa, logo depois da escolha do plano.
+ */
+export async function exigirAceiteSva(
+  formulario: Record<string, any>,
+): Promise<string | null> {
+  const plano = formulario.plano_escolhido || formulario.plano;
+  if (!planoTemSva(plano)) return null;
+  const aceitou =
+    formulario.aceite_sva === true || formulario.aceite_sva === "true";
+  if (aceitou) return null;
+  return (
+    "Este plano inclui a Watch TV, um Serviço de Valor Adicionado. Marque o " +
+    "aceite do Termo de Adesão SVA para continuar."
+  );
+}
+
 export function buscarServico(id: string): ServicoWeb | undefined {
   return CATALOGO.find((s) => s.id === id);
 }
@@ -545,8 +567,17 @@ export async function resolverCampos(
       campos.push(campo);
       continue;
     }
-    let opcoes: Array<{ id: string; title: string }> = [];
-    if (campo.fonte === "planos") opcoes = await getPlanosDoSistema();
+    // `sva` marca o plano que inclui Serviço de Valor Adicionado: o
+    // formulário pede o aceite do termo quando ele é escolhido.
+    let opcoes: Array<{ id: string; title: string; sva?: boolean }> = [];
+    if (campo.fonte === "planos") {
+      opcoes = (await getPlanosDoSistema()).map((p) => ({
+        ...p,
+        // Pelo `id`, que é o nome do plano no cadastro — o `title` é só o
+        // rótulo formatado, e é o `id` que volta no formulário.
+        sva: planoTemSva(p.id),
+      }));
+    }
     else if (campo.fonte === "planos_wifi") opcoes = await getPlanosWifiExtendido();
     else if (campo.fonte === "estados") opcoes = ESTADOS;
     else if (campo.fonte === "vencimentos") opcoes = VENCIMENTOS;

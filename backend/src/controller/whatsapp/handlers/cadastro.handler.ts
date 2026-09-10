@@ -2,6 +2,10 @@ import axios from "axios";
 import moment from "moment-timezone";
 import { v4 as uuidv4 } from "uuid";
 import AppDataSource from "../../../database/DataSource";
+import {
+  pedirAceiteTermoSva,
+  precisaAceitarTermoSva,
+} from "./termoSva.handler";
 import { ClientesEntities } from "../../../entities/ClientesEntities";
 import MkauthDataSource from "../../../database/MkauthSource";
 import { SolicitacaoServico } from "../../../entities/SolicitacaoServico";
@@ -267,6 +271,12 @@ export async function handleAwaitingFlowCadastro(
       const planoFlow = dadosFlow.plano || "";
       session.planoEscolhido = planoFlow;
 
+      // Plano com SVA: o termo de adesão vem antes de registrar o pedido.
+      if (precisaAceitarTermoSva(session, planoFlow)) {
+        await pedirAceiteTermoSva(celular, session, "instalacao", texto);
+        return true;
+      }
+
       await MensagensComuns(
         celular,
         "✅ Recebemos a sua solicitação!\nNossa equipe vai *analisar o CPF informado* e continuar os próximos passos da instalação. Obrigado pela confiança!",
@@ -432,6 +442,12 @@ export async function handleFinalRegister(
   session: any,
 ) {
   if (texto.toLowerCase() === "sim, li e aceito") {
+    // Plano com SVA: falta o termo de adesão antes de fechar o pedido.
+    if (precisaAceitarTermoSva(session, session.planoEscolhido)) {
+      await pedirAceiteTermoSva(celular, session, "instalacao", texto);
+      return;
+    }
+
     await MensagensComuns(
       celular,
       "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\nSua solicitação será enviada para análise da equipe, que poderá *consultar o CPF* ou *ignorar a consulta* para seguir com a instalação.",

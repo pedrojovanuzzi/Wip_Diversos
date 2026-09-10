@@ -22,6 +22,7 @@ import ZapSign from "../ZapSign";
 import {
   buscarServico,
   camposDoPapel,
+  exigirAceiteSva,
   listarServicos,
   resolverServico,
   formasPagamento,
@@ -913,9 +914,11 @@ class ServiceLinkController {
 
       // Regra que só dá para conferir com o formulário na mão — o plano
       // escolhido, por exemplo. O cliente volta ao formulário com o motivo.
-      const recusa = servico.validarFormulario
-        ? await servico.validarFormulario(formulario, cliente)
-        : null;
+      const recusa =
+        (await exigirAceiteSva(formulario)) ||
+        (servico.validarFormulario
+          ? await servico.validarFormulario(formulario, cliente)
+          : null);
       if (recusa) {
         res.status(409).json({ errors: [{ msg: recusa }] });
         return;

@@ -18,6 +18,7 @@ import {
   PodeMePassarOCpf,
   Finalizar,
 } from "../services/messaging.service";
+import { handleTermoSva } from "./termoSva.handler";
 import { enviarBoleto } from "../services/payment.service";
 import { getPlanosDoSistema } from "../services/plano.service";
 import ApiMkDataSource from "../../../database/API_MK";
@@ -591,6 +592,12 @@ export async function handleMessage(
 
     case "watch_tv":
       await iniciarWatchTv(celular, texto, session, type);
+      break;
+
+    // Plano combo: o cliente precisa aceitar o Termo de Adesão SVA antes de
+    // o pedido ser fechado.
+    case "aguardando_termo_sva":
+      await handleTermoSva(celular, texto, session);
       break;
 
     case "choose_type_wifi_extendido":
