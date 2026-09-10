@@ -53,7 +53,6 @@ import {
   handleChooseTypeTrocaPlano,
   handleAwaitingTrocaPlanoFlow,
   iniciarWifiExtendido,
-  coletarContatoWatchTv,
   iniciarWatchTv,
   handleChooseTypeWifiExtendido,
   handleAwaitingWifiExtendidoFlow,
@@ -592,11 +591,6 @@ export async function handleMessage(
 
     case "watch_tv":
       await iniciarWatchTv(celular, texto, session, type);
-      break;
-
-    // Aberta pelo webhook do ZapSign, depois que o contrato é assinado.
-    case "watch_tv_contato":
-      await coletarContatoWatchTv(celular, texto, session, type);
       break;
 
     case "choose_type_wifi_extendido":

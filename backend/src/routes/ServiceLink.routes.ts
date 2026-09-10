@@ -26,10 +26,6 @@ router.post("/publico/:token/pagamento", (req, res) =>
 router.post("/publico/:token/enviar", (req, res) =>
   ServiceLinkController.enviar(req, res),
 );
-router.post("/publico/:token/acesso", (req, res) =>
-  ServiceLinkController.acesso(req, res),
-);
-
 router.get("/publico/:token/status", (req, res) =>
   ServiceLinkController.status(req, res),
 );

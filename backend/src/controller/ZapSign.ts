@@ -296,39 +296,36 @@ function veioDaWeb(solicitacao: SolicitacaoServico): boolean {
 }
 
 /**
- * Abre a conversa para colher o contato de acesso da Watch TV.
+ * Avisa o cliente, no WhatsApp, que o acesso saiu.
  *
- * Deixa a sessão do bot parada nessa pergunta: a resposta do cliente cai em
- * `coletarContatoWatchTv`, que cria a conta na Watch Brasil.
+ * O e-mail com as instruções é enviado pela própria Watch TV quando a conta é
+ * criada; aqui só apontamos para onde olhar.
  */
-async function pedirContatoWatchTvPeloBot(
+async function avisarAcessoLiberado(
   solicitacao: SolicitacaoServico,
-  login: string,
+  email?: string,
 ) {
   const dados = (solicitacao.dados || {}) as any;
   const bruto = String(
     dados.telefone_conversa || dados.telefone || dados.celular || "",
   ).replace(/\D/g, "");
-  if (!bruto) {
-    console.warn(
-      `[WatchTV] Solicitação ${solicitacao.id} sem telefone: não dá para pedir o contato.`,
-    );
-    return;
-  }
+  if (!bruto) return;
   const celular = bruto.startsWith("55") ? bruto : `55${bruto}`;
-
-  await saveSession(celular, {
-    stage: "watch_tv_contato",
-    watchTvContatoStep: "ask_email",
-    watchTvLogin: login,
-    watchTvSolicitacaoId: solicitacao.id,
-    nome: dados.nome || "",
-  });
 
   await Whatsapp.MensagensComuns(
     celular,
-    `✅ *Contrato assinado!*\n\nFalta só liberar o seu acesso à *Watch TV*.\n\n` +
-      `📧 Me diga o *e-mail* que você quer usar para entrar no aplicativo.`,
+    `🎉 *Watch TV liberada!*
+
+` +
+      (email
+        ? `📧 A Watch TV enviou um e-mail para *${email}* com as instruções de ` +
+          `acesso e a criação da sua senha.
+
+`
+        : `📧 A Watch TV enviou um e-mail com as instruções de acesso.
+
+`) +
+      `Se não encontrar, confira a caixa de *spam* ou *promoções*.`,
   );
 }
 
@@ -1048,14 +1045,19 @@ class ZapSign {
                   const loginWatch = dados.login || solicitacao.login_cliente;
                   const r = await contratarStreamingAposAssinatura({
                     login: loginWatch,
+                    // Contato colhido antes da assinatura, no bot ou no site.
+                    email: dados.email_watch || dados.email,
+                    phone: dados.celular_watch || dados.telefone,
                     usuario: "assinatura",
-                    ativarAcesso: false,
                   });
 
-                  // No bot a conversa está aberta: dá para perguntar ali
-                  // mesmo. No site quem pergunta é a própria página.
-                  if (r.status === "aguardando_contato" && !veioDaWeb(solicitacao)) {
-                    await pedirContatoWatchTvPeloBot(solicitacao, loginWatch);
+                  // A conta na Watch Brasil é quem dispara o e-mail de
+                  // boas-vindas; o cliente precisa saber onde procurar.
+                  if (r.status === "adicionado" && !veioDaWeb(solicitacao)) {
+                    await avisarAcessoLiberado(
+                      solicitacao,
+                      dados.email_watch || dados.email,
+                    );
                   }
                   console.log(
                     `[ZapSign Webhook] Watch TV de ${loginWatch}: ${r.status}` +

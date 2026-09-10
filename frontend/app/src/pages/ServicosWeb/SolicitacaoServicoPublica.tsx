@@ -138,13 +138,11 @@ const SolicitacaoServicoPublica: React.FC = () => {
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [pagoConfirmado, setPagoConfirmado] = useState(false);
   const [assinadoConfirmado, setAssinadoConfirmado] = useState(false);
-  /** Depois de assinar, o acesso ao streaming ainda precisa do contato. */
-  const [acessoPendente, setAcessoPendente] = useState(false);
-  const [acessoEmail, setAcessoEmail] = useState("");
-  const [acessoCelular, setAcessoCelular] = useState("");
-  const [acessoLiberado, setAcessoLiberado] = useState<string | null>(null);
-  const [acessoErro, setAcessoErro] = useState<string | null>(null);
-  const [acessoEnviando, setAcessoEnviando] = useState(false);
+  /** Como ficou o acesso ao streaming depois da assinatura. */
+  const [acesso, setAcesso] = useState<{
+    status?: string;
+    email?: string;
+  } | null>(null);
 
   const [aceites, setAceites] = useState<string[]>([]);
   const [cpf, setCpf] = useState("");
@@ -219,33 +217,13 @@ const SolicitacaoServicoPublica: React.FC = () => {
       try {
         const { data } = await axios.get(`${base}/status`);
         if (data.assinado) setAssinadoConfirmado(true);
-        if (data.acesso_pendente) setAcessoPendente(true);
+        if (data.acesso) setAcesso(data.acesso);
       } catch {
         /* mantém o polling silencioso */
       }
     }, 10000);
     return () => clearInterval(timer);
   }, [resultado, assinadoConfirmado, base]);
-
-  const enviarAcesso = async () => {
-    setAcessoErro(null);
-    setAcessoEnviando(true);
-    try {
-      const { data } = await axios.post(`${base}/acesso`, {
-        email: acessoEmail,
-        celular: acessoCelular,
-      });
-      setAcessoLiberado(data.email || acessoEmail);
-      setAcessoPendente(false);
-    } catch (e: any) {
-      setAcessoErro(
-        e?.response?.data?.errors?.[0]?.msg ||
-          "Não foi possível liberar o acesso. Tente novamente.",
-      );
-    } finally {
-      setAcessoEnviando(false);
-    }
-  };
 
   const chamar = async (caminho: string, corpo: any) => {
     setErro(null);
@@ -800,66 +778,24 @@ const SolicitacaoServicoPublica: React.FC = () => {
                           Contrato assinado. Obrigado!
                         </Alert>
 
-                        {/* O acesso ao streaming é criado com o contato que o
-                            cliente informar aqui — é essa conta que dispara o
-                            e-mail de boas-vindas da Watch TV. */}
-                        {acessoPendente && !acessoLiberado && (
-                          <Box sx={{ mt: 2 }}>
-                            <Typography variant="subtitle1" fontWeight={700}>
-                              Falta liberar o seu acesso
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                              sx={{ mb: 2 }}
-                            >
-                              Informe o e-mail e o celular que você quer usar no
-                              aplicativo da Watch TV.
-                            </Typography>
-                            {acessoErro && (
-                              <Alert severity="error" sx={{ mb: 2 }}>
-                                {acessoErro}
-                              </Alert>
-                            )}
-                            <Stack spacing={2}>
-                              <TextField
-                                label="E-mail"
-                                type="email"
-                                fullWidth
-                                value={acessoEmail}
-                                onChange={(e) => setAcessoEmail(e.target.value)}
-                              />
-                              <TextField
-                                label="Celular com DDD"
-                                fullWidth
-                                value={acessoCelular}
-                                onChange={(e) =>
-                                  setAcessoCelular(e.target.value)
-                                }
-                              />
-                              <Button
-                                variant="contained"
-                                color="success"
-                                disabled={
-                                  acessoEnviando ||
-                                  !acessoEmail.trim() ||
-                                  !acessoCelular.trim()
-                                }
-                                onClick={enviarAcesso}
-                              >
-                                {acessoEnviando
-                                  ? "Liberando…"
-                                  : "Liberar meu acesso"}
-                              </Button>
-                            </Stack>
-                          </Box>
+                        {/* A conta na Watch TV é criada assim que o
+                            contrato é assinado, com o e-mail informado no
+                            formulário — e é a Watch que envia o e-mail. */}
+                        {acesso?.status === "adicionado" && (
+                          <Alert severity="success" sx={{ mt: 2 }}>
+                            Acesso liberado! A Watch TV enviou um e-mail
+                            {acesso.email ? ` para ` : " "}
+                            {acesso.email && <b>{acesso.email}</b>} com as
+                            instruções de acesso. Se não encontrar, confira a
+                            caixa de spam.
+                          </Alert>
                         )}
 
-                        {acessoLiberado && (
-                          <Alert severity="success" sx={{ mt: 2 }}>
-                            Acesso liberado! A Watch TV enviou um e-mail para{" "}
-                            <b>{acessoLiberado}</b> com as instruções de acesso.
-                            Se não encontrar, confira a caixa de spam.
+                        {acesso?.status === "sem_acesso" && (
+                          <Alert severity="warning" sx={{ mt: 2 }}>
+                            Sua contratação está registrada. A liberação do
+                            acesso ficou pendente e nossa equipe vai concluir —
+                            você recebe o e-mail da Watch TV em seguida.
                           </Alert>
                         )}
                       </>

@@ -174,7 +174,6 @@ export type ResultadoContratacao = {
   status:
     | "adicionado"
     | "sem_acesso"
-    | "aguardando_contato"
     | "ja_tinha"
     | "erro"
     | "nao_aplica";
@@ -200,12 +199,6 @@ export async function contratarStreamingAposAssinatura(params: {
   phone?: string;
   usuario?: string;
   valor?: number;
-  /**
-   * Cria a conta na Watch Brasil junto. Fica `false` quando o e-mail e o
-   * celular de acesso ainda vão ser perguntados ao cliente — é a conta que
-   * dispara o e-mail de boas-vindas, então ela espera o dado certo.
-   */
-  ativarAcesso?: boolean;
 }): Promise<ResultadoContratacao> {
   const login = String(params.login || "").trim();
   if (!login || login === "Desconhecido" || login === "Não informado") {
@@ -237,16 +230,6 @@ export async function contratarStreamingAposAssinatura(params: {
     valor: params.valor ?? VALOR_STREAMER,
     usuario: params.usuario || "assinatura",
   });
-
-  if (params.ativarAcesso === false) {
-    return {
-      status: "aguardando_contato",
-      servico: salvo.nome,
-      motivo:
-        "Serviço adicionado ao cadastro. O acesso é criado quando o cliente " +
-        "informar o e-mail e o celular da Watch TV.",
-    };
-  }
 
   const email = String(params.email || cliente.email || "").trim();
   const phone = String(
@@ -287,43 +270,6 @@ export function emailValido(email?: string | null): boolean {
 export function celularValido(celular?: string | null): boolean {
   const n = String(celular || "").replace(/\D/g, "");
   return n.length === 10 || n.length === 11;
-}
-
-/**
- * Cria a conta de acesso na Watch Brasil com o contato informado pelo cliente.
- *
- * É este passo que dispara o e-mail de boas-vindas — quem envia é a própria
- * Watch, com as instruções de acesso. Roda depois da assinatura, quando o
- * cliente responde o e-mail e o celular que quer usar.
- */
-export async function ativarAcessoStreaming(params: {
-  login: string;
-  email: string;
-  phone: string;
-}): Promise<{ ok: boolean; motivo?: string; email?: string }> {
-  const login = String(params.login || "").trim();
-  const email = String(params.email || "").trim();
-  const phone = String(params.phone || "").replace(/\D/g, "");
-
-  if (!emailValido(email)) return { ok: false, motivo: "E-mail inválido." };
-  if (!celularValido(phone)) return { ok: false, motivo: "Celular inválido." };
-
-  const cliente = await MkauthSource.getRepository(ClientesEntities).findOne({
-    where: { login },
-  });
-  if (!cliente) {
-    return { ok: false, motivo: `Cliente ${login} não encontrado.` };
-  }
-
-  try {
-    await registrarAssinanteStreaming({ cliente, email, phone });
-    return { ok: true, email };
-  } catch (e: any) {
-    return {
-      ok: false,
-      motivo: `A Watch Brasil recusou a ativação: ${e?.message || e}`,
-    };
-  }
 }
 
 /**

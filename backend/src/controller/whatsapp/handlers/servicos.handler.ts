@@ -41,7 +41,6 @@ import {
   textoCobrancaProporcional,
 } from "../../../services/cobrancaProporcional";
 import {
-  ativarAcessoStreaming,
   celularValido,
   emailValido,
   impedimentoPlanoComSva,
@@ -359,8 +358,10 @@ async function salvarSolicitacaoWatchTv(session: any, celularConversa: string) {
     plano: session.plano_watch_tv || "Não informado",
     // Contato do aplicativo: por padrão o mesmo do cadastro, e o atendimento
     // ajusta na tela se o cliente pedir outro.
-    email_watch: session.email || "",
-    celular_watch: session.celularCliente || celularConversa,
+    // Informados pelo cliente no atendimento; o cadastro é só o fallback.
+    email_watch: session.email_watch || session.email || "",
+    celular_watch:
+      session.celular_watch || session.celularCliente || celularConversa,
     // Sem Pix: a assinatura entra na mensalidade. O que se registra é o
     // proporcional aos dias até o próximo vencimento, para o atendimento
     // lançar na fatura — mesma conta que o site faz.
@@ -402,6 +403,24 @@ function aplicarCadastroWatchTv(session: any, cliente: any, cpf: string) {
     login: cliente.login,
     endereco: `${cliente.endereco}, ${cliente.numero}`,
   };
+}
+
+/**
+ * Pergunta o contato de acesso antes de fechar o pedido.
+ *
+ * É com esse e-mail e celular que a conta da Watch TV é criada — só que
+ * depois da assinatura, porque é a criação da conta que dispara o e-mail de
+ * boas-vindas e não faz sentido liberar antes de o contrato existir.
+ */
+async function pedirContatoWatchTv(celular: any, session: any) {
+  session.watchTvStep = "ask_email";
+  await MensagensComuns(
+    celular,
+    `📺 Cadastro selecionado: *${session.login}*
+
+` +
+      `📧 Qual *e-mail* você quer usar para entrar no aplicativo da Watch TV?`,
+  );
 }
 
 /** Fecha o pedido: grava a solicitação e abre o chamado no cadastro. */
@@ -569,6 +588,41 @@ export async function iniciarWatchTv(
     }
 
     aplicarCadastroWatchTv(session, cadastros[0], cpf);
+    await pedirContatoWatchTv(celular, session);
+    return;
+  }
+
+  if (session.watchTvStep === "ask_email") {
+    const email = String(texto || "").trim();
+    if (!emailValido(email)) {
+      await MensagensComuns(
+        celular,
+        "❌ E-mail inválido. Digite no formato *nome@provedor.com*.",
+      );
+      return;
+    }
+    session.email_watch = email;
+    session.watchTvStep = "ask_celular";
+    await MensagensComuns(
+      celular,
+      `📧 Anotado: *${email}*
+
+` +
+        `📱 Agora me diga o *celular com DDD* para o cadastro na Watch TV.`,
+    );
+    return;
+  }
+
+  if (session.watchTvStep === "ask_celular") {
+    const cel = String(texto || "").trim();
+    if (!celularValido(cel)) {
+      await MensagensComuns(
+        celular,
+        "❌ Celular inválido. Digite com DDD, por exemplo *14999998888*.",
+      );
+      return;
+    }
+    session.celular_watch = cel.replace(/\D/g, "");
     await concluirWatchTv(celular, session);
     return;
   }
@@ -611,7 +665,7 @@ export async function iniciarWatchTv(
     }
 
     aplicarCadastroWatchTv(session, cadastro, session.cpf);
-    await concluirWatchTv(celular, session);
+    await pedirContatoWatchTv(celular, session);
     return;
   }
 }
@@ -2793,78 +2847,4 @@ export async function handleChooseTypeRenovacao(
   } else {
     await MensagensComuns(celular, "Aperte nos Botoes de Sim ou Não");
   }
-}
-
-// --- Watch TV: contato de acesso, colhido depois da assinatura ---
-
-/**
- * Pergunta o e-mail e o celular de acesso e cria a conta na Watch Brasil.
- *
- * Só entra aqui quem já assinou o Contrato de SVA — a sessão é aberta pelo
- * webhook do ZapSign. É a criação da conta que dispara o e-mail de
- * boas-vindas, e quem envia é a própria Watch.
- */
-export async function coletarContatoWatchTv(
-  celular: any,
-  texto: any,
-  session: any,
-  _type: any,
-) {
-  const resposta = String(texto || "").trim();
-
-  if (session.watchTvContatoStep === "ask_celular") {
-    if (!celularValido(resposta)) {
-      await MensagensComuns(
-        celular,
-        "❌ Celular inválido. Digite com DDD, por exemplo *14999998888*.",
-      );
-      return;
-    }
-
-    const r = await ativarAcessoStreaming({
-      login: session.watchTvLogin,
-      email: session.watchTvEmail,
-      phone: resposta,
-    });
-
-    if (!r.ok) {
-      // O serviço já está no cadastro: o que falhou foi só o acesso, e o
-      // atendimento consegue refazer pela tela de Serviços de Contrato.
-      console.error("[WatchTV] Falha ao ativar o acesso:", r.motivo);
-      await MensagensComuns(
-        celular,
-        "⚠️ Não consegui liberar o acesso agora. Nossa equipe vai finalizar " +
-          "a ativação e te avisar — sua contratação está registrada.",
-      );
-      deleteSession(celular);
-      return;
-    }
-
-    await MensagensComuns(
-      celular,
-      `🎉 *Watch TV liberada!*\n\n` +
-        `📧 A Watch TV enviou um e-mail para *${session.watchTvEmail}* com as ` +
-        `instruções de acesso e a criação da sua senha.\n\n` +
-        `Se não encontrar, confira a caixa de *spam* ou *promoções*.`,
-    );
-    deleteSession(celular);
-    return;
-  }
-
-  // Etapa inicial: o e-mail.
-  if (!emailValido(resposta)) {
-    await MensagensComuns(
-      celular,
-      "❌ E-mail inválido. Digite no formato *nome@provedor.com*.",
-    );
-    return;
-  }
-
-  session.watchTvEmail = resposta;
-  session.watchTvContatoStep = "ask_celular";
-  await MensagensComuns(
-    celular,
-    `📧 Anotado: *${resposta}*\n\n` +
-      `📱 Agora me diga o *celular com DDD* para o cadastro na Watch TV.`,
-  );
 }

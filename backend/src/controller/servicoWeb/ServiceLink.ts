@@ -40,7 +40,6 @@ import {
   reais,
   textoCobrancaProporcional,
 } from "../../services/cobrancaProporcional";
-import { ativarAcessoStreaming } from "../../services/streamingCadastro";
 
 const MAX_TENTATIVAS_CPF = 5;
 
@@ -1565,69 +1564,6 @@ class ServiceLinkController {
     };
   }
 
-  /**
-   * POST /api/service-links/publico/:token/acesso { email, celular }
-   *
-   * Contato de acesso informado depois da assinatura. É o que cria a conta na
-   * Watch Brasil — e é a Watch que manda o e-mail de boas-vindas.
-   */
-  public acesso = async (req: Request, res: Response) => {
-    try {
-      const ctx = await this.carregar(req, res);
-      if (!ctx) return;
-      const { link } = ctx;
-
-      const solicitacaoId = link.resultado?.solicitacao_id;
-      if (!solicitacaoId) {
-        res.status(400).json({ errors: [{ msg: "Solicitação não encontrada." }] });
-        return;
-      }
-
-      const solicitacaoRepo = AppDataSource.getRepository(SolicitacaoServico);
-      const solicitacao = await solicitacaoRepo.findOne({
-        where: { id: solicitacaoId },
-      });
-      if (!solicitacao?.assinado) {
-        res.status(409).json({
-          errors: [{ msg: "Assine o contrato antes de liberar o acesso." }],
-        });
-        return;
-      }
-
-      const dados = (solicitacao.dados || {}) as any;
-      const r = await ativarAcessoStreaming({
-        login: dados.login || solicitacao.login_cliente,
-        email: String(req.body?.email || ""),
-        phone: String(req.body?.celular || ""),
-      });
-
-      if (!r.ok) {
-        res.status(400).json({ errors: [{ msg: r.motivo || "Não foi possível liberar o acesso." }] });
-        return;
-      }
-
-      solicitacao.dados = {
-        ...dados,
-        email_watch: r.email,
-        celular_watch: String(req.body?.celular || ""),
-        servico_cadastro: {
-          ...(dados.servico_cadastro || {}),
-          status: "adicionado",
-          motivo: undefined,
-          em: new Date().toISOString(),
-        },
-      };
-      await solicitacaoRepo.save(solicitacao);
-
-      res.status(200).json({ ok: true, email: r.email });
-    } catch (error) {
-      console.error("[ServiceLink.acesso]", error);
-      res
-        .status(500)
-        .json({ errors: [{ msg: "Erro ao liberar o acesso." }] });
-    }
-  };
-
   /** GET /api/service-links/publico/:token/status */
   public status = async (req: Request, res: Response) => {
     try {
@@ -1645,19 +1581,22 @@ class ServiceLinkController {
       }
 
       let assinado = false;
-      let acessoPendente = false;
+      let acesso: { status?: string; email?: string } | null = null;
       if (link.resultado?.solicitacao_id) {
         const solicitacaoRepo = AppDataSource.getRepository(SolicitacaoServico);
         const solicitacao = await solicitacaoRepo.findOne({
           where: { id: link.resultado.solicitacao_id },
         });
         assinado = !!solicitacao?.assinado;
-        // Depois de assinar, o serviço que entra na mensalidade ainda precisa
-        // do e-mail e do celular para a conta de acesso ser criada.
-        acessoPendente =
-          assinado &&
-          (solicitacao?.dados as any)?.servico_cadastro?.status ===
-            "aguardando_contato";
+        // Como foi a liberação do acesso depois da assinatura: a página avisa
+        // o cliente que o e-mail da Watch TV saiu.
+        const sc = (solicitacao?.dados as any)?.servico_cadastro;
+        if (assinado && sc) {
+          acesso = {
+            status: sc.status,
+            email: (solicitacao?.dados as any)?.email_watch,
+          };
+        }
         // Espelha o pagamento confirmado na solicitação de serviço.
         if (pagoConfirmado && solicitacao && !solicitacao.pago) {
           solicitacao.pago = true;
@@ -1679,7 +1618,7 @@ class ServiceLinkController {
         status: link.status,
         pago: pagoConfirmado,
         assinado,
-        acesso_pendente: acessoPendente,
+        acesso,
         resultado: link.resultado ?? null,
       });
     } catch (error) {
