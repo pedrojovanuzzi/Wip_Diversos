@@ -143,6 +143,8 @@ const SolicitacaoServicoPublica: React.FC = () => {
     status?: string;
     email?: string;
   } | null>(null);
+  /** Este serviço ainda tem a liberação do acesso depois de assinar. */
+  const [acessoEsperado, setAcessoEsperado] = useState(false);
 
   const [aceites, setAceites] = useState<string[]>([]);
   const [cpf, setCpf] = useState("");
@@ -210,20 +212,25 @@ const SolicitacaoServicoPublica: React.FC = () => {
     return () => clearInterval(timer);
   }, [resultado, base]);
 
-  // Enquanto o contrato não for assinado, confere a assinatura periodicamente.
+  // Confere a assinatura periodicamente e, quando o serviço tem liberação de
+  // acesso, continua até ela sair — assinar e ativar são dois momentos, e
+  // parar no primeiro deixava o cliente sem o aviso do e-mail.
+  const aguardandoAcesso = acessoEsperado && !acesso;
   useEffect(() => {
-    if (!resultado?.zapsign?.url || assinadoConfirmado) return;
+    if (!resultado?.zapsign?.url) return;
+    if (assinadoConfirmado && !aguardandoAcesso) return;
     const timer = setInterval(async () => {
       try {
         const { data } = await axios.get(`${base}/status`);
         if (data.assinado) setAssinadoConfirmado(true);
+        if (data.acesso_esperado) setAcessoEsperado(true);
         if (data.acesso) setAcesso(data.acesso);
       } catch {
         /* mantém o polling silencioso */
       }
     }, 10000);
     return () => clearInterval(timer);
-  }, [resultado, assinadoConfirmado, base]);
+  }, [resultado, assinadoConfirmado, aguardandoAcesso, base]);
 
   const chamar = async (caminho: string, corpo: any) => {
     setErro(null);
@@ -781,6 +788,13 @@ const SolicitacaoServicoPublica: React.FC = () => {
                         {/* A conta na Watch TV é criada assim que o
                             contrato é assinado, com o e-mail informado no
                             formulário — e é a Watch que envia o e-mail. */}
+                        {assinadoConfirmado && aguardandoAcesso && (
+                          <Alert severity="info" sx={{ mt: 2 }}>
+                            Liberando o seu acesso à Watch TV… pode deixar
+                            esta página aberta.
+                          </Alert>
+                        )}
+
                         {acesso?.status === "adicionado" && (
                           <Alert severity="success" sx={{ mt: 2 }}>
                             Watch TV ativada! As instruções de acesso foram

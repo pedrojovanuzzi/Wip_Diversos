@@ -40,6 +40,7 @@ import {
   reais,
   textoCobrancaProporcional,
 } from "../../services/cobrancaProporcional";
+import { planoTemSva } from "../../config/planosComSva";
 
 const MAX_TENTATIVAS_CPF = 5;
 
@@ -1569,7 +1570,7 @@ class ServiceLinkController {
     try {
       const ctx = await this.carregar(req, res);
       if (!ctx) return;
-      const { link } = ctx;
+      const { link, servico } = ctx;
 
       const idFatura = link.resultado?.pix?.id_fatura;
       let pagoConfirmado = false;
@@ -1582,6 +1583,9 @@ class ServiceLinkController {
 
       let assinado = false;
       let acesso: { status?: string; email?: string } | null = null;
+      // A página precisa saber que ainda vem um passo depois da assinatura,
+      // senão ela para de perguntar antes de o acesso ficar pronto.
+      let acessoEsperado = false;
       if (link.resultado?.solicitacao_id) {
         const solicitacaoRepo = AppDataSource.getRepository(SolicitacaoServico);
         const solicitacao = await solicitacaoRepo.findOne({
@@ -1590,6 +1594,11 @@ class ServiceLinkController {
         assinado = !!solicitacao?.assinado;
         // Como foi a liberação do acesso depois da assinatura: a página avisa
         // o cliente que o e-mail da Watch TV saiu.
+        const plano =
+          (solicitacao?.dados as any)?.plano_escolhido ||
+          (solicitacao?.dados as any)?.plano;
+        acessoEsperado = servico.id === "watch_tv" || planoTemSva(plano);
+
         const sc = (solicitacao?.dados as any)?.servico_cadastro;
         if (assinado && sc) {
           acesso = {
@@ -1621,6 +1630,7 @@ class ServiceLinkController {
         pago: pagoConfirmado,
         assinado,
         acesso,
+        acesso_esperado: acessoEsperado,
         resultado: link.resultado ?? null,
       });
     } catch (error) {
