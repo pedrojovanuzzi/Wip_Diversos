@@ -636,13 +636,40 @@ class ServiceLinkController {
       link.tentativas = 0;
       link.dados = { ...(link.dados || {}), cpf };
 
+      // Serviço que o cadastro já tem não entra na lista: melhor avisar aqui
+      // do que deixar o cliente assinar para o pedido ser recusado depois.
+      const impedidos: string[] = [];
+      const elegiveis: typeof cadastros = [];
+      for (const c of cadastros) {
+        const motivo = servico.impedimento
+          ? await servico.impedimento(c)
+          : null;
+        if (motivo) impedidos.push(motivo);
+        else elegiveis.push(c);
+      }
+
+      if (elegiveis.length === 0) {
+        await this.repo().save(link);
+        res.status(409).json({
+          errors: [
+            {
+              msg:
+                cadastros.length > 1
+                  ? `Todos os seus cadastros já têm este serviço. ${impedidos[0]}`
+                  : impedidos[0],
+            },
+          ],
+        });
+        return;
+      }
+
       // Cadastro único: já segue direto para a escolha da forma de pagamento.
-      if (cadastros.length === 1) {
-        link.dados = { ...link.dados, cliente: cadastros[0], cadastros: null };
+      if (elegiveis.length === 1) {
+        link.dados = { ...link.dados, cliente: elegiveis[0], cadastros: null };
         await this.repo().save(link);
         res.status(200).json({
           etapa: "termos",
-          cliente: resumoCliente(cadastros[0]),
+          cliente: resumoCliente(elegiveis[0]),
           termos: termosDoServico(servico),
         });
         return;
@@ -650,12 +677,12 @@ class ServiceLinkController {
 
       link.dados = {
         ...link.dados,
-        cadastros: cadastros.map(resumoCliente),
+        cadastros: elegiveis.map(resumoCliente),
       };
       await this.repo().save(link);
       res.status(200).json({
         etapa: "selecionar",
-        cadastros: cadastros.map(resumoCliente),
+        cadastros: elegiveis.map(resumoCliente),
       });
     } catch (error) {
       console.error("[ServiceLink.identificar]", error);
@@ -688,6 +715,16 @@ class ServiceLinkController {
       });
       if (!cliente) {
         res.status(404).json({ errors: [{ msg: "Cadastro não encontrado." }] });
+        return;
+      }
+
+      // Confere de novo: a lista pode ter sido montada antes de o serviço
+      // entrar no cadastro, ou o cliente pode reabrir um link antigo.
+      const motivo = servico.impedimento
+        ? await servico.impedimento(cliente)
+        : null;
+      if (motivo) {
+        res.status(409).json({ errors: [{ msg: motivo }] });
         return;
       }
 

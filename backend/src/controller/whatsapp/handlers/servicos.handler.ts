@@ -40,6 +40,7 @@ import {
   reais,
   textoCobrancaProporcional,
 } from "../../../services/cobrancaProporcional";
+import { impedimentoWatchTv } from "../../../services/streamingCadastro";
 
 const FLOW_TROCA_TITULARIDADE_CONTATO =
   process.env.WA_FLOW_TROCA_TITULARIDADE_CONTATO ||
@@ -487,6 +488,35 @@ export async function iniciarWatchTv(
       return;
     }
 
+    // Quem já tem a Watch TV não segue: o serviço é único por cadastro, e
+    // deixar passar geraria um pedido que o atendimento teria de recusar.
+    const elegiveis: typeof cadastros = [];
+    let motivoImpedimento = "";
+    for (const c of cadastros) {
+      const motivo = await impedimentoWatchTv(c.login);
+      if (motivo) motivoImpedimento = motivo;
+      else elegiveis.push(c);
+    }
+
+    if (elegiveis.length === 0) {
+      await MensagensComuns(
+        celular,
+        `📺 *${cadastros.length > 1 ? "Todos os seus cadastros já têm a Watch TV" : "Você já tem a Watch TV"}*
+
+` +
+          `${motivoImpedimento}
+
+` +
+          `Digite *início* para voltar ao menu.`,
+      );
+      deleteSession(celular);
+      return;
+    }
+
+    // Daqui para baixo só entram os cadastros que ainda podem contratar.
+    cadastros.length = 0;
+    cadastros.push(...elegiveis);
+
     if (cadastros.length > 1) {
       let indice = 1;
       session.structuredDataWatchTv = cadastros.map((c) => ({
@@ -550,6 +580,15 @@ export async function iniciarWatchTv(
         celular,
         "❌ Não identifiquei esse cadastro. Toque em *Ver opções* na mensagem acima e escolha um da lista, ou digite *início* para cancelar.",
       );
+      return;
+    }
+
+    // Última conferência antes de gravar: a lista pode ter sido montada antes
+    // de o serviço entrar no cadastro.
+    const motivo = await impedimentoWatchTv(cadastro.login);
+    if (motivo) {
+      await MensagensComuns(celular, `📺 ${motivo}`);
+      deleteSession(celular);
       return;
     }
 

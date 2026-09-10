@@ -5,6 +5,7 @@ import {
   reais,
   textoCobrancaProporcional,
 } from "../../services/cobrancaProporcional";
+import { impedimentoWatchTv } from "../../services/streamingCadastro";
 import ApiMkDataSource from "../../database/API_MK";
 import ZapSignTemplates from "../../entities/APIMK/ZapSignTemplates";
 import {
@@ -113,6 +114,12 @@ export type ServicoWeb = {
   /** Chave usada por gerarLancamentoServico ao lançar a cobrança no MKAUTH. */
   tipoLancamento?: "mudanca_comodo" | "mudanca_endereco";
   campos: CampoServico[];
+  /**
+   * Motivo para não deixar este cadastro contratar, ou `null` para seguir.
+   * Verificado assim que o cliente é identificado, antes dos termos — não
+   * adianta descobrir depois da assinatura que o serviço já existe.
+   */
+  impedimento?: (cliente: any) => Promise<string | null>;
   /** Cria o contrato no ZapSign. Recebe o payload achatado do serviço. */
   criarContrato?: (params: Record<string, any>) => Promise<any>;
   /**
@@ -373,6 +380,8 @@ export const CATALOGO: ServicoWeb[] = [
       },
       CAMPO_OBSERVACAO,
     ],
+    // Watch TV é única por cadastro: quem já tem não passa da identificação.
+    impedimento: (cliente) => impedimentoWatchTv(cliente?.login),
     criarContrato: (params) => ZapSign.createContratoSva(params),
   },
   {

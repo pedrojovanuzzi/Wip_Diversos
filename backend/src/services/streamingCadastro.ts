@@ -39,6 +39,25 @@ export async function clienteJaTemStreaming(login: string): Promise<boolean> {
 }
 
 /**
+ * Motivo para barrar a contratação da Watch TV, ou `null` quando pode seguir.
+ *
+ * Bot e site consultam isto antes de deixar o cliente contratar: o serviço é
+ * único por cadastro, e deixar passar só geraria uma solicitação que o
+ * atendimento teria de recusar depois — com o cliente já tendo assinado.
+ */
+export async function impedimentoWatchTv(
+  login?: string | null,
+): Promise<string | null> {
+  const l = String(login || "").trim();
+  if (!l) return null;
+  if (!(await clienteJaTemStreaming(l))) return null;
+  return (
+    "Este cadastro já tem a Watch TV ativa. Se estiver com dificuldade para " +
+    "acessar, fale com o nosso atendimento."
+  );
+}
+
+/**
  * Cria (ou atualiza) o assinante na Watch Brasil e guarda o ticket.
  *
  * Lança se a Watch Brasil recusar: sem assinante lá, o serviço no cadastro
