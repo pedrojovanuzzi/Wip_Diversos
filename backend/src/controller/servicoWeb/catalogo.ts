@@ -5,7 +5,10 @@ import {
   reais,
   textoCobrancaProporcional,
 } from "../../services/cobrancaProporcional";
-import { impedimentoWatchTv } from "../../services/streamingCadastro";
+import {
+  impedimentoPlanoComSva,
+  impedimentoWatchTv,
+} from "../../services/streamingCadastro";
 import ApiMkDataSource from "../../database/API_MK";
 import ZapSignTemplates from "../../entities/APIMK/ZapSignTemplates";
 import {
@@ -120,6 +123,15 @@ export type ServicoWeb = {
    * adianta descobrir depois da assinatura que o serviço já existe.
    */
   impedimento?: (cliente: any) => Promise<string | null>;
+  /**
+   * Motivo para recusar o formulário preenchido, ou `null` para seguir. Vale
+   * para o que só dá para conferir depois da escolha do cliente — o plano,
+   * por exemplo.
+   */
+  validarFormulario?: (
+    formulario: Record<string, any>,
+    cliente: any,
+  ) => Promise<string | null>;
   /** Cria o contrato no ZapSign. Recebe o payload achatado do serviço. */
   criarContrato?: (params: Record<string, any>) => Promise<any>;
   /**
@@ -305,6 +317,10 @@ export const CATALOGO: ServicoWeb[] = [
       },
       CAMPO_OBSERVACAO,
     ],
+    // O combo já inclui a Watch TV: quem tem o streaming avulso não migra
+    // sozinho, senão pagaria duas vezes pelo mesmo serviço.
+    validarFormulario: (formulario, cliente) =>
+      impedimentoPlanoComSva(cliente?.login, formulario.plano_escolhido),
     criarContrato: (params) => ZapSign.createContractAlteracaoPlano(params),
   },
   {

@@ -58,6 +58,29 @@ export async function impedimentoWatchTv(
 }
 
 /**
+ * Motivo para não deixar o cliente entrar num plano com SVA, ou `null`.
+ *
+ * O combo já traz a Watch TV embutida no preço do acesso. Quem tem o streaming
+ * contratado à parte pagaria duas vezes pela mesma coisa — e o serviço é único
+ * por cadastro, então a linha de R$ 0,00 do plano nem entraria.
+ */
+export async function impedimentoPlanoComSva(
+  login?: string | null,
+  plano?: string | null,
+): Promise<string | null> {
+  if (!planoTemSva(plano)) return null;
+  const l = String(login || "").trim();
+  if (!l) return null;
+  if (!(await clienteJaTemStreaming(l))) return null;
+  return (
+    `O plano ${String(plano).trim()} já inclui a Watch TV, e este cadastro ` +
+    "já tem a Watch TV contratada à parte. Para migrar sem pagar duas vezes, " +
+    "fale com o nosso atendimento: a assinatura avulsa é removida antes da " +
+    "troca de plano."
+  );
+}
+
+/**
  * Cria (ou atualiza) o assinante na Watch Brasil e guarda o ticket.
  *
  * Lança se a Watch Brasil recusar: sem assinante lá, o serviço no cadastro

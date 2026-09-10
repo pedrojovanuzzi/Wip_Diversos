@@ -40,7 +40,10 @@ import {
   reais,
   textoCobrancaProporcional,
 } from "../../../services/cobrancaProporcional";
-import { impedimentoWatchTv } from "../../../services/streamingCadastro";
+import {
+  impedimentoPlanoComSva,
+  impedimentoWatchTv,
+} from "../../../services/streamingCadastro";
 
 const FLOW_TROCA_TITULARIDADE_CONTATO =
   process.env.WA_FLOW_TROCA_TITULARIDADE_CONTATO ||
@@ -2114,6 +2117,21 @@ export async function handleAwaitingTrocaPlanoFlow(
       await MensagensComuns(
         celular,
         "📋 Por favor, escolha um plano no formulário enviado acima para continuar.",
+      );
+      return;
+    }
+
+    // O combo já inclui a Watch TV: quem tem o streaming avulso pagaria duas
+    // vezes. Devolve o formulário para escolher outro plano, em vez de
+    // encerrar o atendimento.
+    const recusa = await impedimentoPlanoComSva(session.login, planoEscolhido);
+    if (recusa) {
+      await MensagensComuns(celular, `📶 ${recusa}`);
+      await MensagemFlowTrocaPlano(
+        celular,
+        "alteracao_plano",
+        "Escolher Plano",
+        await getPlanosDoSistema(),
       );
       return;
     }
