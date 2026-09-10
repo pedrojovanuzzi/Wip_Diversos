@@ -273,6 +273,11 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
     },
     // --- Termo de Adesão SVA: serviços contratados ---
     { de: "{{qtdstreaming}}", para: sva.streaming ? String(sva.streaming) : "" },
+    // A linha do streaming é fixa no documento. Estas duas variáveis existem
+    // para quem preferir que o rótulo venha daqui, em vez de digitado no
+    // .docx — o nome comercial do serviço é "Watch TV".
+    { de: "{{tipostreaming}}", para: "SVA" },
+    { de: "{{servicostreaming}}", para: "Watch TV" },
     ...linhasSva,
     // --- SVA: mensalidade e o proporcional do primeiro mês ---
     { de: "{{valorsva}}", para: s("valor_sva", "valor") },
