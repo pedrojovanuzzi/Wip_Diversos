@@ -130,6 +130,15 @@ const SolicitacoesServico = () => {
     cobranca?: string;
   } | null>(null);
   const [linkCopiado, setLinkCopiado] = useState<string | null>(null);
+  /**
+   * Quem ainda precisa mandar o link ao cliente. "bot" é o único caso em que
+   * o cliente já recebeu; nos outros o envio é com o atendente.
+   */
+  const [linksOrigem, setLinksOrigem] = useState<"web" | "bot" | "manual">(
+    "web",
+  );
+  /** Resultado da ação que gerou os links, mostrado dentro do diálogo. */
+  const [linksMensagem, setLinksMensagem] = useState<string | null>(null);
   const { user } = useAuth();
 
   const fetchServices = useCallback(
@@ -218,14 +227,20 @@ const SolicitacoesServico = () => {
   /** Abre o quadro de links quando a solicitação veio do site. */
   const tratarResposta = (data: any, mensagemPadrao: string) => {
     const temLink = data?.links?.pix || data?.links?.assinatura;
-    if (data?.origemWeb && temLink) {
+    // Vale para os dois canais: no site ninguem enviou nada ao cliente, e no
+    // bot o link ja foi pelo WhatsApp mas o atendente pode precisar reenviar.
+    if (temLink) {
+      setLinksOrigem(
+        data?.envio_manual ? "manual" : data?.origemWeb ? "web" : "bot",
+      );
+      setLinksMensagem(data?.message || mensagemPadrao);
       setLinksWeb(data.links);
       return;
     }
     alert(data?.message || mensagemPadrao);
   };
 
-  /** Abre os links guardados da solicitação (origem web). */
+  /** Abre os links guardados da solicitação, de qualquer origem. */
   const abrirLinksSalvos = async (service: any) => {
     setLoadingAction(service.id);
     try {
@@ -236,10 +251,21 @@ const SolicitacoesServico = () => {
       const temLink = data?.links?.pix || data?.links?.assinatura;
       if (!temLink) {
         alert(
-          "Nenhum link foi gerado ainda para esta solicitação. Faça a consulta de CPF ou gere o contrato manualmente.",
+          "Nenhum link foi gerado ainda para esta solicitação. Use \"Enviar assinatura\" no menu (…) para gerar o contrato.",
         );
         return;
       }
+      // Os links guardados não dizem se o bot chegou a enviar; a Watch TV
+      // nunca envia sozinha, e é a única que precisa do aviso reforçado.
+      const svc = (service.servico || "").toLowerCase();
+      setLinksOrigem(
+        svc.includes("watch tv") || svc.includes("sva")
+          ? "manual"
+          : service.origem === "web"
+            ? "web"
+            : "bot",
+      );
+      setLinksMensagem(null);
       setLinksWeb(data.links);
     } catch (e: any) {
       alert(e?.response?.data?.message || "Erro ao buscar os links.");
@@ -1123,7 +1149,9 @@ const SolicitacoesServico = () => {
                           Info
                         </Button>
                       </Tooltip>
-                      {service.origem === "web" && (
+                      {/* Vale para os dois canais: no bot o link foi pelo
+                          WhatsApp, mas o atendente pode precisar reenviar. */}
+                      {!service.cancelado && (
                         <Tooltip title="Mostrar os links de contrato e Pix para enviar ao cliente" arrow>
                           <span>
                             <Button
@@ -1512,15 +1540,29 @@ const SolicitacoesServico = () => {
 
         <Dialog
           open={!!linksWeb}
-          onClose={() => setLinksWeb(null)}
+          onClose={() => {
+            setLinksWeb(null);
+            setLinksMensagem(null);
+          }}
           fullWidth
           maxWidth="sm"
         >
           <DialogTitle>Links para enviar ao cliente</DialogTitle>
           <DialogContent dividers>
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Esta solicitação veio do site, então o bot não enviou nada pelo
-              WhatsApp. Copie os links abaixo e encaminhe ao cliente.
+            {linksMensagem && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                {linksMensagem}
+              </Alert>
+            )}
+            <Alert
+              severity={linksOrigem === "manual" ? "warning" : "info"}
+              sx={{ mb: 2 }}
+            >
+              {linksOrigem === "manual"
+                ? "O cliente NÃO recebeu nada: este termo não é enviado automaticamente. Confira o pedido e mande o link você mesmo."
+                : linksOrigem === "web"
+                  ? "Esta solicitação veio do site, então o bot não enviou nada pelo WhatsApp. Copie os links abaixo e encaminhe ao cliente."
+                  : "O link já foi enviado ao cliente pelo WhatsApp. Se precisar reenviar por outro canal, copie abaixo."}
             </Alert>
 
             {linksWeb?.pix && (
@@ -1593,7 +1635,14 @@ const SolicitacoesServico = () => {
             )}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setLinksWeb(null)}>Fechar</Button>
+            <Button
+              onClick={() => {
+                setLinksWeb(null);
+                setLinksMensagem(null);
+              }}
+            >
+              Fechar
+            </Button>
           </DialogActions>
         </Dialog>
 

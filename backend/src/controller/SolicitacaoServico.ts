@@ -31,6 +31,15 @@ function veioDaWeb(solicitacao: SolicitacaoServico): boolean {
   return (solicitacao.dados as any)?.origem === "web";
 }
 
+/**
+ * Serviços cujo link de assinatura nunca sai sozinho pelo WhatsApp.
+ *
+ * O termo do SVA autoriza uma cobrança na mensalidade do cliente, então quem
+ * decide enviar é o atendimento, depois de conferir o pedido — o bot mandar
+ * direto abriria espaço para pedido feito em nome de terceiro.
+ */
+const ENVIO_DE_LINK_MANUAL = ["watch tv", "sva"];
+
 class SolicitacaoServicoController {
   private isConsultaCpfConcluida(solicitacao: SolicitacaoServico): boolean {
     return Boolean(
@@ -1221,16 +1230,25 @@ class SolicitacaoServicoController {
       // Envia o link de assinatura ao cliente via WhatsApp
       // Solicitação do site não tem conversa no WhatsApp: o link volta na resposta.
       const origemWebAssinatura = veioDaWeb(solicitacao);
+      // A Watch TV não sai sozinha pelo bot: o termo autoriza uma cobrança na
+      // mensalidade, então quem manda o link é o atendimento, depois de
+      // conferir o pedido.
+      const envioManual = ENVIO_DE_LINK_MANUAL.some((s) =>
+        servicoNorm.includes(s),
+      );
+      const enviarPeloBot = !origemWebAssinatura && !envioManual;
       const msgAssinatura = urlDocumentoExtra
         ? `📄 *Aqui estão os seus links de assinatura:*\n\n` +
           `1) Contrato: ${zapSignUrl}\n` +
           `2) ${nomeDocumentoExtra || "Documento adicional"}: ${urlDocumentoExtra}\n\n` +
           `Por favor, *assine os dois* para formalizarmos sua contratação! 🚀`
         : `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos sua contratação! 🚀`;
-      if (!origemWebAssinatura) await MensagensComuns(celular, msgAssinatura);
+      if (enviarPeloBot) await MensagensComuns(celular, msgAssinatura);
 
-      // Salva a mensagem no histórico de conversas
+      // Salva a mensagem no histórico de conversas — só do que saiu de fato,
+      // senão o atendente veria no chat um link que o cliente não recebeu.
       try {
+        if (!enviarPeloBot) throw new Error("SEM_ENVIO");
         const people = await ApiMkDataSource.getRepository(PeopleConversations)
           .createQueryBuilder("p")
           .where("REPLACE(p.telefone, '+', '') = :cel OR p.telefone = :celPlus", {
@@ -1257,23 +1275,33 @@ class SolicitacaoServicoController {
             console.log(`[EnviarAssinatura] Mensagem salva no histórico (conv_id: ${convUser.conv_id})`);
           }
         }
-      } catch (errMsg) {
-        console.error("[EnviarAssinatura] Erro ao salvar mensagem no histórico:", errMsg);
+      } catch (errMsg: any) {
+        if (errMsg?.message !== "SEM_ENVIO") {
+          console.error("[EnviarAssinatura] Erro ao salvar mensagem no histórico:", errMsg);
+        }
       }
 
       if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
 
       const partes: string[] = [];
-      partes.push(contratoJaExistia ? "Link de assinatura reenviado" : "Contrato gerado e enviado");
+      partes.push(
+        contratoJaExistia
+          ? "Link de assinatura recuperado"
+          : enviarPeloBot
+            ? "Contrato gerado e enviado"
+            : "Contrato gerado",
+      );
       if (loginCriado) partes.push(`cadastro criado (login: ${loginCriado})`);
 
       res.status(200).json({
         success: true,
-        message: origemWebAssinatura
-          ? `${partes.join(" e ")}. Envie o link ao cliente.`
-          : `${partes.join(" e ")} com sucesso.`,
+        message: enviarPeloBot
+          ? `${partes.join(" e ")} com sucesso.`
+          : `${partes.join(" e ")}. Envie o link ao cliente.`,
         login_cliente: solicitacao.login_cliente,
         origemWeb: origemWebAssinatura,
+        // A tela avisa que o cliente ainda não recebeu nada.
+        envio_manual: !enviarPeloBot,
         links: {
           assinatura: zapSignUrl,
           ...(urlDocumentoExtra
