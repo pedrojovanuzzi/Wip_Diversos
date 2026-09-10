@@ -574,9 +574,23 @@ export function formasPagamento(
   // Serviço que entra na mensalidade: não há o que escolher, só confirmar. O
   // que aparece é quanto entra na próxima fatura pelos dias de uso.
   if (servico.cobrancaNaFatura) {
+    // Sem cadastro identificado não há vencimento, e um proporcional chutado
+    // seria um valor errado na tela. Aqui só se promete o que é certo.
+    if (!Number(cliente?.venc)) {
+      return [
+        {
+          id: "proxima_fatura",
+          titulo: "Cobrado na sua fatura",
+          descricao:
+            `R$ ${reais(servico.valor)} por mês, e no primeiro mês só os ` +
+            "dias de uso até o seu vencimento.",
+          valor: servico.valor,
+        },
+      ];
+    }
     const proporcional = cobrancaProporcional(
       servico.valor,
-      Number(cliente?.venc) || 1,
+      Number(cliente?.venc),
     );
     return [
       {
