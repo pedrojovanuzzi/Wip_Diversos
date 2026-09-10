@@ -439,6 +439,34 @@ async function concluirWatchTv(celular: any, session: any) {
  * Watch TV: pede o CPF, mostra os cadastros para o cliente escolher em qual
  * quer o serviço e envia o pedido para a tela de solicitações.
  */
+/**
+ * Manda a lista de cadastros do cliente.
+ *
+ * Todos aparecem, inclusive os que já têm o serviço — esconder um endereço
+ * faria o cliente procurar o que sumiu. Quem já tem vai marcado na descrição
+ * e, se for tocado, a lista volta.
+ */
+async function enviarListaWatchTv(celular: any, session: any, titulo: string) {
+  // A lista de 10 é o teto do WhatsApp; acima disso a mensagem é recusada.
+  const linhas = (session.structuredDataWatchTv || [])
+    .slice(0, 10)
+    .map((c: any) => ({
+      id: `watchtv_${c.index}`,
+      title: c.titulo,
+      // O aviso vai na própria linha: o cliente vê antes de tocar.
+      description: (
+        c.jaTem
+          ? `JÁ TEM A WATCH TV — ${c.endereco || ""}, ${c.numero || ""}`
+          : `${c.endereco || ""}, ${c.numero || ""} - ${c.bairro || ""}`
+      ).slice(0, 72),
+    }));
+
+  await MensagemLista(celular, titulo, {
+    sections: [{ title: "Seus cadastros", rows: linhas }],
+  });
+  await MensagensComuns(celular, "👉🏻 Caso queira cancelar digite *início*");
+}
+
 export async function iniciarWatchTv(
   celular: any,
   texto: any,
@@ -488,15 +516,13 @@ export async function iniciarWatchTv(
       return;
     }
 
-    // Quem já tem a Watch TV não segue: o serviço é único por cadastro, e
-    // deixar passar geraria um pedido que o atendimento teria de recusar.
-    const elegiveis: typeof cadastros = [];
-    let motivoImpedimento = "";
+    // A Watch TV é única por cadastro. Os que já têm continuam na lista, mas
+    // marcados: esconder um endereço faria o cliente achar que sumiu.
+    const jaTem = new Map<string, boolean>();
     for (const c of cadastros) {
-      const motivo = await impedimentoWatchTv(c.login);
-      if (motivo) motivoImpedimento = motivo;
-      else elegiveis.push(c);
+      jaTem.set(String(c.login), !!(await impedimentoWatchTv(c.login)));
     }
+    const elegiveis = cadastros.filter((c) => !jaTem.get(String(c.login)));
 
     if (elegiveis.length === 0) {
       await MensagensComuns(
@@ -504,7 +530,7 @@ export async function iniciarWatchTv(
         `📺 *${cadastros.length > 1 ? "Todos os seus cadastros já têm a Watch TV" : "Você já tem a Watch TV"}*
 
 ` +
-          `${motivoImpedimento}
+          `Se estiver com dificuldade para acessar, fale com o nosso atendimento.
 
 ` +
           `Digite *início* para voltar ao menu.`,
@@ -513,10 +539,6 @@ export async function iniciarWatchTv(
       return;
     }
 
-    // Daqui para baixo só entram os cadastros que ainda podem contratar.
-    cadastros.length = 0;
-    cadastros.push(...elegiveis);
-
     if (cadastros.length > 1) {
       let indice = 1;
       session.structuredDataWatchTv = cadastros.map((c) => ({
@@ -524,6 +546,7 @@ export async function iniciarWatchTv(
         // O título é o que volta do WhatsApp quando o cliente toca na opção,
         // e o limite dele é 24 caracteres — por isso é o identificador.
         titulo: String(c.login || "").slice(0, 24),
+        jaTem: !!jaTem.get(String(c.login)),
         nome: c.nome, endereco: c.endereco, login: c.login, numero: c.numero,
         bairro: c.bairro, cidade: c.cidade, estado: c.estado, cep: c.cep,
         venc: c.venc, termo: c.termo, plano: c.plano, email: c.email,
@@ -531,23 +554,10 @@ export async function iniciarWatchTv(
       }));
       session.watchTvStep = "select_address";
 
-      // A lista de 10 é o teto do WhatsApp; acima disso a mensagem é recusada.
-      const linhas = session.structuredDataWatchTv
-        .slice(0, 10)
-        .map((c: any) => ({
-          id: `watchtv_${c.index}`,
-          title: c.titulo,
-          description: `${c.endereco || ""}, ${c.numero || ""} - ${c.bairro || ""}`,
-        }));
-
-      await MensagemLista(
+      await enviarListaWatchTv(
         celular,
+        session,
         "🔍 Encontramos mais de um cadastro. Toque abaixo e escolha em qual deseja a *Watch TV*.",
-        { sections: [{ title: "Seus cadastros", rows: linhas }] },
-      );
-      await MensagensComuns(
-        celular,
-        "👉🏻 Caso queira cancelar digite *início*",
       );
       return;
     }
@@ -583,12 +593,14 @@ export async function iniciarWatchTv(
       return;
     }
 
-    // Última conferência antes de gravar: a lista pode ter sido montada antes
-    // de o serviço entrar no cadastro.
-    const motivo = await impedimentoWatchTv(cadastro.login);
-    if (motivo) {
-      await MensagensComuns(celular, `📺 ${motivo}`);
-      deleteSession(celular);
+    // Escolheu um cadastro que já tem: avisa e devolve a lista, em vez de
+    // encerrar o atendimento — o outro endereço ainda pode ser contratado.
+    if (await impedimentoWatchTv(cadastro.login)) {
+      await enviarListaWatchTv(
+        celular,
+        session,
+        `📺 O cadastro *${cadastro.login}* já tem a Watch TV. Escolha outro abaixo.`,
+      );
       return;
     }
 
