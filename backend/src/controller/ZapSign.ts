@@ -329,6 +329,41 @@ async function avisarAcessoLiberado(
   );
 }
 
+/**
+ * Avisa que a Watch TV do plano foi criada.
+ *
+ * Nos fluxos de plano (instalação, troca de plano, titularidade) ninguém
+ * pergunta um e-mail de acesso: vale o do cadastro, e é para lá que a Watch
+ * escreve.
+ */
+async function avisarWatchTvDoPlano(
+  solicitacao: SolicitacaoServico,
+  email?: string,
+) {
+  const dados = (solicitacao.dados || {}) as any;
+  const bruto = String(
+    dados.telefone_conversa || dados.telefone || dados.celular || "",
+  ).replace(/\D/g, "");
+  if (!bruto) return;
+  const celular = bruto.startsWith("55") ? bruto : `55${bruto}`;
+
+  await Whatsapp.MensagensComuns(
+    celular,
+    `📺 *Watch TV incluída no seu plano!*
+
+` +
+      `Já deixamos a sua conta criada — não precisa fazer nada.
+
+` +
+      (email
+        ? `📧 As instruções de acesso chegam no e-mail cadastrado: *${email}*.`
+        : `📧 As instruções de acesso chegam no e-mail cadastrado.`) +
+      `
+
+Se não encontrar, confira a caixa de *spam* ou *promoções*.`,
+  );
+}
+
 // Todas as funções createContract* aceitam Record<string, any> e usam
 // buildUniversalZapSignData() para resolver as variáveis do documento.
 
@@ -957,23 +992,7 @@ class ZapSign {
                   }
                   // Instalou no plano combo: a Watch TV vem junto, por R$ 0,00.
                   try {
-                    const rInst = await contratarStreamingDoPlano({
-                      login: loginCriado,
-                      plano: dados.plano,
-                      email: dados.email,
-                      phone: dados.celular || dados.telefone,
-                    });
-                    if (rInst.status !== "nao_aplica") {
-                      console.log(
-                        `[ZapSign Webhook] Watch TV do plano de ${loginCriado}: ${rInst.status}` +
-                          (rInst.motivo ? ` — ${rInst.motivo}` : ""),
-                      );
-                      solicitacao.dados = {
-                        ...solicitacao.dados,
-                        servico_cadastro: { ...rInst, em: new Date().toISOString() },
-                      };
-                      await repo.save(solicitacao);
-                    }
+                    await this.ativarWatchTvDoPlano(solicitacao, loginCriado, dados);
                   } catch (eSva) {
                     console.error("[ZapSign Webhook] Erro ao ativar a Watch TV do plano:", eSva);
                   }
@@ -1013,23 +1032,7 @@ class ZapSign {
                     );
                     // Plano combo traz a Watch TV embutida: cria o acesso na
                     // Watch Brasil e registra o serviço por R$ 0,00.
-                    const rPlano = await contratarStreamingDoPlano({
-                      login: loginPlano,
-                      plano: dados.plano,
-                      email: dados.email,
-                      phone: dados.celular || dados.telefone,
-                    });
-                    if (rPlano.status !== "nao_aplica") {
-                      console.log(
-                        `[ZapSign Webhook] Watch TV do plano de ${loginPlano}: ${rPlano.status}` +
-                          (rPlano.motivo ? ` — ${rPlano.motivo}` : ""),
-                      );
-                      solicitacao.dados = {
-                        ...solicitacao.dados,
-                        servico_cadastro: { ...rPlano, em: new Date().toISOString() },
-                      };
-                      await repo.save(solicitacao);
-                    }
+                    await this.ativarWatchTvDoPlano(solicitacao, loginPlano, dados);
                   } else {
                     console.warn(
                       `[ZapSign Webhook] Login não identificado para atualização de plano: ${solicitacao.id}`,
@@ -1111,6 +1114,44 @@ class ZapSign {
       res.status(500).send("Internal Server Error");
     }
   }
+
+  /**
+   * Plano com SVA acabou de entrar num cadastro: cria a conta na Watch Brasil,
+   * registra o resultado na solicitação e avisa o cliente.
+   *
+   * Vale para instalação, troca de plano e titularidade — em todos, o plano é
+   * gravado no cadastro e o streaming vem junto, por R$ 0,00.
+   */
+  private ativarWatchTvDoPlano = async (
+    solicitacao: SolicitacaoServico,
+    login: string,
+    dados: any,
+  ) => {
+    const r = await contratarStreamingDoPlano({
+      login,
+      plano: dados?.plano,
+      email: dados?.email,
+      phone: dados?.celular || dados?.telefone,
+    });
+    if (r.status === "nao_aplica") return r;
+
+    console.log(
+      `[ZapSign Webhook] Watch TV do plano de ${login}: ${r.status}` +
+        (r.motivo ? ` — ${r.motivo}` : ""),
+    );
+
+    const repo = AppDataSource.getRepository(SolicitacaoServico);
+    solicitacao.dados = {
+      ...(solicitacao.dados || {}),
+      servico_cadastro: { ...r, em: new Date().toISOString() },
+    };
+    await repo.save(solicitacao);
+
+    if (r.status === "adicionado" && !veioDaWeb(solicitacao)) {
+      await avisarWatchTvDoPlano(solicitacao, r.email || dados?.email);
+    }
+    return r;
+  };
 
   // === Métodos Auxiliares para Alteração de Titularidade ===
 
@@ -1249,6 +1290,18 @@ class ZapSign {
           solicitacaoNovoTitular,
         );
         console.log(`[AlteraçãoTitularidade] Chamado de instalação criado para novo titular ${dadosNovoTitular?.nome}.`);
+
+        // O cadastro do novo titular nasce com o plano escolhido: se for o
+        // combo, a Watch TV entra junto e ele é avisado.
+        try {
+          await this.ativarWatchTvDoPlano(
+            solicitacaoNovoTitular,
+            loginNovoTitular,
+            dadosNovoTitular,
+          );
+        } catch (eSva) {
+          console.error("[AlteraçãoTitularidade] Erro ao ativar a Watch TV do plano:", eSva);
+        }
       } catch (e) {
         console.error("[AlteraçãoTitularidade] Erro ao cadastrar novo titular ou criar chamado:", e);
       }

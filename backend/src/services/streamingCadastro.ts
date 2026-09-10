@@ -180,6 +180,8 @@ export type ResultadoContratacao = {
   motivo?: string;
   /** Nome comercial gravado no contrato, quando gravou. */
   servico?: string;
+  /** E-mail que recebeu o acesso — é para ele que a Watch TV escreve. */
+  email?: string;
 };
 
 /**
@@ -258,7 +260,7 @@ export async function contratarStreamingAposAssinatura(params: {
     };
   }
 
-  return { status: "adicionado", servico: salvo.nome };
+  return { status: "adicionado", servico: salvo.nome, email };
 }
 
 /** Validação simples de e-mail, só para não mandar lixo à Watch Brasil. */

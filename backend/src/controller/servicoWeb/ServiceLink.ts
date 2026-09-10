@@ -1594,7 +1594,9 @@ class ServiceLinkController {
         if (assinado && sc) {
           acesso = {
             status: sc.status,
-            email: (solicitacao?.dados as any)?.email_watch,
+            // O e-mail que a Watch usou: nos planos é o do cadastro, na
+            // contratação avulsa é o que o cliente informou.
+            email: sc.email || (solicitacao?.dados as any)?.email_watch,
           };
         }
         // Espelha o pagamento confirmado na solicitação de serviço.

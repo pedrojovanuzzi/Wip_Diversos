@@ -783,11 +783,11 @@ const SolicitacaoServicoPublica: React.FC = () => {
                             formulário — e é a Watch que envia o e-mail. */}
                         {acesso?.status === "adicionado" && (
                           <Alert severity="success" sx={{ mt: 2 }}>
-                            Acesso liberado! A Watch TV enviou um e-mail
-                            {acesso.email ? ` para ` : " "}
-                            {acesso.email && <b>{acesso.email}</b>} com as
-                            instruções de acesso. Se não encontrar, confira a
-                            caixa de spam.
+                            Watch TV ativada! As instruções de acesso foram
+                            enviadas pela Watch TV
+                            {acesso.email ? " para " : " "}
+                            {acesso.email && <b>{acesso.email}</b>}. Se não
+                            encontrar, confira a caixa de spam.
                           </Alert>
                         )}
 
