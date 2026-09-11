@@ -22,6 +22,13 @@ import {
   tagDoServico,
   nomeServicoContrato,
 } from "../services/servicosAdicionaisNomes";
+import { VALOR_STREAMER } from "../config/servicosAdicionais";
+import {
+  cobrancaProporcional,
+  dataBR,
+  reais,
+  textoCobrancaProporcional,
+} from "../services/cobrancaProporcional";
 import { reservarLoginUnico } from "../services/loginCliente";
 import { planoTemSva } from "../config/planosComSva";
 import {
@@ -309,6 +316,8 @@ function veioDaWeb(solicitacao: SolicitacaoServico): boolean {
 async function avisarAcessoLiberado(
   solicitacao: SolicitacaoServico,
   email?: string,
+  /** Proporcional dos dias de uso, recalculado na assinatura. */
+  cobranca?: string,
 ) {
   const dados = (solicitacao.dados || {}) as any;
   const bruto = String(
@@ -330,7 +339,9 @@ async function avisarAcessoLiberado(
         : `📧 A Watch TV enviou um e-mail com as instruções de acesso.
 
 `) +
-      `Se não encontrar, confira a caixa de *spam* ou *promoções*.`,
+      `Se não encontrar, confira a caixa de *spam* ou *promoções*.` +
+      // O uso começa agora, então o proporcional é o da data da assinatura.
+      (cobranca ? `\n\n📅 Cobrança: ${cobranca}` : ""),
   );
 }
 
@@ -1046,11 +1057,24 @@ class ZapSign {
                   break;
                 case "watch tv":
                 case "contrato de sva": {
-                  // Assinou o Contrato de SVA: o streaming entra no cadastro
-                  // e passa a compor a mensalidade. A conta de acesso, não —
-                  // ela é criada com o e-mail e o celular que o cliente ainda
-                  // vai informar, porque é ela que dispara o e-mail da Watch.
+                  // Assinou o Contrato de SVA: o streaming entra no cadastro,
+                  // passa a compor a mensalidade, e a conta de acesso é criada
+                  // com o e-mail e o celular informados antes da assinatura.
                   const loginWatch = dados.login || solicitacao.login_cliente;
+
+                  // Os dias de uso contam a partir de agora, não da data do
+                  // pedido: entre pedir e assinar podem passar dias, e o
+                  // proporcional guardado no pedido ficaria maior que o real.
+                  const proporcional = cobrancaProporcional(
+                    VALOR_STREAMER,
+                    Number(dados.vencimento || dados.venc) || 1,
+                  );
+                  Object.assign(dados, {
+                    valor_proporcional: reais(proporcional.valor),
+                    dias_proporcional: String(proporcional.dias),
+                    vencimento_proporcional: dataBR(proporcional.vencimento),
+                    cobranca_proporcional: textoCobrancaProporcional(proporcional),
+                  });
                   const r = await contratarStreamingAposAssinatura({
                     login: loginWatch,
                     // Contato colhido antes da assinatura, no bot ou no site.
@@ -1065,6 +1089,7 @@ class ZapSign {
                     await avisarAcessoLiberado(
                       solicitacao,
                       dados.email_watch || dados.email,
+                      dados.cobranca_proporcional,
                     );
                   }
                   console.log(

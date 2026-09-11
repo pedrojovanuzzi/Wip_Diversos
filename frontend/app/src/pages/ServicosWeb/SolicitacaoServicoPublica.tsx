@@ -143,6 +143,8 @@ const SolicitacaoServicoPublica: React.FC = () => {
   const [acesso, setAcesso] = useState<{
     status?: string;
     email?: string;
+    /** Proporcional dos dias de uso, recalculado na assinatura. */
+    cobranca?: string;
   } | null>(null);
   /** Este serviço ainda tem a liberação do acesso depois de assinar. */
   const [acessoEsperado, setAcessoEsperado] = useState(false);
@@ -848,6 +850,12 @@ const SolicitacaoServicoPublica: React.FC = () => {
                             {acesso.email ? " para " : " "}
                             {acesso.email && <b>{acesso.email}</b>}. Se não
                             encontrar, confira a caixa de spam.
+                            {acesso.cobranca && (
+                              <>
+                                <br />
+                                Cobrança: {acesso.cobranca}
+                              </>
+                            )}
                           </Alert>
                         )}
 

@@ -1585,7 +1585,11 @@ class ServiceLinkController {
       }
 
       let assinado = false;
-      let acesso: { status?: string; email?: string } | null = null;
+      let acesso: {
+        status?: string;
+        email?: string;
+        cobranca?: string;
+      } | null = null;
       // A página precisa saber que ainda vem um passo depois da assinatura,
       // senão ela para de perguntar antes de o acesso ficar pronto.
       let acessoEsperado = false;
@@ -1609,6 +1613,8 @@ class ServiceLinkController {
             // O e-mail que a Watch usou: nos planos é o do cadastro, na
             // contratação avulsa é o que o cliente informou.
             email: sc.email || (solicitacao?.dados as any)?.email_watch,
+            // Proporcional recalculado na assinatura, quando o uso começa.
+            cobranca: (solicitacao?.dados as any)?.cobranca_proporcional,
           };
         }
         // Espelha o pagamento confirmado na solicitação de serviço.

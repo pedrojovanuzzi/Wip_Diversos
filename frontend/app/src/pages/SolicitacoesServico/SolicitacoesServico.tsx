@@ -49,6 +49,11 @@ const ETAPA_LABEL: Record<string, string> = {
 const rotuloPagamento = (service: any): string => {
   if (service.gratis) return "Grátis";
   if (service.pago) return "Pago";
+  // Watch TV avulsa: sem Pix, o proporcional dos dias de uso entra na fatura.
+  if (service.dados?.forma_pagamento === "proxima_fatura") {
+    const v = service.dados?.valor_proporcional;
+    return v ? `Na fatura: R$ ${v}` : "Na fatura";
+  }
   if (service.id_fatura || service.dados?.forma_pagamento === "pix")
     return "Pendente";
   if (service.servico === "Instalação") return "A definir";
@@ -993,8 +998,11 @@ const SolicitacoesServico = () => {
                   <TableCell>
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                        PAGAMENTO_CLASSE[rotuloPagamento(service)]
+                        PAGAMENTO_CLASSE[rotuloPagamento(service)] ??
+                        // "Na fatura: R$ X" traz o valor no texto.
+                        "bg-green-100 text-green-800"
                       }`}
+                      title={service.dados?.cobranca_proporcional || undefined}
                     >
                       {rotuloPagamento(service)}
                     </span>
