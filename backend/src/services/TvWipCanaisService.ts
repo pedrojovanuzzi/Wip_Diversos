@@ -50,12 +50,12 @@ class TvWipCanaisService {
 
   // ---------------------------------------------------------------- canais
 
-  /** Todos os canais cadastrados no sistema antigo. */
+  /** Todos os canais cadastrados no sistema antigo, na ordem do ID. */
   async listarCanais(apenasAtivos = false): Promise<Canal[]> {
     const repo = CanaisSource.getRepository(Canal);
     return repo.find({
       where: apenasAtivos ? { ativo: 1 } : {},
-      order: { canal: "ASC" },
+      order: { idcanal: "ASC" },
     });
   }
 
