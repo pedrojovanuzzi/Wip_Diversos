@@ -376,11 +376,24 @@ class TvWip {
   /** Edita um canal (nome, url, logo, no ar). */
   public salvarCanal = async (req: Request, res: Response) => {
     try {
-      const canal = await TvWipCanaisService.salvarCanal(
-        Number(req.params.idcanal),
-        req.body,
-      );
-      res.json({ ok: true, canal, message: "Canal atualizado." });
+      let idcanal = Number(req.params.idcanal);
+      let message = "Canal atualizado.";
+
+      // Trocar o ID é o jeito de mudar a posição do canal na lista: a ordem
+      // de exibição segue o ID. Vem primeiro, e o resto da edição é aplicado
+      // já no número novo.
+      const novoId = req.body?.idcanal;
+      if (novoId !== undefined && Number(novoId) !== idcanal) {
+        const troca = await TvWipCanaisService.alterarIdCanal(
+          idcanal,
+          Number(novoId),
+        );
+        idcanal = troca.idcanal;
+        message = troca.message;
+      }
+
+      const canal = await TvWipCanaisService.salvarCanal(idcanal, req.body);
+      res.json({ ok: true, canal, message });
     } catch (error: any) {
       res.status(400).json({ message: error?.message || "Erro ao salvar." });
     }

@@ -126,6 +126,105 @@ class TvWipCanaisService {
     return repo.save(canal);
   }
 
+  /**
+   * Muda o ID de um canal. É o ID que define a posição na lista — no painel e
+   * no player antigo, que exibe os canais na ordem da chave.
+   *
+   * Se o número de destino já é de outro canal, os dois trocam de lugar: é o
+   * que se quer ao reordenar.
+   *
+   * O que aponta para o ID também muda:
+   *   - `visualizacoes` (wip_canais) segue sozinha: a FK é ON UPDATE CASCADE;
+   *   - pacotes e liberações por cliente (wip_diversos) ficam em outro
+   *     servidor, sem FK, e são atualizados aqui.
+   * A troca passa por um ID temporário, senão as chaves únicas
+   * (pacote+canal, login+canal) travariam no meio do caminho.
+   */
+  async alterarIdCanal(
+    de: number,
+    para: number,
+  ): Promise<{ idcanal: number; message: string }> {
+    if (!Number.isInteger(para) || para <= 0) {
+      throw new Error("O ID precisa ser um número inteiro maior que zero.");
+    }
+    if (para === de) return { idcanal: de, message: "Canal atualizado." };
+
+    const repo = CanaisSource.getRepository(Canal);
+    const canal = await repo.findOne({ where: { idcanal: de } });
+    if (!canal) throw new Error("Canal não encontrado.");
+
+    // Acima do AUTO_INCREMENT o número colidiria com o próximo canal criado.
+    // O valor vem do SHOW CREATE TABLE: o do information_schema fica em cache
+    // no MySQL 8 (information_schema_stats_expiry) e chega a ficar dias atrás
+    // do real — foi o que travou a troca no teste.
+    const [ddl] = await CanaisSource.query("SHOW CREATE TABLE tb_canais");
+    const ai = Number(
+      (String(ddl?.["Create Table"] || "").match(/AUTO_INCREMENT=(\d+)/) || [])[1],
+    );
+    if (ai && para >= ai) {
+      throw new Error(
+        `Use um ID menor que ${ai}: acima disso ele colidiria com os próximos canais criados.`,
+      );
+    }
+
+    const ocupante = await repo.findOne({ where: { idcanal: para } });
+
+    // Passos [de, para] aplicados em ordem nos dois bancos.
+    let passosCanais: Array<[number, number]> = [[de, para]];
+    let passosVinculos: Array<[number, number]> = [[de, para]];
+    if (ocupante) {
+      // No wip_canais o temporário é o maior ID + 1, garantidamente livre.
+      // No wip_diversos, um negativo: nunca é ID real, nem de vínculo velho
+      // de canal apagado pelo painel antigo.
+      const [{ maior }] = await CanaisSource.query(
+        "SELECT MAX(idcanal) maior FROM tb_canais",
+      );
+      const temp = Number(maior) + 1;
+      passosCanais = [[de, temp], [para, de], [temp, para]];
+      passosVinculos = [[de, -1], [para, de], [-1, para]];
+    }
+
+    const aplicarCanais = (passos: Array<[number, number]>) =>
+      CanaisSource.transaction(async (m) => {
+        for (const [a, b] of passos) {
+          await m.query("UPDATE tb_canais SET idcanal = ? WHERE idcanal = ?", [b, a]);
+        }
+      });
+
+    await aplicarCanais(passosCanais);
+
+    try {
+      await AppDataSource.transaction(async (m) => {
+        for (const [a, b] of passosVinculos) {
+          await m.query(
+            "UPDATE tv_wip_pacote_canais SET idcanal = ? WHERE idcanal = ?",
+            [b, a],
+          );
+          await m.query(
+            "UPDATE tv_wip_conta_canais SET idcanal = ? WHERE idcanal = ?",
+            [b, a],
+          );
+        }
+      });
+    } catch (e) {
+      // Bancos diferentes não têm transação comum: se os vínculos falharem,
+      // o canal volta ao número antigo para os dois lados não divergirem.
+      const inverso = passosCanais
+        .slice()
+        .reverse()
+        .map(([a, b]) => [b, a] as [number, number]);
+      await aplicarCanais(inverso);
+      throw e;
+    }
+
+    return {
+      idcanal: para,
+      message: ocupante
+        ? `${canal.canal} e ${ocupante.canal} trocaram de posição (#${para} e #${de}).`
+        : `${canal.canal} agora é o #${para}.`,
+    };
+  }
+
   // --------------------------------------------------------------- pacotes
 
   async listarPacotes(): Promise<PacoteComCanais[]> {

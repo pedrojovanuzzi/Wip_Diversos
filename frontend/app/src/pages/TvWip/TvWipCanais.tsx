@@ -23,6 +23,8 @@ export interface CanalTv {
 
 /** O que a edição envia. `ativo` vai como boolean; o backend grava 1/0. */
 type EdicaoCanal = {
+  /** Novo ID: é ele que define a posição do canal na lista. */
+  idcanal?: number;
   canal?: string;
   url?: string;
   imagens?: string;
@@ -143,8 +145,11 @@ export const TvWipCanais: React.FC<Props> = ({ avisar }) => {
   async function salvar(idcanal: number, dados: EdicaoCanal) {
     setSalvando(true);
     try {
-      await axios.put(`${base}/tv-wip/canais/${idcanal}`, dados, { headers });
-      avisar("Canal atualizado.", "ok");
+      const res = await axios.put(`${base}/tv-wip/canais/${idcanal}`, dados, {
+        headers,
+      });
+      // Na troca de ID a mensagem diz com quem o canal trocou de lugar.
+      avisar(res.data?.message || "Canal atualizado.", "ok");
       setEditando(null);
       carregar();
     } catch (e: any) {
@@ -370,7 +375,27 @@ export const TvWipCanais: React.FC<Props> = ({ avisar }) => {
                 const emEdicao = editando === c.idcanal;
                 return (
                   <tr key={c.idcanal} className="border-t border-gray-100">
-                    <td className="px-3 py-2 text-gray-400">{c.idcanal}</td>
+                    <td className="px-3 py-2 text-gray-400">
+                      {emEdicao ? (
+                        // O ID define a posição na lista. Se o número já for
+                        // de outro canal, os dois trocam de lugar.
+                        <input
+                          type="number"
+                          min={1}
+                          value={rascunho.idcanal ?? ""}
+                          onChange={(e) =>
+                            setRascunho({
+                              ...rascunho,
+                              idcanal: Number(e.target.value) || undefined,
+                            })
+                          }
+                          title="Mude o número para mudar a posição. Se já existir, os dois canais trocam de lugar."
+                          className="w-16 rounded border border-gray-300 p-1 text-sm"
+                        />
+                      ) : (
+                        c.idcanal
+                      )}
+                    </td>
                     <td className="px-3 py-2">
                       {emEdicao ? (
                         <input
@@ -527,6 +552,7 @@ export const TvWipCanais: React.FC<Props> = ({ avisar }) => {
                             onClick={() => {
                               setEditando(c.idcanal);
                               setRascunho({
+                                idcanal: c.idcanal,
                                 canal: c.canal,
                                 url: c.url,
                                 imagens: c.imagens,
