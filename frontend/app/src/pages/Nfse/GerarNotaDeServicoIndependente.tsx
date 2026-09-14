@@ -22,7 +22,8 @@ export const GerarNotaDeServicoIndependente = () => {
     nfeNumber: "",
     ambiente: "homologacao",
     aliquota: "5.0000",
-    rpsNumber: "",
+    // Último RPS usado: a nota sai com o seguinte (o backend soma 1).
+    ultimoRps: "",
   });
 
   const handleChange = (
@@ -66,6 +67,13 @@ export const GerarNotaDeServicoIndependente = () => {
         msg: "Preencha todos os campos obrigatórios.",
         type: "error",
       });
+      setLoading(false);
+      return;
+    }
+
+    // A NFSE exige o RPS: informa-se o último usado e a nota sai com o seguinte.
+    if (!/^\d+$/.test(formData.ultimoRps.trim())) {
+      setMessage({ msg: "Informe o último número de RPS usado.", type: "error" });
       setLoading(false);
       return;
     }
@@ -148,23 +156,35 @@ export const GerarNotaDeServicoIndependente = () => {
               </select>
             </div>
 
-            {/* RPS Number */}
+            {/* Último RPS: a nota sai com o número seguinte. */}
             <div className="flex flex-col">
               <label
-                htmlFor="rpsNumber"
+                htmlFor="ultimoRps"
                 className="font-semibold text-gray-700"
               >
-                Número do RPS (Opcional)
+                Último número do RPS <span className="text-red-600">*</span>
               </label>
               <input
                 type="text"
-                name="rpsNumber"
-                id="rpsNumber"
+                inputMode="numeric"
+                name="ultimoRps"
+                id="ultimoRps"
                 className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Ex: 123456"
-                value={formData.rpsNumber}
-                onChange={handleChange}
+                value={formData.ultimoRps}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    ultimoRps: e.target.value.replace(/\D/g, ""),
+                  })
+                }
+                required
               />
+              {formData.ultimoRps && (
+                <span className="mt-1 text-xs text-gray-500">
+                  A nota sai com o RPS {Number(formData.ultimoRps) + 1}.
+                </span>
+              )}
             </div>
 
             {/* Aliquota */}

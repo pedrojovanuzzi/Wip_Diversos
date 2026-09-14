@@ -31,6 +31,21 @@ import { FiorilliProvider } from "../services/nfse/FiorilliProvider";
 
 dotenv.config();
 
+/**
+ * Próximo RPS a partir do último informado pelo usuário.
+ *
+ * A NFSE passou a exigir o número do RPS digitado: não dá mais para descobrir
+ * sozinho qual é o próximo. O usuário informa o último usado e a nota sai com
+ * o seguinte; num lote, cada nota seguinte soma mais um.
+ *
+ * Devolve `null` quando o valor não é um número inteiro (vazio, letras, etc.).
+ */
+function proximoNumeroRps(ultimo: unknown): number | null {
+  const texto = String(ultimo ?? "").trim();
+  if (!/^\d+$/.test(texto)) return null;
+  return Number(texto) + 1;
+}
+
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
   private TEMP_DIR = path.resolve(__dirname, "../files");
@@ -165,8 +180,16 @@ class NFSEController {
         reducao,
         ambiente,
         lastNfe,
-        rpsNumber,
+        ultimoRps,
       } = req.body;
+
+      // A NFSE passou a exigir o número do RPS: o usuário informa o último
+      // usado e as notas saem a partir do seguinte.
+      const rpsNumber = proximoNumeroRps(ultimoRps);
+      if (rpsNumber === null) {
+        res.status(400).json({ erro: "Informe o último número de RPS usado." });
+        return;
+      }
       this.PASSWORD = password;
 
       console.log(aliquota);
@@ -1599,7 +1622,7 @@ class NFSEController {
         nfeNumber,
         ambiente,
         aliquota,
-        rpsNumber,
+        ultimoRps,
       } = req.body;
 
       console.log("GerarNfseAvulsa Payload:", JSON.stringify(req.body));
@@ -1607,6 +1630,14 @@ class NFSEController {
 
       if (!login || !valor || !servico || !password) {
         res.status(400).json({ error: "Dados incompletos" });
+        return;
+      }
+
+      // A NFSE exige o RPS: o usuário informa o último usado e a nota sai com
+      // o seguinte.
+      const rpsNumber = proximoNumeroRps(ultimoRps);
+      if (rpsNumber === null) {
+        res.status(400).json({ error: "Informe o último número de RPS usado." });
         return;
       }
 
@@ -2137,7 +2168,7 @@ class NFSEController {
         aliquota,
         servico,
         nfeNumber,
-        rpsNumber,
+        ultimoRps,
       } = req.body as {
         logins?: string[];
         password?: string;
@@ -2145,7 +2176,7 @@ class NFSEController {
         aliquota?: string;
         servico?: string;
         nfeNumber?: string | number;
-        rpsNumber?: string | number;
+        ultimoRps?: string | number;
       };
 
       if (!Array.isArray(logins) || logins.length === 0) {
@@ -2156,6 +2187,14 @@ class NFSEController {
         res
           .status(400)
           .json({ error: "password e nfeNumber são obrigatórios." });
+        return;
+      }
+
+      // A NFSE exige o RPS: o usuário informa o último usado e as notas saem a
+      // partir do seguinte, uma a uma.
+      const primeiroRps = proximoNumeroRps(ultimoRps);
+      if (primeiroRps === null) {
+        res.status(400).json({ error: "Informe o último número de RPS usado." });
         return;
       }
 
@@ -2174,9 +2213,7 @@ class NFSEController {
         ambiente,
       );
       let nextNfseNumber = startNumbers.nextNfseNumber;
-      let currentRpsNumber = rpsNumber
-        ? Number(rpsNumber)
-        : startNumbers.nextRpsNumber;
+      let currentRpsNumber = primeiroRps;
 
       const results: any[] = [];
       for (const login of logins) {

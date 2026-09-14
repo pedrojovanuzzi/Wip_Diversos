@@ -42,7 +42,8 @@ export const NFSEServicosAdicionais: React.FC = () => {
   const [aliquota, setAliquota] = useState("5.0");
   const [servico, setServico] = useState("010501");
   const [nfeNumber, setNfeNumber] = useState("");
-  const [rpsNumber, setRpsNumber] = useState("");
+  /** Último RPS usado. A nota sai com o seguinte (o backend soma 1). */
+  const [ultimoRps, setUltimoRps] = useState("");
 
   const headers = { Authorization: `Bearer ${token}` };
   const base = process.env.REACT_APP_URL;
@@ -100,6 +101,11 @@ export const NFSEServicosAdicionais: React.FC = () => {
       showError("Informe o último número NF-e.");
       return;
     }
+    // A NFSE exige o RPS: informa-se o último usado e a nota sai com o seguinte.
+    if (!/^\d+$/.test(ultimoRps.trim())) {
+      showError("Informe o último número de RPS usado.");
+      return;
+    }
     setEmitting(true);
     try {
       const res = await axios.post(
@@ -111,7 +117,7 @@ export const NFSEServicosAdicionais: React.FC = () => {
           aliquota,
           servico,
           nfeNumber,
-          rpsNumber: rpsNumber || undefined,
+          ultimoRps: ultimoRps.trim(),
         },
         { headers, timeout: 600000 },
       );
@@ -334,10 +340,16 @@ export const NFSEServicosAdicionais: React.FC = () => {
           />
           <input
             type="text"
-            value={rpsNumber}
-            onChange={(e) => setRpsNumber(e.target.value)}
-            placeholder="Número RPS (opcional)"
-            className="border p-2 rounded"
+            inputMode="numeric"
+            value={ultimoRps}
+            onChange={(e) => setUltimoRps(e.target.value.replace(/\D/g, ""))}
+            placeholder="Último Nº RPS *"
+            title={
+              ultimoRps
+                ? `A primeira nota sai com o RPS ${Number(ultimoRps) + 1}.`
+                : "Obrigatório: a nota sai com o número seguinte."
+            }
+            className="border-2 border-red-400 p-2 rounded"
           />
           <button
             onClick={emitir}
