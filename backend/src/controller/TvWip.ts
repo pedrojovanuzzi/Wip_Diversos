@@ -7,6 +7,7 @@ import { TvWipConta } from "../entities/TvWipConta";
 import TvWipService from "../services/TvWipService";
 import TvWipCanaisService from "../services/TvWipCanaisService";
 import TvWipEpgService from "../services/TvWipEpgService";
+import TvWipNotificacoesService from "../services/TvWipNotificacoesService";
 import { salvarLogo } from "../services/TvWipLogoService";
 
 /**
@@ -493,6 +494,64 @@ class TvWip {
       res.json({ ok: true, message: "Exceção atualizada." });
     } catch (error: any) {
       res.status(400).json({ message: error?.message || "Erro ao salvar." });
+    }
+  };
+
+  // ------------------------------------------------- notificações do app
+
+  public listarNotificacoes = async (_req: Request, res: Response) => {
+    try {
+      res.json({ notificacoes: await TvWipNotificacoesService.listar() });
+    } catch (error: any) {
+      console.error("[TvWip] Erro ao listar notificações:", error?.message || error);
+      res.status(500).json({ message: "Erro ao listar as notificações." });
+    }
+  };
+
+  /** Envia um aviso: ele aparece no envelope do app na próxima busca. */
+  public criarNotificacao = async (req: Request, res: Response) => {
+    try {
+      const notificacao = await TvWipNotificacoesService.criar({
+        titulo: req.body?.titulo,
+        mensagem: req.body?.mensagem,
+        destino: req.body?.destino,
+        alvos: req.body?.alvos,
+        expira_em: req.body?.expira_em,
+        criadoPor: (req as any).user?.login || "",
+      });
+      res.status(201).json({
+        ok: true,
+        notificacao,
+        message: "Notificação enviada. Os aparelhos recebem na próxima busca.",
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Erro ao enviar." });
+    }
+  };
+
+  public ativarNotificacao = async (req: Request, res: Response) => {
+    try {
+      const ativo = !!req.body?.ativo;
+      const notificacao = await TvWipNotificacoesService.definirAtivo(
+        Number(req.params.id),
+        ativo,
+      );
+      res.json({
+        ok: true,
+        notificacao,
+        message: ativo ? "Notificação reativada." : "Notificação retirada do app.",
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Erro ao salvar." });
+    }
+  };
+
+  public removerNotificacao = async (req: Request, res: Response) => {
+    try {
+      await TvWipNotificacoesService.remover(Number(req.params.id));
+      res.json({ ok: true, message: "Notificação apagada." });
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Erro ao apagar." });
     }
   };
 

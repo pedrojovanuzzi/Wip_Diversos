@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { TvWipCanais } from "./TvWipCanais";
 import { TvWipPacotes, Pacote } from "./TvWipPacotes";
+import { TvWipNotificacoes } from "./TvWipNotificacoes";
 import {
   BsArrowRepeat,
   BsClipboard,
@@ -16,7 +17,7 @@ import {
   BsCollectionPlay,
 } from "react-icons/bs";
 
-type Aba = "contas" | "pacotes" | "canais";
+type Aba = "contas" | "pacotes" | "canais" | "notificacoes";
 
 interface Conta {
   id: number;
@@ -443,6 +444,7 @@ export const TvWipLista: React.FC = () => {
               { id: "contas", rotulo: "Contas" },
               { id: "pacotes", rotulo: "Pacotes de canais" },
               { id: "canais", rotulo: "Canais" },
+              { id: "notificacoes", rotulo: "Notificações" },
             ] as { id: Aba; rotulo: string }[]
           ).map((t) => (
             <button
@@ -481,6 +483,12 @@ export const TvWipLista: React.FC = () => {
         {aba === "canais" && (
           <div className="mt-4">
             <TvWipCanais avisar={avisar} />
+          </div>
+        )}
+
+        {aba === "notificacoes" && (
+          <div className="mt-4">
+            <TvWipNotificacoes avisar={avisar} />
           </div>
         )}
 

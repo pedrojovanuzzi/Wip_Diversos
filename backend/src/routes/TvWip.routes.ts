@@ -74,6 +74,9 @@ router.get("/app/canais", TvWipApp.sessao, TvWipApp.canais);
 router.get("/app/perfil", TvWipApp.sessao, TvWipApp.perfil);
 router.get("/app/playlist.m3u", TvWipApp.sessao, TvWipApp.playlist);
 router.get("/app/epg", TvWipApp.sessao, TvWipApp.epg);
+router.get("/app/notificacoes", TvWipApp.sessao, TvWipApp.notificacoes);
+// Logins fixos do app (sem conta): só a chave, e só os avisos para todos.
+router.get("/app/notificacoes/publicas", ChaveDoApp, TvWipApp.notificacoesPublicas);
 
 // ---- Painel interno ----
 router.get("/", AuthGuard, TvWip.listar);
@@ -97,5 +100,11 @@ router.delete("/pacotes/:id", AuthGuard, TvWip.removerPacote);
 router.post("/pacotes/atribuir", AuthGuard, TvWip.atribuirPacotes);
 router.get("/conta/:login", AuthGuard, TvWip.detalhesDaConta);
 router.post("/conta/:login/excecao", AuthGuard, TvWip.definirExcecao);
+
+// ---- Notificações do app ----
+router.get("/notificacoes", AuthGuard, TvWip.listarNotificacoes);
+router.post("/notificacoes", AuthGuard, TvWip.criarNotificacao);
+router.put("/notificacoes/:id/ativo", AuthGuard, TvWip.ativarNotificacao);
+router.delete("/notificacoes/:id", AuthGuard, TvWip.removerNotificacao);
 
 export default router;

@@ -30,6 +30,7 @@ import { TvWipPacote } from "../entities/TvWipPacote";
 import { TvWipPacoteCanal } from "../entities/TvWipPacoteCanal";
 import { TvWipContaPacote } from "../entities/TvWipContaPacote";
 import { TvWipContaCanal } from "../entities/TvWipContaCanal";
+import { TvWipNotificacao } from "../entities/TvWipNotificacao";
 import { CodefPlanoConta } from "../entities/CodefPlanoConta";
 import { CodefCompetencia } from "../entities/CodefCompetencia";
 
@@ -71,6 +72,7 @@ const AppDataSource = new DataSource({
     TvWipPacoteCanal,
     TvWipContaPacote,
     TvWipContaCanal,
+    TvWipNotificacao,
     CodefPlanoConta,
     CodefCompetencia,
     ServidorAcesso,

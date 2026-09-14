@@ -7,6 +7,7 @@ import TvWipCanaisService, {
   CanalResolvido,
 } from "../services/TvWipCanaisService";
 import TvWipEpgService from "../services/TvWipEpgService";
+import TvWipNotificacoesService from "../services/TvWipNotificacoesService";
 
 dotenv.config();
 
@@ -298,6 +299,32 @@ class TvWipApp {
     } catch (error: any) {
       console.error("[TvWipApp] Erro no EPG:", error?.message || error);
       res.status(500).json({ ok: false, mensagem: "Erro ao carregar a guia." });
+    }
+  };
+
+  /** Envelope do app: avisos gerais, do pacote da conta e dela própria. */
+  public notificacoes = async (_req: Request, res: Response) => {
+    try {
+      const login = String(res.locals.loginTv);
+      const notificacoes = await TvWipNotificacoesService.doLogin(login);
+      res.json({ ok: true, total: notificacoes.length, notificacoes });
+    } catch (error: any) {
+      console.error("[TvWipApp] Erro nas notificações:", error?.message || error);
+      res.status(500).json({ ok: false, mensagem: "Erro ao carregar os avisos." });
+    }
+  };
+
+  /**
+   * Só os avisos para todos. Os logins fixos do aplicativo não têm conta nem
+   * token, então entram pela chave do app — e só enxergam o que é geral.
+   */
+  public notificacoesPublicas = async (_req: Request, res: Response) => {
+    try {
+      const notificacoes = await TvWipNotificacoesService.publicas();
+      res.json({ ok: true, total: notificacoes.length, notificacoes });
+    } catch (error: any) {
+      console.error("[TvWipApp] Erro nas notificações:", error?.message || error);
+      res.status(500).json({ ok: false, mensagem: "Erro ao carregar os avisos." });
     }
   };
 
