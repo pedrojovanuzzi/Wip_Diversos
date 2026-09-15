@@ -1417,115 +1417,57 @@ class NFSEController {
         },
         order: { id: "DESC" },
       });
-      const arr = await Promise.all(
-        clientesResponse.map(async (c) => {
-          const nfseDoCliente = nfseResponse.filter(
-            (nf) => nf.login === c.login,
-          );
-
-          const nfseValidas: typeof nfseDoCliente = [];
-          const nfseNumberArray: string[] = [];
-
-          for (const nf of nfseDoCliente) {
-            // const isCancelada = await this.setNfseStatus(
-            //   nf.numeroRps,
-            //   nf.serieRps,
-            //   nf.tipoRps,
-            //   ambiente
-            // );
-            // if (isCancelada) {
-            //   nf.status = "Cancelada";
-            // }
-
-            nfseValidas.push(nf);
-          }
-
-          if (!nfseValidas.length) return null;
-
-          return {
-            ...c,
-            nfse: {
-              id: nfseValidas.map((nf) => nf.id).join(", "),
-              login: nfseValidas.map((nf) => nf.login).join(", ") || null,
-              numero_rps:
-                nfseValidas.map((nf) => nf.numeroRps).join(", ") || null,
-              serie_rps:
-                nfseValidas.map((nf) => nf.serieRps).join(", ") || null,
-              tipo_rps: nfseValidas.map((nf) => nf.tipoRps).join(", ") || null,
-              data_emissao:
-                nfseValidas
-                  .map((nf) =>
-                    moment
-                      .tz(nf.dataEmissao, "America/Sao_Paulo")
-                      .format("DD/MM/YYYY"),
-                  )
-                  .join(", ") || null,
-              competencia:
-                nfseValidas
-                  .map((nf) =>
-                    moment
-                      .tz(nf.competencia, "America/Sao_Paulo")
-                      .format("DD/MM/YYYY"),
-                  )
-                  .join(", ") || null,
-              valor_servico:
-                nfseValidas.map((nf) => nf.valorServico).join(", ") || null,
-              aliquota: nfseValidas.map((nf) => nf.aliquota).join(", ") || null,
-              iss_retido:
-                nfseValidas.map((nf) => nf.issRetido).join(", ") || null,
-              responsavel_retecao:
-                nfseValidas.map((nf) => nf.responsavelRetencao).join(", ") ||
-                null,
-              item_lista_servico:
-                nfseValidas.map((nf) => nf.itemListaServico).join(", ") || null,
-              discriminacao:
-                nfseValidas.map((nf) => nf.discriminacao).join(", ") || null,
-              codigo_municipio:
-                nfseValidas.map((nf) => nf.codigoMunicipio).join(", ") || null,
-              exigibilidade_iss:
-                nfseValidas.map((nf) => nf.exigibilidadeIss).join(", ") || null,
-              cnpj_prestador:
-                nfseValidas.map((nf) => nf.cnpjPrestador).join(", ") || null,
-              inscricao_municipal_prestador:
-                nfseValidas
-                  .map((nf) => nf.inscricaoMunicipalPrestador)
-                  .join(", ") || null,
-              cpf_tomador:
-                nfseValidas.map((nf) => nf.cpfTomador).join(", ") || null,
-              razao_social_tomador:
-                nfseValidas.map((nf) => nf.razaoSocialTomador).join(", ") ||
-                null,
-              endereco_tomador:
-                nfseValidas.map((nf) => nf.enderecoTomador).join(", ") || null,
-              numero_endereco:
-                nfseValidas.map((nf) => nf.numeroEndereco).join(", ") || null,
-              complemento:
-                nfseValidas.map((nf) => nf.complemento).join(", ") || null,
-              bairro: nfseValidas.map((nf) => nf.bairro).join(", ") || null,
-              uf: nfseValidas.map((nf) => nf.uf).join(", ") || null,
-              cep: nfseValidas.map((nf) => nf.cep).join(", ") || null,
-              telefone_tomador:
-                nfseValidas.map((nf) => nf.telefoneTomador).join(", ") || null,
-              email_tomador:
-                nfseValidas.map((nf) => nf.emailTomador).join(", ") || null,
-              optante_simples_nacional:
-                nfseValidas.map((nf) => nf.optanteSimplesNacional).join(", ") ||
-                null,
-              incentivo_fiscal:
-                nfseValidas.map((nf) => nf.incentivoFiscal).join(", ") || null,
-              status: nfseValidas.map((nf) => nf.status).join(", ") || null,
-              numeroNfse:
-                nfseValidas.map((nf) => nf.numeroNfe).join(", ") || null,
-              timestamp:
-                nfseValidas.map((nf) => nf.timestamp).join(", ") || null,
-            },
-          };
-        }),
-      );
-      const filtered = arr
-        .filter((i): i is NonNullable<typeof i> => i !== null)
-        .sort((a, b) => (b?.nfse?.id || "").localeCompare(a?.nfse?.id || ""));
-      res.status(200).json(filtered);
+      // Uma linha por nota. Antes as notas de um mesmo cliente vinham juntas
+      // numa linha só ("1263, 1262"), o que quebrava a seleção, a impressão,
+      // o cancelamento e a data na tela.
+      const clientePorLogin = new Map(clientesResponse.map((c) => [c.login, c]));
+      const linhas = nfseResponse
+        .filter((nf) => clientePorLogin.has(nf.login))
+        .map((nf) => ({
+          ...clientePorLogin.get(nf.login)!,
+          nfse: {
+            id: nf.id,
+            login: nf.login,
+            numero_rps: nf.numeroRps,
+            serie_rps: nf.serieRps,
+            tipo_rps: nf.tipoRps,
+            data_emissao: moment
+              .tz(nf.dataEmissao, "America/Sao_Paulo")
+              .format("DD/MM/YYYY"),
+            competencia: moment
+              .tz(nf.competencia, "America/Sao_Paulo")
+              .format("DD/MM/YYYY"),
+            valor_servico: nf.valorServico,
+            aliquota: nf.aliquota,
+            iss_retido: nf.issRetido,
+            responsavel_retecao: nf.responsavelRetencao,
+            item_lista_servico: nf.itemListaServico,
+            discriminacao: nf.discriminacao,
+            codigo_municipio: nf.codigoMunicipio,
+            exigibilidade_iss: nf.exigibilidadeIss,
+            cnpj_prestador: nf.cnpjPrestador,
+            inscricao_municipal_prestador: nf.inscricaoMunicipalPrestador,
+            cpf_tomador: nf.cpfTomador,
+            razao_social_tomador: nf.razaoSocialTomador,
+            endereco_tomador: nf.enderecoTomador,
+            numero_endereco: nf.numeroEndereco,
+            complemento: nf.complemento,
+            bairro: nf.bairro,
+            uf: nf.uf,
+            cep: nf.cep,
+            telefone_tomador: nf.telefoneTomador,
+            email_tomador: nf.emailTomador,
+            optante_simples_nacional: nf.optanteSimplesNacional,
+            incentivo_fiscal: nf.incentivoFiscal,
+            status: nf.status,
+            numeroNfse: nf.numeroNfe,
+            timestamp: nf.timestamp,
+            modelo: nf.modelo,
+            chave_nfse: nf.chaveNfse,
+          },
+        }))
+        .sort((a, b) => b.nfse.id - a.nfse.id);
+      res.status(200).json(linhas);
     } catch {
       res.status(500).json({ error: "Internal Server Error" });
     }
@@ -1825,33 +1767,26 @@ class NFSEController {
         },
         order: { id: "DESC" },
       });
-      const arr = clientesResponse
-        .map((cliente) => {
-          const fat = faturasResponse.filter((f) => f.login === cliente.login);
-          if (!fat.length) return null;
+      // Uma linha por fatura. Antes as faturas de um mesmo cliente vinham
+      // juntas ("123, 124"), e a seleção mandava um título inválido para a
+      // geração da nota.
+      const clientePorLogin = new Map(clientesResponse.map((c) => [c.login, c]));
+      const arr = faturasResponse
+        .filter((f) => clientePorLogin.has(f.login))
+        .map((f) => {
+          const cliente = clientePorLogin.get(f.login)!;
           return {
             ...cliente,
             fatura: {
-              titulo: fat.map((f) => f.id).join(", ") || null,
-              login: fat.map((f) => f.login).join(", ") || null,
-              datavenc:
-                fat
-                  .map((f) => new Date(f.datavenc).toLocaleDateString("pt-BR"))
-                  .join(", ") || null,
-              tipo: fat.map((f) => f.tipo).join(", ") || null,
-              valor:
-                fat
-                  .map((f) =>
-                    (Number(f.valor) - (cliente.desconto || 0)).toFixed(2),
-                  )
-                  .join(", ") || null,
+              titulo: f.id,
+              login: f.login,
+              datavenc: new Date(f.datavenc).toLocaleDateString("pt-BR"),
+              tipo: f.tipo,
+              valor: (Number(f.valor) - (cliente.desconto || 0)).toFixed(2),
             },
           };
         })
-        .filter((i): i is NonNullable<typeof i> => i !== null)
-        .sort((a, b) =>
-          (b?.fatura?.titulo || "").localeCompare(a?.fatura?.titulo || ""),
-        );
+        .sort((a, b) => Number(b.fatura.titulo) - Number(a.fatura.titulo));
       res.status(200).json(arr);
     } catch {
       res.status(500).json({ message: "Erro ao buscar clientes" });

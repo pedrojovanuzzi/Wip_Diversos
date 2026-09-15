@@ -357,7 +357,7 @@ export const NFSE = () => {
                     );
                     return (
                       <tr
-                        key={cliente.id}
+                        key={cliente.fatura.titulo}
                         onClick={() =>
                           handleCheckboxChange(cliente.fatura.titulo)
                         }

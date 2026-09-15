@@ -523,7 +523,7 @@ export const BuscarNfseGerada = () => {
               <div className="mt-8 bg-white shadow-lg rounded-lg border border-gray-200 overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                   <h2 className="text-lg font-medium text-gray-900">
-                    Resultados encontrados: {clientes.length}
+                    Notas encontradas: {clientes.length}
                   </h2>
                   {/* Ações em Lote */}
                   <div className="flex gap-2">
@@ -626,7 +626,7 @@ export const BuscarNfseGerada = () => {
                         .sort((a, b) => b.nfse.id - a.nfse.id)
                         .map((cliente) => (
                           <tr
-                            key={cliente.id}
+                            key={cliente.nfse.id}
                             className="hover:bg-gray-50 transition-colors"
                           >
                             <td className="px-6 py-4 text-left text-sm text-gray-500">
