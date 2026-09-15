@@ -8,7 +8,6 @@ import axios from "axios";
 import moment from "moment-timezone";
 import { In, Between, IsNull, Not, Like, Raw } from "typeorm";
 import { parseStringPromise } from "xml2js";
-import { v4 as uuidv4 } from "uuid";
 
 import AppDataSource from "../database/DataSource";
 import MkauthSource from "../database/MkauthSource";
@@ -26,10 +25,46 @@ import {
 } from "../services/servicosAdicionaisNomes";
 
 import { NfseXmlFactory } from "../services/nfse/NfseXmlFactory";
+import {
+  ACAO_NACIONAL,
+  MensagemNacional,
+  NfseNacionalXmlFactory,
+  NotaNacional,
+  URL_WS_NACIONAL,
+  lerMensagens,
+  lerNotas,
+  lerStatus,
+  notaNacionalNoFormatoAbrasf,
+} from "../services/nfse/NfseNacionalXmlFactory";
 import { validarCertificadoPfx } from "../utils/certUtils";
 import { FiorilliProvider } from "../services/nfse/FiorilliProvider";
 
 dotenv.config();
+
+/** Município do prestador (Arealva-SP): emissão e local da prestação. */
+const CODIGO_MUNICIPIO = "3503406";
+
+/** Código IBGE da cidade do tomador; sem resposta válida, fica o do prestador. */
+async function codigoIbgeDaCidade(cidade?: string | null): Promise<string> {
+  if (!cidade) return CODIGO_MUNICIPIO;
+  try {
+    const resp = await axios.get(
+      `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${encodeURIComponent(cidade)}`,
+      { timeout: 10000 },
+    );
+    const id = String(resp.data?.id ?? "");
+    return /^\d{7}$/.test(id) ? id : CODIGO_MUNICIPIO;
+  } catch {
+    return CODIGO_MUNICIPIO;
+  }
+}
+
+/** Texto curto das mensagens da prefeitura, para o resultado do job/tela. */
+function resumoMensagens(mensagens: MensagemNacional[]): string {
+  return mensagens
+    .map((m) => [m.codigo, m.mensagem, m.correcao].filter(Boolean).join(" - "))
+    .join(" | ");
+}
 
 /**
  * Próximo RPS a partir do último informado pelo usuário.
@@ -53,11 +88,24 @@ class NFSEController {
   private WSDL_URL = "";
   private PASSWORD = "";
 
+  /** XML ABRASF: só para consultar/cancelar as notas antigas. */
   private xmlFactory: NfseXmlFactory;
+  /** XML da NFS-e Nacional: emissão, cancelamento e consulta das notas novas. */
+  private nacionalXml: NfseNacionalXmlFactory;
+  /** Web service nacional (IssWebWSNacional). */
   private fiorilliProvider: FiorilliProvider;
+  /** Web service antigo (IssWebWS / ABRASF), mantido para as notas antigas. */
+  private legacyProvider: FiorilliProvider;
+  private ultimoNumeroLote = 0;
 
   constructor() {
     this.xmlFactory = new NfseXmlFactory();
+    this.nacionalXml = new NfseNacionalXmlFactory();
+    this.legacyProvider = new FiorilliProvider(
+      this.certPath,
+      this.TEMP_DIR,
+      "",
+    );
     // Provider will be initialized properly when we have the WSDL URL set in 'iniciar' or defaults
     // For now we set partial defaults, but WSDL might change based on 'homologacao'
     this.fiorilliProvider = new FiorilliProvider(
@@ -86,19 +134,119 @@ class NFSEController {
   }
 
   private configureProvider(ambiente: string = "producao") {
-    if (ambiente === "homologacao") {
-      this.WSDL_URL =
-        "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
-    } else {
-      this.WSDL_URL =
-        "https://wsnfe.arealva.sp.gov.br:8443/IssWeb-ejb/IssWebWS/IssWebWS?wsdl";
-    }
-    // Re-instantiate provider with correct WSDL
+    const homologacao = ambiente === "homologacao";
+
+    // Emissão passou para a NFS-e Nacional.
+    this.WSDL_URL = homologacao
+      ? URL_WS_NACIONAL.homologacao
+      : URL_WS_NACIONAL.producao;
     this.fiorilliProvider = new FiorilliProvider(
       this.certPath,
       this.TEMP_DIR,
       this.WSDL_URL,
     );
+
+    // O ABRASF continua para as notas emitidas antes da troca.
+    this.legacyProvider = new FiorilliProvider(
+      this.certPath,
+      this.TEMP_DIR,
+      homologacao
+        ? "http://fi1.fiorilli.com.br:5663/IssWeb-ejb/IssWebWS/IssWebWS?wsdl"
+        : "https://wsnfe.arealva.sp.gov.br:8443/IssWeb-ejb/IssWebWS/IssWebWS?wsdl",
+    );
+  }
+
+  private prestadorDoAmbiente(ambiente: string) {
+    const homologacao = ambiente === "homologacao";
+    return {
+      cnpj:
+        (homologacao
+          ? process.env.MUNICIPIO_CNPJ_TEST
+          : process.env.MUNICIPIO_LOGIN) || "",
+      inscricao:
+        (homologacao
+          ? process.env.MUNICIPIO_INCRICAO_TEST
+          : process.env.MUNICIPIO_INCRICAO) || "",
+    };
+  }
+
+  /**
+   * Assina as DPS, envia o lote síncrono e separa o resultado de cada uma.
+   *
+   * No lote nacional a prefeitura pode autorizar parte das DPS e recusar
+   * outras (as mensagens trazem o IdDPS); cada DPS recebe a sua nota ou os
+   * seus erros. Mensagem sem IdDPS vale para o lote inteiro.
+   */
+  private async enviarDpsNacional(
+    dps: { id: string; xml: string }[],
+    password: string,
+    ambiente: string,
+  ): Promise<{
+    responseXml: string;
+    porDps: Map<string, { nota?: NotaNacional; erros: MensagemNacional[] }>;
+  }> {
+    const { cnpj, inscricao } = this.prestadorDoAmbiente(ambiente);
+
+    // Número de lote único a cada envio (a prefeitura recusa lote repetido,
+    // E233): segundos atuais, sempre acima do último usado. Em milissegundos
+    // estoura o inteiro de 32 bits do servidor e volta negativo.
+    const numeroLote = Math.max(
+      Math.floor(Date.now() / 1000),
+      this.ultimoNumeroLote + 1,
+    );
+    this.ultimoNumeroLote = numeroLote;
+
+    const assinadas = dps.map((d) =>
+      this.fiorilliProvider.assinarXml(d.xml, "infDPS", password),
+    );
+    const soapXml = this.nacionalXml.createLoteSincronoSoap(
+      numeroLote,
+      cnpj,
+      inscricao,
+      assinadas,
+    );
+
+    if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
+    fs.appendFileSync("./log/xml_log.txt", soapXml + "\n", "utf8");
+
+    let responseXml: string;
+    try {
+      responseXml = await this.fiorilliProvider.sendSoapRequest(
+        soapXml,
+        ACAO_NACIONAL.lote,
+        password,
+      );
+    } catch (err: any) {
+      // SOAP Fault chega como HTTP 500: o corpo traz o motivo.
+      if (!err?.response?.data) throw err;
+      responseXml = String(err.response.data);
+    }
+
+    console.log("XML Response (NFS-e Nacional): ", responseXml);
+
+    const notas = lerNotas(responseXml);
+    const mensagens = lerMensagens(responseXml);
+    const gerais = mensagens.filter((m) => !m.idDps);
+
+    const porDps = new Map<
+      string,
+      { nota?: NotaNacional; erros: MensagemNacional[] }
+    >();
+    dps.forEach((d, i) => {
+      const nota =
+        notas.find((n) => n.idDps === d.id) ||
+        // Resposta sem o Id da DPS dentro da nota: casa pela ordem.
+        (notas.length === dps.length && !notas[i]?.idDps
+          ? notas[i]
+          : undefined);
+      const erros = mensagens.filter((m) => m.idDps === d.id);
+      porDps.set(d.id, {
+        nota,
+        erros: nota ? [] : erros.length ? erros : gerais,
+      });
+    });
+
+    return { responseXml, porDps };
   }
 
   /**
@@ -369,14 +517,12 @@ class NFSEController {
         total: ids.length,
       });
 
-      if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
-      const logPath = "./log/xml_log.txt";
-
       for (let i = 0; i < ids.length; i += 50) {
         const batch = ids.slice(i, i + 50);
-        let rpsXmls = "";
+        const dpsDoLote: { id: string; xml: string }[] = [];
 
-        const entitiesToSave: NFSE[] = [];
+        const entitiesToSave: { entidade: NFSE; idDps: string; bid: string }[] =
+          [];
 
         // Process batch
         for (const bid of batch) {
@@ -386,12 +532,10 @@ class NFSEController {
           });
           const {
             xml,
+            idDps,
             valorReduzido,
             rpsData,
             ClientData,
-            FaturasData,
-            // nfseBase, // Avoid shadowing, we already have it in scope
-            ibgeId,
             serieRps,
           } = await this.prepareRpsData(
             bid,
@@ -404,15 +548,8 @@ class NFSEController {
             ambiente,
           );
 
-          // Sign RPS
-          let signedRps = this.fiorilliProvider.assinarXml(
-            xml,
-            "InfDeclaracaoPrestacaoServico",
-            password,
-          );
-
-          // Append to list
-          rpsXmls += signedRps;
+          // A DPS é assinada no envio do lote
+          dpsDoLote.push({ id: idDps, xml });
 
           // Increment number
           currentRpsNumber++;
@@ -458,139 +595,78 @@ class NFSEController {
             ambiente: ambiente,
             status: "Ativa",
             numeroNfe: currentNfseNumber - 1,
+            modelo: "nacional",
+            idDps,
           });
-          entitiesToSave.push(novoRegistro);
+          entitiesToSave.push({ entidade: novoRegistro, idDps, bid });
         }
 
-        // Create Lote XML
-        const loteId = `lote${currentRpsNumber}`; // Note: strictly speaking this might be slightly off if multiple batches, but follows original logic intent
-        const cnpj =
-          ambiente === "homologacao"
-            ? process.env.MUNICIPIO_CNPJ_TEST
-            : process.env.MUNICIPIO_LOGIN;
-        const inscricao =
-          ambiente === "homologacao"
-            ? process.env.MUNICIPIO_INCRICAO_TEST
-            : process.env.MUNICIPIO_INCRICAO;
-
-        const loteXml = this.xmlFactory.createLoteXml(
-          loteId,
-          cnpj || "",
-          inscricao || "",
-          batch.length,
-          rpsXmls,
-        );
-
-        // Wrap in SOAP
-        const user = process.env.MUNICIPIO_LOGIN || "";
-        const pass = process.env.MUNICIPIO_SENHA || "";
-        const soapXml = this.xmlFactory.createEnviarLoteSoap(
-          loteXml,
-          user,
-          pass,
-        );
-
-        // Log
-        fs.appendFileSync(logPath, soapXml + "\n", "utf8");
-
-        // Send Request
-        const responseXml = await this.fiorilliProvider.sendSoapRequest(
-          soapXml,
-          SOAPAction,
-          password,
-        );
-
-        // Parse Response
-        const parsed = await parseStringPromise(responseXml, {
-          explicitArray: false,
-        });
-
-        // Check for error
-        // The structure might be different depending on success/fail.
-        // User log shows: soap:Body -> ns3:recepcionarLoteRpsSincronoResponse -> ns2:EnviarLoteRpsSincronoResposta -> ns2:ListaMensagemRetornoLote -> ns2:MensagemRetorno
-        const resposta =
-          parsed?.["soap:Envelope"]?.["soap:Body"]?.[
-            "ns3:recepcionarLoteRpsSincronoResponse"
-          ]?.["ns2:EnviarLoteRpsSincronoResposta"];
-
-        const temErro =
-          resposta?.["ns2:ListaMensagemRetorno"]?.["ns2:MensagemRetorno"] ||
-          resposta?.["ns2:ListaMensagemRetornoLote"]?.["ns2:MensagemRetorno"];
-
-        // Verifica se teve sucesso (tem ListaNfse na resposta)
-        const temSucesso = resposta?.["ns2:ListaNfse"]?.["ns2:CompNfse"];
-
-        console.log("Tem erro: " + JSON.stringify(temErro));
-        console.log(
-          "Tem sucesso (ListaNfse): " +
-            JSON.stringify(temSucesso ? true : false),
-        );
-
-        // Se tem mensagem de erro explícita, marca como erro
-        if (temErro) {
-          console.log(
-            "Erro detectado na resposta SOAP:",
-            JSON.stringify(temErro),
-          );
-          // If batch failed, mark all items in this batch as failed
+        // Envia o lote (NFS-e Nacional)
+        let envio: Awaited<ReturnType<NFSEController["enviarDpsNacional"]>>;
+        try {
+          envio = await this.enviarDpsNacional(dpsDoLote, password, ambiente);
+        } catch (err: any) {
+          console.error("Erro ao enviar o lote de DPS:", err?.message || err);
           for (const bid of batch) {
             respArr.push({
               id: bid,
               success: false,
               error: "Erro na geração do lote",
-              detalhes: temErro,
+              detalhes: err?.message || String(err),
             });
           }
-          // Do NOT save entitiesToSave
           continue;
         }
 
-        // Se não tem sucesso E não tem erro, algo inesperado aconteceu
-        if (!temSucesso && !temErro) {
-          console.log(
-            "Resposta inesperada do SOAP (sem ListaNfse e sem erro):",
-            JSON.stringify(resposta),
-          );
-          for (const bid of batch) {
+        // Só vai para o banco a DPS que virou nota.
+        for (const item of entitiesToSave) {
+          const resultado = envio.porDps.get(item.idDps);
+
+          if (!resultado?.nota) {
+            const erros = resultado?.erros || [];
+            console.log(
+              "DPS recusada:",
+              item.idDps,
+              erros.length ? resumoMensagens(erros) : "(sem mensagem)",
+            );
             respArr.push({
-              id: bid,
+              id: item.bid,
               success: false,
-              error: "Resposta inesperada do servidor",
-              detalhes: resposta,
+              error: erros.length
+                ? "Erro na geração do lote"
+                : "Resposta inesperada do servidor",
+              detalhes: erros.length
+                ? erros.map((m) => ({
+                    Codigo: m.codigo,
+                    Mensagem: m.mensagem,
+                    Correcao: m.correcao,
+                  }))
+                : envio.responseXml.slice(0, 2000),
             });
-          }
-          continue;
-        }
-
-        // If success, save to DB
-        if (entitiesToSave.length > 0) {
-          try {
-            await NsfeData.save(entitiesToSave);
-            console.log("✅ Entidades salvas no banco com sucesso!");
-          } catch (err) {
-            console.error("❌ Erro ao salvar entidades no banco:", err);
-            // Verify if we should mark as error if DB save fails
-            for (const bid of batch) {
-              respArr.push({
-                id: bid,
-                success: false,
-                error: "Erro ao salvar no banco",
-                detalhes: err,
-              });
-            }
             continue;
           }
-        }
 
-        console.log("XML Response: ", responseXml);
+          item.entidade.chaveNfse = resultado.nota.chave || null;
+          if (Number(resultado.nota.numero) > 0) {
+            item.entidade.numeroNfe = Number(resultado.nota.numero);
+          }
 
-        // Mark all items in batch as success
-        for (const bid of batch) {
-          respArr.push({
-            id: bid,
-            success: true,
-            message: "Nota gerada com sucesso",
-          });
+          try {
+            await NsfeData.save(item.entidade);
+            respArr.push({
+              id: item.bid,
+              success: true,
+              message: "Nota gerada com sucesso",
+            });
+          } catch (err) {
+            console.error("❌ Erro ao salvar entidade no banco:", err);
+            respArr.push({
+              id: item.bid,
+              success: false,
+              error: "Erro ao salvar no banco",
+              detalhes: err,
+            });
+          }
         }
       }
 
@@ -656,16 +732,7 @@ class NFSEController {
     });
 
     // Fetch IBGE code
-    // Optimization: cache this if possible, but keeping original flow
-    let ibgeId = "3503406"; // default fallback or Bauru/Arealva?
-    try {
-      const resp = await axios.get(
-        `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`,
-      );
-      ibgeId = resp.data.id;
-    } catch (e) {
-      /* ignore */
-    }
+    const ibgeId = await codigoIbgeDaCidade(ClientData?.cidade);
 
     let val = ClientData?.desconto
       ? Number(rpsData?.valor) - Number(ClientData?.desconto)
@@ -701,41 +768,43 @@ class NFSEController {
         ? "wip99"
         : nfseBase?.serieRps;
 
-    const xml = this.xmlFactory.createRpsXml(
-      rpsData?.uuid_lanc || "",
-      nfseNumber,
-      serieRps,
-      nfseBase?.tipoRps || "1",
-      new Date(), // Data Emissao
-      "1", // Status
-      val,
-      Number(aliquota).toFixed(4),
-      nfseBase?.issRetido || 2, // Default: Retido=2 (Não)
-      nfseBase?.responsavelRetencao || 1,
-      nfseBase?.itemListaServico,
-      service,
-      "3503406", // CodigoMunicipio Prestacao
-      nfseBase?.exigibilidadeIss || 1, // Default: Exigivel=1
-      cnpjPrestador || "",
-      inscricaoPrestador || "",
-      ClientData?.cpf_cnpj || "",
-      ClientData?.nome || "",
-      this.removerAcentos(ClientData?.endereco),
-      ClientData?.numero || "",
-      ClientData?.complemento || "",
-      ClientData?.bairro || "",
-      String(ibgeId),
-      "SP",
-      ClientData?.cep.replace(/[^0-9]/g, "") || "",
-      ClientData?.celular.replace(/[^0-9]/g, "") || "",
-      email,
-      ambiente === "homologacao" ? "" : "6", // Regime Especial
-      ambiente === "homologacao" ? "2" : "1", // Force 1 (Sim) as per Error L124 (Contribuinte É Optante)
-      nfseBase?.incentivoFiscal || 2,
-    );
+    const { id: idDps, xml } = this.nacionalXml.createDpsXml({
+      ambiente,
+      serie: serieRps,
+      numero: nfseNumber,
+      codigoMunicipio: CODIGO_MUNICIPIO,
+      prestador: {
+        cnpj: cnpjPrestador || "",
+        inscricaoMunicipal: inscricaoPrestador || "",
+        // Contribuinte é optante (erro L124 no ABRASF); homologação não.
+        optanteSimples: ambiente === "homologacao" ? "2" : "1",
+      },
+      tomador: {
+        cpfCnpj: ClientData?.cpf_cnpj || "",
+        nome: ClientData?.nome || "",
+        logradouro: this.removerAcentos(ClientData?.endereco),
+        numero: ClientData?.numero || "",
+        complemento: ClientData?.complemento || "",
+        bairro: ClientData?.bairro || "",
+        codigoMunicipio: ibgeId,
+        cep: ClientData?.cep?.replace(/[^0-9]/g, "") || "",
+        telefone: ClientData?.celular?.replace(/[^0-9]/g, "") || "",
+        email,
+      },
+      servico: {
+        itemListaServico: nfseBase?.itemListaServico,
+        discriminacao: service,
+      },
+      valores: {
+        valorServicos: val,
+        aliquota: Number(aliquota).toFixed(4),
+        issRetido: nfseBase?.issRetido || 2, // Default: Retido=2 (Não)
+      },
+    });
 
     return {
       xml,
+      idDps,
       valorReduzido,
       rpsData,
       ClientData,
@@ -756,6 +825,9 @@ class NFSEController {
           where: { id: Number(id), ambiente },
         });
 
+        if (nfse?.modelo === "nacional") {
+          return this.BuscarNfseNacionalDetalhes(nfse, ambiente);
+        }
         if (nfse) {
           return this.BuscarNSFEDetalhes(
             nfse.numeroRps,
@@ -770,6 +842,81 @@ class NFSEController {
     console.log(result);
 
     res.status(200).json(result);
+  }
+
+  /**
+   * Consulta a NFS-e Nacional (pela chave; sem ela, pelo número/série da DPS)
+   * e devolve no mesmo formato da consulta ABRASF, usado na impressão.
+   */
+  async BuscarNfseNacionalDetalhes(nfse: NFSE, ambiente: string): Promise<any> {
+    try {
+      this.configureProvider(ambiente);
+      const { cnpj, inscricao } = this.prestadorDoAmbiente(ambiente);
+
+      const soapXml = this.nacionalXml.createConsultaSoap({
+        cnpj,
+        inscricaoMunicipal: inscricao,
+        chaveNfse: nfse.chaveNfse,
+        numeroDps: nfse.numeroRps,
+        serieDps: nfse.serieRps,
+      });
+
+      let response: string;
+      try {
+        response = await this.fiorilliProvider.sendSoapRequest(
+          soapXml,
+          ACAO_NACIONAL.consultar,
+          this.PASSWORD,
+        );
+      } catch (err: any) {
+        if (!err?.response?.data) throw err;
+        response = String(err.response.data);
+      }
+
+      const [nota] = lerNotas(response);
+      if (!nota) {
+        const mensagens = lerMensagens(response);
+        return {
+          status: "error",
+          message: mensagens.length
+            ? resumoMensagens(mensagens)
+            : "NFS-e não encontrada na consulta.",
+        };
+      }
+
+      // Guarda a chave de notas que ainda não a tinham (ex.: consulta por DPS).
+      if (!nfse.chaveNfse && nota.chave) {
+        await AppDataSource.getRepository(NFSE).update(nfse.id, {
+          chaveNfse: nota.chave,
+        });
+      }
+
+      const data = notaNacionalNoFormatoAbrasf(
+        nota,
+        nfse.status === "Cancelada",
+      );
+      const tomadorEndereco =
+        data.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico
+          .InfDeclaracaoPrestacaoServico.Tomador.Endereco;
+      if (tomadorEndereco.CodigoMunicipio) {
+        const ibge = await axios
+          .get(
+            `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${tomadorEndereco.CodigoMunicipio}`,
+            { timeout: 1000 },
+          )
+          .catch(() => ({ data: { nome: "" } }));
+        tomadorEndereco.Cidade = ibge.data?.nome || "";
+        tomadorEndereco.Uf =
+          ibge.data?.microrregiao?.mesorregiao?.UF?.sigla || nfse.uf || "";
+      }
+      return { status: "success", data };
+    } catch (error: any) {
+      return {
+        status: "error",
+        message: "Erro ao buscar detalhes da NFSE.",
+        error: error?.message || error,
+      };
+    }
   }
 
   async verificaRps(
@@ -802,7 +949,7 @@ class NFSEController {
       );
 
       this.configureProvider(ambiente); // Ensure correct wsdl
-      const response = await this.fiorilliProvider.sendSoapRequest(
+      const response = await this.legacyProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
         this.PASSWORD,
@@ -886,6 +1033,14 @@ class NFSEController {
             continue;
           }
 
+          if (nfseEntity.modelo === "nacional") {
+            responses.push(
+              await this.cancelarNfseNacional(nfseEntity, password, ambiente),
+            );
+            continue;
+          }
+
+          // Notas antigas (ABRASF): cancelamento pelo web service antigo.
           const rps = nfseEntity.numeroRps;
 
           const nfseNumber = await this.setNfseNumber(
@@ -914,7 +1069,7 @@ class NFSEController {
           );
           const envioXml = `<CancelarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${pedidoXml}</CancelarNfseEnvio>`;
 
-          const envioXmlAssinado = this.fiorilliProvider.assinarXml(
+          const envioXmlAssinado = this.legacyProvider.assinarXml(
             envioXml,
             "InfPedidoCancelamento",
             password,
@@ -928,7 +1083,7 @@ class NFSEController {
 
           let soapToSend = soapFinal;
 
-          const response = await this.fiorilliProvider.sendSoapRequest(
+          const response = await this.legacyProvider.sendSoapRequest(
             soapToSend,
             "ConsultarNfseServicoPrestadoEnvio",
             password,
@@ -1009,6 +1164,98 @@ class NFSEController {
     }
   }
 
+  /**
+   * Cancelamento na NFS-e Nacional: evento 101101 sobre a chave de acesso.
+   * Nota sem chave guardada tem a chave buscada antes pela consulta da DPS.
+   */
+  private async cancelarNfseNacional(
+    nfseEntity: NFSE,
+    password: string,
+    ambiente: string,
+  ): Promise<any> {
+    const nfseRepository = AppDataSource.getRepository(NFSE);
+    const { cnpj, inscricao } = this.prestadorDoAmbiente(ambiente);
+
+    let chave = nfseEntity.chaveNfse;
+    if (!chave) {
+      const detalhes = await this.BuscarNfseNacionalDetalhes(
+        nfseEntity,
+        ambiente,
+      );
+      chave =
+        detalhes?.data?.CompNfse?.Nfse?.InfNfse?.CodigoVerificacao || null;
+      if (!chave) {
+        return {
+          id: nfseEntity.id,
+          success: false,
+          error: "Chave da NFS-e não encontrada",
+          detalhes: detalhes?.message,
+        };
+      }
+    }
+
+    const pedido = this.nacionalXml.createPedidoCancelamentoXml({
+      ambiente,
+      chaveNfse: chave,
+      cnpjAutor: cnpj,
+      inscricaoMunicipal: inscricao,
+    });
+    const pedidoAssinado = this.fiorilliProvider.assinarXml(
+      pedido,
+      "infPedReg",
+      password,
+    );
+    const soapXml = this.nacionalXml.createCancelamentoSoap(pedidoAssinado);
+
+    let response: string;
+    try {
+      response = await this.fiorilliProvider.sendSoapRequest(
+        soapXml,
+        ACAO_NACIONAL.cancelar,
+        password,
+      );
+    } catch (err: any) {
+      if (!err?.response?.data) {
+        return {
+          id: nfseEntity.id,
+          success: false,
+          error: err?.message || "Erro ao enviar o cancelamento",
+        };
+      }
+      response = String(err.response.data);
+    }
+
+    const mensagens = lerMensagens(response);
+    const status = lerStatus(response);
+    const recebido = /CancelarNFSeResposta/.test(response);
+    const confirmado = /sucesso|cancelad|homologad|^100$|^1$/i.test(status);
+
+    if (!recebido || (mensagens.length > 0 && !confirmado)) {
+      console.error(
+        "ERRO AO CANCELAR NFSe " + nfseEntity.id + ":",
+        resumoMensagens(mensagens) || response,
+      );
+      return {
+        id: nfseEntity.id,
+        success: false,
+        error: "Prefeitura rejeitou o cancelamento",
+        detalhes: mensagens.length
+          ? mensagens.map((m) => ({
+              Codigo: m.codigo,
+              Mensagem: m.mensagem,
+              Correcao: m.correcao,
+            }))
+          : String(response).slice(0, 2000),
+      };
+    }
+
+    nfseEntity.status = "Cancelada";
+    nfseEntity.chaveNfse = chave;
+    await nfseRepository.save(nfseEntity);
+
+    return { id: nfseEntity.id, success: true, response };
+  }
+
   async setPassword(req: Request, res: Response) {
     const { password } = req.body;
     this.PASSWORD = password;
@@ -1047,7 +1294,7 @@ class NFSEController {
       );
 
       this.configureProvider(ambiente);
-      const response = await this.fiorilliProvider.sendSoapRequest(
+      const response = await this.legacyProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
         this.PASSWORD,
@@ -1109,7 +1356,7 @@ class NFSEController {
       );
 
       this.configureProvider(ambiente);
-      const response = await this.fiorilliProvider.sendSoapRequest(
+      const response = await this.legacyProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
         this.PASSWORD,
@@ -1318,7 +1565,7 @@ class NFSEController {
         process.env.MUNICIPIO_SENHA || "",
       );
 
-      const response = await this.fiorilliProvider.sendSoapRequest(
+      const response = await this.legacyProvider.sendSoapRequest(
         soapFinal,
         "ConsultarNfseServicoPrestadoEnvio",
         this.PASSWORD,
@@ -1427,7 +1674,7 @@ class NFSEController {
 
       console.log("SOAP Request getLastNfseNumber:", soapXml);
 
-      const response = await this.fiorilliProvider.sendSoapRequest(
+      const response = await this.legacyProvider.sendSoapRequest(
         soapXml,
         "ConsultarNfseServicoPrestadoEnvio", // Action per doc
         this.PASSWORD,
@@ -1652,8 +1899,6 @@ class NFSEController {
         return;
       }
 
-      const uuidLanc = uuidv4();
-
       let nextNfseNumber = 0;
       let nextRpsNumber = 0;
 
@@ -1702,15 +1947,7 @@ class NFSEController {
         targetSeries = lastProd?.serieRps || "1";
       }
 
-      let ibgeId = "3503406";
-      try {
-        const resp = await axios.get(
-          `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`,
-        );
-        ibgeId = resp.data.id;
-      } catch (e) {
-        /* ignore */
-      }
+      const ibgeId = await codigoIbgeDaCidade(ClientData?.cidade);
 
       const email =
         ClientData?.email && ClientData.email.trim() !== ""
@@ -1726,101 +1963,64 @@ class NFSEController {
           ? process.env.MUNICIPIO_INCRICAO
           : process.env.MUNICIPIO_INCRICAO_TEST;
 
-      const xml = this.xmlFactory.createRpsXml(
-        uuidLanc,
-        currentRpsNumber,
-        targetSeries,
-        "1",
-        new Date(),
-        "1",
-        Number(valor),
-        aliquota,
-        2,
-        1,
-        servico,
-        this.removerAcentos(descricao || "Servico Avulso"),
-        "3503406",
-        1,
-        cnpjPrestador!,
-        inscricaoPrestador!,
-        ClientData?.cpf_cnpj,
-        this.removerAcentos(ClientData?.nome || ""),
-        this.removerAcentos(ClientData?.endereco || ""),
-        ClientData?.numero || "",
-        this.removerAcentos(ClientData?.complemento || ""),
-        this.removerAcentos(ClientData?.bairro || ""),
-        String(ibgeId),
-        "SP",
-        ClientData?.cep.replace(/[^0-9]/g, "") || "",
-        ClientData?.celular.replace(/[^0-9]/g, "") || "",
-        email,
-        "6",
-        "1",
-        2,
-      );
-
-      const signedRps = this.fiorilliProvider.assinarXml(
-        xml,
-        "InfDeclaracaoPrestacaoServico",
-        password,
-      );
-
-      const loteId = `lote${currentRpsNumber}`;
-      const loteXml = this.xmlFactory.createLoteXml(
-        loteId,
-        cnpjPrestador || "",
-        inscricaoPrestador || "",
-        1,
-        signedRps,
-      );
-
-      const loginMunicipio =
-        ambiente === "producao"
-          ? process.env.MUNICIPIO_LOGIN
-          : process.env.MUNICIPIO_LOGIN_TEST;
-      const senhaMunicipio =
-        ambiente === "producao"
-          ? process.env.MUNICIPIO_SENHA
-          : process.env.MUNICIPIO_SENHA_TEST;
-
-      const soapXml = this.xmlFactory.createEnviarLoteSoap(
-        loteXml,
-        loginMunicipio!,
-        senhaMunicipio!,
-      );
-
-      let responseXml;
-      try {
-        responseXml = await this.fiorilliProvider.sendSoapRequest(
-          soapXml,
-          "EnviarLoteRpsSincronoEnvio",
-          password,
-        );
-      } catch (error: any) {
-        if (error.response && error.response.data) {
-          console.error("SOAP FAULT:", error.response.data);
-          res.status(500).json({
-            error: "Erro no Servidor SOAP",
-            detalhes: error.response.data,
-          });
-          return;
-        }
-        throw error;
-      }
-
-      const parsed = await parseStringPromise(responseXml, {
-        explicitArray: false,
+      const dps = this.nacionalXml.createDpsXml({
+        ambiente,
+        serie: targetSeries,
+        numero: currentRpsNumber,
+        codigoMunicipio: CODIGO_MUNICIPIO,
+        prestador: {
+          cnpj: cnpjPrestador || "",
+          inscricaoMunicipal: inscricaoPrestador || "",
+          optanteSimples: "1",
+        },
+        tomador: {
+          cpfCnpj: ClientData?.cpf_cnpj || "",
+          nome: this.removerAcentos(ClientData?.nome || ""),
+          logradouro: this.removerAcentos(ClientData?.endereco || ""),
+          numero: ClientData?.numero || "",
+          complemento: this.removerAcentos(ClientData?.complemento || ""),
+          bairro: this.removerAcentos(ClientData?.bairro || ""),
+          codigoMunicipio: ibgeId,
+          cep: ClientData?.cep?.replace(/[^0-9]/g, "") || "",
+          telefone: ClientData?.celular?.replace(/[^0-9]/g, "") || "",
+          email,
+        },
+        servico: {
+          itemListaServico: servico,
+          discriminacao: this.removerAcentos(descricao || "Servico Avulso"),
+        },
+        valores: {
+          valorServicos: Number(valor),
+          aliquota,
+          issRetido: 2,
+        },
       });
 
-      const resposta =
-        parsed?.["soap:Envelope"]?.["soap:Body"]?.[
-          "ns3:recepcionarLoteRpsSincronoResponse"
-        ]?.["ns2:EnviarLoteRpsSincronoResposta"];
+      let envio: Awaited<ReturnType<NFSEController["enviarDpsNacional"]>>;
+      try {
+        envio = await this.enviarDpsNacional(
+          [dps],
+          password,
+          ambiente,
+        );
+      } catch (error: any) {
+        console.error("Erro ao enviar a DPS:", error?.message || error);
+        res.status(500).json({
+          error: "Erro no Servidor SOAP",
+          detalhes: error?.message || String(error),
+        });
+        return;
+      }
 
-      const temSucesso = resposta?.["ns2:ListaNfse"]?.["ns2:CompNfse"];
-      const temErro =
-        resposta?.["ns2:ListaMensagemRetorno"]?.["ns2:MensagemRetorno"] ||
-        resposta?.["ns2:ListaMensagemRetornoLote"]?.["ns2:MensagemRetorno"];
+      const resultado = envio.porDps.get(dps.id);
+      const temSucesso = resultado?.nota;
+      const temErro = resultado?.erros.length
+        ? resultado.erros.map((m) => ({
+            Codigo: m.codigo,
+            Mensagem: m.mensagem,
+            Correcao: m.correcao,
+          }))
+        : null;
 
       if (temSucesso) {
         const novoRegistro = NsfeData.create({
@@ -1855,16 +2055,21 @@ class NFSEController {
           incentivoFiscal: 2,
           ambiente: ambiente,
           status: "Ativa",
-          numeroNfe: nextNfseNumber,
+          numeroNfe: Number(temSucesso.numero) || nextNfseNumber,
+          modelo: "nacional",
+          chaveNfse: temSucesso.chave || null,
+          idDps: dps.id,
         });
         await NsfeData.save(novoRegistro);
-        res
-          .status(200)
-          .json({ message: "NFSE Gerada com Sucesso", detalhes: temSucesso });
+        res.status(200).json({
+          message: "NFSE Gerada com Sucesso",
+          detalhes: { numero: temSucesso.numero, chave: temSucesso.chave },
+        });
       } else {
-        res
-          .status(400)
-          .json({ error: "Erro ao gerar NFSE", detalhes: temErro || resposta });
+        res.status(400).json({
+          error: "Erro ao gerar NFSE",
+          detalhes: temErro || envio.responseXml.slice(0, 2000),
+        });
       }
     } catch (error) {
       console.error(error);
@@ -1981,17 +2186,7 @@ class NFSEController {
       return { ok: false, error: `Cliente ${login} não encontrado` };
     }
 
-    const uuidLanc = uuidv4();
-
-    let ibgeId = "3503406";
-    try {
-      const resp = await axios.get(
-        `https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ClientData?.cidade}`,
-      );
-      ibgeId = resp.data.id;
-    } catch {
-      /* ignore */
-    }
+    const ibgeId = await codigoIbgeDaCidade(ClientData?.cidade);
 
     const email =
       ClientData?.email && ClientData.email.trim() !== ""
@@ -2013,112 +2208,67 @@ class NFSEController {
       ambiente === "homologacao"
         ? "suporte_wiptelecom@outlook.com"
         : email;
-    const regimeEspecial = ambiente === "homologacao" ? "" : "6";
     const optanteSimples = ambiente === "homologacao" ? "2" : "1";
 
-    const xml = this.xmlFactory.createRpsXml(
-      uuidLanc,
-      currentRpsNumber,
-      serieToUse,
-      "1",
-      new Date(),
-      "1",
-      Number(valor),
-      aliquotaFmt,
-      2,
-      1,
-      servico,
-      this.removerAcentos(descricao || "Servicos Adicionais"),
-      "3503406",
-      1,
-      cnpjPrestador!,
-      inscricaoPrestador!,
-      ClientData.cpf_cnpj,
-      this.removerAcentos(ClientData.nome || ""),
-      this.removerAcentos(ClientData.endereco || ""),
-      ClientData.numero || "",
-      this.removerAcentos(ClientData.complemento || ""),
-      this.removerAcentos(ClientData.bairro || ""),
-      String(ibgeId),
-      "SP",
-      ClientData.cep.replace(/[^0-9]/g, "") || "",
-      ClientData.celular.replace(/[^0-9]/g, "") || "",
-      emailToUse,
-      regimeEspecial,
-      optanteSimples,
-      2,
-    );
+    const dps = this.nacionalXml.createDpsXml({
+      ambiente,
+      serie: serieToUse,
+      numero: currentRpsNumber,
+      codigoMunicipio: CODIGO_MUNICIPIO,
+      prestador: {
+        cnpj: cnpjPrestador || "",
+        inscricaoMunicipal: inscricaoPrestador || "",
+        optanteSimples,
+      },
+      tomador: {
+        cpfCnpj: ClientData.cpf_cnpj || "",
+        nome: this.removerAcentos(ClientData.nome || ""),
+        logradouro: this.removerAcentos(ClientData.endereco || ""),
+        numero: ClientData.numero || "",
+        complemento: this.removerAcentos(ClientData.complemento || ""),
+        bairro: this.removerAcentos(ClientData.bairro || ""),
+        codigoMunicipio: ibgeId,
+        cep: ClientData.cep?.replace(/[^0-9]/g, "") || "",
+        telefone: ClientData.celular?.replace(/[^0-9]/g, "") || "",
+        email: emailToUse,
+      },
+      servico: {
+        itemListaServico: servico,
+        discriminacao: this.removerAcentos(descricao || "Servicos Adicionais"),
+      },
+      valores: {
+        valorServicos: Number(valor),
+        aliquota: aliquotaFmt,
+        issRetido: 2,
+      },
+    });
 
-    const signedRps = this.fiorilliProvider.assinarXml(
-      xml,
-      "InfDeclaracaoPrestacaoServico",
-      password,
-    );
-
-    const loteId = `lote${currentRpsNumber}`;
-    const loteXml = this.xmlFactory.createLoteXml(
-      loteId,
-      cnpjPrestador || "",
-      inscricaoPrestador || "",
-      1,
-      signedRps,
-    );
-
-    const loginMunicipio =
-      ambiente === "producao"
-        ? process.env.MUNICIPIO_LOGIN
-        : process.env.MUNICIPIO_LOGIN_TEST;
-    const senhaMunicipio =
-      ambiente === "producao"
-        ? process.env.MUNICIPIO_SENHA
-        : process.env.MUNICIPIO_SENHA_TEST;
-
-    const soapXml = this.xmlFactory.createEnviarLoteSoap(
-      loteXml,
-      loginMunicipio!,
-      senhaMunicipio!,
-    );
-
-    let responseXml;
+    let envio: Awaited<ReturnType<NFSEController["enviarDpsNacional"]>>;
     try {
-      responseXml = await this.fiorilliProvider.sendSoapRequest(
-        soapXml,
-        "EnviarLoteRpsSincronoEnvio",
+      envio = await this.enviarDpsNacional(
+        [dps],
         password,
+        ambiente,
       );
     } catch (err: any) {
       console.error(
         "[NFSE-Servicos] SOAP fault para",
         login,
         ":",
-        err?.response?.data || err?.message,
+        err?.message || err,
       );
-      return { ok: false, error: err?.response?.data || err?.message || err };
+      return { ok: false, error: err?.message || String(err) };
     }
 
-    console.log("[NFSE-Servicos] Response XML para", login, ":", responseXml);
-
-    const parsed = await parseStringPromise(responseXml, {
-      explicitArray: false,
-    });
-    const resposta =
-      parsed?.["soap:Envelope"]?.["soap:Body"]?.[
-        "ns3:recepcionarLoteRpsSincronoResponse"
-      ]?.["ns2:EnviarLoteRpsSincronoResposta"];
-
-    const temSucesso = resposta?.["ns2:ListaNfse"]?.["ns2:CompNfse"];
-    const temErro =
-      resposta?.["ns2:ListaMensagemRetorno"]?.["ns2:MensagemRetorno"] ||
-      resposta?.["ns2:ListaMensagemRetornoLote"]?.["ns2:MensagemRetorno"];
+    const resultado = envio.porDps.get(dps.id);
+    const temSucesso = resultado?.nota;
 
     if (!temSucesso) {
-      console.error(
-        "[NFSE-Servicos] Falha para",
-        login,
-        "— erro:",
-        JSON.stringify(temErro || resposta).slice(0, 2000),
-      );
-      return { ok: false, error: temErro || resposta };
+      const erro = resultado?.erros.length
+        ? resumoMensagens(resultado.erros)
+        : envio.responseXml.slice(0, 2000);
+      console.error("[NFSE-Servicos] Falha para", login, "— erro:", erro);
+      return { ok: false, error: erro };
     }
 
     const NsfeData = AppDataSource.getRepository(NFSE);
@@ -2153,10 +2303,16 @@ class NFSEController {
       incentivoFiscal: 2,
       ambiente,
       status: "Ativa",
-      numeroNfe: nextNfseNumber,
+      numeroNfe: Number(temSucesso.numero) || nextNfseNumber,
+      modelo: "nacional",
+      chaveNfse: temSucesso.chave || null,
+      idDps: dps.id,
     });
     await NsfeData.save(novoRegistro);
-    return { ok: true, nfse: temSucesso };
+    return {
+      ok: true,
+      nfse: { numero: temSucesso.numero, chave: temSucesso.chave },
+    };
   }
 
   public EmitirNfseServicos = async (req: Request, res: Response) => {
@@ -2272,7 +2428,7 @@ class NFSEController {
           ok: r.ok,
           error: r.error,
           numeroRps: currentRpsNumber,
-          numeroNfe: nextNfseNumber,
+          numeroNfe: Number(r.nfse?.numero) || nextNfseNumber,
           valor: valorTotal,
         });
 

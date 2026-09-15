@@ -102,6 +102,18 @@ export class NFSE {
   @Column({ name: "numeroNfe", type: "int" })
   numeroNfe!: number;
 
+  /** 'abrasf' (web service antigo) ou 'nacional' (NFS-e Nacional / DPS). */
+  @Column({ name: "modelo", type: "varchar", length: 20, default: "abrasf" })
+  modelo!: string;
+
+  /** Chave de acesso da NFS-e Nacional (50 dígitos); nula nas notas ABRASF. */
+  @Column({ name: "chave_nfse", type: "varchar", length: 60, nullable: true })
+  chaveNfse!: string | null;
+
+  /** Id da DPS enviada ("DPS" + 42 dígitos); nulo nas notas ABRASF. */
+  @Column({ name: "id_dps", type: "varchar", length: 60, nullable: true })
+  idDps!: string | null;
+
   @Column({
     name: "timestamp",
     type: "timestamp",
