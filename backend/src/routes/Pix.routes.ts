@@ -64,6 +64,16 @@ router.post(
   AuthGuard,
   pixController.consultarWebhooksPixAutomatico,
 );
+router.post(
+  "/conciliarPixAutomatico",
+  AuthGuard,
+  pixController.conciliarPixAutomatico,
+);
+router.post(
+  "/gerarCobrancasDoMes",
+  AuthGuard,
+  pixController.gerarCobrancasDoMes,
+);
 
 router.post(
   "/getPixAutomaticoClients",

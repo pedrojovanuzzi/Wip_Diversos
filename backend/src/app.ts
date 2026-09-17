@@ -44,6 +44,7 @@ import CodefRoutes from "./routes/Codef.routes";
 // Controllers (for scheduled tasks)
 import BackupController from "./controller/Backup";
 import PixController from "./controller/Pix";
+import pixAutomaticoService from "./services/PixAutomaticoService";
 // import DosProtectController from "./controller/DosProtect";
 
 const backup = new BackupController();
@@ -125,19 +126,45 @@ export class App {
   }
 
   private agendarPixAutomatico() {
-    // 🕒 Agendar para todo dia às 03:00
+    // 🕒 Cobranças do mês: todo dia 1º às 03:00.
     cron.schedule("0 3 1 * *", async () => {
-      // cron.schedule("* * * * *", async () => {
-
       console.log("⏰ Executando Pix automático", new Date().toLocaleString());
       try {
-        // await pix.pegarUltimoBoletoGerarPixAutomatico();
-        // Commented out as per original file or to be safe, standardizing based on view_file content usage
-        await pix.pegarUltimoBoletoGerarPixAutomatico();
+        await pixAutomaticoService.garantirCobrancasDoMes();
       } catch (err) {
         console.error("❌ Falha no Pix automático:", err);
       }
     });
+
+    // 🕒 Conferência diária às 04:00: dá baixa no que foi pago mas cuja
+    // notificação não chegou (a Efí desiste depois de 9 tentativas e não
+    // reenvia webhook de Pix Automático).
+    cron.schedule("0 4 * * *", async () => {
+      console.log(
+        "⏰ Conferindo cobranças do Pix Automático",
+        new Date().toLocaleString(),
+      );
+      try {
+        await pixAutomaticoService.processarNotificacoesPendentes();
+        await pixAutomaticoService.conciliarPeriodo();
+      } catch (err) {
+        console.error("❌ Falha na conferência do Pix Automático:", err);
+      }
+    });
+
+    // 🕒 Recuperação na inicialização: se a máquina estava desligada na hora do
+    // agendamento, o mês ficaria sem cobrança nenhuma. Só cria o que falta,
+    // então pode rodar a cada restart.
+    if (process.env.PIX_AUTOMATICO_DESLIGAR_RECUPERACAO !== "true") {
+      setTimeout(() => {
+        pixAutomaticoService
+          .garantirCobrancasDoMes()
+          .then(() => pixAutomaticoService.processarNotificacoesPendentes())
+          .catch((err) =>
+            console.error("❌ Falha na recuperação do Pix Automático:", err),
+          );
+      }, 60_000);
+    }
 
     console.log("📅 Agendador de Pix");
   }

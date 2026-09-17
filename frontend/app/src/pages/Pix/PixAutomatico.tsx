@@ -394,6 +394,59 @@ export const PixAutomatico = () => {
     }
   }
 
+  /**
+   * Confere as cobranças do período com a Efí e dá baixa no que estiver pago.
+   * A mesma rotina roda sozinha todo dia às 4h; aqui é para não ter que
+   * esperar por ela.
+   */
+  async function conferirPagamentos() {
+    try {
+      setLoading(true);
+      setError("");
+      setSucesso("");
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Pix/conciliarPixAutomatico`,
+        {
+          inicio: `${filtroCob.inicio}T00:00:00Z`,
+          fim: `${filtroCob.fim}T23:59:59Z`,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const r = response.data ?? {};
+      setSucesso(
+        `Conferência: ${r.cobrancas ?? 0} cobrança(s), ${r.pagas ?? 0} paga(s), ${r.baixadas ?? 0} mensalidade(s) baixada(s) agora, ${r.jaBaixadas ?? 0} já estavam baixadas.`,
+      );
+      await listarCobrancas();
+    } catch (error: any) {
+      setError(extractErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /** Cria as cobranças do mês que estiverem faltando. */
+  async function gerarCobrancasDoMes() {
+    try {
+      setLoading(true);
+      setError("");
+      setSucesso("");
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/Pix/gerarCobrancasDoMes`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const r = response.data ?? {};
+      setSucesso(
+        `Geração: ${r.criadas ?? 0} cobrança(s) criada(s), ${r.jaExistiam ?? 0} já existiam, ${r.semMensalidade ?? 0} sem mensalidade no mês.`,
+      );
+      await listarCobrancas();
+    } catch (error: any) {
+      setError(extractErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   /** Jornada 1: cancela a autorização que foi enviada ao app do banco. */
   async function cancelarSolicitacao() {
     if (!solicitacao?.idSolicRec) return;
@@ -1217,6 +1270,27 @@ export const PixAutomatico = () => {
                 {loading ? "Buscando..." : "Buscar cobranças"}
               </button>
             </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              onClick={conferirPagamentos}
+              disabled={loading}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+              title="Lê as cobranças na Efí e baixa as mensalidades já pagas"
+            >
+              Conferir pagamentos agora
+            </button>
+            {permission! >= 5 && (
+              <button
+                onClick={gerarCobrancasDoMes}
+                disabled={loading}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                title="Cria as cobranças do mês que estiverem faltando"
+              >
+                Gerar cobranças do mês que faltam
+              </button>
+            )}
           </div>
 
           {retentativa && (

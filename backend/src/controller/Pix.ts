@@ -16,6 +16,7 @@ import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { whatsappOutgoingQueue } from "./whatsapp/index";
 import ZapSign from "./ZapSign";
 import { liberarContratoPosPagamento } from "./servicoWeb/contrato";
+import pixAutomaticoService from "../services/PixAutomaticoService";
 
 dotenv.config();
 
@@ -203,6 +204,41 @@ class Pix {
       console.error("❌ Erro em aplicarJuros_Desconto:", error);
       // 🔹 Em caso de erro, retorna o valor original sem alteração
       return Number(valor);
+    }
+  };
+
+  /**
+   * Conferência manual: lê as cobranças do período na Efí e dá baixa nas
+   * mensalidades já pagas. É a mesma rotina que roda todo dia às 4h.
+   */
+  conciliarPixAutomatico = async (req: Request, res: Response) => {
+    try {
+      const { inicio, fim } = req.body ?? {};
+      const resumo = await pixAutomaticoService.conciliarPeriodo(
+        inicio ? new Date(inicio) : undefined,
+        fim ? new Date(fim) : undefined,
+      );
+      res.status(200).json(resumo);
+    } catch (error: any) {
+      console.log(error);
+      res.status(500).json({ error: error?.message || error });
+    }
+  };
+
+  /**
+   * Gera as cobranças do mês que estiverem faltando. Serve para recuperar o
+   * mês quando o servidor estava fora do ar no dia 1º.
+   */
+  gerarCobrancasDoMes = async (req: Request, res: Response) => {
+    try {
+      const { referencia } = req.body ?? {};
+      const resumo = await pixAutomaticoService.garantirCobrancasDoMes(
+        referencia ? new Date(referencia) : undefined,
+      );
+      res.status(200).json(resumo);
+    } catch (error: any) {
+      console.log(error);
+      res.status(500).json({ error: error?.message || error });
     }
   };
 
@@ -617,104 +653,63 @@ class Pix {
     }
   };
 
+  /**
+   * Webhook das cobranças do Pix Automático.
+   *
+   * Grava a notificação e responde 200 na mesma hora: a Efí só tenta entregar
+   * 9 vezes (cerca de 5 horas) e o reenvio manual dela não vale para o Pix
+   * Automático, então uma falha de processamento não pode derrubar a entrega.
+   * O processamento vem depois, e é ele que confere na Efí se o dinheiro
+   * entrou antes de baixar a mensalidade.
+   */
   PixAutomaticWebhookCobr = async (req: Request, res: Response) => {
+    let notificacao = null;
     try {
-      const efipay = new EfiPay(options);
-
-      const cobr = req.body;
-
-      console.log(cobr);
-
-      if (!cobr.cobsr) {
-        res.status(200).json();
-        return;
-      }
-
-      const response = await efipay.pixDetailRecurrenceAutomatic({
-        idRec: cobr.cobsr[0].idRec,
-      });
-
-      console.log(response);
-
-      const cliente = await this.recordRepo.findOne({
-        where: {
-          login: response.vinculo.devedor.nome,
-          status: Not("pago"),
-          datadel: IsNull(),
-        },
-        order: { datavenc: "ASC" as const },
-      });
-
-      console.log(cliente);
-
-      const fatura = await this.recordRepo.update(String(cliente?.id), {
-        status: "pago",
-        coletor: "api_mk_pedro",
-        formapag: "pix_automatico",
-        valorpag:
-          response.valor.valorRec ?? response.valor.valorMinimoRecebedor,
-        datapag: new Date(),
-      });
-
-      console.log(fatura);
-
-      res.status(200).json(fatura);
+      notificacao = await pixAutomaticoService.registrarNotificacao(
+        "cobr",
+        req.body,
+      );
     } catch (error) {
-      console.log(error);
+      console.error("❌ Falha ao gravar notificação do Pix Automático:", error);
+    }
 
-      res.status(500).json(error);
+    res.status(200).json({ recebido: true });
+
+    if (notificacao) {
+      pixAutomaticoService
+        .processarNotificacao(notificacao)
+        .catch((error) =>
+          console.error("❌ Falha ao processar notificação cobr:", error),
+        );
     }
   };
 
+  /**
+   * Webhook das recorrências: avisa quando o cliente autoriza ou cancela a
+   * recorrência. Fica registrado para consulta; quem dá baixa em mensalidade é
+   * o webhook das cobranças.
+   */
   PixAutomaticWebhookRec = async (req: Request, res: Response) => {
+    let notificacao = null;
     try {
-      const efipay = new EfiPay(options);
-
-      const cobr = req.body;
-
-      console.log(cobr);
-
-      if (!cobr.cobsr) {
-        res.status(200).json();
-        return;
-      }
-
-      const response = await efipay.pixDetailRecurrenceAutomatic({
-        idRec: cobr.cobsr[0].idRec,
-      });
-
-      console.log(response);
-
-      const cliente = await this.recordRepo.findOne({
-        where: {
-          login: response.vinculo.devedor.nome,
-          status: Not("pago"),
-          datadel: IsNull(),
-        },
-        order: { datavenc: "ASC" as const },
-      });
-
-      console.log(cliente);
-
-      const fatura = await this.recordRepo.update(String(cliente?.id), {
-        status: "pago",
-        coletor: "api_mk_pedro",
-        formapag: "pix_automatico",
-        valorpag:
-          response.valor.valorRec ?? response.valor.valorMinimoRecebedor,
-        datapag: new Date(),
-      });
-
-      console.log(fatura);
-
-      res.status(200).json(fatura);
+      notificacao = await pixAutomaticoService.registrarNotificacao(
+        "rec",
+        req.body,
+      );
     } catch (error) {
-      console.log(error);
+      console.error("❌ Falha ao gravar notificação do Pix Automático:", error);
+    }
 
-      res.status(500).json(error);
+    res.status(200).json({ recebido: true });
+
+    if (notificacao) {
+      pixAutomaticoService
+        .processarNotificacao(notificacao)
+        .catch((error) =>
+          console.error("❌ Falha ao processar notificação rec:", error),
+        );
     }
   };
-
   validarCPF(cpfCnpj: string): boolean {
     cpfCnpj = cpfCnpj.replace(/[^\d]+/g, "");
     if (cpfCnpj.length === 11) {
