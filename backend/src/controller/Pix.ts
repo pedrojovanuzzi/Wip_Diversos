@@ -206,6 +206,40 @@ class Pix {
     }
   };
 
+  /**
+   * Mostra os webhooks do Pix Automático que estão cadastrados hoje na Efí.
+   *
+   * Serve para conferir o endereço que a Efí vai chamar: ela acrescenta "/rec"
+   * e "/cobr" ao final da URL cadastrada, a não ser que o endereço termine em
+   * "?ignorar=".
+   */
+  consultarWebhooksPixAutomatico = async (
+    _req: Request,
+    res: Response,
+  ): Promise<void> => {
+    try {
+      options.validateMtls = false;
+      const efipay = new EfiPay(options);
+
+      const [recorrencia, cobranca] = await Promise.allSettled([
+        efipay.pixListWebhookRecurrenceAutomatic(),
+        efipay.pixListWebhookAutomaticCharge(),
+      ]);
+
+      res.status(200).json({
+        recorrencia:
+          recorrencia.status === "fulfilled" ? recorrencia.value : null,
+        erroRecorrencia:
+          recorrencia.status === "rejected" ? recorrencia.reason : null,
+        cobranca: cobranca.status === "fulfilled" ? cobranca.value : null,
+        erroCobranca: cobranca.status === "rejected" ? cobranca.reason : null,
+      });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json(error);
+    }
+  };
+
   AlterarWebhookPixAutomaticoRecorrencia = async (
     req: Request,
     res: Response,
@@ -306,7 +340,9 @@ class Pix {
 
       const status = pix.status;
       console.log(`[Webhook PIX] status=${status} | txid=${txid}`);
-      console.log(`[Webhook PIX] infoAdicionais=${JSON.stringify(pix.infoAdicionais)}`);
+      console.log(
+        `[Webhook PIX] infoAdicionais=${JSON.stringify(pix.infoAdicionais)}`,
+      );
 
       if (status !== "CONCLUIDA") {
         res.status(200).json({ message: "PIX ainda não concluído", status });
@@ -349,11 +385,15 @@ class Pix {
         if (!record_pppoe) continue;
 
         // --- Processamento de serviços (independente de o cliente existir no MKAuth) ---
-        console.log(`[Webhook PIX] tipo=${record_pppoe.tipo} | login=${record_pppoe.login} | id=${record_pppoe.id}`);
+        console.log(
+          `[Webhook PIX] tipo=${record_pppoe.tipo} | login=${record_pppoe.login} | id=${record_pppoe.id}`,
+        );
         if (record_pppoe.tipo === "servicos") {
           try {
             const localRepo = LocalDataSource.getRepository(SolicitacaoServico);
-            const servicoNome = record_pppoe.obs.split("Serviço: ")[1]?.split(" -")[0];
+            const servicoNome = record_pppoe.obs
+              .split("Serviço: ")[1]
+              ?.split(" -")[0];
             console.log(`[Webhook PIX] servicoNome extraído: "${servicoNome}"`);
 
             // Busca prioritariamente pelo ID da fatura vinculada
@@ -361,21 +401,31 @@ class Pix {
               where: { id_fatura: Number(record_pppoe.id), pago: false },
               order: { data_solicitacao: "DESC" },
             });
-            console.log(`[Webhook PIX] solicitacao por id_fatura=${record_pppoe.id}: ${solicitacao ? `id=${solicitacao.id}` : "não encontrada"}`);
+            console.log(
+              `[Webhook PIX] solicitacao por id_fatura=${record_pppoe.id}: ${solicitacao ? `id=${solicitacao.id}` : "não encontrada"}`,
+            );
 
             // Fallback pelo login + serviço
             if (!solicitacao && servicoNome) {
               solicitacao = await localRepo.findOne({
-                where: { login_cliente: record_pppoe.login, servico: servicoNome, pago: false },
+                where: {
+                  login_cliente: record_pppoe.login,
+                  servico: servicoNome,
+                  pago: false,
+                },
                 order: { data_solicitacao: "DESC" },
               });
-              console.log(`[Webhook PIX] solicitacao por login+serviço: ${solicitacao ? `id=${solicitacao.id}` : "não encontrada"}`);
+              console.log(
+                `[Webhook PIX] solicitacao por login+serviço: ${solicitacao ? `id=${solicitacao.id}` : "não encontrada"}`,
+              );
             }
 
             if (solicitacao) {
               solicitacao.pago = true;
               await localRepo.save(solicitacao);
-              console.log(`[Dashboard Sync] Solicitação ${solicitacao.id} marcada como paga (Fatura ID: ${record_pppoe.id})`);
+              console.log(
+                `[Dashboard Sync] Solicitação ${solicitacao.id} marcada como paga (Fatura ID: ${record_pppoe.id})`,
+              );
             }
 
             // Notificação para TEST_PHONE
@@ -391,21 +441,38 @@ class Pix {
                       recipient_type: "individual",
                       to: testPhone,
                       type: "template",
-                      template: { name: "notificacao_pagamento", language: { code: "pt_BR" } },
+                      template: {
+                        name: "notificacao_pagamento",
+                        language: { code: "pt_BR" },
+                      },
                     },
-                    headers: { Authorization: `Bearer ${waToken}`, "Content-Type": "application/json" },
+                    headers: {
+                      Authorization: `Bearer ${waToken}`,
+                      "Content-Type": "application/json",
+                    },
                   },
-                  { removeOnComplete: true, removeOnFail: false, attempts: 3, backoff: { type: "exponential", delay: 5000 } },
+                  {
+                    removeOnComplete: true,
+                    removeOnFail: false,
+                    attempts: 3,
+                    backoff: { type: "exponential", delay: 5000 },
+                  },
                 );
               } catch (queueError) {
-                console.error("[Webhook PIX] Erro ao enfileirar notificação:", queueError);
+                console.error(
+                  "[Webhook PIX] Erro ao enfileirar notificação:",
+                  queueError,
+                );
               }
             }
 
             // Determina o telefone do cliente a partir da solicitação (funciona mesmo sem MKAuth)
             let requesterPhone = "";
             if (solicitacao?.dados?.telefone_conversa) {
-              const clean = solicitacao.dados.telefone_conversa.replace(/\D/g, "");
+              const clean = solicitacao.dados.telefone_conversa.replace(
+                /\D/g,
+                "",
+              );
               requesterPhone = clean.startsWith("55") ? clean : "55" + clean;
             } else if (solicitacao?.dados?.telefone) {
               const clean = solicitacao.dados.telefone.replace(/\D/g, "");
@@ -414,8 +481,11 @@ class Pix {
 
             // Fallback para telefone do MKAuth se disponível
             if (!requesterPhone) {
-              const sis_clienteFallback = await this.clienteRepo.findOne({ where: { login: record_pppoe.login } });
-              const tel = sis_clienteFallback?.celular || sis_clienteFallback?.fone || "";
+              const sis_clienteFallback = await this.clienteRepo.findOne({
+                where: { login: record_pppoe.login },
+              });
+              const tel =
+                sis_clienteFallback?.celular || sis_clienteFallback?.fone || "";
               if (tel) {
                 const clean = tel.replace(/\D/g, "");
                 requesterPhone = clean.startsWith("55") ? clean : "55" + clean;
@@ -442,12 +512,22 @@ class Pix {
             if (solicitacao?.dados && !solicitacao.token_zapsign) {
               try {
                 let zapResponse;
-                if (solicitacao.servico === "Instalação" && solicitacao.dados.dificuldade_acesso) {
-                  zapResponse = await ZapSign.createContractInstalacaoDificuldadeAcesso(solicitacao.dados);
+                if (
+                  solicitacao.servico === "Instalação" &&
+                  solicitacao.dados.dificuldade_acesso
+                ) {
+                  zapResponse =
+                    await ZapSign.createContractInstalacaoDificuldadeAcesso(
+                      solicitacao.dados,
+                    );
                 } else if (solicitacao.servico === "Instalação") {
-                  zapResponse = await ZapSign.createContractInstalacao(solicitacao.dados);
+                  zapResponse = await ZapSign.createContractInstalacao(
+                    solicitacao.dados,
+                  );
                 } else if (solicitacao.servico === "Mudança de Endereço") {
-                  zapResponse = await ZapSign.createContractMudancaEndereco(solicitacao.dados);
+                  zapResponse = await ZapSign.createContractMudancaEndereco(
+                    solicitacao.dados,
+                  );
                 }
                 if (zapResponse) {
                   zapSignUrl = zapResponse.signers[0].sign_url;
@@ -463,7 +543,8 @@ class Pix {
 
             // Envia WhatsApp ao cliente
             if (requesterPhone) {
-              const nomeCliente = solicitacao?.dados?.nome || record_pppoe.login;
+              const nomeCliente =
+                solicitacao?.dados?.nome || record_pppoe.login;
               const nomeServico = servicoNome || "Contratado";
               if (zapSignUrl) {
                 await Whatsapp.MensagensComuns(
@@ -1245,7 +1326,17 @@ class Pix {
         periodicidade,
         valor,
         politica,
+        jornada,
+        destinatario,
       } = pixAutoData;
+
+      /**
+       * Jornada de contratação (documentação do Pix Automático da Efí):
+       * 1 = sem QR, a confirmação chega no app do banco do cliente (solicrec);
+       * 2 = QR só de autorização, sem cobrar nada na hora;
+       * 3 = QR que cobra a mensalidade em aberto e já autoriza a recorrência.
+       */
+      const tipoJornada = String(jornada ?? "3");
 
       if (!cpf) {
         res.status(500).json("Sem CPF");
@@ -1301,7 +1392,8 @@ class Pix {
         order: { datavenc: "ASC" as const },
       });
 
-      if (!cliente) {
+      // Só a jornada 3 cobra na hora, então só ela precisa de mensalidade aberta.
+      if (!cliente && tipoJornada === "3") {
         throw new Error(
           `Usuário ${nome} não encontrado ou sem mensalidades vencidas`,
         );
@@ -1309,7 +1401,11 @@ class Pix {
 
       const efipay = new EfiPay(options);
 
-      const locResponse = await efipay.pixCreateLocationRecurrenceAutomatic();
+      // A jornada 1 não usa QR Code, logo não precisa de location.
+      const locResponse =
+        tipoJornada === "1"
+          ? null
+          : await efipay.pixCreateLocationRecurrenceAutomatic();
 
       console.log(locResponse);
 
@@ -1318,22 +1414,26 @@ class Pix {
       const num = Number(String(valor).replace(",", "."));
       console.log(num.toFixed(2));
 
-      const payload1 = {
-        calendario: { expiracao: 3600 },
-        chave: String(process.env.CHAVE_PIX),
-        valor: { original: num.toFixed(2) },
-        // loc: {id: locResponse.id},
-        devedor: isCPF ? { nome, cpf: documento } : { nome, cnpj: documento },
-        infoAdicionais: [{ nome: "TITULO", valor: String(cliente.id) }],
-        solicitacaoPagador: "Mensalidade",
-      };
+      // Cobrança imediata: só existe na jornada 3, e é ela que o QR cobra na
+      // hora. Fora da jornada 3 essa cobrança ficaria solta, sem vínculo com a
+      // recorrência, e o cliente poderia pagá-la por engano.
+      if (tipoJornada === "3") {
+        const payload1 = {
+          calendario: { expiracao: 3600 },
+          chave: String(process.env.CHAVE_PIX),
+          valor: { original: num.toFixed(2) },
+          devedor: isCPF ? { nome, cpf: documento } : { nome, cnpj: documento },
+          infoAdicionais: [{ nome: "TITULO", valor: String(cliente!.id) }],
+          solicitacaoPagador: "Mensalidade",
+        };
 
-      console.log(params.txid);
-      console.log(options.sandbox);
+        console.log(params.txid);
+        console.log(options.sandbox);
 
-      const cobv = await efipay.pixCreateCharge(params, payload1);
+        const cobv = await efipay.pixCreateCharge(params, payload1);
 
-      console.log(cobv);
+        console.log(cobv);
+      }
 
       if (data_inicial.includes("/")) {
         const [dia, mes, ano] = data_inicial.split("/");
@@ -1367,22 +1467,65 @@ class Pix {
         return;
       }
 
-      const payload2 = {
+      const payload2: any = {
         calendario: { dataInicial: data_inicial, periodicidade },
         politicaRetentativa: politica,
-        // ativacao: {dadosJornada: {txid: }},
-        loc: locResponse.id,
         valor: { valorRec: num.toFixed(2) },
         vinculo: {
           contrato,
           devedor: isCPF ? { nome, cpf: documento } : { nome, cnpj: documento },
+          objeto: String(servico || "Mensalidade").slice(0, 35),
         },
       };
+
+      if (locResponse) payload2.loc = locResponse.id;
+
+      // É esse vínculo que faz o QR cobrar a mensalidade e autorizar a
+      // recorrência no mesmo pagamento (jornada 3).
+      if (tipoJornada === "3") {
+        payload2.ativacao = { dadosJornada: { txid: params.txid } };
+      }
 
       const responseRecurrence = await efipay.pixCreateRecurrenceAutomatic(
         "",
         payload2,
       );
+
+      // Jornada 1: a confirmação chega no app do banco do cliente, então
+      // precisa dos dados da conta dele (agência, conta e ISPB do banco).
+      let solicitacao = null;
+      if (tipoJornada === "1") {
+        if (
+          !destinatario?.agencia ||
+          !destinatario?.conta ||
+          !destinatario?.ispbParticipante
+        ) {
+          res.status(400).json({
+            error:
+              "Para a jornada 1 informe agência, conta e ISPB do banco do cliente.",
+          });
+          return;
+        }
+
+        const expiracao =
+          destinatario.dataExpiracaoSolicitacao ||
+          new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split(".")[0] + "Z";
+
+        solicitacao = await efipay.pixCreateRequestRecurrenceAutomatic("", {
+          idRec: responseRecurrence.idRec,
+          calendario: { dataExpiracaoSolicitacao: expiracao },
+          destinatario: {
+            ...(isCPF ? { cpf: documento } : { cnpj: documento }),
+            agencia: String(destinatario.agencia),
+            conta: String(destinatario.conta),
+            ispbParticipante: String(destinatario.ispbParticipante),
+          },
+        });
+
+        console.log(solicitacao);
+      }
 
       const response = await efipay.pixDetailRecurrenceAutomatic({
         idRec: responseRecurrence.idRec,
@@ -1390,7 +1533,7 @@ class Pix {
 
       console.log(response);
 
-      res.status(200).json(response);
+      res.status(200).json({ ...response, solicitacao, jornada: tipoJornada });
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
@@ -1618,6 +1761,136 @@ class Pix {
     }
   };
 
+  /**
+   * Jornada 1: consulta a solicitação de confirmação enviada ao app do banco.
+   */
+  buscarSolicitacaoRecorrencia = async (req: Request, res: Response) => {
+    try {
+      const { idSolicRec } = req.body;
+      if (!idSolicRec) {
+        res.status(400).json({ error: "Informe o idSolicRec." });
+        return;
+      }
+      const efi = new EfiPay(options);
+      const response = await efi.pixDetailRequestRecurrenceAutomatic({
+        idSolicRec,
+      });
+      res.status(200).json(response);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json(error);
+    }
+  };
+
+  /**
+   * Jornada 1: cancela a solicitação enquanto ela ainda está CRIADA ou RECEBIDA.
+   */
+  cancelarSolicitacaoRecorrencia = async (req: Request, res: Response) => {
+    try {
+      const { idSolicRec } = req.body;
+      if (!idSolicRec) {
+        res.status(400).json({ error: "Informe o idSolicRec." });
+        return;
+      }
+      const efi = new EfiPay(options);
+      const response = await efi.pixUpdateRequestRecurrenceAutomatic(
+        { idSolicRec },
+        { status: "CANCELADA" },
+      );
+      res.status(200).json(response);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json(error);
+    }
+  };
+
+  /**
+   * Nova tentativa de uma cobrança que não foi paga. Só funciona quando a
+   * recorrência foi criada com a política PERMITE_3R_7D.
+   */
+  solicitarRetentativaCobranca = async (req: Request, res: Response) => {
+    try {
+      const { txid, data } = req.body;
+      if (!txid || !data) {
+        res
+          .status(400)
+          .json({ error: "Informe o txid e a data da nova tentativa." });
+        return;
+      }
+      const efi = new EfiPay(options);
+      const response = await efi.pixRetryRequestAutomaticCharge({
+        txid,
+        data: String(data).slice(0, 10),
+      });
+      res.status(200).json(response);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json(error);
+    }
+  };
+
+  /**
+   * Lista as cobranças do Pix Automático de um período, seguindo as páginas
+   * até o fim. Sem período, usa o mês corrente.
+   */
+  listarCobrancasPixAutomatico = async (req: Request, res: Response) => {
+    try {
+      const { inicio, fim, status, idRec, cpf } = req.body ?? {};
+
+      const agora = new Date();
+      const inicioPadrao = new Date(agora.getFullYear(), agora.getMonth(), 1);
+      const fimPadrao = new Date(
+        agora.getFullYear(),
+        agora.getMonth() + 1,
+        0,
+        23,
+        59,
+        59,
+      );
+
+      /**
+       * A Efí exige a data no formato AAAA-MM-DDTHH:MM:SSZ, sem milissegundos.
+       * Recorta sempre a partir do ISO completo: tentar "cortar o milissegundo"
+       * de um texto que já vinha sem ponto acabava gerando dois Z no fim.
+       */
+      const paraFormatoEfi = (valor: string | Date, padrao: Date) => {
+        const data = valor ? new Date(valor) : padrao;
+        const valida = isNaN(data.getTime()) ? padrao : data;
+        return valida.toISOString().split(".")[0] + "Z";
+      };
+
+      const efi = new EfiPay(options);
+      const cobsr: any[] = [];
+      let paginaAtual = 0;
+      let quantidadeDePaginas = 1;
+      let parametros: any = null;
+
+      while (paginaAtual < quantidadeDePaginas) {
+        const params: any = {
+          inicio: paraFormatoEfi(inicio, inicioPadrao),
+          fim: paraFormatoEfi(fim, fimPadrao),
+          "paginacao.itensPorPagina": 100,
+          "paginacao.paginaAtual": paginaAtual,
+        };
+        if (status && status !== "TODOS") params.status = status;
+        if (idRec) params.idRec = idRec;
+        if (cpf) params.cpf = String(cpf).replace(/\D/g, "");
+
+        const response = await efi.pixListAutomaticCharge(params);
+        cobsr.push(...(response.cobsr ?? []));
+        parametros = response.parametros;
+        quantidadeDePaginas =
+          response.parametros?.paginacao?.quantidadeDePaginas ?? 1;
+        paginaAtual++;
+      }
+
+      res.status(200).json({ parametros, cobsr });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json(error);
+    }
+  };
+
   buscarCobranca = async (req: Request, res: Response) => {
     try {
       const { txid } = req.body;
@@ -1785,7 +2058,8 @@ class Pix {
 
     while (start <= endFinal) {
       // laço até cobrir todo o período
-      const end = new Date( // calcula o fim da janela atual
+      const end = new Date(
+        // calcula o fim da janela atual
         Math.min(start.getTime() + janelaMs, endFinal.getTime()), // não ultrapassa o fim final
       );
 

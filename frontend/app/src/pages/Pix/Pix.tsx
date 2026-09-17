@@ -4,7 +4,7 @@ import { NavBar } from "../../components/navbar/NavBar";
 import { ClockIcon } from "@heroicons/react/24/outline";
 import { IoDocuments } from "react-icons/io5";
 import { FaBoxOpen, FaUsers } from "react-icons/fa";
-import { MdPaid } from "react-icons/md";
+import { MdPaid, MdAutorenew } from "react-icons/md";
 import { CiSettings } from "react-icons/ci";
 import PixCard from "./components/PixCard";
 import { useAuth } from "../../context/AuthContext";
@@ -94,6 +94,14 @@ export const Pix = () => {
             cor="bg-emerald-50 text-emerald-700"
             titulo="Buscar Pix Pagos"
             descricao="Consulta pagamentos pelo ID de transação do Pix."
+          />
+
+          <PixCard
+            link="/Pix/automatico"
+            icon={<MdAutorenew className="size-6" />}
+            cor="bg-indigo-50 text-indigo-700"
+            titulo="Cadastrar Pix Automático"
+            descricao="Cadastra a cobrança recorrente do cliente na Efí (Gerencianet)."
           />
         </div>
       </div>

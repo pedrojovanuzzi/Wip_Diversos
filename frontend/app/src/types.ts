@@ -44,6 +44,15 @@ export interface PixAuto {
   periodicidade: string;
   valor: string;
   politica: string;
+  /** 1 = app do banco (solicrec), 2 = QR de autorização, 3 = QR que cobra agora. */
+  jornada?: string;
+  /** Dados bancários do cliente, exigidos só na jornada 1. */
+  destinatario?: {
+    agencia?: string;
+    conta?: string;
+    ispbParticipante?: string;
+    dataExpiracaoSolicitacao?: string;
+  };
 }
 
 export interface PixAutomaticoListPeople {
@@ -81,11 +90,10 @@ export interface PixAutomaticoListOnePeople {
   };
 }
 
-
 export interface FiltrosPix {
-  status?: 'CRIADA' | 'CANCELADA' | 'APROVADA' | 'TODOS';
-  periodicidade?: 'SEMANAL' | 'MENSAL' | 'ANUAL' | 'TODOS';
-  idRec? : string,
+  status?: "CRIADA" | "CANCELADA" | "APROVADA" | "TODOS";
+  periodicidade?: "SEMANAL" | "MENSAL" | "ANUAL" | "TODOS";
+  idRec?: string;
 }
 
 export interface PixRecurrence {
