@@ -70,6 +70,7 @@ const TECNICOS = [
 const SERVICOS = [
   "TV NH",
   "TV WIP",
+  "WATCH TV",
   "TROCA DE PLANO",
   "CDNTV",
   "INSTALACAO",
