@@ -57,22 +57,22 @@ export class NFSE {
   })
   inscricaoMunicipalPrestador!: string;
 
-  @Column({ name: "cpf_tomador", type: "varchar", length: 11 })
+  @Column({ name: "cpf_tomador", type: "varchar", length: 14 })
   cpfTomador!: string;
 
-  @Column({ name: "razao_social_tomador", type: "varchar", length: 100 })
+  @Column({ name: "razao_social_tomador", type: "varchar", length: 255 })
   razaoSocialTomador!: string;
 
-  @Column({ name: "endereco_tomador", type: "varchar", length: 100 })
+  @Column({ name: "endereco_tomador", type: "varchar", length: 255 })
   enderecoTomador!: string;
 
   @Column({ name: "numero_endereco", type: "varchar", length: 100 })
   numeroEndereco!: string;
 
-  @Column({ name: "complemento", type: "varchar", length: 50 })
+  @Column({ name: "complemento", type: "varchar", length: 150 })
   complemento!: string;
 
-  @Column({ name: "bairro", type: "varchar", length: 50 })
+  @Column({ name: "bairro", type: "varchar", length: 120 })
   bairro!: string;
 
   @Column({ name: "uf", type: "varchar", length: 2 })
@@ -81,10 +81,10 @@ export class NFSE {
   @Column({ name: "cep", type: "varchar", length: 8 })
   cep!: string;
 
-  @Column({ name: "telefone_tomador", type: "varchar", length: 15 })
+  @Column({ name: "telefone_tomador", type: "varchar", length: 20 })
   telefoneTomador!: string;
 
-  @Column({ name: "email_tomador", type: "varchar", length: 100 })
+  @Column({ name: "email_tomador", type: "varchar", length: 120 })
   emailTomador!: string;
 
   @Column({ name: "optante_simples_nacional", type: "int" })

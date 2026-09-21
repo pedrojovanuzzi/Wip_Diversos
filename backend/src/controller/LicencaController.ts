@@ -2,11 +2,51 @@ import { Request, Response } from "express";
 import AppDataSource from "../database/DataSource";
 import { LicencaEntity } from "../entities/LicencaEntities";
 
+/**
+ * Campos fiscais do tomador, usados na NFS-e da licença. Ficam separados do
+ * resto porque só entram quando informados: salvar a licença sem eles não
+ * pode apagar o que já estava preenchido.
+ */
+function dadosFiscaisDoCorpo(corpo: any) {
+  const campos = [
+    "razao_social",
+    "email",
+    "telefone",
+    "endereco",
+    "numero",
+    "complemento",
+    "bairro",
+    "cidade",
+    "codigo_municipio",
+    "uf",
+    "cep",
+  ] as const;
+
+  const dados: Record<string, string | null> = {};
+
+  if (corpo?.documento !== undefined) {
+    dados.documento = String(corpo.documento).replace(/\D/g, "") || null;
+  }
+  if (corpo?.cep !== undefined) {
+    dados.cep = String(corpo.cep).replace(/\D/g, "") || null;
+  }
+
+  for (const campo of campos) {
+    if (campo === "cep") continue;
+    if (corpo?.[campo] === undefined) continue;
+    const valor = String(corpo[campo] ?? "").trim();
+    dados[campo] = valor || null;
+  }
+
+  return dados;
+}
+
 class LicencaController {
   constructor() {
     this.criarLicenca = this.criarLicenca.bind(this);
     this.listarLicencas = this.listarLicencas.bind(this);
     this.atualizarStatus = this.atualizarStatus.bind(this);
+    this.atualizarLicenca = this.atualizarLicenca.bind(this);
     this.verificarLicenca = this.verificarLicenca.bind(this);
     this.removerLicenca = this.removerLicenca.bind(this);
     this.recuperarChaveLicenca = this.recuperarChaveLicenca.bind(this);
@@ -36,6 +76,7 @@ class LicencaController {
         software,
         chave,
         observacao,
+        ...dadosFiscaisDoCorpo(req.body),
         status: "ativo",
       });
 
@@ -57,6 +98,34 @@ class LicencaController {
       res.status(200).json(licencas);
     } catch (error) {
       console.error("Erro ao listar licenças:", error);
+      res.status(500).json({ message: "Erro interno do servidor." });
+    }
+  }
+
+  /** Edita a licença, inclusive os dados fiscais usados na NFS-e. */
+  public async atualizarLicenca(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const licencaRepo = AppDataSource.getRepository(LicencaEntity);
+      const licenca = await licencaRepo.findOne({ where: { id: Number(id) } });
+
+      if (!licenca) {
+        res.status(404).json({ message: "Licença não encontrada." });
+        return;
+      }
+
+      const { cliente_nome, software, observacao } = req.body ?? {};
+      if (cliente_nome !== undefined)
+        licenca.cliente_nome = String(cliente_nome).trim();
+      if (software !== undefined) licenca.software = String(software).trim();
+      if (observacao !== undefined) licenca.observacao = observacao;
+
+      Object.assign(licenca, dadosFiscaisDoCorpo(req.body));
+
+      await licencaRepo.save(licenca);
+      res.status(200).json(licenca);
+    } catch (error) {
+      console.error("Erro ao atualizar licença:", error);
       res.status(500).json({ message: "Erro interno do servidor." });
     }
   }

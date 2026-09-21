@@ -12,7 +12,20 @@ import {
   FaUnlock,
   FaKey,
   FaDesktop,
+  FaPen,
 } from "react-icons/fa";
+import { MensalidadesLicenca } from "./MensalidadesLicenca";
+import { ConfiguracaoMensalidades } from "./ConfiguracaoMensalidades";
+import { NotasFiscaisLicenca } from "./NotasFiscaisLicenca";
+
+type Aba = "licencas" | "mensalidades" | "notas" | "configuracao";
+
+const ABAS: { id: Aba; rotulo: string }[] = [
+  { id: "licencas", rotulo: "Licenças" },
+  { id: "mensalidades", rotulo: "Mensalidades" },
+  { id: "notas", rotulo: "Notas fiscais" },
+  { id: "configuracao", rotulo: "Configuração" },
+];
 
 interface Licenca {
   id: number;
@@ -23,18 +36,65 @@ interface Licenca {
   observacao: string;
   created_at: string;
   updated_at: string;
+  // Dados do tomador, usados na NFS-e da licença.
+  documento?: string | null;
+  razao_social?: string | null;
+  email?: string | null;
+  telefone?: string | null;
+  endereco?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  codigo_municipio?: string | null;
+  uf?: string | null;
+  cep?: string | null;
 }
+
+/** Campos fiscais do formulário, todos opcionais no cadastro. */
+const FISCAIS_VAZIOS = {
+  documento: "",
+  razao_social: "",
+  email: "",
+  telefone: "",
+  endereco: "",
+  numero: "",
+  complemento: "",
+  bairro: "",
+  cidade: "",
+  uf: "SP",
+  cep: "",
+};
+
+type Fiscais = typeof FISCAIS_VAZIOS;
+
+const CAMPOS_FISCAIS: { chave: keyof Fiscais; rotulo: string }[] = [
+  { chave: "documento", rotulo: "CPF/CNPJ" },
+  { chave: "razao_social", rotulo: "Razão social (se diferente do nome)" },
+  { chave: "email", rotulo: "E-mail" },
+  { chave: "telefone", rotulo: "Telefone" },
+  { chave: "endereco", rotulo: "Endereço" },
+  { chave: "numero", rotulo: "Número" },
+  { chave: "complemento", rotulo: "Complemento" },
+  { chave: "bairro", rotulo: "Bairro" },
+  { chave: "cidade", rotulo: "Cidade" },
+  { chave: "uf", rotulo: "UF" },
+  { chave: "cep", rotulo: "CEP" },
+];
 
 export const GerenciarLicencas = () => {
   const [licencas, setLicencas] = useState<Licenca[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [aba, setAba] = useState<Aba>("licencas");
 
   // Form states
   const [clienteNome, setClienteNome] = useState("");
   const [software, setSoftware] = useState("");
   const [chave, setChave] = useState("");
   const [observacao, setObservacao] = useState("");
+  const [fiscais, setFiscais] = useState<Fiscais>(FISCAIS_VAZIOS);
+  const [editando, setEditando] = useState<Licenca | null>(null);
 
   const { user } = useAuth();
   const token = user?.token;
@@ -62,6 +122,39 @@ export const GerenciarLicencas = () => {
     fetchLicencas();
   }, [fetchLicencas]);
 
+  /** Abre o formulário já preenchido, para editar os dados fiscais. */
+  const abrirEdicao = (licenca: Licenca) => {
+    setEditando(licenca);
+    setClienteNome(licenca.cliente_nome);
+    setSoftware(licenca.software || "");
+    setChave(licenca.chave);
+    setObservacao(licenca.observacao || "");
+    setFiscais({
+      documento: licenca.documento || "",
+      razao_social: licenca.razao_social || "",
+      email: licenca.email || "",
+      telefone: licenca.telefone || "",
+      endereco: licenca.endereco || "",
+      numero: licenca.numero || "",
+      complemento: licenca.complemento || "",
+      bairro: licenca.bairro || "",
+      cidade: licenca.cidade || "",
+      uf: licenca.uf || "SP",
+      cep: licenca.cep || "",
+    });
+    setShowModal(true);
+  };
+
+  const fecharModal = () => {
+    setShowModal(false);
+    setEditando(null);
+    setClienteNome("");
+    setSoftware("");
+    setChave("");
+    setObservacao("");
+    setFiscais(FISCAIS_VAZIOS);
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clienteNome || !chave) {
@@ -69,22 +162,33 @@ export const GerenciarLicencas = () => {
       return;
     }
 
+    const corpo = {
+      cliente_nome: clienteNome,
+      software,
+      chave,
+      observacao,
+      ...fiscais,
+    };
+
     try {
-      await axios.post(
-        `${process.env.REACT_APP_URL}/licenca/criar`,
-        { cliente_nome: clienteNome, software, chave, observacao },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      showSuccess("Licença criada com sucesso!");
-      setShowModal(false);
-      setClienteNome("");
-      setSoftware("");
-      setChave("");
-      setObservacao("");
+      if (editando) {
+        await axios.put(
+          `${process.env.REACT_APP_URL}/licenca/${editando.id}`,
+          corpo,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        showSuccess("Licença atualizada!");
+      } else {
+        await axios.post(`${process.env.REACT_APP_URL}/licenca/criar`, corpo, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        showSuccess("Licença criada com sucesso!");
+      }
+      fecharModal();
       fetchLicencas();
     } catch (error: any) {
-      console.error("Erro ao criar licença:", error);
-      showError(error.response?.data?.message || "Erro ao criar licença.");
+      console.error("Erro ao salvar licença:", error);
+      showError(error.response?.data?.message || "Erro ao salvar licença.");
     }
   };
 
@@ -134,21 +238,46 @@ export const GerenciarLicencas = () => {
   return (
     <div>
       <NavBar />
-      <div className="h-screen bg-gray-200 p-4 sm:p-8">
+      <div className="min-h-screen bg-gray-200 p-4 sm:p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
               <FaDesktop /> Gerenciar Licenças de Software
             </h1>
-            <button
-              onClick={() => setShowModal(true)}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center gap-2"
-            >
-              <FaPlus /> Nova Licença
-            </button>
+            {aba === "licencas" && (
+              <button
+                onClick={() => setShowModal(true)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center gap-2"
+              >
+                <FaPlus /> Nova Licença
+              </button>
+            )}
           </div>
 
-          <div className="bg-gray-100 shadow-md rounded-lg overflow-hidden">
+          <div className="mb-6 inline-flex rounded-lg bg-gray-100 p-1">
+            {ABAS.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setAba(item.id)}
+                className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+                  aba === item.id
+                    ? "bg-white text-indigo-700 shadow-sm"
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                {item.rotulo}
+              </button>
+            ))}
+          </div>
+
+          {aba === "mensalidades" && <MensalidadesLicenca />}
+          {aba === "notas" && <NotasFiscaisLicenca />}
+          {aba === "configuracao" && <ConfiguracaoMensalidades />}
+
+          <div
+            className="bg-gray-100 shadow-md rounded-lg overflow-hidden"
+            hidden={aba !== "licencas"}
+          >
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-100">
@@ -234,6 +363,13 @@ export const GerenciarLicencas = () => {
                             )}
                           </button>
                           <button
+                            onClick={() => abrirEdicao(licenca)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                            title="Editar (inclusive dados da nota fiscal)"
+                          >
+                            <FaPen />
+                          </button>
+                          <button
                             onClick={() => handleDelete(licenca.id)}
                             className="text-red-600 hover:text-red-900 ml-2"
                             title="Excluir"
@@ -253,13 +389,13 @@ export const GerenciarLicencas = () => {
 
       {showModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-          <div className="bg-white p-5 rounded-lg shadow-xl w-full max-w-md">
+          <div className="bg-white p-5 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold text-gray-900">
-                Nova Licença
+                {editando ? "Editar Licença" : "Nova Licença"}
               </h3>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={fecharModal}
                 className="text-gray-400 hover:text-gray-600"
               >
                 X
@@ -321,10 +457,49 @@ export const GerenciarLicencas = () => {
                   className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                 />
               </div>
+
+              {/* Dados do tomador: sem eles a NFS-e da licença não sai. */}
+              <div className="mb-4 rounded border border-gray-200 p-3">
+                <p className="mb-1 text-sm font-bold text-gray-700">
+                  Dados para nota fiscal
+                </p>
+                <p className="mb-3 text-xs text-gray-500">
+                  Só são exigidos na hora de emitir a NFS-e. Dá para deixar em
+                  branco agora e preencher depois.
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {CAMPOS_FISCAIS.map(({ chave: nome, rotulo }) => (
+                    <label
+                      key={nome}
+                      className={`flex flex-col gap-1 ${
+                        nome === "endereco" || nome === "razao_social"
+                          ? "col-span-2"
+                          : ""
+                      }`}
+                    >
+                      <span className="text-xs font-medium text-gray-600">
+                        {rotulo}
+                      </span>
+                      <input
+                        type="text"
+                        value={fiscais[nome]}
+                        onChange={(e) =>
+                          setFiscais((prev) => ({
+                            ...prev,
+                            [nome]: e.target.value,
+                          }))
+                        }
+                        className="shadow appearance-none border rounded w-full py-1.5 px-2 text-sm text-gray-700 focus:outline-none focus:shadow-outline"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={fecharModal}
                   className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
                 >
                   Cancelar

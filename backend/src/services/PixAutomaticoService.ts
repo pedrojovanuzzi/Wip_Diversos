@@ -28,6 +28,14 @@ const options = {
   validateMtls: false,
 };
 
+/**
+ * Erro de tabela que ainda não existe (migration não rodou). Vale avisar em
+ * uma linha em vez de derrubar a rotina com um stack trace a cada boot.
+ */
+function tabelaAusente(erro: any): boolean {
+  return erro?.code === "ER_NO_SUCH_TABLE" || erro?.errno === 1146;
+}
+
 /** Data no formato que a Efí exige: AAAA-MM-DDTHH:MM:SSZ, sem milissegundos. */
 function formatoEfi(data: Date): string {
   return data.toISOString().split(".")[0] + "Z";
@@ -135,11 +143,23 @@ class PixAutomaticoService {
 
   /** Reprocessa o que ficou para trás (erro no meio, banco fora do ar). */
   async processarNotificacoesPendentes(limite = 50) {
-    const pendentes = await this.notificacaoRepo.find({
-      where: { processada: false },
-      order: { id: "ASC" },
-      take: limite,
-    });
+    let pendentes: PixAutomaticoNotificacao[] = [];
+    try {
+      pendentes = await this.notificacaoRepo.find({
+        where: { processada: false },
+        order: { id: "ASC" },
+        take: limite,
+      });
+    } catch (erro: any) {
+      if (tabelaAusente(erro)) {
+        console.warn(
+          "⚠️ Pix Automático: tabelas de controle ainda não existem. Rode 'npm run migration:run'.",
+        );
+        return 0;
+      }
+      throw erro;
+    }
+
     for (const pendente of pendentes) await this.processarNotificacao(pendente);
     return pendentes.length;
   }

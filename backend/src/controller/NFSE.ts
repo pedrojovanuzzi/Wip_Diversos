@@ -44,6 +44,30 @@ dotenv.config();
 /** Município do prestador (Arealva-SP): emissão e local da prestação. */
 const CODIGO_MUNICIPIO = "3503406";
 
+/** Município do ambiente de homologação da Fiorilli. */
+const CODIGO_MUNICIPIO_TESTE = "3507506";
+
+/**
+ * Código IBGE do município emissor (`cLocEmi` e local da prestação).
+ *
+ * Em produção é Arealva. Em homologação o servidor da Fiorilli representa
+ * outro município, com CNPJ e inscrição de teste — mandar Arealva lá faz a
+ * prefeitura recusar com "N1 - Código da localidade emissora incorreto".
+ */
+function codigoMunicipioEmissor(ambiente: string): string {
+  const padrao =
+    ambiente === "homologacao" ? CODIGO_MUNICIPIO_TESTE : CODIGO_MUNICIPIO;
+
+  // O .env só entra se um dia o município mudar; sem ele, vale o padrão acima.
+  const configurado = String(
+    (ambiente === "homologacao"
+      ? process.env.MUNICIPIO_IBGE_TEST
+      : process.env.MUNICIPIO_IBGE) ?? "",
+  ).replace(/\D/g, "");
+
+  return /^\d{7}$/.test(configurado) ? configurado : padrao;
+}
+
 /** Código IBGE da cidade do tomador; sem resposta válida, fica o do prestador. */
 async function codigoIbgeDaCidade(cidade?: string | null): Promise<string> {
   if (!cidade) return CODIGO_MUNICIPIO;
@@ -297,7 +321,9 @@ class NFSEController {
       const falha = validarCertificadoPfx(temporario, senha, tempDir);
       if (falha) {
         limpar();
-        res.status(400).json({ erro: `${falha} O certificado anterior foi mantido.` });
+        res
+          .status(400)
+          .json({ erro: `${falha} O certificado anterior foi mantido.` });
         return;
       }
 
@@ -530,23 +556,17 @@ class NFSEController {
           await AppDataSource.getRepository(Jobs).update(job.id, {
             processados: contadorProcessados,
           });
-          const {
-            xml,
-            idDps,
-            valorReduzido,
-            rpsData,
-            ClientData,
-            serieRps,
-          } = await this.prepareRpsData(
-            bid,
-            aliquota,
-            service,
-            reducao,
-            currentRpsNumber,
-            nfseBase as NFSE,
-            serieToUse,
-            ambiente,
-          );
+          const { xml, idDps, valorReduzido, rpsData, ClientData, serieRps } =
+            await this.prepareRpsData(
+              bid,
+              aliquota,
+              service,
+              reducao,
+              currentRpsNumber,
+              nfseBase as NFSE,
+              serieToUse,
+              ambiente,
+            );
 
           // A DPS é assinada no envio do lote
           dpsDoLote.push({ id: idDps, xml });
@@ -772,7 +792,7 @@ class NFSEController {
       ambiente,
       serie: serieRps,
       numero: nfseNumber,
-      codigoMunicipio: CODIGO_MUNICIPIO,
+      codigoMunicipio: codigoMunicipioEmissor(ambiente),
       prestador: {
         cnpj: cnpjPrestador || "",
         inscricaoMunicipal: inscricaoPrestador || "",
@@ -1194,6 +1214,48 @@ class NFSEController {
       }
     }
 
+    const envio = await this.enviarCancelamentoNacional(
+      chave,
+      password,
+      ambiente,
+    );
+
+    if (!envio.ok) {
+      console.error(
+        "ERRO AO CANCELAR NFSe " + nfseEntity.id + ":",
+        envio.error,
+      );
+      return {
+        id: nfseEntity.id,
+        success: false,
+        error: "Prefeitura rejeitou o cancelamento",
+        detalhes: envio.detalhes ?? envio.error,
+      };
+    }
+
+    nfseEntity.status = "Cancelada";
+    nfseEntity.chaveNfse = chave;
+    await nfseRepository.save(nfseEntity);
+
+    return { id: nfseEntity.id, success: true, response: envio.response };
+  }
+
+  /**
+   * Monta, assina e envia o evento de cancelamento (101101) de uma NFS-e
+   * nacional. Só fala com a prefeitura: quem chama decide o que gravar.
+   */
+  private async enviarCancelamentoNacional(
+    chave: string,
+    password: string,
+    ambiente: string,
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    detalhes?: any;
+    response?: string;
+  }> {
+    const { cnpj, inscricao } = this.prestadorDoAmbiente(ambiente);
+
     const pedido = this.nacionalXml.createPedidoCancelamentoXml({
       ambiente,
       chaveNfse: chave,
@@ -1217,8 +1279,7 @@ class NFSEController {
     } catch (err: any) {
       if (!err?.response?.data) {
         return {
-          id: nfseEntity.id,
-          success: false,
+          ok: false,
           error: err?.message || "Erro ao enviar o cancelamento",
         };
       }
@@ -1231,14 +1292,10 @@ class NFSEController {
     const confirmado = /sucesso|cancelad|homologad|^100$|^1$/i.test(status);
 
     if (!recebido || (mensagens.length > 0 && !confirmado)) {
-      console.error(
-        "ERRO AO CANCELAR NFSe " + nfseEntity.id + ":",
-        resumoMensagens(mensagens) || response,
-      );
       return {
-        id: nfseEntity.id,
-        success: false,
-        error: "Prefeitura rejeitou o cancelamento",
+        ok: false,
+        error:
+          resumoMensagens(mensagens) || "Prefeitura rejeitou o cancelamento",
         detalhes: mensagens.length
           ? mensagens.map((m) => ({
               Codigo: m.codigo,
@@ -1246,14 +1303,45 @@ class NFSEController {
               Correcao: m.correcao,
             }))
           : String(response).slice(0, 2000),
+        response,
       };
     }
 
-    nfseEntity.status = "Cancelada";
-    nfseEntity.chaveNfse = chave;
-    await nfseRepository.save(nfseEntity);
+    return { ok: true, response };
+  }
 
-    return { id: nfseEntity.id, success: true, response };
+  /**
+   * Cancela uma NFS-e nacional a partir da chave, sem depender de a nota ter
+   * ficado gravada na tabela `nfse`. Se o registro existir, ele é marcado
+   * como cancelado.
+   */
+  public async cancelarNfsePorChave(
+    chave: string,
+    password: string,
+    ambiente: string,
+  ): Promise<{ ok: boolean; error?: string; detalhes?: any }> {
+    const limpa = String(chave || "").replace(/\D/g, "");
+    if (!limpa) return { ok: false, error: "Chave da NFS-e não informada." };
+
+    this.PASSWORD = password;
+    this.configureProvider(ambiente);
+
+    const envio = await this.enviarCancelamentoNacional(
+      limpa,
+      password,
+      ambiente,
+    );
+    if (!envio.ok)
+      return { ok: false, error: envio.error, detalhes: envio.detalhes };
+
+    const repo = AppDataSource.getRepository(NFSE);
+    const registro = await repo.findOne({ where: { chaveNfse: limpa } });
+    if (registro) {
+      registro.status = "Cancelada";
+      await repo.save(registro);
+    }
+
+    return { ok: true };
   }
 
   async setPassword(req: Request, res: Response) {
@@ -1420,7 +1508,9 @@ class NFSEController {
       // Uma linha por nota. Antes as notas de um mesmo cliente vinham juntas
       // numa linha só ("1263, 1262"), o que quebrava a seleção, a impressão,
       // o cancelamento e a data na tela.
-      const clientePorLogin = new Map(clientesResponse.map((c) => [c.login, c]));
+      const clientePorLogin = new Map(
+        clientesResponse.map((c) => [c.login, c]),
+      );
       const linhas = nfseResponse
         .filter((nf) => clientePorLogin.has(nf.login))
         .map((nf) => ({
@@ -1770,7 +1860,9 @@ class NFSEController {
       // Uma linha por fatura. Antes as faturas de um mesmo cliente vinham
       // juntas ("123, 124"), e a seleção mandava um título inválido para a
       // geração da nota.
-      const clientePorLogin = new Map(clientesResponse.map((c) => [c.login, c]));
+      const clientePorLogin = new Map(
+        clientesResponse.map((c) => [c.login, c]),
+      );
       const arr = faturasResponse
         .filter((f) => clientePorLogin.has(f.login))
         .map((f) => {
@@ -1819,7 +1911,9 @@ class NFSEController {
       // o seguinte.
       const rpsNumber = proximoNumeroRps(ultimoRps);
       if (rpsNumber === null) {
-        res.status(400).json({ error: "Informe o último número de RPS usado." });
+        res
+          .status(400)
+          .json({ error: "Informe o último número de RPS usado." });
         return;
       }
 
@@ -1902,7 +1996,7 @@ class NFSEController {
         ambiente,
         serie: targetSeries,
         numero: currentRpsNumber,
-        codigoMunicipio: CODIGO_MUNICIPIO,
+        codigoMunicipio: codigoMunicipioEmissor(ambiente),
         prestador: {
           cnpj: cnpjPrestador || "",
           inscricaoMunicipal: inscricaoPrestador || "",
@@ -1933,11 +2027,7 @@ class NFSEController {
 
       let envio: Awaited<ReturnType<NFSEController["enviarDpsNacional"]>>;
       try {
-        envio = await this.enviarDpsNacional(
-          [dps],
-          password,
-          ambiente,
-        );
+        envio = await this.enviarDpsNacional([dps], password, ambiente);
       } catch (error: any) {
         console.error("Erro ao enviar a DPS:", error?.message || error);
         res.status(500).json({
@@ -2071,13 +2161,15 @@ class NFSEController {
         const valorStreamer = Number(r.valor_streamer || 0);
         const valorCamera = Number(r.valor_camera || 0);
         const resumo =
-          resumos.get(String(r.login || "").trim().toUpperCase()) ?? null;
+          resumos.get(
+            String(r.login || "")
+              .trim()
+              .toUpperCase(),
+          ) ?? null;
         return {
           ...r,
           nome_streamer:
-            qtdStreamer > 0
-              ? nomeStreaming(valorStreamer / qtdStreamer)
-              : null,
+            qtdStreamer > 0 ? nomeStreaming(valorStreamer / qtdStreamer) : null,
           nome_camera:
             qtdCamera > 0 ? nomeServicoCamera(resumo, valorCamera) : null,
         };
@@ -2089,6 +2181,180 @@ class NFSEController {
       res.status(500).json({ error: "Erro ao buscar clientes." });
     }
   };
+
+  /**
+   * Emite uma NFS-e para um tomador informado por quem chama, sem depender do
+   * cadastro do MKAuth.
+   *
+   * Serve para quem não é cliente de internet — hoje, as licenças de software.
+   * O caminho é o mesmo das outras notas: monta a DPS, assina e envia pelo
+   * web service nacional; só a origem dos dados do tomador muda.
+   */
+  public async emitirNfseParaTomador(opts: {
+    /** Identificação da nota no sistema (vai na coluna `login`). */
+    referencia: string;
+    valor: number;
+    /** Código do item da lista de serviços (ex.: 010501, licenciamento). */
+    servico: string;
+    descricao: string;
+    password: string;
+    ambiente: string;
+    aliquota: string;
+    numeroRps: number;
+    serie?: string;
+    tomador: {
+      cpfCnpj: string;
+      nome: string;
+      logradouro?: string | null;
+      numero?: string | null;
+      complemento?: string | null;
+      bairro?: string | null;
+      codigoMunicipio?: string | null;
+      cidade?: string | null;
+      uf?: string | null;
+      cep?: string | null;
+      telefone?: string | null;
+      email?: string | null;
+    };
+  }): Promise<{
+    ok: boolean;
+    error?: string;
+    nfseId?: number;
+    numero?: string;
+    chave?: string;
+    /** Nota emitida, mas com problema ao gravar do lado de cá. */
+    aviso?: string;
+  }> {
+    const { ambiente, password } = opts;
+    this.PASSWORD = password;
+    this.configureProvider(ambiente);
+
+    const { cnpj: cnpjPrestador, inscricao: inscricaoPrestador } =
+      this.prestadorDoAmbiente(ambiente);
+
+    const documento = String(opts.tomador.cpfCnpj || "").replace(/\D/g, "");
+    if (documento.length !== 11 && documento.length !== 14) {
+      return { ok: false, error: "CPF/CNPJ do tomador inválido." };
+    }
+
+    // Sem código IBGE informado, busca pela cidade; sem cidade, usa o do
+    // prestador, que é o que o leiaute aceita como último recurso.
+    const codigoMunicipio = /^\d{7}$/.test(
+      String(opts.tomador.codigoMunicipio ?? ""),
+    )
+      ? String(opts.tomador.codigoMunicipio)
+      : await codigoIbgeDaCidade(opts.tomador.cidade);
+
+    const serie = opts.serie || (ambiente === "homologacao" ? "wip99" : "1");
+
+    const dps = this.nacionalXml.createDpsXml({
+      ambiente,
+      serie,
+      numero: opts.numeroRps,
+      codigoMunicipio: codigoMunicipioEmissor(ambiente),
+      prestador: {
+        cnpj: cnpjPrestador,
+        inscricaoMunicipal: inscricaoPrestador,
+        optanteSimples: ambiente === "homologacao" ? "2" : "1",
+      },
+      tomador: {
+        cpfCnpj: documento,
+        nome: this.removerAcentos(opts.tomador.nome || ""),
+        logradouro: this.removerAcentos(opts.tomador.logradouro || ""),
+        numero: opts.tomador.numero || "",
+        complemento: this.removerAcentos(opts.tomador.complemento || ""),
+        bairro: this.removerAcentos(opts.tomador.bairro || ""),
+        codigoMunicipio,
+        cep: String(opts.tomador.cep || "").replace(/\D/g, ""),
+        telefone: String(opts.tomador.telefone || "").replace(/\D/g, ""),
+        email: opts.tomador.email || "",
+      },
+      servico: {
+        itemListaServico: opts.servico,
+        discriminacao: this.removerAcentos(opts.descricao || "Servico"),
+      },
+      valores: {
+        valorServicos: Number(opts.valor),
+        aliquota: Number(opts.aliquota || 0).toFixed(4),
+        issRetido: 2,
+      },
+    });
+
+    let envio: Awaited<ReturnType<NFSEController["enviarDpsNacional"]>>;
+    try {
+      envio = await this.enviarDpsNacional([dps], password, ambiente);
+    } catch (err: any) {
+      return { ok: false, error: err?.message || String(err) };
+    }
+
+    const resultado = envio.porDps.get(dps.id);
+    if (!resultado?.nota) {
+      return {
+        ok: false,
+        error: resultado?.erros.length
+          ? resumoMensagens(resultado.erros)
+          : envio.responseXml.slice(0, 1000),
+      };
+    }
+
+    // Daqui em diante a nota JÁ EXISTE na prefeitura. Qualquer falha ao
+    // gravar aqui não pode virar erro de emissão: quem chamou precisa saber o
+    // número para não emitir a mesma nota de novo.
+    const NsfeData = AppDataSource.getRepository(NFSE);
+    const registro = NsfeData.create({
+      login: opts.referencia.slice(0, 255),
+      numeroRps: opts.numeroRps,
+      serieRps: serie,
+      tipoRps: 1,
+      dataEmissao: new Date(),
+      competencia: new Date(),
+      valorServico: Number(opts.valor),
+      aliquota: Number(opts.aliquota) || 0,
+      issRetido: 2,
+      responsavelRetencao: 1,
+      itemListaServico: opts.servico,
+      discriminacao: opts.descricao,
+      codigoMunicipio: 0,
+      exigibilidadeIss: 1,
+      cnpjPrestador,
+      inscricaoMunicipalPrestador: inscricaoPrestador,
+      cpfTomador: documento,
+      razaoSocialTomador: opts.tomador.nome || "",
+      enderecoTomador: opts.tomador.logradouro || "",
+      numeroEndereco: opts.tomador.numero || "",
+      complemento: opts.tomador.complemento || undefined,
+      bairro: opts.tomador.bairro || "",
+      uf: opts.tomador.uf || "SP",
+      cep: String(opts.tomador.cep || "").replace(/\D/g, ""),
+      telefoneTomador:
+        String(opts.tomador.telefone || "").replace(/\D/g, "") || undefined,
+      emailTomador: opts.tomador.email || undefined,
+      optanteSimplesNacional: 1,
+      incentivoFiscal: 2,
+      ambiente,
+      status: "Ativa",
+      numeroNfe: Number(resultado.nota.numero) || 0,
+      modelo: "nacional",
+      chaveNfse: resultado.nota.chave || null,
+      idDps: dps.id,
+    });
+
+    let aviso: string | undefined;
+    try {
+      await NsfeData.save(registro);
+    } catch (err: any) {
+      aviso = `Nota ${resultado.nota.numero} emitida na prefeitura, mas não foi gravada na tabela nfse: ${err?.message || err}`;
+      console.error("❌", aviso);
+    }
+
+    return {
+      ok: true,
+      nfseId: registro.id ?? undefined,
+      numero: resultado.nota.numero,
+      chave: resultado.nota.chave,
+      aviso,
+    };
+  }
 
   private async _emitirNfseServicoUnico(opts: {
     login: string;
@@ -2140,16 +2406,14 @@ class NFSEController {
     const aliquotaFmt = Number(aliquota || 0).toFixed(4);
     const serieToUse = ambiente === "homologacao" ? "wip99" : targetSeries;
     const emailToUse =
-      ambiente === "homologacao"
-        ? "suporte_wiptelecom@outlook.com"
-        : email;
+      ambiente === "homologacao" ? "suporte_wiptelecom@outlook.com" : email;
     const optanteSimples = ambiente === "homologacao" ? "2" : "1";
 
     const dps = this.nacionalXml.createDpsXml({
       ambiente,
       serie: serieToUse,
       numero: currentRpsNumber,
-      codigoMunicipio: CODIGO_MUNICIPIO,
+      codigoMunicipio: codigoMunicipioEmissor(ambiente),
       prestador: {
         cnpj: cnpjPrestador || "",
         inscricaoMunicipal: inscricaoPrestador || "",
@@ -2180,11 +2444,7 @@ class NFSEController {
 
     let envio: Awaited<ReturnType<NFSEController["enviarDpsNacional"]>>;
     try {
-      envio = await this.enviarDpsNacional(
-        [dps],
-        password,
-        ambiente,
-      );
+      envio = await this.enviarDpsNacional([dps], password, ambiente);
     } catch (err: any) {
       console.error(
         "[NFSE-Servicos] SOAP fault para",
@@ -2285,7 +2545,9 @@ class NFSEController {
       // partir do seguinte, uma a uma.
       const primeiroRps = proximoNumeroRps(ultimoRps);
       if (primeiroRps === null) {
-        res.status(400).json({ error: "Informe o último número de RPS usado." });
+        res
+          .status(400)
+          .json({ error: "Informe o último número de RPS usado." });
         return;
       }
 

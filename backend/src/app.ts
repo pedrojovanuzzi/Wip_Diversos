@@ -45,6 +45,7 @@ import CodefRoutes from "./routes/Codef.routes";
 import BackupController from "./controller/Backup";
 import PixController from "./controller/Pix";
 import pixAutomaticoService from "./services/PixAutomaticoService";
+import licencaMensalidadeService from "./services/LicencaMensalidadeService";
 // import DosProtectController from "./controller/DosProtect";
 
 const backup = new BackupController();
@@ -59,6 +60,7 @@ export class App {
     this.router();
     this.agendarBackup();
     this.agendarPixAutomatico();
+    this.agendarMensalidadesDeLicenca();
     // this.verificaDDOS();
   }
 
@@ -167,6 +169,26 @@ export class App {
     }
 
     console.log("📅 Agendador de Pix");
+  }
+
+  /**
+   * Mensalidades das licenças de software.
+   *
+   * Roda todo dia às 03:15 em vez de só no dia 1º: a rotina não duplica
+   * (mensalidade é única por licença e mês), então uma licença cadastrada no
+   * meio do mês já entra na cobrança sem esperar o mês seguinte, e um dia com
+   * o servidor desligado não deixa o mês em branco.
+   */
+  private agendarMensalidadesDeLicenca() {
+    cron.schedule("15 3 * * *", async () => {
+      try {
+        await licencaMensalidadeService.gerarMensalidades();
+      } catch (err) {
+        console.error("❌ Falha ao gerar mensalidades de licença:", err);
+      }
+    });
+
+    console.log("📅 Agendador de mensalidades de licença");
   }
 
   // private verificaDDOS(){

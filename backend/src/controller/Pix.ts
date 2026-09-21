@@ -17,6 +17,9 @@ import { whatsappOutgoingQueue } from "./whatsapp/index";
 import ZapSign from "./ZapSign";
 import { liberarContratoPosPagamento } from "./servicoWeb/contrato";
 import pixAutomaticoService from "../services/PixAutomaticoService";
+import licencaMensalidadeService, {
+  INFO_LICENCA,
+} from "../services/LicencaMensalidadeService";
 
 dotenv.config();
 
@@ -382,6 +385,33 @@ class Pix {
 
       if (status !== "CONCLUIDA") {
         res.status(200).json({ message: "PIX ainda não concluído", status });
+        return;
+      }
+
+      // Mensalidade de licença de software: baixa no sistema de licenças e
+      // termina aqui. Não pode seguir para o MKAuth — mensalidade de internet
+      // é outro assunto, e a cobrança de licença nem leva o par ID/VALOR que
+      // o trecho abaixo usa.
+      const marcaLicenca = Array.isArray(pix.infoAdicionais)
+        ? pix.infoAdicionais.find((info: any) => info?.nome === INFO_LICENCA)
+        : null;
+
+      if (marcaLicenca?.valor) {
+        const mensalidade = await licencaMensalidadeService.baixarPorPix({
+          mensalidadeId: Number(marcaLicenca.valor),
+          txid,
+          valorPago: pixData[0]?.valor ?? pix?.valor?.original,
+          endToEndId: pixData[0]?.endToEndId,
+          horario: pixData[0]?.horario
+            ? new Date(pixData[0].horario)
+            : new Date(),
+        });
+
+        res.status(200).json({
+          message: mensalidade
+            ? "Mensalidade de licença baixada"
+            : "Mensalidade de licença não encontrada",
+        });
         return;
       }
 

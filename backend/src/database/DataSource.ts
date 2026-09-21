@@ -24,6 +24,8 @@ import { FileShare } from "../entities/FileShare";
 import { ServiceLink } from "../entities/ServiceLink";
 import { PixAutomaticoCobranca } from "../entities/PixAutomaticoCobranca";
 import { PixAutomaticoNotificacao } from "../entities/PixAutomaticoNotificacao";
+import { LicencaMensalidade } from "../entities/LicencaMensalidade";
+import { LicencaMensalidadeConfig } from "../entities/LicencaMensalidadeConfig";
 import { ServidorAcesso } from "../entities/ServidorAcesso";
 import { ClientMonitor } from "../entities/ClientMonitor";
 import { ClientMonitorEvent } from "../entities/ClientMonitorEvent";
@@ -81,6 +83,8 @@ const AppDataSource = new DataSource({
     ServiceLink,
     PixAutomaticoCobranca,
     PixAutomaticoNotificacao,
+    LicencaMensalidade,
+    LicencaMensalidadeConfig,
   ],
   migrations: [
     path.join(__dirname, "../migration/*.{ts,js}").replace(/\\/g, "/"),
