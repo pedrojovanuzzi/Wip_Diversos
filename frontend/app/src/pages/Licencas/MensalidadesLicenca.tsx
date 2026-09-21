@@ -314,17 +314,21 @@ export const MensalidadesLicenca = () => {
                               <FaCheck />
                             </button>
                           )}
-                          {m.status === "paga" && (
-                            <button
-                              onClick={() =>
-                                acao(m, "reabrir", "Mensalidade reaberta.")
-                              }
-                              className="text-amber-600 hover:text-amber-900"
-                              title="Reabrir"
-                            >
-                              <FaUndo />
-                            </button>
-                          )}
+                          {/* Só a baixa manual se desfaz: pagamento por Pix
+                              foi confirmado pela Efí e reabrir cobraria de
+                              novo quem já pagou. */}
+                          {m.status === "paga" &&
+                            m.formaPagamento !== "pix" && (
+                              <button
+                                onClick={() =>
+                                  acao(m, "reabrir", "Mensalidade reaberta.")
+                                }
+                                className="text-amber-600 hover:text-amber-900"
+                                title="Desfazer a baixa manual"
+                              >
+                                <FaUndo />
+                              </button>
+                            )}
                         </div>
                       </td>
                     </tr>

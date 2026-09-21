@@ -565,10 +565,20 @@ class LicencaMensalidadeService {
     return this.mensalidadeRepo.save(mensalidade);
   }
 
-  /** Reabre uma mensalidade baixada por engano. */
+  /**
+   * Reabre uma mensalidade baixada na mão, por engano.
+   *
+   * Baixa por Pix não se reabre: ela veio de um pagamento confirmado pela
+   * Efí, com endToEndId. Reabrir cobraria de novo quem já pagou.
+   */
   async reabrir(id: number) {
     const mensalidade = await this.mensalidadeRepo.findOne({ where: { id } });
     if (!mensalidade) throw new Error("Mensalidade não encontrada.");
+    if (mensalidade.formaPagamento === "pix") {
+      throw new Error(
+        "Esta mensalidade foi paga por Pix e não pode ser reaberta.",
+      );
+    }
 
     mensalidade.status = "aberta";
     mensalidade.formaPagamento = null;

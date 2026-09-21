@@ -180,13 +180,22 @@ export class App {
    * o servidor desligado não deixa o mês em branco.
    */
   private agendarMensalidadesDeLicenca() {
-    cron.schedule("15 3 * * *", async () => {
-      try {
-        await licencaMensalidadeService.gerarMensalidades();
-      } catch (err) {
-        console.error("❌ Falha ao gerar mensalidades de licença:", err);
-      }
-    });
+    const gerar = (origem: string) =>
+      licencaMensalidadeService
+        .gerarMensalidades()
+        .catch((err) =>
+          console.error(
+            `❌ Falha ao gerar mensalidades de licença (${origem}):`,
+            err,
+          ),
+        );
+
+    cron.schedule("15 3 * * *", () => gerar("agendamento diário"));
+
+    // Também ao subir: se a máquina estiver desligada às 3h15 todos os dias,
+    // o agendamento nunca dispara e o mês ficaria sem mensalidade nenhuma.
+    // Repetir não duplica — a mensalidade é única por licença e competência.
+    setTimeout(() => gerar("inicialização"), 60_000);
 
     console.log("📅 Agendador de mensalidades de licença");
   }
