@@ -218,17 +218,18 @@ export const PixAutomatico = () => {
         { pixAutoData },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      // Na jornada 3 quem cobra é a cobrança imediata; o QR da recorrência
-      // apenas autoriza. Mostrar o da recorrência aqui faria o cliente
-      // autorizar sem pagar a mensalidade.
+      // Na jornada 3 o QR bom é o da recorrência: com a cobrança criada na
+      // mesma location, ele cobra e autoriza de uma vez. O da cobrança fica
+      // como reserva, para o caso de a Efí não devolver o combinado.
       const cobranca = response.data?.cobrancaImediata;
-      setQrCode(
-        cobranca?.pixCopiaECola ?? response.data?.dadosQR?.pixCopiaECola ?? "",
+      const jornada = response.data?.dadosQR?.jornada ?? "";
+      const combinado = response.data?.dadosQR?.pixCopiaECola;
+
+      setQrCode(combinado ?? cobranca?.pixCopiaECola ?? "");
+      setQrCobra(
+        combinado ? /3/.test(String(jornada)) : !!cobranca?.pixCopiaECola,
       );
-      setQrCobra(!!cobranca?.pixCopiaECola);
-      setJornadaDoQr(
-        response.data?.dadosQR?.jornada ?? response.data?.jornada ?? "",
-      );
+      setJornadaDoQr(jornada || response.data?.jornada || "");
       setSolicitacao(response.data?.solicitacao ?? null);
       setSucesso(
         response.data?.solicitacao?.idSolicRec
@@ -1011,7 +1012,7 @@ export const PixAutomatico = () => {
                   {qrCobra
                     ? "Este QR cobra a mensalidade agora e autoriza a recorrência."
                     : "Este QR apenas autoriza a recorrência — nada é cobrado agora."}
-                  {jornadaDoQr ? ` (${jornadaDoQr})` : ""}
+                  {jornadaDoQr ? ` (jornada ${jornadaDoQr})` : ""}
                 </p>
                 <QRCodeCanvas value={qr} size={200} />
                 <button

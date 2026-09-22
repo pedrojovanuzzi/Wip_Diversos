@@ -1443,14 +1443,17 @@ class Pix {
       // Fora da jornada 3 essa cobrança ficaria solta, sem vínculo com a
       // recorrência, e o cliente poderia pagá-la por engano.
       //
-      // O "copia e cola" desta cobrança é o que o cliente precisa pagar: o QR
-      // da recorrência só autoriza, não cobra nada.
+      // Ela nasce na MESMA location da recorrência (locrec): é isso que faz a
+      // Efí devolver, em GET /v2/rec/:idRec, um único QR que cobra e autoriza.
+      // Com location própria saem dois QRs separados — um que cobra sem
+      // autorizar, outro que autoriza sem cobrar.
       let cobrancaImediata: any = null;
       if (tipoJornada === "3") {
         const payload1 = {
           calendario: { expiracao: 3600 },
           chave: String(process.env.CHAVE_PIX),
           valor: { original: num.toFixed(2) },
+          loc: { id: locResponse!.id },
           devedor: isCPF ? { nome, cpf: documento } : { nome, cnpj: documento },
           infoAdicionais: [{ nome: "TITULO", valor: String(cliente!.id) }],
           solicitacaoPagador: "Mensalidade",
