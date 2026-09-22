@@ -1454,7 +1454,13 @@ class Pix {
           chave: String(process.env.CHAVE_PIX),
           valor: { original: num.toFixed(2) },
           devedor: isCPF ? { nome, cpf: documento } : { nome, cnpj: documento },
-          infoAdicionais: [{ nome: "TITULO", valor: String(cliente!.id) }],
+          // O par ID/VALOR, nesta ordem, é o que o webhook do Pix usa para
+          // baixar a mensalidade no MKAuth. Com outro nome (TITULO, por
+          // exemplo) o pagamento entra e a fatura fica em aberto.
+          infoAdicionais: [
+            { nome: "ID", valor: String(cliente!.id) },
+            { nome: "VALOR", valor: num.toFixed(2) },
+          ],
           solicitacaoPagador: "Mensalidade",
         };
 
