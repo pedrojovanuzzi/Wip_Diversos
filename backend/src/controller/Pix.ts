@@ -434,6 +434,24 @@ class Pix {
         });
       }
 
+      // As cobranças da jornada 3 criadas antes da padronização levam só
+      // "TITULO" com o número da fatura. Sem isto, o pagamento entra e a
+      // mensalidade fica em aberto, sem erro nenhum aparecer.
+      if (updates.length === 0 && Array.isArray(pix.infoAdicionais)) {
+        const titulo = pix.infoAdicionais.find(
+          (info: any) => info?.nome === "TITULO" && info?.valor,
+        );
+        if (titulo) {
+          updates.push({
+            idValor: String(titulo.valor),
+            valor: String(pixData[0]?.valor ?? pix?.valor?.original ?? ""),
+          });
+          console.log(
+            `[Webhook PIX] fatura identificada por TITULO=${titulo.valor}`,
+          );
+        }
+      }
+
       console.log(`[Webhook PIX] updates gerados: ${JSON.stringify(updates)}`);
 
       for (const update of updates) {
