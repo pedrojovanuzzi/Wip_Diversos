@@ -187,6 +187,7 @@ export const PixAutomatico = () => {
   /** O QR em tela cobra agora (jornada 3) ou só autoriza (jornada 2)? */
   const [qrCobra, setQrCobra] = useState(false);
   const [jornadaDoQr, setJornadaDoQr] = useState("");
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
   const [cobs, setCobs] = useState<any[] | null>(null);
   const [filtroCob, setFiltroCob] = useState({
     inicio: inicioDoMes(),
@@ -208,6 +209,47 @@ export const PixAutomatico = () => {
   // Só as aprovadas por padrão: as canceladas se acumulam e escondem quem
   // está valendo. Para ver o resto, é só usar os filtros.
   const [filtros, setFiltros] = useState<FiltrosPix>({ status: "APROVADA" });
+
+  /**
+   * Ao sair do campo de login, traz contrato, documento, plano e valor do
+   * cadastro. O valor é o da mensalidade em aberto, já com desconto — é o
+   * mesmo que a cobrança usa, então digitar à mão só abria espaço para erro.
+   */
+  async function carregarCliente(login: string) {
+    const busca = login.trim();
+    if (!busca) return;
+
+    try {
+      setBuscandoCliente(true);
+      setError("");
+      const resposta = await axios.get(
+        `${process.env.REACT_APP_URL}/Pix/dadosClientePixAutomatico`,
+        {
+          params: { login: busca },
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      const cliente = resposta.data ?? {};
+      setPixAutoData((prev) => ({
+        ...prev,
+        contrato: cliente.contrato || prev.contrato,
+        cpf: cliente.documento || prev.cpf,
+        servico: cliente.plano || prev.servico,
+        valor: cliente.valor || prev.valor,
+      }));
+
+      setSucesso(
+        cliente.faturaEmAberto
+          ? `Dados de ${cliente.nome} carregados.`
+          : `Dados de ${cliente.nome} carregados. Atenção: não há mensalidade em aberto, então o valor não veio preenchido.`,
+      );
+    } catch (error: any) {
+      setError(extractErrorMessage(error));
+    } finally {
+      setBuscandoCliente(false);
+    }
+  }
 
   async function criarPixAutomatico(e: React.FormEvent) {
     try {
@@ -730,7 +772,11 @@ export const PixAutomatico = () => {
 
                   <Campo
                     rotulo="Login (PPPoE)"
-                    dica="Login do cliente no sistema."
+                    dica={
+                      buscandoCliente
+                        ? "Buscando o cadastro..."
+                        : "Ao sair do campo, traz contrato, documento, plano e valor."
+                    }
                   >
                     <input
                       className={entrada}
@@ -743,6 +789,7 @@ export const PixAutomatico = () => {
                           nome: e.target.value,
                         }))
                       }
+                      onBlur={(e) => carregarCliente(e.target.value)}
                     />
                   </Campo>
 

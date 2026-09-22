@@ -254,6 +254,64 @@ class Pix {
    * "?ignorar=".
    */
   /**
+   * Dados do cliente para preencher o cadastro do Pix Automático pelo login.
+   *
+   * O valor vem da mensalidade em aberto (já com o desconto do cadastro), que
+   * é o mesmo cálculo usado na cobrança — digitar à mão abria espaço para a
+   * recorrência nascer com valor diferente do que o cliente paga hoje.
+   */
+  dadosClientePixAutomatico = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
+    try {
+      const login = String(req.query.login || "").trim();
+      if (!login) {
+        res.status(400).json({ error: "Informe o login." });
+        return;
+      }
+
+      const cliente = await this.clienteRepo.findOne({ where: { login } });
+      if (!cliente) {
+        res.status(404).json({ error: `Cliente ${login} não encontrado.` });
+        return;
+      }
+
+      const fatura = await this.recordRepo.findOne({
+        where: {
+          login,
+          status: Not("pago"),
+          datadel: IsNull(),
+        },
+        order: { datavenc: "ASC" as const },
+      });
+
+      const desconto = Number(cliente.desconto || 0);
+      const valorFatura =
+        fatura && fatura.valor !== undefined && fatura.valor !== null
+          ? Math.max(Number(fatura.valor) - desconto, 0)
+          : null;
+
+      res.status(200).json({
+        login: cliente.login,
+        nome: cliente.nome,
+        documento: cliente.cpf_cnpj,
+        contrato: cliente.contrato || "",
+        plano: cliente.plano || "",
+        vencimento: cliente.venc || "",
+        valor: valorFatura !== null ? valorFatura.toFixed(2) : "",
+        // Só para a tela avisar quando não há mensalidade em aberto.
+        faturaEmAberto: fatura
+          ? { id: fatura.id, datavenc: fatura.datavenc }
+          : null,
+      });
+    } catch (error: any) {
+      console.error("Erro ao buscar cliente:", error?.message);
+      res.status(500).json({ error: "Erro ao buscar o cliente." });
+    }
+  };
+
+  /**
    * Pagamentos Pix recentes, para o sino de notificações.
    *
    * Junta três origens, cada uma com o seu tipo, porque na tela elas são

@@ -99,6 +99,11 @@ router.post(
 );
 
 router.get(
+  "/dadosClientePixAutomatico",
+  AuthGuard,
+  pixController.dadosClientePixAutomatico,
+);
+router.get(
   "/notificacoesPagamentos",
   AuthGuard,
   pixController.notificacoesPagamentos,
