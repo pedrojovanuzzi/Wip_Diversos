@@ -296,7 +296,9 @@ class Pix {
         login: cliente.login,
         nome: cliente.nome,
         documento: cliente.cpf_cnpj,
-        contrato: cliente.contrato || "",
+        // O número do contrato que aparece no plano (ex.: 4100C/2024) fica em
+        // "termo". A coluna "contrato" guarda outro identificador, interno.
+        contrato: cliente.termo || cliente.contrato || "",
         plano: cliente.plano || "",
         vencimento: cliente.venc || "",
         valor: valorFatura !== null ? valorFatura.toFixed(2) : "",
