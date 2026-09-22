@@ -107,6 +107,10 @@ export class ChamadoFichaTecnica {
     testado: boolean;
   }>;
 
+  /** Testes de velocidade feitos no atendimento, em Mbps. */
+  @Column({ type: "json", nullable: true })
+  testes?: Array<{ download: string; upload: string }>;
+
   @Column({ type: "json", nullable: true })
   apr?: AprDados;
 

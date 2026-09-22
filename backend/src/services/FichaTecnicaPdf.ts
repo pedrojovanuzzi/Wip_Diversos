@@ -47,9 +47,12 @@ export function montarPdfFichaTecnica(doc: Doc, ficha: ChamadoFichaTecnica) {
       const linha = visiveis.slice(i, i + 2);
       const alturas = linha.map(([, valor]) => {
         const h =
-          doc.font("Helvetica").fontSize(9).heightOfString(String(valor), {
-            width: colW - 12,
-          }) + 14;
+          doc
+            .font("Helvetica")
+            .fontSize(9)
+            .heightOfString(String(valor), {
+              width: colW - 12,
+            }) + 14;
         return Math.max(h, 26);
       });
       const alturaLinha = Math.max(...alturas);
@@ -83,9 +86,12 @@ export function montarPdfFichaTecnica(doc: Doc, ficha: ChamadoFichaTecnica) {
   const blocoTexto = (titulo: string, texto?: string | null) => {
     if (!texto || !String(texto).trim()) return;
     const altura =
-      doc.font("Helvetica").fontSize(9).heightOfString(String(texto), {
-        width: contentWidth - 12,
-      }) + 22;
+      doc
+        .font("Helvetica")
+        .fontSize(9)
+        .heightOfString(String(texto), {
+          width: contentWidth - 12,
+        }) + 22;
     ensure(altura);
     const topo = doc.y;
     doc
@@ -281,6 +287,21 @@ export function montarPdfFichaTecnica(doc: Doc, ficha: ChamadoFichaTecnica) {
     ["Nome do Wi-Fi secundário", ficha.nome_wifi_secundario],
     ["Senha do Wi-Fi secundário", ficha.senha_wifi_secundario],
   ]);
+
+  const testes = (ficha.testes ?? []).filter(
+    (t) => t && (t.download || t.upload),
+  );
+  if (testes.length > 0) {
+    secao("Testes de velocidade");
+    tabela(
+      [
+        { titulo: "Teste", w: 60 },
+        { titulo: "Download (Mbps)", w: (contentWidth - 60) / 2 },
+        { titulo: "Upload (Mbps)", w: (contentWidth - 60) / 2 },
+      ],
+      testes.map((t, i) => [String(i + 1), t.download || "-", t.upload || "-"]),
+    );
+  }
 
   const equipamentos = (ficha.equipamentos ?? []).filter(
     (e) => e && Number(e.qtd) > 0,

@@ -38,6 +38,8 @@ import {
   DialogTitle,
 } from "@mui/material";
 import {
+  MdAdd,
+  MdDelete,
   MdEdit,
   MdRefresh,
   MdRestartAlt,
@@ -280,7 +282,8 @@ const PainelAssinatura = forwardRef<AssinaturaHandle>((_props, ref) => {
   }));
 
   const getCanvasPoint = (
-    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+    e:
+      React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
   ) => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
@@ -297,7 +300,8 @@ const PainelAssinatura = forwardRef<AssinaturaHandle>((_props, ref) => {
   };
 
   const iniciarDesenho = (
-    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+    e:
+      React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
   ) => {
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
@@ -308,7 +312,8 @@ const PainelAssinatura = forwardRef<AssinaturaHandle>((_props, ref) => {
   };
 
   const continuarDesenho = (
-    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+    e:
+      React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
   ) => {
     if (!desenhandoRef.current) return;
     const ctx = canvasRef.current?.getContext("2d");
@@ -437,10 +442,13 @@ const CriarFichaTecnica: React.FC = () => {
   const [mac, setMac] = useState("");
   const [sn, setSn] = useState("");
 
-  const [equipamentos, setEquipamentos] = useState<EquipamentoLinha[]>(
-    EQUIPAMENTOS_PADRAO,
-  );
+  const [equipamentos, setEquipamentos] =
+    useState<EquipamentoLinha[]>(EQUIPAMENTOS_PADRAO);
   const [motivo, setMotivo] = useState("");
+  /** Testes de velocidade do atendimento, em Mbps. Começa com um. */
+  const [testes, setTestes] = useState<{ download: string; upload: string }[]>([
+    { download: "", upload: "" },
+  ]);
   const [observacao, setObservacao] = useState("");
   const [responsavelNome, setResponsavelNome] = useState("");
   const [responsavelCpf, setResponsavelCpf] = useState("");
@@ -460,7 +468,8 @@ const CriarFichaTecnica: React.FC = () => {
   const [aprEquipamentos, setAprEquipamentos] = useState<AprEquipamentoLinha[]>(
     APR_EQUIPAMENTOS_PADRAO,
   );
-  const [aprEtapas, setAprEtapas] = useState<AprEtapaLinha[]>(APR_ETAPAS_PADRAO);
+  const [aprEtapas, setAprEtapas] =
+    useState<AprEtapaLinha[]>(APR_ETAPAS_PADRAO);
   const [aprResponsavel, setAprResponsavel] = useState("");
 
   const [enviando, setEnviando] = useState(false);
@@ -525,11 +534,7 @@ const CriarFichaTecnica: React.FC = () => {
         { headers: { Authorization: `Bearer ${user?.token}` } },
       );
       const resposta = response.data?.respostaTelnet;
-      if (
-        !resposta ||
-        resposta === "Sem Onu" ||
-        resposta === "ONU APAGADA"
-      ) {
+      if (!resposta || resposta === "Sem Onu" || resposta === "ONU APAGADA") {
         setSinalOnuAntena("0");
       } else {
         setSinalOnuAntena(extrairRxPower(String(resposta)));
@@ -552,10 +557,7 @@ const CriarFichaTecnica: React.FC = () => {
   const assinaturaClienteRef = useRef<AssinaturaHandle>(null);
   const assinaturaAprRef = useRef<AssinaturaHandle>(null);
 
-  const atualizarEquip = (
-    idx: number,
-    patch: Partial<EquipamentoLinha>,
-  ) => {
+  const atualizarEquip = (idx: number, patch: Partial<EquipamentoLinha>) => {
     setEquipamentos((prev) =>
       prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)),
     );
@@ -641,7 +643,9 @@ const CriarFichaTecnica: React.FC = () => {
       nome_wifi: upper(nomeWifi),
       senha_wifi: upper(senhaWifi),
       nome_wifi_secundario: temRedeSecundaria ? upper(nomeWifiSecundario) : "",
-      senha_wifi_secundario: temRedeSecundaria ? upper(senhaWifiSecundario) : "",
+      senha_wifi_secundario: temRedeSecundaria
+        ? upper(senhaWifiSecundario)
+        : "",
       nota: Number(nota),
       tec_externo: tecExterno,
       tec_interno: tecInterno,
@@ -660,6 +664,13 @@ const CriarFichaTecnica: React.FC = () => {
       sn,
       horario_registro: horarioAtual,
       equipamentos: equipamentosPayload,
+      // Linhas em branco não vão: o técnico pode deixar uma sobrando.
+      testes: testes
+        .map((t) => ({
+          download: t.download.trim(),
+          upload: t.upload.trim(),
+        }))
+        .filter((t) => t.download || t.upload),
       motivo: upper(motivo),
       observacao: upper(observacao),
       celular_avaliacao: celularAvaliacao,
@@ -1196,6 +1207,88 @@ const CriarFichaTecnica: React.FC = () => {
             </Grid>
           ))}
 
+          {/* Testes de velocidade: quantos o técnico precisar. */}
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="caption" fontWeight={700}>
+            TESTES DE VELOCIDADE (Mbps)
+          </Typography>
+
+          {testes.map((t, idx) => (
+            <Grid
+              key={idx}
+              container
+              spacing={1}
+              alignItems="center"
+              sx={{ py: 0.5 }}
+            >
+              <Grid item xs={12} sm={2}>
+                <Typography variant="body2" fontWeight={600}>
+                  TESTE {idx + 1}
+                </Typography>
+              </Grid>
+              <Grid item xs={5} sm={4}>
+                <TextField
+                  size="small"
+                  label="Download"
+                  inputProps={{ inputMode: "decimal" }}
+                  value={t.download}
+                  onChange={(ev) =>
+                    setTestes((prev) =>
+                      prev.map((linha, i) =>
+                        i === idx
+                          ? { ...linha, download: ev.target.value }
+                          : linha,
+                      ),
+                    )
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={5} sm={4}>
+                <TextField
+                  size="small"
+                  label="Upload"
+                  inputProps={{ inputMode: "decimal" }}
+                  value={t.upload}
+                  onChange={(ev) =>
+                    setTestes((prev) =>
+                      prev.map((linha, i) =>
+                        i === idx
+                          ? { ...linha, upload: ev.target.value }
+                          : linha,
+                      ),
+                    )
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={2} sm={2}>
+                {testes.length > 1 && (
+                  <IconButton
+                    size="small"
+                    title="Remover este teste"
+                    onClick={() =>
+                      setTestes((prev) => prev.filter((_, i) => i !== idx))
+                    }
+                  >
+                    <MdDelete />
+                  </IconButton>
+                )}
+              </Grid>
+            </Grid>
+          ))}
+
+          <Button
+            size="small"
+            startIcon={<MdAdd />}
+            onClick={() =>
+              setTestes((prev) => [...prev, { download: "", upload: "" }])
+            }
+            sx={{ mt: 1 }}
+          >
+            Adicionar teste
+          </Button>
+
           <CampoTexto
             fullWidth
             sx={{ mt: 3 }}
@@ -1294,7 +1387,9 @@ const CriarFichaTecnica: React.FC = () => {
                 maxLength: 13,
                 style: { fontSize: "1.25rem", fontWeight: 700 },
               }}
-              error={celularAvaliacao.length > 0 && celularAvaliacao.length < 10}
+              error={
+                celularAvaliacao.length > 0 && celularAvaliacao.length < 10
+              }
               helperText={
                 celularAvaliacao.length > 0 && celularAvaliacao.length < 10
                   ? "Número incompleto: informe DDD + número."
@@ -1386,9 +1481,7 @@ const CriarFichaTecnica: React.FC = () => {
                   fullWidth
                   label="RG"
                   value={t.rg}
-                  onValueChange={(v) =>
-                    atualizarAprTrabalhador(idx, { rg: v })
-                  }
+                  onValueChange={(v) => atualizarAprTrabalhador(idx, { rg: v })}
                 />
               </Grid>
             </Grid>
@@ -1444,9 +1537,7 @@ const CriarFichaTecnica: React.FC = () => {
                       fullWidth
                       label="Outro equipamento"
                       value={e.item}
-                      onValueChange={(v) =>
-                        atualizarAprEquip(idx, { item: v })
-                      }
+                      onValueChange={(v) => atualizarAprEquip(idx, { item: v })}
                       transformar={upper}
                     />
                   ) : (
@@ -1468,9 +1559,7 @@ const CriarFichaTecnica: React.FC = () => {
                   fullWidth
                   label={`${String(idx + 1).padStart(2, "0")} - Etapa da tarefa`}
                   value={e.etapa}
-                  onValueChange={(v) =>
-                    atualizarAprEtapa(idx, { etapa: v })
-                  }
+                  onValueChange={(v) => atualizarAprEtapa(idx, { etapa: v })}
                   transformar={upper}
                 />
               </Grid>
@@ -1480,9 +1569,7 @@ const CriarFichaTecnica: React.FC = () => {
                   fullWidth
                   label="Riscos"
                   value={e.riscos}
-                  onValueChange={(v) =>
-                    atualizarAprEtapa(idx, { riscos: v })
-                  }
+                  onValueChange={(v) => atualizarAprEtapa(idx, { riscos: v })}
                   transformar={upper}
                 />
               </Grid>
@@ -1492,9 +1579,7 @@ const CriarFichaTecnica: React.FC = () => {
                   fullWidth
                   label="Medidas de controle"
                   value={e.medidas}
-                  onValueChange={(v) =>
-                    atualizarAprEtapa(idx, { medidas: v })
-                  }
+                  onValueChange={(v) => atualizarAprEtapa(idx, { medidas: v })}
                   transformar={upper}
                 />
               </Grid>
@@ -1562,10 +1647,16 @@ const CriarFichaTecnica: React.FC = () => {
                 automaticamente a partir do último chamado <b>ABERTO</b> deste
                 cliente no MKAUTH.
               </p>
-              <p>Trocando por outro, passa a valer o número que você digitar:</p>
+              <p>
+                Trocando por outro, passa a valer o número que você digitar:
+              </p>
               <ul>
-                <li>a resposta da ficha será inserida <b>nesse outro chamado</b>;</li>
-                <li>o PDF e o <b>Processo da APR</b> sairão com ele;</li>
+                <li>
+                  a resposta da ficha será inserida <b>nesse outro chamado</b>;
+                </li>
+                <li>
+                  o PDF e o <b>Processo da APR</b> sairão com ele;
+                </li>
                 <li>
                   se o número não existir <b>para este cliente</b>, o envio será
                   recusado.

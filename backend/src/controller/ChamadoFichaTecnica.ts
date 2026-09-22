@@ -91,6 +91,12 @@ function montarMensagemFinalizacao(f: ChamadoFichaTecnica): string {
     partes.push(`SENHA WIFI SECUNDARIO ${f.senha_wifi_secundario ?? ""}`);
   }
   partes.push(`NOTA ${f.nota ?? ""}`);
+  // Testes de velocidade, um por linha, para ficar legível no chamado.
+  (f.testes ?? []).forEach((t, i) => {
+    partes.push(
+      `TESTE ${i + 1}: DOWNLOAD ${t.download || "-"} MBPS / UPLOAD ${t.upload || "-"} MBPS`,
+    );
+  });
   partes.push(`QUEM ASSINOU:${f.responsavel_nome ?? ""}`);
   partes.push(`CPF:${f.responsavel_cpf ?? ""}`);
   partes.push(`PORTA OLT ${f.porta_olt ?? ""}`);
@@ -259,11 +265,21 @@ class ChamadoFichaTecnicaController {
         ? (body.equipamentos as Equipamento[])
         : [];
 
+      // Linha de teste em branco é descartada: o técnico pode adicionar uma
+      // linha a mais e não preencher.
+      const testes = (Array.isArray(body.testes) ? body.testes : [])
+        .map((t: any) => ({
+          download: String(t?.download ?? "").trim(),
+          upload: String(t?.upload ?? "").trim(),
+        }))
+        .filter((t) => t.download || t.upload);
+
       const nova = repo.create({
         ...body,
         usuario,
         celular_avaliacao: celularAvaliacao,
         equipamentos,
+        testes,
         apr: normalizarApr(body.apr),
         horario_registro:
           body.horario_registro ||
