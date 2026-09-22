@@ -184,6 +184,9 @@ export const PixAutomatico = () => {
     destinatario: { agencia: "", conta: "", ispbParticipante: "" },
   });
   const [solicitacao, setSolicitacao] = useState<any>(null);
+  /** O QR em tela cobra agora (jornada 3) ou só autoriza (jornada 2)? */
+  const [qrCobra, setQrCobra] = useState(false);
+  const [jornadaDoQr, setJornadaDoQr] = useState("");
   const [cobs, setCobs] = useState<any[] | null>(null);
   const [filtroCob, setFiltroCob] = useState({
     inicio: inicioDoMes(),
@@ -215,8 +218,17 @@ export const PixAutomatico = () => {
         { pixAutoData },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      // Nem toda resposta traz o QR da jornada; sem ele a recorrência continua criada.
-      setQrCode(response.data?.dadosQR?.pixCopiaECola ?? "");
+      // Na jornada 3 quem cobra é a cobrança imediata; o QR da recorrência
+      // apenas autoriza. Mostrar o da recorrência aqui faria o cliente
+      // autorizar sem pagar a mensalidade.
+      const cobranca = response.data?.cobrancaImediata;
+      setQrCode(
+        cobranca?.pixCopiaECola ?? response.data?.dadosQR?.pixCopiaECola ?? "",
+      );
+      setQrCobra(!!cobranca?.pixCopiaECola);
+      setJornadaDoQr(
+        response.data?.dadosQR?.jornada ?? response.data?.jornada ?? "",
+      );
       setSolicitacao(response.data?.solicitacao ?? null);
       setSucesso(
         response.data?.solicitacao?.idSolicRec
@@ -987,6 +999,20 @@ export const PixAutomatico = () => {
 
             {qr && (
               <div className="mt-5 flex flex-col items-center gap-3 rounded-xl bg-slate-50 p-4">
+                {/* Sem dizer o que o QR faz, é fácil achar que autorizar já
+                    pagou a mensalidade. */}
+                <p
+                  className={`w-full rounded-lg px-3 py-2 text-center text-xs font-medium ${
+                    qrCobra
+                      ? "bg-emerald-50 text-emerald-800"
+                      : "bg-amber-50 text-amber-800"
+                  }`}
+                >
+                  {qrCobra
+                    ? "Este QR cobra a mensalidade agora e autoriza a recorrência."
+                    : "Este QR apenas autoriza a recorrência — nada é cobrado agora."}
+                  {jornadaDoQr ? ` (${jornadaDoQr})` : ""}
+                </p>
                 <QRCodeCanvas value={qr} size={200} />
                 <button
                   onClick={copiarQr}

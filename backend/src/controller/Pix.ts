@@ -1439,9 +1439,13 @@ class Pix {
       const num = Number(String(valor).replace(",", "."));
       console.log(num.toFixed(2));
 
-      // Cobrança imediata: só existe na jornada 3, e é ela que o QR cobra na
-      // hora. Fora da jornada 3 essa cobrança ficaria solta, sem vínculo com a
+      // Cobrança imediata: só existe na jornada 3, e é ela que cobra na hora.
+      // Fora da jornada 3 essa cobrança ficaria solta, sem vínculo com a
       // recorrência, e o cliente poderia pagá-la por engano.
+      //
+      // O "copia e cola" desta cobrança é o que o cliente precisa pagar: o QR
+      // da recorrência só autoriza, não cobra nada.
+      let cobrancaImediata: any = null;
       if (tipoJornada === "3") {
         const payload1 = {
           calendario: { expiracao: 3600 },
@@ -1455,9 +1459,9 @@ class Pix {
         console.log(params.txid);
         console.log(options.sandbox);
 
-        const cobv = await efipay.pixCreateCharge(params, payload1);
+        cobrancaImediata = await efipay.pixCreateCharge(params, payload1);
 
-        console.log(cobv);
+        console.log(cobrancaImediata);
       }
 
       if (data_inicial.includes("/")) {
@@ -1558,7 +1562,20 @@ class Pix {
 
       console.log(response);
 
-      res.status(200).json({ ...response, solicitacao, jornada: tipoJornada });
+      res.status(200).json({
+        ...response,
+        solicitacao,
+        jornada: tipoJornada,
+        // Vai separado para a tela saber qual QR mostrar: o que cobra agora
+        // (jornada 3) ou o que apenas autoriza (jornada 2).
+        cobrancaImediata: cobrancaImediata
+          ? {
+              txid: cobrancaImediata.txid,
+              valor: cobrancaImediata.valor?.original,
+              pixCopiaECola: cobrancaImediata.pixCopiaECola,
+            }
+          : null,
+      });
     } catch (error) {
       console.error(error);
       res.status(500).json(error);
