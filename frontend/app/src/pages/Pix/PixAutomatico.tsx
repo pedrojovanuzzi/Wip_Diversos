@@ -331,10 +331,6 @@ export const PixAutomatico = () => {
     }
   }
 
-  function navegarCancelar() {
-    navigate("/Pix/Cancelar/Cobranca");
-  }
-
   /** Cobranças do Pix Automático no período escolhido. */
   async function listarCobrancas() {
     try {
@@ -959,12 +955,6 @@ export const PixAutomatico = () => {
               >
                 <FiSearch className="size-4" />
                 {loading ? "Buscando..." : "Buscar"}
-              </button>
-              <button
-                onClick={navegarCancelar}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
-              >
-                Buscar cobranças
               </button>
             </div>
 

@@ -1443,17 +1443,16 @@ class Pix {
       // Fora da jornada 3 essa cobrança ficaria solta, sem vínculo com a
       // recorrência, e o cliente poderia pagá-la por engano.
       //
-      // Ela nasce na MESMA location da recorrência (locrec): é isso que faz a
-      // Efí devolver, em GET /v2/rec/:idRec, um único QR que cobra e autoriza.
-      // Com location própria saem dois QRs separados — um que cobra sem
-      // autorizar, outro que autoriza sem cobrar.
+      // Ela fica com location própria: a location da recorrência não pode ser
+      // reaproveitada aqui ("location_em_uso"). O que liga as duas é o txid
+      // desta cobrança, informado em ativacao.dadosJornada na recorrência —
+      // e é a partir dele que a Efí monta o QR combinado.
       let cobrancaImediata: any = null;
       if (tipoJornada === "3") {
         const payload1 = {
           calendario: { expiracao: 3600 },
           chave: String(process.env.CHAVE_PIX),
           valor: { original: num.toFixed(2) },
-          loc: { id: locResponse!.id },
           devedor: isCPF ? { nome, cpf: documento } : { nome, cnpj: documento },
           infoAdicionais: [{ nome: "TITULO", valor: String(cliente!.id) }],
           solicitacaoPagador: "Mensalidade",
@@ -1559,11 +1558,22 @@ class Pix {
         console.log(solicitacao);
       }
 
+      // O QR combinado da jornada 3 só vem quando o txid da cobrança imediata
+      // é informado AQUI, como query param da consulta da recorrência. Sem
+      // ele a Efí devolve o QR que apenas autoriza, e o cliente acaba
+      // autorizando a recorrência sem pagar a mensalidade.
       const response = await efipay.pixDetailRecurrenceAutomatic({
         idRec: responseRecurrence.idRec,
+        ...(cobrancaImediata?.txid ? { txid: cobrancaImediata.txid } : {}),
       });
 
       console.log(response);
+      // A Efí diz aqui qual jornada o QR carrega. Jornada 3 é o QR que cobra e
+      // autoriza junto; qualquer outra coisa significa que o vínculo com a
+      // cobrança imediata não pegou.
+      console.log(
+        `[Pix Automático] jornada pedida=${tipoJornada} | dadosQR.jornada=${response?.dadosQR?.jornada ?? "(ausente)"} | txid da cobrança=${cobrancaImediata?.txid ?? "-"}`,
+      );
 
       res.status(200).json({
         ...response,
