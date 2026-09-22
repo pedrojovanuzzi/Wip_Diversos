@@ -205,7 +205,9 @@ export const PixAutomatico = () => {
   const [idRec, setIdRec] = useState("");
   const token = user?.token;
   const permission = user?.permission;
-  const [filtros, setFiltros] = useState<FiltrosPix>({ status: "TODOS" });
+  // Só as aprovadas por padrão: as canceladas se acumulam e escondem quem
+  // está valendo. Para ver o resto, é só usar os filtros.
+  const [filtros, setFiltros] = useState<FiltrosPix>({ status: "APROVADA" });
 
   async function criarPixAutomatico(e: React.FormEvent) {
     try {
@@ -274,7 +276,7 @@ export const PixAutomatico = () => {
       if (!filtrosActive) {
         const response = await axios.post(
           `${process.env.REACT_APP_URL}/Pix/getPixAutomaticoClients`,
-          {},
+          { filtros: { status: "APROVADA" } },
           { headers: { Authorization: `Bearer ${token}` } },
         );
         setPeople(response.data);
@@ -898,8 +900,8 @@ export const PixAutomatico = () => {
               Clientes já cadastrados
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Sem filtro, traz todas as recorrências. Com o IdRec, abre a ficha
-              completa do cliente.
+              Sem filtro, traz só as recorrências aprovadas. Com o IdRec, abre a
+              ficha completa do cliente.
             </p>
 
             <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">

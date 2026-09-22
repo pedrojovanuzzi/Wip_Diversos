@@ -8,7 +8,7 @@ import path from "path";
 import fs from "fs";
 import axios from "axios";
 import { Request, Response } from "express";
-import { Between, In, IsNull, Not, Repository } from "typeorm";
+import { Between, In, IsNull, MoreThan, Not, Repository } from "typeorm";
 import { isNotIn } from "class-validator";
 import Whatsapp from "./Whatsapp";
 import LocalDataSource from "../database/DataSource";
@@ -20,6 +20,7 @@ import pixAutomaticoService from "../services/PixAutomaticoService";
 import licencaMensalidadeService, {
   INFO_LICENCA,
 } from "../services/LicencaMensalidadeService";
+import { LicencaMensalidade } from "../entities/LicencaMensalidade";
 
 dotenv.config();
 
@@ -252,6 +253,88 @@ class Pix {
    * e "/cobr" ao final da URL cadastrada, a não ser que o endereço termine em
    * "?ignorar=".
    */
+  /**
+   * Pagamentos Pix recentes, para o sino de notificações.
+   *
+   * Junta três origens, cada uma com o seu tipo, porque na tela elas são
+   * mostradas de formas diferentes: mensalidade paga por Pix comum, por Pix
+   * Automático, e mensalidade de licença de software.
+   */
+  notificacoesPagamentos = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
+    try {
+      const desdeTexto = String(req.query.desde || "");
+      const desde = desdeTexto ? new Date(desdeTexto) : null;
+      const inicio =
+        desde && !isNaN(desde.getTime())
+          ? desde
+          : new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      // Mensalidades de internet (MKAuth)
+      const faturas = await this.recordRepo.find({
+        where: {
+          status: "pago",
+          formapag: In(["pix_pedro_api", "pix_automatico", "Pix"]),
+          datapag: MoreThan(inicio),
+        },
+        order: { datapag: "DESC" },
+        take: 30,
+      });
+
+      const pagamentos = faturas.map((f) => ({
+        id: `fatura-${f.id}`,
+        tipo: f.formapag === "pix_automatico" ? "automatico" : "normal",
+        titulo: f.formapag === "pix_automatico" ? "Pix Automático" : "Pix",
+        cliente: f.login,
+        referencia: `Mensalidade ${f.id}`,
+        valor: Number(f.valorpag ?? f.valor ?? 0),
+        pagoEm: f.datapag,
+      }));
+
+      // Mensalidades de licença de software (banco local)
+      try {
+        const mensalidades = await LocalDataSource.getRepository(
+          LicencaMensalidade,
+        ).find({
+          where: {
+            status: "paga",
+            formaPagamento: "pix",
+            pagoEm: MoreThan(inicio),
+          },
+          order: { pagoEm: "DESC" },
+          take: 30,
+        });
+
+        pagamentos.push(
+          ...mensalidades.map((m) => ({
+            id: `licenca-${m.id}`,
+            tipo: "licenca",
+            titulo: "Licença",
+            cliente: m.clienteNome ?? "",
+            referencia: `${m.software ?? "Licença"} ${m.competencia}`,
+            valor: Number(m.valorPago ?? m.valor ?? 0),
+            pagoEm: m.pagoEm as Date,
+          })),
+        );
+      } catch (erro: any) {
+        // Tabela ainda não criada: o sino segue com os outros pagamentos.
+        if (erro?.code !== "ER_NO_SUCH_TABLE" && erro?.errno !== 1146)
+          throw erro;
+      }
+
+      pagamentos.sort(
+        (a, b) => new Date(b.pagoEm).getTime() - new Date(a.pagoEm).getTime(),
+      );
+
+      res.status(200).json(pagamentos.slice(0, 30));
+    } catch (error: any) {
+      console.error("Erro ao listar pagamentos recentes:", error?.message);
+      res.status(500).json({ error: "Erro ao listar pagamentos recentes." });
+    }
+  };
+
   consultarWebhooksPixAutomatico = async (
     _req: Request,
     res: Response,

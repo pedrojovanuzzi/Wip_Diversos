@@ -44,6 +44,7 @@ import { FaFlask } from "react-icons/fa";
 
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { SinoPagamentos } from "../notificacoes/SinoPagamentos";
 import Cookies from "js-cookie";
 import { BsFillSendPlusFill, BsCameraVideoFill, BsTv } from "react-icons/bs";
 
@@ -561,6 +562,9 @@ export const NavBar = ({ color = "black", className = "" }: Color) => {
         isOpen ? "sm:w-72" : "sm:w-0"
       } bg-stone-800 sm:fixed sm:top-0 sm:left-0 grid sm:grid-rows-[auto,1fr] p-4 sm:p-0 sm:pt-4 transition-all duration-300 ${className}`}
     >
+      {/* Fica aqui porque a NavBar aparece em todas as telas. */}
+      <SinoPagamentos />
+
       <nav className="sm:w-full sm:px-4 grid place-items-center relative">
         {isMobile ? (
           <HiBars3

@@ -98,6 +98,11 @@ router.post(
   pixController.simularPagamentoWebhookPixAutomatico,
 );
 
+router.get(
+  "/notificacoesPagamentos",
+  AuthGuard,
+  pixController.notificacoesPagamentos,
+);
 router.post("/BuscarPixPago", AuthGuard, pixController.BuscarPixPago);
 router.post("/BuscarPixPagoData", AuthGuard, pixController.BuscarPixPagoData);
 router.post(
