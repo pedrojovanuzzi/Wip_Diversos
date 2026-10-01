@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Dialog,
   DialogBackdrop,
@@ -8,12 +9,22 @@ import {
 } from "@headlessui/react";
 import { CgDanger } from "react-icons/cg";
 
+/** Códigos aceitos pelo evento de cancelamento da NFS-e Nacional. */
+export type CodigoMotivo = "1" | "2" | "9";
+
+const MOTIVOS: { codigo: CodigoMotivo; rotulo: string }[] = [
+  { codigo: "1", rotulo: "Erro na emissão" },
+  { codigo: "2", rotulo: "Serviço não prestado" },
+  { codigo: "9", rotulo: "Outros" },
+];
+
 interface PopUpButtonProps {
   setShowPopUp: (show: boolean) => void;
   showPopUp: boolean;
   setPassword: (text: string) => void;
   password: string;
-  cancelNFSE : () => void;
+  quantidade: number;
+  cancelNFSE: (codigoMotivo: CodigoMotivo, motivo: string) => void;
 }
 
 export default function PopUpButton({
@@ -21,8 +32,20 @@ export default function PopUpButton({
   showPopUp,
   setPassword,
   password,
-  cancelNFSE
+  quantidade,
+  cancelNFSE,
 }: PopUpButtonProps) {
+  const [codigoMotivo, setCodigoMotivo] = useState<CodigoMotivo>("2");
+  const [motivo, setMotivo] = useState("");
+
+  // A prefeitura exige descrição de 15 a 255 caracteres; vazia, o backend
+  // usa um texto padrão para o código escolhido.
+  const tamanho = motivo.trim().length;
+  const motivoInvalido = tamanho > 0 && tamanho < 15;
+  // "Outros" não diz nada sozinho: aí a descrição é obrigatória.
+  const faltaDescricao = codigoMotivo === "9" && tamanho === 0;
+  const podeEnviar = !!password && !motivoInvalido && !faltaDescricao;
+
   return (
     <Dialog
       open={showPopUp}
@@ -42,42 +65,122 @@ export default function PopUpButton({
           >
             <div>
               <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-red-100">
-                <CgDanger
-                  aria-hidden="true"
-                  className="size-6 text-red-600"
-                />
+                <CgDanger aria-hidden="true" className="size-6 text-red-600" />
               </div>
-              <span className="flex justify-center mt-5">Cancelar NFSE</span>
               <div className="mt-3 text-center sm:mt-5">
                 <DialogTitle
                   as="h3"
                   className="text-base font-semibold text-gray-900"
                 >
-                  Informe a Senha do Certificado
+                  Cancelar {quantidade} {quantidade === 1 ? "nota" : "notas"}
                 </DialogTitle>
+                <p className="mt-1 text-sm text-gray-500">
+                  O cancelamento é enviado à prefeitura e não pode ser desfeito.
+                </p>
               </div>
             </div>
-            <div className="mt-5 flex flex-col sm:flex-row gap-2">
-              <input
-                type="password"
-                placeholder="Senha"
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="ring-2 ring-indigo-400 p-1 rounded"
-              />
 
-              <button
-                type="button"
-                data-autofocus
-                onClick={() => {
+            <div className="mt-5 flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="codigoMotivo"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Motivo
+                </label>
+                <select
+                  id="codigoMotivo"
+                  value={codigoMotivo}
+                  onChange={(e) =>
+                    setCodigoMotivo(e.target.value as CodigoMotivo)
+                  }
+                  className="rounded-md border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                >
+                  {MOTIVOS.map((m) => (
+                    <option key={m.codigo} value={m.codigo}>
+                      {m.codigo} - {m.rotulo}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="motivo"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Descrição{" "}
+                  {codigoMotivo === "9" ? (
+                    <span className="text-red-600">*</span>
+                  ) : (
+                    <span className="font-normal text-gray-400">
+                      (opcional)
+                    </span>
+                  )}
+                </label>
+                <textarea
+                  id="motivo"
+                  rows={3}
+                  maxLength={255}
+                  value={motivo}
+                  onChange={(e) => setMotivo(e.target.value)}
+                  placeholder="Ex: Valor informado errado na emissão"
+                  className="rounded-md border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <span
+                  className={`text-xs ${
+                    motivoInvalido || faltaDescricao
+                      ? "text-red-600"
+                      : "text-gray-400"
+                  }`}
+                >
+                  {faltaDescricao
+                    ? "Descreva o motivo (mínimo 15 caracteres)."
+                    : motivoInvalido
+                      ? `Mínimo 15 caracteres (${tamanho}/15).`
+                      : `${tamanho}/255`}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="senhaCancelamento"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Senha do certificado
+                </label>
+                <input
+                  id="senhaCancelamento"
+                  type="password"
+                  placeholder="Senha"
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="rounded-md border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPopUp(false)}
+                  className="rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  data-autofocus
+                  disabled={!podeEnviar}
+                  onClick={() => {
                     setShowPopUp(false);
-                    cancelNFSE();
-                }}
-                className="mt-3 inline-flex w-full justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-gray-200 shadow-sm ring-1 ring-inset hover:bg-green-400 sm:col-start-1 sm:mt-0"
-              >
-                Enviar
-              </button>
+                    cancelNFSE(codigoMotivo, motivo.trim());
+                  }}
+                  className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:bg-gray-400"
+                >
+                  Cancelar nota
+                </button>
+              </div>
             </div>
           </DialogPanel>
         </div>

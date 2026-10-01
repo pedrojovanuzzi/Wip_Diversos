@@ -146,8 +146,11 @@ function totalTributos(
   valores: { aliquota: string | number },
 ): string {
   if (optante) {
+    // Sem percentual configurado nem alíquota na emissão, fica nos 5% que
+    // já eram o padrão das telas.
+    const informada = Number(String(valores.aliquota ?? "").replace(",", "."));
     const sn = percentual(
-      process.env.NFSE_PERCENTUAL_SIMPLES || valores.aliquota,
+      process.env.NFSE_PERCENTUAL_SIMPLES || (informada > 0 ? informada : 5),
     );
     return `<totTrib><pTotTribSN>${sn}</pTotTribSN></totTrib>`;
   }

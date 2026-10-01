@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import Message from "../../components/Message";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { NavBar } from "../../components/navbar/NavBar";
+import { useUltimoRps } from "./useUltimoRps";
 
 export const GerarNotaDeServicoIndependente = () => {
   const { user } = useAuth();
@@ -19,12 +20,15 @@ export const GerarNotaDeServicoIndependente = () => {
     servico: "140201",
     descricao: "Serviço Avulso",
     password: "",
-    nfeNumber: "",
     ambiente: "homologacao",
-    aliquota: "5.0000",
     // Último RPS usado: a nota sai com o seguinte (o backend soma 1).
     ultimoRps: "",
   });
+
+  // O último RPS vem preenchido; o número da nota vem da API nacional.
+  useUltimoRps(formData.ambiente, user?.token, (ultimoRps) =>
+    setFormData((atual) => ({ ...atual, ultimoRps })),
+  );
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -33,7 +37,7 @@ export const GerarNotaDeServicoIndependente = () => {
   ) => {
     const { name, value } = e.target;
     let next = value;
-    if (name === "valor" || name === "aliquota") {
+    if (name === "valor") {
       next = value.replace(/[^\d.,]/g, "").replace(",", ".");
       const firstDot = next.indexOf(".");
       if (firstDot !== -1) {
@@ -59,9 +63,7 @@ export const GerarNotaDeServicoIndependente = () => {
       !formData.valor ||
       !formData.servico ||
       !formData.password ||
-      !formData.nfeNumber ||
-      !formData.ambiente ||
-      !formData.aliquota
+      !formData.ambiente
     ) {
       setMessage({
         msg: "Preencha todos os campos obrigatórios.",
@@ -73,7 +75,10 @@ export const GerarNotaDeServicoIndependente = () => {
 
     // A NFSE exige o RPS: informa-se o último usado e a nota sai com o seguinte.
     if (!/^\d+$/.test(formData.ultimoRps.trim())) {
-      setMessage({ msg: "Informe o último número de RPS usado.", type: "error" });
+      setMessage({
+        msg: "Informe o último número de RPS usado.",
+        type: "error",
+      });
       setLoading(false);
       return;
     }
@@ -187,24 +192,6 @@ export const GerarNotaDeServicoIndependente = () => {
               )}
             </div>
 
-            {/* Aliquota */}
-            <div className="flex flex-col">
-              <label htmlFor="aliquota" className="font-semibold text-gray-700">
-                Aliquota
-              </label>
-              <input
-                type="text"
-                inputMode="decimal"
-                name="aliquota"
-                id="aliquota"
-                className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="0.00"
-                value={formData.aliquota}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
             {/* Valor */}
             <div className="flex flex-col">
               <label htmlFor="valor" className="font-semibold text-gray-700">
@@ -218,26 +205,6 @@ export const GerarNotaDeServicoIndependente = () => {
                 className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
                 value={formData.valor}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            {/* Número da Nota */}
-            <div className="flex flex-col">
-              <label
-                htmlFor="nfeNumber"
-                className="font-semibold text-gray-700"
-              >
-                Ultimo Nota Gerada
-              </label>
-              <input
-                type="text"
-                name="nfeNumber"
-                id="nfeNumber"
-                className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Número da Nota"
-                value={formData.nfeNumber}
                 onChange={handleChange}
                 required
               />

@@ -11,6 +11,7 @@ import { useAuth } from "../../context/AuthContext";
 
 import { Link } from "react-router-dom";
 import { useNotification } from "../../context/NotificationContext";
+import { useUltimoRps } from "./useUltimoRps";
 
 const CAMPO =
   "mt-1 block w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
@@ -33,8 +34,6 @@ export const NFSE = () => {
 
   const [searchCpf, setSearchCpf] = useState<string>("");
   const [clientes, setClientes] = useState<any[]>([]);
-  const [aliquota, setAliquota] = useState("");
-  const [lastNfe, setLastNfe] = useState<string>("");
   /** Último RPS usado. A nota sai com o seguinte (o backend soma 1). */
   const [ultimoRps, setUltimoRps] = useState<string>("");
   const [service, setService] = useState("");
@@ -79,6 +78,8 @@ export const NFSE = () => {
   );
   const { user } = useAuth();
   const token = user?.token;
+  // O último RPS vem preenchido; o número da nota vem da API nacional.
+  useUltimoRps(ambiente, token, setUltimoRps);
   const { addJob, showError, showSuccess } = useNotification();
 
   const handleCheckboxChange = (clienteId: number) => {
@@ -115,11 +116,9 @@ export const NFSE = () => {
         {
           password,
           clientesSelecionados,
-          aliquota,
           service,
           reducao,
           ambiente,
-          lastNfe,
           ultimoRps,
         },
         {
@@ -246,10 +245,6 @@ export const NFSE = () => {
   };
 
   const handleOpenPopup = () => {
-    if (!lastNfe) {
-      alert("Por favor, preencha o campo 'Ultima NF-e'.");
-      return;
-    }
     // A NFSE exige o RPS: informa-se o último usado e a nota sai com o seguinte.
     if (!ultimoRps) {
       alert("Por favor, preencha o campo 'Último número RPS'.");
@@ -432,17 +427,6 @@ export const NFSE = () => {
             </div>
 
             <div>
-              <label className={ROTULO}>Alíquota</label>
-              <input
-                type="text"
-                value={aliquota}
-                onChange={(e) => setAliquota(e.target.value)}
-                placeholder="Exemplo 5,0000%"
-                className={CAMPO}
-              />
-            </div>
-
-            <div>
               <label className={ROTULO}>Serviço</label>
               <input
                 type="text"
@@ -483,26 +467,6 @@ export const NFSE = () => {
 
             <div>
               <label className={ROTULO}>
-                Último número NF-e <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={lastNfe}
-                onChange={(e) => {
-                  setLastNfe(
-                    e.target.value.normalize("NFD").replace(/[^a-zA-Z0-9 ]/g, ""),
-                  );
-                }}
-                placeholder="Obrigatório"
-                className={`${CAMPO} ${
-                  lastNfe ? "" : "border-red-400 focus:ring-red-500"
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className={ROTULO}>
                 Último número RPS <span className="text-red-600">*</span>
               </label>
               <input
@@ -510,7 +474,9 @@ export const NFSE = () => {
                 inputMode="numeric"
                 required
                 value={ultimoRps}
-                onChange={(e) => setUltimoRps(e.target.value.replace(/\D/g, ""))}
+                onChange={(e) =>
+                  setUltimoRps(e.target.value.replace(/\D/g, ""))
+                }
                 placeholder="Obrigatório"
                 className={`${CAMPO} ${
                   ultimoRps ? "" : "border-red-400 focus:ring-red-500"
@@ -518,7 +484,8 @@ export const NFSE = () => {
               />
               {ultimoRps && (
                 <p className="mt-1 text-xs text-gray-500">
-                  A primeira nota sai com o RPS {Number(ultimoRps) + 1}.
+                  Preenchido com o último gravado. A primeira nota sai com o RPS{" "}
+                  {Number(ultimoRps) + 1}.
                 </p>
               )}
             </div>

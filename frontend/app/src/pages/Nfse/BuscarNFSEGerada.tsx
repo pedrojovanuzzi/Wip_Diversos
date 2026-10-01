@@ -7,7 +7,8 @@ import { BsFiletypeDoc } from "react-icons/bs";
 import { BiCalendar, BiUser } from "react-icons/bi";
 import { IoArrowUpCircleOutline } from "react-icons/io5";
 
-import PopUpCancelNFSE from "./Components/PopUpCancelNFSE";
+import PopUpCancelNFSE, { CodigoMotivo } from "./Components/PopUpCancelNFSE";
+import { MdContentCopy } from "react-icons/md";
 import PDFNFSE from "./Components/PDFNFSE";
 import { useReactToPrint } from "react-to-print";
 import Success from "./Components/Success";
@@ -166,7 +167,16 @@ export const BuscarNfseGerada = () => {
     }
   };
 
-  const cancelNFSE = async () => {
+  const copiarChave = async (chave: string) => {
+    try {
+      await navigator.clipboard.writeText(chave);
+      showSuccess("Chave copiada!");
+    } catch {
+      showError("Não foi possível copiar a chave.");
+    }
+  };
+
+  const cancelNFSE = async (codigoMotivo: CodigoMotivo, motivo: string) => {
     try {
       setLoading(true);
       const resposta = await axios.post(
@@ -175,6 +185,8 @@ export const BuscarNfseGerada = () => {
           id: clientesSelecionados,
           password: password,
           ambiente: ambiente || "homologacao",
+          codigoMotivo,
+          motivo,
         },
         {
           headers: {
@@ -195,8 +207,8 @@ export const BuscarNfseGerada = () => {
         showSuccess("Notas Canceladas com Sucesso!");
         window.location.reload();
       }
-    } catch (erro) {
-      showError("Erro ao Cancelar Notas!");
+    } catch (erro: any) {
+      showError(erro?.response?.data?.error || "Erro ao Cancelar Notas!");
       console.error("Erro ao Buscar Clientes:", erro);
     } finally {
       setShowCancelPopUp(false);
@@ -587,6 +599,12 @@ export const BuscarNfseGerada = () => {
                           scope="col"
                           className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
                         >
+                          Chave
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                        >
                           Login
                         </th>
                         <th
@@ -647,6 +665,27 @@ export const BuscarNfseGerada = () => {
                             <td className="px-6 py-4 text-left text-sm text-gray-900">
                               {cliente.nfse.numeroNfse}
                             </td>
+                            <td className="px-6 py-4 text-left text-xs text-gray-500">
+                              {cliente.nfse.chave_nfse ? (
+                                <div className="flex items-start gap-1">
+                                  <span className="max-w-[13rem] break-all font-mono">
+                                    {cliente.nfse.chave_nfse}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    title="Copiar chave"
+                                    onClick={() =>
+                                      copiarChave(cliente.nfse.chave_nfse)
+                                    }
+                                    className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                                  >
+                                    <MdContentCopy />
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-gray-300">—</span>
+                              )}
+                            </td>
                             <td className="px-6 py-4 text-left text-sm text-gray-500">
                               {cliente.login}
                             </td>
@@ -701,6 +740,7 @@ export const BuscarNfseGerada = () => {
           showPopUp={showCancelPopUp}
           setPassword={setPassword}
           password={password}
+          quantidade={clientesSelecionados.length}
           cancelNFSE={cancelNFSE}
         />
       )}

@@ -122,6 +122,41 @@ function proximoNumeroRps(ultimo: unknown): number | null {
   return Number(texto) + 1;
 }
 
+/** Justificativa do evento de cancelamento (101101) da NFS-e Nacional. */
+type MotivoCancelamento = { codigo: "1" | "2" | "9"; descricao: string };
+
+/**
+ * Valida o motivo vindo da tela. O leiaute aceita só os códigos 1 (erro na
+ * emissão), 2 (serviço não prestado) e 9 (outros), com descrição de 15 a 255
+ * caracteres. Sem nada informado, mantém o padrão antigo (código 2).
+ */
+function motivoCancelamento(
+  codigo: unknown,
+  descricao: unknown,
+): MotivoCancelamento | { erro: string } {
+  const cod = String(codigo ?? "2").trim();
+  if (cod !== "1" && cod !== "2" && cod !== "9") {
+    return { erro: "Motivo de cancelamento inválido (use 1, 2 ou 9)." };
+  }
+  const texto = String(descricao ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!texto) {
+    const padrao = {
+      "1": "Erro na emissao da NFS-e - cancelamento solicitado pelo prestador",
+      "2": "Servico nao prestado - cancelamento solicitado pelo prestador",
+      "9": "Cancelamento solicitado pelo prestador",
+    } as const;
+    return { codigo: cod, descricao: padrao[cod] };
+  }
+  if (texto.length < 15 || texto.length > 255) {
+    return {
+      erro: "A descrição do motivo precisa ter entre 15 e 255 caracteres.",
+    };
+  }
+  return { codigo: cod, descricao: texto };
+}
+
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
   private TEMP_DIR = path.resolve(__dirname, "../files");
@@ -530,37 +565,17 @@ class NFSEController {
 
       console.log("Último RPS no banco local:", lastRpsForSeries);
 
-      const { nextNfseNumber, nextRpsNumber } = await this.getLastNfseNumber(
-        lastNfe,
-        ambiente,
-      );
-
-      console.log("Próximo RPS da API:", nextRpsNumber);
-      console.log("Próximo NFSe da API:", nextNfseNumber);
-
-      // CORREÇÃO: Usa o MAIOR número entre banco local e API para evitar duplicação
+      // O número da NFS-e vem na resposta da API nacional, nota a nota. Antes
+      // ele era deduzido consultando o ISSWeb a partir da "última NF-e", que
+      // agora só serve para consulta das notas antigas.
+      const nextRpsNumber =
+        rpsNumber ||
+        (lastRpsForSeries?.numeroRps ? lastRpsForSeries.numeroRps + 1 : 1);
       let currentRpsNumber = nextRpsNumber;
+      console.log(`✅ Primeiro RPS do lote: ${currentRpsNumber}`);
 
-      if (rpsNumber) {
-        console.log(`ℹ️ RPS Number fornecido manualmente: ${rpsNumber}`);
-        currentRpsNumber = rpsNumber;
-      } else {
-        if (lastRpsForSeries && lastRpsForSeries.numeroRps) {
-          const localNextRps = lastRpsForSeries.numeroRps + 1;
-          console.log("Próximo RPS calculado do banco local:", localNextRps);
-
-          // Se o banco local tem um número maior, usa ele
-          if (localNextRps > nextRpsNumber) {
-            console.log(
-              `⚠️ ATENÇÃO: Banco local tem RPS mais recente (${localNextRps}) que a API (${nextRpsNumber}). Usando ${localNextRps}.`,
-            );
-            currentRpsNumber = localNextRps;
-          }
-        }
-      }
-
-      // Mirror logic for NFSe number counting
-      let currentNfseNumber = nextNfseNumber;
+      // Provisório: cada nota é gravada com o número devolvido pela API.
+      let currentNfseNumber = Number(lastNfe) > 0 ? Number(lastNfe) + 1 : 0;
 
       let nfseBase: any;
 
@@ -1091,6 +1106,11 @@ class NFSEController {
         res.status(400).json({ error: "id must be an array" });
         return;
       }
+      const motivo = motivoCancelamento(req.body.codigoMotivo, req.body.motivo);
+      if ("erro" in motivo) {
+        res.status(400).json({ error: motivo.erro });
+        return;
+      }
       this.PASSWORD = password;
       this.configureProvider(ambiente);
 
@@ -1103,7 +1123,7 @@ class NFSEController {
       });
       await AppDataSource.getRepository(Jobs).save(job);
 
-      this.processarCancelamentoNfseJob(job, id, password, ambiente);
+      this.processarCancelamentoNfseJob(job, id, password, ambiente, motivo);
 
       res.status(200).json({
         message: "Cancelamento em andamento!",
@@ -1119,6 +1139,7 @@ class NFSEController {
     ids: (string | number)[],
     password: string,
     ambiente: string,
+    motivo?: MotivoCancelamento,
   ) {
     const responses: any[] = [];
     try {
@@ -1159,7 +1180,12 @@ class NFSEController {
             nfseEntity.modelo === "sefin"
           ) {
             responses.push(
-              await this.cancelarNfseNacional(nfseEntity, password, ambiente),
+              await this.cancelarNfseNacional(
+                nfseEntity,
+                password,
+                ambiente,
+                motivo,
+              ),
             );
             continue;
           }
@@ -1296,6 +1322,7 @@ class NFSEController {
     nfseEntity: NFSE,
     password: string,
     ambiente: string,
+    motivo?: MotivoCancelamento,
   ): Promise<any> {
     const nfseRepository = AppDataSource.getRepository(NFSE);
     const { cnpj, inscricao } = this.prestadorDoAmbiente(ambiente);
@@ -1323,6 +1350,7 @@ class NFSEController {
       password,
       ambiente,
       nfseEntity.modelo === "nacional" ? "fiorilli" : "sefin",
+      motivo,
     );
 
     if (!envio.ok) {
@@ -1355,6 +1383,7 @@ class NFSEController {
     ambiente: string,
     /** "sefin": nota da API nacional; "fiorilli": nota de antes de 01/10/2026. */
     via: "sefin" | "fiorilli" = "sefin",
+    motivo?: MotivoCancelamento,
   ): Promise<{
     ok: boolean;
     error?: string;
@@ -1368,6 +1397,8 @@ class NFSEController {
         ambiente,
         chaveNfse: chave,
         cnpjAutor: cnpj,
+        codigoMotivo: motivo?.codigo,
+        motivo: motivo?.descricao,
       });
       const assinado = this.fiorilliProvider.assinarXml(
         pedido,
@@ -1399,6 +1430,8 @@ class NFSEController {
       chaveNfse: chave,
       cnpjAutor: cnpj,
       inscricaoMunicipal: inscricao,
+      codigoMotivo: motivo?.codigo,
+      motivo: motivo?.descricao,
     });
     const pedidoAssinado = this.fiorilliProvider.assinarXml(
       pedido,
@@ -1486,6 +1519,23 @@ class NFSEController {
 
     return { ok: true };
   }
+
+  /**
+   * Último RPS gravado no ambiente, para o campo das telas de emissão vir
+   * preenchido: repetir um número que já saiu faz a API recusar (E0014).
+   */
+  public ultimoRps = async (req: Request, res: Response) => {
+    try {
+      const ambiente = String(req.query.ambiente || "producao");
+      const ultima = await AppDataSource.getRepository(NFSE).findOne({
+        where: { ambiente },
+        order: { numeroRps: "DESC" },
+      });
+      res.status(200).json({ ultimoRps: ultima?.numeroRps ?? null });
+    } catch (error: any) {
+      res.status(500).json({ error: "Erro ao consultar o último RPS." });
+    }
+  };
 
   async setPassword(req: Request, res: Response) {
     const { password } = req.body;
@@ -2038,12 +2088,16 @@ class NFSEController {
         password,
         nfeNumber,
         ambiente,
-        aliquota,
         ultimoRps,
       } = req.body;
 
-      console.log("GerarNfseAvulsa Payload:", JSON.stringify(req.body));
-      console.log("nfeNumber recebido:", nfeNumber, "Tipo:", typeof nfeNumber);
+      // A alíquota saiu da tela: no Simples sem retenção ela não vai para a
+      // nota. Fica o padrão de sempre para o registro e para o percentual
+      // aproximado de tributos.
+      const aliquota =
+        String(req.body.aliquota ?? "")
+          .trim()
+          .replace(",", ".") || "5.0000";
 
       if (!login || !valor || !servico || !password) {
         res.status(400).json({ error: "Dados incompletos" });
@@ -2078,46 +2132,16 @@ class NFSEController {
       let currentRpsNumber = 0;
       let targetSeries = "1";
 
-      if (!rpsNumber) {
-        const result = await this.getLastNfseNumber(
-          Number(nfeNumber),
-          ambiente,
-        );
-        nextNfseNumber = result.nextNfseNumber;
-        nextRpsNumber = result.nextRpsNumber;
+      // O RPS é sempre informado; o número da NFS-e vem da resposta da API
+      // nacional (antes era deduzido consultando o ISSWeb pela última NF-e).
+      currentRpsNumber = Number(rpsNumber);
+      nextNfseNumber = Number(nfeNumber) > 0 ? Number(nfeNumber) + 1 : 0;
 
-        console.log("nextNfseNumber:", nextNfseNumber);
-        console.log("nextRpsNumber:", nextRpsNumber);
-
-        const lastProd = await NsfeData.findOne({
-          where: { serieRps: Not("wip99") },
-          order: { id: "DESC" },
-        });
-        targetSeries = lastProd?.serieRps || "1";
-
-        const lastRpsForSeries = await NsfeData.findOne({
-          where: { serieRps: targetSeries },
-          order: { numeroRps: "DESC" },
-        });
-
-        currentRpsNumber = nextRpsNumber;
-      } else {
-        currentRpsNumber = Number(rpsNumber);
-        const result = await this.getLastNfseNumber(
-          Number(nfeNumber),
-          ambiente,
-        );
-        nextNfseNumber = result.nextNfseNumber;
-
-        console.log("nextNfseNumber:", nextNfseNumber);
-        console.log("nextRpsNumber:", nextRpsNumber);
-
-        const lastProd = await NsfeData.findOne({
-          where: { serieRps: Not("wip99") },
-          order: { id: "DESC" },
-        });
-        targetSeries = lastProd?.serieRps || "1";
-      }
+      const lastProd = await NsfeData.findOne({
+        where: { serieRps: Not("wip99") },
+        order: { id: "DESC" },
+      });
+      targetSeries = lastProd?.serieRps || "1";
 
       const ibgeId = await codigoIbgeDaCidade(ClientData?.cidade);
 
@@ -2194,7 +2218,7 @@ class NFSEController {
           dataEmissao: new Date(),
           competencia: new Date(),
           valorServico: Number(valor),
-          aliquota: aliquota,
+          aliquota: Number(aliquota) || 0,
           issRetido: 2,
           responsavelRetencao: 1,
           itemListaServico: servico,
@@ -2669,10 +2693,8 @@ class NFSEController {
         res.status(400).json({ error: "Selecione ao menos um cliente." });
         return;
       }
-      if (!password || !nfeNumber) {
-        res
-          .status(400)
-          .json({ error: "password e nfeNumber são obrigatórios." });
+      if (!password) {
+        res.status(400).json({ error: "Informe a senha do certificado." });
         return;
       }
 
@@ -2696,11 +2718,9 @@ class NFSEController {
       });
       const targetSeries = lastProd?.serieRps || "1";
 
-      const startNumbers = await this.getLastNfseNumber(
-        Number(nfeNumber),
-        ambiente,
-      );
-      let nextNfseNumber = startNumbers.nextNfseNumber;
+      // O número de cada NFS-e vem da resposta da API nacional; este é só o
+      // provisório, caso a resposta não traga o número.
+      let nextNfseNumber = Number(nfeNumber) > 0 ? Number(nfeNumber) + 1 : 0;
       let currentRpsNumber = primeiroRps;
 
       const results: any[] = [];

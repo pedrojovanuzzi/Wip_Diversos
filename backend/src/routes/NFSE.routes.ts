@@ -41,6 +41,7 @@ router.post("/BuscarClientes", AuthGuard, NFSE.BuscarClientes);
 router.post("/cancelarNfse", AuthGuard, NFSE.cancelarNfse.bind(NFSE));
 
 router.post("/BuscarNSFE", AuthGuard, NFSE.BuscarNSFE);
+router.get("/ultimoRps", AuthGuard, NFSE.ultimoRps);
 
 router.post("/GerarNfseAvulsa", AuthGuard, NFSE.GerarNfseAvulsa);
 

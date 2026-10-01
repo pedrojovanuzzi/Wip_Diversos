@@ -3,6 +3,7 @@ import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
+import { useUltimoRps } from "./useUltimoRps";
 
 interface ClienteServico {
   login: string;
@@ -39,11 +40,11 @@ export const NFSEServicosAdicionais: React.FC = () => {
   // params NFSE
   const [password, setPassword] = useState("");
   const [ambiente, setAmbiente] = useState("homologacao");
-  const [aliquota, setAliquota] = useState("5.0");
   const [servico, setServico] = useState("010501");
-  const [nfeNumber, setNfeNumber] = useState("");
   /** Último RPS usado. A nota sai com o seguinte (o backend soma 1). */
   const [ultimoRps, setUltimoRps] = useState("");
+  // O último RPS vem preenchido; o número da nota vem da API nacional.
+  useUltimoRps(ambiente, token, setUltimoRps);
 
   const headers = { Authorization: `Bearer ${token}` };
   const base = process.env.REACT_APP_URL;
@@ -97,10 +98,6 @@ export const NFSEServicosAdicionais: React.FC = () => {
       showError("Informe a senha do certificado.");
       return;
     }
-    if (!nfeNumber) {
-      showError("Informe o último número NF-e.");
-      return;
-    }
     // A NFSE exige o RPS: informa-se o último usado e a nota sai com o seguinte.
     if (!/^\d+$/.test(ultimoRps.trim())) {
       showError("Informe o último número de RPS usado.");
@@ -114,9 +111,7 @@ export const NFSEServicosAdicionais: React.FC = () => {
           logins: selecionados,
           password,
           ambiente,
-          aliquota,
           servico,
-          nfeNumber,
           ultimoRps: ultimoRps.trim(),
         },
         { headers, timeout: 600000 },
@@ -315,28 +310,12 @@ export const NFSEServicosAdicionais: React.FC = () => {
           </select>
           <input
             type="text"
-            name="aliquota-field"
-            autoComplete="off"
-            value={aliquota}
-            onChange={(e) => setAliquota(e.target.value)}
-            placeholder="Alíquota (ex: 5.0)"
-            className="border p-2 rounded"
-          />
-          <input
-            type="text"
             name="item-lista-servico"
             autoComplete="off"
             value={servico}
             onChange={(e) => setServico(e.target.value)}
             placeholder="Item Lista Serviço (ex: 010501)"
             className="border p-2 rounded"
-          />
-          <input
-            type="text"
-            value={nfeNumber}
-            onChange={(e) => setNfeNumber(e.target.value)}
-            placeholder="Último Nº NF-e *"
-            className="border-2 border-red-400 p-2 rounded"
           />
           <input
             type="text"
