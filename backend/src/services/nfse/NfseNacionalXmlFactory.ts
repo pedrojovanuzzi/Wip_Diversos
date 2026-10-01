@@ -182,8 +182,8 @@ export class NfseNacionalXmlFactory {
    *   justamente isso, então regEspTrib fica 0 (nenhum).
    * - OptanteSimplesNacional 2 → opSimpNac 1 (não optante).
    * - IssRetido 1 → tpRetISSQN 2 (retido pelo tomador); 2 → 1 (não retido).
-   * - A alíquota só vai quando o prestador é ME/EPP do Simples ou há retenção:
-   *   fora disso quem define é o cadastro do município.
+   * - A alíquota só vai quando há retenção do ISS. Para ME/EPP do Simples sem
+   *   retenção a API nacional recusa se ela vier (E0625).
    */
   createDpsXml(dados: DadosDps): { id: string; xml: string } {
     const serie = serieDps(dados.serie);
@@ -221,8 +221,11 @@ export class NfseNacionalXmlFactory {
 
     const telefone = digitos(dados.tomador.telefone);
     const aliquota = Number(String(dados.valores.aliquota).replace(",", "."));
+    // Alíquota só com retenção do ISS. Sem retenção ela não vai: no Simples
+    // (ME/EPP) a API nacional recusa a nota se vier (E0625), e fora do
+    // Simples quem define é a parametrização do município.
     const pAliq =
-      (optante || retido) && Number.isFinite(aliquota) && aliquota > 0
+      retido && Number.isFinite(aliquota) && aliquota > 0
         ? `<pAliq>${aliquota.toFixed(2)}</pAliq>`
         : "";
 
