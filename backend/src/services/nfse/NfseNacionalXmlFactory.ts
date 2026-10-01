@@ -104,7 +104,9 @@ function digitos(texto: unknown): string {
 
 /** Corta no limite do leiaute antes de escapar, para não partir uma entidade. */
 function conteudo(valor: unknown, limite?: number): string {
-  let bruto = String(valor ?? "").replace(/\s+/g, " ").trim();
+  let bruto = String(valor ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (limite) bruto = bruto.slice(0, limite).trim();
   return escapar(bruto);
 }
@@ -309,13 +311,32 @@ export class NfseNacionalXmlFactory {
     codigoMotivo?: "1" | "2" | "9";
     motivo?: string;
   }): string {
-    const chave = digitos(opts.chaveNfse);
-    const id = `PRE${chave}101101`;
-    const motivo =
-      opts.motivo || "Servico nao prestado - cancelamento solicitado pelo prestador";
+    // Envelope do webservice da Fiorilli, usado só nas notas antigas.
     return (
       `<CancelarNFSeEnvio xmlns="${NS_FIORILLI}">` +
       tagOpcional("IM", opts.inscricaoMunicipal) +
+      this.createPedRegEventoCancelamento(opts) +
+      `</CancelarNFSeEnvio>`
+    );
+  }
+
+  /**
+   * Pedido de registro do evento de cancelamento (101101), sem envelope —
+   * é o que a API nacional recebe, depois de assinado em `infPedReg`.
+   */
+  createPedRegEventoCancelamento(opts: {
+    ambiente: string;
+    chaveNfse: string;
+    cnpjAutor: string;
+    codigoMotivo?: "1" | "2" | "9";
+    motivo?: string;
+  }): string {
+    const chave = digitos(opts.chaveNfse);
+    const id = `PRE${chave}101101`;
+    const motivo =
+      opts.motivo ||
+      "Servico nao prestado - cancelamento solicitado pelo prestador";
+    return (
       `<pedRegEvento xmlns="${NS_NFSE}" versao="${VERSAO_LEIAUTE}">` +
       `<infPedReg Id="${id}">` +
       `<tpAmb>${tipoAmbiente(opts.ambiente)}</tpAmb>` +
@@ -329,8 +350,7 @@ export class NfseNacionalXmlFactory {
       tag("xMotivo", motivo, 255) +
       `</e101101>` +
       `</infPedReg>` +
-      `</pedRegEvento>` +
-      `</CancelarNFSeEnvio>`
+      `</pedRegEvento>`
     );
   }
 
@@ -393,13 +413,17 @@ function elementos(raiz: Node | null | undefined, nome: string): Element[] {
   return achados;
 }
 
-function filhoDireto(pai: Element | null | undefined, nome: string): Element | null {
+function filhoDireto(
+  pai: Element | null | undefined,
+  nome: string,
+): Element | null {
   if (!pai) return null;
   for (let i = 0; i < pai.childNodes.length; i++) {
     const filho = pai.childNodes[i];
     if (
       filho.nodeType === 1 &&
-      ((filho as Element).localName || filho.nodeName.replace(/^.*:/, "")) === nome
+      ((filho as Element).localName || filho.nodeName.replace(/^.*:/, "")) ===
+        nome
     )
       return filho as Element;
   }

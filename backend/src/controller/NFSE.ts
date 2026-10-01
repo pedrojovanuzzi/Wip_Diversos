@@ -38,34 +38,27 @@ import {
 } from "../services/nfse/NfseNacionalXmlFactory";
 import { validarCertificadoPfx } from "../utils/certUtils";
 import { FiorilliProvider } from "../services/nfse/FiorilliProvider";
+import { SefinNacionalProvider } from "../services/nfse/SefinNacionalProvider";
 
 dotenv.config();
 
 /** Município do prestador (Arealva-SP): emissão e local da prestação. */
 const CODIGO_MUNICIPIO = "3503406";
 
-/** Município do ambiente de homologação da Fiorilli. */
-const CODIGO_MUNICIPIO_TESTE = "3507506";
-
 /**
  * Código IBGE do município emissor (`cLocEmi` e local da prestação).
  *
- * Em produção é Arealva. Em homologação o servidor da Fiorilli representa
- * outro município, com CNPJ e inscrição de teste — mandar Arealva lá faz a
- * prefeitura recusar com "N1 - Código da localidade emissora incorreto".
+ * Arealva nos dois ambientes: na API nacional a produção restrita usa o
+ * prestador e o município reais. O município de teste da Fiorilli (3507506)
+ * só valia no servidor de homologação dela, que não emite mais.
  */
-function codigoMunicipioEmissor(ambiente: string): string {
-  const padrao =
-    ambiente === "homologacao" ? CODIGO_MUNICIPIO_TESTE : CODIGO_MUNICIPIO;
-
-  // O .env só entra se um dia o município mudar; sem ele, vale o padrão acima.
-  const configurado = String(
-    (ambiente === "homologacao"
-      ? process.env.MUNICIPIO_IBGE_TEST
-      : process.env.MUNICIPIO_IBGE) ?? "",
-  ).replace(/\D/g, "");
-
-  return /^\d{7}$/.test(configurado) ? configurado : padrao;
+function codigoMunicipioEmissor(_ambiente: string): string {
+  // O .env só entra se um dia o município mudar.
+  const configurado = String(process.env.MUNICIPIO_IBGE ?? "").replace(
+    /\D/g,
+    "",
+  );
+  return /^\d{7}$/.test(configurado) ? configurado : CODIGO_MUNICIPIO;
 }
 
 /** Código IBGE da cidade do tomador; sem resposta válida, fica o do prestador. */
@@ -120,6 +113,8 @@ class NFSEController {
   private fiorilliProvider: FiorilliProvider;
   /** Web service antigo (IssWebWS / ABRASF), mantido para as notas antigas. */
   private legacyProvider: FiorilliProvider;
+  /** API nacional (Sefin Nacional NFS-e): emissão desde 01/10/2026. */
+  private sefin!: SefinNacionalProvider;
   private ultimoNumeroLote = 0;
 
   constructor() {
@@ -170,6 +165,13 @@ class NFSEController {
       this.WSDL_URL,
     );
 
+    // Emissão, consulta e cancelamento das notas novas: API nacional.
+    this.sefin = new SefinNacionalProvider(
+      this.certPath,
+      this.TEMP_DIR,
+      ambiente,
+    );
+
     // O ABRASF continua para as notas emitidas antes da troca.
     this.legacyProvider = new FiorilliProvider(
       this.certPath,
@@ -195,82 +197,98 @@ class NFSEController {
   }
 
   /**
-   * Assina as DPS, envia o lote síncrono e separa o resultado de cada uma.
+   * Prestador que emite a nota.
    *
-   * No lote nacional a prefeitura pode autorizar parte das DPS e recusar
-   * outras (as mensagens trazem o IdDPS); cada DPS recebe a sua nota ou os
-   * seus erros. Mensagem sem IdDPS vale para o lote inteiro.
+   * Na API nacional o ambiente de teste (produção restrita) usa o prestador
+   * real: o CNPJ e a inscrição de teste do .env eram do servidor de
+   * homologação da Fiorilli, que não emite mais.
+   */
+  private prestadorEmissao() {
+    return {
+      cnpj: process.env.MUNICIPIO_LOGIN || "",
+      inscricao: process.env.MUNICIPIO_INCRICAO || "",
+    };
+  }
+
+  /**
+   * Assina cada DPS e envia à API nacional (Sefin Nacional NFS-e).
+   *
+   * Desde 01/10/2026 Arealva emite pelo padrão nacional; o webservice da
+   * Fiorilli ficou só para consulta. A API nacional não tem lote: cada DPS é
+   * um POST, e cada uma recebe a sua nota ou os seus erros — o formato do
+   * retorno é o mesmo de antes, então quem chama não muda.
    */
   private async enviarDpsNacional(
     dps: { id: string; xml: string }[],
     password: string,
-    ambiente: string,
+    _ambiente: string,
   ): Promise<{
     responseXml: string;
     porDps: Map<string, { nota?: NotaNacional; erros: MensagemNacional[] }>;
   }> {
-    const { cnpj, inscricao } = this.prestadorDoAmbiente(ambiente);
-
-    // Número de lote único a cada envio (a prefeitura recusa lote repetido,
-    // E233): segundos atuais, sempre acima do último usado. Em milissegundos
-    // estoura o inteiro de 32 bits do servidor e volta negativo.
-    const numeroLote = Math.max(
-      Math.floor(Date.now() / 1000),
-      this.ultimoNumeroLote + 1,
-    );
-    this.ultimoNumeroLote = numeroLote;
-
-    const assinadas = dps.map((d) =>
-      this.fiorilliProvider.assinarXml(d.xml, "infDPS", password),
-    );
-    const soapXml = this.nacionalXml.createLoteSincronoSoap(
-      numeroLote,
-      cnpj,
-      inscricao,
-      assinadas,
-    );
-
     if (!fs.existsSync("log")) fs.mkdirSync("log", { recursive: true });
-    fs.appendFileSync("./log/xml_log.txt", soapXml + "\n", "utf8");
-
-    let responseXml: string;
-    try {
-      responseXml = await this.fiorilliProvider.sendSoapRequest(
-        soapXml,
-        ACAO_NACIONAL.lote,
-        password,
-      );
-    } catch (err: any) {
-      // SOAP Fault chega como HTTP 500: o corpo traz o motivo.
-      if (!err?.response?.data) throw err;
-      responseXml = String(err.response.data);
-    }
-
-    console.log("XML Response (NFS-e Nacional): ", responseXml);
-
-    const notas = lerNotas(responseXml);
-    const mensagens = lerMensagens(responseXml);
-    const gerais = mensagens.filter((m) => !m.idDps);
 
     const porDps = new Map<
       string,
       { nota?: NotaNacional; erros: MensagemNacional[] }
     >();
-    dps.forEach((d, i) => {
-      const nota =
-        notas.find((n) => n.idDps === d.id) ||
-        // Resposta sem o Id da DPS dentro da nota: casa pela ordem.
-        (notas.length === dps.length && !notas[i]?.idDps
-          ? notas[i]
-          : undefined);
-      const erros = mensagens.filter((m) => m.idDps === d.id);
+    const respostas: unknown[] = [];
+
+    for (const d of dps) {
+      const assinada = this.fiorilliProvider.assinarXml(
+        d.xml,
+        "infDPS",
+        password,
+      );
+      fs.appendFileSync("./log/xml_log.txt", assinada + "\n", "utf8");
+
+      const r = await this.sefin.emitir(assinada, password);
+      respostas.push({ idDps: d.id, status: r.status, resposta: r.bruto });
+      console.log(
+        `[Sefin Nacional] DPS ${d.id}: HTTP ${r.status} | chave=${r.chaveAcesso ?? "-"} | erros=${r.erros.length}`,
+      );
+
+      if (!r.ok) {
+        porDps.set(d.id, {
+          erros: r.erros.map((e) => ({
+            codigo: e.codigo,
+            mensagem: e.mensagem,
+            correcao: e.correcao,
+            idDps: d.id,
+          })),
+        });
+        continue;
+      }
+
+      // A nota vem no XML devolvido; a chave também vem solta no JSON, e é a
+      // dela que vale se o XML não puder ser lido.
+      const [lida] = lerNotas(r.xml || "");
+      const nota: NotaNacional | undefined = lida
+        ? { ...lida, chave: r.chaveAcesso || lida.chave, idDps: d.id }
+        : r.chaveAcesso
+          ? ({
+              numero: "",
+              chave: r.chaveAcesso,
+              idDps: d.id,
+              elemento: undefined as any,
+            } as NotaNacional)
+          : undefined;
+
       porDps.set(d.id, {
         nota,
-        erros: nota ? [] : erros.length ? erros : gerais,
+        erros: nota
+          ? []
+          : [
+              {
+                codigo: String(r.status),
+                mensagem: "A API aceitou a DPS mas não devolveu a NFS-e.",
+                idDps: d.id,
+              },
+            ],
       });
-    });
+    }
 
-    return { responseXml, porDps };
+    return { responseXml: JSON.stringify(respostas), porDps };
   }
 
   /**
@@ -376,9 +394,8 @@ class NFSEController {
       console.log(this.WSDL_URL);
 
       aliquota = aliquota?.trim() ? aliquota : "5.0000";
-      if (this.homologacao) {
-        aliquota = "2.5000";
-      }
+      // A alíquota de 2,5% era a do prestador de teste da Fiorilli; na API
+      // nacional o teste usa a mesma regra da produção.
       aliquota = aliquota.replace(",", ".").replace("%", "");
       if (!service) service = "Servico de Suporte Tecnico";
 
@@ -507,14 +524,10 @@ class NFSEController {
         nfseBase = { ...lastRpsForSeries };
       }
 
-      if (ambiente == "homologacao") {
-        nfseBase.tipoRps = 1;
-        nfseBase.itemListaServico = "17.01";
-
-        nfseBase.issRetido = 2;
-        nfseBase.responsavelRetencao = 1;
-        nfseBase.exigibilidadeIss = 1;
-      } else {
+      // Mesmo serviço nos dois ambientes: na API nacional a produção restrita
+      // valida contra a parametrização real do município. O "17.01" era o
+      // item cadastrado no servidor de teste da Fiorilli.
+      {
         nfseBase.tipoRps = 1;
         nfseBase.itemListaServico = "140201";
 
@@ -615,7 +628,7 @@ class NFSEController {
             ambiente: ambiente,
             status: "Ativa",
             numeroNfe: currentNfseNumber - 1,
-            modelo: "nacional",
+            modelo: "sefin",
             idDps,
           });
           entitiesToSave.push({ entidade: novoRegistro, idDps, bid });
@@ -773,14 +786,9 @@ class NFSEController {
           ? ClientData.email.trim()
           : "sememail@wiptelecom.com.br";
 
-    const cnpjPrestador =
-      ambiente === "homologacao"
-        ? process.env.MUNICIPIO_CNPJ_TEST
-        : process.env.MUNICIPIO_LOGIN;
-    const inscricaoPrestador =
-      ambiente === "homologacao"
-        ? process.env.MUNICIPIO_INCRICAO_TEST
-        : process.env.MUNICIPIO_INCRICAO;
+    // Prestador real nos dois ambientes (API nacional).
+    const { cnpj: cnpjPrestador, inscricao: inscricaoPrestador } =
+      this.prestadorEmissao();
 
     const serieRps = serieOverride
       ? serieOverride
@@ -797,7 +805,9 @@ class NFSEController {
         cnpj: cnpjPrestador || "",
         inscricaoMunicipal: inscricaoPrestador || "",
         // Contribuinte é optante (erro L124 no ABRASF); homologação não.
-        optanteSimples: ambiente === "homologacao" ? "2" : "1",
+        // Optante do Simples nos dois ambientes: a API nacional confere com a
+        // Receita, e o "nao optante" era do prestador de teste da Fiorilli.
+        optanteSimples: "1",
       },
       tomador: {
         cpfCnpj: ClientData?.cpf_cnpj || "",
@@ -845,7 +855,7 @@ class NFSEController {
           where: { id: Number(id), ambiente },
         });
 
-        if (nfse?.modelo === "nacional") {
+        if (nfse?.modelo === "nacional" || nfse?.modelo === "sefin") {
           return this.BuscarNfseNacionalDetalhes(nfse, ambiente);
         }
         if (nfse) {
@@ -871,36 +881,73 @@ class NFSEController {
   async BuscarNfseNacionalDetalhes(nfse: NFSE, ambiente: string): Promise<any> {
     try {
       this.configureProvider(ambiente);
-      const { cnpj, inscricao } = this.prestadorDoAmbiente(ambiente);
 
-      const soapXml = this.nacionalXml.createConsultaSoap({
-        cnpj,
-        inscricaoMunicipal: inscricao,
-        chaveNfse: nfse.chaveNfse,
-        numeroDps: nfse.numeroRps,
-        serieDps: nfse.serieRps,
-      });
+      let nota: NotaNacional | undefined;
 
-      let response: string;
-      try {
-        response = await this.fiorilliProvider.sendSoapRequest(
-          soapXml,
-          ACAO_NACIONAL.consultar,
-          this.PASSWORD,
-        );
-      } catch (err: any) {
-        if (!err?.response?.data) throw err;
-        response = String(err.response.data);
+      if (nfse.modelo === "sefin") {
+        // Nota emitida pela API nacional: consulta lá, pela chave. Sem chave
+        // gravada, recupera pelo Id da DPS.
+        let chave = nfse.chaveNfse;
+        if (!chave && nfse.idDps) {
+          const porDps = await this.sefin.chaveDaDps(nfse.idDps, this.PASSWORD);
+          chave = porDps.chaveAcesso ?? null;
+        }
+        if (!chave) {
+          return {
+            status: "error",
+            message: "Chave da NFS-e não encontrada para consulta.",
+          };
+        }
+
+        const consulta = await this.sefin.consultar(chave, this.PASSWORD);
+        if (!consulta.ok) {
+          return {
+            status: "error",
+            message: consulta.erros
+              .map((e) => [e.codigo, e.mensagem].filter(Boolean).join(" - "))
+              .join(" | "),
+          };
+        }
+        [nota] = lerNotas(consulta.xml || "");
+      } else {
+        // Notas de antes de 01/10/2026: continuam consultáveis no ISSWeb.
+        const { cnpj, inscricao } = this.prestadorDoAmbiente(ambiente);
+        const soapXml = this.nacionalXml.createConsultaSoap({
+          cnpj,
+          inscricaoMunicipal: inscricao,
+          chaveNfse: nfse.chaveNfse,
+          numeroDps: nfse.numeroRps,
+          serieDps: nfse.serieRps,
+        });
+
+        let response: string;
+        try {
+          response = await this.fiorilliProvider.sendSoapRequest(
+            soapXml,
+            ACAO_NACIONAL.consultar,
+            this.PASSWORD,
+          );
+        } catch (err: any) {
+          if (!err?.response?.data) throw err;
+          response = String(err.response.data);
+        }
+
+        [nota] = lerNotas(response);
+        if (!nota) {
+          const mensagens = lerMensagens(response);
+          return {
+            status: "error",
+            message: mensagens.length
+              ? resumoMensagens(mensagens)
+              : "NFS-e não encontrada na consulta.",
+          };
+        }
       }
 
-      const [nota] = lerNotas(response);
       if (!nota) {
-        const mensagens = lerMensagens(response);
         return {
           status: "error",
-          message: mensagens.length
-            ? resumoMensagens(mensagens)
-            : "NFS-e não encontrada na consulta.",
+          message: "NFS-e não encontrada na consulta.",
         };
       }
 
@@ -1053,7 +1100,10 @@ class NFSEController {
             continue;
           }
 
-          if (nfseEntity.modelo === "nacional") {
+          if (
+            nfseEntity.modelo === "nacional" ||
+            nfseEntity.modelo === "sefin"
+          ) {
             responses.push(
               await this.cancelarNfseNacional(nfseEntity, password, ambiente),
             );
@@ -1218,6 +1268,7 @@ class NFSEController {
       chave,
       password,
       ambiente,
+      nfseEntity.modelo === "nacional" ? "fiorilli" : "sefin",
     );
 
     if (!envio.ok) {
@@ -1248,12 +1299,45 @@ class NFSEController {
     chave: string,
     password: string,
     ambiente: string,
+    /** "sefin": nota da API nacional; "fiorilli": nota de antes de 01/10/2026. */
+    via: "sefin" | "fiorilli" = "sefin",
   ): Promise<{
     ok: boolean;
     error?: string;
     detalhes?: any;
     response?: string;
   }> {
+    if (via === "sefin") {
+      // API nacional: o pedido vai sem envelope, assinado em infPedReg.
+      const { cnpj } = this.prestadorEmissao();
+      const pedido = this.nacionalXml.createPedRegEventoCancelamento({
+        ambiente,
+        chaveNfse: chave,
+        cnpjAutor: cnpj,
+      });
+      const assinado = this.fiorilliProvider.assinarXml(
+        pedido,
+        "infPedReg",
+        password,
+      );
+      const r = await this.sefin.registrarEvento(chave, assinado, password);
+      if (!r.ok) {
+        return {
+          ok: false,
+          error: r.erros
+            .map((e) => [e.codigo, e.mensagem].filter(Boolean).join(" - "))
+            .join(" | "),
+          detalhes: r.erros.map((e) => ({
+            Codigo: e.codigo,
+            Mensagem: e.mensagem,
+            Correcao: e.correcao,
+          })),
+          response: JSON.stringify(r.bruto ?? {}),
+        };
+      }
+      return { ok: true, response: r.xml || JSON.stringify(r.bruto ?? {}) };
+    }
+
     const { cnpj, inscricao } = this.prestadorDoAmbiente(ambiente);
 
     const pedido = this.nacionalXml.createPedidoCancelamentoXml({
@@ -1326,16 +1410,21 @@ class NFSEController {
     this.PASSWORD = password;
     this.configureProvider(ambiente);
 
+    // Nota de antes de 01/10/2026 (emitida pela Fiorilli) cancela por lá;
+    // as demais, inclusive as que não ficaram gravadas, pela API nacional.
+    const repo = AppDataSource.getRepository(NFSE);
+    const registro = await repo.findOne({ where: { chaveNfse: limpa } });
+    const via = registro?.modelo === "nacional" ? "fiorilli" : "sefin";
+
     const envio = await this.enviarCancelamentoNacional(
       limpa,
       password,
       ambiente,
+      via,
     );
     if (!envio.ok)
       return { ok: false, error: envio.error, detalhes: envio.detalhes };
 
-    const repo = AppDataSource.getRepository(NFSE);
-    const registro = await repo.findOne({ where: { chaveNfse: limpa } });
     if (registro) {
       registro.status = "Cancelada";
       await repo.save(registro);
@@ -1983,14 +2072,9 @@ class NFSEController {
           ? ClientData.email.trim()
           : "sememail@wiptelecom.com.br";
 
-      const cnpjPrestador =
-        ambiente === "producao"
-          ? process.env.MUNICIPIO_LOGIN
-          : process.env.MUNICIPIO_CNPJ_TEST;
-      const inscricaoPrestador =
-        ambiente === "producao"
-          ? process.env.MUNICIPIO_INCRICAO
-          : process.env.MUNICIPIO_INCRICAO_TEST;
+      // Prestador real nos dois ambientes (API nacional).
+      const { cnpj: cnpjPrestador, inscricao: inscricaoPrestador } =
+        this.prestadorEmissao();
 
       const dps = this.nacionalXml.createDpsXml({
         ambiente,
@@ -2081,7 +2165,7 @@ class NFSEController {
           ambiente: ambiente,
           status: "Ativa",
           numeroNfe: Number(temSucesso.numero) || nextNfseNumber,
-          modelo: "nacional",
+          modelo: "sefin",
           chaveNfse: temSucesso.chave || null,
           idDps: dps.id,
         });
@@ -2230,7 +2314,7 @@ class NFSEController {
     this.configureProvider(ambiente);
 
     const { cnpj: cnpjPrestador, inscricao: inscricaoPrestador } =
-      this.prestadorDoAmbiente(ambiente);
+      this.prestadorEmissao();
 
     const documento = String(opts.tomador.cpfCnpj || "").replace(/\D/g, "");
     if (documento.length !== 11 && documento.length !== 14) {
@@ -2255,7 +2339,9 @@ class NFSEController {
       prestador: {
         cnpj: cnpjPrestador,
         inscricaoMunicipal: inscricaoPrestador,
-        optanteSimples: ambiente === "homologacao" ? "2" : "1",
+        // Optante do Simples nos dois ambientes: a API nacional confere com a
+        // Receita, e o "nao optante" era do prestador de teste da Fiorilli.
+        optanteSimples: "1",
       },
       tomador: {
         cpfCnpj: documento,
@@ -2334,7 +2420,7 @@ class NFSEController {
       ambiente,
       status: "Ativa",
       numeroNfe: Number(resultado.nota.numero) || 0,
-      modelo: "nacional",
+      modelo: "sefin",
       chaveNfse: resultado.nota.chave || null,
       idDps: dps.id,
     });
@@ -2394,20 +2480,15 @@ class NFSEController {
         ? ClientData.email.trim()
         : "sememail@wiptelecom.com.br";
 
-    const cnpjPrestador =
-      ambiente === "producao"
-        ? process.env.MUNICIPIO_LOGIN
-        : process.env.MUNICIPIO_CNPJ_TEST;
-    const inscricaoPrestador =
-      ambiente === "producao"
-        ? process.env.MUNICIPIO_INCRICAO
-        : process.env.MUNICIPIO_INCRICAO_TEST;
+    // Prestador real nos dois ambientes (API nacional).
+    const { cnpj: cnpjPrestador, inscricao: inscricaoPrestador } =
+      this.prestadorEmissao();
 
     const aliquotaFmt = Number(aliquota || 0).toFixed(4);
     const serieToUse = ambiente === "homologacao" ? "wip99" : targetSeries;
     const emailToUse =
       ambiente === "homologacao" ? "suporte_wiptelecom@outlook.com" : email;
-    const optanteSimples = ambiente === "homologacao" ? "2" : "1";
+    const optanteSimples = "1";
 
     const dps = this.nacionalXml.createDpsXml({
       ambiente,
@@ -2499,7 +2580,7 @@ class NFSEController {
       ambiente,
       status: "Ativa",
       numeroNfe: Number(temSucesso.numero) || nextNfseNumber,
-      modelo: "nacional",
+      modelo: "sefin",
       chaveNfse: temSucesso.chave || null,
       idDps: dps.id,
     });
