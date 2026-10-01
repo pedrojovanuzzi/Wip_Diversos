@@ -121,6 +121,45 @@ function tag(nome: string, valor: unknown, limite?: number): string {
   return `<${nome}>${conteudo(valor, limite)}</${nome}>`;
 }
 
+/**
+ * Percentual no formato do leiaute nacional: até 2 dígitos inteiros e 2
+ * casas ("5.00", "0.50"). Acima de 99,99% não existe no tipo.
+ */
+function percentual(valor: unknown): string {
+  const numero = Number(String(valor ?? "").replace(",", "."));
+  if (!Number.isFinite(numero) || numero <= 0) return "0";
+  return Math.min(numero, 99.99).toFixed(2);
+}
+
+/**
+ * Total aproximado de tributos (Lei 12.741/2012), conforme o regime:
+ *
+ * - ME/EPP do Simples: percentual aproximado do Simples Nacional
+ *   (pTotTribSN). O indicador "não informar" (indTotTrib) é recusado para
+ *   ME/EPP (E0712). O percentual vem de NFSE_PERCENTUAL_SIMPLES; sem ele, da
+ *   alíquota informada na emissão.
+ * - Não optante: indTotTrib e pTotTribSN são proibidos, então vai o
+ *   percentual por esfera, com o ISS como parte municipal.
+ */
+function totalTributos(
+  optante: boolean,
+  valores: { aliquota: string | number },
+): string {
+  if (optante) {
+    const sn = percentual(
+      process.env.NFSE_PERCENTUAL_SIMPLES || valores.aliquota,
+    );
+    return `<totTrib><pTotTribSN>${sn}</pTotTribSN></totTrib>`;
+  }
+  return (
+    `<totTrib><pTotTrib>` +
+    `<pTotTribFed>0.00</pTotTribFed>` +
+    `<pTotTribEst>0.00</pTotTribEst>` +
+    `<pTotTribMun>${percentual(valores.aliquota)}</pTotTribMun>` +
+    `</pTotTrib></totTrib>`
+  );
+}
+
 /** Série da DPS: só dígitos (a série "wip99" de homologação vira "99"). */
 export function serieDps(serieRps: unknown): string {
   const serie = digitos(serieRps).replace(/^0+(?=\d)/, "");
@@ -267,7 +306,7 @@ export class NfseNacionalXmlFactory {
       `<vServPrest><vServ>${Number(dados.valores.valorServicos).toFixed(2)}</vServ></vServPrest>` +
       `<trib>` +
       `<tribMun><tribISSQN>1</tribISSQN><tpRetISSQN>${retido ? "2" : "1"}</tpRetISSQN>${pAliq}</tribMun>` +
-      `<totTrib><indTotTrib>0</indTotTrib></totTrib>` +
+      totalTributos(optante, dados.valores) +
       `</trib>` +
       `</valores>` +
       `</infDPS>` +
