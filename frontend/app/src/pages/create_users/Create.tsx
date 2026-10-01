@@ -12,6 +12,10 @@ import {
   FaExclamationCircle,
   FaSearch,
   FaUsers,
+  FaPen,
+  FaTrash,
+  FaTimes,
+  FaSave,
 } from "react-icons/fa";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { BsArrowRepeat } from "react-icons/bs";
@@ -29,6 +33,13 @@ const erroSimples = (msg: string): ErrorArray => ({
   path: "",
   location: "",
 });
+
+interface Edicao {
+  id: number;
+  login: string;
+  password: string;
+  permission: string;
+}
 
 const corPermissao = (p: number) =>
   p >= 5
@@ -54,6 +65,23 @@ export const Create = () => {
 
   const { user } = useAuth();
   const token = user?.token;
+
+  const [edicao, setEdicao] = useState<Edicao | null>(null);
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+  const [removendo, setRemovendo] = useState<number | null>(null);
+  const [avisoLista, setAvisoLista] = useState<{
+    texto: string;
+    tipo: "ok" | "erro";
+  } | null>(null);
+
+  const avisar = (texto: string, tipo: "ok" | "erro") => {
+    setAvisoLista({ texto, tipo });
+    setTimeout(() => setAvisoLista(null), 6000);
+  };
+
+  const mensagemDeErro = (e: any, padrao: string) =>
+    e?.response?.data?.errors?.map((x: { msg: string }) => x.msg).join(" ") ||
+    padrao;
 
   const carregarUsuarios = useCallback(
     async (preencherId: boolean) => {
@@ -99,6 +127,68 @@ export const Create = () => {
       (u) => u.login.toLowerCase().includes(t) || String(u.id) === t,
     );
   }, [usuarios, filtro]);
+
+  const loginEmUsoNaEdicao = useMemo(() => {
+    if (!edicao) return undefined;
+    const t = edicao.login.trim().toLowerCase();
+    return usuarios.find(
+      (u) => u.id !== edicao.id && u.login.toLowerCase() === t,
+    );
+  }, [usuarios, edicao]);
+
+  const salvarEdicao = async () => {
+    if (!edicao) return;
+    if (edicao.password && edicao.password.length < 6) {
+      avisar("A nova senha precisa ter no mínimo 6 caracteres.", "erro");
+      return;
+    }
+    setSalvandoEdicao(true);
+    try {
+      await axios.put(
+        `${process.env.REACT_APP_URL}/auth/users/${edicao.id}`,
+        {
+          login: edicao.login.trim(),
+          password: edicao.password || undefined,
+          permission: edicao.permission,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      avisar(
+        `Usuário ID ${edicao.id} atualizado${edicao.password ? " (senha alterada)" : ""}.`,
+        "ok",
+      );
+      setDestaque(edicao.id);
+      setEdicao(null);
+      await carregarUsuarios(false);
+    } catch (e: any) {
+      avisar(mensagemDeErro(e, "Erro ao editar o usuário."), "erro");
+    } finally {
+      setSalvandoEdicao(false);
+    }
+  };
+
+  const remover = async (u: Usuario) => {
+    if (
+      !window.confirm(
+        `Remover o usuário "${u.login}" (ID ${u.id})? Ele perde o acesso ao sistema na hora.`,
+      )
+    ) {
+      return;
+    }
+    setRemovendo(u.id);
+    try {
+      await axios.delete(`${process.env.REACT_APP_URL}/auth/users/${u.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      avisar(`Usuário "${u.login}" (ID ${u.id}) removido.`, "ok");
+      if (edicao?.id === u.id) setEdicao(null);
+      await carregarUsuarios(false);
+    } catch (e: any) {
+      avisar(mensagemDeErro(e, "Erro ao remover o usuário."), "erro");
+    } finally {
+      setRemovendo(null);
+    }
+  };
 
   const createUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -335,6 +425,18 @@ export const Create = () => {
               </div>
             </div>
 
+            {avisoLista && (
+              <p
+                className={`mx-4 mt-3 rounded border p-2.5 text-sm ${
+                  avisoLista.tipo === "ok"
+                    ? "border-green-200 bg-green-50 text-green-700"
+                    : "border-red-200 bg-red-50 text-red-700"
+                }`}
+              >
+                {avisoLista.texto}
+              </p>
+            )}
+
             <div className="max-h-[70vh] overflow-auto">
               <table className="min-w-full text-sm">
                 <thead className="sticky top-0 bg-gray-50 text-left text-gray-600">
@@ -342,39 +444,169 @@ export const Create = () => {
                     <th className="w-20 px-4 py-2">ID</th>
                     <th className="px-4 py-2">Login</th>
                     <th className="w-28 px-4 py-2">Permissão</th>
+                    <th className="w-24 px-4 py-2 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtrados.map((u) => (
-                    <tr
-                      key={u.id}
-                      className={`border-t ${
-                        u.id === destaque
-                          ? "bg-green-50"
-                          : String(u.id) === id.trim()
-                            ? "bg-red-50"
-                            : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <td className="px-4 py-2 font-mono font-semibold text-gray-800">
-                        {u.id}
-                      </td>
-                      <td className="px-4 py-2">{u.login}</td>
-                      <td className="px-4 py-2">
-                        <span
-                          className={`rounded px-2 py-0.5 text-xs font-semibold ${corPermissao(
-                            u.permission,
-                          )}`}
-                        >
-                          {u.permission}
-                          {u.permission >= 5 ? " · admin" : ""}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {filtrados.map((u) =>
+                    edicao?.id === u.id ? (
+                      <tr key={u.id} className="border-t bg-blue-50">
+                        <td className="px-4 py-2 align-top font-mono font-semibold text-gray-800">
+                          {u.id}
+                        </td>
+                        <td className="px-4 py-2" colSpan={2}>
+                          <div className="grid gap-2 sm:grid-cols-[1fr_1fr_100px]">
+                            <label className="text-xs text-gray-600">
+                              Login
+                              <input
+                                value={edicao.login}
+                                onChange={(e) =>
+                                  setEdicao({ ...edicao, login: e.target.value })
+                                }
+                                className={`mt-0.5 block w-full rounded border p-1.5 text-sm ${
+                                  loginEmUsoNaEdicao ? "border-red-400" : "border-gray-300"
+                                }`}
+                              />
+                              {loginEmUsoNaEdicao && (
+                                <span className="text-red-600">
+                                  Usado pelo ID {loginEmUsoNaEdicao.id}
+                                </span>
+                              )}
+                            </label>
+                            <label className="text-xs text-gray-600">
+                              Nova senha
+                              <input
+                                type="text"
+                                value={edicao.password}
+                                placeholder="Em branco: mantém a atual"
+                                onChange={(e) =>
+                                  setEdicao({ ...edicao, password: e.target.value })
+                                }
+                                className="mt-0.5 block w-full rounded border border-gray-300 p-1.5 text-sm"
+                              />
+                            </label>
+                            <label className="text-xs text-gray-600">
+                              Permissão
+                              <select
+                                value={edicao.permission}
+                                onChange={(e) =>
+                                  setEdicao({ ...edicao, permission: e.target.value })
+                                }
+                                className="mt-0.5 block w-full rounded border border-gray-300 p-1.5 text-sm"
+                              >
+                                {[1, 2, 3, 4, 5].map((n) => (
+                                  <option key={n} value={n}>
+                                    {n}
+                                    {n === 5 ? " · admin" : ""}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 align-top">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              type="button"
+                              title="Salvar"
+                              onClick={salvarEdicao}
+                              disabled={
+                                salvandoEdicao ||
+                                !edicao.login.trim() ||
+                                !!loginEmUsoNaEdicao
+                              }
+                              className="rounded p-2 text-green-700 hover:bg-green-100 disabled:opacity-40"
+                            >
+                              {salvandoEdicao ? (
+                                <AiOutlineLoading3Quarters className="animate-spin" />
+                              ) : (
+                                <FaSave />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              title="Cancelar"
+                              onClick={() => setEdicao(null)}
+                              disabled={salvandoEdicao}
+                              className="rounded p-2 text-gray-600 hover:bg-gray-200"
+                            >
+                              <FaTimes />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr
+                        key={u.id}
+                        className={`border-t ${
+                          u.id === destaque
+                            ? "bg-green-50"
+                            : String(u.id) === id.trim()
+                              ? "bg-red-50"
+                              : "hover:bg-gray-50"
+                        }`}
+                      >
+                        <td className="px-4 py-2 font-mono font-semibold text-gray-800">
+                          {u.id}
+                        </td>
+                        <td className="px-4 py-2">
+                          {u.login}
+                          {u.id === user?.id && (
+                            <span className="ml-2 text-xs text-gray-500">(você)</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          <span
+                            className={`rounded px-2 py-0.5 text-xs font-semibold ${corPermissao(
+                              u.permission,
+                            )}`}
+                          >
+                            {u.permission}
+                            {u.permission >= 5 ? " · admin" : ""}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              type="button"
+                              title="Editar login, senha e permissão"
+                              onClick={() =>
+                                setEdicao({
+                                  id: u.id,
+                                  login: u.login,
+                                  password: "",
+                                  permission: String(u.permission),
+                                })
+                              }
+                              className="rounded p-2 text-blue-600 hover:bg-blue-100"
+                            >
+                              <FaPen />
+                            </button>
+                            <button
+                              type="button"
+                              title={
+                                u.id === user?.id
+                                  ? "Você não pode remover o próprio usuário"
+                                  : "Remover usuário"
+                              }
+                              onClick={() => remover(u)}
+                              disabled={u.id === user?.id || removendo === u.id}
+                              className="rounded p-2 text-red-600 hover:bg-red-100 disabled:opacity-30"
+                            >
+                              {removendo === u.id ? (
+                                <AiOutlineLoading3Quarters className="animate-spin" />
+                              ) : (
+                                <FaTrash />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ),
+                  )}
                   {!filtrados.length && !carregandoLista && (
                     <tr>
-                      <td colSpan={3} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
                         Nenhum usuário encontrado.
                       </td>
                     </tr>

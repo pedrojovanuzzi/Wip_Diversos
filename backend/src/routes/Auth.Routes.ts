@@ -17,6 +17,8 @@ const somenteAdmin = (req: any, res: any, next: any) => {
 router.get("/", Auth.show);
 router.post("/create", AuthGuard, somenteAdmin, Auth.createUser);
 router.get("/users", AuthGuard, somenteAdmin, Auth.listUsers);
+router.put("/users/:id", AuthGuard, somenteAdmin, Auth.updateUser);
+router.delete("/users/:id", AuthGuard, somenteAdmin, Auth.deleteUser);
 router.post("/login", Auth.Login);
 router.get("/getUser", Auth.getCurrentUser);
 router.post("/api", Auth.getToken);

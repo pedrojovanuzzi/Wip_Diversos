@@ -4,6 +4,7 @@ import DataSource from "../database/DataSource";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 import jwt, { JwtPayload } from "jsonwebtoken";
+import { Not } from "typeorm";
 import { User } from "../entities/User";
 import { registrarLog, descreverAcao } from "../utils/auditoria";
 
@@ -175,6 +176,142 @@ class Auth {
     }
   }
 
+  /** Quantos administradores (permissão 5) existem, fora o informado. */
+  private static async outrosAdmins(id: number) {
+    return DataSource.getRepository(User)
+      .createQueryBuilder("u")
+      .where("u.permission >= 5")
+      .andWhere("u.id <> :id", { id })
+      .getCount();
+  }
+
+  /**
+   * PUT /auth/users/:id — login, senha e permissão. Campo ausente ou senha em
+   * branco mantém o valor atual.
+   */
+  public async updateUser(req: AuthenticatedRequest, res: Response) {
+    try {
+      const id = Number(req.params.id);
+      const repo = DataSource.getRepository(User);
+      const usuario = await repo.findOne({ where: { id } });
+      if (!usuario) {
+        res.status(404).json({ errors: [{ msg: "Usuário não encontrado" }] });
+        return;
+      }
+
+      const erros: { msg: string }[] = [];
+      const alteracoes: string[] = [];
+      const loginAntigo = usuario.login;
+
+      if (req.body.login !== undefined) {
+        const login = String(req.body.login).trim();
+        if (!login) {
+          erros.push({ msg: "Login é obrigatório" });
+        } else if (login !== usuario.login) {
+          const outro = await repo.findOne({ where: { login, id: Not(id) } });
+          if (outro) {
+            erros.push({
+              msg: `Já existe um usuário com o login "${login}" (ID ${outro.id})`,
+            });
+          } else {
+            alteracoes.push(`login ${usuario.login} → ${login}`);
+            usuario.login = login;
+          }
+        }
+      }
+
+      const senha = String(req.body.password ?? "");
+      if (senha) {
+        if (senha.length < 6) {
+          erros.push({ msg: "Senha tem que ter no Minimo 6 Caracteres" });
+        } else {
+          usuario.password = await bcrypt.hash(senha, await bcrypt.genSalt());
+          alteracoes.push("senha");
+        }
+      }
+
+      if (req.body.permission !== undefined && req.body.permission !== "") {
+        const permissao = Number(req.body.permission);
+        if (!Number.isInteger(permissao) || permissao < 1 || permissao > 5) {
+          erros.push({ msg: "Nivel de Permissão entre 1 e 5" });
+        } else if (permissao !== usuario.permission) {
+          // Sem isso dá para tirar o último admin e ninguém mais administra.
+          if (
+            (usuario.permission ?? 0) >= 5 &&
+            permissao < 5 &&
+            (await Auth.outrosAdmins(id)) === 0
+          ) {
+            erros.push({
+              msg: "Este é o único administrador: não dá para reduzir a permissão dele",
+            });
+          } else {
+            alteracoes.push(`permissão ${usuario.permission} → ${permissao}`);
+            usuario.permission = permissao;
+          }
+        }
+      }
+
+      if (erros.length) {
+        res.status(422).json({ errors: erros });
+        return;
+      }
+
+      if (alteracoes.length) {
+        await repo.save(usuario);
+        descreverAcao(
+          req,
+          `Editou o usuário ${loginAntigo} (ID ${id}): ${alteracoes.join(", ")}`,
+        );
+      }
+
+      res.status(200).json({
+        id: usuario.id,
+        login: usuario.login,
+        permission: usuario.permission,
+      });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ errors: [{ msg: "Erro ao editar usuário" }] });
+    }
+  }
+
+  /** DELETE /auth/users/:id */
+  public async deleteUser(req: AuthenticatedRequest, res: Response) {
+    try {
+      const id = Number(req.params.id);
+      const repo = DataSource.getRepository(User);
+      const usuario = await repo.findOne({ where: { id } });
+      if (!usuario) {
+        res.status(404).json({ errors: [{ msg: "Usuário não encontrado" }] });
+        return;
+      }
+
+      if (req.user?.id === id) {
+        res
+          .status(422)
+          .json({ errors: [{ msg: "Você não pode remover o próprio usuário" }] });
+        return;
+      }
+
+      if (
+        (usuario.permission ?? 0) >= 5 &&
+        (await Auth.outrosAdmins(id)) === 0
+      ) {
+        res.status(422).json({
+          errors: [{ msg: "Não dá para remover o único administrador" }],
+        });
+        return;
+      }
+
+      await repo.delete({ id });
+      descreverAcao(req, `Removeu o usuário ${usuario.login} (ID ${id})`);
+      res.status(200).json({ message: "Usuário removido" });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ errors: [{ msg: "Erro ao remover usuário" }] });
+    }
+  }
+
   public async getToken(req: Request, res: Response) {
     try {
       const authHeader = req.headers["authorization"];
@@ -328,7 +465,9 @@ class Auth {
             return;
           }
 
-          res.json({ valid: true, user: user });
+          // O hash da senha não sai para o navegador.
+          const { password: _senha, ...semSenha } = user;
+          res.json({ valid: true, user: semSenha });
           return;
         },
       );
