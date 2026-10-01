@@ -106,53 +106,7 @@ export const BuscarNfseGerada = () => {
     }
   };
 
-  /**
-   * Nota emitida pela API nacional: abre o DANFSe (PDF oficial, layout
-   * nacional) numa aba nova. A aba abre antes da requisição para o navegador
-   * não bloquear como pop-up.
-   */
-  const imprimirDanfse = async (id: number) => {
-    const janela = window.open("", "_blank");
-    try {
-      setLoading(true);
-      const resposta = await axios.post(
-        `${process.env.REACT_APP_URL}/nfse/danfse`,
-        { id, ambiente: ambiente || "homologacao" },
-        {
-          responseType: "blob",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      const url = URL.createObjectURL(
-        new Blob([resposta.data], { type: "application/pdf" }),
-      );
-      if (janela) janela.location.href = url;
-      else window.open(url, "_blank");
-      setClientesSelecionados([]);
-    } catch (erro: any) {
-      janela?.close();
-      let mensagem = "Erro ao buscar o DANFSe.";
-      try {
-        const texto = await erro?.response?.data?.text?.();
-        mensagem = JSON.parse(texto)?.error || mensagem;
-      } catch {
-        // resposta sem JSON
-      }
-      showError(mensagem);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const imprimir = async (reactToPrintContent: any) => {
-    const nota = clientes.find(
-      (c) => c.nfse?.id === clientesSelecionados[0],
-    )?.nfse;
-    if (nota?.modelo === "sefin") {
-      await imprimirDanfse(nota.id);
-      return;
-    }
-
     try {
       setLoading(true);
       const resposta = await axios.post(
@@ -169,9 +123,19 @@ export const BuscarNfseGerada = () => {
         },
       );
 
-      console.log("Notas Canceladas:", resposta.data);
-
-      const dados = resposta.data;
+      const dados: any[] = resposta.data;
+      // Consulta que falhou (chave não achada, API fora...) vinha em branco
+      // na impressão: avisa o motivo e não imprime.
+      const falha = dados.find((d) => d?.status === "error" || d?.error);
+      if (falha) {
+        showError(
+          `Não foi possível montar a nota: ${falha.message || falha.error}${
+            falha.error && falha.message ? ` (${falha.error})` : ""
+          }`,
+        );
+        setLoading(false);
+        return;
+      }
       setPdfDados(dados);
 
       setTimeout(() => {
@@ -180,8 +144,9 @@ export const BuscarNfseGerada = () => {
 
       setClientesSelecionados([]);
       setLoading(false);
-    } catch (erro) {
-      console.error("Erro ao Buscar Clientes:", erro);
+    } catch (erro: any) {
+      console.error("Erro ao imprimir NFS-e:", erro);
+      showError(erro?.response?.data?.error || "Erro ao imprimir a NFS-e.");
       setLoading(false);
     }
   };

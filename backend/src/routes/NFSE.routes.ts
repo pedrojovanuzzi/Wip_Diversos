@@ -53,7 +53,6 @@ router.post("/BuscarClientesServicos", AuthGuard, NFSE.BuscarClientesServicos);
 router.post("/EmitirNfseServicos", AuthGuard, NFSE.EmitirNfseServicos);
 
 router.post("/imprimirNFSE", AuthGuard, NFSE.imprimirNFSE);
-router.post("/danfse", AuthGuard, NFSE.danfseNFSE);
 
 router.post("/setSessionPassword", AuthGuard, NFSE.setPassword);
 

@@ -18,7 +18,6 @@ import { processarCertificado } from "../../utils/certUtils";
  * - GET  /nfse/{chaveAcesso}       consulta a NFS-e
  * - GET  /dps/{id}                 chave de acesso a partir do Id da DPS
  * - POST /nfse/{chaveAcesso}/eventos  registra evento (cancelamento)
- * - GET  {ADN}/danfse/{chaveAcesso}   PDF oficial da nota (DANFSe)
  */
 
 export const URL_SEFIN_NACIONAL = {
@@ -27,17 +26,6 @@ export const URL_SEFIN_NACIONAL = {
   homologacao:
     process.env.SEFIN_NACIONAL_URL_TEST ||
     "https://sefin.producaorestrita.nfse.gov.br/API/SefinNacional",
-};
-
-/**
- * Ambiente de Dados Nacional (ADN): é de lá que sai o DANFSe, o PDF oficial
- * da nota no layout nacional (GET /danfse/{chaveAcesso}).
- */
-export const URL_ADN_NACIONAL = {
-  producao: process.env.ADN_NACIONAL_URL || "https://adn.nfse.gov.br",
-  homologacao:
-    process.env.ADN_NACIONAL_URL_TEST ||
-    "https://adn.producaorestrita.nfse.gov.br",
 };
 
 export interface MensagemSefin {
@@ -90,7 +78,6 @@ function lerMensagens(lista: unknown): MensagemSefin[] {
 
 export class SefinNacionalProvider {
   private baseUrl: string;
-  private adnUrl: string;
 
   constructor(
     private certPath: string,
@@ -101,9 +88,6 @@ export class SefinNacionalProvider {
     this.baseUrl = homologacao
       ? URL_SEFIN_NACIONAL.homologacao
       : URL_SEFIN_NACIONAL.producao;
-    this.adnUrl = homologacao
-      ? URL_ADN_NACIONAL.homologacao
-      : URL_ADN_NACIONAL.producao;
   }
 
   /** Conexão autenticada pelo certificado A1 (mTLS). */
@@ -224,61 +208,5 @@ export class SefinNacionalProvider {
     const r = this.resultado(status, data);
     r.xml = descompactar(data?.eventoXmlGZipB64);
     return r;
-  }
-
-  /**
-   * DANFSe (PDF oficial, layout nacional) da nota. Devolve o PDF ou o motivo
-   * da recusa — a API responde JSON/HTML quando não acha a nota.
-   */
-  async danfse(
-    chaveAcesso: string,
-    password: string,
-  ): Promise<{ ok: true; pdf: Buffer } | { ok: false; erro: string }> {
-    try {
-      const resposta = await axios.get(
-        `${this.adnUrl}/danfse/${encodeURIComponent(chaveAcesso)}`,
-        {
-          httpsAgent: this.agente(password),
-          responseType: "arraybuffer",
-          timeout: 60_000,
-          headers: { Accept: "application/pdf" },
-        },
-      );
-      const pdf = Buffer.from(resposta.data);
-      if (pdf.subarray(0, 4).toString() !== "%PDF") {
-        return { ok: false, erro: this.textoErro(pdf) };
-      }
-      return { ok: true, pdf };
-    } catch (err: any) {
-      if (err?.response) {
-        const corpo = Buffer.from(err.response.data ?? "");
-        return {
-          ok: false,
-          erro: `${err.response.status} - ${this.textoErro(corpo)}`,
-        };
-      }
-      return { ok: false, erro: err?.message || "Falha ao buscar o DANFSe" };
-    }
-  }
-
-  private textoErro(corpo: Buffer): string {
-    const texto = corpo.toString("utf8");
-    try {
-      const json = JSON.parse(texto);
-      const erros = lerMensagens(json?.erros ?? json?.Erros ?? json?.erro);
-      if (erros.length)
-        return erros
-          .map((e) => [e.codigo, e.mensagem].filter(Boolean).join(" - "))
-          .join(" | ");
-    } catch {
-      // não é JSON
-    }
-    return (
-      texto
-        .replace(/<[^>]+>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 300) || "Resposta vazia"
-    );
   }
 }
