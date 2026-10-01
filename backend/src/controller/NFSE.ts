@@ -944,6 +944,65 @@ class NFSEController {
   }
 
   /**
+   * PDF oficial (DANFSe, layout nacional) de uma nota emitida pela API
+   * nacional. As notas de antes de 01/10/2026 continuam no `imprimirNFSE`.
+   */
+  danfseNFSE = async (req: Request, res: Response) => {
+    try {
+      const { id, ambiente } = req.body;
+      const nfse = await AppDataSource.getRepository(NFSE).findOne({
+        where: { id: Number(id), ambiente },
+      });
+      if (!nfse) {
+        res.status(404).json({ error: `NFS-e ${id} não encontrada.` });
+        return;
+      }
+      if (nfse.modelo !== "sefin") {
+        res.status(400).json({
+          error: "Essa nota é anterior à API nacional: use a impressão antiga.",
+        });
+        return;
+      }
+      if (!this.PASSWORD) {
+        res
+          .status(400)
+          .json({ error: "Informe a senha do certificado antes de imprimir." });
+        return;
+      }
+
+      this.configureProvider(ambiente);
+
+      let chave = nfse.chaveNfse;
+      if (!chave && nfse.idDps) {
+        const porDps = await this.sefin.chaveDaDps(nfse.idDps, this.PASSWORD);
+        chave = porDps.chaveAcesso ?? null;
+      }
+      if (!chave) {
+        res.status(404).json({ error: "Chave da NFS-e não encontrada." });
+        return;
+      }
+
+      const r = await this.sefin.danfse(chave, this.PASSWORD);
+      if (!r.ok) {
+        res.status(502).json({ error: `DANFSe indisponível: ${r.erro}` });
+        return;
+      }
+
+      res
+        .status(200)
+        .type("application/pdf")
+        .setHeader(
+          "Content-Disposition",
+          `inline; filename="NFSe-${chave}.pdf"`,
+        )
+        .send(r.pdf);
+    } catch (err: any) {
+      console.error("Erro ao buscar DANFSe:", err);
+      res.status(500).json({ error: err?.message || "Erro ao buscar DANFSe" });
+    }
+  };
+
+  /**
    * Consulta a NFS-e Nacional (pela chave; sem ela, pelo número/série da DPS)
    * e devolve no mesmo formato da consulta ABRASF, usado na impressão.
    */

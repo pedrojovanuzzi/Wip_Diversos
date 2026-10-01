@@ -15,7 +15,7 @@ const storage = multer.memoryStorage();
 const fileFilter = (
   req: Express.Request,
   file: Express.Multer.File,
-  cb: multer.FileFilterCallback
+  cb: multer.FileFilterCallback,
 ) => {
   // .pfx e .p12 são o mesmo formato (PKCS#12); as certificadoras entregam ora
   // com uma extensão, ora com a outra.
@@ -28,7 +28,11 @@ const fileFilter = (
 };
 
 // 5 MB é folga larga para um A1 (costuma ter poucos KB).
-const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 const router: Router = Router();
 
@@ -49,6 +53,7 @@ router.post("/BuscarClientesServicos", AuthGuard, NFSE.BuscarClientesServicos);
 router.post("/EmitirNfseServicos", AuthGuard, NFSE.EmitirNfseServicos);
 
 router.post("/imprimirNFSE", AuthGuard, NFSE.imprimirNFSE);
+router.post("/danfse", AuthGuard, NFSE.danfseNFSE);
 
 router.post("/setSessionPassword", AuthGuard, NFSE.setPassword);
 
