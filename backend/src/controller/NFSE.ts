@@ -61,6 +61,30 @@ function codigoMunicipioEmissor(_ambiente: string): string {
   return /^\d{7}$/.test(configurado) ? configurado : CODIGO_MUNICIPIO;
 }
 
+/**
+ * Mesma DPS com a inscrição municipal do prestador na outra forma: com a
+ * máscara do ISSWeb ("2195-00/14") ou só números ("21950014"). Só mexe no IM
+ * dentro de <prest>, nunca no do tomador. Devolve null se não houver o que
+ * trocar.
+ */
+function trocarInscricaoDoPrestador(
+  xml: string,
+): { xml: string; de: string; para: string } | null {
+  const prest = xml.match(/<prest>[\s\S]*?<\/prest>/);
+  if (!prest) return null;
+  const atual = prest[0].match(/<IM>([^<]*)<\/IM>/);
+  if (!atual) return null;
+
+  const de = atual[1];
+  const soNumeros = de.replace(/\D/g, "");
+  const comMascara = String(process.env.MUNICIPIO_INCRICAO || "").trim();
+  const para = de === soNumeros ? comMascara : soNumeros;
+  if (!para || para === de) return null;
+
+  const novoPrest = prest[0].replace(`<IM>${de}</IM>`, `<IM>${para}</IM>`);
+  return { xml: xml.replace(prest[0], novoPrest), de, para };
+}
+
 /** Código IBGE da cidade do tomador; sem resposta válida, fica o do prestador. */
 async function codigoIbgeDaCidade(cidade?: string | null): Promise<string> {
   if (!cidade) return CODIGO_MUNICIPIO;
@@ -206,7 +230,13 @@ class NFSEController {
   private prestadorEmissao() {
     return {
       cnpj: process.env.MUNICIPIO_LOGIN || "",
-      inscricao: process.env.MUNICIPIO_INCRICAO || "",
+      // A inscrição precisa ser igual à do Cadastro Nacional (CNC), que pode
+      // estar em formato diferente do ISSWeb. MUNICIPIO_IM_NACIONAL permite
+      // fixar a forma certa sem depender da segunda tentativa.
+      inscricao:
+        process.env.MUNICIPIO_IM_NACIONAL ||
+        process.env.MUNICIPIO_INCRICAO ||
+        "",
     };
   }
 
@@ -235,14 +265,38 @@ class NFSEController {
     const respostas: unknown[] = [];
 
     for (const d of dps) {
-      const assinada = this.fiorilliProvider.assinarXml(
-        d.xml,
-        "infDPS",
-        password,
-      );
-      fs.appendFileSync("./log/xml_log.txt", assinada + "\n", "utf8");
+      const enviar = async (xml: string) => {
+        const assinada = this.fiorilliProvider.assinarXml(
+          xml,
+          "infDPS",
+          password,
+        );
+        fs.appendFileSync("./log/xml_log.txt", assinada + "\n", "utf8");
+        return this.sefin.emitir(assinada, password);
+      };
 
-      const r = await this.sefin.emitir(assinada, password);
+      let r = await enviar(d.xml);
+
+      // E0116: a inscrição municipal enviada não é a que está no Cadastro
+      // Nacional (CNC). O ISSWeb usava a máscara "2195-00/14"; o cadastro
+      // nacional costuma guardar só os números. Uma DPS recusada não vira
+      // nota, então tentar de novo com a outra forma não tem efeito fiscal.
+      if (!r.ok && r.erros.some((e) => e.codigo === "E0116")) {
+        const alternativa = trocarInscricaoDoPrestador(d.xml);
+        if (alternativa) {
+          console.log(
+            `[Sefin Nacional] DPS ${d.id}: E0116 com a IM "${alternativa.de}", tentando "${alternativa.para}".`,
+          );
+          const segunda = await enviar(alternativa.xml);
+          if (segunda.ok) {
+            console.log(
+              `[Sefin Nacional] A IM aceita no cadastro nacional é "${alternativa.para}". Ajuste MUNICIPIO_IM_NACIONAL no .env para evitar a segunda tentativa.`,
+            );
+          }
+          r = segunda.ok ? segunda : r;
+        }
+      }
+
       respostas.push({ idDps: d.id, status: r.status, resposta: r.bruto });
       console.log(
         `[Sefin Nacional] DPS ${d.id}: HTTP ${r.status} | chave=${r.chaveAcesso ?? "-"} | erros=${r.erros.length}`,
