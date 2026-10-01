@@ -1,6 +1,7 @@
 import { Router } from "express";
 import Pix from "../controller/Pix";
 import AuthGuard from "../middleware/AuthGuard";
+import { semAuditoria } from "../utils/auditoria";
 
 const pixController = new Pix();
 
@@ -26,7 +27,7 @@ router.post(
   pixController.pegarUltimoBoletoGerarPixAutomaticoSimular,
 );
 router.post("/cancelarCobranca", AuthGuard, pixController.cancelarCobranca);
-router.post("/buscarCobranca", AuthGuard, pixController.buscarCobranca);
+router.post("/buscarCobranca", AuthGuard, semAuditoria, pixController.buscarCobranca);
 router.post(
   "/listarCobrancasPixAutomatico",
   AuthGuard,
@@ -108,8 +109,8 @@ router.get(
   AuthGuard,
   pixController.notificacoesPagamentos,
 );
-router.post("/BuscarPixPago", AuthGuard, pixController.BuscarPixPago);
-router.post("/BuscarPixPagoData", AuthGuard, pixController.BuscarPixPagoData);
+router.post("/BuscarPixPago", AuthGuard, semAuditoria, pixController.BuscarPixPago);
+router.post("/BuscarPixPagoData", AuthGuard, semAuditoria, pixController.BuscarPixPagoData);
 router.post(
   "/ReenviarNotificacoes",
   AuthGuard,

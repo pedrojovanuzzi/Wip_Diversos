@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import NFSE from "../controller/NFSE";
 import AuthGuard from "../middleware/AuthGuard";
+import { semAuditoria } from "../utils/auditoria";
 import multer from "multer";
 import path from "path";
 
@@ -40,16 +41,16 @@ router.post("/", NFSE.iniciar.bind(NFSE));
 // router.post('/cancelar', NFSE.cancelarRPS.bind(NFSE));
 // router.get('/consultar', NFSE.consultarRPS.bind(NFSE));
 
-router.post("/BuscarClientes", AuthGuard, NFSE.BuscarClientes);
+router.post("/BuscarClientes", AuthGuard, semAuditoria, NFSE.BuscarClientes);
 
 router.post("/cancelarNfse", AuthGuard, NFSE.cancelarNfse.bind(NFSE));
 
-router.post("/BuscarNSFE", AuthGuard, NFSE.BuscarNSFE);
+router.post("/BuscarNSFE", AuthGuard, semAuditoria, NFSE.BuscarNSFE);
 router.get("/ultimoRps", AuthGuard, NFSE.ultimoRps);
 
 router.post("/GerarNfseAvulsa", AuthGuard, NFSE.GerarNfseAvulsa);
 
-router.post("/BuscarClientesServicos", AuthGuard, NFSE.BuscarClientesServicos);
+router.post("/BuscarClientesServicos", AuthGuard, semAuditoria, NFSE.BuscarClientesServicos);
 router.post("/EmitirNfseServicos", AuthGuard, NFSE.EmitirNfseServicos);
 
 router.post("/imprimirNFSE", AuthGuard, NFSE.imprimirNFSE);

@@ -34,6 +34,7 @@ import {
   FaServer,
   FaCalculator,
   FaBalanceScale,
+  FaHistory,
 } from "react-icons/fa";
 import { IoMdAnalytics } from "react-icons/io";
 
@@ -363,6 +364,13 @@ const SECOES: SecaoMenu[] = [
         icon: ico(FaUserPlus),
         title: "Novo Usuário",
         description: "Cadastrar novos usuários no sistema",
+        visivel: (p) => p >= 5,
+      },
+      {
+        to: "/auditoria",
+        icon: ico(FaHistory),
+        title: "Auditoria",
+        description: "Quem entrou e o que criou, editou ou removeu",
         visivel: (p) => p >= 5,
       },
     ],

@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import AuthGuard from "../middleware/AuthGuard";
+import { semAuditoria } from "../utils/auditoria";
 import Nfcom from "../controller/Nfcom";
 
 const nfcom = new Nfcom();
@@ -8,15 +9,15 @@ const nfcom = new Nfcom();
 const router: Router = Router();
 
 router.post("/emitirNFCom", AuthGuard, nfcom.gerarNfcom);
-router.post("/buscarNFCom", AuthGuard, nfcom.buscarNFCom);
-router.post("/buscarClientes", AuthGuard, nfcom.BuscarClientes);
+router.post("/buscarNFCom", AuthGuard, semAuditoria, nfcom.buscarNFCom);
+router.post("/buscarClientes", AuthGuard, semAuditoria, nfcom.BuscarClientes);
 router.post("/cancelarNFCom", AuthGuard, nfcom.cancelarNFcom);
-router.post("/statusJob", AuthGuard, nfcom.getStatusJob);
-router.post("/generateReportPdf", AuthGuard, nfcom.generateReportPdf);
-router.post("/generatePdfFromNfXML", AuthGuard, nfcom.generatePdfFromNfXML);
+router.post("/statusJob", AuthGuard, semAuditoria, nfcom.getStatusJob);
+router.post("/generateReportPdf", AuthGuard, semAuditoria, nfcom.generateReportPdf);
+router.post("/generatePdfFromNfXML", AuthGuard, semAuditoria, nfcom.generatePdfFromNfXML);
 router.post("/NfComPages", AuthGuard, nfcom.NFComPages);
-router.post("/buscarNFComAll", AuthGuard, nfcom.buscarNFComAll);
-router.post("/downloadZipXMLs", AuthGuard, nfcom.baixarZipXml);
+router.post("/buscarNFComAll", AuthGuard, semAuditoria, nfcom.buscarNFComAll);
+router.post("/downloadZipXMLs", AuthGuard, semAuditoria, nfcom.baixarZipXml);
 router.post("/enviarEmailNFCom", AuthGuard, nfcom.enviarEmailNFCom);
 router.get(
   "/getNfcomByChaveDeOlhoNoImposto",

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import ServidorAcessoController from "../controller/ServidorAcesso";
 import AuthGuard from "../middleware/AuthGuard";
+import { semAuditoria } from "../utils/auditoria";
 
 const router: Router = Router();
 
@@ -31,7 +32,7 @@ router.put("/:id", AuthGuard, somenteAdmin, (req, res) =>
 router.delete("/:id", AuthGuard, somenteAdmin, (req, res) =>
   ServidorAcessoController.remover(req, res),
 );
-router.post("/:id/testar", AuthGuard, somenteAdmin, (req, res) =>
+router.post("/:id/testar", AuthGuard, semAuditoria, somenteAdmin, (req, res) =>
   ServidorAcessoController.testar(req, res),
 );
 

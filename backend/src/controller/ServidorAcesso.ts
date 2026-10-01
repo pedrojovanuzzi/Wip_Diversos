@@ -9,6 +9,7 @@ import {
   TipoServidor,
 } from "../entities/ServidorAcesso";
 import { cifrarSenha, decifrarSenha } from "../services/servidorAcesso.service";
+import { descreverAcao } from "../utils/auditoria";
 
 const TIPOS: TipoServidor[] = ["mikrotik", "huawei"];
 const FUNCOES: FuncaoServidor[] = ["pppoe", "olt"];
@@ -56,6 +57,7 @@ class ServidorAcessoController {
         ...dados,
         senha: cifrarSenha(String(req.body.senha)),
       });
+      descreverAcao(req, `Cadastrou o servidor ${servidor.nome}`);
       res.status(201).json(semSenha(servidor as ServidorAcesso));
     } catch (error) {
       console.error("[ServidorAcesso.criar]", error);
@@ -83,6 +85,7 @@ class ServidorAcessoController {
       }
 
       await this.repo().save(servidor);
+      descreverAcao(req, `Editou o servidor ${servidor.nome}`);
       res.status(200).json(semSenha(servidor));
     } catch (error) {
       console.error("[ServidorAcesso.atualizar]", error);

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import Feedback from "../controller/Feedback";
 import AuthGuard from "../middleware/AuthGuard";
+import { semAuditoria } from "../utils/auditoria";
 
 const router: Router = Router()
 
@@ -14,8 +15,8 @@ router.get("/NoteService/year", AuthGuard, Feedback.getNoteService_Year);
 router.get("/NoteResponseTime/month", AuthGuard, Feedback.getNoteResponseTime_Month);
 router.get("/NoteResponseTime/year", AuthGuard, Feedback.getNoteResponseTime_Year);
 
-router.post("/NoteTechnician/month", AuthGuard, Feedback.getTechnician_Month);
-router.post("/NoteTechnician/year", AuthGuard, Feedback.getTechnician_Year);
+router.post("/NoteTechnician/month", AuthGuard, semAuditoria, Feedback.getTechnician_Month);
+router.post("/NoteTechnician/year", AuthGuard, semAuditoria, Feedback.getTechnician_Year);
 
 router.get("/NoteDoYouRecommend/month", AuthGuard, Feedback.doYouRecommend_Month);
 router.get("/NoteDoYouRecommend/year", AuthGuard, Feedback.doYouRecommend_Year);

@@ -40,6 +40,8 @@ import TvWipRoutes from "./routes/TvWip.routes";
 import FileShareRoutes from "./routes/FileShare.routes";
 import ServiceLinkRoutes from "./routes/ServiceLink.routes";
 import CodefRoutes from "./routes/Codef.routes";
+import AuditoriaRoutes from "./routes/Auditoria.routes";
+import { auditoriaMiddleware } from "./utils/auditoria";
 
 // Controllers (for scheduled tasks)
 import BackupController from "./controller/Backup";
@@ -68,6 +70,8 @@ export class App {
     this.server.use(cors());
     this.server.use(express.json());
     this.server.use(express.urlencoded({ extended: true }));
+    // Grava criar/editar/remover de usuário logado em audit_logs.
+    this.server.use(auditoriaMiddleware);
   }
 
   private router() {
@@ -108,6 +112,7 @@ export class App {
     this.server.use("/api/files", FileShareRoutes);
     this.server.use("/api/service-links", ServiceLinkRoutes);
     this.server.use("/api/codef", CodefRoutes);
+    this.server.use("/api/auditoria", AuditoriaRoutes);
   }
 
   private agendarBackup() {
