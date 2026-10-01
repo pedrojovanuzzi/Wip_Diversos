@@ -317,19 +317,27 @@ export const NFSEServicosAdicionais: React.FC = () => {
             placeholder="Item Lista Serviço (ex: 010501)"
             className="border p-2 rounded"
           />
-          <input
-            type="text"
-            inputMode="numeric"
-            value={ultimoRps}
-            onChange={(e) => setUltimoRps(e.target.value.replace(/\D/g, ""))}
-            placeholder="Último Nº RPS *"
-            title={
-              ultimoRps
-                ? `A primeira nota sai com o RPS ${Number(ultimoRps) + 1}.`
-                : "Obrigatório: a nota sai com o número seguinte."
-            }
-            className="border-2 border-red-400 p-2 rounded"
-          />
+          <div className="flex flex-col">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={ultimoRps}
+              onChange={(e) => setUltimoRps(e.target.value.replace(/\D/g, ""))}
+              placeholder="Último Nº RPS *"
+              title="Último RPS usado: a nota sai com o número seguinte."
+              // Vermelho só quando falta: o campo vem preenchido sozinho.
+              className={`p-2 rounded ${
+                ultimoRps ? "border" : "border-2 border-red-400"
+              }`}
+            />
+            <span className="mt-1 text-xs text-gray-500">
+              {ultimoRps
+                ? `Último RPS gravado. A primeira nota sai com o RPS ${
+                    Number(ultimoRps) + 1
+                  }.`
+                : "Obrigatório: informe o último RPS usado."}
+            </span>
+          </div>
           <button
             onClick={emitir}
             disabled={emitting || selecionados.length === 0}
