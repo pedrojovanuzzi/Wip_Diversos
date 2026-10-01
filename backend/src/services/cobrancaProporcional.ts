@@ -17,8 +17,12 @@
 export const DIAS_BASE_MENSALIDADE = 30;
 
 export type CobrancaProporcional = {
-  /** Dias de uso entre a contratação e o próximo vencimento. */
+  /** Dias de uso cobrados: os até o vencimento mais os de teste grátis. */
   dias: number;
+  /** Dias entre a contratação e o próximo vencimento. */
+  diasAteVencimento: number;
+  /** Dias de teste grátis que o cliente usou antes de contratar. */
+  diasTeste: number;
   /** Valor proporcional a esses dias, já arredondado. */
   valor: number;
   /** Mensalidade cheia, cobrada a partir da fatura seguinte. */
@@ -45,7 +49,10 @@ function ultimoDiaDoMes(ano: number, mes: number): number {
  * Quando a contratação cai no próprio dia do vencimento, a fatura daquele dia
  * já está fechada: o proporcional vai para o vencimento do mês seguinte.
  */
-export function proximoVencimento(diaVencimento: number, hoje = new Date()): Date {
+export function proximoVencimento(
+  diaVencimento: number,
+  hoje = new Date(),
+): Date {
   const base = soData(hoje);
   const dia = Math.min(Math.max(Number(diaVencimento) || 1, 1), 31);
 
@@ -60,7 +67,9 @@ export function proximoVencimento(diaVencimento: number, hoje = new Date()): Dat
 /** Diferença em dias inteiros (intervalo, não contagem inclusiva). */
 function diasEntre(inicio: Date, fim: Date): number {
   const MS_DIA = 24 * 60 * 60 * 1000;
-  return Math.round((soData(fim).getTime() - soData(inicio).getTime()) / MS_DIA);
+  return Math.round(
+    (soData(fim).getTime() - soData(inicio).getTime()) / MS_DIA,
+  );
 }
 
 /**
@@ -74,15 +83,21 @@ export function cobrancaProporcional(
   valorMensal: number,
   diaVencimento: number,
   hoje = new Date(),
+  /** Dias de teste grátis já usados, somados aos dias de uso. */
+  diasTeste = 0,
 ): CobrancaProporcional {
   const vencimento = proximoVencimento(diaVencimento, hoje);
-  const dias = Math.max(0, diasEntre(hoje, vencimento));
+  const diasAteVencimento = Math.max(0, diasEntre(hoje, vencimento));
+  const teste = Math.max(0, Math.floor(Number(diasTeste) || 0));
+  const dias = diasAteVencimento + teste;
   const mensal = Number(valorMensal) || 0;
   const bruto = dias * (mensal / DIAS_BASE_MENSALIDADE);
   const valor = Math.round(Math.min(bruto, mensal) * 100) / 100;
 
   return {
     dias,
+    diasAteVencimento,
+    diasTeste: teste,
     valor,
     valorMensal: mensal,
     vencimento,
@@ -109,9 +124,16 @@ export function dataBR(data: Date): string {
  * dois canais.
  */
 export function textoCobrancaProporcional(c: CobrancaProporcional): string {
+  // Com teste grátis, o cliente precisa entender de onde vieram os dias:
+  // sem isso a conta parece errada para quem contratou hoje.
+  const detalheTeste =
+    c.diasTeste > 0
+      ? `, incluindo ${c.diasTeste} ${c.diasTeste === 1 ? "dia" : "dias"} de teste`
+      : "";
+
   return (
     `R$ ${reais(c.valor)} na fatura de ${dataBR(c.vencimento)} ` +
-    `(${c.dias} ${c.dias === 1 ? "dia" : "dias"} de uso), ` +
+    `(${c.dias} ${c.dias === 1 ? "dia" : "dias"} de uso${detalheTeste}), ` +
     `e R$ ${reais(c.valorMensal)} por mês nas seguintes.`
   );
 }

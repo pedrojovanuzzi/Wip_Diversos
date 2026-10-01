@@ -42,6 +42,7 @@ import {
   textoCobrancaProporcional,
 } from "../../services/cobrancaProporcional";
 import { planoTemSva } from "../../config/planosComSva";
+import { diasDeTesteUsados } from "../../services/streamingTesteHistorico";
 
 const MAX_TENTATIVAS_CPF = 5;
 
@@ -181,6 +182,15 @@ function rotuloAssinatura(
 }
 
 /** Só o que o cliente precisa ver do próprio cadastro. */
+/**
+ * Dias de teste grátis que o cliente já usou, para somar ao proporcional.
+ * Quem testou a Watch TV e depois contratou já usou o serviço nesses dias.
+ */
+async function diasTesteDoCliente(cliente?: any): Promise<number> {
+  const login = String(cliente?.login || "").trim();
+  return login ? diasDeTesteUsados(login) : 0;
+}
+
 function resumoCliente(cliente: any) {
   return {
     login: cliente.login,
@@ -255,18 +265,26 @@ class ServiceLinkController {
 
       // Campo em branco = mantém o valor do catálogo (coluna fica nula).
       let valorLink: string | null = null;
-      if (valor !== undefined && valor !== null && String(valor).trim() !== "") {
+      if (
+        valor !== undefined &&
+        valor !== null &&
+        String(valor).trim() !== ""
+      ) {
         const numero = Number(String(valor).replace(",", "."));
         if (!Number.isFinite(numero) || numero < 0) {
           res.status(400).json({
-            errors: [{ msg: "Valor inválido. Use apenas números, ex.: 200,00." }],
+            errors: [
+              { msg: "Valor inválido. Use apenas números, ex.: 200,00." },
+            ],
           });
           return;
         }
         if (!catalogo.permiteValorCustomizado) {
           res.status(400).json({
             errors: [
-              { msg: `O serviço ${catalogo.nome} não aceita valor personalizado.` },
+              {
+                msg: `O serviço ${catalogo.nome} não aceita valor personalizado.`,
+              },
             ],
           });
           return;
@@ -429,7 +447,9 @@ class ServiceLinkController {
       }
       if (link.status === "concluido") {
         res.status(400).json({
-          errors: [{ msg: "Este link já foi concluído e não pode ser cancelado." }],
+          errors: [
+            { msg: "Este link já foi concluído e não pode ser cancelado." },
+          ],
         });
         return;
       }
@@ -459,12 +479,16 @@ class ServiceLinkController {
     if (link.status === "cancelado") {
       res
         .status(410)
-        .json({ errors: [{ msg: "Este link foi cancelado pelo atendimento." }] });
+        .json({
+          errors: [{ msg: "Este link foi cancelado pelo atendimento." }],
+        });
       return null;
     }
     if (linkExpirado(link)) {
       res.status(410).json({
-        errors: [{ msg: "Este link expirou. Solicite um novo ao atendimento." }],
+        errors: [
+          { msg: "Este link expirou. Solicite um novo ao atendimento." },
+        ],
       });
       return null;
     }
@@ -514,7 +538,11 @@ class ServiceLinkController {
       vinculado: !!link.login_cliente,
       cliente: link.dados?.cliente ? resumoCliente(link.dados.cliente) : null,
       cadastros: link.dados?.cadastros ?? null,
-      formas_pagamento: formasPagamento(servico, link.dados?.cliente),
+      formas_pagamento: formasPagamento(
+        servico,
+        link.dados?.cliente,
+        await diasTesteDoCliente(link.dados?.cliente),
+      ),
       campos:
         etapa === "formulario"
           ? await resolverCampos(servico, link.papel)
@@ -587,7 +615,9 @@ class ServiceLinkController {
       if (servico.clienteNovo) {
         res.status(400).json({
           errors: [
-            { msg: "Este serviço não exige cadastro existente. Preencha o formulário." },
+            {
+              msg: "Este serviço não exige cadastro existente. Preencha o formulário.",
+            },
           ],
         });
         return;
@@ -608,7 +638,11 @@ class ServiceLinkController {
       if (cpf.length !== 11 && cpf.length !== 14) {
         res
           .status(400)
-          .json({ errors: [{ msg: "CPF/CNPJ inválido. Verifique e tente novamente." }] });
+          .json({
+            errors: [
+              { msg: "CPF/CNPJ inválido. Verifique e tente novamente." },
+            ],
+          });
         return;
       }
 
@@ -688,7 +722,9 @@ class ServiceLinkController {
       });
     } catch (error) {
       console.error("[ServiceLink.identificar]", error);
-      res.status(500).json({ errors: [{ msg: "Erro ao localizar o cadastro." }] });
+      res
+        .status(500)
+        .json({ errors: [{ msg: "Erro ao localizar o cadastro." }] });
     }
   };
 
@@ -703,18 +739,24 @@ class ServiceLinkController {
       if (!cpf) {
         res
           .status(400)
-          .json({ errors: [{ msg: "Informe o CPF/CNPJ antes de escolher o cadastro." }] });
+          .json({
+            errors: [
+              { msg: "Informe o CPF/CNPJ antes de escolher o cadastro." },
+            ],
+          });
         return;
       }
 
-      const cliente = await MkauthDataSource.getRepository(Sis_Cliente).findOne({
-        select: CAMPOS_CLIENTE,
-        where: {
-          login: String(req.body?.login || "").trim(),
-          cpf_cnpj: cpf,
-          cli_ativado: "s",
+      const cliente = await MkauthDataSource.getRepository(Sis_Cliente).findOne(
+        {
+          select: CAMPOS_CLIENTE,
+          where: {
+            login: String(req.body?.login || "").trim(),
+            cpf_cnpj: cpf,
+            cli_ativado: "s",
+          },
         },
-      });
+      );
       if (!cliente) {
         res.status(404).json({ errors: [{ msg: "Cadastro não encontrado." }] });
         return;
@@ -764,7 +806,9 @@ class ServiceLinkController {
       ) {
         res
           .status(400)
-          .json({ errors: [{ msg: "Identifique o cadastro antes de continuar." }] });
+          .json({
+            errors: [{ msg: "Identifique o cadastro antes de continuar." }],
+          });
         return;
       }
 
@@ -789,7 +833,11 @@ class ServiceLinkController {
       link.dados = {
         ...(link.dados || {}),
         aceite: {
-          termos: termos.map((t) => ({ id: t.id, titulo: t.titulo, url: t.url })),
+          termos: termos.map((t) => ({
+            id: t.id,
+            titulo: t.titulo,
+            url: t.url,
+          })),
           em: new Date().toISOString(),
           ip: req.ip ?? null,
           user_agent: req.headers["user-agent"] ?? null,
@@ -797,18 +845,21 @@ class ServiceLinkController {
       };
       await this.repo().save(link);
 
+      const diasTeste = await diasTesteDoCliente(link.dados?.cliente);
+      const formas = formasPagamento(servico, link.dados?.cliente, diasTeste);
+
       const proxima: Etapa =
         servico.clienteNovo || ehLinkDeNovoTitular(link) || servico.parDeLinks
           ? "formulario"
           : link.dados.forma_pagamento
             ? "formulario"
-            : formasPagamento(servico, link.dados?.cliente).length > 0
+            : formas.length > 0
               ? "pagamento"
               : "formulario";
 
       res.status(200).json({
         etapa: proxima,
-        formas_pagamento: formasPagamento(servico, link.dados?.cliente),
+        formas_pagamento: formas,
         campos:
           proxima === "formulario"
             ? await resolverCampos(servico, link.papel)
@@ -832,7 +883,9 @@ class ServiceLinkController {
       if (!link.dados?.cliente) {
         res
           .status(400)
-          .json({ errors: [{ msg: "Identifique o cadastro antes de continuar." }] });
+          .json({
+            errors: [{ msg: "Identifique o cadastro antes de continuar." }],
+          });
         return;
       }
       if (!link.dados?.aceite) {
@@ -843,7 +896,11 @@ class ServiceLinkController {
       }
 
       const escolhida = String(req.body?.forma_pagamento || "");
-      const formas = formasPagamento(servico, link.dados?.cliente);
+      const formas = formasPagamento(
+        servico,
+        link.dados?.cliente,
+        await diasTesteDoCliente(link.dados?.cliente),
+      );
       if (!formas.some((f) => f.id === escolhida)) {
         res
           .status(400)
@@ -907,7 +964,9 @@ class ServiceLinkController {
         .map((c) => c.label);
       if (faltando.length > 0) {
         res.status(400).json({
-          errors: [{ msg: `Preencha os campos obrigatórios: ${faltando.join(", ")}.` }],
+          errors: [
+            { msg: `Preencha os campos obrigatórios: ${faltando.join(", ")}.` },
+          ],
         });
         return;
       }
@@ -1013,10 +1072,9 @@ class ServiceLinkController {
       valor_plano: planoRecord?.valor || "",
       observacao: formulario.observacao || "",
       nome_novo_titular: String(formulario.nome_novo_titular || "").trim(),
-      celular_novo_titular: String(formulario.celular_novo_titular || "").replace(
-        /\D/g,
-        "",
-      ),
+      celular_novo_titular: String(
+        formulario.celular_novo_titular || "",
+      ).replace(/\D/g, ""),
     };
 
     const solicitacaoRepo = AppDataSource.getRepository(SolicitacaoServico);
@@ -1127,7 +1185,8 @@ class ServiceLinkController {
       observacao: formulario.observacao || "",
       valor: "0.00",
       termo: "",
-      login_titular_atual: dadosTitular.login || linkTitular.login_cliente || "",
+      login_titular_atual:
+        dadosTitular.login || linkTitular.login_cliente || "",
       solicitacao_id_titular: solicitacaoTitular?.id ?? null,
     };
 
@@ -1260,10 +1319,9 @@ class ServiceLinkController {
     let { cidade, estado, bairro } = formulario;
     if (!cidade || !estado || !bairro) {
       try {
-        const resp = await axios.get(
-          `https://viacep.com.br/ws/${cep}/json/`,
-          { timeout: 5000 },
-        );
+        const resp = await axios.get(`https://viacep.com.br/ws/${cep}/json/`, {
+          timeout: 5000,
+        });
         if (resp.data && !resp.data.erro) {
           cidade = cidade || resp.data.localidade || "";
           estado = estado || resp.data.uf || "";
@@ -1316,7 +1374,9 @@ class ServiceLinkController {
       finalizado: false,
       dados: {
         ...dados,
-        ...(debitoAnterior.temDebito && { alertaDebitoAnterior: debitoAnterior }),
+        ...(debitoAnterior.temDebito && {
+          alertaDebitoAnterior: debitoAnterior,
+        }),
       },
     });
 
@@ -1409,6 +1469,9 @@ class ServiceLinkController {
       const proporcional = cobrancaProporcional(
         servico.valor,
         Number(cliente.venc) || 1,
+        new Date(),
+        // Dias de teste grátis entram no proporcional da contratação paga.
+        await diasDeTesteUsados(String(cliente.login || "")),
       );
       Object.assign(dadosSolicitacao, {
         valor: reais(servico.valor),
@@ -1552,7 +1615,12 @@ class ServiceLinkController {
       !!pix && !!servico.criarContrato && !semContrato;
     let zapsign: any = null;
     if (servico.criarContrato && !contratoAposPagamento && !semContrato) {
-      zapsign = await gerarContrato(servico, solicitacao, dadosSolicitacao, pago);
+      zapsign = await gerarContrato(
+        servico,
+        solicitacao,
+        dadosSolicitacao,
+        pago,
+      );
     }
 
     return {

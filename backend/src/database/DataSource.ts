@@ -22,6 +22,7 @@ import { StreamingAssinante } from "../entities/StreamingAssinante";
 import { DeclaracaoQuitacao } from "../entities/DeclaracaoQuitacao";
 import { FileShare } from "../entities/FileShare";
 import { ServiceLink } from "../entities/ServiceLink";
+import { StreamingTeste } from "../entities/StreamingTeste";
 import { PixAutomaticoCobranca } from "../entities/PixAutomaticoCobranca";
 import { PixAutomaticoNotificacao } from "../entities/PixAutomaticoNotificacao";
 import { LicencaMensalidade } from "../entities/LicencaMensalidade";
@@ -85,6 +86,7 @@ const AppDataSource = new DataSource({
     PixAutomaticoNotificacao,
     LicencaMensalidade,
     LicencaMensalidadeConfig,
+    StreamingTeste,
   ],
   migrations: [
     path.join(__dirname, "../migration/*.{ts,js}").replace(/\\/g, "/"),

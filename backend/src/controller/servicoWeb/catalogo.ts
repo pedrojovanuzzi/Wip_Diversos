@@ -18,13 +18,7 @@ import {
 } from "../whatsapp/services/plano.service";
 
 export type TipoCampo =
-  | "text"
-  | "number"
-  | "email"
-  | "phone"
-  | "date"
-  | "select"
-  | "textarea";
+  "text" | "number" | "email" | "phone" | "date" | "select" | "textarea";
 
 export type CampoServico = {
   name: string;
@@ -151,9 +145,33 @@ export type ServicoWeb = {
 };
 
 const ESTADOS = [
-  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS",
-  "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC",
-  "SP", "SE", "TO",
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
 ].map((uf) => ({ id: uf, title: uf }));
 
 const VENCIMENTOS = ["05", "10", "15", "20", "25"].map((d) => ({
@@ -194,10 +212,30 @@ export const CATALOGO: ServicoWeb[] = [
     campos: [
       { name: "nome", label: "Nome completo", type: "text", required: true },
       { name: "cpf", label: "CPF ou CNPJ", type: "number", required: true },
-      { name: "rg", label: "RG ou IE (opcional)", type: "text", required: false },
-      { name: "dataNascimento", label: "Data de nascimento", type: "date", required: true },
-      { name: "celular", label: "Celular (com DDD)", type: "phone", required: true },
-      { name: "celularSecundario", label: "Celular secundário", type: "phone", required: false },
+      {
+        name: "rg",
+        label: "RG ou IE (opcional)",
+        type: "text",
+        required: false,
+      },
+      {
+        name: "dataNascimento",
+        label: "Data de nascimento",
+        type: "date",
+        required: true,
+      },
+      {
+        name: "celular",
+        label: "Celular (com DDD)",
+        type: "phone",
+        required: true,
+      },
+      {
+        name: "celularSecundario",
+        label: "Celular secundário",
+        type: "phone",
+        required: false,
+      },
       { name: "email", label: "E-mail", type: "email", required: true },
       {
         name: "cep",
@@ -210,7 +248,13 @@ export const CATALOGO: ServicoWeb[] = [
       { name: "numero", label: "Número", type: "text", required: true },
       { name: "bairro", label: "Bairro", type: "text", required: true },
       { name: "cidade", label: "Cidade", type: "text", required: true },
-      { name: "estado", label: "Estado", type: "select", required: true, fonte: "estados" },
+      {
+        name: "estado",
+        label: "Estado",
+        type: "select",
+        required: true,
+        fonte: "estados",
+      },
       {
         name: "plano_escolhido",
         label: "Escolha o plano",
@@ -280,8 +324,18 @@ export const CATALOGO: ServicoWeb[] = [
     tipoLancamento: "mudanca_endereco",
     campos: [
       { name: "cep", label: "CEP", type: "number", required: true },
-      { name: "rua", label: "Novo endereço (rua)", type: "text", required: true },
-      { name: "numero", label: "Número (ou S/N)", type: "text", required: true },
+      {
+        name: "rua",
+        label: "Novo endereço (rua)",
+        type: "text",
+        required: true,
+      },
+      {
+        name: "numero",
+        label: "Número (ou S/N)",
+        type: "text",
+        required: true,
+      },
       { name: "bairro", label: "Novo bairro", type: "text", required: true },
       { name: "cidade", label: "Cidade", type: "text", required: true },
       {
@@ -440,19 +494,55 @@ export const CATALOGO: ServicoWeb[] = [
       CAMPO_OBSERVACAO,
     ],
     campos: [
-      { name: "nome", label: "Nome completo do novo titular", type: "text", required: true },
-      { name: "cpf", label: "CPF ou CNPJ do novo titular", type: "number", required: true },
-      { name: "rg", label: "RG ou IE (opcional)", type: "text", required: false },
-      { name: "dataNascimento", label: "Data de nascimento", type: "date", required: true },
-      { name: "celular", label: "Celular (com DDD)", type: "phone", required: true },
-      { name: "celularSecundario", label: "Celular secundário", type: "phone", required: false },
+      {
+        name: "nome",
+        label: "Nome completo do novo titular",
+        type: "text",
+        required: true,
+      },
+      {
+        name: "cpf",
+        label: "CPF ou CNPJ do novo titular",
+        type: "number",
+        required: true,
+      },
+      {
+        name: "rg",
+        label: "RG ou IE (opcional)",
+        type: "text",
+        required: false,
+      },
+      {
+        name: "dataNascimento",
+        label: "Data de nascimento",
+        type: "date",
+        required: true,
+      },
+      {
+        name: "celular",
+        label: "Celular (com DDD)",
+        type: "phone",
+        required: true,
+      },
+      {
+        name: "celularSecundario",
+        label: "Celular secundário",
+        type: "phone",
+        required: false,
+      },
       { name: "email", label: "E-mail", type: "email", required: true },
       { name: "cep", label: "CEP", type: "number", required: true },
       { name: "rua", label: "Rua", type: "text", required: true },
       { name: "numero", label: "Número", type: "text", required: true },
       { name: "bairro", label: "Bairro", type: "text", required: true },
       { name: "cidade", label: "Cidade", type: "text", required: true },
-      { name: "estado", label: "Estado", type: "select", required: true, fonte: "estados" },
+      {
+        name: "estado",
+        label: "Estado",
+        type: "select",
+        required: true,
+        fonte: "estados",
+      },
       {
         name: "plano_escolhido",
         label: "Escolha o plano",
@@ -507,9 +597,8 @@ export function buscarServico(id: string): ServicoWeb | undefined {
  */
 export async function listarServicos(): Promise<ServicoWeb[]> {
   try {
-    const templates = await ApiMkDataSource.getRepository(
-      ZapSignTemplates,
-    ).find();
+    const templates =
+      await ApiMkDataSource.getRepository(ZapSignTemplates).find();
 
     const nomes = new Map<string, string>();
     for (const t of templates) {
@@ -552,7 +641,8 @@ export function camposDoPapel(
   servico: ServicoWeb,
   papel?: string | null,
 ): CampoServico[] {
-  if (papel === "titular" && servico.camposTitular) return servico.camposTitular;
+  if (papel === "titular" && servico.camposTitular)
+    return servico.camposTitular;
   return servico.campos;
 }
 
@@ -577,8 +667,8 @@ export async function resolverCampos(
         // rótulo formatado, e é o `id` que volta no formulário.
         sva: planoTemSva(p.id),
       }));
-    }
-    else if (campo.fonte === "planos_wifi") opcoes = await getPlanosWifiExtendido();
+    } else if (campo.fonte === "planos_wifi")
+      opcoes = await getPlanosWifiExtendido();
     else if (campo.fonte === "estados") opcoes = ESTADOS;
     else if (campo.fonte === "vencimentos") opcoes = VENCIMENTOS;
     campos.push({ ...campo, opcoes });
@@ -599,6 +689,8 @@ export function formasPagamento(
   servico: ServicoWeb,
   /** Cadastro do cliente, quando já identificado: dá o dia do vencimento. */
   cliente?: { venc?: any } | null,
+  /** Dias de teste grátis já usados, somados aos dias de uso. */
+  diasTeste = 0,
 ): FormaPagamento[] {
   // A cobrança da instalação só é definida depois da análise interna.
   if (servico.analiseManual) return [];
@@ -622,6 +714,8 @@ export function formasPagamento(
     const proporcional = cobrancaProporcional(
       servico.valor,
       Number(cliente?.venc),
+      new Date(),
+      diasTeste,
     );
     return [
       {

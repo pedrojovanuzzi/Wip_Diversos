@@ -16,6 +16,11 @@ import { insertAssinante } from "./WatchBrasilService";
 import { VALOR_STREAMER } from "../config/servicosAdicionais";
 import { planoTemSva } from "../config/planosComSva";
 import {
+  diasDeTesteUsados,
+  encerrarTeste,
+  registrarInicioTeste,
+} from "./streamingTesteHistorico";
+import {
   nomeContratoParaGravar,
   sqlTagServico,
 } from "./servicosAdicionaisNomes";
@@ -139,6 +144,13 @@ export async function registrarAssinanteStreaming(params: {
   assinante.last_response = JSON.stringify(apiResp).slice(0, 2000);
   await streamingRepo.save(assinante);
 
+  // O teste grátis fica registrado à parte: esta linha é apagada quando o
+  // prazo acaba, e os dias usados precisam sobreviver para entrar no
+  // proporcional da contratação paga.
+  if (expiraTeste) {
+    await registrarInicioTeste(cliente.login, expiraTeste);
+  }
+
   return { ticket, chave, assinante };
 }
 
@@ -171,12 +183,7 @@ export type ResultadoContratacao = {
    * `sem_acesso`: o serviço está no cadastro (e será cobrado), mas a conta na
    * Watch Brasil não foi criada — o atendimento precisa ativar.
    */
-  status:
-    | "adicionado"
-    | "sem_acesso"
-    | "ja_tinha"
-    | "erro"
-    | "nao_aplica";
+  status: "adicionado" | "sem_acesso" | "ja_tinha" | "erro" | "nao_aplica";
   motivo?: string;
   /** Nome comercial gravado no contrato, quando gravou. */
   servico?: string;
@@ -232,6 +239,10 @@ export async function contratarStreamingAposAssinatura(params: {
     valor: params.valor ?? VALOR_STREAMER,
     usuario: params.usuario || "assinatura",
   });
+
+  // O cliente passou a pagar: o teste em andamento acaba aqui, e os dias que
+  // ele usou ficam guardados para entrar no proporcional.
+  await encerrarTeste(login, "convertido");
 
   const email = String(params.email || cliente.email || "").trim();
   const phone = String(

@@ -31,7 +31,10 @@ import {
   whatsappOutgoingQueue,
 } from "../services/messaging.service";
 import { url as waUrl, token as waToken } from "../config";
-import { getPlanosDoSistema, getPlanosWifiExtendido } from "../services/plano.service";
+import {
+  getPlanosDoSistema,
+  getPlanosWifiExtendido,
+} from "../services/plano.service";
 import { criarChamadoMkauth } from "../services/chamado.service";
 import { VALOR_STREAMER } from "../../../config/servicosAdicionais";
 import {
@@ -50,6 +53,7 @@ import {
   impedimentoPlanoComSva,
   impedimentoWatchTv,
 } from "../../../services/streamingCadastro";
+import { diasDeTesteUsados } from "../../../services/streamingTesteHistorico";
 
 const FLOW_TROCA_TITULARIDADE_CONTATO =
   process.env.WA_FLOW_TROCA_TITULARIDADE_CONTATO ||
@@ -142,7 +146,6 @@ const perguntasBasicas: Pergunta[] = [
   { campo: "cpf", pergunta: "➡️ Digite seu *CPF/CNPJ*:" },
   { campo: "celular", pergunta: "➡️ Digite seu *Celular* com *DDD*:" },
 ];
-
 
 async function gerarLancamentoServicoMudancaComodo(session: any) {
   const valor = process.env.SERVIDOR_HOMOLOGACAO === "true" ? 1 : 200;
@@ -309,7 +312,6 @@ async function salvarSolicitacaoWifiExtendido(
   return await repo.save(novaSolicitacao);
 }
 
-
 /**
  * Manda o link do documento que acompanha o contrato, quando existir.
  *
@@ -334,10 +336,15 @@ async function enviarLinkDocumentoExtra(celular: any, zapResponse: any) {
  *
  * Mesma função usada pelo site: o cliente ouve o mesmo valor nos dois canais.
  */
-function cobrancaWatchTv(session: any) {
+async function cobrancaWatchTv(session: any) {
+  // Dias de teste grátis entram na conta: quem testou e ficou já usou o
+  // serviço nesses dias.
+  const login = String(session.login_watch_tv || session.login || "").trim();
   return cobrancaProporcional(
     VALOR_STREAMER,
     Number(session.venc_watch_tv) || 1,
+    new Date(),
+    await diasDeTesteUsados(login),
   );
 }
 
@@ -352,7 +359,7 @@ function cobrancaWatchTv(session: any) {
 async function salvarSolicitacaoWatchTv(session: any, celularConversa: string) {
   const repo = AppDataSource.getRepository(SolicitacaoServico);
   const nova = new SolicitacaoServico();
-  const proporcional = cobrancaWatchTv(session);
+  const proporcional = await cobrancaWatchTv(session);
 
   nova.servico = "Watch TV";
   nova.login_cliente = session.login || "Desconhecido";
@@ -439,15 +446,14 @@ async function pedirContatoWatchTv(celular: any, session: any) {
     celular,
     `📺 Cadastro selecionado: *${session.login}*
 
-` +
-      `📧 Qual *e-mail* você quer usar para entrar no aplicativo da Watch TV?`,
+` + `📧 Qual *e-mail* você quer usar para entrar no aplicativo da Watch TV?`,
   );
 }
 
 /** Fecha o pedido: grava a solicitação e abre o chamado no cadastro. */
 async function concluirWatchTv(celular: any, session: any) {
   const solicitacao = await salvarSolicitacaoWatchTv(session, celular);
-  const proporcional = cobrancaWatchTv(session);
+  const proporcional = await cobrancaWatchTv(session);
 
   const resumo =
     `Contratação da Watch TV solicitada pelo WhatsApp.\n\n` +
@@ -461,7 +467,12 @@ async function concluirWatchTv(celular: any, session: any) {
     `proporcional lançado na fatura.`;
 
   try {
-    await criarChamadoMkauth("CONTRATACAO WATCH TV", session, resumo, solicitacao);
+    await criarChamadoMkauth(
+      "CONTRATACAO WATCH TV",
+      session,
+      resumo,
+      solicitacao,
+    );
   } catch (e: any) {
     // A solicitação já está salva: o atendimento vê na tela mesmo sem chamado.
     console.error("[WatchTV] Falha ao abrir o chamado:", e?.message || e);
@@ -500,10 +511,9 @@ async function enviarListaWatchTv(celular: any, session: any, titulo: string) {
       id: `watchtv_${c.index}`,
       title: c.titulo,
       // O aviso vai na própria linha: o cliente vê antes de tocar.
-      description: (
-        c.jaTem
-          ? `JÁ TEM A WATCH TV — ${c.endereco || ""}, ${c.numero || ""}`
-          : `${c.endereco || ""}, ${c.numero || ""} - ${c.bairro || ""}`
+      description: (c.jaTem
+        ? `JÁ TEM A WATCH TV — ${c.endereco || ""}, ${c.numero || ""}`
+        : `${c.endereco || ""}, ${c.numero || ""} - ${c.bairro || ""}`
       ).slice(0, 72),
     }));
 
@@ -546,9 +556,21 @@ export async function iniciarWatchTv(
     session.cpf = cpf;
     const cadastros = await MkauthDataSource.getRepository(Sis_Cliente).find({
       select: {
-        id: true, nome: true, endereco: true, login: true, numero: true,
-        bairro: true, cidade: true, estado: true, cep: true, venc: true,
-        termo: true, email: true, rg: true, cpf_cnpj: true, celular: true,
+        id: true,
+        nome: true,
+        endereco: true,
+        login: true,
+        numero: true,
+        bairro: true,
+        cidade: true,
+        estado: true,
+        cep: true,
+        venc: true,
+        termo: true,
+        email: true,
+        rg: true,
+        cpf_cnpj: true,
+        celular: true,
         plano: true,
       },
       where: { cpf_cnpj: cpf, cli_ativado: "s" },
@@ -593,10 +615,20 @@ export async function iniciarWatchTv(
         // e o limite dele é 24 caracteres — por isso é o identificador.
         titulo: String(c.login || "").slice(0, 24),
         jaTem: !!jaTem.get(String(c.login)),
-        nome: c.nome, endereco: c.endereco, login: c.login, numero: c.numero,
-        bairro: c.bairro, cidade: c.cidade, estado: c.estado, cep: c.cep,
-        venc: c.venc, termo: c.termo, plano: c.plano, email: c.email,
-        rg: c.rg, celular: c.celular,
+        nome: c.nome,
+        endereco: c.endereco,
+        login: c.login,
+        numero: c.numero,
+        bairro: c.bairro,
+        cidade: c.cidade,
+        estado: c.estado,
+        cep: c.cep,
+        venc: c.venc,
+        termo: c.termo,
+        plano: c.plano,
+        email: c.email,
+        rg: c.rg,
+        celular: c.celular,
       }));
       session.watchTvStep = "select_address";
 
@@ -628,8 +660,7 @@ export async function iniciarWatchTv(
       celular,
       `📧 Anotado: *${email}*
 
-` +
-        `📱 Agora me diga o *celular com DDD* para o cadastro na Watch TV.`,
+` + `📱 Agora me diga o *celular com DDD* para o cadastro na Watch TV.`,
     );
     return;
   }
@@ -802,7 +833,9 @@ export async function iniciarMudancaComodo(
       session.vencimento = sis_cliente[0].venc || "";
       session.plano_comodo = sis_cliente[0].plano || "";
       const _planoComodoSingle = sis_cliente[0].plano
-        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: sis_cliente[0].plano } })
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({
+            where: { nome: sis_cliente[0].plano },
+          })
         : null;
       session.valor_plano_atual = _planoComodoSingle?.valor || "0,00";
       session.dadosCompleto = {};
@@ -832,10 +865,7 @@ export async function iniciarMudancaComodo(
   }
 
   if (session.mudancaComodoStep === "select_address") {
-    if (
-      texto.toLowerCase() === "inicio" ||
-      texto.toLowerCase() === "início"
-    ) {
+    if (texto.toLowerCase() === "inicio" || texto.toLowerCase() === "início") {
       session.mudancaComodoStep = undefined;
       session.structuredDataComodo = undefined;
       session.login = undefined;
@@ -874,7 +904,9 @@ export async function iniciarMudancaComodo(
       session.vencimento = selectedClient.venc || "";
       session.plano_comodo = selectedClient.plano || "";
       const _planoComodoSelected = selectedClient.plano
-        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: selectedClient.plano } })
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({
+            where: { nome: selectedClient.plano },
+          })
         : null;
       session.valor_plano_atual = _planoComodoSelected?.valor || "0,00";
       session.dadosCompleto = {};
@@ -909,7 +941,9 @@ export async function iniciarMudancaComodo(
       if (payload.flow_token) {
         let dadosFlow = session.dadosCadastro;
         try {
-          const dbSession = await ApiMkDataSource.getRepository(Sessions).findOne({
+          const dbSession = await ApiMkDataSource.getRepository(
+            Sessions,
+          ).findOne({
             where: { celular },
           });
           if (dbSession && dbSession.dados) {
@@ -996,9 +1030,17 @@ export async function iniciarMudancaComodo(
         }
 
         try {
-          await criarChamadoMkauth("MUDANCA DE COMODO", session, resumoMudanca, solicitacaoSalva);
+          await criarChamadoMkauth(
+            "MUDANCA DE COMODO",
+            session,
+            resumoMudanca,
+            solicitacaoSalva,
+          );
         } catch (e) {
-          console.error("[Chamado] Erro ao criar chamado de mudança de cômodo:", e);
+          console.error(
+            "[Chamado] Erro ao criar chamado de mudança de cômodo:",
+            e,
+          );
         }
 
         await Finalizar(resumoMudanca, celular, true);
@@ -1037,8 +1079,9 @@ export async function iniciarMudancaComodo(
               ...(solicitacaoSalva?.dados || dadosSolicitacao),
               valor: "0.00",
             };
-            const zapResponse =
-              await ZapSign.createContractMudancaComodo(payloadZap as any);
+            const zapResponse = await ZapSign.createContractMudancaComodo(
+              payloadZap as any,
+            );
             const zapSignUrl = zapResponse.signers[0].sign_url;
 
             if (solicitacaoSalva) {
@@ -1112,7 +1155,11 @@ export async function iniciarWifiEstendido(
 }
 
 // --- Alteração de Titularidade ---
-async function selecionarCadastroTitularidade(celular: any, session: any, cliente: any) {
+async function selecionarCadastroTitularidade(
+  celular: any,
+  session: any,
+  cliente: any,
+) {
   session.login = cliente.login;
   session.nome = cliente.nome;
   session.email = cliente.email;
@@ -1120,7 +1167,9 @@ async function selecionarCadastroTitularidade(celular: any, session: any, client
   session.contrato_cliente = cliente.termo || "";
   session.celularCliente = cliente.celular;
   const _planoTitularidade = cliente.plano
-    ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: cliente.plano } })
+    ? await MkauthDataSource.getRepository(SisPlano).findOne({
+        where: { nome: cliente.plano },
+      })
     : null;
   session.valor_plano_atual = _planoTitularidade?.valor || "0,00";
   session.dadosCompleto = {
@@ -1262,10 +1311,7 @@ export async function iniciarTrocaTitularidade(
   }
 
   if (session.trocaTitularidadeStep === "select_cadastro") {
-    if (
-      texto.toLowerCase() === "inicio" ||
-      texto.toLowerCase() === "início"
-    ) {
+    if (texto.toLowerCase() === "inicio" || texto.toLowerCase() === "início") {
       session.trocaTitularidadeStep = undefined;
       session.structuredDataTitularidade = undefined;
       await boasVindas(celular);
@@ -1410,7 +1456,9 @@ export async function iniciarTrocaPlano(
       session.contrato_cliente = sis_cliente[0].termo || "";
       session.celularCliente = sis_cliente[0].celular;
       const _planoTrocaSingle = sis_cliente[0].plano
-        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: sis_cliente[0].plano } })
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({
+            where: { nome: sis_cliente[0].plano },
+          })
         : null;
       session.valor_plano_atual = _planoTrocaSingle?.valor || "0,00";
       session.dadosCompleto = {
@@ -1430,12 +1478,7 @@ export async function iniciarTrocaPlano(
         "Ler Termos",
         "https://wipdiversos.wiptelecomunicacoes.com.br/doc/altera_plano",
       );
-      await MensagemBotao(
-        celular,
-        "Escolha a Opção",
-        "Sim Concordo",
-        "Não",
-      );
+      await MensagemBotao(celular, "Escolha a Opção", "Sim Concordo", "Não");
       session.stage = "choose_type_troca_plano";
       return;
     }
@@ -1448,10 +1491,7 @@ export async function iniciarTrocaPlano(
   }
 
   if (session.trocaPlanoStep === "select_address") {
-    if (
-      texto.toLowerCase() === "inicio" ||
-      texto.toLowerCase() === "início"
-    ) {
+    if (texto.toLowerCase() === "inicio" || texto.toLowerCase() === "início") {
       session.trocaPlanoStep = undefined;
       session.structuredDataTrocaPlano = undefined;
       session.login = undefined;
@@ -1489,7 +1529,9 @@ export async function iniciarTrocaPlano(
       session.contrato_cliente = selectedClient.termo || "";
       session.celularCliente = selectedClient.celular;
       const _planoTrocaSelected = selectedClient.plano
-        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: selectedClient.plano } })
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({
+            where: { nome: selectedClient.plano },
+          })
         : null;
       session.valor_plano_atual = _planoTrocaSelected?.valor || "0,00";
       session.dadosCompleto = {
@@ -1509,12 +1551,7 @@ export async function iniciarTrocaPlano(
         "Ler Termos",
         "https://wipdiversos.wiptelecomunicacoes.com.br/doc/altera_plano",
       );
-      await MensagemBotao(
-        celular,
-        "Escolha a Opção",
-        "Sim Concordo",
-        "Não",
-      );
+      await MensagemBotao(celular, "Escolha a Opção", "Sim Concordo", "Não");
       session.stage = "choose_type_troca_plano";
       return;
     }
@@ -1555,12 +1592,7 @@ export async function iniciarRenovacao(
         "Ler Termos",
         "https://wipdiversos.wiptelecomunicacoes.com.br/doc/renovacao",
       );
-      await MensagemBotao(
-        celular,
-        "Escolha a Opção",
-        "Sim Concordo",
-        "Não",
-      );
+      await MensagemBotao(celular, "Escolha a Opção", "Sim Concordo", "Não");
       session.stage = "choose_type_renovacao";
     },
   );
@@ -1635,11 +1667,7 @@ export async function handleChooseTypeComodo(
   session: any,
 ) {
   if (texto.toLowerCase() === "paga") {
-    await MensagemBotao(
-      celular,
-      "Escolha Forma de Pagamento",
-      "Pix",
-    );
+    await MensagemBotao(celular, "Escolha Forma de Pagamento", "Pix");
     session.stage = "choose_type_payment";
   } else if (
     texto.toLowerCase() === "grátis" ||
@@ -1658,7 +1686,10 @@ export async function handleChooseTypeComodo(
     session.mudancaComodoStep = "flow";
     session.stage = "mudanca_comodo";
   } else {
-    await MensagensComuns(celular, "Opção Invalída, Selecione a Opção da Lista");
+    await MensagensComuns(
+      celular,
+      "Opção Invalída, Selecione a Opção da Lista",
+    );
   }
 }
 
@@ -1668,11 +1699,7 @@ export async function handleChooseTypeEndereco(
   session: any,
 ) {
   if (texto.toLowerCase() === "paga") {
-    await MensagemBotao(
-      celular,
-      "Escolha Forma de Pagamento",
-      "Pix",
-    );
+    await MensagemBotao(celular, "Escolha Forma de Pagamento", "Pix");
     session.stage = "choose_type_payment";
   } else if (
     texto.toLowerCase() === "grátis" ||
@@ -1690,7 +1717,10 @@ export async function handleChooseTypeEndereco(
     );
     session.stage = "awaiting_mudanca_flow";
   } else {
-    await MensagensComuns(celular, "Opção Invalída, Selecione a Opção da Lista");
+    await MensagensComuns(
+      celular,
+      "Opção Invalída, Selecione a Opção da Lista",
+    );
   }
 }
 
@@ -1701,17 +1731,28 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
 ) {
   try {
     const payload = JSON.parse(texto);
-    console.log("[TrocaTitularidadeContato] payload recebido:", JSON.stringify(payload));
+    console.log(
+      "[TrocaTitularidadeContato] payload recebido:",
+      JSON.stringify(payload),
+    );
 
     const nome = (payload.nome || "").trim();
     const rawCelular = String(payload.celular_destino || payload.celular || "");
     const celularDestino = normalizarCelularWhatsapp(rawCelular);
 
-    console.log("[TrocaTitularidadeContato] nome:", nome, "| celularDestino:", celularDestino);
+    console.log(
+      "[TrocaTitularidadeContato] nome:",
+      nome,
+      "| celularDestino:",
+      celularDestino,
+    );
 
     const partesNome = nome.split(/\s+/).filter(Boolean);
     if (partesNome.length < 2) {
-      console.log("[TrocaTitularidadeContato] Falhou: nome com menos de 2 partes:", nome);
+      console.log(
+        "[TrocaTitularidadeContato] Falhou: nome com menos de 2 partes:",
+        nome,
+      );
       await MensagensComuns(
         celular,
         "⚠️ Por favor, informe o *nome completo* (nome e sobrenome) do novo titular.",
@@ -1725,7 +1766,10 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
     }
 
     if (celularDestino.length < 12) {
-      console.log("[TrocaTitularidadeContato] Falhou: celular inválido, length:", celularDestino.length);
+      console.log(
+        "[TrocaTitularidadeContato] Falhou: celular inválido, length:",
+        celularDestino.length,
+      );
       await MensagemFlowTrocaTitularidadeContato(
         celular,
         FLOW_TROCA_TITULARIDADE_CONTATO,
@@ -1745,8 +1789,12 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
       login: session.login || session.dadosCompleto?.login || "",
       nome: session.dadosCompleto?.nome || session.nome || "Não informado",
       cpf: session.dadosCompleto?.cpf || session.cpf || "Não informado",
-      email: session.dadosCompleto?.email || session.email || "financeiro@wiptelecom.com.br",
-      telefone: session.dadosCompleto?.celular || session.celularCliente || celular,
+      email:
+        session.dadosCompleto?.email ||
+        session.email ||
+        "financeiro@wiptelecom.com.br",
+      telefone:
+        session.dadosCompleto?.celular || session.celularCliente || celular,
       telefone_conversa: celular,
       endereco: session.dadosCompleto?.endereco || "Não informado",
       rg: session.dadosCompleto?.rg || session.rg || "Não informado",
@@ -1767,7 +1815,8 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
     const repo = AppDataSource.getRepository(SolicitacaoServico);
     const novaSolicitacao = new SolicitacaoServico();
     novaSolicitacao.servico = "Alteração de Titularidade Titular";
-    novaSolicitacao.login_cliente = session.login || session.dadosCompleto?.login || "Desconhecido";
+    novaSolicitacao.login_cliente =
+      session.login || session.dadosCompleto?.login || "Desconhecido";
     novaSolicitacao.data_solicitacao = new Date();
     novaSolicitacao.assinado = false;
     novaSolicitacao.pago = false;
@@ -1810,7 +1859,12 @@ export async function handleAwaitingTrocaTitularidadeContatoFlow(
               {
                 type: "body",
                 parameters: [
-                  { type: "text", parameter_name: "titular", text: session.dadosCompleto?.nome || session.nome || "Titular" },
+                  {
+                    type: "text",
+                    parameter_name: "titular",
+                    text:
+                      session.dadosCompleto?.nome || session.nome || "Titular",
+                  },
                 ],
               },
             ],
@@ -1920,7 +1974,8 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
 
     try {
       const dadosTitular = session.dados_titular || {};
-      const celularTitular = session.celular_titular || dadosTitular.telefone_conversa;
+      const celularTitular =
+        session.celular_titular || dadosTitular.telefone_conversa;
 
       // Cria o documento de Alteração de Titularidade com dados de AMBOS
       const payloadZapTitularidade = {
@@ -1938,14 +1993,20 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
         login_novo_titular: dadosFlow.login || "",
         termo: dadosTitular.termo || session.contrato_cliente || "",
       };
-      const zapTitularidade = await ZapSign.createContractTrocaTitularidadeTitular(payloadZapTitularidade as any);
+      const zapTitularidade =
+        await ZapSign.createContractTrocaTitularidadeTitular(
+          payloadZapTitularidade as any,
+        );
       const urlTitularAssinatura = zapTitularidade.signers[0].sign_url;
-      const urlNovoTitularTitularidade = zapTitularidade.second_signer?.sign_url || null;
+      const urlNovoTitularTitularidade =
+        zapTitularidade.second_signer?.sign_url || null;
 
       // Atualiza a SolicitacaoServico do titular com o token do documento criado
       const repo = AppDataSource.getRepository(SolicitacaoServico);
       if (session.solicitacao_id_titular) {
-        const solicitacaoTitular = await repo.findOne({ where: { id: session.solicitacao_id_titular } });
+        const solicitacaoTitular = await repo.findOne({
+          where: { id: session.solicitacao_id_titular },
+        });
         if (solicitacaoTitular) {
           solicitacaoTitular.token_zapsign = zapTitularidade.token;
           solicitacaoTitular.dados = {
@@ -1977,7 +2038,9 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
         rg: dadosFlow.rg || "Não informado",
         termo: "",
       };
-      const zapCadastro = await ZapSign.createContractInstalacao(payloadZapCadastro as any);
+      const zapCadastro = await ZapSign.createContractInstalacao(
+        payloadZapCadastro as any,
+      );
       const urlCadastro = zapCadastro.signers[0].sign_url;
 
       // Salva SolicitacaoServico do novo titular (Adesão)
@@ -1989,14 +2052,23 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
       novaSolicitacao.pago = false;
       novaSolicitacao.gratis = 1;
       novaSolicitacao.token_zapsign = zapCadastro.token;
-      novaSolicitacao.dados = { ...dadosFlow, telefone_conversa: celular, solicitacao_id_titular: session.solicitacao_id_titular || null };
+      novaSolicitacao.dados = {
+        ...dadosFlow,
+        telefone_conversa: celular,
+        solicitacao_id_titular: session.solicitacao_id_titular || null,
+      };
       await repo.save(novaSolicitacao);
 
       // Atualiza a solicitação do titular com o ID da solicitação do novo titular para link bidirecional
       if (session.solicitacao_id_titular && novaSolicitacao.id) {
-        const solTitularLink = await repo.findOne({ where: { id: session.solicitacao_id_titular } });
+        const solTitularLink = await repo.findOne({
+          where: { id: session.solicitacao_id_titular },
+        });
         if (solTitularLink) {
-          solTitularLink.dados = { ...solTitularLink.dados, solicitacao_id_novo_titular: novaSolicitacao.id };
+          solTitularLink.dados = {
+            ...solTitularLink.dados,
+            solicitacao_id_novo_titular: novaSolicitacao.id,
+          };
           await repo.save(solTitularLink);
         }
       }
@@ -2015,21 +2087,37 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
           nome: session.dados_titular?.nome || "",
           email: session.dados_titular?.email || "",
         };
-        await criarChamadoMkauth("ALTERAÇÃO DE TITULARIDADE", chamadoOrigem, msgDados);
+        await criarChamadoMkauth(
+          "ALTERAÇÃO DE TITULARIDADE",
+          chamadoOrigem,
+          msgDados,
+        );
       } catch (e) {
         console.error("[Chamado] Erro ao criar chamado:", e);
       }
 
       // Envia link para o TITULAR assinar
       if (celularTitular) {
-        await MensagensComuns(celularTitular, "✅ O novo titular preencheu os dados! Aqui está o seu link para assinar o *Termo de Alteração de Titularidade*:");
-        await MensagensComuns(celularTitular, `📄 *Termo de Alteração de Titularidade:*\n${urlTitularAssinatura}`);
+        await MensagensComuns(
+          celularTitular,
+          "✅ O novo titular preencheu os dados! Aqui está o seu link para assinar o *Termo de Alteração de Titularidade*:",
+        );
+        await MensagensComuns(
+          celularTitular,
+          `📄 *Termo de Alteração de Titularidade:*\n${urlTitularAssinatura}`,
+        );
       }
 
       // Envia links para o NOVO TITULAR assinar ambos
-      await MensagensComuns(celular, "✅ Perfeito! Aqui estão os links para assinatura dos documentos:");
+      await MensagensComuns(
+        celular,
+        "✅ Perfeito! Aqui estão os links para assinatura dos documentos:",
+      );
       if (urlNovoTitularTitularidade) {
-        await MensagensComuns(celular, `📄 *Termo de Alteração de Titularidade:*\n${urlNovoTitularTitularidade}`);
+        await MensagensComuns(
+          celular,
+          `📄 *Termo de Alteração de Titularidade:*\n${urlNovoTitularTitularidade}`,
+        );
       }
       await MensagensComuns(
         celular,
@@ -2040,7 +2128,10 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
       await enviarLinkDocumentoExtra(celular, zapCadastro);
       session.stage = "awaiting_signature_link";
     } catch (zapError) {
-      console.error("[ZapSign] Erro ao criar contratos para novo titular:", zapError);
+      console.error(
+        "[ZapSign] Erro ao criar contratos para novo titular:",
+        zapError,
+      );
       const contaOrigem =
         `\n\n*Conta a alterar:* ${session.dados_titular?.login || "?"}` +
         `\nEndereço: ${session.dados_titular?.endereco || "?"}`;
@@ -2055,7 +2146,11 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
           nome: session.dados_titular?.nome || "",
           email: session.dados_titular?.email || "",
         };
-        await criarChamadoMkauth("ALTERAÇÃO DE TITULARIDADE", chamadoOrigem, msgDados);
+        await criarChamadoMkauth(
+          "ALTERAÇÃO DE TITULARIDADE",
+          chamadoOrigem,
+          msgDados,
+        );
       } catch (e) {
         console.error("[Chamado] Erro ao criar chamado:", e);
       }
@@ -2074,11 +2169,7 @@ export async function handleAwaitingTrocaTitularidadeContratacaoFlow(
   }
 }
 
-export async function handleChooseEst(
-  celular: any,
-  texto: any,
-  session: any,
-) {
+export async function handleChooseEst(celular: any, texto: any, session: any) {
   if (texto.toLowerCase() === "sim concordo") {
     await MensagensComuns(
       celular,
@@ -2091,10 +2182,7 @@ export async function handleChooseEst(
       "Wifi 1000 Mbps",
     );
     session.stage = "choose_wifi_est";
-  } else if (
-    texto.toLowerCase() === "não" ||
-    texto.toLowerCase() === "nao"
-  ) {
+  } else if (texto.toLowerCase() === "não" || texto.toLowerCase() === "nao") {
     await MensagensComuns(
       celular,
       "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
@@ -2171,10 +2259,7 @@ export async function handleChooseTypeTrocaPlano(
       planosDoSistema,
     );
     session.stage = "awaiting_troca_plano_flow";
-  } else if (
-    texto.toLowerCase() === "nao" ||
-    texto.toLowerCase() === "não"
-  ) {
+  } else if (texto.toLowerCase() === "nao" || texto.toLowerCase() === "não") {
     await MensagensComuns(
       celular,
       "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
@@ -2262,15 +2347,26 @@ export async function handleAwaitingTrocaPlanoFlow(
 
     let solicitacaoSalva: SolicitacaoServico | null = null;
     try {
-      solicitacaoSalva = await salvarSolicitacaoAlteracaoPlano(session, celular);
+      solicitacaoSalva = await salvarSolicitacaoAlteracaoPlano(
+        session,
+        celular,
+      );
     } catch (error) {
       console.error("Erro ao salvar solicitação de alteração de plano:", error);
     }
 
     try {
-      await criarChamadoMkauth("ALTERACAO DE PLANO", session, resumoAlteracaoPlano, solicitacaoSalva);
+      await criarChamadoMkauth(
+        "ALTERACAO DE PLANO",
+        session,
+        resumoAlteracaoPlano,
+        solicitacaoSalva,
+      );
     } catch (e) {
-      console.error("[Chamado] Erro ao criar chamado de alteração de plano:", e);
+      console.error(
+        "[Chamado] Erro ao criar chamado de alteração de plano:",
+        e,
+      );
     }
 
     await Finalizar(resumoAlteracaoPlano, celular, true);
@@ -2308,8 +2404,9 @@ export async function handleAwaitingTrocaPlanoFlow(
         valor_plano: valorPlano,
       };
 
-      const zapResponse =
-        await ZapSign.createContractAlteracaoPlano(payloadZap as any);
+      const zapResponse = await ZapSign.createContractAlteracaoPlano(
+        payloadZap as any,
+      );
       const zapSignUrl = zapResponse.signers[0].sign_url;
 
       if (solicitacaoSalva) {
@@ -2460,7 +2557,9 @@ export async function iniciarWifiExtendido(
       session.contrato_cliente = sis_cliente[0].termo || "";
       session.celularCliente = sis_cliente[0].celular;
       const _planoSingle = sis_cliente[0].plano
-        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: sis_cliente[0].plano } })
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({
+            where: { nome: sis_cliente[0].plano },
+          })
         : null;
       session.valor_plano_atual = _planoSingle?.valor || "0,00";
       session.dadosCompleto = {
@@ -2480,12 +2579,7 @@ export async function iniciarWifiExtendido(
         "Ler Termos",
         "https://wipdiversos.wiptelecomunicacoes.com.br/doc/wifi_extendido",
       );
-      await MensagemBotao(
-        celular,
-        "Escolha a Opção",
-        "Sim Concordo",
-        "Não",
-      );
+      await MensagemBotao(celular, "Escolha a Opção", "Sim Concordo", "Não");
       session.stage = "choose_type_wifi_extendido";
       return;
     }
@@ -2498,10 +2592,7 @@ export async function iniciarWifiExtendido(
   }
 
   if (session.wifiExtendidoStep === "select_address") {
-    if (
-      texto.toLowerCase() === "inicio" ||
-      texto.toLowerCase() === "início"
-    ) {
+    if (texto.toLowerCase() === "inicio" || texto.toLowerCase() === "início") {
       session.wifiExtendidoStep = undefined;
       session.structuredDataWifiExtendido = undefined;
       session.login = undefined;
@@ -2539,7 +2630,9 @@ export async function iniciarWifiExtendido(
       session.contrato_cliente = selectedClient.termo || "";
       session.celularCliente = selectedClient.celular;
       const _planoSelected = selectedClient.plano
-        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: selectedClient.plano } })
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({
+            where: { nome: selectedClient.plano },
+          })
         : null;
       session.valor_plano_atual = _planoSelected?.valor || "0,00";
       session.dadosCompleto = {
@@ -2559,12 +2652,7 @@ export async function iniciarWifiExtendido(
         "Ler Termos",
         "https://wipdiversos.wiptelecomunicacoes.com.br/doc/wifi_extendido",
       );
-      await MensagemBotao(
-        celular,
-        "Escolha a Opção",
-        "Sim Concordo",
-        "Não",
-      );
+      await MensagemBotao(celular, "Escolha a Opção", "Sim Concordo", "Não");
       session.stage = "choose_type_wifi_extendido";
       return;
     }
@@ -2594,10 +2682,7 @@ export async function handleChooseTypeWifiExtendido(
       planosDoSistema,
     );
     session.stage = "awaiting_wifi_extendido_flow";
-  } else if (
-    texto.toLowerCase() === "nao" ||
-    texto.toLowerCase() === "não"
-  ) {
+  } else if (texto.toLowerCase() === "nao" || texto.toLowerCase() === "não") {
     await MensagensComuns(
       celular,
       "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",
@@ -2667,7 +2752,12 @@ export async function handleAwaitingWifiExtendidoFlow(
     }
 
     try {
-      await criarChamadoMkauth("WIFI EXTENDIDO", session, resumoWifiExtendido, solicitacaoSalva);
+      await criarChamadoMkauth(
+        "WIFI EXTENDIDO",
+        session,
+        resumoWifiExtendido,
+        solicitacaoSalva,
+      );
     } catch (e) {
       console.error("[Chamado] Erro ao criar chamado de wifi extendido:", e);
     }
@@ -2707,8 +2797,9 @@ export async function handleAwaitingWifiExtendidoFlow(
         valor_plano: valorPlano,
       };
 
-      const zapResponse =
-        await ZapSign.createContractWifiExtendido(payloadZap as any);
+      const zapResponse = await ZapSign.createContractWifiExtendido(
+        payloadZap as any,
+      );
       const zapSignUrl = zapResponse.signers[0].sign_url;
 
       if (solicitacaoSalva) {
@@ -2826,10 +2917,7 @@ export async function handlePlanTrocaFinal(
   }
 }
 
-export async function handleFinishTrocaPlan(
-  celular: any,
-  session: any,
-) {
+export async function handleFinishTrocaPlan(celular: any, session: any) {
   await MensagensComuns(
     celular,
     "🫱🏻‍🫲🏼 *Parabéns* estamos quase lá...\n🔍 Um de nossos *atendentes* entrará em contato para concluir a sua *Alteração de plano* enviando o *link* com os *Termos de Alteração de Plano, Termo de Adesão e Contrato de Permanência* a serem *assinados*\n\nClique no botão abaixo para finalizar",
@@ -2840,7 +2928,11 @@ export async function handleFinishTrocaPlan(
   session.msgDadosFinais = `*🔌 Alteração de Plano* \nPlano Escolhido: ${session.planoEscolhido}\nDados do Cliente: ${dadosCliente}`;
   logAndEmailFinalize(session);
   try {
-    await criarChamadoMkauth("ALTERACAO DE PLANO", session, session.msgDadosFinais);
+    await criarChamadoMkauth(
+      "ALTERACAO DE PLANO",
+      session,
+      session.msgDadosFinais,
+    );
   } catch (e) {
     console.error("[Chamado] Erro ao criar chamado de alteração de plano:", e);
   }
@@ -2864,16 +2956,20 @@ export async function handleChooseTypeRenovacao(
     session.msgDadosFinais = `*🆕 Renovação Contratual* \nDados do Cliente: ${dadosCliente}`;
     logAndEmailFinalize(session);
     try {
-      await criarChamadoMkauth("RENOVACAO CONTRATUAL", session, session.msgDadosFinais);
+      await criarChamadoMkauth(
+        "RENOVACAO CONTRATUAL",
+        session,
+        session.msgDadosFinais,
+      );
     } catch (e) {
-      console.error("[Chamado] Erro ao criar chamado de renovação contratual:", e);
+      console.error(
+        "[Chamado] Erro ao criar chamado de renovação contratual:",
+        e,
+      );
     }
     await MensagemBotao(celular, "Concluir Solicitação", "Finalizar");
     session.stage = "finalizar";
-  } else if (
-    texto.toLowerCase() === "nao" ||
-    texto.toLowerCase() === "não"
-  ) {
+  } else if (texto.toLowerCase() === "nao" || texto.toLowerCase() === "não") {
     await MensagensComuns(
       celular,
       "🤷🏽 *Infelizmente* não podemos dar continuidade ao seu *atendimento* por não Aceitar os *Termos!!*",

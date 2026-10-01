@@ -35,6 +35,7 @@ import {
   contratarStreamingAposAssinatura,
   contratarStreamingDoPlano,
 } from "../services/streamingCadastro";
+import { diasDeTesteUsados } from "../services/streamingTesteHistorico";
 import {
   buscarCadastroPorLoginOuCpf,
   loginCadastroValido,
@@ -44,7 +45,10 @@ dotenv.config();
 
 const isSandbox = process.env.SERVIDOR_HOMOLOGACAO === "true";
 
-const formatVelocidade = (velup?: number | null, veldown?: number | null): string => {
+const formatVelocidade = (
+  velup?: number | null,
+  veldown?: number | null,
+): string => {
   if (!velup && !veldown) return "Consultar Viabilidade";
   const up = velup ? `${velup} Kbps` : "N/A";
   const down = veldown ? `${veldown} Kbps` : "N/A";
@@ -123,13 +127,17 @@ async function servicosSvaDoCliente(login: string): Promise<{
   }
 }
 
-async function buildUniversalZapSignData(params: Record<string, any>): Promise<Array<{de: string; para: string}>> {
+async function buildUniversalZapSignData(
+  params: Record<string, any>,
+): Promise<Array<{ de: string; para: string }>> {
   const s = (key: string, ...fallbacks: string[]): string => {
     let val = params[key];
-    if (val !== undefined && val !== null && String(val).trim() !== "") return String(val);
+    if (val !== undefined && val !== null && String(val).trim() !== "")
+      return String(val);
     for (const fb of fallbacks) {
       val = params[fb];
-      if (val !== undefined && val !== null && String(val).trim() !== "") return String(val);
+      if (val !== undefined && val !== null && String(val).trim() !== "")
+        return String(val);
     }
     return "";
   };
@@ -137,13 +145,17 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
   // Resolve plano → SisPlano (velup, veldown, valor)
   const planoNome = s("plano");
   const planoRecord = planoNome
-    ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: planoNome } })
+    ? await MkauthDataSource.getRepository(SisPlano).findOne({
+        where: { nome: planoNome },
+      })
     : null;
 
   // Gera termo se vazio: último sis_cliente ID + 1 → "{id}C/{ano}"
   let termo = s("termo");
   if (!termo) {
-    const [lastCliente] = await MkauthDataSource.getRepository(ClientesEntities).find({
+    const [lastCliente] = await MkauthDataSource.getRepository(
+      ClientesEntities,
+    ).find({
       select: { id: true },
       order: { id: "DESC" },
       take: 1,
@@ -156,7 +168,9 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
   const endereco = s("endereco", "rua");
   const numero = s("numero");
   const complemento = s("complemento");
-  const enderecoCompleto = [endereco, numero, complemento].filter(Boolean).join(", ");
+  const enderecoCompleto = [endereco, numero, complemento]
+    .filter(Boolean)
+    .join(", ");
   const enderecoSemNumero = [endereco, complemento].filter(Boolean).join(", ");
   const valorPlano = s("valor_plano") || planoRecord?.valor || "";
 
@@ -195,7 +209,10 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
     // do provedor, não do cliente — e antes eram "XXXXXXXXXX" no documento.
     { de: "{{provedorie}}", para: process.env.PROVEDOR_IE || "" },
     { de: "{{provedoranatel}}", para: process.env.PROVEDOR_ANATEL || "" },
-    { de: "{{provedorfone}}", para: process.env.PROVEDOR_FONE || "(14) 3296-1608" },
+    {
+      de: "{{provedorfone}}",
+      para: process.env.PROVEDOR_FONE || "(14) 3296-1608",
+    },
     { de: "{{provedorsac}}", para: process.env.PROVEDOR_SAC || "0800 7741608" },
     { de: "{{provedorsite}}", para: process.env.PROVEDOR_SITE || "" },
     // Foro eleito no Contrato de SVA. Campo jurídico: fica no .env para ser
@@ -279,7 +296,10 @@ async function buildUniversalZapSignData(params: Record<string, any>): Promise<A
       para: s("vencimento_instalacao") || s("vencimento", "venc"),
     },
     // --- Termo de Adesão SVA: serviços contratados ---
-    { de: "{{qtdstreaming}}", para: sva.streaming ? String(sva.streaming) : "" },
+    {
+      de: "{{qtdstreaming}}",
+      para: sva.streaming ? String(sva.streaming) : "",
+    },
     // A linha do streaming é fixa no documento. Estas duas variáveis existem
     // para quem preferir que o rótulo venha daqui, em vez de digitado no
     // .docx — o nome comercial do serviço é "Watch TV".
@@ -465,12 +485,17 @@ class ZapSign {
     try {
       const valor = params.valor || "0,00";
       const tipo =
-        valor === "0,00" || valor === "0" || valor === "0.00" ? "gratis" : "pago";
+        valor === "0,00" || valor === "0" || valor === "0.00"
+          ? "gratis"
+          : "pago";
 
-      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+      const template = await ApiMkDataSource.getRepository(
+        ZapSignTemplates,
+      ).findOne({
         where: { nome_servico: "Instalação", tipo },
       });
-      if (!template?.token_id) throw new Error("Token do template 'Instalação' não encontrado.");
+      if (!template?.token_id)
+        throw new Error("Token do template 'Instalação' não encontrado.");
 
       const zapData = await buildUniversalZapSignData(params);
 
@@ -504,19 +529,32 @@ class ZapSign {
       console.error("Error in createContractInstalacao:", error);
       throw error;
     }
-  }
+  };
 
-  createContractInstalacaoDificuldadeAcesso = async (params: Record<string, any>) => {
+  createContractInstalacaoDificuldadeAcesso = async (
+    params: Record<string, any>,
+  ) => {
     try {
-      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+      const template = await ApiMkDataSource.getRepository(
+        ZapSignTemplates,
+      ).findOne({
         where: { nome_servico: "Instalação", tipo: "dificuldade_acesso" },
       });
-      if (!template?.token_id) throw new Error("Token do template 'Instalação' (dificuldade_acesso) não encontrado.");
+      if (!template?.token_id)
+        throw new Error(
+          "Token do template 'Instalação' (dificuldade_acesso) não encontrado.",
+        );
 
-      const valorInstalacao = parseFloat(String(params.valor || "0").replace(",", "."));
+      const valorInstalacao = parseFloat(
+        String(params.valor || "0").replace(",", "."),
+      );
       const valorMulta = 600;
       const valorTotal = valorInstalacao + valorMulta;
-      const fmt = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmt = (v: number) =>
+        v.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
 
       const zapData = await buildUniversalZapSignData(params);
       // Adiciona variáveis específicas de dificuldade de acesso
@@ -555,21 +593,31 @@ class ZapSign {
       const extra = await documentoExtraDoPlano(params);
       return { ...response.data, ...extra };
     } catch (error) {
-      console.error("Error in createContractInstalacaoDificuldadeAcesso:", error);
+      console.error(
+        "Error in createContractInstalacaoDificuldadeAcesso:",
+        error,
+      );
       throw error;
     }
-  }
+  };
 
   createContractMudancaEndereco = async (params: Record<string, any>) => {
     try {
       const valor = params.valor || "0,00";
       const tipo =
-        valor === "0,00" || valor === "0" || valor === "0.00" ? "gratis" : "pago";
+        valor === "0,00" || valor === "0" || valor === "0.00"
+          ? "gratis"
+          : "pago";
 
-      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+      const template = await ApiMkDataSource.getRepository(
+        ZapSignTemplates,
+      ).findOne({
         where: { nome_servico: "Mudança de Endereço", tipo },
       });
-      if (!template?.token_id) throw new Error("Token do template 'Mudança de Endereço' não encontrado.");
+      if (!template?.token_id)
+        throw new Error(
+          "Token do template 'Mudança de Endereço' não encontrado.",
+        );
 
       const zapData = await buildUniversalZapSignData(params);
 
@@ -601,7 +649,7 @@ class ZapSign {
       console.error("Error in createContractMudancaEndereco:", error);
       throw error;
     }
-  }
+  };
 
   generatePdfContratacao = async (req: Request, res: Response) => {
     try {
@@ -611,7 +659,7 @@ class ZapSign {
       console.error("Error generating PDF:", error);
       res.status(500).json({ error: "Failed to generate PDF" });
     }
-  }
+  };
 
   generatePdfMudancaEndereco = async (req: Request, res: Response) => {
     try {
@@ -621,18 +669,25 @@ class ZapSign {
       console.error("Error generating Mudança Endereço PDF:", error);
       res.status(500).json({ error: "Failed to generate PDF" });
     }
-  }
+  };
 
   createContractMudancaComodo = async (params: Record<string, any>) => {
     try {
       const valor = params.valor || "0,00";
       const tipo =
-        valor === "0,00" || valor === "0" || valor === "0.00" ? "gratis" : "pago";
+        valor === "0,00" || valor === "0" || valor === "0.00"
+          ? "gratis"
+          : "pago";
 
-      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+      const template = await ApiMkDataSource.getRepository(
+        ZapSignTemplates,
+      ).findOne({
         where: { nome_servico: "Mudança de Cômodo", tipo },
       });
-      if (!template?.token_id) throw new Error("Token do template 'Mudança de Cômodo' não encontrado.");
+      if (!template?.token_id)
+        throw new Error(
+          "Token do template 'Mudança de Cômodo' não encontrado.",
+        );
 
       const zapData = await buildUniversalZapSignData(params);
 
@@ -664,7 +719,7 @@ class ZapSign {
       console.error("Error in createContractMudancaComodo:", error);
       throw error;
     }
-  }
+  };
 
   generatePdfMudancaComodo = async (req: Request, res: Response) => {
     try {
@@ -674,7 +729,7 @@ class ZapSign {
       console.error("Error generating Mudança Cômodo PDF:", error);
       res.status(500).json({ error: "Failed to generate PDF" });
     }
-  }
+  };
 
   /**
    * Busca dados do cliente pelo login e gera todos os documentos de uma vez (somente localhost).
@@ -687,16 +742,22 @@ class ZapSign {
         return;
       }
 
-      const cliente = await MkauthDataSource.getRepository(ClientesEntities).findOne({
+      const cliente = await MkauthDataSource.getRepository(
+        ClientesEntities,
+      ).findOne({
         where: { login },
       });
       if (!cliente) {
-        res.status(404).json({ error: `Cliente com login "${login}" não encontrado` });
+        res
+          .status(404)
+          .json({ error: `Cliente com login "${login}" não encontrado` });
         return;
       }
 
       const planoRecord = cliente.plano
-        ? await MkauthDataSource.getRepository(SisPlano).findOne({ where: { nome: cliente.plano } })
+        ? await MkauthDataSource.getRepository(SisPlano).findOne({
+            where: { nome: cliente.plano },
+          })
         : null;
 
       const params: Record<string, any> = {
@@ -743,58 +804,106 @@ class ZapSign {
 
       // 1. Instalação Grátis
       try {
-        resultados["Instalação (grátis)"] = await this.createContractInstalacao({ ...params, valor: "0.00" });
-      } catch (e: any) { erros["Instalação (grátis)"] = e.message; }
+        resultados["Instalação (grátis)"] = await this.createContractInstalacao(
+          { ...params, valor: "0.00" },
+        );
+      } catch (e: any) {
+        erros["Instalação (grátis)"] = e.message;
+      }
 
       // 2. Instalação Paga
       try {
-        resultados["Instalação (pago)"] = await this.createContractInstalacao({ ...params, valor: "200.00" });
-      } catch (e: any) { erros["Instalação (pago)"] = e.message; }
+        resultados["Instalação (pago)"] = await this.createContractInstalacao({
+          ...params,
+          valor: "200.00",
+        });
+      } catch (e: any) {
+        erros["Instalação (pago)"] = e.message;
+      }
 
       // 3. Instalação Dificuldade de Acesso
       try {
-        resultados["Instalação (dificuldade_acesso)"] = await this.createContractInstalacaoDificuldadeAcesso({ ...params, valor: "200.00" });
-      } catch (e: any) { erros["Instalação (dificuldade_acesso)"] = e.message; }
+        resultados["Instalação (dificuldade_acesso)"] =
+          await this.createContractInstalacaoDificuldadeAcesso({
+            ...params,
+            valor: "200.00",
+          });
+      } catch (e: any) {
+        erros["Instalação (dificuldade_acesso)"] = e.message;
+      }
 
       // 4. Mudança de Endereço Grátis
       try {
-        resultados["Mudança de Endereço (grátis)"] = await this.createContractMudancaEndereco({ ...params, valor: "0.00" });
-      } catch (e: any) { erros["Mudança de Endereço (grátis)"] = e.message; }
+        resultados["Mudança de Endereço (grátis)"] =
+          await this.createContractMudancaEndereco({
+            ...params,
+            valor: "0.00",
+          });
+      } catch (e: any) {
+        erros["Mudança de Endereço (grátis)"] = e.message;
+      }
 
       // 5. Mudança de Endereço Paga
       try {
-        resultados["Mudança de Endereço (pago)"] = await this.createContractMudancaEndereco({ ...params, valor: "200.00" });
-      } catch (e: any) { erros["Mudança de Endereço (pago)"] = e.message; }
+        resultados["Mudança de Endereço (pago)"] =
+          await this.createContractMudancaEndereco({
+            ...params,
+            valor: "200.00",
+          });
+      } catch (e: any) {
+        erros["Mudança de Endereço (pago)"] = e.message;
+      }
 
       // 6. Mudança de Cômodo Grátis
       try {
-        resultados["Mudança de Cômodo (grátis)"] = await this.createContractMudancaComodo({ ...params, valor: "0.00" });
-      } catch (e: any) { erros["Mudança de Cômodo (grátis)"] = e.message; }
+        resultados["Mudança de Cômodo (grátis)"] =
+          await this.createContractMudancaComodo({ ...params, valor: "0.00" });
+      } catch (e: any) {
+        erros["Mudança de Cômodo (grátis)"] = e.message;
+      }
 
       // 7. Mudança de Cômodo Paga
       try {
-        resultados["Mudança de Cômodo (pago)"] = await this.createContractMudancaComodo({ ...params, valor: "200.00" });
-      } catch (e: any) { erros["Mudança de Cômodo (pago)"] = e.message; }
+        resultados["Mudança de Cômodo (pago)"] =
+          await this.createContractMudancaComodo({
+            ...params,
+            valor: "200.00",
+          });
+      } catch (e: any) {
+        erros["Mudança de Cômodo (pago)"] = e.message;
+      }
 
       // 8. Alteração de Plano
       try {
-        resultados["Alteração de Plano"] = await this.createContractAlteracaoPlano(params);
-      } catch (e: any) { erros["Alteração de Plano"] = e.message; }
+        resultados["Alteração de Plano"] =
+          await this.createContractAlteracaoPlano(params);
+      } catch (e: any) {
+        erros["Alteração de Plano"] = e.message;
+      }
 
       // 8.1 Wifi Extendido
       try {
-        resultados["Wifi Extendido"] = await this.createContractWifiExtendido(params);
-      } catch (e: any) { erros["Wifi Extendido"] = e.message; }
+        resultados["Wifi Extendido"] =
+          await this.createContractWifiExtendido(params);
+      } catch (e: any) {
+        erros["Wifi Extendido"] = e.message;
+      }
 
       // 9. Troca de Titularidade (Titular)
       try {
-        resultados["Troca de Titularidade (titular)"] = await this.createContractTrocaTitularidadeTitular(params);
-      } catch (e: any) { erros["Troca de Titularidade (titular)"] = e.message; }
+        resultados["Troca de Titularidade (titular)"] =
+          await this.createContractTrocaTitularidadeTitular(params);
+      } catch (e: any) {
+        erros["Troca de Titularidade (titular)"] = e.message;
+      }
 
       // 10. Troca de Titularidade (Novo Titular)
       try {
-        resultados["Troca de Titularidade (novo titular)"] = await this.createContractTrocaTitularidadeNovoTitular(params);
-      } catch (e: any) { erros["Troca de Titularidade (novo titular)"] = e.message; }
+        resultados["Troca de Titularidade (novo titular)"] =
+          await this.createContractTrocaTitularidadeNovoTitular(params);
+      } catch (e: any) {
+        erros["Troca de Titularidade (novo titular)"] = e.message;
+      }
 
       const docs = Object.entries(resultados).map(([servico, data]) => ({
         servico,
@@ -803,12 +912,20 @@ class ZapSign {
         second_signer_url: data?.second_signer?.sign_url || null,
       }));
 
-      res.status(200).json({ cliente: { login: cliente.login, nome: cliente.nome }, docs, erros });
+      res
+        .status(200)
+        .json({
+          cliente: { login: cliente.login, nome: cliente.nome },
+          docs,
+          erros,
+        });
     } catch (error: any) {
       console.error("Error in gerarTodosDocumentosTeste:", error);
-      res.status(500).json({ error: error.message || "Erro ao gerar documentos de teste" });
+      res
+        .status(500)
+        .json({ error: error.message || "Erro ao gerar documentos de teste" });
     }
-  }
+  };
 
   /**
    * Busca dados do cliente pelo login (somente localhost).
@@ -816,8 +933,28 @@ class ZapSign {
   buscarClientePorLogin = async (req: Request, res: Response) => {
     try {
       const { login } = req.params;
-      const cliente = await MkauthDataSource.getRepository(ClientesEntities).findOne({
-        select: { id: true, nome: true, login: true, cpf_cnpj: true, rg: true, email: true, celular: true, endereco: true, numero: true, complemento: true, bairro: true, cidade: true, estado: true, cep: true, plano: true, venc: true, termo: true },
+      const cliente = await MkauthDataSource.getRepository(
+        ClientesEntities,
+      ).findOne({
+        select: {
+          id: true,
+          nome: true,
+          login: true,
+          cpf_cnpj: true,
+          rg: true,
+          email: true,
+          celular: true,
+          endereco: true,
+          numero: true,
+          complemento: true,
+          bairro: true,
+          cidade: true,
+          estado: true,
+          cep: true,
+          plano: true,
+          venc: true,
+          termo: true,
+        },
         where: { login },
       });
       if (!cliente) {
@@ -829,7 +966,7 @@ class ZapSign {
       console.error("Error in buscarClientePorLogin:", error);
       res.status(500).json({ error: error.message });
     }
-  }
+  };
 
   webhook = async (req: Request, res: Response) => {
     try {
@@ -847,12 +984,16 @@ class ZapSign {
 
       if (event_type === "doc_signed") {
         const repo = AppDataSource.getRepository(SolicitacaoServico);
-        const solicitacao = await repo.findOne({ where: { token_zapsign: token } });
+        const solicitacao = await repo.findOne({
+          where: { token_zapsign: token },
+        });
         if (solicitacao) {
           const servicoNorm = solicitacao.servico?.toLowerCase();
           // Notifica novo titular apenas na primeira assinatura (quando ainda faltam signatários)
           if (
-            (servicoNorm === "alteração de titularidade titular" || servicoNorm === "troca de titularidade titular" || servicoNorm === "troca_titularidade_titular") &&
+            (servicoNorm === "alteração de titularidade titular" ||
+              servicoNorm === "troca de titularidade titular" ||
+              servicoNorm === "troca_titularidade_titular") &&
             !solicitacao.dados?.titular_assinou &&
             !docFullySigned &&
             !solicitacao.assinado
@@ -865,14 +1006,18 @@ class ZapSign {
       }
 
       if (event_type === "all_signed" || docFullySigned) {
-        console.log(`[ZapSign Webhook] Processando assinatura completa para token: ${token}`);
+        console.log(
+          `[ZapSign Webhook] Processando assinatura completa para token: ${token}`,
+        );
         const repo = AppDataSource.getRepository(SolicitacaoServico);
 
         const solicitacao = await repo.findOne({
           where: { token_zapsign: token },
         });
 
-        console.log(`[ZapSign Webhook] Solicitação encontrada: ${solicitacao ? `ID ${solicitacao.id} (${solicitacao.servico})` : "NÃO ENCONTRADA"}`);
+        console.log(
+          `[ZapSign Webhook] Solicitação encontrada: ${solicitacao ? `ID ${solicitacao.id} (${solicitacao.servico})` : "NÃO ENCONTRADA"}`,
+        );
 
         if (solicitacao) {
           // Trava idempotente: ZapSign pode mandar `doc_signed` (com todos assinados)
@@ -921,7 +1066,9 @@ class ZapSign {
 
             if (requesterPhone) {
               const servicoNorm = (solicitacao.servico || "").toLowerCase();
-              const isTitular = servicoNorm.includes("titularidade titular") && !servicoNorm.includes("novo titular");
+              const isTitular =
+                servicoNorm.includes("titularidade titular") &&
+                !servicoNorm.includes("novo titular");
               const msgAssinatura = isTitular
                 ? `✅ *Assinatura Confirmada!*\n\nOlá ${solicitacao.dados?.nome || "Cliente"}, recebemos a sua assinatura para o serviço: *${solicitacao.servico || "Contratado"}*.\n\nTudo certo, daremos continuidade do serviço com o novo titular, obrigado! 🙏🏻`
                 : `✅ *Assinatura Confirmada!*\n\nOlá ${solicitacao.dados?.nome || "Cliente"}, recebemos a sua assinatura para o serviço: *${solicitacao.servico || "Contratado"}*.\n\nAgradecemos a confiança! Em breve nossa equipe entrará em contato para confirmação do serviço. 🚀`;
@@ -983,7 +1130,9 @@ class ZapSign {
                     break;
                   }
                   const loginCriado = await this.registerClientInMkAuth(dados);
-                  console.log(`[ZapSign Webhook] Cliente ${dados.nome} cadastrado no MKAuth para Instalação. Login: ${loginCriado}`);
+                  console.log(
+                    `[ZapSign Webhook] Cliente ${dados.nome} cadastrado no MKAuth para Instalação. Login: ${loginCriado}`,
+                  );
                   try {
                     const msgChamado =
                       `Cliente solicitou novo cadastro via WhatsApp e assinou o contrato.\n\n` +
@@ -999,18 +1148,32 @@ class ZapSign {
                       `📅 Vencimento: Dia ${dados.vencimento || "-"}`;
                     await criarChamadoMkauth(
                       "INSTALACAO",
-                      { nome: dados.nome, login: loginCriado, email: dados.email || "" },
+                      {
+                        nome: dados.nome,
+                        login: loginCriado,
+                        email: dados.email || "",
+                      },
                       msgChamado,
                       solicitacao,
                     );
                   } catch (eChamado) {
-                    console.error("[ZapSign Webhook] Erro ao criar chamado de instalação:", eChamado);
+                    console.error(
+                      "[ZapSign Webhook] Erro ao criar chamado de instalação:",
+                      eChamado,
+                    );
                   }
                   // Instalou no plano combo: a Watch TV vem junto, por R$ 0,00.
                   try {
-                    await this.ativarWatchTvDoPlano(solicitacao, loginCriado, dados);
+                    await this.ativarWatchTvDoPlano(
+                      solicitacao,
+                      loginCriado,
+                      dados,
+                    );
                   } catch (eSva) {
-                    console.error("[ZapSign Webhook] Erro ao ativar a Watch TV do plano:", eSva);
+                    console.error(
+                      "[ZapSign Webhook] Erro ao ativar a Watch TV do plano:",
+                      eSva,
+                    );
                   }
                   break;
                 case "mudança de endereço":
@@ -1048,7 +1211,11 @@ class ZapSign {
                     );
                     // Plano combo traz a Watch TV embutida: cria o acesso na
                     // Watch Brasil e registra o serviço por R$ 0,00.
-                    await this.ativarWatchTvDoPlano(solicitacao, loginPlano, dados);
+                    await this.ativarWatchTvDoPlano(
+                      solicitacao,
+                      loginPlano,
+                      dados,
+                    );
                   } else {
                     console.warn(
                       `[ZapSign Webhook] Login não identificado para atualização de plano: ${solicitacao.id}`,
@@ -1065,15 +1232,20 @@ class ZapSign {
                   // Os dias de uso contam a partir de agora, não da data do
                   // pedido: entre pedir e assinar podem passar dias, e o
                   // proporcional guardado no pedido ficaria maior que o real.
+                  // Dias de teste grátis entram na conta: quem testou e ficou
+                  // já usou o serviço nesses dias.
                   const proporcional = cobrancaProporcional(
                     VALOR_STREAMER,
                     Number(dados.vencimento || dados.venc) || 1,
+                    new Date(),
+                    await diasDeTesteUsados(loginWatch),
                   );
                   Object.assign(dados, {
                     valor_proporcional: reais(proporcional.valor),
                     dias_proporcional: String(proporcional.dias),
                     vencimento_proporcional: dataBR(proporcional.vencimento),
-                    cobranca_proporcional: textoCobrancaProporcional(proporcional),
+                    cobranca_proporcional:
+                      textoCobrancaProporcional(proporcional),
                   });
                   const r = await contratarStreamingAposAssinatura({
                     login: loginWatch,
@@ -1109,14 +1281,20 @@ class ZapSign {
                   break;
                 }
                 case "alteração de titularidade titular":
-                case "troca de titularidade titular":   // legado
-                case "troca_titularidade_titular":       // legado
+                case "troca de titularidade titular": // legado
+                case "troca_titularidade_titular": // legado
                   // notificarNovoTitular é chamado no doc_signed (primeira assinatura)
-                  await this.verificarEFinalizarTrocaTitularidade(solicitacao, repo);
+                  await this.verificarEFinalizarTrocaTitularidade(
+                    solicitacao,
+                    repo,
+                  );
                   break;
                 case "alteração de titularidade novo titular":
-                case "troca de titularidade novo titular":  // legado
-                  await this.verificarEFinalizarTrocaTitularidade(solicitacao, repo);
+                case "troca de titularidade novo titular": // legado
+                  await this.verificarEFinalizarTrocaTitularidade(
+                    solicitacao,
+                    repo,
+                  );
                   break;
                 default:
                   console.log(
@@ -1143,7 +1321,7 @@ class ZapSign {
       console.error("[ZapSign Webhook] Erro ao processar:", error);
       res.status(500).send("Internal Server Error");
     }
-  }
+  };
 
   /**
    * Plano com SVA acabou de entrar num cadastro: cria a conta na Watch Brasil,
@@ -1187,14 +1365,16 @@ class ZapSign {
 
   private notificarNovoTitular = async (_solicitacao: SolicitacaoServico) => {
     // Notificação de "aguardando assinatura do novo titular" removida a pedido
-  }
+  };
 
   private verificarEFinalizarTrocaTitularidade = async (
     solicitacaoAssinada: SolicitacaoServico,
     repo: ReturnType<typeof AppDataSource.getRepository<SolicitacaoServico>>,
   ) => {
     try {
-      const isNovoTitular = (solicitacaoAssinada.servico || "").toLowerCase().includes("novo titular");
+      const isNovoTitular = (solicitacaoAssinada.servico || "")
+        .toLowerCase()
+        .includes("novo titular");
 
       let solicitacaoTitular: SolicitacaoServico | null = null;
       let solicitacaoNovoTitular: SolicitacaoServico | null = null;
@@ -1207,14 +1387,19 @@ class ZapSign {
         }
       } else {
         solicitacaoTitular = solicitacaoAssinada;
-        const idNovoTitular = solicitacaoAssinada.dados?.solicitacao_id_novo_titular;
+        const idNovoTitular =
+          solicitacaoAssinada.dados?.solicitacao_id_novo_titular;
         if (idNovoTitular) {
-          solicitacaoNovoTitular = await repo.findOne({ where: { id: idNovoTitular } });
+          solicitacaoNovoTitular = await repo.findOne({
+            where: { id: idNovoTitular },
+          });
         }
       }
 
       if (!solicitacaoTitular || !solicitacaoNovoTitular) {
-        console.log("[AlteraçãoTitularidade] Aguardando a outra solicitação ser localizada.");
+        console.log(
+          "[AlteraçãoTitularidade] Aguardando a outra solicitação ser localizada.",
+        );
         return;
       }
 
@@ -1229,7 +1414,10 @@ class ZapSign {
       }
 
       // Marca como processado para evitar execução dupla
-      solicitacaoTitular.dados = { ...solicitacaoTitular.dados, troca_finalizada: true };
+      solicitacaoTitular.dados = {
+        ...solicitacaoTitular.dados,
+        troca_finalizada: true,
+      };
       await repo.save(solicitacaoTitular);
 
       const dadosTitular = solicitacaoTitular.dados;
@@ -1242,50 +1430,61 @@ class ZapSign {
             `[AlteraçãoTitularidade] Titular ${solicitacaoTitular.id} já teve chamado criado manualmente sem assinatura. Ignorando duplicação.`,
           );
         } else {
-        const cpfOriginal = (dadosTitular?.cpf || "").replace(/\D/g, "");
-        const loginOriginal = solicitacaoTitular.login_cliente || dadosTitular?.login || "";
-        if (cpfOriginal || loginOriginal) {
-          // O login escolhido no atendimento manda; o CPF é o plano B e, nele,
-          // vale o cadastro mais novo — o mesmo CPF costuma ter cadastros
-          // antigos e o chamado ia parar no errado.
-          const clienteOriginal = await buscarCadastroPorLoginOuCpf(
-            loginOriginal,
-            cpfOriginal,
-          );
-
-          const sessionFake = {
-            login:
-              clienteOriginal?.login ||
-              (loginCadastroValido(loginOriginal) ? loginOriginal : ""),
-            nome: clienteOriginal?.nome || dadosTitular?.nome || "",
-            email: clienteOriginal?.email || dadosTitular?.email || "",
-          };
-
-          const mensagemChamado =
-            `Troca de titularidade realizada em ${moment().format("DD/MM/YYYY HH:mm")}. ` +
-            `Contrato assinado pelo titular e novo titular.\n\n` +
-            `Dados do novo titular:\n` +
-            `Nome: ${dadosNovoTitular?.nome || "Não informado"}\n` +
-            `CPF: ${dadosNovoTitular?.cpf || "Não informado"}\n` +
-            `E-mail: ${dadosNovoTitular?.email || "Não informado"}\n` +
-            `Celular: ${dadosNovoTitular?.celular || dadosNovoTitular?.telefone_conversa || "Não informado"}`;
-
-          if (!sessionFake.login) {
-            console.warn(
-              `[AlteraçãoTitularidade] Cadastro do titular original não localizado (login "${loginOriginal}", CPF "${cpfOriginal}"). Chamado não criado.`,
+          const cpfOriginal = (dadosTitular?.cpf || "").replace(/\D/g, "");
+          const loginOriginal =
+            solicitacaoTitular.login_cliente || dadosTitular?.login || "";
+          if (cpfOriginal || loginOriginal) {
+            // O login escolhido no atendimento manda; o CPF é o plano B e, nele,
+            // vale o cadastro mais novo — o mesmo CPF costuma ter cadastros
+            // antigos e o chamado ia parar no errado.
+            const clienteOriginal = await buscarCadastroPorLoginOuCpf(
+              loginOriginal,
+              cpfOriginal,
             );
+
+            const sessionFake = {
+              login:
+                clienteOriginal?.login ||
+                (loginCadastroValido(loginOriginal) ? loginOriginal : ""),
+              nome: clienteOriginal?.nome || dadosTitular?.nome || "",
+              email: clienteOriginal?.email || dadosTitular?.email || "",
+            };
+
+            const mensagemChamado =
+              `Troca de titularidade realizada em ${moment().format("DD/MM/YYYY HH:mm")}. ` +
+              `Contrato assinado pelo titular e novo titular.\n\n` +
+              `Dados do novo titular:\n` +
+              `Nome: ${dadosNovoTitular?.nome || "Não informado"}\n` +
+              `CPF: ${dadosNovoTitular?.cpf || "Não informado"}\n` +
+              `E-mail: ${dadosNovoTitular?.email || "Não informado"}\n` +
+              `Celular: ${dadosNovoTitular?.celular || dadosNovoTitular?.telefone_conversa || "Não informado"}`;
+
+            if (!sessionFake.login) {
+              console.warn(
+                `[AlteraçãoTitularidade] Cadastro do titular original não localizado (login "${loginOriginal}", CPF "${cpfOriginal}"). Chamado não criado.`,
+              );
+            } else {
+              await criarChamadoMkauth(
+                "ALTERAÇÃO DE TITULARIDADE",
+                sessionFake,
+                mensagemChamado,
+                solicitacaoTitular,
+              );
+              console.log(
+                `[AlteraçãoTitularidade] Chamado criado no cadastro ${sessionFake.login} (CPF ${cpfOriginal || "-"}).`,
+              );
+            }
           } else {
-            await criarChamadoMkauth("ALTERAÇÃO DE TITULARIDADE", sessionFake, mensagemChamado, solicitacaoTitular);
-            console.log(
-              `[AlteraçãoTitularidade] Chamado criado no cadastro ${sessionFake.login} (CPF ${cpfOriginal || "-"}).`,
+            console.warn(
+              "[AlteraçãoTitularidade] CPF e login do titular original não encontrados nos dados.",
             );
           }
-        } else {
-          console.warn("[AlteraçãoTitularidade] CPF e login do titular original não encontrados nos dados.");
-        }
         }
       } catch (e) {
-        console.error("[AlteraçãoTitularidade] Erro ao criar chamado para titular:", e);
+        console.error(
+          "[AlteraçãoTitularidade] Erro ao criar chamado para titular:",
+          e,
+        );
       }
 
       // 2. Criar novo cadastro no MkAuth para o novo titular e abrir chamado de instalação
@@ -1296,8 +1495,11 @@ class ZapSign {
           );
           return;
         }
-        const loginNovoTitular = await this.registerClientInMkAuth(dadosNovoTitular);
-        console.log(`[AlteraçãoTitularidade] Novo titular ${dadosNovoTitular?.nome} cadastrado no MKAuth. Login: ${loginNovoTitular}`);
+        const loginNovoTitular =
+          await this.registerClientInMkAuth(dadosNovoTitular);
+        console.log(
+          `[AlteraçãoTitularidade] Novo titular ${dadosNovoTitular?.nome} cadastrado no MKAuth. Login: ${loginNovoTitular}`,
+        );
 
         const msgNovoTitular =
           `Instalação originada por alteração de titularidade. Contrato assinado em ${moment().format("DD/MM/YYYY HH:mm")}.\n\n` +
@@ -1315,11 +1517,17 @@ class ZapSign {
 
         await criarChamadoMkauth(
           "INSTALACAO",
-          { nome: dadosNovoTitular?.nome || "", login: loginNovoTitular, email: dadosNovoTitular?.email || "" },
+          {
+            nome: dadosNovoTitular?.nome || "",
+            login: loginNovoTitular,
+            email: dadosNovoTitular?.email || "",
+          },
           msgNovoTitular,
           solicitacaoNovoTitular,
         );
-        console.log(`[AlteraçãoTitularidade] Chamado de instalação criado para novo titular ${dadosNovoTitular?.nome}.`);
+        console.log(
+          `[AlteraçãoTitularidade] Chamado de instalação criado para novo titular ${dadosNovoTitular?.nome}.`,
+        );
 
         // O cadastro do novo titular nasce com o plano escolhido: se for o
         // combo, a Watch TV entra junto e ele é avisado.
@@ -1330,15 +1538,24 @@ class ZapSign {
             dadosNovoTitular,
           );
         } catch (eSva) {
-          console.error("[AlteraçãoTitularidade] Erro ao ativar a Watch TV do plano:", eSva);
+          console.error(
+            "[AlteraçãoTitularidade] Erro ao ativar a Watch TV do plano:",
+            eSva,
+          );
         }
       } catch (e) {
-        console.error("[AlteraçãoTitularidade] Erro ao cadastrar novo titular ou criar chamado:", e);
+        console.error(
+          "[AlteraçãoTitularidade] Erro ao cadastrar novo titular ou criar chamado:",
+          e,
+        );
       }
     } catch (error) {
-      console.error("[AlteraçãoTitularidade] Erro ao processar finalização da troca:", error);
+      console.error(
+        "[AlteraçãoTitularidade] Erro ao processar finalização da troca:",
+        error,
+      );
     }
-  }
+  };
 
   // === Métodos Auxiliares para MKAuth ===
 
@@ -1357,14 +1574,19 @@ class ZapSign {
         .trim();
     }
     return clean;
-  }
+  };
 
   createContractAlteracaoPlano = async (params: Record<string, any>) => {
     try {
-      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+      const template = await ApiMkDataSource.getRepository(
+        ZapSignTemplates,
+      ).findOne({
         where: { nome_servico: "Alteração de Plano", tipo: "gratis" },
       });
-      if (!template?.token_id) throw new Error("Token do template 'Alteração de Plano' não encontrado.");
+      if (!template?.token_id)
+        throw new Error(
+          "Token do template 'Alteração de Plano' não encontrado.",
+        );
 
       const zapData = await buildUniversalZapSignData(params);
 
@@ -1398,14 +1620,17 @@ class ZapSign {
       console.error("Error in createContractAlteracaoPlano:", error);
       throw error;
     }
-  }
+  };
 
   createContractWifiExtendido = async (params: Record<string, any>) => {
     try {
-      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+      const template = await ApiMkDataSource.getRepository(
+        ZapSignTemplates,
+      ).findOne({
         where: { nome_servico: "Wifi Extendido", tipo: "gratis" },
       });
-      if (!template?.token_id) throw new Error("Token do template 'Wifi Extendido' não encontrado.");
+      if (!template?.token_id)
+        throw new Error("Token do template 'Wifi Extendido' não encontrado.");
 
       const zapData = await buildUniversalZapSignData(params);
 
@@ -1437,7 +1662,7 @@ class ZapSign {
       console.error("Error in createContractWifiExtendido:", error);
       throw error;
     }
-  }
+  };
 
   /**
    * Termo de Adesão do Serviço de Valor Adicionado — usado na contratação do
@@ -1460,7 +1685,7 @@ class ZapSign {
       console.error("Error in createContratoSva:", error);
       throw error;
     }
-  }
+  };
 
   /**
    * Termo de Adesão SVA: sai quando o plano com serviço de valor adicionado
@@ -1473,14 +1698,21 @@ class ZapSign {
       console.error("Error in createTermoAdesaoSva:", error);
       throw error;
     }
-  }
+  };
 
-  createContractTrocaTitularidadeTitular = async (params: Record<string, any>) => {
+  createContractTrocaTitularidadeTitular = async (
+    params: Record<string, any>,
+  ) => {
     try {
-      const template = await ApiMkDataSource.getRepository(ZapSignTemplates).findOne({
+      const template = await ApiMkDataSource.getRepository(
+        ZapSignTemplates,
+      ).findOne({
         where: { nome_servico: "Troca de Titularidade", tipo: "gratis" },
       });
-      if (!template?.token_id) throw new Error("Token do template 'Troca de Titularidade' não encontrado.");
+      if (!template?.token_id)
+        throw new Error(
+          "Token do template 'Troca de Titularidade' não encontrado.",
+        );
 
       const zapData = await buildUniversalZapSignData({
         ...params,
@@ -1518,7 +1750,9 @@ class ZapSign {
 
       if (nomeNovo && celularNovo && docToken) {
         const phoneRaw = String(celularNovo).replace(/\D/g, "");
-        const phoneNumber = phoneRaw.startsWith("55") ? phoneRaw.slice(2) : phoneRaw;
+        const phoneNumber = phoneRaw.startsWith("55")
+          ? phoneRaw.slice(2)
+          : phoneRaw;
 
         const addSignerResponse = await axios.post(
           isSandbox
@@ -1546,19 +1780,27 @@ class ZapSign {
       console.error("Error in createContractTrocaTitularidadeTitular:", error);
       throw error;
     }
-  }
+  };
 
-  createContractTrocaTitularidadeNovoTitular = async (params: Record<string, any>) => {
+  createContractTrocaTitularidadeNovoTitular = async (
+    params: Record<string, any>,
+  ) => {
     try {
       const templateRepo = ApiMkDataSource.getRepository(ZapSignTemplates);
       const template =
         (await templateRepo.findOne({
-          where: { nome_servico: "Troca de Titularidade Novo Titular", tipo: "gratis" },
+          where: {
+            nome_servico: "Troca de Titularidade Novo Titular",
+            tipo: "gratis",
+          },
         })) ||
         (await templateRepo.findOne({
           where: { nome_servico: "Troca de Titularidade", tipo: "gratis" },
         }));
-      if (!template?.token_id) throw new Error("Token do template 'Troca de Titularidade Novo Titular' não encontrado.");
+      if (!template?.token_id)
+        throw new Error(
+          "Token do template 'Troca de Titularidade Novo Titular' não encontrado.",
+        );
 
       const zapData = await buildUniversalZapSignData(params);
 
@@ -1589,10 +1831,13 @@ class ZapSign {
       const extra = await documentoExtraDoPlano(params);
       return { ...response.data, ...extra };
     } catch (error) {
-      console.error("Error in createContractTrocaTitularidadeNovoTitular:", error);
+      console.error(
+        "Error in createContractTrocaTitularidadeNovoTitular:",
+        error,
+      );
       throw error;
     }
-  }
+  };
 
   private FormatarCidade = (cidade: string): string => {
     if (!cidade) return "";
@@ -1601,7 +1846,7 @@ class ZapSign {
       .split(" ")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
-  }
+  };
 
   public registerClientInMkAuth = async (dados: any): Promise<string> => {
     const ClientesRepository = MkauthDataSource.getRepository(ClientesEntities);
@@ -1640,7 +1885,9 @@ class ZapSign {
 
     // Garante login único. Normalmente `dados.login` já vem reservado desde a
     // geração do link/flow; aqui é só a última conferência antes de gravar.
-    const finalLogin = await reservarLoginUnico(dados.login || dados.nome || "");
+    const finalLogin = await reservarLoginUnico(
+      dados.login || dados.nome || "",
+    );
 
     const celularFormatado = (dados.telefone || dados.celular || "").replace(
       /\D/g,
@@ -1722,7 +1969,7 @@ class ZapSign {
     });
 
     return finalLogin;
-  }
+  };
 
   private updateClientAddressInMkAuth = async (login: string, dados: any) => {
     const ClientesRepository = MkauthDataSource.getRepository(ClientesEntities);
@@ -1751,7 +1998,7 @@ class ZapSign {
           : client.cep,
       });
     }
-  }
+  };
 
   private updateClientPlanInMkAuth = async (login: string, dados: any) => {
     const ClientesRepository = MkauthDataSource.getRepository(ClientesEntities);
@@ -1764,7 +2011,7 @@ class ZapSign {
         plano: dados.plano || client.plano,
       });
     }
-  }
+  };
 }
 
 export default new ZapSign();

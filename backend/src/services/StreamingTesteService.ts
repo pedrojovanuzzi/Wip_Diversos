@@ -5,6 +5,7 @@ import { StreamingAssinante } from "../entities/StreamingAssinante";
 import { SisSerContratos } from "../entities/SisSerContratos";
 import { sqlTagServico } from "./servicosAdicionaisNomes";
 import { deleteTicket } from "./WatchBrasilService";
+import { encerrarTeste } from "./streamingTesteHistorico";
 
 /** Tags de streaming em sis_ser_contratos. */
 const TIPOS_STREAMING = ["STREAMER", "STREAMER_COLAB"];
@@ -87,6 +88,10 @@ class StreamingTesteService {
     if (remover.length > 0) {
       await contratos.delete(remover.map((r) => r.id));
     }
+
+    // Guarda quantos dias o cliente chegou a usar: a linha acima some, e esse
+    // número entra no proporcional se ele contratar a Watch TV paga depois.
+    await encerrarTeste(assinante.login, "expirou");
 
     await AppDataSource.getRepository(StreamingAssinante).delete(assinante.id);
 
