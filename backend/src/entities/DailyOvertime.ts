@@ -30,6 +30,10 @@ export class DailyOvertime {
   @Column({ type: "decimal", precision: 5, scale: 2, default: 0 })
   hours100!: number;
 
+  /** Horas digitadas por um admin: o cálculo automático não sobrescreve. */
+  @Column({ type: "boolean", default: false, name: "hours_manual" })
+  hoursManual!: boolean;
+
   @Column({ type: "longtext", nullable: true })
   signature!: string;
 

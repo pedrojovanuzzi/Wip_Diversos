@@ -8,6 +8,31 @@ import { SignatureModal } from "../../../components/SignatureModal";
 import { CpfVerificationModal } from "../../../components/CpfVerificationModal";
 import { useAuth } from "../../../context/AuthContext";
 
+/** 1.3 (H.MM, 1h30) → "1:30" para o campo de edição. */
+const toHM = (v: any) => {
+  const n = Number(v) || 0;
+  if (!n) return "";
+  const h = Math.floor(n);
+  const m = Math.round((n - h) * 100);
+  return `${h}:${String(m).padStart(2, "0")}`;
+};
+
+/**
+ * "1:30", "1.30", "1,30" ou "2" → 1.3 / 2 (H.MM). Vazio vale 0.
+ * Devolve null se os minutos passarem de 59 ou o texto não for horário.
+ */
+const parseHM = (texto: string): number | null => {
+  const t = texto.trim();
+  if (!t) return 0;
+  const m = t.match(/^(\d{1,3})(?:[:.,](\d{1,2}))?$/);
+  if (!m) return null;
+  const horas = Number(m[1]);
+  // Um dígito só depois do separador é dezena: "1.3" é 1h30, como o banco guarda.
+  const minutos = m[2] ? Number(m[2].length === 1 ? `${m[2]}0` : m[2]) : 0;
+  if (minutos > 59) return null;
+  return horas + minutos / 100;
+};
+
 export const MonthlyReport = () => {
   const { user } = useAuth();
   const token = user?.token;
@@ -22,8 +47,14 @@ export const MonthlyReport = () => {
     [key: string]: string;
   }>({});
   const [overtimeData, setOvertimeData] = useState<{
-    [key: string]: { hours50: any; hours100: any };
+    [key: string]: { hours50: any; hours100: any; manual?: boolean };
   }>({});
+  const [editingOt, setEditingOt] = useState<{
+    date: string;
+    h50: string;
+    h100: string;
+  } | null>(null);
+  const [savingOt, setSavingOt] = useState(false);
   const [dayStatuses, setDayStatuses] = useState<{ [key: string]: string }>({});
   const [savingStatusDate, setSavingStatusDate] = useState<string | null>(null);
   const [monthlySignature, setMonthlySignature] = useState<string | null>(null);
@@ -93,6 +124,74 @@ export const MonthlyReport = () => {
       alert("Erro ao excluir registro.");
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handleSaveOvertime = async () => {
+    if (!editingOt || !selectedEmployee) return;
+    const h50 = parseHM(editingOt.h50);
+    const h100 = parseHM(editingOt.h100);
+    if (h50 === null || h100 === null) {
+      alert("Horas inválidas. Use o formato H:MM (ex.: 1:30), com minutos até 59.");
+      return;
+    }
+    setSavingOt(true);
+    try {
+      await axios.put(
+        `${process.env.REACT_APP_URL}/time-tracking/overtime/manual`,
+        {
+          employeeId: Number(selectedEmployee),
+          date: moment(editingOt.date, "DD/MM/YYYY").format("YYYY-MM-DD"),
+          hours50: h50,
+          hours100: h100,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setOvertimeData((prev) => ({
+        ...prev,
+        [editingOt.date]: { hours50: h50, hours100: h100, manual: true },
+      }));
+      setEditingOt(null);
+    } catch (e: any) {
+      console.error(e);
+      alert(e.response?.data?.error || "Erro ao salvar horas extras.");
+    } finally {
+      setSavingOt(false);
+    }
+  };
+
+  const handleResetOvertime = async (dateBr: string) => {
+    if (!selectedEmployee) return;
+    if (
+      !window.confirm(
+        `Voltar as horas de ${dateBr} ao cálculo automático pelas batidas? O valor digitado será perdido.`,
+      )
+    ) {
+      return;
+    }
+    setSavingOt(true);
+    try {
+      const scaleToUse =
+        moment(dateBr, "DD/MM/YYYY").day() === 6 && editScale === "8h"
+          ? "4h"
+          : editScale;
+      await axios.delete(
+        `${process.env.REACT_APP_URL}/time-tracking/overtime/manual`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          data: {
+            employeeId: Number(selectedEmployee),
+            date: moment(dateBr, "DD/MM/YYYY").format("YYYY-MM-DD"),
+            scale: scaleToUse,
+          },
+        },
+      );
+      await fetchOvertime();
+    } catch (e: any) {
+      console.error(e);
+      alert(e.response?.data?.error || "Erro ao recalcular horas extras.");
+    } finally {
+      setSavingOt(false);
     }
   };
 
@@ -206,6 +305,7 @@ export const MonthlyReport = () => {
         overtime[d] = {
           hours50: Number(r.hours50),
           hours100: Number(r.hours100),
+          manual: !!r.hoursManual,
         };
         if (r.signature) {
           signatures[d] = r.signature;
@@ -641,24 +741,119 @@ export const MonthlyReport = () => {
                         )}
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-1.5 text-center">
-                      <input
-                        readOnly
-                        type="number"
-                        className="w-full text-center bg-transparent focus:outline-none"
-                        value={currentOvertime.hours50}
-                        placeholder="-"
-                      />
-                    </td>
-                    <td className="border border-gray-300 p-1.5 text-center">
-                      <input
-                        readOnly
-                        type="number"
-                        className="w-full text-center bg-transparent focus:outline-none"
-                        value={currentOvertime.hours100}
-                        placeholder="-"
-                      />
-                    </td>
+                    {editingOt?.date === date ? (
+                      <>
+                        <td className="border border-gray-300 p-1 text-center">
+                          <input
+                            autoFocus
+                            value={editingOt.h50}
+                            onChange={(e) =>
+                              setEditingOt({ ...editingOt, h50: e.target.value })
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSaveOvertime();
+                              if (e.key === "Escape") setEditingOt(null);
+                            }}
+                            placeholder="H:MM"
+                            className="w-full rounded border border-blue-400 bg-white text-center"
+                          />
+                        </td>
+                        <td className="border border-gray-300 p-1 text-center">
+                          <div className="flex items-center gap-0.5">
+                            <input
+                              value={editingOt.h100}
+                              onChange={(e) =>
+                                setEditingOt({ ...editingOt, h100: e.target.value })
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSaveOvertime();
+                                if (e.key === "Escape") setEditingOt(null);
+                              }}
+                              placeholder="H:MM"
+                              className="w-full min-w-0 rounded border border-blue-400 bg-white text-center"
+                            />
+                            <button
+                              onClick={handleSaveOvertime}
+                              disabled={savingOt}
+                              className="font-bold text-green-700 print:hidden"
+                              title="Salvar (Enter)"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => setEditingOt(null)}
+                              disabled={savingOt}
+                              className="text-gray-500 print:hidden"
+                              title="Cancelar (Esc)"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td
+                          className={`border border-gray-300 p-1.5 text-center ${
+                            currentOvertime.manual ? "bg-amber-50 print:bg-transparent" : ""
+                          }`}
+                        >
+                          <input
+                            readOnly
+                            type="number"
+                            className="w-full text-center bg-transparent focus:outline-none"
+                            value={currentOvertime.hours50}
+                            placeholder="-"
+                          />
+                        </td>
+                        <td
+                          className={`border border-gray-300 p-1.5 text-center ${
+                            currentOvertime.manual ? "bg-amber-50 print:bg-transparent" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-0.5">
+                            <input
+                              readOnly
+                              type="number"
+                              className="w-full min-w-0 text-center bg-transparent focus:outline-none"
+                              value={currentOvertime.hours100}
+                              placeholder="-"
+                            />
+                            {canEdit && selectedEmployee && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    setEditingOt({
+                                      date,
+                                      h50: toHM(currentOvertime.hours50),
+                                      h100: toHM(currentOvertime.hours100),
+                                    })
+                                  }
+                                  className="text-blue-600 print:hidden"
+                                  title={
+                                    currentOvertime.manual
+                                      ? "Horas digitadas manualmente — editar"
+                                      : "Editar horas extras manualmente"
+                                  }
+                                >
+                                  ✎
+                                </button>
+                                {currentOvertime.manual && (
+                                  <button
+                                    onClick={() => handleResetOvertime(date)}
+                                    disabled={savingOt}
+                                    className="text-amber-700 print:hidden"
+                                    title="Valor manual. Clique para voltar ao cálculo automático pelas batidas"
+                                  >
+                                    ↺
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    )}
                     <td className="border border-gray-300 p-1.5 text-center">
                       <div className="flex gap-1 justify-center items-center h-full">
                         {dailySignatures[date] ? (

@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from "uuid";
 import { Between } from "typeorm";
 import Holidays from "date-holidays";
 import { DailyOvertime } from "../entities/DailyOvertime";
+import { descreverAcao } from "../utils/auditoria";
 
 class TimeRecordController {
   private timeRepo = AppDataSource.getRepository(TimeRecord);
@@ -224,6 +225,14 @@ class TimeRecordController {
           });
         }
 
+        // Valor digitado por admin vale até ele voltar ao automático.
+        if (overtimeEntry.hoursManual) {
+          console.log(
+            `Overtime manual mantido para ${employeeId} em ${dateStr}`,
+          );
+          return;
+        }
+
         if (isSundayOrHoliday && scale !== "12h") {
           overtimeEntry.hours100 = extraHoursFormatted;
           overtimeEntry.hours50 = 0;
@@ -304,6 +313,11 @@ class TimeRecordController {
 
     const dailyOvertimeRepo = AppDataSource.getRepository(DailyOvertime);
 
+    const manual = await dailyOvertimeRepo.findOne({
+      where: { employeeId, date: dateStr, hoursManual: true },
+    });
+    if (manual) return;
+
     if (!hasSaida) {
       const existing = await dailyOvertimeRepo.findOne({
         where: { employeeId, date: dateStr },
@@ -364,6 +378,90 @@ class TimeRecordController {
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Erro ao atualizar registro" });
+    }
+  };
+
+  /**
+   * PUT /overtime/manual — admin digita as horas extras do dia (H.MM, ex.:
+   * 1.30 = 1h30). O dia fica marcado como manual e o recálculo automático
+   * deixa de mexer nele.
+   */
+  setManualOvertime = async (req: Request, res: Response) => {
+    try {
+      const { employeeId, date, hours50, hours100 } = req.body;
+      const empId = Number(employeeId);
+      if (!empId || !/^\d{4}-\d{2}-\d{2}$/.test(String(date ?? ""))) {
+        res.status(400).json({ error: "employeeId e date (AAAA-MM-DD) são obrigatórios." });
+        return;
+      }
+
+      const h50 = Number(hours50 || 0);
+      const h100 = Number(hours100 || 0);
+      // H.MM: a parte decimal são minutos, então não pode passar de .59.
+      const valido = (v: number) =>
+        Number.isFinite(v) &&
+        v >= 0 &&
+        v < 1000 &&
+        Math.round((v - Math.floor(v)) * 100) < 60;
+      if (!valido(h50) || !valido(h100)) {
+        res.status(400).json({ error: "Horas inválidas. Use H:MM, com minutos até 59." });
+        return;
+      }
+
+      const employee = await this.employeeRepo.findOneBy({ id: empId });
+      if (!employee) {
+        res.status(404).json({ error: "Funcionário não encontrado" });
+        return;
+      }
+
+      const repo = AppDataSource.getRepository(DailyOvertime);
+      let entry = await repo.findOne({ where: { employeeId: empId, date } });
+      if (!entry) entry = repo.create({ employeeId: empId, date });
+
+      const antes = `${Number(entry.hours50 ?? 0).toFixed(2)} / ${Number(entry.hours100 ?? 0).toFixed(2)}`;
+      entry.hours50 = h50;
+      entry.hours100 = h100;
+      entry.hoursManual = true;
+      await repo.save(entry);
+
+      descreverAcao(
+        req,
+        `Horas extras de ${employee.name} em ${date}: ${antes} → ${h50.toFixed(2)} / ${h100.toFixed(2)} (50% / 100%)`,
+      );
+      res.json(entry);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Erro ao salvar horas extras" });
+    }
+  };
+
+  /** DELETE /overtime/manual — tira a marca manual e recalcula pelas batidas. */
+  clearManualOvertime = async (req: Request, res: Response) => {
+    try {
+      const { employeeId, date, scale: scaleRaw } = req.body || {};
+      const empId = Number(employeeId);
+      if (!empId || !/^\d{4}-\d{2}-\d{2}$/.test(String(date ?? ""))) {
+        res.status(400).json({ error: "employeeId e date (AAAA-MM-DD) são obrigatórios." });
+        return;
+      }
+
+      const repo = AppDataSource.getRepository(DailyOvertime);
+      const entry = await repo.findOne({ where: { employeeId: empId, date } });
+      if (entry?.hoursManual) {
+        entry.hoursManual = false;
+        await repo.save(entry);
+      }
+
+      // Meio-dia evita o dia "escorregar" por fuso ao montar o Date.
+      const dia = new Date(`${date}T12:00:00`);
+      await this.recalcDayOvertime(empId, dia, this.resolveScale(scaleRaw, dia));
+
+      const atualizado = await repo.findOne({ where: { employeeId: empId, date } });
+      descreverAcao(req, `Horas extras de ${date} (funcionário ${empId}) voltaram ao cálculo automático`);
+      res.json(atualizado);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Erro ao recalcular horas extras" });
     }
   };
 
