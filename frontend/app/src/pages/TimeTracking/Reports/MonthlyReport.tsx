@@ -49,10 +49,11 @@ export const MonthlyReport = () => {
   const [overtimeData, setOvertimeData] = useState<{
     [key: string]: { hours50: any; hours100: any; manual?: boolean };
   }>({});
-  const [editingOt, setEditingOt] = useState<{
+  // Célula de H.E. em edição: texto digitado enquanto o campo tem foco.
+  const [otDraft, setOtDraft] = useState<{
     date: string;
-    h50: string;
-    h100: string;
+    field: "hours50" | "hours100";
+    text: string;
   } | null>(null);
   const [savingOt, setSavingOt] = useState(false);
   const [dayStatuses, setDayStatuses] = useState<{ [key: string]: string }>({});
@@ -127,37 +128,128 @@ export const MonthlyReport = () => {
     }
   };
 
+  /**
+   * Salva a célula em edição (Enter ou ao sair do campo). Só chama a API se
+   * o valor mudou; a outra coluna do dia vai junto com o valor que já tinha.
+   */
   const handleSaveOvertime = async () => {
-    if (!editingOt || !selectedEmployee) return;
-    const h50 = parseHM(editingOt.h50);
-    const h100 = parseHM(editingOt.h100);
-    if (h50 === null || h100 === null) {
+    const draft = otDraft;
+    if (!draft || !selectedEmployee) return;
+    const valor = parseHM(draft.text);
+    if (valor === null) {
+      setOtDraft(null);
       alert("Horas inválidas. Use o formato H:MM (ex.: 1:30), com minutos até 59.");
       return;
     }
+    const atual = overtimeData[draft.date] || { hours50: 0, hours100: 0 };
+    if ((Number(atual[draft.field]) || 0) === valor) {
+      setOtDraft(null);
+      return;
+    }
+    const novo = {
+      hours50: Number(atual.hours50) || 0,
+      hours100: Number(atual.hours100) || 0,
+      [draft.field]: valor,
+    };
     setSavingOt(true);
     try {
       await axios.put(
         `${process.env.REACT_APP_URL}/time-tracking/overtime/manual`,
         {
           employeeId: Number(selectedEmployee),
-          date: moment(editingOt.date, "DD/MM/YYYY").format("YYYY-MM-DD"),
-          hours50: h50,
-          hours100: h100,
+          date: moment(draft.date, "DD/MM/YYYY").format("YYYY-MM-DD"),
+          hours50: novo.hours50,
+          hours100: novo.hours100,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setOvertimeData((prev) => ({
         ...prev,
-        [editingOt.date]: { hours50: h50, hours100: h100, manual: true },
+        [draft.date]: { ...novo, manual: true },
       }));
-      setEditingOt(null);
+      setOtDraft(null);
     } catch (e: any) {
       console.error(e);
       alert(e.response?.data?.error || "Erro ao salvar horas extras.");
     } finally {
       setSavingOt(false);
     }
+  };
+
+  // Esc tira o foco para cancelar; o onBlur não pode salvar nesse caso.
+  const cancelOtRef = useRef(false);
+
+  /** Célula de H.E.: admin clica e digita; os demais só leem. */
+  const renderOtCell = (
+    date: string,
+    field: "hours50" | "hours100",
+    current: { hours50: any; hours100: any; manual?: boolean },
+  ) => {
+    const editando = otDraft?.date === date && otDraft.field === field;
+    const texto = editando ? otDraft!.text : toHM(current[field]);
+    return (
+      <td
+        className={`border border-gray-300 p-1 text-center ${
+          current.manual ? "bg-amber-50 print:bg-transparent" : ""
+        }`}
+      >
+        <div className="flex items-center justify-center gap-0.5">
+          <input
+            type="text"
+            inputMode="decimal"
+            readOnly={!canEdit || !selectedEmployee}
+            disabled={savingOt && editando}
+            value={texto}
+            placeholder="-"
+            title={
+              canEdit
+                ? current.manual
+                  ? "Valor digitado manualmente. Clique para alterar (H:MM)"
+                  : "Clique para digitar as horas (H:MM)"
+                : undefined
+            }
+            onFocus={() => {
+              if (!canEdit || !selectedEmployee) return;
+              setOtDraft({ date, field, text: toHM(current[field]) });
+            }}
+            onChange={(e) => {
+              if (!editando) return;
+              setOtDraft({ date, field, text: e.target.value });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") {
+                cancelOtRef.current = true;
+                e.currentTarget.blur();
+              }
+            }}
+            onBlur={() => {
+              if (cancelOtRef.current) {
+                cancelOtRef.current = false;
+                setOtDraft(null);
+                return;
+              }
+              if (editando) handleSaveOvertime();
+            }}
+            className={`w-full min-w-[2.75rem] bg-transparent text-center focus:outline-none ${
+              canEdit
+                ? "cursor-text rounded hover:bg-blue-50 focus:bg-white focus:ring-1 focus:ring-blue-400 print:hover:bg-transparent"
+                : ""
+            }`}
+          />
+          {canEdit && field === "hours100" && current.manual && (
+            <button
+              onClick={() => handleResetOvertime(date)}
+              disabled={savingOt}
+              className="text-amber-700 print:hidden"
+              title="Valor manual. Clique para voltar ao cálculo automático pelas batidas"
+            >
+              ↺
+            </button>
+          )}
+        </div>
+      </td>
+    );
   };
 
   const handleResetOvertime = async (dateBr: string) => {
@@ -741,119 +833,8 @@ export const MonthlyReport = () => {
                         )}
                       </div>
                     </td>
-                    {editingOt?.date === date ? (
-                      <>
-                        <td className="border border-gray-300 p-1 text-center">
-                          <input
-                            autoFocus
-                            value={editingOt.h50}
-                            onChange={(e) =>
-                              setEditingOt({ ...editingOt, h50: e.target.value })
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleSaveOvertime();
-                              if (e.key === "Escape") setEditingOt(null);
-                            }}
-                            placeholder="H:MM"
-                            className="w-full rounded border border-blue-400 bg-white text-center"
-                          />
-                        </td>
-                        <td className="border border-gray-300 p-1 text-center">
-                          <div className="flex items-center gap-0.5">
-                            <input
-                              value={editingOt.h100}
-                              onChange={(e) =>
-                                setEditingOt({ ...editingOt, h100: e.target.value })
-                              }
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleSaveOvertime();
-                                if (e.key === "Escape") setEditingOt(null);
-                              }}
-                              placeholder="H:MM"
-                              className="w-full min-w-0 rounded border border-blue-400 bg-white text-center"
-                            />
-                            <button
-                              onClick={handleSaveOvertime}
-                              disabled={savingOt}
-                              className="font-bold text-green-700 print:hidden"
-                              title="Salvar (Enter)"
-                            >
-                              ✓
-                            </button>
-                            <button
-                              onClick={() => setEditingOt(null)}
-                              disabled={savingOt}
-                              className="text-gray-500 print:hidden"
-                              title="Cancelar (Esc)"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td
-                          className={`border border-gray-300 p-1.5 text-center ${
-                            currentOvertime.manual ? "bg-amber-50 print:bg-transparent" : ""
-                          }`}
-                        >
-                          <input
-                            readOnly
-                            type="number"
-                            className="w-full text-center bg-transparent focus:outline-none"
-                            value={currentOvertime.hours50}
-                            placeholder="-"
-                          />
-                        </td>
-                        <td
-                          className={`border border-gray-300 p-1.5 text-center ${
-                            currentOvertime.manual ? "bg-amber-50 print:bg-transparent" : ""
-                          }`}
-                        >
-                          <div className="flex items-center gap-0.5">
-                            <input
-                              readOnly
-                              type="number"
-                              className="w-full min-w-0 text-center bg-transparent focus:outline-none"
-                              value={currentOvertime.hours100}
-                              placeholder="-"
-                            />
-                            {canEdit && selectedEmployee && (
-                              <>
-                                <button
-                                  onClick={() =>
-                                    setEditingOt({
-                                      date,
-                                      h50: toHM(currentOvertime.hours50),
-                                      h100: toHM(currentOvertime.hours100),
-                                    })
-                                  }
-                                  className="text-blue-600 print:hidden"
-                                  title={
-                                    currentOvertime.manual
-                                      ? "Horas digitadas manualmente — editar"
-                                      : "Editar horas extras manualmente"
-                                  }
-                                >
-                                  ✎
-                                </button>
-                                {currentOvertime.manual && (
-                                  <button
-                                    onClick={() => handleResetOvertime(date)}
-                                    disabled={savingOt}
-                                    className="text-amber-700 print:hidden"
-                                    title="Valor manual. Clique para voltar ao cálculo automático pelas batidas"
-                                  >
-                                    ↺
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </>
-                    )}
+                    {renderOtCell(date, "hours50", currentOvertime)}
+                    {renderOtCell(date, "hours100", currentOvertime)}
                     <td className="border border-gray-300 p-1.5 text-center">
                       <div className="flex gap-1 justify-center items-center h-full">
                         {dailySignatures[date] ? (
