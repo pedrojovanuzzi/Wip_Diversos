@@ -841,7 +841,9 @@ export const MonthlyReport = () => {
                           <img
                             src={dailySignatures[date]}
                             alt="Assinatura"
-                            className="scale-[200%] h-4 w-20 object-contain"
+                            // Ampliada, ela cobre as colunas de H.E. ao lado:
+                            // sem pointer-events o clique passa para elas.
+                            className="pointer-events-none scale-[200%] h-4 w-20 object-contain"
                           />
                         ) : (
                           <span className="text-[8px] text-gray-400 italic"></span>
