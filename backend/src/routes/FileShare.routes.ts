@@ -4,6 +4,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import FileShareController, { FILESHARE_DIR } from "../controller/FileShare";
+import { protegido } from "../middleware/PermissionGuard";
 
 // Garante que a pasta de armazenamento exista
 fs.mkdirSync(FILESHARE_DIR, { recursive: true });
@@ -25,9 +26,13 @@ const controller = new FileShareController();
 
 const router: Router = Router();
 
-router.post("/upload", upload.single("file"), controller.upload);
-router.get("/list", controller.list);
+// O guard vem antes do multer: sem token o arquivo nem chega a ser gravado.
+router.post("/upload", protegido(2), upload.single("file"), controller.upload);
+router.get("/list", protegido(2), controller.list);
+router.delete("/:id", protegido(2), controller.remove);
+
+// Público de propósito: é o link enviado ao cliente. O token aleatório de
+// 16 bytes é o segredo.
 router.get("/d/:token", controller.download);
-router.delete("/:id", controller.remove);
 
 export default router;

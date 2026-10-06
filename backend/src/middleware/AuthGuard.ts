@@ -47,4 +47,31 @@ async function AuthGuard(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+/**
+ * Para rotas públicas que mostram mais dados a quem está logado: preenche
+ * `req.user` se vier um token válido e segue em frente de qualquer jeito.
+ */
+export async function AuthOpcional(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+) {
+  const AuthHeader = req.headers["authorization"];
+  const token =
+    (AuthHeader && AuthHeader.split(" ")[1]) || (req.query.token as string);
+
+  if (token) {
+    try {
+      const verified = jwt.verify(token, jwtSecret) as JwtPayload;
+      req.user = await DataSource.getRepository(User).findOne({
+        where: { id: verified.id },
+        select: ["id", "login", "permission"],
+      });
+    } catch {
+      req.user = null;
+    }
+  }
+  next();
+}
+
 export default AuthGuard;

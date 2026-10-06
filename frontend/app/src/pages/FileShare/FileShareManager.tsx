@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { NavBar } from "../../components/navbar/NavBar";
+import { useAuth } from "../../context/AuthContext";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import {
   BsTrash,
@@ -32,6 +33,8 @@ function formatSize(bytes: number): string {
 
 export const FileShareManager: React.FC = () => {
   const base = process.env.REACT_APP_URL; // ex.: http://localhost:3000/api
+  const { user } = useAuth();
+  const authHeader = { Authorization: `Bearer ${user?.token}` };
 
   const [items, setItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -55,7 +58,9 @@ export const FileShareManager: React.FC = () => {
   const fetchList = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${base}/files/list`);
+      const res = await axios.get(`${base}/files/list`, {
+        headers: authHeader,
+      });
       setItems(res.data || []);
     } catch (e: any) {
       flash(e?.response?.data?.erro || "Erro ao carregar arquivos", "err");
@@ -77,7 +82,7 @@ export const FileShareManager: React.FC = () => {
       const form = new FormData();
       form.append("file", file);
       await axios.post(`${base}/files/upload`, form, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: { ...authHeader, "Content-Type": "multipart/form-data" },
         onUploadProgress: (ev) => {
           if (ev.total) {
             setProgress(Math.round((ev.loaded * 100) / ev.total));
@@ -128,7 +133,7 @@ export const FileShareManager: React.FC = () => {
     if (!window.confirm(`Excluir "${item.originalName}"? O link deixará de funcionar.`))
       return;
     try {
-      await axios.delete(`${base}/files/${item.id}`);
+      await axios.delete(`${base}/files/${item.id}`, { headers: authHeader });
       setItems((prev) => prev.filter((i) => i.id !== item.id));
       flash("Arquivo excluído.", "ok");
     } catch (e: any) {

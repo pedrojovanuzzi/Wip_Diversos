@@ -20,7 +20,20 @@ class EmployeeController {
   list = async (req: Request, res: Response) => {
     try {
       const employees = await this.employeeRepo.find();
-      res.json(employees);
+      // Rota pública (tela de ponto e feedback): o CPF é a "senha" do ponto,
+      // então só administrador recebe.
+      if ((req.user?.permission ?? 0) >= 5) {
+        res.json(employees);
+        return;
+      }
+      res.json(
+        employees.map(({ id, name, role, active }) => ({
+          id,
+          name,
+          role,
+          active,
+        })),
+      );
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Error listing employees" });

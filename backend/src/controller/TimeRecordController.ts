@@ -513,7 +513,20 @@ class TimeRecordController {
         order: { timestamp: "ASC" },
       });
 
-      res.json(records);
+      // Rota pública (tela de ponto): sem administrador logado, devolve só o
+      // que a tela usa, sem a localização e a foto do funcionário.
+      if ((req.user?.permission ?? 0) >= 5) {
+        res.json(records);
+        return;
+      }
+      res.json(
+        records.map(({ id, employeeId, timestamp, type }) => ({
+          id,
+          employeeId,
+          timestamp,
+          type,
+        })),
+      );
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Error fetching daily records" });

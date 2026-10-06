@@ -58,6 +58,10 @@ export class App {
 
   constructor() {
     this.server = express();
+    // Atrás do nginx: req.ip passa a ser o IP que o proxy viu, e não o que o
+    // cliente escreveu no X-Forwarded-For. TRUST_PROXY = quantos proxies há
+    // na frente (padrão 1, só o nginx).
+    this.server.set("trust proxy", Number(process.env.TRUST_PROXY ?? 1));
     this.middleware();
     this.router();
     this.agendarBackup();

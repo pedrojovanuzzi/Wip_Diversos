@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import TvWip from "../controller/TvWip";
 import TvWipApp from "../controller/TvWipApp";
-import AuthGuard from "../middleware/AuthGuard";
+import { protegido } from "../middleware/PermissionGuard";
 import multer from "multer";
 
 /**
@@ -18,6 +18,9 @@ const logo = multer({
 });
 
 const router: Router = Router();
+
+// Níveis iguais aos das telas no frontend (App.tsx): operador = 2, admin = 5.
+const operador = protegido(2);
 
 /**
  * A rota de autenticação é consumida pelo APLICATIVO da TV, que não tem login
@@ -79,32 +82,32 @@ router.get("/app/notificacoes", TvWipApp.sessao, TvWipApp.notificacoes);
 router.get("/app/notificacoes/publicas", ChaveDoApp, TvWipApp.notificacoesPublicas);
 
 // ---- Painel interno ----
-router.get("/", AuthGuard, TvWip.listar);
-router.post("/avulso", AuthGuard, TvWip.criarAvulso);
-router.delete("/avulso/:login", AuthGuard, TvWip.removerAvulso);
-router.post("/desativar", AuthGuard, TvWip.desativar);
-router.post("/reativar", AuthGuard, TvWip.reativar);
-router.post("/sincronizar", AuthGuard, TvWip.sincronizar);
+router.get("/", operador, TvWip.listar);
+router.post("/avulso", operador, TvWip.criarAvulso);
+router.delete("/avulso/:login", operador, TvWip.removerAvulso);
+router.post("/desativar", operador, TvWip.desativar);
+router.post("/reativar", operador, TvWip.reativar);
+router.post("/sincronizar", operador, TvWip.sincronizar);
 
 // ---- Canais e pacotes ----
-router.get("/canais", AuthGuard, TvWip.listarCanais);
-router.get("/canais/epg", AuthGuard, TvWip.epgDeVarios);
-router.get("/canais/:idcanal/epg", AuthGuard, TvWip.epgDoCanal);
-router.post("/canais", AuthGuard, logo.any(), TvWip.criarCanal);
-router.post("/canais/:idcanal/logo", AuthGuard, logo.any(), TvWip.enviarLogo);
-router.delete("/canais/:idcanal", AuthGuard, TvWip.removerCanal);
-router.put("/canais/:idcanal", AuthGuard, TvWip.salvarCanal);
-router.get("/pacotes", AuthGuard, TvWip.listarPacotes);
-router.post("/pacotes", AuthGuard, TvWip.salvarPacote);
-router.delete("/pacotes/:id", AuthGuard, TvWip.removerPacote);
-router.post("/pacotes/atribuir", AuthGuard, TvWip.atribuirPacotes);
-router.get("/conta/:login", AuthGuard, TvWip.detalhesDaConta);
-router.post("/conta/:login/excecao", AuthGuard, TvWip.definirExcecao);
+router.get("/canais", operador, TvWip.listarCanais);
+router.get("/canais/epg", operador, TvWip.epgDeVarios);
+router.get("/canais/:idcanal/epg", operador, TvWip.epgDoCanal);
+router.post("/canais", operador, logo.any(), TvWip.criarCanal);
+router.post("/canais/:idcanal/logo", operador, logo.any(), TvWip.enviarLogo);
+router.delete("/canais/:idcanal", operador, TvWip.removerCanal);
+router.put("/canais/:idcanal", operador, TvWip.salvarCanal);
+router.get("/pacotes", operador, TvWip.listarPacotes);
+router.post("/pacotes", operador, TvWip.salvarPacote);
+router.delete("/pacotes/:id", operador, TvWip.removerPacote);
+router.post("/pacotes/atribuir", operador, TvWip.atribuirPacotes);
+router.get("/conta/:login", operador, TvWip.detalhesDaConta);
+router.post("/conta/:login/excecao", operador, TvWip.definirExcecao);
 
 // ---- Notificações do app ----
-router.get("/notificacoes", AuthGuard, TvWip.listarNotificacoes);
-router.post("/notificacoes", AuthGuard, TvWip.criarNotificacao);
-router.put("/notificacoes/:id/ativo", AuthGuard, TvWip.ativarNotificacao);
-router.delete("/notificacoes/:id", AuthGuard, TvWip.removerNotificacao);
+router.get("/notificacoes", operador, TvWip.listarNotificacoes);
+router.post("/notificacoes", operador, TvWip.criarNotificacao);
+router.put("/notificacoes/:id/ativo", operador, TvWip.ativarNotificacao);
+router.delete("/notificacoes/:id", operador, TvWip.removerNotificacao);
 
 export default router;

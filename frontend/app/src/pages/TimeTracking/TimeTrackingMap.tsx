@@ -73,9 +73,15 @@ export const TimeTrackingMap = () => {
 
   const fetchData = async () => {
     try {
+      // O state `token` ainda está vazio no primeiro render: lê do cookie.
+      let authToken = "";
+      try {
+        authToken = JSON.parse(Cookies.get("user") || '""');
+      } catch {}
+      const auth = { headers: { Authorization: `Bearer ${authToken}` } };
       const [recordsRes, employeesRes] = await Promise.all([
-        axios.get(`${process.env.REACT_APP_URL}/time-tracking/map-records`),
-        axios.get(`${process.env.REACT_APP_URL}/time-tracking/employee`),
+        axios.get(`${process.env.REACT_APP_URL}/time-tracking/map-records`, auth),
+        axios.get(`${process.env.REACT_APP_URL}/time-tracking/employee`, auth),
       ]);
       setRecords(recordsRes.data);
       setEmployees(employeesRes.data);

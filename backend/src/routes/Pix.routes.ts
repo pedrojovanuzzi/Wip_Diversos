@@ -1,107 +1,112 @@
 import { Router } from "express";
 import Pix from "../controller/Pix";
 import AuthGuard from "../middleware/AuthGuard";
+import { protegido } from "../middleware/PermissionGuard";
 import { semAuditoria } from "../utils/auditoria";
 
 const pixController = new Pix();
 
 const router: Router = Router();
 
+// Níveis iguais aos das telas no frontend (App.tsx): operador = 2, admin = 5.
+const operador = protegido(2);
+const admin = protegido(5);
+
 //Codigo Legado que foi adaptado para typescript
-router.post("/gerador", AuthGuard, pixController.gerarPix);
-router.get("/gerador", AuthGuard, pixController.gerarPix);
+router.post("/gerador", operador, pixController.gerarPix);
+router.get("/gerador", operador, pixController.gerarPix);
 
-router.post("/geradorAll", AuthGuard, pixController.gerarPixAll);
-router.get("/geradorAll", AuthGuard, pixController.gerarPixAll);
+router.post("/geradorAll", operador, pixController.gerarPixAll);
+router.get("/geradorAll", operador, pixController.gerarPixAll);
 
-router.post("/geradorAberto", AuthGuard, pixController.gerarPixAberto);
-router.get("/geradorAberto", AuthGuard, pixController.gerarPixAberto);
+router.post("/geradorAberto", operador, pixController.gerarPixAberto);
+router.get("/geradorAberto", operador, pixController.gerarPixAberto);
 
-router.post("/geradorTitulos", AuthGuard, pixController.gerarPixVariasContas);
-router.get("/geradorTitulos", AuthGuard, pixController.gerarPixVariasContas);
+router.post("/geradorTitulos", operador, pixController.gerarPixVariasContas);
+router.get("/geradorTitulos", operador, pixController.gerarPixVariasContas);
 
-router.post("/criarPixAutomatico", AuthGuard, pixController.PixAutomaticoCriar);
+router.post("/criarPixAutomatico", operador, pixController.PixAutomaticoCriar);
 router.post(
   "/criarCobrancaPixAutomatico",
-  AuthGuard,
+  admin,
   pixController.pegarUltimoBoletoGerarPixAutomaticoSimular,
 );
-router.post("/cancelarCobranca", AuthGuard, pixController.cancelarCobranca);
-router.post("/buscarCobranca", AuthGuard, semAuditoria, pixController.buscarCobranca);
+router.post("/cancelarCobranca", admin, pixController.cancelarCobranca);
+router.post("/buscarCobranca", operador, semAuditoria, pixController.buscarCobranca);
 router.post(
   "/listarCobrancasPixAutomatico",
-  AuthGuard,
+  operador,
   pixController.listarCobrancasPixAutomatico,
 );
 router.post(
   "/retentativaCobranca",
-  AuthGuard,
+  operador,
   pixController.solicitarRetentativaCobranca,
 );
 router.post(
   "/buscarSolicitacaoRecorrencia",
-  AuthGuard,
+  operador,
   pixController.buscarSolicitacaoRecorrencia,
 );
 router.post(
   "/cancelarSolicitacaoRecorrencia",
-  AuthGuard,
+  operador,
   pixController.cancelarSolicitacaoRecorrencia,
 );
 
-router.post("/criarWebhookPix", AuthGuard, pixController.AlterarWebhook);
+router.post("/criarWebhookPix", admin, pixController.AlterarWebhook);
 router.post(
   "/criarWebhookPixAutomatico",
-  AuthGuard,
+  admin,
   pixController.AlterarWebhookPixAutomatico,
 );
 router.post(
   "/criarWebhookPixAutomaticoRecurrency",
-  AuthGuard,
+  admin,
   pixController.AlterarWebhookPixAutomaticoRecorrencia,
 );
 router.post(
   "/consultarWebhooksPixAutomatico",
-  AuthGuard,
+  admin,
   pixController.consultarWebhooksPixAutomatico,
 );
 router.post(
   "/conciliarPixAutomatico",
-  AuthGuard,
+  operador,
   pixController.conciliarPixAutomatico,
 );
 router.post(
   "/gerarCobrancasDoMes",
-  AuthGuard,
+  admin,
   pixController.gerarCobrancasDoMes,
 );
 
 router.post(
   "/getPixAutomaticoClients",
-  AuthGuard,
+  operador,
   pixController.listaPixAutomatico,
 );
 router.post(
   "/getPixAutomaticoOneClient",
-  AuthGuard,
+  operador,
   pixController.listarPixAutomaticoUmCliente,
 );
 
 router.post(
   "/atualizarPixAutomaticoClients",
-  AuthGuard,
+  operador,
   pixController.atualizarPixAutomatico,
 );
 
 router.post(
   "/simularPagamento",
-  AuthGuard,
+  admin,
   pixController.simularPagamentoWebhookPixAutomatico,
 );
 
 router.get(
   "/dadosClientePixAutomatico",
-  AuthGuard,
+  operador,
   pixController.dadosClientePixAutomatico,
 );
 router.get(
@@ -109,11 +114,11 @@ router.get(
   AuthGuard,
   pixController.notificacoesPagamentos,
 );
-router.post("/BuscarPixPago", AuthGuard, semAuditoria, pixController.BuscarPixPago);
-router.post("/BuscarPixPagoData", AuthGuard, semAuditoria, pixController.BuscarPixPagoData);
+router.post("/BuscarPixPago", operador, semAuditoria, pixController.BuscarPixPago);
+router.post("/BuscarPixPagoData", operador, semAuditoria, pixController.BuscarPixPagoData);
 router.post(
   "/ReenviarNotificacoes",
-  AuthGuard,
+  admin,
   pixController.ReenviarNotificacoes,
 );
 
