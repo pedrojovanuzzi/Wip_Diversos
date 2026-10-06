@@ -48,6 +48,27 @@ TimeTrackingRoutes.post("/overtime", DailyOvertimeController.save);
 TimeTrackingRoutes.post("/signature", DailyOvertimeController.saveSignature);
 TimeTrackingRoutes.post("/day-status", DailyOvertimeController.saveDayStatus);
 
+// Ajuste manual das horas extras pelo relatório: só administradores.
+const somenteAdmin = (req: any, res: any, next: any) => {
+  if ((req.user?.permission ?? 0) < 5) {
+    res.status(403).json({ error: "Permissão insuficiente." });
+    return;
+  }
+  next();
+};
+TimeTrackingRoutes.put(
+  "/overtime/manual",
+  AuthGuard,
+  somenteAdmin,
+  TimeRecordController.setManualOvertime,
+);
+TimeTrackingRoutes.delete(
+  "/overtime/manual",
+  AuthGuard,
+  somenteAdmin,
+  TimeRecordController.clearManualOvertime,
+);
+
 TimeTrackingRoutes.get(
   "/overtime/:employeeId/:month/:year",
   DailyOvertimeController.getByMonth,
