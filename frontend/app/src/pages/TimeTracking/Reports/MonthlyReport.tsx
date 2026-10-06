@@ -371,7 +371,9 @@ export const MonthlyReport = () => {
     try {
       const url = `${process.env.REACT_APP_URL}/time-tracking/employee`;
       console.log("Fetching employees from:", url);
-      const res = await axios.get(url);
+      const res = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       console.log("Employees fetched:", res.data);
       const sorted = [...res.data].sort(
         (a: any, b: any) => Number(a.id) - Number(b.id)
@@ -387,6 +389,7 @@ export const MonthlyReport = () => {
       if (!selectedEmployee) return;
       const res = await axios.get(
         `${process.env.REACT_APP_URL}/time-tracking/overtime/${selectedEmployee}/${month}/${year}`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       const overtime: any = {};
       const signatures: any = {};
@@ -459,7 +462,9 @@ export const MonthlyReport = () => {
       const url = `${process.env.REACT_APP_URL}/time-tracking/records/${selectedEmployee}`;
       console.log("Fetching records from:", url);
 
-      const res = await axios.get(url);
+      const res = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       console.log("Records fetched:", res.data);
       setRecords(res.data);
       if (res.data.length === 0) {

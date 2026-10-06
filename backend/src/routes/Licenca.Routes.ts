@@ -1,14 +1,17 @@
 import { Router } from "express";
 import LicencaController from "../controller/LicencaController";
 import LicencaMensalidadeController from "../controller/LicencaMensalidadeController";
-import AuthGuard from "../middleware/AuthGuard";
+import { protegido } from "../middleware/PermissionGuard";
 
 const Licenca = Router();
 
-Licenca.post("/criar", AuthGuard, LicencaController.criarLicenca);
-Licenca.get("/listar", AuthGuard, LicencaController.listarLicencas);
-Licenca.put("/status/:id", AuthGuard, LicencaController.atualizarStatus);
-Licenca.put("/:id", AuthGuard, LicencaController.atualizarLicenca);
+// Níveis iguais aos das telas no frontend (App.tsx): operador = 2, admin = 5.
+const admin = protegido(5);
+
+Licenca.post("/criar", admin, LicencaController.criarLicenca);
+Licenca.get("/listar", admin, LicencaController.listarLicencas);
+Licenca.put("/status/:id", admin, LicencaController.atualizarStatus);
+Licenca.put("/:id", admin, LicencaController.atualizarLicenca);
 Licenca.get("/verificar", LicencaController.verificarLicenca); // GET para consulta simples
 Licenca.post("/verificar", LicencaController.verificarLicenca); // POST para enviar dados mais complexos se precisar
 Licenca.post("/recuperar-chave", LicencaController.recuperarChaveLicenca);
@@ -16,81 +19,81 @@ Licenca.post("/recuperar-chave", LicencaController.recuperarChaveLicenca);
 // Mensalidades das licenças (não passam pelo MKAuth)
 Licenca.get(
   "/mensalidades/config",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.listarConfiguracoes,
 );
 Licenca.post(
   "/mensalidades/config",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.salvarConfiguracao,
 );
 Licenca.delete(
   "/mensalidades/config/:id",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.removerConfiguracao,
 );
 Licenca.get(
   "/mensalidades",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.listarMensalidades,
 );
 Licenca.post(
   "/mensalidades/gerar",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.gerarMensalidades,
 );
 Licenca.post(
   "/mensalidades/:id/pix",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.gerarPix,
 );
 Licenca.post(
   "/mensalidades/:id/nfse",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.emitirNfse,
 );
 Licenca.get(
   "/mensalidades/ultimo-rps",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.ultimoRps,
 );
 Licenca.post(
   "/mensalidades/:id/cancelar-nfse",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.cancelarNfse,
 );
 Licenca.post(
   "/mensalidades/:id/desvincular-nfse",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.desvincularNfse,
 );
 Licenca.post(
   "/mensalidades/:id/vincular-nfse",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.vincularNfse,
 );
 Licenca.post(
   "/mensalidades/:id/baixar",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.baixar,
 );
 Licenca.post(
   "/mensalidades/:id/reabrir",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.reabrir,
 );
 Licenca.post(
   "/mensalidades/:id/cancelar",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.cancelar,
 );
 Licenca.delete(
   "/mensalidades/:id",
-  AuthGuard,
+  admin,
   LicencaMensalidadeController.remover,
 );
 
 // Deixa por último: senão "/mensalidades" cairia aqui como se fosse um id.
-Licenca.delete("/:id", AuthGuard, LicencaController.removerLicenca);
+Licenca.delete("/:id", admin, LicencaController.removerLicenca);
 
 export default Licenca;

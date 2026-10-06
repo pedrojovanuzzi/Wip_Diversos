@@ -80,12 +80,20 @@ function serializarDados(dados: unknown): string | null {
   }
 }
 
+/**
+ * IP real de quem fez a requisição. Não lê o X-Forwarded-For na mão: o
+ * primeiro valor dele é escrito pelo cliente e forjável. Com o `trust proxy`
+ * do app.ts, `req.ip` já vem resolvido a partir do que o nginx anexou.
+ * CF-Connecting-IP só vale com ATRAS_DA_CLOUDFLARE=true; sem Cloudflare na
+ * frente, qualquer um manda esse cabeçalho.
+ */
 function ipDe(req: Request): string | null {
-  const encaminhado = req.headers["x-forwarded-for"];
+  const cf =
+    process.env.ATRAS_DA_CLOUDFLARE === "true"
+      ? req.headers["cf-connecting-ip"]
+      : undefined;
   const ip =
-    (Array.isArray(encaminhado) ? encaminhado[0] : encaminhado)
-      ?.split(",")[0]
-      .trim() ||
+    (Array.isArray(cf) ? cf[0] : cf)?.trim() ||
     req.ip ||
     req.socket?.remoteAddress ||
     null;

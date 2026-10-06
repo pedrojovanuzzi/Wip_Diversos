@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import NFSE from "../controller/NFSE";
-import AuthGuard from "../middleware/AuthGuard";
+import { protegido } from "../middleware/PermissionGuard";
 import { semAuditoria } from "../utils/auditoria";
 import multer from "multer";
 import path from "path";
@@ -37,28 +37,32 @@ const upload = multer({
 
 const router: Router = Router();
 
-router.post("/", NFSE.iniciar.bind(NFSE));
+// Níveis iguais aos das telas no frontend (App.tsx): operador = 2, admin = 5.
+const operador = protegido(2);
+const admin = protegido(5);
+
+router.post("/", operador, NFSE.iniciar.bind(NFSE));
 // router.post('/cancelar', NFSE.cancelarRPS.bind(NFSE));
 // router.get('/consultar', NFSE.consultarRPS.bind(NFSE));
 
-router.post("/BuscarClientes", AuthGuard, semAuditoria, NFSE.BuscarClientes);
+router.post("/BuscarClientes", operador, semAuditoria, NFSE.BuscarClientes);
 
-router.post("/cancelarNfse", AuthGuard, NFSE.cancelarNfse.bind(NFSE));
+router.post("/cancelarNfse", admin, NFSE.cancelarNfse.bind(NFSE));
 
-router.post("/BuscarNSFE", AuthGuard, semAuditoria, NFSE.BuscarNSFE);
-router.get("/ultimoRps", AuthGuard, NFSE.ultimoRps);
+router.post("/BuscarNSFE", operador, semAuditoria, NFSE.BuscarNSFE);
+router.get("/ultimoRps", operador, NFSE.ultimoRps);
 
-router.post("/GerarNfseAvulsa", AuthGuard, NFSE.GerarNfseAvulsa);
+router.post("/GerarNfseAvulsa", operador, NFSE.GerarNfseAvulsa);
 
-router.post("/BuscarClientesServicos", AuthGuard, semAuditoria, NFSE.BuscarClientesServicos);
-router.post("/EmitirNfseServicos", AuthGuard, NFSE.EmitirNfseServicos);
+router.post("/BuscarClientesServicos", operador, semAuditoria, NFSE.BuscarClientesServicos);
+router.post("/EmitirNfseServicos", operador, NFSE.EmitirNfseServicos);
 
-router.post("/imprimirNFSE", AuthGuard, NFSE.imprimirNFSE);
+router.post("/imprimirNFSE", operador, NFSE.imprimirNFSE);
 
-router.post("/setSessionPassword", AuthGuard, NFSE.setPassword);
+router.post("/setSessionPassword", operador, NFSE.setPassword);
 
 // AuthGuard ANTES do multer — na ordem anterior o arquivo era gravado em disco
 // mesmo sem token válido.
-router.post("/upload", AuthGuard, upload.any(), NFSE.uploadCertificado);
+router.post("/upload", operador, upload.any(), NFSE.uploadCertificado);
 
 export default router;

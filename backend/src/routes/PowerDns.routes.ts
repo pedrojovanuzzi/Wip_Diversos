@@ -1,5 +1,5 @@
 import { Router } from "express";
-import AuthGuard from "../middleware/AuthGuard";
+import { protegido } from "../middleware/PermissionGuard";
 import PowerDNS from "../controller/PowerDns";
 
 import path from "path";
@@ -22,28 +22,31 @@ const powerdns = new PowerDNS();
 
 const router: Router = Router();
 
+// Níveis iguais aos das telas no frontend (App.tsx): operador = 2, admin = 5.
+const operador = protegido(2);
+
 router.post(
   "/inserirPdf",
-  AuthGuard,
+  operador,
   upload.single("file"),
   powerdns.inserirPdf.bind(powerdns),
 );
 router.post(
   "/removerPdf",
-  AuthGuard,
+  operador,
   upload.single("file"),
   powerdns.removerPdf.bind(powerdns),
 );
 router.post(
   "/inserirDominio",
-  AuthGuard,
+  operador,
   powerdns.inserirDominio.bind(powerdns),
 );
 router.post(
   "/removerDominio",
-  AuthGuard,
+  operador,
   powerdns.removerDominio.bind(powerdns),
 );
-router.get("/obterDominios", AuthGuard, powerdns.obterDominios.bind(powerdns));
+router.get("/obterDominios", operador, powerdns.obterDominios.bind(powerdns));
 
 export default router;

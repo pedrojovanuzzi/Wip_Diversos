@@ -206,7 +206,16 @@ function App() {
               )
             }
           />
-          <Route path="/arquivos" element={<FileShareManager />} />
+          <Route
+            path="/arquivos"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <FileShareManager />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
           <Route path="/s/:token" element={<SolicitacaoServicoPublica />} />
           <Route
             path="/servicos/links"

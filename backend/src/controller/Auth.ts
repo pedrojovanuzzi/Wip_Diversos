@@ -8,6 +8,20 @@ import { Not } from "typeorm";
 import { User } from "../entities/User";
 import { registrarLog, descreverAcao } from "../utils/auditoria";
 
+// Login inexistente também passa por um bcrypt.compare, contra este hash:
+// sem isso ele responde bem mais rápido e denuncia quais logins existem.
+const HASH_FALSO = bcrypt.hashSync("senha-que-nao-existe", 10);
+
+// Mesma mensagem para login inexistente e senha errada (o motivo real vai
+// para audit_logs).
+const ERRO_LOGIN = {
+  type: "field",
+  value: "",
+  path: "user",
+  msg: "Login ou senha inválidos",
+  location: "body",
+} as const;
+
 dotenv.config();
 
 const jwtSecret = String(process.env.JWT_SECRET);
@@ -363,13 +377,8 @@ class Auth {
       let errorsArray = validationResult(req).array();
 
       if (!user) {
-        errorsArray.push({
-          type: "field",
-          value: "",
-          path: "user",
-          msg: "Usuário não encontrado",
-          location: "body", // Onde o erro ocorreu (corpo da requisição)
-        });
+        await bcrypt.compare(String(password), HASH_FALSO);
+        errorsArray.push(ERRO_LOGIN);
 
         void registrarLog({
           acao: "LOGIN_FALHOU",
@@ -384,13 +393,7 @@ class Auth {
       }
 
       if (!(await bcrypt.compare(password, String(user.password)))) {
-        errorsArray.push({
-          type: "field",
-          value: "",
-          path: "user",
-          msg: "Senha Inválida",
-          location: "body",
-        });
+        errorsArray.push(ERRO_LOGIN);
 
         void registrarLog({
           acao: "LOGIN_FALHOU",

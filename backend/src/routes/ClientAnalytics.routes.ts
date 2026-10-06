@@ -1,29 +1,33 @@
 import { Router } from "express";
 import ClientAnalytics from "../controller/ClientAnalytics";
 import AuthGuard from "../middleware/AuthGuard";
+import { protegido } from "../middleware/PermissionGuard";
 
 const router: Router = Router()
 
+// Níveis iguais aos das telas no frontend (App.tsx): operador = 2, admin = 5.
+const operador = protegido(2);
 
-router.post("/info", AuthGuard, ClientAnalytics.info);
-router.post("/Desconections", AuthGuard, ClientAnalytics.desconections);
+
+router.post("/info", operador, ClientAnalytics.info);
+router.post("/Desconections", operador, ClientAnalytics.desconections);
 router.post("/SinalOnu", AuthGuard, ClientAnalytics.onuSinal);
-router.post("/Mikrotik", AuthGuard, ClientAnalytics.mikrotik);
-router.post("/TempoReal", AuthGuard, ClientAnalytics.mikrotikTempoReal);
-router.post("/Reset", AuthGuard, ClientAnalytics.onuReiniciar);
-router.get("/ClientList", AuthGuard, ClientAnalytics.clientList);
-router.post("/HuaweiUptime", AuthGuard, ClientAnalytics.huaweiUptime);
-router.get("/ClientsWithoutQueue", AuthGuard, ClientAnalytics.clientsWithoutQueue);
-router.post("/Observacao", AuthGuard, ClientAnalytics.observacao);
-router.post("/SubirCliente", AuthGuard, ClientAnalytics.subirCliente);
-router.post("/DerrubarPppoe", AuthGuard, ClientAnalytics.derrubarPppoe);
-router.post("/MkauthLogin", AuthGuard, ClientAnalytics.mkauthLogin);
-router.post("/RepararMkauth", AuthGuard, ClientAnalytics.repararMkauth);
-router.get("/Logs", AuthGuard, ClientAnalytics.pppoesLogs);
-router.get("/Consumo", AuthGuard, ClientAnalytics.consumo);
-router.post("/Monitor/Start", AuthGuard, ClientAnalytics.monitorStart);
-router.post("/Monitor/:id/Stop", AuthGuard, ClientAnalytics.monitorStop);
-router.get("/Monitor", AuthGuard, ClientAnalytics.monitorList);
-router.get("/Monitor/:id", AuthGuard, ClientAnalytics.monitorDetail);
+router.post("/Mikrotik", operador, ClientAnalytics.mikrotik);
+router.post("/TempoReal", operador, ClientAnalytics.mikrotikTempoReal);
+router.post("/Reset", operador, ClientAnalytics.onuReiniciar);
+router.get("/ClientList", operador, ClientAnalytics.clientList);
+router.post("/HuaweiUptime", operador, ClientAnalytics.huaweiUptime);
+router.get("/ClientsWithoutQueue", operador, ClientAnalytics.clientsWithoutQueue);
+router.post("/Observacao", operador, ClientAnalytics.observacao);
+router.post("/SubirCliente", operador, ClientAnalytics.subirCliente);
+router.post("/DerrubarPppoe", operador, ClientAnalytics.derrubarPppoe);
+router.post("/MkauthLogin", operador, ClientAnalytics.mkauthLogin);
+router.post("/RepararMkauth", operador, ClientAnalytics.repararMkauth);
+router.get("/Logs", operador, ClientAnalytics.pppoesLogs);
+router.get("/Consumo", operador, ClientAnalytics.consumo);
+router.post("/Monitor/Start", operador, ClientAnalytics.monitorStart);
+router.post("/Monitor/:id/Stop", operador, ClientAnalytics.monitorStop);
+router.get("/Monitor", operador, ClientAnalytics.monitorList);
+router.get("/Monitor/:id", operador, ClientAnalytics.monitorDetail);
 
 export default router;

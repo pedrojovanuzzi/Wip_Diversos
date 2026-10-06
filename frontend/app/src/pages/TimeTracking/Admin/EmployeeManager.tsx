@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { AiOutlineDelete, AiOutlineEdit } from "react-icons/ai";
 import { NavBar } from "../../../components/navbar/NavBar";
+import { useAuth } from "../../../context/AuthContext";
 
 interface Employee {
   id: number;
@@ -12,6 +13,8 @@ interface Employee {
 }
 
 export const EmployeeManager = () => {
+  const { user } = useAuth();
+  const auth = { headers: { Authorization: `Bearer ${user?.token}` } };
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [form, setForm] = useState({ name: "", role: "", cpf: "" });
   const [loading, setLoading] = useState(false);
@@ -21,7 +24,7 @@ export const EmployeeManager = () => {
     try {
       const url = `${process.env.REACT_APP_URL}/time-tracking/employee`;
       console.log("Manager: Fetching from", url);
-      const res = await axios.get(url);
+      const res = await axios.get(url, auth);
       setEmployees(res.data);
     } catch (error) {
       console.error("Manager: Error fetching", error);
@@ -38,7 +41,8 @@ export const EmployeeManager = () => {
     try {
       await axios.post(
         `${process.env.REACT_APP_URL}/time-tracking/employee`,
-        form
+        form,
+        auth
       );
       console.log("Manager: Created employee");
       setMessage("Funcionário cadastrado com sucesso!");
@@ -56,7 +60,8 @@ export const EmployeeManager = () => {
     if (!window.confirm("Tem certeza que deseja excluir?")) return;
     try {
       await axios.delete(
-        `${process.env.REACT_APP_URL}/time-tracking/employee/${id}`
+        `${process.env.REACT_APP_URL}/time-tracking/employee/${id}`,
+        auth
       );
       console.log("Manager: Deleted employee", id);
       fetchEmployees();
