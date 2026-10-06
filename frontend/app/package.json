@@ -24,7 +24,7 @@
     "file-saver": "^2.0.5",
     "heroicons": "^2.2.0",
     "install": "^0.13.0",
-    "js-cookie": "^3.0.5",
+    "js-cookie": "^3.0.7",
     "jwt-decode": "^4.0.0",
     "leaflet": "^1.9.4",
     "moment": "^2.30.1",
