@@ -351,19 +351,8 @@ class TokenAtendimento {
     dataVenc: Date | string,
   ): Promise<number> => {
     try {
-      // 🔹 Busca o cliente no banco de dados pelo login (pppoe)
-      const client = await this.clienteRepo.findOne({
-        where: { login: pppoe },
-      });
-
-      // 🔹 Pega o desconto do cliente (ou 0 se não tiver)
-      const desconto = client?.desconto || 0;
-
-      // 🔹 Converte o valor recebido em número e aplica o desconto
-      let valorFinal = Number(valor) - desconto;
-
-      // 🔹 Garante que o valor nunca fique negativo
-      if (valorFinal < 0) valorFinal = 0;
+      // 🔹 O totem não aplica mais o desconto do cadastro do cliente
+      let valorFinal = Number(valor);
 
       // 🔹 Cria datas sem horário (somente dia/mês/ano)
       const resetTime = (date: Date) => {
@@ -438,19 +427,8 @@ class TokenAtendimento {
     pppoe: string,
   ): Promise<number> => {
     try {
-      // 🔹 Busca o cliente no banco de dados pelo login (pppoe)
-      const client = await this.clienteRepo.findOne({
-        where: { login: pppoe },
-      });
-
-      // 🔹 Pega o desconto do cliente (ou 0 se não tiver)
-      const desconto = client?.desconto || 0;
-
-      // 🔹 Converte o valor recebido em número e aplica o desconto
-      let valorFinal = Number(valor) - desconto;
-
-      // 🔹 Garante que o valor nunca fique negativo
-      if (valorFinal < 0) valorFinal = 0;
+      // 🔹 O totem não aplica mais o desconto do cadastro do cliente
+      let valorFinal = Number(valor);
 
       return Number(valorFinal.toFixed(2));
     } catch (error) {
