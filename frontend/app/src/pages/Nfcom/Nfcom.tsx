@@ -25,7 +25,7 @@ const moeda = (v: number) =>
 export default function Nfcom() {
   const [dadosNFe, setDadosNFe] = useState({});
   const [arquivo, setArquivo] = useState<File | null>(null);
-  const [ambiente, setAmbiente] = useState("homologacao");
+  const [ambiente, setAmbiente] = useState("producao");
 
   // Estados para controlar envio do certificado e senha
   const [showCertPasswordPopUp, setShowCertPasswordPopUp] = useState(false);

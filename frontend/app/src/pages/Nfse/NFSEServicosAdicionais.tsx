@@ -39,7 +39,7 @@ export const NFSEServicosAdicionais: React.FC = () => {
 
   // params NFSE
   const [password, setPassword] = useState("");
-  const [ambiente, setAmbiente] = useState("homologacao");
+  const [ambiente, setAmbiente] = useState("producao");
   const [servico, setServico] = useState("010501");
   /** Último RPS usado. A nota sai com o seguinte (o backend soma 1). */
   const [ultimoRps, setUltimoRps] = useState("");

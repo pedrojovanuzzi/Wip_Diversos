@@ -38,7 +38,7 @@ export const NFSE = () => {
   const [ultimoRps, setUltimoRps] = useState<string>("");
   const [service, setService] = useState("");
   const [loading, setLoading] = useState(false);
-  const [ambiente, setAmbiente] = useState("homologacao");
+  const [ambiente, setAmbiente] = useState("producao");
   const [reducao, setReducao] = useState("");
   const [clientesSelecionados, setClientesSelecionados] = useState<number[]>(
     [],
