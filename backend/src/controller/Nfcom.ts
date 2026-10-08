@@ -1466,7 +1466,7 @@ class Nfcom {
   };
 
   public async BuscarClientes(req: Request, res: Response) {
-    const { cpf, filters, dateFilter } = req.body;
+    const { cpf, filters, dateFilter, ambiente } = req.body;
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const w: any = {};
     let servicosFilter: string[] = ["mensalidade"];
@@ -1520,9 +1520,28 @@ class Nfcom {
         },
         order: { id: "DESC" },
       });
+
+      // Fatura que já tem NFCom (não cancelada) no mesmo ambiente sai da
+      // lista: só aparece o que ainda falta gerar. Nota de homologação não
+      // esconde a fatura da produção.
+      const jaGeradas = faturasResponse.length
+        ? await DataSource.getRepository(NFCom).find({
+            where: {
+              fatura_id: In(faturasResponse.map((f) => f.id)),
+              status: Not("cancelada"),
+              tpAmb: ambiente === "homologacao" ? 2 : 1,
+            },
+            select: { fatura_id: true },
+          })
+        : [];
+      const faturasComNota = new Set(jaGeradas.map((n) => Number(n.fatura_id)));
+      const faturasPendentes = faturasResponse.filter(
+        (f) => !faturasComNota.has(Number(f.id)),
+      );
+
       const arr = clientesResponse
         .map((cliente) => {
-          const fat = faturasResponse.filter((f) => f.login === cliente.login);
+          const fat = faturasPendentes.filter((f) => f.login === cliente.login);
           if (!fat.length) return null;
           return {
             ...cliente,

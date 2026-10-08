@@ -157,6 +157,23 @@ function motivoCancelamento(
   return { codigo: cod, descricao: texto };
 }
 
+/** Login normalizado para comparar nota (banco local) com cliente (MKAuth). */
+function chaveLogin(login: unknown): string {
+  return String(login ?? "")
+    .trim()
+    .toUpperCase();
+}
+
+/**
+ * "AAAA-MM" de uma data. Coluna `date` do MySQL chega como texto
+ * "AAAA-MM-DD" e não pode virar Date (o fuso jogaria para o dia anterior).
+ */
+function mesAno(valor: Date | string): string {
+  if (typeof valor === "string") return valor.slice(0, 7);
+  const d = new Date(valor);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 class NFSEController {
   private certPath = path.resolve(__dirname, "../files/certificado.pfx");
   private TEMP_DIR = path.resolve(__dirname, "../files");
@@ -2003,8 +2020,42 @@ class NFSEController {
     return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   }
 
+  /**
+   * Notas já emitidas (não canceladas) no ambiente informado, como chaves
+   * "LOGIN|AAAA-MM" da competência. É o que liga a nota ao cliente/mês para
+   * as telas de emissão mostrarem só o que ainda falta gerar.
+   *
+   * `servicosAdicionais` separa os dois tipos: a nota de serviços adicionais
+   * (WatchTV/câmeras) não conta como a nota da mensalidade, e vice-versa.
+   */
+  private async notasEmitidasPorMes(opts: {
+    logins: string[];
+    inicio: Date;
+    fim: Date;
+    ambiente: string;
+    servicosAdicionais: boolean;
+  }): Promise<Set<string>> {
+    if (!opts.logins.length) return new Set();
+    const prefixo = "Servicos adicionais%";
+    const notas = await AppDataSource.getRepository(NFSE).find({
+      where: {
+        login: In(opts.logins),
+        ambiente: opts.ambiente === "homologacao" ? "homologacao" : "producao",
+        status: Not("Cancelada"),
+        competencia: Between(opts.inicio, opts.fim),
+        discriminacao: opts.servicosAdicionais
+          ? Like(prefixo)
+          : Not(Like(prefixo)),
+      },
+      select: { login: true, competencia: true },
+    });
+    return new Set(
+      notas.map((n) => `${chaveLogin(n.login)}|${mesAno(n.competencia)}`),
+    );
+  }
+
   async BuscarClientes(req: Request, res: Response) {
-    const { cpf, filters, dateFilter } = req.body;
+    const { cpf, filters, dateFilter, ambiente } = req.body;
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
     const w: any = {};
     let servicosFilter: string[] = ["mensalidade"];
@@ -2064,8 +2115,25 @@ class NFSEController {
       const clientePorLogin = new Map(
         clientesResponse.map((c) => [c.login, c]),
       );
+
+      // Fatura cujo cliente já tem NFSE da mensalidade naquele mês (a nota
+      // grava o vencimento da fatura como competência) não aparece de novo.
+      const inicioMes = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+      const fimMes = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0);
+      const jaEmitidas = await this.notasEmitidasPorMes({
+        logins: [...new Set(faturasResponse.map((f) => f.login))],
+        inicio: inicioMes,
+        fim: fimMes,
+        ambiente,
+        servicosAdicionais: false,
+      });
+
       const arr = faturasResponse
         .filter((f) => clientePorLogin.has(f.login))
+        .filter(
+          (f) =>
+            !jaEmitidas.has(`${chaveLogin(f.login)}|${mesAno(f.datavenc)}`),
+        )
         .map((f) => {
           const cliente = clientePorLogin.get(f.login)!;
           return {
@@ -2274,10 +2342,11 @@ class NFSEController {
 
   public BuscarClientesServicos = async (req: Request, res: Response) => {
     try {
-      const { cpf, cidade, ativo } = (req.body || {}) as {
+      const { cpf, cidade, ativo, ambiente } = (req.body || {}) as {
         cpf?: string;
         cidade?: string;
         ativo?: string;
+        ambiente?: string;
       };
 
       const params: any[] = [];
@@ -2321,7 +2390,21 @@ class NFSEController {
         ORDER BY c.nome ASC
       `;
 
-      const rows = (await MkauthSource.query(sql, params)) as any[];
+      const todas = (await MkauthSource.query(sql, params)) as any[];
+
+      // Serviço adicional é cobrado por mês: quem já tem a nota deste mês
+      // (a emissão grava a data do dia como competência) sai da lista.
+      const hoje = new Date();
+      const jaEmitidas = await this.notasEmitidasPorMes({
+        logins: todas.map((r) => r.login),
+        inicio: new Date(hoje.getFullYear(), hoje.getMonth(), 1),
+        fim: new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0),
+        ambiente: ambiente ?? "producao",
+        servicosAdicionais: true,
+      });
+      const rows = todas.filter(
+        (r) => !jaEmitidas.has(`${chaveLogin(r.login)}|${mesAno(hoje)}`),
+      );
 
       // Nome comercial completo de cada serviço, no lugar das tags cruas.
       const resumos = await buscarResumoCameras(rows.map((r) => r.login));

@@ -101,9 +101,12 @@ export default function Nfcom() {
     }
   };
 
+  // Busca de novo ao trocar o ambiente: a lista esconde o que já tem nota
+  // gerada naquele ambiente.
   useEffect(() => {
     handleSearch();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ambiente]);
 
   const emitirNFCom = async () => {
     try {
@@ -203,6 +206,7 @@ export default function Nfcom() {
           cpf: searchCpfRegex,
           filters: activeFilters,
           dateFilter: dateFilter,
+          ambiente,
         },
         {
           headers: {

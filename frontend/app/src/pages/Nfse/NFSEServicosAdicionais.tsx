@@ -54,7 +54,7 @@ export const NFSEServicosAdicionais: React.FC = () => {
     try {
       const res = await axios.post<ClienteServico[]>(
         `${base}/nfse/BuscarClientesServicos`,
-        { cpf, cidade, ativo: ativo || undefined },
+        { cpf, cidade, ativo: ativo || undefined, ambiente },
         { headers },
       );
       setClientes(res.data || []);
@@ -66,10 +66,12 @@ export const NFSEServicosAdicionais: React.FC = () => {
     }
   };
 
+  // Busca de novo ao trocar o ambiente: a lista esconde quem já tem nota
+  // deste mês naquele ambiente.
   useEffect(() => {
     buscar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ambiente]);
 
   const toggle = (login: string) => {
     setSelecionados((prev) =>
@@ -210,7 +212,7 @@ export const NFSEServicosAdicionais: React.FC = () => {
               {clientes.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-4 text-center text-gray-500">
-                    Nenhum cliente com serviços adicionais.
+                    Nenhum cliente com nota pendente neste mês.
                   </td>
                 </tr>
               ) : (
