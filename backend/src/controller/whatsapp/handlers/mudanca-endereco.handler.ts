@@ -480,5 +480,16 @@ export async function iniciarMudanca(
       celular,
       "Por favor, preencha o formulário clicando no botão que enviamos acima para prosseguir.",
     );
+    return;
   }
+
+  // Nenhum passo reconhecido (ex.: sessão antiga parada em "flow"): em vez
+  // de ficar sem responder, recomeça pedindo o CPF.
+  session.mudancaStep = "ask_cpf";
+  session.structuredData = undefined;
+  session.stage = "mudanca_endereco";
+  await MensagensComuns(
+    celular,
+    "Para iniciar a mudança de endereço, por favor digite o seu *CPF/CNPJ*:",
+  );
 }

@@ -64,6 +64,16 @@ import {
 } from "./servicos.handler";
 import { iniciarMudanca } from "./mudanca-endereco.handler";
 
+/**
+ * Esquece o passo das mudanças de endereço/cômodo. A sessão fica gravada no
+ * banco, e um passo que sobrou de outra tentativa fazia o fluxo seguinte
+ * recomeçar no meio — na mudança de endereço, sem responder nada.
+ */
+function limparPassosDeMudanca(session: any) {
+  session.mudancaStep = undefined;
+  session.mudancaComodoStep = undefined;
+  session.structuredData = undefined;
+}
 
 /**
  * Termos exibidos antes de iniciar um serviço.
@@ -185,6 +195,7 @@ export async function handleMessage(
     }
 
     if (texto && texto.toLowerCase() === "inicio") {
+      limparPassosDeMudanca(session);
       await boasVindas(celular);
       await MensagemBotao(
         celular,
@@ -296,10 +307,14 @@ export async function handleMessage(
           session.stage = "lgpd_request";
           session.service = "instalacao";
         } else if (t === "mudança de endereço" || t === "mudanca de endereco") {
+          // Começa do zero: um passo que sobrou de uma tentativa anterior
+          // deixava o bot sem responder.
+          limparPassosDeMudanca(session);
           session.service = "mudanca_endereco";
           session.stage = "mudanca_endereco";
           await iniciarMudanca(celular, texto, session, type);
         } else if (t === "mudança de cômodo" || t === "mudanca de comodo") {
+          limparPassosDeMudanca(session);
           session.service = "mudanca_comodo";
           session.stage = "mudanca_comodo";
           await iniciarMudancaComodo(celular, texto, session, type);
@@ -324,6 +339,7 @@ export async function handleMessage(
           session.stage = "lgpd_request";
           session.service = "wifi_estendido";
         } else if (t === "inicio" || t === "inicío" || t === "início") {
+          limparPassosDeMudanca(session);
           await boasVindas(celular);
           await MensagemBotao(
             celular,
