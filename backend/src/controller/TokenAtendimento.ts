@@ -10,6 +10,7 @@ import crypto from "crypto";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import moment from "moment";
+import { valorAtualizadoFatura } from "../utils/valorFatura";
 
 dotenv.config();
 
@@ -350,76 +351,9 @@ class TokenAtendimento {
     pppoe: string,
     dataVenc: Date | string,
   ): Promise<number> => {
-    try {
-      // 🔹 O totem não aplica mais o desconto do cadastro do cliente
-      let valorFinal = Number(valor);
-
-      // 🔹 Cria datas sem horário (somente dia/mês/ano)
-      const resetTime = (date: Date) => {
-        const d = new Date(date);
-        d.setHours(0, 0, 0, 0);
-        return d;
-      };
-
-      const dataHoje = resetTime(new Date());
-      const dataVencimento = resetTime(new Date(dataVenc));
-
-      console.log("📅 Data de hoje:", dataHoje.toLocaleDateString());
-      console.log(
-        "📆 Data de vencimento:",
-        dataVencimento.toLocaleDateString(),
-      );
-
-      // 🔹 Se ainda não venceu
-      if (dataVencimento > dataHoje) {
-        console.log("✅ Não está em atraso");
-        return Number(valorFinal.toFixed(2));
-      }
-
-      // 🔹 Se vence exatamente hoje
-      if (dataVencimento.getTime() === dataHoje.getTime()) {
-        console.log("📅 Vence hoje (sem juros ou multa)");
-        return Number(valorFinal.toFixed(2));
-      }
-
-      // 🔹 Se está em atraso
-      console.log("⚠️ Está em atraso!");
-
-      // Função auxiliar para calcular a diferença em dias entre duas datas
-      const differenceInDays = (d1: Date, d2: Date): number => {
-        const oneDay = 24 * 60 * 60 * 1000;
-        return Math.floor(Math.abs((d2.getTime() - d1.getTime()) / oneDay));
-      };
-
-      const diffInDays = differenceInDays(dataVencimento, dataHoje);
-      console.log("📆 Dias de atraso:", diffInDays);
-
-      // 🔹 Definições de multa e juros
-      const monthlyFine = 0.02; // 2% fixo
-      const dailyFine = 0.00033; // 0.033% ao dia
-
-      // 🔹 Multa de 2% sobre o valor original
-      const multaMensal = valorFinal * monthlyFine;
-
-      // 🔹 Juros diários (só após 4 dias de tolerância)
-      const multaDiaria =
-        diffInDays > 4 ? valorFinal * ((diffInDays - 4) * dailyFine) : 0;
-
-      // 🔹 Soma total das multas ao valor
-      valorFinal = valorFinal + multaMensal + multaDiaria;
-
-      console.log("💰 Valor base:", valor);
-      console.log("📈 Multa mensal:", multaMensal.toFixed(2));
-      console.log("📈 Multa diária:", multaDiaria.toFixed(2));
-      console.log("✅ Valor final com juros:", valorFinal.toFixed(2));
-
-      // 🔹 Retorna o valor arredondado com duas casas decimais
-      return Number(valorFinal.toFixed(2));
-    } catch (error) {
-      console.error("❌ Erro em aplicarJuros_Desconto:", error);
-      // 🔹 Em caso de erro, retorna o valor original sem alteração
-      return Number(valor);
-    }
+    // Regra única com o bot do WhatsApp (utils/valorFatura): sem o desconto
+    // do cadastro, multa e juros só em atraso.
+    return valorAtualizadoFatura(valor, dataVenc);
   };
 
   aplicar_Desconto = async (

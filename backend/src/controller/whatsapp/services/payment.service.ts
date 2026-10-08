@@ -20,6 +20,7 @@ import {
   MensagensComuns,
   MensagensDeMidia,
 } from "./messaging.service";
+import { valorAtualizadoFatura } from "../../../utils/valorFatura";
 
 // Cria lançamento de instalação paga diretamente com status 'pago'.
 // Usado quando o cliente já pagou via Pix antes de fazer o cadastro.
@@ -281,8 +282,6 @@ export async function enviarBoleto(
     where: { login: pppoe, cpf_cnpj: cpf, cli_ativado: "s" },
   });
 
-  const desconto = sis_cliente.desconto;
-
   let valor: number | string = Number(cliente.valor);
   const dataVenc = cliente.datavenc;
   let id = cliente.id;
@@ -320,48 +319,9 @@ export async function enviarBoleto(
 
   const link = qrlink.linkVisualizacao;
 
-  valor -= desconto;
-
-  const dataHoje = new Date();
-
-  function resetTime(date: any) {
-    date.setHours(0, 0, 0, 0);
-    return date;
-  }
-
-  let dataVencSemHora = resetTime(new Date(dataVenc));
-  let dataHojeSemHora = resetTime(new Date(dataHoje));
-
-  if (dataVencSemHora > dataHojeSemHora) {
-    console.log("Não está em atraso");
-  } else if (dataVencSemHora < dataHojeSemHora) {
-    console.log("está em atraso");
-
-    const date1 = new Date(dataVenc);
-    const date2 = new Date(dataHoje);
-
-    function differenceInDays(date1: any, date2: any) {
-      const oneDay = 24 * 60 * 60 * 1000;
-      const diffDays = Math.floor(Math.abs((date1 - date2) / oneDay));
-      return diffDays;
-    }
-
-    const diffInDays = differenceInDays(date1, date2);
-
-    const monthlyFine = 0.02;
-    const dailyFine = 0.00033;
-
-    let multaMensal = valor * monthlyFine;
-    let multaDiaria = (valor as number) * ((diffInDays - 4) * dailyFine);
-
-    let valorFinal = (valor as number) + multaMensal + multaDiaria;
-    let valorFinalArredondado = Math.floor(valorFinal * 100) / 100;
-    let valorFinalFormatado = valorFinalArredondado.toFixed(2);
-
-    valor = valorFinalFormatado;
-  } else if (dataVencSemHora === dataHojeSemHora) {
-    console.log("Vence Hoje");
-  }
+  // Mesmo cálculo do totem: sem o desconto do cadastro, multa e juros só
+  // em atraso (juros depois de 4 dias de tolerância).
+  valor = valorAtualizadoFatura(valor, dataVenc);
 
   writeLog({
     tipo: "BOLETO/PIX BOT SOLICITADO",
