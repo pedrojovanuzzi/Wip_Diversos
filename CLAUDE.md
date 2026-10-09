@@ -43,8 +43,8 @@ Onde mexer, dentro do `<script>` do arquivo (seção DADOS):
   Se a edição deslocar uma função citada, corrija o número.
 
 Também são calculados sozinhos, a partir dos dados: os contadores do
-cabeçalho, a legenda dos tipos de máquina, os totais de cada bairro na faixa
-de rotas, o selo de nível (PÚB/AUTH/N1/N2/N5, tirado da portaria da rota ou
+cabeçalho, a legenda dos tipos de máquina, a lista "Escolher pedido" (guiados
+e uma entrada por rota, com os totais de cada bairro), o selo de nível (PÚB/AUTH/N1/N2/N5, tirado da portaria da rota ou
 dos níveis da tela), a barra de tamanho do controller e o minimapa. Os
 textos fixos da trilha de estudo e do glossário continuam manuais.
 

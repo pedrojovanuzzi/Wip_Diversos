@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&display=swap">
 <style>
-/* Layout: cabeçalho com painel de contadores, faixas de pedidos e rotas, mapa (SVG arrastável com zoom e minimapa) com painel de pedido e inspetor à direita, trilha de estudo e glossário embaixo; empilha no celular.
+/* Layout: cabeçalho com painel de contadores, mapa (SVG arrastável com zoom e minimapa) com painel de pedido (com a lista de pedidos) e inspetor à direita, trilha de estudo e glossário embaixo; empilha no celular.
    Chão de fábrica escuro de propósito: um tema só, todas as cores explícitas. Cada setor tem uma placa com o nome, acima das esteiras. */
 :root {
   color-scheme: dark;
@@ -63,27 +63,10 @@ h1 { font: 800 clamp(2.5rem, 5.2vw, 3.9rem)/.9 var(--f-display); text-transform:
 .kchip i { width: 12px; height: 12px; border-radius: 2px; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .5); }
 .kchip small { font: .7rem var(--f-mono); color: var(--ink-faint); }
 
-/* faixas de pedidos e rotas */
-.strip { display: grid; gap: 8px; }
-.strip-h { margin: 0; font: 700 .8rem var(--f-cond); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; }
-.strip-h span { font: 400 .8rem var(--f-body); letter-spacing: 0; text-transform: none; color: var(--ink-faint); }
-.missions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 176px), 1fr)); gap: 8px; }
-.mbtn { text-align: left; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--panel-lo); box-shadow: inset 0 1px 0 var(--panel-hi), 0 2px 0 var(--panel-lo); border-radius: 4px; padding: 8px 10px; cursor: pointer; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 10px; align-items: center; transition: transform .12s, border-color .12s; }
-.mbtn:hover { border-color: #5a5249; transform: translateY(-1px); }
-.mbtn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-wash); }
-.mbtn .chip { grid-row: span 2; width: 30px; height: 30px; border-radius: 3px; background: var(--c); font: 600 9.5px/30px var(--f-mono); color: #15130f; text-align: center; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .25); }
-.mbtn b { font: 600 1.08rem/1.2 var(--f-cond); letter-spacing: .02em; }
-.mbtn code { font: .7rem var(--f-mono); color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.routes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 228px), 1fr)); gap: 10px 16px; }
-.grp { min-width: 0; }
-.grp h3 { margin: 0 0 5px; font: 700 .76rem var(--f-cond); text-transform: uppercase; letter-spacing: .1em; color: var(--ink-dim); display: flex; flex-wrap: wrap; gap: 0 8px; align-items: baseline; }
-.grp h3 small { white-space: nowrap; }
-.grp h3 small { font: .68rem var(--f-mono); letter-spacing: 0; text-transform: none; color: var(--ink-faint); }
-.grp div { display: flex; flex-wrap: wrap; gap: 4px; }
-.rbtn { font: 500 .8rem var(--f-body); color: var(--ink); background: var(--panel); border: 1px solid var(--panel-lo); box-shadow: inset 0 1px 0 var(--panel-hi); border-radius: 3px; padding: 2px 8px; cursor: pointer; }
-.rbtn:hover { border-color: #5a5249; }
-.rbtn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-wash); }
-.rbtn.guided::after { content: " ★"; color: var(--accent); }
+/* seletor de pedido */
+.pick { display: grid; gap: 3px; margin-bottom: 10px; font-size: .78rem; color: var(--ink-dim); }
+.pick select { width: 100%; min-width: 0; font: 500 .9rem var(--f-body); color: var(--ink); background: var(--panel-lo); border: 1px solid var(--panel-hi); border-radius: 3px; padding: 5px 6px; cursor: pointer; }
+.pick select:hover { border-color: #5a5249; }
 
 /* mapa */
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; }
@@ -229,7 +212,7 @@ ol.steps li.err button { color: var(--bad); }
 @keyframes flow { to { stroke-dashoffset: -12; } }
 .bus { fill: none; stroke: #2c2924; stroke-width: 10; stroke-dasharray: 7 5; }
 .item text { font: 600 9px var(--f-mono); fill: #15130f; }
-@media (prefers-reduced-motion: reduce) { .belt.on, .mach.active .gear, .mach.active .hand, .mach.active .boxes, .mach.active .halo { animation: none; } .mbtn, .prog i { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .belt.on, .mach.active .gear, .mach.active .hand, .mach.active .boxes, .mach.active .halo { animation: none; } .prog i { transition: none; } }
 </style>
 
 <div class="shell">
@@ -255,14 +238,6 @@ ol.steps li.err button { color: var(--bad); }
   </div>
 </div>
 
-<section class="strip">
-  <h2 class="strip-h">Pedidos guiados <span>passo a passo, com o arquivo e a linha de cada etapa</span></h2>
-  <nav class="missions" id="missions" aria-label="Pedidos guiados"></nav>
-</section>
-<section class="strip">
-  <h2 class="strip-h">Pedido de cada rota <span>★ tem pedido guiado · as outras montam o caminho sozinhas</span></h2>
-  <nav class="routes" id="routes" aria-label="Pedido de cada rota"></nav>
-</section>
 
 <div class="layout">
   <div class="mapbox" id="mapbox" tabindex="0" aria-label="Mapa da fábrica. Setas movem, + e - fazem zoom.">
@@ -281,6 +256,7 @@ ol.steps li.err button { color: var(--bad); }
   <aside class="side">
     <section class="card" aria-live="polite">
       <h2 id="mtitle">Pedido</h2>
+      <label class="pick"><span>Escolher pedido</span><select id="pick"></select></label>
       <div class="controls">
         <button class="btn" id="play">▶ Rodar</button>
         <button class="btn alt" id="next">Próxima etapa</button>
@@ -1030,32 +1006,17 @@ function link(f, l, label) {
 }
 
 function buildMissions() {
-  const nav = $("missions");
-  MISSIONS.forEach(ms => {
-    const b = document.createElement("button");
-    b.className = "mbtn"; b.id = "m-" + ms.id; b.style.setProperty("--c", ms.color);
-    b.innerHTML = `<span class="chip">${ms.item}</span><b></b><code></code>`;
-    b.querySelector("b").textContent = ms.title; b.querySelector("code").textContent = ms.http;
-    b.dataset.key = ms.id;
-    b.addEventListener("click", () => select(ms.id, true));
-    nav.appendChild(b);
-  });
-  const rt = $("routes");
+  // lista de pedidos: os guiados e uma entrada por rota, agrupadas por bairro (★ = rota com pedido guiado)
+  const pick = $("pick"), og = label => { const g = document.createElement("optgroup"); g.label = label; pick.appendChild(g); return g; };
+  const opt = (g, value, text) => { const o = document.createElement("option"); o.value = value; o.textContent = text; g.appendChild(o); };
+  const gm = og("Pedidos guiados");
+  MISSIONS.forEach(ms => opt(gm, ms.id, ms.title + " · " + ms.http));
   for (const d in DIST) {
-    const grp = document.createElement("div"); grp.className = "grp";
-    const h = document.createElement("h3"), inD = CTRLS.filter(c => c[1] === d), sm = document.createElement("small");
-    sm.textContent = inD.length + " rotas · " + inD.reduce((s, c) => s + c[7], 0) + " endpoints";
-    h.append(DIST[d].title, sm);
-    const row = document.createElement("div");
-    CTRLS.filter(c => c[1] === d).forEach(c => {
-      const id = c[0], key = GUIDED_FOR[id] || "r:" + id, b = document.createElement("button");
-      b.className = "rbtn" + (GUIDED_FOR[id] ? " guided" : ""); b.dataset.key = key; b.dataset.ctrl = id;
-      b.textContent = M[id].name; b.title = M[id].prefix + (GUIDED_FOR[id] ? " (pedido guiado)" : "");
-      b.addEventListener("click", () => select(key, true));
-      row.appendChild(b);
-    });
-    grp.append(h, row); rt.appendChild(grp);
+    const inD = CTRLS.filter(c => c[1] === d);
+    const g = og(DIST[d].title + " · " + inD.length + " rotas · " + inD.reduce((s, c) => s + c[7], 0) + " endpoints");
+    inD.forEach(c => opt(g, GUIDED_FOR[c[0]] || "r:" + c[0], M[c[0]].name + " · " + M[c[0]].prefix + (GUIDED_FOR[c[0]] ? " ★" : "")));
   }
+  pick.addEventListener("change", () => select(pick.value, true));
   // contadores do cabeçalho, calculados dos dados acima
   const count = k => Object.keys(M).filter(id => M[id].k === k).length;
   [["rotas no backend", CTRLS.length], ["endpoints", CTRLS.reduce((s, c) => s + c[7], 0)],
@@ -1090,8 +1051,8 @@ function select(key, frameIt, autoplay) {
   if (!ms) return;
   mission = ms;
   const ctrlOf = key.startsWith("r:") ? key.slice(2).split("@")[0] : null;
-  document.querySelectorAll(".mbtn").forEach(b => b.setAttribute("aria-pressed", b.dataset.key === key));
-  document.querySelectorAll(".rbtn").forEach(b => b.setAttribute("aria-pressed", ctrlOf ? b.dataset.ctrl === ctrlOf : b.dataset.key === key));
+  const pick = $("pick"); pick.value = key;
+  if (pick.value !== key && ctrlOf) pick.value = GUIDED_FOR[ctrlOf] || "r:" + ctrlOf;
   $("mtitle").textContent = mission.title + " · " + mission.http;
   $("gopts").hidden = !mission.build;
   try { localStorage.setItem("fabrica-missao", key); } catch (e) {}
