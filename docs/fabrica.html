@@ -1,0 +1,960 @@
+<title>Fábrica Wip Diversos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: mapa-mundo do repositório (SVG arrastável com zoom) à esquerda, painel de pedido/inspetor à direita; empilha no celular.
+   Visual escuro de propósito (chão de fábrica), um tema só, todas as cores explícitas. */
+:root {
+  color-scheme: dark;
+  --ground: #191816;
+  --panel: #2a2723;
+  --panel-hi: #3b3731;
+  --panel-lo: #12110f;
+  --ink: #ebe5d8;
+  --ink-dim: #a49c8d;
+  --accent: #f39a1d;
+  --belt-http: #d9a62c;
+  --belt-fila: #cf4b3c;
+  --belt-sql: #4a8ad6;
+  --belt-ext: #5fae63;
+  --ok: #7cc66f;
+  --bad: #e2574a;
+  --f-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --f-body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--ground); color: var(--ink); }
+body { font-family: var(--f-body); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 14px 40px; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, .mapbox:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px; max-width: 1700px; margin: 0 auto 12px; }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: 2rem; letter-spacing: .02em; text-transform: uppercase; margin: 0; line-height: 1; }
+h1 small { display: block; font-family: var(--f-body); font-weight: 500; font-size: .9rem; text-transform: none; letter-spacing: 0; color: var(--ink-dim); margin-top: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .82rem; color: var(--ink-dim); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 22px; height: 8px; border-radius: 2px; background: repeating-linear-gradient(90deg, var(--c) 0 6px, var(--panel-lo) 6px 9px); }
+
+.missions { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; max-width: 1700px; margin: 0 auto 12px; }
+.mbtn { text-align: left; font: inherit; color: var(--ink); background: var(--panel); border: 2px solid var(--panel-lo); box-shadow: inset 0 2px 0 var(--panel-hi); border-radius: 4px; padding: 7px 10px; cursor: pointer; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 8px; align-items: center; }
+.mbtn:hover { border-color: #4d473f; }
+.mbtn[aria-pressed="true"] { border-color: var(--accent); background: #3a2f1f; }
+.mbtn .chip { grid-row: span 2; width: 22px; height: 22px; border-radius: 3px; background: var(--c); font: 600 9px/22px var(--f-mono); color: #15130f; text-align: center; }
+.mbtn b { font-family: var(--f-display); font-size: 1.02rem; font-weight: 600; letter-spacing: .02em; }
+.mbtn code { font: .7rem var(--f-mono); color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 370px; gap: 14px; max-width: 1700px; margin: 0 auto; }
+@media (max-width: 980px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.mapbox { position: relative; background: var(--panel-lo); border: 2px solid #000; border-radius: 4px; overflow: hidden; min-width: 0; height: clamp(440px, calc(100vh - 210px), 1000px); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.mapbox.drag { cursor: grabbing; }
+svg#map { display: block; width: 100%; height: 100%; }
+.tools { position: absolute; top: 8px; right: 8px; display: flex; flex-wrap: wrap; gap: 4px; justify-content: end; max-width: calc(100% - 16px); }
+.tools button, .tools label, .tools input { font: 600 .85rem var(--f-body); background: rgba(42, 39, 35, .94); color: var(--ink); border: 1px solid var(--panel-hi); border-radius: 3px; padding: 4px 9px; cursor: pointer; }
+.tools input[type="search"] { cursor: text; width: 190px; font-weight: 400; }
+.tools label { display: inline-flex; gap: 5px; align-items: center; font-weight: 500; }
+.tools input[type="checkbox"] { padding: 0; accent-color: var(--accent); }
+.maphint { position: absolute; left: 8px; bottom: 8px; font-size: .75rem; color: var(--ink-dim); background: rgba(18, 17, 15, .85); padding: 3px 8px; border-radius: 3px; pointer-events: none; }
+
+.side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card { background: var(--panel); border: 2px solid var(--panel-lo); box-shadow: inset 0 2px 0 var(--panel-hi); border-radius: 4px; padding: 12px 14px; min-width: 0; }
+.card h2 { font-family: var(--f-display); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: .85rem; color: var(--ink-dim); margin: 0 0 8px; }
+.controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.btn { font: 600 .9rem var(--f-body); color: #1a1408; background: var(--accent); border: 0; border-bottom: 3px solid #a8620a; border-radius: 3px; padding: 6px 12px; cursor: pointer; }
+.btn.alt { background: var(--panel-hi); color: var(--ink); border-bottom-color: var(--panel-lo); }
+.btn:active { transform: translateY(1px); border-bottom-width: 2px; }
+.speed { margin-left: auto; font-size: .8rem; color: var(--ink-dim); display: flex; gap: 4px; align-items: center; }
+.speed select { font: inherit; background: var(--panel-lo); color: var(--ink); border: 1px solid var(--panel-hi); border-radius: 3px; padding: 2px 4px; }
+
+.now { margin-top: 10px; padding: 10px; background: var(--panel-lo); border-radius: 3px; min-height: 110px; }
+.now .where { font: 600 .72rem var(--f-mono); color: var(--accent); text-transform: uppercase; letter-spacing: .05em; }
+.now h3 { margin: 2px 0 4px; font-family: var(--f-display); font-size: 1.3rem; font-weight: 600; line-height: 1.15; text-wrap: balance; }
+.now p { margin: 0 0 6px; }
+.now .err h3 { color: var(--bad); }
+.status { display: inline-block; font: 600 .75rem var(--f-mono); padding: 1px 6px; border-radius: 2px; margin-left: 6px; vertical-align: 2px; }
+.status.ok { background: #2f4a2a; color: var(--ok); }
+.status.bad { background: #4d2420; color: var(--bad); }
+.src { font: .76rem var(--f-mono); word-break: break-all; }
+
+ol.steps { list-style: none; margin: 10px 0 0; padding: 0; counter-reset: s; display: grid; gap: 2px; max-height: 220px; overflow-y: auto; }
+ol.steps li { counter-increment: s; }
+ol.steps button { width: 100%; text-align: left; font: .84rem var(--f-body); color: var(--ink-dim); background: none; border: 0; border-radius: 2px; padding: 3px 6px; cursor: pointer; display: flex; gap: 8px; }
+ol.steps button::before { content: counter(s); font: 600 .72rem/1.7 var(--f-mono); min-width: 1.4em; color: var(--ink-dim); }
+ol.steps button:hover { background: var(--panel-hi); color: var(--ink); }
+ol.steps li.done button { color: var(--ink); }
+ol.steps li.cur button { background: #3a2f1f; color: var(--ink); }
+ol.steps li.cur button::before { color: var(--accent); }
+
+.gopts { display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--panel-hi); }
+.gopts fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.gopts legend { font-size: .78rem; color: var(--ink-dim); padding: 0; margin-bottom: 3px; width: 100%; }
+.gopts label { cursor: pointer; }
+.gopts input { position: absolute; opacity: 0; }
+.gopts label span { display: inline-block; font-size: .82rem; padding: 3px 9px; border-radius: 3px; background: var(--panel-lo); border: 1px solid var(--panel-hi); }
+.gopts input:checked + span { border-color: var(--accent); color: var(--accent); }
+.gopts input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.insp .kind { font: 600 .72rem var(--f-mono); color: var(--ink-dim); text-transform: uppercase; }
+.insp h3 { margin: 0 0 6px; font-family: var(--f-display); font-size: 1.25rem; font-weight: 600; }
+.insp p { margin: 0 0 8px; }
+.insp ul { margin: 0 0 8px; padding-left: 18px; }
+.insp li { margin-bottom: 2px; }
+.insp dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 10px; margin: 0 0 8px; font-size: .85rem; }
+.insp dt { color: var(--ink-dim); }
+.insp dd { margin: 0; font-variant-numeric: tabular-nums; }
+.insp .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 8px; }
+.insp .chips button { font: .78rem var(--f-mono); background: var(--panel-lo); color: var(--ink); border: 1px solid var(--panel-hi); border-radius: 3px; padding: 1px 7px; cursor: pointer; }
+.insp .chips button:hover { border-color: var(--accent); }
+.insp .lbl { font-size: .78rem; color: var(--ink-dim); margin-top: 6px; }
+.hint { color: var(--ink-dim); font-size: .85rem; margin: 0; }
+
+.study { max-width: 1700px; margin: 16px auto 0; }
+.study ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 80ch; }
+.study code { font: .82rem var(--f-mono); color: var(--ink); background: var(--panel-lo); padding: 0 4px; border-radius: 2px; }
+
+/* SVG */
+.plate rect { fill: #201e1b; stroke: #36322c; stroke-width: 3; stroke-dasharray: 14 8; }
+.plate text { font: 700 40px var(--f-display); fill: #4e473d; letter-spacing: .08em; text-transform: uppercase; }
+.plate text.sub { font: 500 20px var(--f-body); letter-spacing: 0; text-transform: none; fill: #5c5448; }
+.mach rect.body { fill: var(--panel); stroke: #000; stroke-width: 2; }
+.mach rect.hi { fill: none; stroke: var(--panel-hi); stroke-width: 2; }
+.mach .tag { font: 600 11px var(--f-mono); fill: #f3ede0; }
+.mach .name { font: 600 16px var(--f-display); fill: var(--ink); letter-spacing: .02em; }
+.mach { cursor: pointer; }
+.mach:hover rect.body { fill: #34302a; }
+.mach.dim { opacity: .4; }
+.mach.active rect.body { stroke: var(--accent); stroke-width: 4; }
+.mach.sel rect.body { stroke: #fff; stroke-width: 3; stroke-dasharray: 6 3; }
+.mach .lamp { fill: #3a352e; }
+.mach.active .lamp { fill: var(--accent); }
+.mach.erro .lamp { fill: var(--bad); }
+.gear { fill: none; stroke: #6d655a; stroke-width: 5; stroke-dasharray: 3 3; transform-box: fill-box; transform-origin: center; }
+.mach.active .gear { stroke: var(--accent); animation: spin 1.2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.belt-base { fill: none; stroke: #0b0a09; stroke-width: 16; stroke-linejoin: round; }
+.belt { fill: none; stroke-width: 9; stroke-dasharray: 7 5; stroke-linejoin: round; opacity: .22; }
+.belt.on { opacity: 1; animation: flow .6s linear infinite; }
+.dyn .belt-base { opacity: .9; }
+@keyframes flow { to { stroke-dashoffset: -12; } }
+.bus { fill: none; stroke: #2c2924; stroke-width: 10; stroke-dasharray: 7 5; }
+.item text { font: 600 9px var(--f-mono); fill: #15130f; }
+@media (prefers-reduced-motion: reduce) { .belt.on, .mach.active .gear { animation: none; } }
+</style>
+
+<header class="top">
+  <h1>Fábrica Wip Diversos<small>O repositório inteiro como uma fábrica: telas, rotas, filas, bancos e serviços externos. Arraste para andar, use a roda do mouse para zoom.</small></h1>
+  <div class="legend" aria-label="Legenda das esteiras">
+    <span><i style="--c: var(--belt-http)"></i>requisição / chamada</span>
+    <span><i style="--c: var(--belt-fila)"></i>fila Redis (BullMQ)</span>
+    <span><i style="--c: var(--belt-sql)"></i>banco MySQL</span>
+    <span><i style="--c: var(--belt-ext)"></i>mundo lá fora</span>
+  </div>
+</header>
+
+<nav class="missions" id="missions" aria-label="Pedidos"></nav>
+
+<div class="layout">
+  <div class="mapbox" id="mapbox" tabindex="0" aria-label="Mapa da fábrica. Setas movem, + e - fazem zoom.">
+    <svg id="map" role="img" aria-label="Mapa do repositório Wip Diversos"></svg>
+    <div class="tools">
+      <input type="search" id="find" list="findlist" placeholder="Procurar tela ou rota…" aria-label="Procurar máquina">
+      <datalist id="findlist"></datalist>
+      <button id="zin" aria-label="Aproximar">+</button>
+      <button id="zout" aria-label="Afastar">−</button>
+      <button id="zfit">Ver tudo</button>
+      <label><input type="checkbox" id="follow" checked> seguir peça</label>
+    </div>
+    <div class="maphint">arraste para mover · roda do mouse ou pinça para zoom · clique numa máquina</div>
+  </div>
+  <aside class="side">
+    <section class="card" aria-live="polite">
+      <h2 id="mtitle">Pedido</h2>
+      <div class="controls">
+        <button class="btn" id="play">▶ Rodar</button>
+        <button class="btn alt" id="next">Próxima etapa</button>
+        <button class="btn alt" id="reset">Reiniciar</button>
+        <label class="speed">velocidade
+          <select id="speed"><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+        </label>
+      </div>
+      <div id="gopts" class="gopts" hidden>
+        <fieldset><legend>O funcionário mandou…</legend>
+          <label><input type="radio" name="tok" id="tok-none" value="none"><span>sem token</span></label>
+          <label><input type="radio" name="tok" id="tok-bad" value="bad"><span>token vencido</span></label>
+          <label><input type="radio" name="tok" id="tok-ok" value="ok" checked><span>token válido</span></label>
+        </fieldset>
+        <fieldset><legend>Nível de permissão do usuário</legend>
+          <label><input type="radio" name="perm" id="perm-1" value="1"><span>1 · consulta</span></label>
+          <label><input type="radio" name="perm" id="perm-2" value="2" checked><span>2 · operador</span></label>
+          <label><input type="radio" name="perm" id="perm-5" value="5"><span>5 · admin</span></label>
+        </fieldset>
+      </div>
+      <div class="now" id="now"></div>
+      <ol class="steps" id="steps"></ol>
+    </section>
+    <section class="card insp" id="insp">
+      <h2>Inspetor</h2>
+      <p class="hint">Clique em qualquer máquina do mapa para ver o que ela faz, onde está o código e com quem ela se liga.</p>
+    </section>
+  </aside>
+</div>
+
+<section class="card study">
+  <h2>Trilha de estudo sugerida</h2>
+  <ol>
+    <li><b>Veja o mapa inteiro.</b> Aperte "Ver tudo". À esquerda ficam as telas (React, Next e o app de localização), no meio a portaria e as 38 rotas agrupadas por assunto, à direita os serviços externos e embaixo os bancos.</li>
+    <li><b>Ligue a fábrica.</b> Leia <code>backend/src/server.ts</code> e <code>app.ts</code> inteiros. São curtos e mostram tudo que sobe: middlewares, as 38 rotas, os 4 agendamentos e as filas.</li>
+    <li><b>Entenda a portaria.</b> <code>middleware/AuthGuard.ts</code> e <code>PermissionGuard.ts</code>. Rode o pedido "Portaria" com as 3 opções de token e os 3 níveis. Repare que a tela também confere o nível (<code>frontend/app/src/App.tsx</code>), mas quem protege de verdade é o backend.</li>
+    <li><b>Siga um pedido simples de ponta a ponta.</b> Login: a tela <code>pages/auth</code> → <code>routes/Auth.Routes.ts</code> → <code>controller/Auth.ts</code> → banco.</li>
+    <li><b>Aprenda as filas.</b> A pasta <code>controller/whatsapp/</code> é a parte mais bem organizada (handlers, services, testes). Leia <code>queues.ts</code> e depois o <code>switch</code> do <code>message.handler.ts</code>.</li>
+    <li><b>Só então as máquinas gigantes.</b> <code>NFE.ts</code> (3.594 linhas), <code>Nfcom.ts</code> (3.271), <code>NFSE.ts</code> (2.896) e <code>Pix.ts</code> (2.395). Não leia de cima a baixo: clique na tela, veja qual rota ela chama e siga a partir do método.</li>
+  </ol>
+</section>
+
+<script>
+(() => {
+const REPO = "https://github.com/pedrojovanuzzi/Wip_Diversos/";
+const WORLD = { w: 3200, h: 1960 };
+const BUS_X = 880, CTRL_LANE = 1545, DB_LANE = 1255, OUT_LANE = 2870;
+
+/* ======================= DADOS ======================= */
+// k = tipo da máquina. rank decide a ordem das esteiras (quem fica "antes" de quem).
+const KIND = {
+  screen: { label: "tela React",       color: "#6b4a7a", w: 160, h: 60, rank: 0 },
+  next:   { label: "tela Next.js",     color: "#3c3c3c", w: 160, h: 60, rank: 0 },
+  app:    { label: "app / cliente",    color: "#4a5a3a", w: 160, h: 60, rank: 0 },
+  dock:   { label: "entrada externa",  color: "#3f6a43", w: 160, h: 60, rank: 0 },
+  core:   { label: "núcleo",           color: "#6b5428", w: 130, h: 90, rank: 1 },
+  guard:  { label: "portaria",         color: "#6e3029", w: 140, h: 76, rank: 3 },
+  ctrl:   { label: "rota + controller", color: "#3e4660", w: 170, h: 76, rank: 4 },
+  queue:  { label: "fila",             color: "#7a2c26", w: 170, h: 76, rank: 5 },
+  worker: { label: "segundo plano",    color: "#57395e", w: 170, h: 76, rank: 5 },
+  clock:  { label: "agendador",        color: "#5b5230", w: 170, h: 76, rank: 5 },
+  db:     { label: "banco",            color: "#264a73", w: 170, h: 76, rank: 6 },
+  out:    { label: "serviço externo",  color: "#3f6a43", w: 200, h: 76, rank: 7 },
+  tool:   { label: "ferramenta",       color: "#4a4a40", w: 200, h: 70, rank: 8 },
+};
+
+const M = {};
+const add = (id, o) => (M[id] = { files: [], ...o });
+
+// ---- Telas do React (frontend/app/src/pages) ----
+// [pasta, nome, rotas da tela "caminho:nível", rotas da API que ela chama]
+const SCREENS = [
+  ["auth", "Login", "/auth/login:pub", "c_auth"],
+  ["home", "Início", "/:1", "c_home c_backup"],
+  ["create_users", "Usuários", "/Create:5", "c_auth"],
+  ["Auditoria", "Auditoria", "/auditoria:5", "c_auditoria"],
+  ["Nfse", "NFS-e", "/NFSE:2 /NFSE/ServicosAdicionais:2 /BuscarNfseGerada:2 /GerarNotaDeServicoIndependente:pub", "c_nfse"],
+  ["Nfe", "NF-e comodato", "/nfe/comodato:2 /NfeComodato:2 /BuscarNfe:2", "c_nfe c_nfse"],
+  ["Nfcom", "NFCom", "/Nfcom:2 /Nfcom/Buscar:1 /Nfcom/DeclaracaoQuitacao:2 /Nfcom/DeclaracoesQuitacao:2", "c_nfcom c_nfse"],
+  ["prefeitura_login", "Login Prefeitura", "/Prefeitura/Login:pub /Prefeitura/CodeOtp:pub", "c_prefeitura"],
+  ["Pix", "Pix", "/Pix:2 /Pix/automatico:2 /Pix/Admin:5 /Pix/automaticoAdmin:5 /Pix/findPaid:pub /Pix/:tipo:pub", "c_pix"],
+  ["CalculadoraDebitos", "Calculadora de débitos", "/calculadora-debitos:2", ""],
+  ["TokenAutoAtendimento", "Totem autoatendimento", "/TokenAutoAtendimento:pub /TokenAutoAtendimento/pagar-fatura:pub /TokenAutoAtendimento/criar-chamado:pub /TokenAutoAtendimento/fazer-cadastro:pub", "c_token c_totem"],
+  ["Licencas", "Licenças", "/licencas:5", "c_licenca"],
+  ["Codef", "Codef", "/codef:5", "c_codef"],
+  ["whatsapp_chat", "Chat WhatsApp", "/Whatsapp:2 /Whatsapp/:id:2", "c_whatsapp"],
+  ["Marketing", "Disparo em massa", "/whatsapp/broadcast:5", "c_whatsapp"],
+  ["whatsapp", "Teste do robô", "/whatsapp-teste:pub", "c_watest"],
+  ["zapsign", "ZapSign", "/ZapSignConfig:2 /zapsign-config:5 /zapsign-teste:pub", "c_zapsign c_zaptpl"],
+  ["SolicitacoesServico", "Solicitações", "/solicitacoes-servico:2", "c_solic c_servlink"],
+  ["ServicosWeb", "Links de serviço", "/servicos/links:2 /s/:token:pub", "c_servlink"],
+  ["Chamados", "Gráfico instalações", "/grafico-instalacoes:2", "c_chamados"],
+  ["ChamadosFichaTecnica", "Ficha técnica", "/chamados/ficha-tecnica:pub /chamados/ficha-tecnica/nova:pub", "c_ficha c_analytics"],
+  ["feedback", "Feedback", "/feedbackCreate:2 /feedback/Opnion:pub /feedback/:technician/:id:pub", "c_feedback c_timetracking"],
+  ["ClientAnalytics", "Análise de clientes", "/ClientAnalytics:2 /ClientAnalytics/Logs:2 /ClientAnalytics/Servidores:5 /ClientAnalytics/Consumo:2", "c_analytics c_servidor"],
+  ["DDDOS_Monitoring", "Monitor DDoS", "/DDDOS:2", "c_dos"],
+  ["logs", "Logs", "/ServerLogs:2 /ClientLogsSearch:2 /LogViewer:2 /Pm2Logs:5", "c_serverlogs c_pm2"],
+  ["onu", "ONU", "/Onu:2 /Onu/AutorizarOnu:2 /Onu/DesautorizarOnu:2 /Onu/Settings:5", "c_onu"],
+  ["powerdns", "PowerDNS", "/PowerDns:2", "c_powerdns"],
+  ["TvWip", "TV WIP", "/tv-wip:2", "c_tvwip"],
+  ["SerContratos", "Contratos / Streaming", "/SerContratos:pub /Streaming:pub", "c_sercontratos c_streaming c_cameras"],
+  ["Cameras", "Câmeras", "/Cameras/Admin:5 /Cameras/Setup/:uuid:pub", "c_cameras"],
+  ["TimeTracking", "Ponto eletrônico", "/TimeTracking/ClockIn:pub /TimeTracking/Admin:5 /TimeTracking/Map:5 /TimeTracking/Report:5", "c_timetracking"],
+  ["PhoneLocation", "Localização técnicos", "/phone-location:2", "c_phone"],
+  ["FileShare", "Arquivos", "/arquivos:2", "c_files"],
+  ["PdfViewer", "Visualizar PDF", "/doc/:fileName:pub", ""],
+];
+SCREENS.forEach(([dir, name, paths, apis], i) => add("s_" + dir.toLowerCase(), {
+  k: "screen", x: 130 + (i % 4) * 180, y: 170 + Math.floor(i / 4) * 115, tag: "pages/" + dir, name,
+  paths: paths.split(" ").map(p => { const j = p.lastIndexOf(":"); return [p.slice(0, j), p.slice(j + 1)]; }),
+  apis: apis ? apis.split(" ") : [], dir: "frontend/app/src/pages/" + dir,
+  desc: "Tela do app React (Create React App). Chama o backend com fetch/axios em process.env.REACT_APP_URL, mandando o token no header.",
+}));
+
+// ---- Telas já migradas para o Next.js (frontend/app_nextjs/app) ----
+[
+  ["n_auth", "Login + Início", "app/auth, app/page.tsx", "c_auth c_backup"],
+  ["n_fiscal", "Notas fiscais", "app/NFSE, nfe, Nfcom, BuscarNfe, BuscarNfseGerada, GerarNotaDeServicoIndependente", "c_nfse c_nfe c_nfcom"],
+  ["n_licencas", "Licenças", "app/licencas", "c_licenca"],
+  ["n_feedback", "Feedback", "app/feedback/Opnion", "c_feedback"],
+  ["n_infra", "ONU · DNS · Logs", "app/Onu, PowerDns, Pm2Logs, ServerLogs", "c_onu c_powerdns c_pm2 c_serverlogs"],
+  ["n_ponto", "Ponto eletrônico", "app/TimeTracking", "c_timetracking"],
+].forEach(([id, name, dirs, apis], i) => add(id, {
+  k: "next", x: 130 + (i % 4) * 180, y: 1350 + Math.floor(i / 4) * 100, tag: "app_nextjs", name, apis: apis.split(" "),
+  dir: "frontend/app_nextjs/app",
+  desc: "Migração incremental do React para Next.js 15 (App Router, porta 3001). O app React continua em produção; as páginas vão sendo copiadas para cá uma a uma. Pastas: " + dirs + ".",
+  files: [["frontend/app_nextjs/MIGRATION_INSTRUCTIONS.md", 0, "instruções da migração"]],
+}));
+
+// ---- Outros clientes e entradas externas ----
+add("app_loc", { k: "app", x: 130, y: 1680, tag: "Localizacao_app", name: "App de localização", apis: ["c_phone"],
+  desc: "App React Native (Expo) que o técnico instala. Manda a posição em segundo plano para /api/phone-location/position, mesmo com o app fechado.",
+  files: [["backend/Localizacao_app/src/backgroundTask.ts", 12, "tarefa em 2º plano"], ["backend/Localizacao_app/src/api.ts", 24, "envio"]] });
+add("hotspot", { k: "app", x: 310, y: 1680, tag: "frontend/app/hotspot", name: "Hotspot MikroTik", apis: [],
+  desc: "Páginas HTML de login do hotspot (login, status, logout...), servidas pelo próprio roteador MikroTik. Não passam pelo backend.",
+  files: [["frontend/app/hotspot/login.html", 0, "login.html"]] });
+add("in_meta", { k: "dock", x: 490, y: 1680, tag: "Meta", name: "WhatsApp (entrada)", apis: ["c_wahook"],
+  desc: "A Meta (WhatsApp Cloud API) chama o webhook sempre que um cliente manda mensagem." });
+add("in_efi", { k: "dock", x: 670, y: 1680, tag: "Efí", name: "Banco Efí (entrada)", apis: ["c_pix"],
+  desc: "A Efí avisa por webhook quando um Pix é pago ou uma recorrência do Pix Automático muda." });
+add("in_watch", { k: "dock", x: 490, y: 1800, tag: "Watch Brasil", name: "Watch (retorno)", apis: ["c_watch"],
+  desc: "Depois do login na Watch Brasil, o navegador do cliente volta para /api/watchbrasil/redirect." });
+
+// ---- Núcleo e portaria ----
+add("gate", { k: "core", x: 1050, y: 1000, tag: "app.ts", name: "Portão Express",
+  desc: "server.ts sobe o Express na porta 3000. Toda requisição passa por cors, express.json, urlencoded e auditoriaMiddleware (grava criar/editar/remover de usuário logado em audit_logs). O 'trust proxy' faz req.ip ser o IP real visto pelo nginx.",
+  files: [["server.ts", 20, "listen(3000)"], ["app.ts", 73, "middleware()"], ["utils/auditoria.ts", 173, "auditoriaMiddleware"]] });
+add("router", { k: "core", x: 1210, y: 1000, tag: "app.ts", name: "Roteador 38 rotas",
+  desc: "router() liga cada prefixo /api/... a um arquivo em routes/. Cada rota é uma máquina no bairro à direita.",
+  files: [["app.ts", 81, "router()"]] });
+add("limiter", { k: "guard", x: 1390, y: 640, tag: "rate-limit", name: "Contador de tentativas",
+  desc: "express-rate-limit só na rota de login: 10 senhas erradas por IP a cada 15 minutos. Login certo não conta, para não travar o escritório inteiro saindo pelo mesmo IP.",
+  files: [["routes/Auth.Routes.ts", 20, "loginLimiter"]] });
+add("auth", { k: "guard", x: 1390, y: 760, tag: "AuthGuard", name: "Confere o crachá",
+  desc: "Pega o token do header Authorization (ou ?token=), faz jwt.verify e carrega o User do banco em req.user. Sem token: 401 'Acesso Negado!'. Token ruim: 401 'Token Inválido'. Existe também AuthOpcional, para rotas públicas que mostram mais a quem está logado.",
+  files: [["middleware/AuthGuard.ts", 19, "AuthGuard"], ["middleware/AuthGuard.ts", 56, "AuthOpcional"]] });
+add("perm", { k: "guard", x: 1390, y: 880, tag: "PermissionGuard", name: "Confere o nível",
+  desc: "protegido(n) = [AuthGuard, exigirPermissao(n)], sempre nessa ordem. Níveis: 1 consulta, 2 operador, 5 administrador. Abaixo do mínimo: 403 'Permissão insuficiente.' A regra para rota nova está em .claude/rules/rotas-seguras.md.",
+  files: [["middleware/PermissionGuard.ts", 11, "exigirPermissao"], ["middleware/PermissionGuard.ts", 22, "protegido"], [".claude/rules/rotas-seguras.md", 0, "regra de rotas"]] });
+
+// ---- As 38 rotas, por bairro ----
+const DIST = {
+  equipe:  { x0: 1600, y0: 170, title: "Equipe e acesso" },
+  fiscal:  { x0: 1600, y0: 570, title: "Fiscal" },
+  finan:   { x0: 1600, y0: 860, title: "Financeiro" },
+  atend:   { x0: 2020, y0: 170, title: "Atendimento" },
+  tv:      { x0: 2020, y0: 790, title: "TV e câmeras" },
+  rede:    { x0: 2440, y0: 170, title: "Rede e servidores" },
+};
+// [id, bairro, prefixo, nome, arquivo de rota, controllers, linhas, endpoints, portaria, bancos, externos, descrição]
+const CTRLS = [
+  ["c_auth", "equipe", "/api/auth", "Login e usuários", "Auth.Routes.ts", "Auth.ts", 483, 9, "login com limite de tentativas; usuários só nível 5", "dbMain", "", "Login, cadastro e edição de usuários. Senha com bcrypt, crachá JWT de 8 horas."],
+  ["c_home", "equipe", "/api/", "Home", "Home.Routes.ts", "Home.ts", 8, 1, "AuthGuard", "", "", "Só confirma que o token vale."],
+  ["c_auditoria", "equipe", "/api/auditoria", "Auditoria", "Auditoria.routes.ts", "Auditoria.ts", 86, 2, "nível 5", "dbMain", "", "Consulta o audit_logs que o auditoriaMiddleware grava."],
+  ["c_timetracking", "equipe", "/api/time-tracking", "Ponto eletrônico", "TimeTracking.routes.ts", "EmployeeController.ts TimeRecordController.ts DailyOvertimeController.ts ImageController.ts MonthlyReportSignatureController.ts", 898, 19, "bater ponto aberto; gestão nível 5", "dbMain", "", "Funcionários, registros de ponto com foto, horas extras e assinatura do relatório mensal. Feriados via date-holidays."],
+  ["c_phone", "equipe", "/api/phone-location", "Localização", "PhoneLocation.routes.ts", "PhoneLocation.ts", 155, 5, "/position público (device_token); resto AuthGuard", "dbMain", "", "Recebe a posição do app dos técnicos e lista para o painel."],
+  ["c_files", "equipe", "/api/files", "Arquivos", "FileShare.routes.ts", "FileShare.ts", 113, 4, "nível 2; download por link", "dbMain", "", "Upload e compartilhamento de arquivos."],
+  ["c_nfse", "fiscal", "/api/nfse", "NFS-e", "NFSE.routes.ts", "NFSE.ts", 2896, 13, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco", "Emite, consulta, imprime e cancela NFS-e. Provedores em services/nfse (Fiorilli e SEFIN Nacional)."],
+  ["c_nfe", "fiscal", "/api/NFEletronica", "NF-e", "NFE.Routes.ts", "NFE.ts", 3594, 17, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco", "NF-e de comodato: monta XML, assina com certificado A1, gera DANFE em PDF. O maior arquivo do projeto."],
+  ["c_nfcom", "fiscal", "/api/NFCom", "NFCom", "NFCom.routes.ts", "Nfcom.ts", 3271, 17, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco", "Nota fiscal de comunicação (internet): XML assinado, QR Code, PDF e declaração de quitação."],
+  ["c_prefeitura", "fiscal", "/api/Prefeitura", "Login Prefeitura", "PrefeituraUser.routes.ts", "PrefeituraLogin.ts", 316, 10, "público com código por SMS", "dbMain", "out_twilio", "Acesso da prefeitura com código de verificação enviado por SMS (Twilio)."],
+  ["c_pix", "finan", "/api/Pix", "Pix", "Pix.routes.ts", "Pix.ts", 2395, 35, "nível 2 / 5; webhooks públicos", "dbMain mkauth", "out_efi", "Gera Pix, Pix Automático e recebe os webhooks da Efí. A regra do Pix Automático mora em services/PixAutomaticoService.ts."],
+  ["c_token", "finan", "/api/TokenAutoAtendimento", "Autoatendimento", "TokenAtendimento.routes.ts", "TokenAtendimento.ts", 1105, 15, "público (totem)", "mkauth", "out_efi", "O totem: cliente consulta e paga fatura, abre chamado, faz cadastro."],
+  ["c_totem", "finan", "/api/totem-solicitacao", "Registro do totem", "TotemSolicitacao.routes.ts", "TotemSolicitacao.ts", 31, 1, "público", "dbMain", "", "Registra os Pix pedidos no totem."],
+  ["c_licenca", "finan", "/api/licenca", "Licenças", "Licenca.Routes.ts", "LicencaController.ts LicencaMensalidadeController.ts", 460, 23, "nível 5", "dbMain", "", "Licenças de software e mensalidades (geradas todo dia às 03:15)."],
+  ["c_codef", "finan", "/api/codef", "Codef", "Codef.routes.ts", "Codef.ts", 206, 6, "nível 5", "dbMain", "", "Plano de contas e planilha da Codef (services/CodefService.ts)."],
+  ["c_wahook", "atend", "/api/whatsappWebHook", "Webhook WhatsApp", "WhatsappWebHook.routes.ts", "whatsapp/index.ts", 0, 4, "público (quem chama é a Meta)", "apimk mkauth", "out_meta", "A porta do robô: recebe, tira duplicadas e põe na fila. A pasta controller/whatsapp tem 28 arquivos (handlers, services, testes)."],
+  ["c_whatsapp", "atend", "/api/whatsapp", "Chat WhatsApp", "Whatsapp.Routes.ts", "Whatsapp.ts", 673, 7, "AuthGuard", "apimk mkauth", "out_meta", "Conversas para os atendentes, envio manual e disparo em massa."],
+  ["c_watest", "atend", "/api/whatsapp-test", "Teste do robô", "WhatsappTest.routes.ts", "whatsapp/handlers/whatsapp-test.controller.ts", 435, 3, "AuthGuard", "apimk mkauth", "", "Simula conversas com o robô sem mandar mensagem de verdade."],
+  ["c_zapsign", "atend", "/api/zapsign", "ZapSign", "ZapSign.routes.ts", "ZapSign.ts", 2017, 5, "AuthGuard", "apimk dbMain mkauth", "out_zapsign", "Contratos e termos para assinatura eletrônica."],
+  ["c_zaptpl", "atend", "/api/zapsign-templates", "Modelos ZapSign", "ZapSignTemplates.routes.ts", "ZapSignTemplatesController.ts", 151, 3, "AuthGuard", "apimk", "out_zapsign", "Modelos de documento usados pelo ZapSign."],
+  ["c_solic", "atend", "/api/solicitacao-servico", "Solicitações", "SolicitacaoServico.routes.ts", "SolicitacaoServico.ts", 1514, 12, "AuthGuard", "apimk dbMain mkauth", "", "Pedidos de serviço (mudança, troca de plano...) vindos do robô e dos links."],
+  ["c_servlink", "atend", "/api/service-links", "Links de serviço", "ServiceLink.routes.ts", "servicoWeb/ServiceLink.ts", 1720, 12, "AuthGuard; link /s/:token público", "dbMain mkauth", "", "Links que o cliente abre para contratar serviço. Catálogo e contrato em controller/servicoWeb."],
+  ["c_chamados", "atend", "/api/chamados", "Chamados", "Chamados.Routes.ts", "Chamados.ts", 1122, 13, "AuthGuard", "mkauth", "", "Chamados e gráficos de instalação, direto do MK-Auth."],
+  ["c_ficha", "atend", "/api/chamados-ficha", "Ficha técnica", "ChamadoFichaTecnica.routes.ts", "ChamadoFichaTecnica.ts", 550, 6, "AuthGuard", "dbMain mkauth", "", "Ficha técnica do atendimento, gerada em PDF (pdfkit)."],
+  ["c_feedback", "atend", "/api/feedback", "Feedback", "Feedback.routes.ts", "Feedback.ts", 299, 16, "AuthGuard; avaliação pública", "dbMain", "", "Link de avaliação do técnico e painel de notas."],
+  ["c_analytics", "rede", "/api/ClientAnalytics", "Análise de clientes", "ClientAnalytics.routes.ts", "ClientAnalytics.ts", 1711, 20, "nível 2", "mkauth", "out_servers", "Diagnóstico do cliente: sinal, consumo, logs, monitoramento contínuo (ClientMonitorService)."],
+  ["c_servidor", "rede", "/api/servidores-acesso", "Servidores de acesso", "ServidorAcesso.routes.ts", "ServidorAcesso.ts", 352, 7, "nível 5", "dbMain", "out_servers", "Cadastro dos concentradores e acesso por SSH/Telnet."],
+  ["c_onu", "rede", "/api/Onu", "ONU", "Onu.routes.ts", "Onu.ts", 889, 7, "nível 2; ajustes nível 5", "", "out_olt", "Autoriza e desautoriza ONUs falando com a OLT por Telnet."],
+  ["c_powerdns", "rede", "/api/PowerDns", "PowerDNS", "PowerDns.routes.ts", "PowerDns.ts", 113, 5, "nível 2", "", "", "Cadastro de domínios no DNS (utils/createDns.ts)."],
+  ["c_dos", "rede", "/api/DosProtect", "Monitor DDoS", "DosProtect.Routes.ts", "DosProtect.ts", 572, 4, "AuthGuard", "dbMain", "out_servers", "Eventos de ataque por minuto, coletados por SSH."],
+  ["c_serverlogs", "rede", "/api/ServerLogs", "Logs de servidor", "ServerLogs.Routes.ts", "ServerLogs.ts", 918, 6, "AuthGuard", "mkauth", "out_servers", "Busca logs por SFTP, lê PDF e planilhas."],
+  ["c_pm2", "rede", "/api/pm2-logs", "Logs PM2", "Pm2Logs.routes.ts", "Pm2Logs.ts", 97, 2, "AuthGuard", "", "", "Roda 'pm2 jlist' na própria máquina do backend."],
+  ["c_backup", "rede", "/api/Backup", "Backup", "Backup.routes.ts", "Backup.ts", 400, 1, "AuthGuard (botão na Home)", "dbMain mkauth apimk", "out_drive", "mysqldump dos bancos e upload para o OneDrive. Também roda sozinho às 03:00."],
+  ["c_tvwip", "tv", "/api/tv-wip", "TV WIP", "TvWip.routes.ts", "TvWip.ts TvWipApp.ts", 957, 32, "nível 2; app da TV com token próprio", "dbMain canais", "", "Contas, pacotes, canais, EPG e notificações da TV WIP."],
+  ["c_streaming", "tv", "/api/streaming", "Streaming", "Streaming.Routes.ts", "Streaming.ts", 175, 7, "AuthGuard", "dbMain mkauth", "out_watch", "Assinantes e testes da Watch TV."],
+  ["c_watch", "tv", "/api/watchbrasil/redirect", "Retorno Watch", "WatchBrasilWebhook.routes.ts", "", 0, 2, "público (redirect)", "", "out_watch", "Recebe o retorno do login OAuth da Watch Brasil. A lógica fica na própria rota."],
+  ["c_cameras", "tv", "/api/cameras", "Câmeras", "Camera.routes.ts", "Camera.ts", 540, 16, "AuthGuard", "cams mkauth", "out_mediamtx", "Portal de câmeras: cadastro, planos de gravação e acesso ao vídeo pelo MediaMTX."],
+  ["c_sercontratos", "tv", "/api/sercontratos", "Contratos SVA", "SerContratos.Routes.ts", "SerContratos.ts", 689, 7, "AuthGuard", "dbMain mkauth", "", "Contratos de serviços adicionais (streaming, câmeras)."],
+];
+const cnt = {};
+CTRLS.forEach(([id, d, prefix, name, rf, cf, lines, eps, guard, dbs, ext, desc]) => {
+  const i = (cnt[d] = (cnt[d] || 0) + 1) - 1, D = DIST[d];
+  const files = [["routes/" + rf, 0, "rota"]].concat(cf ? cf.split(" ").map(f => ["controller/" + f, 0, "controller"]) : []);
+  add(id, { k: "ctrl", x: D.x0 + 95 + (i % 2) * 190, y: D.y0 + Math.floor(i / 2) * 110, tag: prefix.replace("/api", "") || "/", name,
+    prefix, lines, eps, guard, dbs: dbs ? dbs.split(" ") : [], ext: ext ? ext.split(" ") : [], desc, files, dist: d });
+});
+
+// ---- Segundo plano ----
+add("redis", { k: "queue", x: 2535, y: 690, tag: "Redis · BullMQ", name: "Filas", links: ["c_wahook", "c_whatsapp", "worker"],
+  desc: "Três filas: whatsapp-incoming (mensagens que chegaram), whatsapp-outgoing (respostas a enviar) e whatsapp-inactivity (aviso após 15 min parado). O Redis sobe pelo backend/docker-compose.yml.",
+  files: [["controller/whatsapp/services/messaging.service.ts", 7, "Queue(...)"], ["backend/docker-compose.yml", 2, "redis"]] });
+add("worker", { k: "worker", x: 2725, y: 690, tag: "queues.ts", name: "Robô do WhatsApp", links: ["apimk", "out_meta"],
+  desc: "initQueues() (chamado pelo server.ts depois do listen) cria os workers. O de entrada roda handleMessage: uma máquina de estados com uns 40 estágios ('' → boas-vindas, awaiting_cpf, plan, troca_plano, mudanca_endereco...).",
+  files: [["controller/whatsapp/queues.ts", 45, "initQueues"], ["controller/whatsapp/handlers/message.handler.ts", 107, "handleMessage"]] });
+add("jobs", { k: "worker", x: 2535, y: 800, tag: "tabela Jobs", name: "Produção em 2º plano", links: ["c_nfse", "c_nfe", "c_nfcom", "dbMain"],
+  desc: "Não é BullMQ: é uma função chamada sem await, que vai atualizando um registro na tabela Jobs (pendente → processando → concluido/erro). Roda dentro do processo do Node, então, se o servidor reiniciar no meio, não é retomado sozinho.",
+  files: [["controller/NFSE.ts", 545, "processarGeracaoNfseJob"], ["entities/Jobs.ts", 0, "Jobs"]] });
+add("cron", { k: "clock", x: 2725, y: 800, tag: "node-cron", name: "Relógio", links: ["c_backup", "c_pix", "c_licenca"],
+  desc: "Agendado no app.ts: 03:00 todo dia, backup. 03:00 do dia 1º, cobranças do Pix Automático. 03:15 todo dia, mensalidades de licença. 04:00 todo dia, conferência do Pix Automático. Pix e licenças também rodam 60 s depois de o servidor subir, para recuperar o que se perdeu com a máquina desligada.",
+  files: [["app.ts", 124, "backup 03:00"], ["app.ts", 141, "Pix dia 1º"], ["app.ts", 202, "licenças 03:15"], ["app.ts", 153, "conferência 04:00"]] });
+add("services", { k: "clock", x: 2535, y: 910, tag: "server.ts", name: "Serviços contínuos", links: ["c_analytics", "c_streaming", "c_tvwip"],
+  desc: "Ligados assim que o servidor sobe: ClientMonitorService (retoma monitoramentos de clientes), StreamingTesteService (encerra testes da Watch TV vencidos) e TvWipService (varredura diária da TV WIP).",
+  files: [["server.ts", 22, "start()"], ["services/ClientMonitorService.ts", 0, "ClientMonitorService"]] });
+
+// ---- Bancos ----
+add("dbMain", { k: "db", x: 1720, y: 1400, tag: "DataSource.ts", name: "MySQL principal",
+  desc: "O banco do próprio sistema: User, NFSE, NFE, NFCom, Jobs, Pix Automático, licenças, ponto, TV WIP, Codef, auditoria...", files: [["database/DataSource.ts", 0, "DataSource"]] });
+add("mkauth", { k: "db", x: 1960, y: 1400, tag: "MkauthSource.ts", name: "MK-Auth",
+  desc: "O banco do MK-Auth, o sistema de gestão do provedor: clientes, faturas, chamados e funcionários. O backend lê e dá baixa aqui.", files: [["database/MkauthSource.ts", 22, "entities"]] });
+add("apimk", { k: "db", x: 2200, y: 1400, tag: "API_MK.ts", name: "Banco do WhatsApp",
+  desc: "Conversas, mensagens e sessões do robô (Sessions guarda em que estágio cada celular está), além dos modelos do ZapSign.", files: [["database/API_MK.ts", 0, "API_MK"]] });
+add("cams", { k: "db", x: 2440, y: 1400, tag: "CamsSource.ts", name: "Banco das câmeras",
+  desc: "Câmeras, clientes e planos de gravação do portal de câmeras.", files: [["database/CamsSource.ts", 0, "CamsSource"]] });
+add("canais", { k: "db", x: 2680, y: 1400, tag: "CanaisSource.ts", name: "Banco dos canais",
+  desc: "Canais de TV usados pela TV WIP (services/TvWipCanaisService.ts e TvWipEpgService.ts).", files: [["database/CanaisSource.ts", 0, "CanaisSource"]] });
+
+// ---- Saída: serviços externos ----
+[
+  ["out_meta", "Graph API", "WhatsApp (saída)", "O outgoingWorker e o chat mandam mensagens pela Graph API da Meta.", [["controller/whatsapp/queues.ts", 169, "outgoingWorker"]]],
+  ["out_fisco", "SEFIN · SEFAZ", "Fisco", "NFS-e vai para a SEFIN Nacional ou para a Fiorilli (prefeitura). NF-e e NFCom vão para a SEFAZ. Tudo em XML assinado com o certificado A1.", [["controller/NFSE.ts", 303, "enviarDpsNacional"], ["services/nfse/FiorilliProvider.ts", 0, "FiorilliProvider"]]],
+  ["out_efi", "API Efí", "Banco Efí (saída)", "Chamadas à Efí pelo SDK sdk-node-apis-efi: criar cobrança, gerar QR Code, consultar pagamentos.", [["services/PixAutomaticoService.ts", 97, "efi()"]]],
+  ["out_drive", "OneDrive", "OneDrive", "Destino dos backups, na pasta Backup, via Microsoft Graph (LargeFileUploadTask).", [["controller/Backup.ts", 227, "createUploadSession"]]],
+  ["out_zapsign", "API ZapSign", "ZapSign", "Assinatura eletrônica de contratos e termos.", []],
+  ["out_twilio", "Twilio", "SMS (Twilio)", "Envia o código de verificação do login da prefeitura.", []],
+  ["out_watch", "Watch Brasil", "Watch TV", "Plataforma de streaming: cadastro de assinantes e login OAuth.", []],
+  ["out_mediamtx", "MediaMTX", "Vídeo das câmeras", "Container separado que faz o RTSP, o ao vivo (WebRTC) e a gravação 24/7. O backend não processa vídeo: só orquestra o MediaMTX e emite tokens curtos.", [["backend/mediamtx/README.md", 0, "README"], ["services/NginxService.ts", 0, "NginxService"]]],
+  ["out_olt", "Telnet", "OLT Huawei", "Equipamento da rede óptica. O backend autoriza ONUs e faz diagnóstico por Telnet/SSH.", [["services/oltSsh.ts", 0, "oltSsh"], ["services/huaweiDiagnostico.ts", 0, "huaweiDiagnostico"]]],
+  ["out_servers", "SSH · SFTP", "Servidores da rede", "Concentradores e servidores acessados por SSH/SFTP para logs, diagnóstico e monitoramento de DDoS.", []],
+].forEach(([id, tag, name, desc, files], i) => add(id, { k: "out", x: 3030, y: 170 + i * 125, tag, name, desc, files }));
+
+// ---- Ferramentas e infraestrutura ----
+[
+  ["t_migr", "migration/", "89 migrações", "Histórico do banco principal em TypeORM. run-migrations.ts aplica as pendentes.", [["run-migrations.ts", 0, "run-migrations"]], ["dbMain"]],
+  ["t_tests", "vitest", "Testes", "Testes do robô do WhatsApp (controller/__tests__/whatsapp) e do fiscal (services/fiscal/__tests__).", [["backend/vitest.config.ts", 0, "vitest.config"]], []],
+  ["t_docker", "docker-compose.yml", "Docker", "Sobe o Redis (filas) e o MediaMTX (câmeras). O backend em si roda com PM2.", [["backend/docker-compose.yml", 0, "docker-compose"]], ["redis", "out_mediamtx"]],
+  ["t_scripts", "scripts", "Scripts avulsos", "Correções pontuais rodadas à mão: backfill-nfe-data.ts, cancelarNfse.ts, scripts/fix-chamados-abertos.ts, remove_log.js.", [["backfill-nfe-data.ts", 0, "backfill-nfe-data"], ["scripts/fix-chamados-abertos.ts", 0, "fix-chamados-abertos"]], ["dbMain", "mkauth"]],
+  ["t_onu", "extract_onu.py", "Extrator de ONUs", "Script Python na raiz: lê uma lista de ONUs exportada da OLT e gera um UPDATE em SQL.", [["extract_onu.py", 0, "extract_onu.py"]], ["mkauth"]],
+  ["t_cc", "CodeCharta", "Mapa CodeCharta", "backend.cc.json.gz: a 'cidade' do código (tamanho e complexidade de cada arquivo). Abra em codecharta.com.", [["backend.cc.json.gz", 0, "backend.cc.json.gz"]], []],
+].forEach(([id, tag, name, desc, files, links], i) => add(id, { k: "tool", x: 1110 + (i % 2) * 240, y: 1300 + Math.floor(i / 2) * 120, tag, name, desc, files, links }));
+
+const PLATES = [
+  [40, 80, 760, 1110, "Frontend React", "frontend/app · 34 pastas de tela"],
+  [40, 1250, 760, 260, "Frontend Next.js", "frontend/app_nextjs · migração em andamento"],
+  [40, 1570, 760, 320, "Outros clientes e entradas", "app de celular, hotspot e webhooks"],
+  [970, 540, 520, 560, "Portaria", "backend/src/app.ts + middleware/"],
+  [970, 1200, 520, 450, "Ferramentas", "fora do caminho das requisições"],
+  [1580, 80, 400, 380, "Equipe e acesso", ""],
+  [1580, 480, 400, 270, "Fiscal", ""],
+  [1580, 770, 400, 380, "Financeiro", ""],
+  [2000, 80, 400, 640, "Atendimento", ""],
+  [2000, 740, 400, 380, "TV e câmeras", ""],
+  [2420, 80, 400, 500, "Rede e servidores", ""],
+  [2420, 600, 400, 380, "Segundo plano", "filas, jobs, relógio"],
+  [1580, 1300, 1240, 190, "Bancos", "MySQL"],
+  [2890, 80, 280, 1300, "Saída", "serviços externos"],
+];
+
+/* ======================= PEDIDOS ======================= */
+const S = (m, t, d, f, l, x = {}) => ({ m, t, d, f, l, ...x });
+const MISSIONS = [
+  { id: "login", title: "Login", http: "POST /api/auth/login", item: "REQ", color: "#d9a62c", steps: [
+    S("s_auth", "Funcionário clica em Entrar", "A tela de login envia { login, password }.", "frontend/app/src/pages/auth", 0),
+    S("gate", "Entra pelo portão", "cors, express.json (o corpo vira req.body) e auditoriaMiddleware.", "app.ts", 73),
+    S("router", "Escolhe a esteira", "O prefixo /api/auth manda para routes/Auth.Routes.ts.", "app.ts", 81),
+    S("limiter", "Passa pelo contador", "Menos de 10 erros deste IP nos últimos 15 minutos: pode seguir.", "routes/Auth.Routes.ts", 20),
+    S("c_auth", "Valida o formulário", "express-validator: login obrigatório e senha com 6+ caracteres. Se falhar, devolve 400.", "controller/Auth.ts", 353),
+    S("dbMain", "Procura o usuário", "userRepository.findOne({ where: { login } }) no MySQL principal.", "controller/Auth.ts", 375),
+    S("c_auth", "Confere a senha e faz o crachá", "bcrypt.compare na senha. Login inexistente também compara com um hash falso, para o tempo de resposta não entregar quais logins existem. Deu certo: jwt.sign({ id }) por 8 horas.", "controller/Auth.ts", 34),
+    S("s_auth", "Crachá entregue", "O frontend guarda o token num cookie (context/AuthContext.tsx) e manda Authorization: Bearer <token> em todo pedido seguinte.", "frontend/app/src/context/AuthContext.tsx", 43, { end: "200" }),
+  ]},
+  { id: "whats", title: "Mensagem no WhatsApp", http: "POST /api/whatsappWebHook", item: "MSG", color: "#6fc277", steps: [
+    S("in_meta", "Cliente manda \"oi\"", "A Meta entrega a mensagem no webhook."),
+    S("gate", "Entra pelo portão", "Os mesmos middlewares de sempre.", "app.ts", 73),
+    S("router", "Rota pública", "/api/whatsappWebHook não tem AuthGuard: quem chama é a Meta, não um funcionário.", "routes/WhatsappWebHook.routes.ts", 7),
+    S("c_wahook", "Recebe e despacha", "Grava o messageId no Redis por 24h (SET NX) para ignorar mensagem repetida, enfileira e responde 200 na hora, para a Meta não reenviar.", "controller/whatsapp/handlers/webhook.handler.ts", 38),
+    S("redis", "Fila de entrada", "O job entra em whatsapp-incoming.", "controller/whatsapp/handlers/webhook.handler.ts", 188),
+    S("worker", "Robô pega o job", "Confere se já processou esta mensagem e pega um lock por celular, para não atender duas mensagens da mesma pessoa ao mesmo tempo.", "controller/whatsapp/queues.ts", 45),
+    S("apimk", "Lê a sessão", "Busca em Sessions em que estágio a conversa desse celular parou.", "controller/whatsapp/queues.ts", 56),
+    S("worker", "Máquina de estados", "handleMessage faz switch(stage). Estágio vazio: manda boas-vindas e o menu. Os próximos (awaiting_cpf, plan, troca_plano...) dependem da resposta.", "controller/whatsapp/handlers/message.handler.ts", 107),
+    S("apimk", "Salva o novo estágio", "saveSession grava o stage novo e agenda o aviso de inatividade de 15 min.", "controller/whatsapp/queues.ts", 118),
+    S("redis", "Fila de saída", "A resposta que o handleMessage montou está em whatsapp-outgoing.", "controller/whatsapp/services/messaging.service.ts", 51),
+    S("out_meta", "Resposta no celular", "O outgoingWorker envia pela Graph API da Meta.", "controller/whatsapp/queues.ts", 169, { end: "enviada" }),
+  ]},
+  { id: "nfse", title: "Emitir NFS-e", http: "POST /api/nfse", item: "RPS", color: "#6ea6e6", steps: [
+    S("s_nfse", "Operador escolhe os clientes", "Na tela /NFSE ele marca os clientes e envia alíquota, ambiente, último RPS e a senha do certificado.", "frontend/app/src/pages/Nfse", 0),
+    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 73),
+    S("router", "Esteira /api/nfse", "Vai para routes/NFSE.routes.ts, que usa protegido(2).", "routes/NFSE.routes.ts", 44),
+    S("auth", "Confere o crachá", "AuthGuard: tira o token do header, jwt.verify e carrega req.user.", "middleware/AuthGuard.ts", 19),
+    S("perm", "Confere o nível", "exigirPermissao(2): operador ou acima pode seguir.", "middleware/PermissionGuard.ts", 11),
+    S("c_nfse", "Abre a ordem de serviço", "iniciar calcula o próximo RPS, cria um registro em Jobs com status \"pendente\" e já responde 200 com o id do job. O trabalho pesado continua depois da resposta.", "controller/NFSE.ts", 471),
+    S("jobs", "Produção em 2º plano", "processarGeracaoNfseJob roda sem await, em lotes de 50 clientes, atualizando \"processados\" a cada nota.", "controller/NFSE.ts", 644),
+    S("mkauth", "Busca cliente e fatura", "prepareRpsData lê ClientesEntities e Faturas no MK-Auth para montar o XML.", "controller/NFSE.ts", 828),
+    S("out_fisco", "Envia para o fisco", "enviarDpsNacional assina o XML com o certificado A1 e envia.", "controller/NFSE.ts", 303),
+    S("dbMain", "Guarda e fecha o job", "Salva cada NFSE e marca o Job como \"concluido\" ou \"erro\". A tela vai consultando o job até terminar.", "controller/NFSE.ts", 818, { end: "concluido" }),
+  ]},
+  { id: "pix", title: "Pix pago", http: "POST /api/Pix/PixAutomatico/webhookCobr", item: "PIX", color: "#4fc3b0", steps: [
+    S("in_efi", "Cliente pagou", "A Efí chama o webhook da cobrança do Pix Automático."),
+    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 73),
+    S("router", "Esteira /api/Pix", "Os webhooks não têm AuthGuard: quem chama é o banco.", "routes/Pix.routes.ts", 135),
+    S("c_pix", "Anota e responde rápido", "PixAutomaticWebhookCobr registra a notificação e responde 200 { recebido: true } antes de processar.", "controller/Pix.ts", 856),
+    S("dbMain", "Notificação guardada", "Fica em PixAutomaticoNotificacao. Se o processamento falhar, a conferência das 04:00 pega de novo.", "services/PixAutomaticoService.ts", 106),
+    S("out_efi", "Confirma com o banco", "processarNotificacao consulta a cobrança na Efí (pixDetailAutomaticCharge) em vez de confiar só no corpo do webhook.", "services/PixAutomaticoService.ts", 177),
+    S("mkauth", "Dá baixa na fatura", "darBaixaNaMensalidade marca a fatura como paga no MK-Auth.", "services/PixAutomaticoService.ts", 280, { end: "pago" }),
+  ]},
+  { id: "loc", title: "Técnico em campo", http: "POST /api/phone-location/position", item: "GPS", color: "#e07a5f", steps: [
+    S("app_loc", "Celular manda a posição", "O app Expo roda uma tarefa em segundo plano que pega o GPS e envia, mesmo com o app fechado.", "backend/Localizacao_app/src/backgroundTask.ts", 12),
+    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 73),
+    S("router", "Esteira /api/phone-location", "A rota /position é pública: o celular se identifica pelo device_token no corpo, não por login.", "routes/PhoneLocation.routes.ts", 8),
+    S("c_phone", "Confere o aparelho", "updatePosition valida o device_token e atualiza a posição.", "controller/PhoneLocation.ts", 96),
+    S("dbMain", "Posição salva", "Fica na tabela PhoneLocation.", "entities/PhoneLocation.ts", 0),
+    S("c_phone", "Painel pede a lista", "A tela /phone-location (nível 2) chama GET /api/phone-location, que exige AuthGuard.", "routes/PhoneLocation.routes.ts", 13),
+    S("s_phonelocation", "Técnicos no mapa", "O painel mostra onde cada técnico está.", "frontend/app/src/pages/PhoneLocation", 0, { end: "200" }),
+  ]},
+  { id: "backup", title: "Backup das 03:00", http: "cron \"0 3 * * *\"", item: "SQL", color: "#b58be0", steps: [
+    S("cron", "O relógio bate 03:00", "node-cron dispara o agendamento. Ninguém precisa pedir nada.", "app.ts", 124),
+    S("c_backup", "gerarTodos", "BackupController percorre a lista de bancos.", "controller/Backup.ts", 376),
+    S("dbMain", "mysqldump", "Gera um .sql de cada banco. Se um falhar, pula e segue com os outros.", "controller/Backup.ts", 189),
+    S("out_drive", "Sobe para o OneDrive", "Cria uma sessão de upload no Microsoft Graph e envia o arquivo para a pasta Backup.", "controller/Backup.ts", 227, { end: "salvo" }),
+  ]},
+  { id: "guard", title: "Portaria", http: "POST /api/Pix/gerador", item: "REQ", color: "#f39a1d", build: guardSteps },
+];
+
+function guardSteps(o) {
+  const s = [
+    S("s_pix", "Funcionário pede um Pix", "A tela /Pix já confere o nível no App.tsx, mas isso só esconde a tela: quem protege de verdade é o backend. O pedido vai " + (o.tok === "none" ? "sem token." : o.tok === "bad" ? "com um token vencido." : "com o token no header."), "frontend/app/src/App.tsx", 487),
+    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 73),
+    S("router", "Esteira /api/Pix", "A rota /gerador usa protegido(2): precisa de crachá e de nível 2.", "routes/Pix.routes.ts", 16),
+  ];
+  if (o.tok === "none") return s.concat(
+    S("auth", "Barrado: sem crachá", "Não veio token no header nem em ?token=. Responde 401 { errors: [\"Acesso Negado!\"] } e a requisição nem chega no controller.", "middleware/AuthGuard.ts", 24, { err: 1 }),
+    S("s_pix", "Volta com 401", "O frontend recebe o erro e manda o usuário para o login.", null, null, { end: "401", err: 1 }));
+  if (o.tok === "bad") return s.concat(
+    S("auth", "Barrado: crachá vencido", "jwt.verify lança erro (o token passou das 8 horas ou foi adulterado). Responde 401 \"Token Inválido\".", "middleware/AuthGuard.ts", 46, { err: 1 }),
+    S("s_pix", "Volta com 401", "O usuário precisa logar de novo.", null, null, { end: "401", err: 1 }));
+  s.push(
+    S("auth", "Crachá válido", "jwt.verify passou e o token tem o id do usuário.", "middleware/AuthGuard.ts", 30),
+    S("dbMain", "Carrega o usuário", "Busca id, login e permission do User e coloca em req.user.", "middleware/AuthGuard.ts", 34));
+  if (+o.perm < 2) return s.concat(
+    S("perm", "Barrado: nível " + o.perm + " < 2", "exigirPermissao(2) compara req.user.permission com o mínimo. Responde 403 \"Permissão insuficiente.\"", "middleware/PermissionGuard.ts", 13, { err: 1 }),
+    S("s_pix", "Volta com 403", "Está logado, mas não tem nível para essa tela.", null, null, { end: "403", err: 1 }));
+  return s.concat(
+    S("perm", "Nível " + o.perm + " ≥ 2: pode passar", "exigirPermissao(2) libera e chama next().", "middleware/PermissionGuard.ts", 11),
+    S("c_pix", "gerarPix", "Agora sim o controller trabalha.", "controller/Pix.ts", 948),
+    S("out_efi", "Cria a cobrança", "pixCreateLocation e pixGenerateQRCode na Efí.", "controller/Pix.ts", 969),
+    S("s_pix", "QR Code na tela", "Resposta 200 com o Pix gerado.", null, null, { end: "200" }));
+}
+
+/* ======================= DESENHO ======================= */
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("map");
+const el = (tag, attrs = {}, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
+const $ = id => document.getElementById(id);
+const K = id => KIND[M[id].k];
+
+const defs = el("defs", {}, svg);
+const pat = el("pattern", { id: "tiles", width: 32, height: 32, patternUnits: "userSpaceOnUse" }, defs);
+el("rect", { width: 32, height: 32, fill: "#1b1917" }, pat);
+el("path", { d: "M32 0H0V32", fill: "none", stroke: "#24211d", "stroke-width": 1 }, pat);
+el("rect", { x: -4000, y: -4000, width: WORLD.w + 8000, height: WORLD.h + 8000, fill: "url(#tiles)" }, svg);
+
+const gPlates = el("g", {}, svg);
+PLATES.forEach(([x, y, w, h, t, sub]) => {
+  const g = el("g", { class: "plate" }, gPlates);
+  el("rect", { x, y, width: w, height: h, rx: 6 }, g);
+  const tt = el("text", { x: x + 18, y: y + 42 }, g); tt.textContent = t;
+  if (sub) { const st = el("text", { x: x + 18, y: y + h - 16, class: "sub" }, g); st.textContent = sub; }
+});
+// barramento principal (decorativo): onde todas as telas descem até o portão
+for (let i = -1; i <= 1; i++) el("path", { class: "bus", d: `M${BUS_X + i * 14} 140V1860` }, gPlates);
+
+const gBelts = el("g", {}, svg), gDyn = el("g", { class: "dyn" }, svg), gMach = el("g", {}, svg), gItem = el("g", {}, svg);
+
+// Esteira entre duas máquinas, sempre desenhada da de rank menor para a maior.
+function order(a, b) { return K(a).rank <= K(b).rank ? [a, b] : [b, a]; }
+function route(a, b) {
+  const [lo, hi] = order(a, b), A = M[lo], B = M[hi], ka = A.k, kb = B.k;
+  const hvh = mx => `M${A.x} ${A.y}H${mx}V${B.y}H${B.x}`;
+  if (Math.abs(A.y - B.y) < 2) return `M${A.x} ${A.y}H${B.x}`;
+  if (Math.abs(A.x - B.x) < 2) return `M${A.x} ${A.y}V${B.y}`;
+  if (K(lo).rank === 0) return hvh(BUS_X);
+  if (kb === "out") return hvh(OUT_LANE);
+  if (kb === "db") return `M${A.x} ${A.y}V${DB_LANE}H${B.x}V${B.y}`;
+  if (ka === "core" && kb === "guard") return hvh(1300);
+  if ((ka === "core" || ka === "guard") && kb === "ctrl") return hvh(CTRL_LANE);
+  return hvh(Math.round((A.x + B.x) / 2));
+}
+function beltColor(a, b) {
+  const ka = M[a].k, kb = M[b].k, has = k => ka === k || kb === k;
+  if (has("db")) return "var(--belt-sql)";
+  if (has("queue")) return "var(--belt-fila)";
+  if (has("out") || has("dock")) return "var(--belt-ext)";
+  return "var(--belt-http)";
+}
+const keyOf = (a, b) => order(a, b).join("|");
+
+const belts = {};
+function staticBelt(a, b) {
+  const key = keyOf(a, b);
+  if (belts[key]) return;
+  const d = route(a, b);
+  el("path", { d, class: "belt-base" }, gBelts);
+  belts[key] = el("path", { d, class: "belt", stroke: beltColor(a, b) }, gBelts);
+}
+// Esteiras fixas: toda tela/entrada → portão → roteador → cada rota.
+for (const id in M) if (K(id).rank === 0 && M[id].apis && M[id].apis.length) staticBelt(id, "gate");
+staticBelt("gate", "router");
+CTRLS.forEach(c => staticBelt("router", c[0]));
+
+function hopsOf(steps) { const h = []; for (let i = 1; i < steps.length; i++) if (steps[i - 1].m !== steps[i].m) h.push([steps[i - 1].m, steps[i].m]); return h; }
+
+// Esteiras dinâmicas: aparecem só para o pedido ou a máquina em foco.
+function showLinks(pairs) {
+  gDyn.innerHTML = "";
+  for (const k in belts) belts[k].classList.remove("on");
+  const seen = new Set();
+  pairs.forEach(([a, b]) => {
+    if (a === b) return;
+    const key = keyOf(a, b);
+    if (seen.has(key)) return; seen.add(key);
+    if (belts[key]) { belts[key].classList.add("on"); return; }
+    const d = route(a, b);
+    el("path", { d, class: "belt-base" }, gDyn);
+    el("path", { d, class: "belt on", stroke: beltColor(a, b) }, gDyn);
+  });
+  const used = new Set(pairs.flat());
+  for (const id in machEls) machEls[id].classList.toggle("dim", used.size > 0 && !used.has(id));
+}
+
+function wrap(text, max) {
+  const out = []; let line = "";
+  text.split(" ").forEach(w => { if ((line + " " + w).trim().length > max && line) { out.push(line); line = w; } else line = (line + " " + w).trim(); });
+  if (line) out.push(line);
+  return out.slice(0, 2);
+}
+const machEls = {};
+for (const id in M) {
+  const m = M[id], k = KIND[m.k], W = k.w, H = k.h;
+  const g = el("g", { class: "mach", transform: `translate(${m.x - W / 2} ${m.y - H / 2})`, "data-id": id }, gMach);
+  el("rect", { class: "body", width: W, height: H, rx: 4 }, g);
+  el("rect", { class: "hi", x: 3, y: 3, width: W - 6, height: H - 6, rx: 2 }, g);
+  el("rect", { x: 2, y: 2, width: W - 4, height: 18, fill: k.color, rx: 2 }, g);
+  const tg = el("text", { class: "tag", x: 8, y: 15 }, g);
+  tg.textContent = m.tag.length > (W - 30) / 6.8 ? m.tag.slice(0, Math.floor((W - 34) / 6.8)) + "…" : m.tag;
+  el("circle", { class: "lamp", cx: W - 10, cy: 11, r: 4 }, g);
+  if (H >= 70) el("circle", { class: "gear", cx: W - 18, cy: H - 18, r: 9 }, g);
+  const lines = wrap(m.name, Math.floor((W - (H >= 70 ? 40 : 16)) / 8));
+  lines.forEach((ln, i) => { const t = el("text", { class: "name", x: 9, y: (H >= 70 ? 42 : 40) + i * 17 - (lines.length - 1) * (H >= 70 ? 4 : 8) }, g); t.textContent = ln; });
+  machEls[id] = g;
+}
+
+const item = el("g", { class: "item" }, gItem);
+const itemBox = el("rect", { x: -14, y: -14, width: 28, height: 28, rx: 3, stroke: "#000", "stroke-width": 2 }, item);
+const itemTxt = el("text", { "text-anchor": "middle", y: 3 }, item);
+
+/* ======================= CÂMERA (arrastar e zoom) ======================= */
+const box = $("mapbox");
+let vb = { x: 0, y: 0, w: WORLD.w, h: WORLD.h }, cam = null;
+function aspect() { const r = box.getBoundingClientRect(); return r.height ? r.width / r.height : 1.6; }
+function apply() { svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`); }
+function clampW(w) { return Math.max(260, Math.min(WORLD.w * 2.2, w)); }
+function frame(x0, y0, x1, y1, pad = 80, animate = true) {
+  const a = aspect(); let w = x1 - x0 + pad * 2, h = y1 - y0 + pad * 2;
+  if (w / h > a) h = w / a; else w = h * a;
+  w = clampW(w); h = w / a;
+  goTo({ x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w, h }, animate);
+}
+function goTo(t, animate = true) {
+  cancelAnimationFrame(cam);
+  if (!animate || reduce) { vb = t; apply(); return; }
+  const s = { ...vb }, t0 = performance.now(), D = 550;
+  (function f(now) {
+    const k = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - k, 3);
+    vb = { x: s.x + (t.x - s.x) * e, y: s.y + (t.y - s.y) * e, w: s.w + (t.w - s.w) * e, h: s.h + (t.h - s.h) * e };
+    apply(); if (k < 1) cam = requestAnimationFrame(f);
+  })(t0);
+}
+function fitAll(animate) { frame(0, 40, WORLD.w, WORLD.h - 40, 20, animate); }
+function frameIds(ids) {
+  const xs = [], ys = [];
+  ids.forEach(id => { const m = M[id], k = K(id); xs.push(m.x - k.w / 2, m.x + k.w / 2); ys.push(m.y - k.h / 2, m.y + k.h / 2); });
+  frame(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), 70);
+}
+function toWorld(cx, cy) { const r = box.getBoundingClientRect(); return { x: vb.x + (cx - r.left) / r.width * vb.w, y: vb.y + (cy - r.top) / r.height * vb.h }; }
+function zoomAt(cx, cy, f) {
+  cancelAnimationFrame(cam);
+  const p = toWorld(cx, cy), a = aspect(), w = clampW(vb.w * f), h = w / a;
+  vb = { x: p.x - (p.x - vb.x) * (w / vb.w), y: p.y - (p.y - vb.y) * (h / vb.h), w, h }; apply();
+}
+function zoomCenter(f) { const r = box.getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, f); }
+function stopFollow() { $("follow").checked = false; }
+
+const ptrs = new Map(); let dragged = false, pinch0 = null, downAt = null;
+box.addEventListener("pointerdown", e => {
+  if (e.target.closest(".tools")) return;
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  downAt = { x: e.clientX, y: e.clientY }; dragged = false;
+  if (ptrs.size === 2) { const [p, q] = [...ptrs.values()]; pinch0 = { d: Math.hypot(p.x - q.x, p.y - q.y), w: vb.w }; }
+});
+box.addEventListener("pointermove", e => {
+  if (!ptrs.has(e.pointerId)) return;
+  const prev = ptrs.get(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (ptrs.size === 2 && pinch0) {
+    const [p, q] = [...ptrs.values()], d = Math.hypot(p.x - q.x, p.y - q.y);
+    zoomAt((p.x + q.x) / 2, (p.y + q.y) / 2, (pinch0.w * pinch0.d / d) / vb.w); dragged = true; return;
+  }
+  if (!dragged && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 5) return;
+  if (!dragged) { dragged = true; box.classList.add("drag"); try { box.setPointerCapture(e.pointerId); } catch (_) {} stopFollow(); cancelAnimationFrame(cam); }
+  const r = box.getBoundingClientRect();
+  vb.x -= (e.clientX - prev.x) / r.width * vb.w; vb.y -= (e.clientY - prev.y) / r.height * vb.h; apply();
+});
+const endPtr = e => {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = null;
+  if (ptrs.size === 0) box.classList.remove("drag");
+  if (e.type === "pointerup" && !dragged) {
+    const t = document.elementFromPoint(e.clientX, e.clientY), g = t && t.closest && t.closest(".mach");
+    if (g) focusMachine(g.dataset.id);
+  }
+};
+box.addEventListener("pointerup", endPtr);
+box.addEventListener("pointercancel", endPtr);
+box.addEventListener("wheel", e => { e.preventDefault(); stopFollow(); zoomAt(e.clientX, e.clientY, Math.exp(e.deltaY * (e.deltaMode ? 0.05 : 0.0015))); }, { passive: false });
+box.addEventListener("keydown", e => {
+  if (e.target !== box) return;
+  const step = vb.w * 0.08, mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+  if (mv) { e.preventDefault(); stopFollow(); vb.x += mv[0]; vb.y += mv[1]; apply(); }
+  if (e.key === "+" || e.key === "=") zoomCenter(0.8);
+  if (e.key === "-") zoomCenter(1.25);
+});
+$("zin").addEventListener("click", () => zoomCenter(0.7));
+$("zout").addEventListener("click", () => zoomCenter(1.4));
+$("zfit").addEventListener("click", () => { stopFollow(); fitAll(true); });
+new ResizeObserver(() => { const a = aspect(), cx = vb.x + vb.w / 2, cy = vb.y + vb.h / 2; vb.h = vb.w / a; vb.y = cy - vb.h / 2; vb.x = cx - vb.w / 2; apply(); }).observe(box);
+
+// procurar
+const dl = $("findlist"), byLabel = {};
+for (const id in M) { const lab = M[id].name + " · " + (M[id].prefix || M[id].tag); byLabel[lab.toLowerCase()] = id; const o = document.createElement("option"); o.value = lab; dl.appendChild(o); }
+$("find").addEventListener("change", e => {
+  const q = e.target.value.trim().toLowerCase(); if (!q) return;
+  const id = byLabel[q] || Object.entries(byLabel).find(([l]) => l.includes(q))?.[1];
+  if (id) { focusMachine(id); e.target.value = ""; }
+});
+
+/* ======================= PEDIDOS: estado e animação ======================= */
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let mission = MISSIONS[0], steps = [], idx = 0, playing = false, busy = false, token = 0;
+const guardOpts = { tok: "ok", perm: "2" };
+
+function link(f, l, label) {
+  const full = /^(frontend|backend|\.claude|extract_onu|docs)/.test(f) || f.includes(".cc.json") ? f : "backend/src/" + f;
+  const isDir = !/\.[a-z]+$/i.test(full.split("/").pop());
+  const a = document.createElement("a");
+  a.href = REPO + (isDir ? "tree" : "blob") + "/main/" + full + (l > 1 ? "#L" + l : "");
+  a.target = "_blank"; a.rel = "noopener"; a.className = "src";
+  a.textContent = (label ? label + " · " : "") + full.replace(/^backend\/src\//, "") + (l > 1 ? ":" + l : "");
+  return a;
+}
+
+function buildMissions() {
+  const nav = $("missions");
+  MISSIONS.forEach(ms => {
+    const b = document.createElement("button");
+    b.className = "mbtn"; b.id = "m-" + ms.id; b.style.setProperty("--c", ms.color);
+    b.innerHTML = `<span class="chip">${ms.item}</span><b></b><code></code>`;
+    b.querySelector("b").textContent = ms.title; b.querySelector("code").textContent = ms.http;
+    b.addEventListener("click", () => select(ms.id, true));
+    nav.appendChild(b);
+  });
+}
+
+function select(id, frameIt) {
+  mission = MISSIONS.find(m => m.id === id);
+  document.querySelectorAll(".mbtn").forEach(b => b.setAttribute("aria-pressed", b.id === "m-" + id));
+  $("mtitle").textContent = mission.title + " · " + mission.http;
+  $("gopts").hidden = !mission.build;
+  try { localStorage.setItem("fabrica-missao", id); } catch (e) {}
+  reset();
+  if (frameIt) { $("follow").checked = true; frameIds(steps.map(s => s.m)); }
+}
+
+function missionLinks() { showLinks(hopsOf(steps)); }
+
+function reset() {
+  token++; playing = false; busy = false;
+  steps = mission.build ? mission.build(guardOpts) : mission.steps;
+  idx = 0;
+  missionLinks();
+  itemBox.setAttribute("fill", mission.color); itemTxt.textContent = mission.item;
+  placeItem(steps[0].m);
+  renderList(); show();
+  $("play").textContent = "▶ Rodar";
+}
+
+function placeItem(id) { const m = M[id]; item.setAttribute("transform", `translate(${m.x} ${m.y - K(id).h / 2 - 6})`); }
+
+function show() {
+  const s = steps[idx];
+  for (const id in machEls) machEls[id].classList.remove("active", "erro");
+  machEls[s.m].classList.add("active");
+  if (s.err) machEls[s.m].classList.add("erro");
+  itemBox.setAttribute("fill", s.err ? "var(--bad)" : mission.color);
+  const now = $("now"); now.innerHTML = "";
+  const bx = document.createElement("div"); if (s.err) bx.className = "err";
+  const w = document.createElement("div"); w.className = "where"; w.textContent = `Etapa ${idx + 1} de ${steps.length} · ${M[s.m].name}`;
+  const h = document.createElement("h3"); h.textContent = s.t;
+  if (s.end) { const st = document.createElement("span"); st.className = "status " + (s.err ? "bad" : "ok"); st.textContent = s.end; h.appendChild(st); }
+  const p = document.createElement("p"); p.textContent = s.d;
+  bx.append(w, h, p);
+  if (s.f) bx.appendChild(link(s.f, s.l));
+  now.appendChild(bx);
+  document.querySelectorAll("#steps li").forEach((li, i) => { li.classList.toggle("cur", i === idx); li.classList.toggle("done", i < idx); });
+  const cur = document.querySelector("#steps li.cur");
+  if (cur) { const ol = $("steps"); ol.scrollTop = cur.offsetTop - ol.offsetTop - ol.clientHeight / 2; }
+  inspect(s.m, true);
+}
+
+function renderList() {
+  const ol = $("steps"); ol.innerHTML = "";
+  steps.forEach((s, i) => {
+    const li = document.createElement("li"), b = document.createElement("button");
+    b.textContent = s.t;
+    b.addEventListener("click", () => { token++; playing = false; busy = false; $("play").textContent = "▶ Rodar"; idx = i; missionLinks(); placeItem(s.m); show(); if ($("follow").checked) followTo(M[s.m].x, M[s.m].y); });
+    li.appendChild(b); ol.appendChild(li);
+  });
+}
+
+const speed = () => +$("speed").value;
+function followTo(x, y) {
+  if (!$("follow").checked) return;
+  const tx = x - vb.w / 2, ty = y - vb.h / 2;
+  const mx = vb.w * 0.28, my = vb.h * 0.28, cx = vb.x + vb.w / 2, cy = vb.y + vb.h / 2;
+  if (Math.abs(x - cx) > mx || Math.abs(y - cy) > my) { vb.x += (tx - vb.x) * 0.08; vb.y += (ty - vb.y) * 0.08; apply(); }
+}
+
+function moveTo(next, done) {
+  const a = steps[idx].m, b = steps[next].m, my = token;
+  const finish = () => { if (my !== token) return; idx = next; show(); done && done(); };
+  if (a === b || reduce) { placeItem(b); if ($("follow").checked) frameIds([b]); return setTimeout(finish, reduce ? 0 : 200); }
+  const path = el("path", { d: route(a, b) }), L = path.getTotalLength(), dur = Math.min(3200, L / (420 * speed()) * 1000);
+  const forward = order(a, b)[0] === a, t0 = performance.now();
+  machEls[a].classList.remove("active");
+  if ($("follow").checked && vb.w > 1500) frame(Math.min(M[a].x, M[b].x), Math.min(M[a].y, M[b].y), Math.max(M[a].x, M[b].x), Math.max(M[a].y, M[b].y), 260);
+  (function f(t) {
+    if (my !== token) return;
+    const k = Math.min(1, (t - t0) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    const pt = path.getPointAtLength((forward ? e : 1 - e) * L);
+    item.setAttribute("transform", `translate(${pt.x} ${pt.y})`);
+    followTo(pt.x, pt.y);
+    if (k < 1) requestAnimationFrame(f); else { placeItem(b); finish(); }
+  })(t0);
+}
+
+function step(after) {
+  if (busy || idx >= steps.length - 1) return;
+  busy = true; missionLinks();
+  moveTo(idx + 1, () => { busy = false; after && after(); });
+}
+function loop() {
+  if (!playing) return;
+  if (idx >= steps.length - 1) { playing = false; $("play").textContent = "↻ De novo"; return; }
+  const my = token;
+  step(() => setTimeout(() => { if (my === token) loop(); }, 1100 / speed()));
+}
+
+$("play").addEventListener("click", () => {
+  if (idx >= steps.length - 1) reset();
+  playing = !playing;
+  $("play").textContent = playing ? "⏸ Pausar" : "▶ Rodar";
+  if (playing) { missionLinks(); if (!busy) loop(); }
+});
+$("next").addEventListener("click", () => { playing = false; $("play").textContent = "▶ Rodar"; step(); });
+$("reset").addEventListener("click", reset);
+document.querySelectorAll("#gopts input").forEach(i => i.addEventListener("change", () => { guardOpts[i.name] = i.value; reset(); }));
+
+/* ======================= INSPETOR ======================= */
+function connections(id) {
+  const m = M[id], pairs = [];
+  if (K(id).rank === 0) (m.apis || []).forEach(c => pairs.push([id, "gate"], ["gate", "router"], ["router", c]));
+  if (m.k === "ctrl") {
+    for (const s in M) if ((M[s].apis || []).includes(id)) pairs.push([s, "gate"]);
+    pairs.push(["gate", "router"], ["router", id]);
+    m.dbs.forEach(d => pairs.push([id, d])); m.ext.forEach(x => pairs.push([id, x]));
+  }
+  if (m.k === "db" || m.k === "out") CTRLS.forEach(c => { const cm = M[c[0]]; if (cm.dbs.includes(id) || cm.ext.includes(id)) pairs.push([c[0], id]); });
+  (m.links || []).forEach(l => pairs.push([id, l]));
+  for (const o in M) if ((M[o].links || []).includes(id)) pairs.push([o, id]);
+  if (id === "gate") pairs.push(["gate", "router"]);
+  if (id === "router") CTRLS.forEach(c => pairs.push(["router", c[0]]));
+  if (m.k === "guard") pairs.push(["router", id]);
+  return pairs;
+}
+
+function focusMachine(id) {
+  token++; playing = false; busy = false; $("play").textContent = "▶ Rodar";
+  for (const k in machEls) machEls[k].classList.remove("active");
+  const pairs = connections(id);
+  showLinks(pairs.length ? pairs : [[id, id]]);
+  inspect(id, false);
+  const ids = pairs.length && pairs.length < 30 ? pairs.flat() : [id];
+  stopFollow();
+  if (ids.length > 1) frameIds(ids); else { const m = M[id]; frame(m.x - 150, m.y - 120, m.x + 150, m.y + 120, 40); }
+}
+
+function chipRow(ids, parent) {
+  const row = document.createElement("div"); row.className = "chips";
+  ids.forEach(c => { const b = document.createElement("button"); b.textContent = M[c].prefix || M[c].name; b.addEventListener("click", () => focusMachine(c)); row.appendChild(b); });
+  parent.appendChild(row);
+}
+function inspect(id, fromStep) {
+  const m = M[id], bx = $("insp");
+  for (const k in machEls) machEls[k].classList.toggle("sel", !fromStep && k === id);
+  bx.innerHTML = "<h2>Inspetor</h2>";
+  const kd = document.createElement("div"); kd.className = "kind"; kd.textContent = KIND[m.k].label + " · " + m.tag;
+  const h = document.createElement("h3"); h.textContent = m.name;
+  const p = document.createElement("p"); p.textContent = m.desc;
+  bx.append(kd, h, p);
+  const lbl = t => { const d = document.createElement("div"); d.className = "lbl"; d.textContent = t; bx.appendChild(d); };
+  if (m.k === "ctrl") {
+    const dl = document.createElement("dl");
+    [["prefixo", m.prefix], ["endpoints", m.eps], ["linhas", m.lines ? m.lines.toLocaleString("pt-BR") : "na própria rota"], ["portaria", m.guard]]
+      .forEach(([a, b]) => { const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = a; dd.textContent = b; dl.append(dt, dd); });
+    bx.appendChild(dl);
+    if (m.dbs.length || m.ext.length) { lbl("Fala com"); chipRow(m.dbs.concat(m.ext), bx); }
+    const users = Object.keys(M).filter(s => (M[s].apis || []).includes(id));
+    if (users.length) { lbl("Telas que chamam"); chipRow(users, bx); }
+  }
+  if (m.paths) {
+    lbl("Endereços da tela (nível exigido no App.tsx)");
+    const ul = document.createElement("ul");
+    m.paths.forEach(([pth, lv]) => { const li = document.createElement("li"); li.textContent = pth + " · " + (lv === "pub" ? "sem login" : "nível " + lv); ul.appendChild(li); });
+    bx.appendChild(ul);
+  }
+  if (m.apis && m.apis.length && m.k !== "ctrl") { lbl("Rotas que chama"); chipRow(m.apis, bx); }
+  if (m.apis && !m.apis.length && K(id).rank === 0) lbl("Não chama o backend.");
+  if ((m.k === "db" || m.k === "out")) {
+    const users = CTRLS.filter(c => M[c[0]].dbs.includes(id) || M[c[0]].ext.includes(id)).map(c => c[0]);
+    if (users.length) { lbl("Usado por"); chipRow(users, bx); }
+  }
+  const files = (m.dir ? [[m.dir, 0, "pasta"]] : []).concat(m.files);
+  if (files.length) {
+    lbl("Código");
+    const ul = document.createElement("ul");
+    files.forEach(([f, l, lab]) => { const li = document.createElement("li"); li.appendChild(link(f, l, lab)); ul.appendChild(li); });
+    bx.appendChild(ul);
+  }
+  const uses = MISSIONS.filter(ms => (ms.steps || [].concat(...["none", "bad", "ok"].flatMap(t => ["1", "5"].map(pp => guardSteps({ tok: t, perm: pp }))))).some(s => s.m === id)).map(ms => ms.title);
+  if (uses.length) lbl("Aparece nos pedidos: " + uses.join(", "));
+}
+
+/* ======================= INÍCIO ======================= */
+buildMissions();
+let start = "login";
+try { const s = localStorage.getItem("fabrica-missao"); if (s && MISSIONS.some(m => m.id === s)) start = s; } catch (e) {}
+fitAll(false);
+select(start, false);
+})();
+</script>
