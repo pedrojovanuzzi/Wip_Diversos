@@ -120,6 +120,9 @@ svg#map { display: block; width: 100%; height: 100%; }
 .now .where { font: 600 .72rem var(--f-mono); color: var(--accent); text-transform: uppercase; letter-spacing: .05em; }
 .now h3 { margin: 2px 0 4px; font: 600 1.35rem/1.15 var(--f-cond); text-wrap: balance; }
 .now p { margin: 0 0 6px; }
+.now .w { text-decoration-line: underline; text-decoration-color: transparent; text-decoration-thickness: 2px; text-underline-offset: 4px; transition: text-decoration-color .2s, color .2s; }
+.now.reading .w { color: var(--ink-dim); }
+.now .w.read { color: var(--ink); text-decoration-color: var(--accent); }
 .now .err h3, .now .err .where { color: var(--bad); }
 .status { display: inline-block; font: 600 .75rem var(--f-mono); padding: 1px 6px; border-radius: 2px; margin-left: 6px; vertical-align: 2px; }
 .status.ok { background: #2f4a2a; color: var(--ok); }
@@ -198,7 +201,9 @@ ol.steps li.err button { color: var(--bad); }
 .mach .gauge-bg { fill: #15130f; }
 .mach .gauge { fill: #806226; }
 .mach:hover rect.body { stroke: #77705f; }
-.mach.dim { opacity: .28; }
+.mach .veil { fill: #121110; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.mach.dim .veil { opacity: .72; }
+.mach.dim .shadow { opacity: .2; }
 .mach .halo { fill: none; stroke: var(--accent); stroke-width: 3; opacity: 0; }
 .mach.active .halo { opacity: .7; animation: pulse 1.4s ease-in-out infinite; }
 .mach.erro .halo { stroke: var(--bad); }
@@ -281,7 +286,7 @@ ol.steps li.err button { color: var(--bad); }
         <button class="btn alt" id="next">Próxima etapa</button>
         <button class="btn alt" id="reset">Reiniciar</button>
         <label class="speed">velocidade
-          <select id="speed"><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+          <select id="speed"><option value="0.5" selected>0,5×</option><option value="1">1×</option><option value="2">2×</option></select>
         </label>
       </div>
       <div id="gopts" class="gopts" hidden>
@@ -890,6 +895,8 @@ for (const id in M) {
     el("rect", { class: "gauge-bg", x: 4, y: H - 7, width: W - 8, height: 3, rx: 1 }, g);
     if (m.lines) el("rect", { class: "gauge", x: 4, y: H - 7, width: Math.max(2, (W - 8) * m.lines / MAX_LINES), height: 3, rx: 1 }, g);
   } else if (m.paths) lvBadge(g, levelOf(id), W - 7, H - 8, true);
+  // película para apagar a máquina sem deixar ela transparente (as esteiras de trás não aparecem pelo texto)
+  el("rect", { class: "veil", x: -1, y: -1, width: W + 2, height: H + 2, rx: 4 }, g);
   machEls[id] = g;
 }
 
@@ -1126,7 +1133,10 @@ function show() {
   const w = document.createElement("div"); w.className = "where"; w.textContent = `Etapa ${idx + 1} de ${steps.length} · ${M[s.m].name}`;
   const h = document.createElement("h3"); h.textContent = s.t;
   if (s.end) { const st = document.createElement("span"); st.className = "status " + (s.err ? "bad" : "ok"); st.textContent = s.end; h.appendChild(st); }
-  const p = document.createElement("p"); p.textContent = s.d;
+  // cada palavra (com o espaço depois) vira um span, para o sublinhado ir andando enquanto o pedido roda
+  const p = document.createElement("p");
+  (s.d.match(/\S+\s*/g) || []).forEach(t => { const w = document.createElement("span"); w.className = "w"; w.textContent = t; p.appendChild(w); });
+  now.classList.toggle("reading", playing);
   bx.append(w, h, p);
   if (s.f) bx.appendChild(link(s.f, s.l));
   now.appendChild(bx);
@@ -1178,16 +1188,34 @@ function step(after) {
   busy = true; missionLinks();
   moveTo(idx + 1, () => { busy = false; after && after(); });
 }
+// Lê a explicação da etapa: sublinha palavra por palavra e só então chama done.
+// Pausar para no meio; ao voltar, continua da primeira palavra não lida.
+let readTimer = null;
+function readStep(done) {
+  clearTimeout(readTimer);
+  const my = token, ws = [...document.querySelectorAll("#now .w")];
+  $("now").classList.add("reading");
+  let i = ws.findIndex(w => !w.classList.contains("read")); if (i < 0) i = ws.length;
+  (function tick() {
+    if (my !== token || !playing) return;
+    if (i >= ws.length) { readTimer = setTimeout(() => { if (my === token && playing) done(); }, 500 / speed()); return; }
+    ws[i++].classList.add("read");
+    readTimer = setTimeout(tick, 190 / speed());
+  })();
+}
 function loop() {
   if (!playing) return;
-  if (idx >= steps.length - 1) { playing = false; $("play").textContent = "↻ De novo"; return; }
   const my = token;
-  step(() => setTimeout(() => { if (my === token) loop(); }, 1100 / speed()));
+  readStep(() => {
+    if (idx >= steps.length - 1) { playing = false; $("play").textContent = "↻ De novo"; return; }
+    step(() => { if (my === token) loop(); });
+  });
 }
 
 $("play").addEventListener("click", () => {
-  if (idx >= steps.length - 1) reset();
+  if (idx >= steps.length - 1 && !document.querySelector("#now .w:not(.read)")) reset();
   playing = !playing;
+  if (!playing) clearTimeout(readTimer);
   $("play").textContent = playing ? "⏸ Pausar" : "▶ Rodar";
   if (playing) { missionLinks(); if (!busy) loop(); }
 });
