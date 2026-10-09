@@ -42,6 +42,12 @@ Onde mexer, dentro do `<script>` do arquivo (seção DADOS):
   (0 = arquivo sem linha). Caminhos sem prefixo são relativos a `backend/src/`.
   Se a edição deslocar uma função citada, corrija o número.
 
+Também são calculados sozinhos, a partir dos dados: os contadores do
+cabeçalho, a legenda dos tipos de máquina, os totais de cada bairro na faixa
+de rotas, o selo de nível (PÚB/AUTH/N1/N2/N5, tirado da portaria da rota ou
+dos níveis da tela), a barra de tamanho do controller e o minimapa. Os
+textos fixos da trilha de estudo e do glossário continuam manuais.
+
 As esteiras são desenhadas sozinhas a partir de `apis`, `dbs`, `ext`, `links`
 e dos passos dos pedidos. Ao mexer em posições fixas, não sobreponha máquinas
 nem placas. No fim, rode `node --check` no conteúdo do `<script>`.

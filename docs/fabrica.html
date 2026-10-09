@@ -1,99 +1,141 @@
 <title>Fábrica Wip Diversos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&display=swap">
 <style>
-/* Layout: mapa-mundo do repositório (SVG arrastável com zoom) à esquerda, painel de pedido/inspetor à direita; empilha no celular.
-   Visual escuro de propósito (chão de fábrica), um tema só, todas as cores explícitas. */
+/* Layout: cabeçalho com painel de contadores, faixas de pedidos e rotas, mapa (SVG arrastável com zoom e minimapa) com painel de pedido e inspetor à direita, trilha de estudo e glossário embaixo; empilha no celular.
+   Chão de fábrica escuro de propósito: um tema só, todas as cores explícitas. Cada setor tem uma placa com o nome, acima das esteiras. */
 :root {
   color-scheme: dark;
-  --ground: #191816;
-  --panel: #2a2723;
-  --panel-hi: #3b3731;
-  --panel-lo: #12110f;
-  --ink: #ebe5d8;
-  --ink-dim: #a49c8d;
-  --accent: #f39a1d;
+  --ground: #171614;
+  --panel: #2a2824;
+  --panel-hi: #3c3933;
+  --panel-lo: #110f0e;
+  --line: #34312b;
+  --ink: #ece6d9;
+  --ink-dim: #a69e8f;
+  --ink-faint: #756e62;
+  --accent: #f2a01c;
+  --accent-deep: #a8650b;
+  --accent-wash: #3a2e1c;
   --belt-http: #d9a62c;
   --belt-fila: #cf4b3c;
   --belt-sql: #4a8ad6;
   --belt-ext: #5fae63;
   --ok: #7cc66f;
   --bad: #e2574a;
-  --f-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --f-display: "Big Shoulders Display", "Barlow Condensed", "Arial Narrow", sans-serif;
+  --f-cond: "Barlow Condensed", "Arial Narrow", sans-serif;
   --f-body: "Barlow", "Segoe UI", system-ui, sans-serif;
   --f-mono: "JetBrains Mono", Consolas, monospace;
 }
 * { box-sizing: border-box; }
-html, body { background: var(--ground); color: var(--ink); }
-body { font-family: var(--f-body); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 14px 40px; }
+[hidden] { display: none !important; }
+html { background: var(--ground); color: var(--ink); }
+body { background: radial-gradient(ellipse 1100px 420px at 12% -8%, rgba(242, 160, 28, .08), transparent 70%) no-repeat, var(--ground); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 20px 48px; }
 a { color: var(--accent); }
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, .mapbox:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shell { max-width: 1700px; margin-inline: auto; display: grid; gap: 16px; }
 
-.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px; max-width: 1700px; margin: 0 auto 12px; }
-h1 { font-family: var(--f-display); font-weight: 700; font-size: 2rem; letter-spacing: .02em; text-transform: uppercase; margin: 0; line-height: 1; }
-h1 small { display: block; font-family: var(--f-body); font-weight: 500; font-size: .9rem; text-transform: none; letter-spacing: 0; color: var(--ink-dim); margin-top: 6px; }
-.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .82rem; color: var(--ink-dim); }
-.legend span { display: inline-flex; align-items: center; gap: 6px; }
-.legend i { width: 22px; height: 8px; border-radius: 2px; background: repeating-linear-gradient(90deg, var(--c) 0 6px, var(--panel-lo) 6px 9px); }
+/* cabeçalho */
+.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 40px; align-items: end; }
+@media (max-width: 1120px) { .top { grid-template-columns: minmax(0, 1fr); } }
+.eyebrow { font: 600 .72rem var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font: 800 clamp(2.5rem, 5.2vw, 3.9rem)/.9 var(--f-display); text-transform: uppercase; letter-spacing: .005em; margin: 6px 0 10px; text-wrap: balance; }
+.lede { margin: 0; max-width: 70ch; color: var(--ink-dim); }
+.counters { margin: 0; display: grid; grid-template-columns: repeat(4, minmax(104px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+@media (max-width: 560px) { .counters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.counters div { background: var(--panel-lo); padding: 8px 12px 9px; display: flex; flex-direction: column-reverse; gap: 1px; }
+.counters dd { margin: 0; font: 600 1.55rem/1.1 var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+.counters div:first-child dd { color: var(--accent); }
+.counters dt { font: 600 .7rem var(--f-cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); }
 
-.missions { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; max-width: 1700px; margin: 0 auto 12px; }
-.mbtn { text-align: left; font: inherit; color: var(--ink); background: var(--panel); border: 2px solid var(--panel-lo); box-shadow: inset 0 2px 0 var(--panel-hi); border-radius: 4px; padding: 7px 10px; cursor: pointer; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 8px; align-items: center; }
-.mbtn:hover { border-color: #4d473f; }
-.mbtn[aria-pressed="true"] { border-color: var(--accent); background: #3a2f1f; }
-.mbtn .chip { grid-row: span 2; width: 22px; height: 22px; border-radius: 3px; background: var(--c); font: 600 9px/22px var(--f-mono); color: #15130f; text-align: center; }
-.mbtn b { font-family: var(--f-display); font-size: 1.02rem; font-weight: 600; letter-spacing: .02em; }
+/* legenda */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 32px; align-items: center; padding-block: 10px; border-block: 1px solid var(--line); }
+.lg-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: .82rem; color: var(--ink-dim); }
+.lg-h { font: 700 .72rem var(--f-cond); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+.belt-sw { display: inline-flex; align-items: center; gap: 6px; }
+.belt-sw i { width: 24px; height: 8px; border-radius: 2px; background: repeating-linear-gradient(90deg, var(--c) 0 6px, var(--panel-lo) 6px 9px); }
+.kchip { font: 500 .8rem var(--f-body); color: var(--ink-dim); background: none; border: 1px solid transparent; border-radius: 3px; padding: 1px 7px 1px 4px; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.kchip:hover { color: var(--ink); border-color: var(--line); }
+.kchip[aria-pressed="true"] { color: var(--ink); border-color: var(--accent); background: var(--accent-wash); }
+.kchip i { width: 12px; height: 12px; border-radius: 2px; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .5); }
+.kchip small { font: .7rem var(--f-mono); color: var(--ink-faint); }
+
+/* faixas de pedidos e rotas */
+.strip { display: grid; gap: 8px; }
+.strip-h { margin: 0; font: 700 .8rem var(--f-cond); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; }
+.strip-h span { font: 400 .8rem var(--f-body); letter-spacing: 0; text-transform: none; color: var(--ink-faint); }
+.missions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 176px), 1fr)); gap: 8px; }
+.mbtn { text-align: left; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--panel-lo); box-shadow: inset 0 1px 0 var(--panel-hi), 0 2px 0 var(--panel-lo); border-radius: 4px; padding: 8px 10px; cursor: pointer; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 10px; align-items: center; transition: transform .12s, border-color .12s; }
+.mbtn:hover { border-color: #5a5249; transform: translateY(-1px); }
+.mbtn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-wash); }
+.mbtn .chip { grid-row: span 2; width: 30px; height: 30px; border-radius: 3px; background: var(--c); font: 600 9.5px/30px var(--f-mono); color: #15130f; text-align: center; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .25); }
+.mbtn b { font: 600 1.08rem/1.2 var(--f-cond); letter-spacing: .02em; }
 .mbtn code { font: .7rem var(--f-mono); color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.routes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 8px 14px; max-width: 1700px; margin: 0 auto 14px; }
+.routes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 228px), 1fr)); gap: 10px 16px; }
 .grp { min-width: 0; }
-.grp h3 { margin: 0 0 4px; font: 700 .75rem var(--f-display); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+.grp h3 { margin: 0 0 5px; font: 700 .76rem var(--f-cond); text-transform: uppercase; letter-spacing: .1em; color: var(--ink-dim); display: flex; flex-wrap: wrap; gap: 0 8px; align-items: baseline; }
+.grp h3 small { white-space: nowrap; }
+.grp h3 small { font: .68rem var(--f-mono); letter-spacing: 0; text-transform: none; color: var(--ink-faint); }
 .grp div { display: flex; flex-wrap: wrap; gap: 4px; }
 .rbtn { font: 500 .8rem var(--f-body); color: var(--ink); background: var(--panel); border: 1px solid var(--panel-lo); box-shadow: inset 0 1px 0 var(--panel-hi); border-radius: 3px; padding: 2px 8px; cursor: pointer; }
 .rbtn:hover { border-color: #5a5249; }
-.rbtn[aria-pressed="true"] { border-color: var(--accent); background: #3a2f1f; }
+.rbtn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-wash); }
 .rbtn.guided::after { content: " ★"; color: var(--accent); }
-.insp .see { margin-bottom: 8px; }
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) 370px; gap: 14px; max-width: 1700px; margin: 0 auto; }
+
+/* mapa */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; }
 @media (max-width: 980px) { .layout { grid-template-columns: minmax(0, 1fr); } }
-.mapbox { position: relative; background: var(--panel-lo); border: 2px solid #000; border-radius: 4px; overflow: hidden; min-width: 0; height: clamp(440px, calc(100vh - 210px), 1000px); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.mapbox { position: relative; background: var(--panel-lo); border: 1px solid #000; box-shadow: 0 0 0 1px var(--line); border-radius: 6px; overflow: hidden; min-width: 0; height: clamp(460px, calc(100vh - 200px), 1000px); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.mapbox::before { content: ""; position: absolute; inset: 0 0 auto; height: 6px; background: repeating-linear-gradient(-45deg, var(--accent) 0 10px, var(--panel-lo) 10px 20px); opacity: .85; z-index: 1; pointer-events: none; }
 .mapbox.drag { cursor: grabbing; }
 svg#map { display: block; width: 100%; height: 100%; }
-.tools { position: absolute; top: 8px; right: 8px; display: flex; flex-wrap: wrap; gap: 4px; justify-content: end; max-width: calc(100% - 16px); }
-.tools button, .tools label, .tools input { font: 600 .85rem var(--f-body); background: rgba(42, 39, 35, .94); color: var(--ink); border: 1px solid var(--panel-hi); border-radius: 3px; padding: 4px 9px; cursor: pointer; }
-.tools input[type="search"] { cursor: text; width: 190px; font-weight: 400; }
+.tools { position: absolute; top: 14px; right: 8px; display: flex; flex-wrap: wrap; gap: 4px; justify-content: end; max-width: calc(100% - 16px); z-index: 2; }
+.tools button, .tools label, .tools input { font: 600 .85rem var(--f-body); background: rgba(42, 40, 36, .95); color: var(--ink); border: 1px solid var(--panel-hi); border-radius: 3px; padding: 4px 9px; cursor: pointer; }
+.tools button:hover { border-color: var(--accent); }
+.tools input[type="search"] { cursor: text; width: 200px; font-weight: 400; }
 .tools label { display: inline-flex; gap: 5px; align-items: center; font-weight: 500; }
 .tools input[type="checkbox"] { padding: 0; accent-color: var(--accent); }
-.maphint { position: absolute; left: 8px; bottom: 8px; font-size: .75rem; color: var(--ink-dim); background: rgba(18, 17, 15, .85); padding: 3px 8px; border-radius: 3px; pointer-events: none; }
+.maphint { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 240px); font-size: .75rem; color: var(--ink-dim); background: rgba(17, 15, 14, .88); padding: 3px 8px; border-radius: 3px; pointer-events: none; }
+.mini { position: absolute; right: 8px; bottom: 8px; width: 216px; max-width: 42%; aspect-ratio: 3200 / 1960; background: rgba(17, 15, 14, .94); border: 1px solid var(--panel-hi); border-radius: 4px; cursor: crosshair; touch-action: none; z-index: 2; }
+.mini svg { display: block; width: 100%; height: 100%; }
+@media (max-width: 640px) { .mini { display: none; } .maphint { max-width: calc(100% - 16px); } }
 
+/* painel lateral */
 .side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.card { background: var(--panel); border: 2px solid var(--panel-lo); box-shadow: inset 0 2px 0 var(--panel-hi); border-radius: 4px; padding: 12px 14px; min-width: 0; }
-.card h2 { font-family: var(--f-display); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: .85rem; color: var(--ink-dim); margin: 0 0 8px; }
+.card { background: var(--panel); border: 1px solid var(--panel-lo); box-shadow: inset 0 1px 0 var(--panel-hi); border-radius: 6px; padding: 12px 14px; min-width: 0; }
+.card h2 { font: 700 .82rem var(--f-cond); text-transform: uppercase; letter-spacing: .12em; color: var(--ink-dim); margin: 0 0 8px; }
 .controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.btn { font: 600 .9rem var(--f-body); color: #1a1408; background: var(--accent); border: 0; border-bottom: 3px solid #a8620a; border-radius: 3px; padding: 6px 12px; cursor: pointer; }
+.btn { font: 600 .9rem var(--f-body); color: #1a1408; background: var(--accent); border: 0; border-bottom: 3px solid var(--accent-deep); border-radius: 3px; padding: 6px 12px; cursor: pointer; }
 .btn.alt { background: var(--panel-hi); color: var(--ink); border-bottom-color: var(--panel-lo); }
 .btn:active { transform: translateY(1px); border-bottom-width: 2px; }
 .speed { margin-left: auto; font-size: .8rem; color: var(--ink-dim); display: flex; gap: 4px; align-items: center; }
 .speed select { font: inherit; background: var(--panel-lo); color: var(--ink); border: 1px solid var(--panel-hi); border-radius: 3px; padding: 2px 4px; }
+.prog { height: 4px; background: var(--panel-lo); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+.prog i { display: block; height: 100%; width: 0; background: var(--c, var(--accent)); transition: width .3s; }
 
-.now { margin-top: 10px; padding: 10px; background: var(--panel-lo); border-radius: 3px; min-height: 110px; }
+.now { margin-top: 8px; padding: 10px 12px; background: var(--panel-lo); border-radius: 4px; min-height: 120px; }
 .now .where { font: 600 .72rem var(--f-mono); color: var(--accent); text-transform: uppercase; letter-spacing: .05em; }
-.now h3 { margin: 2px 0 4px; font-family: var(--f-display); font-size: 1.3rem; font-weight: 600; line-height: 1.15; text-wrap: balance; }
+.now h3 { margin: 2px 0 4px; font: 600 1.35rem/1.15 var(--f-cond); text-wrap: balance; }
 .now p { margin: 0 0 6px; }
-.now .err h3 { color: var(--bad); }
+.now .err h3, .now .err .where { color: var(--bad); }
 .status { display: inline-block; font: 600 .75rem var(--f-mono); padding: 1px 6px; border-radius: 2px; margin-left: 6px; vertical-align: 2px; }
 .status.ok { background: #2f4a2a; color: var(--ok); }
 .status.bad { background: #4d2420; color: var(--bad); }
 .src { font: .76rem var(--f-mono); word-break: break-all; }
 
-ol.steps { list-style: none; margin: 10px 0 0; padding: 0; counter-reset: s; display: grid; gap: 2px; max-height: 220px; overflow-y: auto; }
+ol.steps { list-style: none; margin: 10px 0 0; padding: 0; counter-reset: s; display: grid; gap: 1px; max-height: 240px; overflow-y: auto; }
 ol.steps li { counter-increment: s; }
-ol.steps button { width: 100%; text-align: left; font: .84rem var(--f-body); color: var(--ink-dim); background: none; border: 0; border-radius: 2px; padding: 3px 6px; cursor: pointer; display: flex; gap: 8px; }
-ol.steps button::before { content: counter(s); font: 600 .72rem/1.7 var(--f-mono); min-width: 1.4em; color: var(--ink-dim); }
+ol.steps button { width: 100%; text-align: left; font: .84rem var(--f-body); color: var(--ink-dim); background: none; border: 0; border-radius: 2px; padding: 3px 6px; cursor: pointer; display: flex; gap: 8px; align-items: flex-start; }
+ol.steps button::before { content: counter(s); font: 600 .72rem/1.75 var(--f-mono); min-width: 1.4em; color: var(--ink-faint); }
+ol.steps .dot { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--c); }
 ol.steps button:hover { background: var(--panel-hi); color: var(--ink); }
 ol.steps li.done button { color: var(--ink); }
-ol.steps li.cur button { background: #3a2f1f; color: var(--ink); }
+ol.steps li.cur button { background: var(--accent-wash); color: var(--ink); }
 ol.steps li.cur button::before { color: var(--accent); }
+ol.steps li.err button { color: var(--bad); }
 
 .gopts { display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--panel-hi); }
 .gopts fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
@@ -104,65 +146,118 @@ ol.steps li.cur button::before { color: var(--accent); }
 .gopts input:checked + span { border-color: var(--accent); color: var(--accent); }
 .gopts input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.insp .kind { font: 600 .72rem var(--f-mono); color: var(--ink-dim); text-transform: uppercase; }
-.insp h3 { margin: 0 0 6px; font-family: var(--f-display); font-size: 1.25rem; font-weight: 600; }
+.insp .kind { font: 600 .72rem var(--f-mono); color: var(--ink-dim); text-transform: uppercase; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.insp .kind i { width: 10px; height: 10px; border-radius: 2px; background: var(--c); }
+.insp h3 { margin: 2px 0 6px; font: 600 1.35rem/1.15 var(--f-cond); }
 .insp p { margin: 0 0 8px; }
 .insp ul { margin: 0 0 8px; padding-left: 18px; }
 .insp li { margin-bottom: 2px; }
+.insp ul.paths { list-style: none; padding: 0; display: grid; gap: 3px; }
+.insp ul.paths li { display: flex; gap: 8px; align-items: center; font: .8rem var(--f-mono); }
 .insp dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 10px; margin: 0 0 8px; font-size: .85rem; }
 .insp dt { color: var(--ink-dim); }
 .insp dd { margin: 0; font-variant-numeric: tabular-nums; }
 .insp .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 8px; }
 .insp .chips button { font: .78rem var(--f-mono); background: var(--panel-lo); color: var(--ink); border: 1px solid var(--panel-hi); border-radius: 3px; padding: 1px 7px; cursor: pointer; }
 .insp .chips button:hover { border-color: var(--accent); }
-.insp .lbl { font-size: .78rem; color: var(--ink-dim); margin-top: 6px; }
+.insp .lbl { font: 600 .74rem var(--f-cond); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); margin-top: 8px; margin-bottom: 3px; }
+.insp .see { margin-bottom: 8px; }
+.meter { height: 6px; background: var(--panel-lo); border-radius: 3px; overflow: hidden; margin: 4px 0 2px; }
+.meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-deep), var(--accent)); }
+.meter-note { font-size: .78rem; color: var(--ink-dim); margin-bottom: 6px; }
+.lv { display: inline-block; flex: none; font: 600 .66rem/1.5 var(--f-mono); padding: 0 5px; border-radius: 2px; border: 1px solid var(--c); color: var(--c); }
 .hint { color: var(--ink-dim); font-size: .85rem; margin: 0; }
 
-.study { max-width: 1700px; margin: 16px auto 0; }
-.study ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 80ch; }
-.study code { font: .82rem var(--f-mono); color: var(--ink); background: var(--panel-lo); padding: 0 4px; border-radius: 2px; }
+/* trilha e glossário */
+.below { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 980px) { .below { grid-template-columns: minmax(0, 1fr); } }
+.study ol { list-style: none; counter-reset: t; margin: 0; padding: 0; display: grid; gap: 12px; max-width: 86ch; }
+.study li { counter-increment: t; display: grid; grid-template-columns: 2.2rem minmax(0, 1fr); gap: 10px; }
+.study li::before { content: counter(t); font: 800 2.1rem/1 var(--f-display); color: var(--accent); }
+.study code, .gloss code { font: .82rem var(--f-mono); color: var(--ink); background: var(--panel-lo); padding: 0 4px; border-radius: 2px; }
+.gloss dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 7px 14px; }
+.gloss dt { font: 600 .95rem var(--f-cond); letter-spacing: .03em; color: var(--ink); }
+.gloss dd { margin: 0; color: var(--ink-dim); font-size: .9rem; }
 
 /* SVG */
-.plate rect { fill: #201e1b; stroke: #36322c; stroke-width: 3; stroke-dasharray: 14 8; }
-.plate text { font: 700 40px var(--f-display); fill: #4e473d; letter-spacing: .08em; text-transform: uppercase; }
-.plate text.sub { font: 500 20px var(--f-body); letter-spacing: 0; text-transform: none; fill: #5c5448; }
-.mach rect.body { fill: var(--panel); stroke: #000; stroke-width: 2; }
-.mach rect.hi { fill: none; stroke: var(--panel-hi); stroke-width: 2; }
-.mach .tag { font: 600 11px var(--f-mono); fill: #f3ede0; }
-.mach .name { font: 600 16px var(--f-display); fill: var(--ink); letter-spacing: .02em; }
+.plate rect.bed { fill: #1e1c19; stroke: #3a352d; stroke-width: 3; stroke-dasharray: 14 8; }
+.plate rect.band { opacity: .45; }
+.plate text { font: 500 19px var(--f-body); fill: #6c6253; }
+.sign rect { fill: #121110; stroke: #3d382f; stroke-width: 2; }
+.sign text { font: 800 26px var(--f-display); fill: #b3a283; letter-spacing: .08em; text-transform: uppercase; }
+.lane { fill: none; stroke: #4d3f1f; stroke-width: 3; stroke-dasharray: 26 16; }
 .mach { cursor: pointer; }
-.mach:hover rect.body { fill: #34302a; }
-.mach.dim { opacity: .4; }
-.mach.active rect.body { stroke: var(--accent); stroke-width: 4; }
+.mach rect.shadow { fill: #000; opacity: .45; }
+.mach rect.body { fill: url(#mbody); stroke: #000; stroke-width: 2; transition: stroke .15s; }
+.mach rect.hi { fill: none; stroke: var(--panel-hi); stroke-width: 2; }
+.mach .rivet { fill: #5a544a; }
+.mach .tag { font: 600 11px var(--f-mono); fill: #f3ede0; }
+.mach .name { font: 600 16px var(--f-cond); fill: var(--ink); letter-spacing: .02em; }
+.mach .stat { font: 500 10.5px var(--f-mono); fill: var(--ink-dim); }
+.mach .lvb { font: 600 9.5px var(--f-mono); }
+.mach .gauge-bg { fill: #15130f; }
+.mach .gauge { fill: #806226; }
+.mach:hover rect.body { stroke: #77705f; }
+.mach.dim { opacity: .28; }
+.mach .halo { fill: none; stroke: var(--accent); stroke-width: 3; opacity: 0; }
+.mach.active .halo { opacity: .7; animation: pulse 1.4s ease-in-out infinite; }
+.mach.erro .halo { stroke: var(--bad); }
+.mach.active rect.body { stroke: var(--accent); stroke-width: 3; }
 .mach.sel rect.body { stroke: #fff; stroke-width: 3; stroke-dasharray: 6 3; }
 .mach .lamp { fill: #3a352e; }
 .mach.active .lamp { fill: var(--accent); }
 .mach.erro .lamp { fill: var(--bad); }
+.mach.erro rect.body { stroke: var(--bad); }
+.mach.active .gauge { fill: var(--accent); }
 .gear { fill: none; stroke: #6d655a; stroke-width: 5; stroke-dasharray: 3 3; transform-box: fill-box; transform-origin: center; }
 .mach.active .gear { stroke: var(--accent); animation: spin 1.2s linear infinite; }
+.hand { stroke: #e0cc8f; stroke-width: 2.5; stroke-dasharray: 7 7; transform-box: fill-box; transform-origin: center; }
+.mach.active .hand { animation: spin 2s linear infinite; }
+.mach.active .boxes { animation: nudge .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes nudge { to { transform: translateX(12px); } }
+@keyframes pulse { 50% { opacity: .15; } }
 .belt-base { fill: none; stroke: #0b0a09; stroke-width: 16; stroke-linejoin: round; }
-.belt { fill: none; stroke-width: 9; stroke-dasharray: 7 5; stroke-linejoin: round; opacity: .22; }
+.belt { fill: none; stroke-width: 9; stroke-dasharray: 7 5; stroke-linejoin: round; opacity: .2; }
 .belt.on { opacity: 1; animation: flow .6s linear infinite; }
 .dyn .belt-base { opacity: .9; }
 @keyframes flow { to { stroke-dashoffset: -12; } }
 .bus { fill: none; stroke: #2c2924; stroke-width: 10; stroke-dasharray: 7 5; }
 .item text { font: 600 9px var(--f-mono); fill: #15130f; }
-@media (prefers-reduced-motion: reduce) { .belt.on, .mach.active .gear { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .belt.on, .mach.active .gear, .mach.active .hand, .mach.active .boxes, .mach.active .halo { animation: none; } .mbtn, .prog i { transition: none; } }
 </style>
 
+<div class="shell">
 <header class="top">
-  <h1>Fábrica Wip Diversos<small>O repositório inteiro como uma fábrica: telas, rotas, filas, bancos e serviços externos. Arraste para andar, use a roda do mouse para zoom.</small></h1>
-  <div class="legend" aria-label="Legenda das esteiras">
-    <span><i style="--c: var(--belt-http)"></i>requisição / chamada</span>
-    <span><i style="--c: var(--belt-fila)"></i>fila Redis (BullMQ)</span>
-    <span><i style="--c: var(--belt-sql)"></i>banco MySQL</span>
-    <span><i style="--c: var(--belt-ext)"></i>mundo lá fora</span>
+  <div>
+    <div class="eyebrow">mapa do repositório · pedrojovanuzzi/Wip_Diversos · main</div>
+    <h1>Fábrica Wip Diversos</h1>
+    <p class="lede">O repositório inteiro como uma fábrica. As telas mandam peças pelas esteiras, a portaria confere o crachá, cada rota do backend é uma máquina, e no fundo ficam os bancos e os serviços lá fora. Clique numa máquina para ver o pedido dela andar até o fim.</p>
   </div>
+  <dl class="counters" id="counters" aria-label="Números do repositório"></dl>
 </header>
 
-<nav class="missions" id="missions" aria-label="Pedidos guiados"></nav>
-<nav class="routes" id="routes" aria-label="Pedido de cada rota"></nav>
+<div class="legend">
+  <div class="lg-row" aria-label="Legenda das esteiras">
+    <span class="lg-h">Esteiras</span>
+    <span class="belt-sw"><i style="--c: var(--belt-http)"></i>requisição / chamada</span>
+    <span class="belt-sw"><i style="--c: var(--belt-fila)"></i>fila Redis (BullMQ)</span>
+    <span class="belt-sw"><i style="--c: var(--belt-sql)"></i>banco MySQL</span>
+    <span class="belt-sw"><i style="--c: var(--belt-ext)"></i>mundo lá fora</span>
+  </div>
+  <div class="lg-row" id="kinds" aria-label="Tipos de máquina (clique para destacar)">
+    <span class="lg-h">Máquinas</span>
+  </div>
+</div>
+
+<section class="strip">
+  <h2 class="strip-h">Pedidos guiados <span>passo a passo, com o arquivo e a linha de cada etapa</span></h2>
+  <nav class="missions" id="missions" aria-label="Pedidos guiados"></nav>
+</section>
+<section class="strip">
+  <h2 class="strip-h">Pedido de cada rota <span>★ tem pedido guiado · as outras montam o caminho sozinhas</span></h2>
+  <nav class="routes" id="routes" aria-label="Pedido de cada rota"></nav>
+</section>
 
 <div class="layout">
   <div class="mapbox" id="mapbox" tabindex="0" aria-label="Mapa da fábrica. Setas movem, + e - fazem zoom.">
@@ -176,6 +271,7 @@ ol.steps li.cur button::before { color: var(--accent); }
       <label><input type="checkbox" id="follow" checked> seguir peça</label>
     </div>
     <div class="maphint">arraste para mover · roda do mouse ou pinça para zoom · clique numa máquina para rodar o pedido dela</div>
+    <div class="mini" id="mini" aria-hidden="true"><svg id="minisvg" viewBox="0 0 3200 1960" preserveAspectRatio="none"></svg></div>
   </div>
   <aside class="side">
     <section class="card" aria-live="polite">
@@ -200,6 +296,7 @@ ol.steps li.cur button::before { color: var(--accent); }
           <label><input type="radio" name="perm" id="perm-5" value="5"><span>5 · admin</span></label>
         </fieldset>
       </div>
+      <div class="prog" aria-hidden="true"><i id="progbar"></i></div>
       <div class="now" id="now"></div>
       <ol class="steps" id="steps"></ol>
     </section>
@@ -210,17 +307,34 @@ ol.steps li.cur button::before { color: var(--accent); }
   </aside>
 </div>
 
-<section class="card study">
-  <h2>Trilha de estudo sugerida</h2>
-  <ol>
-    <li><b>Veja o mapa inteiro.</b> Aperte "Ver tudo". À esquerda ficam as telas (React, Next e o app de localização), no meio a portaria e as 38 rotas agrupadas por assunto, à direita os serviços externos e embaixo os bancos.</li>
-    <li><b>Ligue a fábrica.</b> Leia <code>backend/src/server.ts</code> e <code>app.ts</code> inteiros. São curtos e mostram tudo que sobe: middlewares, as 38 rotas, os 4 agendamentos e as filas.</li>
-    <li><b>Entenda a portaria.</b> <code>middleware/AuthGuard.ts</code> e <code>PermissionGuard.ts</code>. Rode o pedido "Portaria" com as 3 opções de token e os 3 níveis. Repare que a tela também confere o nível (<code>frontend/app/src/App.tsx</code>), mas quem protege de verdade é o backend.</li>
-    <li><b>Siga um pedido simples de ponta a ponta.</b> Login: a tela <code>pages/auth</code> → <code>routes/Auth.Routes.ts</code> → <code>controller/Auth.ts</code> → banco.</li>
-    <li><b>Aprenda as filas.</b> A pasta <code>controller/whatsapp/</code> é a parte mais bem organizada (handlers, services, testes). Leia <code>queues.ts</code> e depois o <code>switch</code> do <code>message.handler.ts</code>.</li>
-    <li><b>Só então as máquinas gigantes.</b> <code>NFE.ts</code> (3.594 linhas), <code>Nfcom.ts</code> (3.271), <code>NFSE.ts</code> (2.896) e <code>Pix.ts</code> (2.395). Não leia de cima a baixo: clique na tela, veja qual rota ela chama e siga a partir do método.</li>
-  </ol>
-</section>
+<div class="below">
+  <section class="card study">
+    <h2>Trilha de estudo sugerida</h2>
+    <ol>
+      <li><div><b>Veja o mapa inteiro.</b> Aperte "Ver tudo". À esquerda ficam as telas (React, Next e o app de localização), no meio a portaria e as 38 rotas agrupadas por assunto, à direita os serviços externos e embaixo os bancos.</div></li>
+      <li><div><b>Ligue a fábrica.</b> Leia <code>backend/src/server.ts</code> e <code>app.ts</code> inteiros. São curtos e mostram tudo que sobe: middlewares, as 38 rotas, os 4 agendamentos e as filas.</div></li>
+      <li><div><b>Entenda a portaria.</b> <code>middleware/AuthGuard.ts</code> e <code>PermissionGuard.ts</code>. Rode o pedido "Portaria" com as 3 opções de token e os 3 níveis. Repare que a tela também confere o nível (<code>frontend/app/src/App.tsx</code>), mas quem protege de verdade é o backend.</div></li>
+      <li><div><b>Siga um pedido simples de ponta a ponta.</b> Login: a tela <code>pages/auth</code> → <code>routes/Auth.Routes.ts</code> → <code>controller/Auth.ts</code> → banco.</div></li>
+      <li><div><b>Aprenda as filas.</b> A pasta <code>controller/whatsapp/</code> é a parte mais bem organizada (handlers, services, testes). Leia <code>queues.ts</code> e depois o <code>switch</code> do <code>message.handler.ts</code>.</div></li>
+      <li><div><b>Só então as máquinas gigantes.</b> <code>NFE.ts</code> (3.594 linhas), <code>Nfcom.ts</code> (3.271), <code>NFSE.ts</code> (2.896) e <code>Pix.ts</code> (2.395). Não leia de cima a baixo: clique na tela, veja qual rota ela chama e siga a partir do método.</div></li>
+    </ol>
+  </section>
+  <section class="card gloss">
+    <h2>Glossário da fábrica</h2>
+    <dl>
+      <dt>Peça</dt><dd>Uma requisição HTTP, uma mensagem do WhatsApp ou um job.</dd>
+      <dt>Máquina</dt><dd>Uma rota com seu controller. Telas, bancos e serviços também aparecem como máquinas.</dd>
+      <dt>Esteira</dt><dd>A ligação entre duas partes: chamada HTTP, fila Redis, consulta SQL ou API externa.</dd>
+      <dt>Portaria</dt><dd><code>AuthGuard</code> e <code>PermissionGuard</code>, antes do controller.</dd>
+      <dt>Crachá</dt><dd>O token JWT de 8 horas que o login entrega.</dd>
+      <dt>Nível</dt><dd>O <code>permission</code> do usuário: 1 consulta, 2 operador, 5 administrador. Nas máquinas: <b>PÚB</b> sem login, <b>AUTH</b> só login, <b>N2</b>/<b>N5</b> nível mínimo.</dd>
+      <dt>Barra embaixo</dt><dd>O tamanho do controller em linhas, comparado ao maior (<code>NFE.ts</code>).</dd>
+      <dt>Relógio</dt><dd>Os agendamentos do <code>node-cron</code> no <code>app.ts</code>.</dd>
+      <dt>Segundo plano</dt><dd>Filas BullMQ, a tabela Jobs e os serviços que sobem com o <code>server.ts</code>.</dd>
+    </dl>
+  </section>
+</div>
+</div>
 
 <script>
 (() => {
@@ -231,13 +345,13 @@ const BUS_X = 880, CTRL_LANE = 1545, DB_LANE = 1255, OUT_LANE = 2870;
 /* ======================= DADOS ======================= */
 // k = tipo da máquina. rank decide a ordem das esteiras (quem fica "antes" de quem).
 const KIND = {
-  screen: { label: "tela React",       color: "#6b4a7a", w: 160, h: 60, rank: 0 },
-  next:   { label: "tela Next.js",     color: "#3c3c3c", w: 160, h: 60, rank: 0 },
-  app:    { label: "app / cliente",    color: "#4a5a3a", w: 160, h: 60, rank: 0 },
-  dock:   { label: "entrada externa",  color: "#3f6a43", w: 160, h: 60, rank: 0 },
+  screen: { label: "tela React",       color: "#6b4a7a", w: 160, h: 64, rank: 0 },
+  next:   { label: "tela Next.js",     color: "#4a4a4a", w: 160, h: 64, rank: 0 },
+  app:    { label: "app / cliente",    color: "#4a5a3a", w: 160, h: 64, rank: 0 },
+  dock:   { label: "entrada externa",  color: "#3f6a43", w: 160, h: 64, rank: 0 },
   core:   { label: "núcleo",           color: "#6b5428", w: 130, h: 90, rank: 1 },
   guard:  { label: "portaria",         color: "#6e3029", w: 140, h: 76, rank: 3 },
-  ctrl:   { label: "rota + controller", color: "#3e4660", w: 170, h: 76, rank: 4 },
+  ctrl:   { label: "rota + controller", color: "#3e4660", w: 170, h: 84, rank: 4 },
   queue:  { label: "fila",             color: "#7a2c26", w: 170, h: 76, rank: 5 },
   worker: { label: "segundo plano",    color: "#57395e", w: 170, h: 76, rank: 5 },
   clock:  { label: "agendador",        color: "#5b5230", w: 170, h: 76, rank: 5 },
@@ -346,7 +460,7 @@ const DIST = {
   fiscal:  { x0: 1600, y0: 570, title: "Fiscal" },
   finan:   { x0: 1600, y0: 860, title: "Financeiro" },
   atend:   { x0: 2020, y0: 170, title: "Atendimento" },
-  tv:      { x0: 2020, y0: 790, title: "TV e câmeras" },
+  tv:      { x0: 2020, y0: 830, title: "TV e câmeras" },
   rede:    { x0: 2440, y0: 170, title: "Rede e servidores" },
 };
 // [id, bairro, prefixo, nome, arquivo de rota, controllers, linhas, endpoints, portaria, bancos, externos, descrição]
@@ -616,18 +730,32 @@ const pat = el("pattern", { id: "tiles", width: 32, height: 32, patternUnits: "u
 el("rect", { width: 32, height: 32, fill: "#1b1917" }, pat);
 el("path", { d: "M32 0H0V32", fill: "none", stroke: "#24211d", "stroke-width": 1 }, pat);
 el("rect", { x: -4000, y: -4000, width: WORLD.w + 8000, height: WORLD.h + 8000, fill: "url(#tiles)" }, svg);
+// corpo das máquinas (chapa com luz de cima) e faixa zebrada amarela e preta
+const grad = el("linearGradient", { id: "mbody", x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+el("stop", { offset: 0, "stop-color": "#38352f" }, grad); el("stop", { offset: 1, "stop-color": "#23211d" }, grad);
+const hz = el("pattern", { id: "hazard", width: 16, height: 16, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, defs);
+el("rect", { width: 16, height: 16, fill: "#14120f" }, hz); el("rect", { width: 8, height: 16, fill: "#9a6f16" }, hz);
 
 const gPlates = el("g", {}, svg);
 PLATES.forEach(([x, y, w, h, t, sub]) => {
   const g = el("g", { class: "plate" }, gPlates);
-  el("rect", { x, y, width: w, height: h, rx: 6 }, g);
-  const tt = el("text", { x: x + 18, y: y + 42 }, g); tt.textContent = t;
+  el("rect", { class: "bed", x, y, width: w, height: h, rx: 6 }, g);
+  el("rect", { class: "band", x: x + 4, y: y + 4, width: Math.min(w - 8, 180), height: 6, rx: 2, fill: "url(#hazard)" }, g);
   if (sub) { const st = el("text", { x: x + 18, y: y + h - 16, class: "sub" }, g); st.textContent = sub; }
 });
-// barramento principal (decorativo): onde todas as telas descem até o portão
+// barramento principal (decorativo): onde todas as telas descem até o portão, com faixa de segurança pintada
 for (let i = -1; i <= 1; i++) el("path", { class: "bus", d: `M${BUS_X + i * 14} 140V1860` }, gPlates);
+for (const s of [-34, 34]) el("path", { class: "lane", d: `M${BUS_X + s} 140V1860` }, gPlates);
 
-const gBelts = el("g", {}, svg), gDyn = el("g", { class: "dyn" }, svg), gMach = el("g", {}, svg), gItem = el("g", {}, svg);
+const gBelts = el("g", {}, svg), gDyn = el("g", { class: "dyn" }, svg), gSigns = el("g", {}, svg), gMach = el("g", {}, svg), gItem = el("g", {}, svg);
+// placa com o nome de cada setor, por cima das esteiras para nenhuma linha cortar o texto
+const signs = PLATES.map(([x, y, w, h, t]) => {
+  const g = el("g", { class: "sign" }, gSigns), r = el("rect", { x: x + 8, y: y + 12, height: 32, rx: 3 }, g);
+  const tt = el("text", { x: x + 20, y: y + 37 }, g); tt.textContent = t;
+  return [r, tt, w];
+});
+function sizeSigns() { signs.forEach(([r, tt, w]) => { let len = 0; try { len = tt.getComputedTextLength(); } catch (_) {} r.setAttribute("width", Math.min(w - 16, (len || tt.textContent.length * 15) + 24)); }); }
+sizeSigns(); if (document.fonts) document.fonts.ready.then(sizeSigns);
 
 // Esteira entre duas máquinas, sempre desenhada da de rank menor para a maior.
 function order(a, b) { return K(a).rank <= K(b).rank ? [a, b] : [b, a]; }
@@ -671,6 +799,7 @@ function hopsOf(steps) { const h = []; for (let i = 1; i < steps.length; i++) if
 function showLinks(pairs) {
   gDyn.innerHTML = "";
   for (const k in belts) belts[k].classList.remove("on");
+  document.querySelectorAll(".kchip").forEach(b => b.setAttribute("aria-pressed", "false"));
   const seen = new Set();
   pairs.forEach(([a, b]) => {
     if (a === b) return;
@@ -691,31 +820,101 @@ function wrap(text, max) {
   if (line) out.push(line);
   return out.slice(0, 2);
 }
+// Nível exigido, do jeito que aparece no selo da máquina: PÚB, AUTH, N1, N2 ou N5.
+const LV = { "PÚB": "#6fbf72", AUTH: "#d9a62c", N1: "#7fa8e0", N2: "#7fa8e0", N5: "#e66a5c" };
+function levelOf(id) {
+  const m = M[id];
+  if (m.k === "ctrl") { const l = (m.guard.match(/nível (\d)/) || [])[1]; return l ? "N" + l : /AuthGuard/.test(m.guard) ? "AUTH" : "PÚB"; }
+  if (m.paths) { const lv = m.paths.map(p => p[1]); return lv.includes("pub") ? "PÚB" : "N" + Math.min(...lv.map(Number)); }
+  return null;
+}
+function lvBadge(g, lv, x, y, end) {
+  const w = lv.length * 6.2 + 9, c = LV[lv] || "#a69e8f", x0 = end ? x - w : x;
+  el("rect", { x: x0, y: y - 10, width: w, height: 14, rx: 2, fill: "#15130f", stroke: c, "stroke-width": 1.2 }, g);
+  const t = el("text", { class: "lvb", x: x0 + w / 2, y: y + 0.5, "text-anchor": "middle", fill: c }, g); t.textContent = lv;
+}
+// Ícone de cada tipo de máquina, no canto de baixo à direita.
+function icon(g, kind, W, H) {
+  const cx = W - 20, cy = H - 20;
+  if (kind === "ctrl") return el("circle", { class: "gear", cx: W - 18, cy: H - 32, r: 9 }, g);
+  if (kind === "core") return el("circle", { class: "gear", cx: W - 22, cy: H - 22, r: 13 }, g);
+  if (kind === "guard") {
+    el("rect", { x: cx + 10, y: cy - 10, width: 5, height: 20, fill: "#6d655a" }, g);
+    return el("rect", { x: cx - 22, y: cy - 4, width: 34, height: 8, rx: 1, fill: "url(#hazard)", stroke: "#000" }, g);
+  }
+  if (kind === "queue") {
+    el("rect", { x: cx - 30, y: cy + 4, width: 42, height: 3, fill: "#4a443b" }, g);
+    const b = el("g", { class: "boxes" }, g);
+    for (let i = 0; i < 3; i++) el("rect", { x: cx - 30 + i * 12, y: cy - 6, width: 9, height: 9, rx: 1, fill: "#8c3a30", stroke: "#000" }, b);
+    return b;
+  }
+  if (kind === "clock") {
+    el("circle", { cx, cy, r: 10, fill: "#191714", stroke: "#8a7d55", "stroke-width": 2 }, g);
+    return el("path", { class: "hand", d: `M${cx} ${cy - 7}V${cy + 7}` }, g);
+  }
+  if (kind === "db") {
+    const st = { fill: "#1d3350", stroke: "#4a8ad6", "stroke-width": 2 };
+    el("path", { d: `M${cx - 10} ${cy - 7}v13a10 4 0 0 0 20 0v-13`, ...st }, g);
+    el("path", { d: `M${cx - 10} ${cy - 1}a10 4 0 0 0 20 0`, ...st, fill: "none" }, g);
+    return el("ellipse", { cx, cy: cy - 7, rx: 10, ry: 4, ...st }, g);
+  }
+  if (kind === "out") {
+    el("path", { d: `M${cx + 11} ${cy - 10}V${cy + 10}`, stroke: "#6d655a", "stroke-width": 3 }, g);
+    return el("path", { d: `M${cx - 14} ${cy}H${cx + 5}M${cx - 1} ${cy - 6}L${cx + 6} ${cy}L${cx - 1} ${cy + 6}`, fill: "none", stroke: "#6fbf72", "stroke-width": 3, "stroke-linecap": "round", "stroke-linejoin": "round" }, g);
+  }
+  return el("circle", { class: "gear", cx, cy, r: 9 }, g);
+}
+const MAX_LINES = Math.max(...CTRLS.map(c => c[6]));
 const machEls = {};
 for (const id in M) {
-  const m = M[id], k = KIND[m.k], W = k.w, H = k.h;
+  const m = M[id], k = KIND[m.k], W = k.w, H = k.h, big = H >= 70, ctrl = m.k === "ctrl";
   const g = el("g", { class: "mach", transform: `translate(${m.x - W / 2} ${m.y - H / 2})`, "data-id": id }, gMach);
+  el("rect", { class: "halo", x: -6, y: -6, width: W + 12, height: H + 12, rx: 8 }, g);
+  el("rect", { class: "shadow", x: 4, y: 6, width: W, height: H, rx: 4 }, g);
   el("rect", { class: "body", width: W, height: H, rx: 4 }, g);
   el("rect", { class: "hi", x: 3, y: 3, width: W - 6, height: H - 6, rx: 2 }, g);
   el("rect", { x: 2, y: 2, width: W - 4, height: 18, fill: k.color, rx: 2 }, g);
+  for (const rx of [6, W - 6]) el("circle", { class: "rivet", cx: rx, cy: 26, r: 1.8 }, g);
   const tg = el("text", { class: "tag", x: 8, y: 15 }, g);
   tg.textContent = m.tag.length > (W - 30) / 6.8 ? m.tag.slice(0, Math.floor((W - 34) / 6.8)) + "…" : m.tag;
   el("circle", { class: "lamp", cx: W - 10, cy: 11, r: 4 }, g);
-  if (H >= 70) el("circle", { class: "gear", cx: W - 18, cy: H - 18, r: 9 }, g);
-  const lines = wrap(m.name, Math.floor((W - (H >= 70 ? 40 : 16)) / 8));
-  lines.forEach((ln, i) => { const t = el("text", { class: "name", x: 9, y: (H >= 70 ? 42 : 40) + i * 17 - (lines.length - 1) * (H >= 70 ? 4 : 8) }, g); t.textContent = ln; });
+  if (big) icon(g, m.k, W, H);
+  const lines = wrap(m.name, Math.floor((W - (big ? 40 : m.paths ? 32 : 16)) / 8));
+  const y0 = ctrl ? 44 : big ? 42 : 40, dy = ctrl || !big ? 8 : 4;
+  lines.forEach((ln, i) => { const t = el("text", { class: "name", x: 9, y: y0 + i * 17 - (lines.length - 1) * dy }, g); t.textContent = ln; });
+  if (ctrl) {
+    // selo do nível, endpoints e linhas, e a barra do tamanho do controller
+    lvBadge(g, levelOf(id), 9, H - 12);
+    const st = el("text", { class: "stat", x: 9 + levelOf(id).length * 6.2 + 15, y: H - 12 }, g);
+    st.textContent = m.eps + " ep · " + (m.lines ? m.lines.toLocaleString("pt-BR") + " lin" : "na rota");
+    el("rect", { class: "gauge-bg", x: 4, y: H - 7, width: W - 8, height: 3, rx: 1 }, g);
+    if (m.lines) el("rect", { class: "gauge", x: 4, y: H - 7, width: Math.max(2, (W - 8) * m.lines / MAX_LINES), height: 3, rx: 1 }, g);
+  } else if (m.paths) lvBadge(g, levelOf(id), W - 7, H - 8, true);
   machEls[id] = g;
 }
 
 const item = el("g", { class: "item" }, gItem);
+el("rect", { x: -11, y: -9, width: 28, height: 28, rx: 3, fill: "#000", opacity: .5 }, item);
 const itemBox = el("rect", { x: -14, y: -14, width: 28, height: 28, rx: 3, stroke: "#000", "stroke-width": 2 }, item);
-const itemTxt = el("text", { "text-anchor": "middle", y: 3 }, item);
+el("path", { d: "M-12 -7H12", stroke: "#000", "stroke-opacity": .35, "stroke-width": 2 }, item);
+const itemTxt = el("text", { "text-anchor": "middle", y: 5 }, item);
+
+// minimapa: setores, máquinas, a peça e o retângulo do que está na tela
+const mini = $("minisvg");
+PLATES.forEach(([x, y, w, h]) => el("rect", { x, y, width: w, height: h, rx: 12, fill: "#24221e", stroke: "#3a352d", "stroke-width": 6 }, mini));
+for (const id in M) { const m = M[id], k = K(id); el("rect", { x: m.x - k.w / 2, y: m.y - k.h / 2, width: k.w, height: k.h, fill: k.color }, mini); }
+const miniView = el("rect", { fill: "rgba(242, 160, 28, .1)", stroke: "#f2a01c", "stroke-width": 16 }, mini);
+const miniItem = el("circle", { r: 34, stroke: "#000", "stroke-width": 8 }, mini);
+function setItem(x, y) { item.setAttribute("transform", `translate(${x} ${y})`); miniItem.setAttribute("cx", x); miniItem.setAttribute("cy", y); }
 
 /* ======================= CÂMERA (arrastar e zoom) ======================= */
 const box = $("mapbox");
 let vb = { x: 0, y: 0, w: WORLD.w, h: WORLD.h }, cam = null;
 function aspect() { const r = box.getBoundingClientRect(); return r.height ? r.width / r.height : 1.6; }
-function apply() { svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`); }
+function apply() {
+  svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  miniView.setAttribute("x", vb.x); miniView.setAttribute("y", vb.y); miniView.setAttribute("width", vb.w); miniView.setAttribute("height", vb.h);
+}
 function clampW(w) { return Math.max(260, Math.min(WORLD.w * 2.2, w)); }
 function frame(x0, y0, x1, y1, pad = 80, animate = true) {
   const a = aspect(); let w = x1 - x0 + pad * 2, h = y1 - y0 + pad * 2;
@@ -749,8 +948,16 @@ function zoomCenter(f) { const r = box.getBoundingClientRect(); zoomAt(r.left + 
 function stopFollow() { $("follow").checked = false; }
 
 const ptrs = new Map(); let dragged = false, pinch0 = null, downAt = null;
+const miniBox = $("mini");
+function miniJump(e) {
+  const r = miniBox.getBoundingClientRect();
+  cancelAnimationFrame(cam); stopFollow();
+  vb.x = (e.clientX - r.left) / r.width * WORLD.w - vb.w / 2; vb.y = (e.clientY - r.top) / r.height * WORLD.h - vb.h / 2; apply();
+}
+miniBox.addEventListener("pointerdown", e => { e.stopPropagation(); try { miniBox.setPointerCapture(e.pointerId); } catch (_) {} miniJump(e); });
+miniBox.addEventListener("pointermove", e => { if (miniBox.hasPointerCapture && miniBox.hasPointerCapture(e.pointerId)) miniJump(e); });
 box.addEventListener("pointerdown", e => {
-  if (e.target.closest(".tools")) return;
+  if (e.target.closest(".tools, .mini")) return;
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   downAt = { x: e.clientX, y: e.clientY }; dragged = false;
   if (ptrs.size === 2) { const [p, q] = [...ptrs.values()]; pinch0 = { d: Math.hypot(p.x - q.x, p.y - q.y), w: vb.w }; }
@@ -829,7 +1036,9 @@ function buildMissions() {
   const rt = $("routes");
   for (const d in DIST) {
     const grp = document.createElement("div"); grp.className = "grp";
-    const h = document.createElement("h3"); h.textContent = DIST[d].title;
+    const h = document.createElement("h3"), inD = CTRLS.filter(c => c[1] === d), sm = document.createElement("small");
+    sm.textContent = inD.length + " rotas · " + inD.reduce((s, c) => s + c[7], 0) + " endpoints";
+    h.append(DIST[d].title, sm);
     const row = document.createElement("div");
     CTRLS.filter(c => c[1] === d).forEach(c => {
       const id = c[0], key = GUIDED_FOR[id] || "r:" + id, b = document.createElement("button");
@@ -840,6 +1049,33 @@ function buildMissions() {
     });
     grp.append(h, row); rt.appendChild(grp);
   }
+  // contadores do cabeçalho, calculados dos dados acima
+  const count = k => Object.keys(M).filter(id => M[id].k === k).length;
+  [["rotas no backend", CTRLS.length], ["endpoints", CTRLS.reduce((s, c) => s + c[7], 0)],
+   ["linhas de controller", CTRLS.reduce((s, c) => s + c[6], 0).toLocaleString("pt-BR")], ["telas React", SCREENS.length],
+   ["grupos no Next", count("next")], ["bancos", count("db")], ["serviços externos", count("out")], ["horários no relógio", M.cron.files.length]]
+    .forEach(([t, v]) => { const d = document.createElement("div"), dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = t; dd.textContent = v; d.append(dt, dd); $("counters").appendChild(d); });
+  // legenda dos tipos de máquina: clicar destaca todas daquele tipo
+  for (const k in KIND) {
+    const n = count(k); if (!n) continue;
+    const b = document.createElement("button"), i = document.createElement("i"), sm = document.createElement("small");
+    b.className = "kchip"; b.dataset.kind = k; b.setAttribute("aria-pressed", "false"); i.style.setProperty("--c", KIND[k].color); sm.textContent = n;
+    b.append(i, KIND[k].label, sm); b.addEventListener("click", () => showKind(k)); $("kinds").appendChild(b);
+  }
+}
+
+function showKind(k) {
+  token++; playing = false; busy = false; $("play").textContent = "▶ Rodar";
+  for (const id in machEls) machEls[id].classList.remove("active", "sel");
+  showLinks([]);
+  const ids = Object.keys(M).filter(id => M[id].k === k);
+  for (const id in machEls) machEls[id].classList.toggle("dim", M[id].k !== k);
+  document.querySelectorAll(".kchip").forEach(b => b.setAttribute("aria-pressed", b.dataset.kind === k));
+  stopFollow(); frameIds(ids);
+  const bx = $("insp"); bx.innerHTML = "<h2>Inspetor</h2>";
+  const h = document.createElement("h3"); h.textContent = ids.length + " × " + KIND[k].label;
+  const p = document.createElement("p"); p.className = "hint"; p.textContent = "Clique num nome para ver as ligações daquela máquina.";
+  bx.append(h, p); chipRow(ids, bx);
 }
 
 function select(key, frameIt, autoplay) {
@@ -871,20 +1107,20 @@ function reset() {
   steps = mission.build ? mission.build(guardOpts) : mission.steps;
   idx = 0;
   missionLinks();
-  itemBox.setAttribute("fill", mission.color); itemTxt.textContent = mission.item;
+  itemBox.setAttribute("fill", mission.color); miniItem.setAttribute("fill", mission.color); $("progbar").style.setProperty("--c", mission.color); itemTxt.textContent = mission.item;
   placeItem(steps[0].m);
   renderList(); show();
   $("play").textContent = "▶ Rodar";
 }
 
-function placeItem(id) { const m = M[id]; item.setAttribute("transform", `translate(${m.x} ${m.y - K(id).h / 2 - 6})`); }
+function placeItem(id) { const m = M[id]; setItem(m.x, m.y - K(id).h / 2 - 6); }
 
 function show() {
   const s = steps[idx];
   for (const id in machEls) machEls[id].classList.remove("active", "erro");
   machEls[s.m].classList.add("active");
   if (s.err) machEls[s.m].classList.add("erro");
-  itemBox.setAttribute("fill", s.err ? "var(--bad)" : mission.color);
+  itemBox.setAttribute("fill", s.err ? "var(--bad)" : mission.color); miniItem.setAttribute("fill", s.err ? "#e2574a" : mission.color); $("progbar").style.width = (steps.length > 1 ? idx / (steps.length - 1) * 100 : 100) + "%";
   const now = $("now"); now.innerHTML = "";
   const bx = document.createElement("div"); if (s.err) bx.className = "err";
   const w = document.createElement("div"); w.className = "where"; w.textContent = `Etapa ${idx + 1} de ${steps.length} · ${M[s.m].name}`;
@@ -903,8 +1139,9 @@ function show() {
 function renderList() {
   const ol = $("steps"); ol.innerHTML = "";
   steps.forEach((s, i) => {
-    const li = document.createElement("li"), b = document.createElement("button");
-    b.textContent = s.t;
+    const li = document.createElement("li"), b = document.createElement("button"), dot = document.createElement("i");
+    dot.className = "dot"; dot.style.setProperty("--c", K(s.m).color); dot.title = KIND[M[s.m].k].label;
+    b.append(dot, s.t); if (s.err) li.className = "err";
     b.addEventListener("click", () => { token++; playing = false; busy = false; $("play").textContent = "▶ Rodar"; idx = i; missionLinks(); placeItem(s.m); show(); if ($("follow").checked) followTo(M[s.m].x, M[s.m].y); });
     li.appendChild(b); ol.appendChild(li);
   });
@@ -930,7 +1167,7 @@ function moveTo(next, done) {
     if (my !== token) return;
     const k = Math.min(1, (t - t0) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
     const pt = path.getPointAtLength((forward ? e : 1 - e) * L);
-    item.setAttribute("transform", `translate(${pt.x} ${pt.y})`);
+    setItem(pt.x, pt.y);
     followTo(pt.x, pt.y);
     if (k < 1) requestAnimationFrame(f); else { placeItem(b); finish(); }
   })(t0);
@@ -996,7 +1233,10 @@ function inspect(id, fromStep) {
   const m = M[id], bx = $("insp");
   for (const k in machEls) machEls[k].classList.toggle("sel", !fromStep && k === id);
   bx.innerHTML = "<h2>Inspetor</h2>";
-  const kd = document.createElement("div"); kd.className = "kind"; kd.textContent = KIND[m.k].label + " · " + m.tag;
+  const kd = document.createElement("div"), sw = document.createElement("i"); kd.className = "kind";
+  sw.style.setProperty("--c", KIND[m.k].color); kd.append(sw, KIND[m.k].label + " · " + m.tag);
+  const lv = levelOf(id);
+  if (lv) { const b = document.createElement("span"); b.className = "lv"; b.style.setProperty("--c", LV[lv]); b.textContent = lv; b.title = "nível mínimo exigido"; kd.appendChild(b); }
   const h = document.createElement("h3"); h.textContent = m.name;
   const p = document.createElement("p"); p.textContent = m.desc;
   bx.append(kd, h, p);
@@ -1015,14 +1255,24 @@ function inspect(id, fromStep) {
     [["prefixo", m.prefix], ["endpoints", m.eps], ["linhas", m.lines ? m.lines.toLocaleString("pt-BR") : "na própria rota"], ["portaria", m.guard]]
       .forEach(([a, b]) => { const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = a; dd.textContent = b; dl.append(dt, dd); });
     bx.appendChild(dl);
+    if (m.lines) {
+      const rank = CTRLS.filter(c => c[6] > m.lines).length + 1, mt = document.createElement("div"), bar = document.createElement("i"), note = document.createElement("div");
+      mt.className = "meter"; bar.style.width = (m.lines / MAX_LINES * 100).toFixed(1) + "%"; mt.appendChild(bar);
+      note.className = "meter-note"; note.textContent = rank + "º maior de " + CTRLS.length + " · " + Math.round(m.lines / MAX_LINES * 100) + "% do tamanho do NFE.ts";
+      lbl("Tamanho do controller"); bx.append(mt, note);
+    }
     if (m.dbs.length || m.ext.length) { lbl("Fala com"); chipRow(m.dbs.concat(m.ext), bx); }
     const users = Object.keys(M).filter(s => (M[s].apis || []).includes(id));
     if (users.length) { lbl("Telas que chamam"); chipRow(users, bx); }
   }
   if (m.paths) {
     lbl("Endereços da tela (nível exigido no App.tsx)");
-    const ul = document.createElement("ul");
-    m.paths.forEach(([pth, lv]) => { const li = document.createElement("li"); li.textContent = pth + " · " + (lv === "pub" ? "sem login" : "nível " + lv); ul.appendChild(li); });
+    const ul = document.createElement("ul"); ul.className = "paths";
+    m.paths.forEach(([pth, lv]) => {
+      const li = document.createElement("li"), b = document.createElement("span"), t = lv === "pub" ? "PÚB" : "N" + lv;
+      b.className = "lv"; b.style.setProperty("--c", LV[t] || "#a69e8f"); b.textContent = t; b.title = lv === "pub" ? "sem login" : "nível " + lv;
+      li.append(b, pth); ul.appendChild(li);
+    });
     bx.appendChild(ul);
   }
   if (m.apis && m.apis.length && m.k !== "ctrl") { lbl("Rotas que chama"); chipRow(m.apis, bx); }
