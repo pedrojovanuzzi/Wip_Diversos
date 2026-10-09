@@ -29,7 +29,11 @@ Onde mexer, dentro do `<script>` do arquivo (seção DADOS):
   Bairro com máquina nova pode precisar de placa maior em `PLATES`.
 - **Bancos, saídas (`out_*`), segundo plano e ferramentas (`t_*`)**: blocos
   `add(...)` e listas próprias. `links` liga máquinas que não são rota.
-- **`MISSIONS`**: os pedidos, passo a passo (`S(máquina, título, explicação,
+- **Pedidos automáticos**: cada linha de `CTRLS` já vira um pedido sozinha
+  (`autoMission`), usando a portaria, os bancos e os externos da linha. Rota
+  com pedido guiado entra em `GUIDED_FOR`; o que roda ao clicar numa máquina
+  que não é rota nem tela fica em `CLICK_MISSION`.
+- **`MISSIONS`**: os pedidos guiados, passo a passo (`S(máquina, título, explicação,
   arquivo, linha)`). Se a mudança altera o caminho de um pedido, ajuste.
 - **Números citados no texto**: 38 rotas, 34 pastas de tela, 89 migrações,
   horários do cron, linhas/endpoints de cada rota e o tamanho dos

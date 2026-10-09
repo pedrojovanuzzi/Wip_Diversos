@@ -45,6 +45,15 @@ h1 small { display: block; font-family: var(--f-body); font-weight: 500; font-si
 .mbtn b { font-family: var(--f-display); font-size: 1.02rem; font-weight: 600; letter-spacing: .02em; }
 .mbtn code { font: .7rem var(--f-mono); color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+.routes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 8px 14px; max-width: 1700px; margin: 0 auto 14px; }
+.grp { min-width: 0; }
+.grp h3 { margin: 0 0 4px; font: 700 .75rem var(--f-display); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+.grp div { display: flex; flex-wrap: wrap; gap: 4px; }
+.rbtn { font: 500 .8rem var(--f-body); color: var(--ink); background: var(--panel); border: 1px solid var(--panel-lo); box-shadow: inset 0 1px 0 var(--panel-hi); border-radius: 3px; padding: 2px 8px; cursor: pointer; }
+.rbtn:hover { border-color: #5a5249; }
+.rbtn[aria-pressed="true"] { border-color: var(--accent); background: #3a2f1f; }
+.rbtn.guided::after { content: " ★"; color: var(--accent); }
+.insp .see { margin-bottom: 8px; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 370px; gap: 14px; max-width: 1700px; margin: 0 auto; }
 @media (max-width: 980px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 .mapbox { position: relative; background: var(--panel-lo); border: 2px solid #000; border-radius: 4px; overflow: hidden; min-width: 0; height: clamp(440px, calc(100vh - 210px), 1000px); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
@@ -152,7 +161,8 @@ ol.steps li.cur button::before { color: var(--accent); }
   </div>
 </header>
 
-<nav class="missions" id="missions" aria-label="Pedidos"></nav>
+<nav class="missions" id="missions" aria-label="Pedidos guiados"></nav>
+<nav class="routes" id="routes" aria-label="Pedido de cada rota"></nav>
 
 <div class="layout">
   <div class="mapbox" id="mapbox" tabindex="0" aria-label="Mapa da fábrica. Setas movem, + e - fazem zoom.">
@@ -165,7 +175,7 @@ ol.steps li.cur button::before { color: var(--accent); }
       <button id="zfit">Ver tudo</button>
       <label><input type="checkbox" id="follow" checked> seguir peça</label>
     </div>
-    <div class="maphint">arraste para mover · roda do mouse ou pinça para zoom · clique numa máquina</div>
+    <div class="maphint">arraste para mover · roda do mouse ou pinça para zoom · clique numa máquina para rodar o pedido dela</div>
   </div>
   <aside class="side">
     <section class="card" aria-live="polite">
@@ -548,6 +558,52 @@ function guardSteps(o) {
     S("s_pix", "QR Code na tela", "Resposta 200 com o Pix gerado.", null, null, { end: "200" }));
 }
 
+// Pedido automático de qualquer rota: entrada → portão → roteador → portaria → controller → bancos → externos → volta.
+const GUIDED_FOR = { c_auth: "login", c_wahook: "whats", c_nfse: "nfse", c_phone: "loc", c_backup: "backup", c_pix: "guard" };
+function autoMission(cid, entry) {
+  const c = M[cid];
+  entry = entry || Object.keys(M).find(s => K(s).rank === 0 && (M[s].apis || []).includes(cid));
+  const E = M[entry], ext = E.k === "dock";
+  const lvl = (c.guard.match(/nível (\d)/) || [])[1], pub = !lvl && !/AuthGuard/.test(c.guard);
+  const rf = c.files[0][0], cf = (c.files[1] || c.files[0])[0];
+  const steps = [
+    S(entry, ext ? E.name + " chama a rota" : "Abre a tela " + E.name,
+      ext ? E.desc : (E.paths ? "Endereços: " + E.paths.map(p => p[0]).join(", ") + ". " : "") + "A tela chama " + c.prefix + ".",
+      E.dir || (E.files[0] || [])[0] || null, 0),
+    S("gate", "Entra pelo portão", "cors, express.json e auditoriaMiddleware.", "app.ts", 73),
+    S("router", "Esteira " + c.prefix, "O prefixo vai para " + rf + "." + (pub ? " Rota pública: " + c.guard + "." : ""), rf, 0),
+  ];
+  if (!pub) steps.push(S("auth", "Confere o crachá", "AuthGuard: jwt.verify no token e carrega req.user. Sem token válido, para aqui com 401.", "middleware/AuthGuard.ts", 19));
+  if (lvl) steps.push(S("perm", "Confere o nível", "exigirPermissao(" + lvl + "): nível " + lvl + " ou mais, senão 403. Portaria desta rota: " + c.guard + ".", "middleware/PermissionGuard.ts", 11));
+  steps.push(S(cid, c.name + " trabalha", c.desc + " (" + c.eps + " endpoints" + (c.lines ? ", " + c.lines.toLocaleString("pt-BR") + " linhas" : "") + ")", cf, 0));
+  c.dbs.forEach(d => steps.push(S(d, "Lê e grava: " + M[d].name, M[d].desc, M[d].files[0] && M[d].files[0][0], 0)));
+  c.ext.forEach(x => steps.push(S(x, "Fala com " + M[x].name, M[x].desc, M[x].files[0] && M[x].files[0][0], M[x].files[0] && M[x].files[0][1])));
+  steps.push(S(entry, ext ? "Confirmação devolvida" : "Resposta na tela", ext ? "O serviço externo recebe o 200." : "O resultado aparece em " + E.name + ".", null, null, { end: "200" }));
+  return { id: "r:" + cid + "@" + entry, title: c.name, http: c.prefix, item: "API", color: "#9db0d8", steps };
+}
+const missionCache = {};
+function getMission(key) {
+  const g = MISSIONS.find(m => m.id === key);
+  if (g) return g;
+  if (missionCache[key]) return missionCache[key];
+  const [cid, entry] = key.slice(2).split("@");
+  if (!M[cid]) return null;
+  return (missionCache[key] = autoMission(cid, entry));
+}
+// Clique no mapa: qual pedido roda para cada máquina.
+const CLICK_MISSION = { cron: "backup", redis: "whats", worker: "whats", jobs: "nfse", in_meta: "whats", in_efi: "pix", app_loc: "loc", limiter: "login", auth: "guard", perm: "guard", gate: "login", router: "login" };
+function missionForMachine(id) {
+  const m = M[id];
+  if (m.k === "ctrl") return GUIDED_FOR[id] || "r:" + id;
+  if (K(id).rank === 0 && m.apis && m.apis.length) {
+    const a = m.apis[0], g = GUIDED_FOR[a] && getMission(GUIDED_FOR[a]);
+    if (g && g.steps && g.steps[0].m === id) return g.id;
+    if (g && g.build && guardSteps(guardOpts)[0].m === id) return g.id;
+    return "r:" + a + "@" + id;
+  }
+  return CLICK_MISSION[id] || null;
+}
+
 /* ======================= DESENHO ======================= */
 const NS = "http://www.w3.org/2000/svg";
 const svg = document.getElementById("map");
@@ -717,7 +773,7 @@ const endPtr = e => {
   if (ptrs.size === 0) box.classList.remove("drag");
   if (e.type === "pointerup" && !dragged) {
     const t = document.elementFromPoint(e.clientX, e.clientY), g = t && t.closest && t.closest(".mach");
-    if (g) focusMachine(g.dataset.id);
+    if (g) runMachine(g.dataset.id);
   }
 };
 box.addEventListener("pointerup", endPtr);
@@ -766,19 +822,46 @@ function buildMissions() {
     b.className = "mbtn"; b.id = "m-" + ms.id; b.style.setProperty("--c", ms.color);
     b.innerHTML = `<span class="chip">${ms.item}</span><b></b><code></code>`;
     b.querySelector("b").textContent = ms.title; b.querySelector("code").textContent = ms.http;
+    b.dataset.key = ms.id;
     b.addEventListener("click", () => select(ms.id, true));
     nav.appendChild(b);
   });
+  const rt = $("routes");
+  for (const d in DIST) {
+    const grp = document.createElement("div"); grp.className = "grp";
+    const h = document.createElement("h3"); h.textContent = DIST[d].title;
+    const row = document.createElement("div");
+    CTRLS.filter(c => c[1] === d).forEach(c => {
+      const id = c[0], key = GUIDED_FOR[id] || "r:" + id, b = document.createElement("button");
+      b.className = "rbtn" + (GUIDED_FOR[id] ? " guided" : ""); b.dataset.key = key; b.dataset.ctrl = id;
+      b.textContent = M[id].name; b.title = M[id].prefix + (GUIDED_FOR[id] ? " (pedido guiado)" : "");
+      b.addEventListener("click", () => select(key, true));
+      row.appendChild(b);
+    });
+    grp.append(h, row); rt.appendChild(grp);
+  }
 }
 
-function select(id, frameIt) {
-  mission = MISSIONS.find(m => m.id === id);
-  document.querySelectorAll(".mbtn").forEach(b => b.setAttribute("aria-pressed", b.id === "m-" + id));
+function select(key, frameIt, autoplay) {
+  const ms = getMission(key);
+  if (!ms) return;
+  mission = ms;
+  const ctrlOf = key.startsWith("r:") ? key.slice(2).split("@")[0] : null;
+  document.querySelectorAll(".mbtn").forEach(b => b.setAttribute("aria-pressed", b.dataset.key === key));
+  document.querySelectorAll(".rbtn").forEach(b => b.setAttribute("aria-pressed", ctrlOf ? b.dataset.ctrl === ctrlOf : b.dataset.key === key));
   $("mtitle").textContent = mission.title + " · " + mission.http;
   $("gopts").hidden = !mission.build;
-  try { localStorage.setItem("fabrica-missao", id); } catch (e) {}
+  try { localStorage.setItem("fabrica-missao", key); } catch (e) {}
   reset();
   if (frameIt) { $("follow").checked = true; frameIds(steps.map(s => s.m)); }
+  if (autoplay) { playing = true; $("play").textContent = "⏸ Pausar"; setTimeout(loop, reduce ? 0 : 600); }
+}
+
+function runMachine(id) {
+  const key = missionForMachine(id);
+  if (!key) { focusMachine(id); return; }
+  select(key, true, true);
+  inspect(id, false);
 }
 
 function missionLinks() { showLinks(hopsOf(steps)); }
@@ -917,6 +1000,15 @@ function inspect(id, fromStep) {
   const h = document.createElement("h3"); h.textContent = m.name;
   const p = document.createElement("p"); p.textContent = m.desc;
   bx.append(kd, h, p);
+  const acts = document.createElement("div"); acts.className = "controls see";
+  const see = document.createElement("button"); see.className = "btn alt"; see.textContent = "Ver ligações";
+  see.addEventListener("click", () => focusMachine(id)); acts.appendChild(see);
+  const mk = missionForMachine(id);
+  if (mk && mk !== (mission && mission.id) && !(mission && mission.id.startsWith(mk + "@"))) {
+    const run = document.createElement("button"); run.className = "btn"; run.textContent = "▶ Rodar pedido";
+    run.addEventListener("click", () => select(mk, true, true)); acts.appendChild(run);
+  }
+  bx.appendChild(acts);
   const lbl = t => { const d = document.createElement("div"); d.className = "lbl"; d.textContent = t; bx.appendChild(d); };
   if (m.k === "ctrl") {
     const dl = document.createElement("dl");
@@ -953,7 +1045,7 @@ function inspect(id, fromStep) {
 /* ======================= INÍCIO ======================= */
 buildMissions();
 let start = "login";
-try { const s = localStorage.getItem("fabrica-missao"); if (s && MISSIONS.some(m => m.id === s)) start = s; } catch (e) {}
+try { const s = localStorage.getItem("fabrica-missao"); if (s && getMission(s)) start = s; } catch (e) {}
 fitAll(false);
 select(start, false);
 })();
