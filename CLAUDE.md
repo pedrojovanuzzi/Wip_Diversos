@@ -5,8 +5,8 @@
 `docs/fabrica.html` é um mapa interativo do repositório inteiro: telas do
 React, do Next e do app de localização, a portaria (guards), as 38 rotas do
 backend agrupadas por bairro, filas e jobs, bancos, serviços externos e
-ferramentas. Pedidos de exemplo (login, WhatsApp, NFS-e, Pix, localização,
-backup, portaria) andam por "esteiras" até o fim. Também está publicado como
+ferramentas. Pedidos de exemplo (login, WhatsApp, NFS-e, NFCom, Pix,
+mensalidade de licença, localização, backup, portaria) andam por "esteiras" até o fim. Também está publicado como
 artifact em https://claude.ai/artifact/QUUvHKw2PJg1m2XSrWChgS
 
 **Sempre que criar, renomear ou remover algo no repositório, atualize o mapa
