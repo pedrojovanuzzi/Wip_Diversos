@@ -18,6 +18,7 @@ interface Mensalidade {
   software: string | null;
   clienteNome: string | null;
   competencia: string;
+  avulsa?: boolean | number;
   vencimento: string;
   valor: string;
   status: string;
@@ -384,6 +385,11 @@ export const MensalidadesLicenca = () => {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {m.competencia}
+                        {!!m.avulsa && (
+                          <span className="ml-2 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                            AVULSA
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {dataBR(m.vencimento)}
@@ -561,8 +567,8 @@ export const MensalidadesLicenca = () => {
             </div>
 
             <p className="mt-3 text-xs text-gray-500">
-              Uma cobrança por cliente em cada competência. Vencimento e valor
-              em branco usam a regra do software.
+              A avulsa é extra: não substitui nem conta como a mensalidade do
+              mês. Vencimento e valor em branco usam a regra do software.
             </p>
 
             <div className="mt-4 flex justify-end gap-2">

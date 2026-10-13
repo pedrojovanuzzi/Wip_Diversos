@@ -188,7 +188,7 @@ class LicencaMensalidadeService {
 
       for (const licenca of licencas) {
         const existente = await this.mensalidadeRepo.findOne({
-          where: { licencaId: licenca.id, competencia },
+          where: { licencaId: licenca.id, competencia, avulsa: false },
         });
         if (existente) {
           resumo.jaExistiam++;
@@ -222,8 +222,8 @@ class LicencaMensalidadeService {
    * Cobrança avulsa de uma licença, criada na mão.
    *
    * Serve para cliente sem regra de software, licença que entrou no meio do
-   * mês ou valor diferente do configurado. Continua sendo uma por licença e
-   * competência: o índice único é o que impede a geração do mês de duplicar.
+   * mês, valor diferente do configurado ou cobrança extra. Fica marcada como
+   * avulsa: convive com a mensalidade do mês e não conta para a geração dela.
    */
   async criarAvulsa(dados: {
     licencaId: number | string;
@@ -240,15 +240,6 @@ class LicencaMensalidadeService {
     const competencia = String(dados.competencia || competenciaDe()).trim();
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(competencia))
       throw new Error("Competência inválida (use AAAA-MM).");
-
-    const existente = await this.mensalidadeRepo.findOne({
-      where: { licencaId: licenca.id, competencia },
-    });
-    if (existente) {
-      throw new Error(
-        `${licenca.cliente_nome} já tem mensalidade em ${competencia} (situação: ${existente.status}).`,
-      );
-    }
 
     const config = licenca.software
       ? await this.configRepo.findOne({ where: { software: licenca.software } })
@@ -277,6 +268,7 @@ class LicencaMensalidadeService {
       software: licenca.software,
       clienteNome: licenca.cliente_nome,
       competencia,
+      avulsa: true,
       vencimento,
       valor: valor.toFixed(2),
       status: "aberta",

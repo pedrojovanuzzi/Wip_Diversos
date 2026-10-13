@@ -16,7 +16,10 @@ import {
  * o que faz o webhook do MKAuth passar direto por ele.
  */
 @Entity("licenca_mensalidades")
-@Index(["licencaId", "competencia"], { unique: true })
+@Index("idx_licenca_mensalidades_licenca_competencia", [
+  "licencaId",
+  "competencia",
+])
 export class LicencaMensalidade {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -39,6 +42,13 @@ export class LicencaMensalidade {
   /** Mês de referência, no formato AAAA-MM. */
   @Column({ type: "varchar", length: 7 })
   competencia!: string;
+
+  /**
+   * Cobrança criada na mão, fora da mensalidade do mês. Pode haver várias na
+   * mesma competência; a mensalidade do mês continua uma só por licença.
+   */
+  @Column({ type: "tinyint", default: 0 })
+  avulsa!: boolean;
 
   @Column({ type: "date" })
   vencimento!: string;

@@ -35,7 +35,7 @@ Onde mexer, dentro do `<script>` do arquivo (seção DADOS):
   que não é rota nem tela fica em `CLICK_MISSION`.
 - **`MISSIONS`**: os pedidos guiados, passo a passo (`S(máquina, título, explicação,
   arquivo, linha)`). Se a mudança altera o caminho de um pedido, ajuste.
-- **Números citados no texto**: 38 rotas, 34 pastas de tela, 89 migrações,
+- **Números citados no texto**: 38 rotas, 34 pastas de tela, 90 migrações,
   horários do cron, linhas/endpoints de cada rota e o tamanho dos
   controllers gigantes na trilha de estudo.
 - **Números de linha**: os links apontam para `main` no GitHub com `#L<linha>`
