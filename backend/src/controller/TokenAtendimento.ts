@@ -10,7 +10,10 @@ import crypto from "crypto";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import moment from "moment";
-import { valorAtualizadoFatura } from "../utils/valorFatura";
+import {
+  valorCobrancaFatura,
+  valorMensalidadeCliente,
+} from "../utils/valorFatura";
 
 dotenv.config();
 
@@ -346,31 +349,20 @@ class TokenAtendimento {
     }
   };
 
+  // Regra única de todos os canais (utils/valorFatura): mensalidade -
+  // desconto do cadastro + serviços (Watch TV/câmeras), com multa e juros só
+  // em atraso.
   aplicarJuros_Desconto = async (
     valor: string | number,
     pppoe: string,
     dataVenc: Date | string,
-  ): Promise<number> => {
-    // Regra única com o bot do WhatsApp (utils/valorFatura): sem o desconto
-    // do cadastro, multa e juros só em atraso.
-    return valorAtualizadoFatura(valor, dataVenc);
-  };
+  ): Promise<number> => valorCobrancaFatura(valor, pppoe, dataVenc);
 
+  // Mesma conta, sem multa e juros (atendente perdoou os juros).
   aplicar_Desconto = async (
     valor: string | number,
     pppoe: string,
-  ): Promise<number> => {
-    try {
-      // 🔹 O totem não aplica mais o desconto do cadastro do cliente
-      let valorFinal = Number(valor);
-
-      return Number(valorFinal.toFixed(2));
-    } catch (error) {
-      console.error("❌ Erro em aplicarJuros_Desconto:", error);
-      // 🔹 Em caso de erro, retorna o valor original sem alteração
-      return Number(valor);
-    }
-  };
+  ): Promise<number> => valorMensalidadeCliente(valor, pppoe);
 
   faturaWentPaid = async (req: Request, res: Response) => {
     try {

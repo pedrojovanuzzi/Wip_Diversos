@@ -20,7 +20,7 @@ import {
   MensagensComuns,
   MensagensDeMidia,
 } from "./messaging.service";
-import { valorAtualizadoFatura } from "../../../utils/valorFatura";
+import { valorCobrancaFatura } from "../../../utils/valorFatura";
 
 // Cria lançamento de instalação paga diretamente com status 'pago'.
 // Usado quando o cliente já pagou via Pix antes de fazer o cadastro.
@@ -319,9 +319,10 @@ export async function enviarBoleto(
 
   const link = qrlink.linkVisualizacao;
 
-  // Mesmo cálculo do totem: sem o desconto do cadastro, multa e juros só
-  // em atraso (juros depois de 4 dias de tolerância).
-  valor = valorAtualizadoFatura(valor, dataVenc);
+  // Regra única de todos os canais: mensalidade - desconto do cadastro +
+  // serviços (Watch TV/câmeras), multa e juros só em atraso (juros depois de
+  // 4 dias de tolerância).
+  valor = await valorCobrancaFatura(valor, pppoe, dataVenc);
 
   writeLog({
     tipo: "BOLETO/PIX BOT SOLICITADO",

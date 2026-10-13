@@ -280,7 +280,7 @@ ol.steps li.err button { color: var(--bad); }
       <li><div><b>Entenda a portaria.</b> <code>middleware/AuthGuard.ts</code> e <code>PermissionGuard.ts</code>. Rode o pedido "Portaria" com as 3 opções de token e os 3 níveis. Repare que a tela também confere o nível (<code>frontend/app/src/App.tsx</code>), mas quem protege de verdade é o backend.</div></li>
       <li><div><b>Siga um pedido simples de ponta a ponta.</b> Login: a tela <code>pages/auth</code> → <code>routes/Auth.Routes.ts</code> → <code>controller/Auth.ts</code> → banco.</div></li>
       <li><div><b>Aprenda as filas.</b> A pasta <code>controller/whatsapp/</code> é a parte mais bem organizada (handlers, services, testes). Leia <code>queues.ts</code> e depois o <code>switch</code> do <code>message.handler.ts</code>.</div></li>
-      <li><div><b>Só então as máquinas gigantes.</b> <code>NFE.ts</code> (3.594 linhas), <code>Nfcom.ts</code> (3.271), <code>NFSE.ts</code> (2.896) e <code>Pix.ts</code> (2.395). Não leia de cima a baixo: clique na tela, veja qual rota ela chama e siga a partir do método.</div></li>
+      <li><div><b>Só então as máquinas gigantes.</b> <code>NFE.ts</code> (3.594 linhas), <code>Nfcom.ts</code> (3.271), <code>NFSE.ts</code> (2.896) e <code>Pix.ts</code> (2.295). Não leia de cima a baixo: clique na tela, veja qual rota ela chama e siga a partir do método.</div></li>
     </ol>
   </details>
   <details class="pane gloss" id="gloss">
@@ -475,8 +475,8 @@ const CTRLS = [
   ["c_nfe", "fiscal", "/api/NFEletronica", "NF-e", "NFE.Routes.ts", "NFE.ts", 3594, 17, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco", "NF-e de comodato: monta XML, assina com certificado A1, gera DANFE em PDF. O maior arquivo do projeto."],
   ["c_nfcom", "fiscal", "/api/NFCom", "NFCom", "NFCom.routes.ts", "Nfcom.ts", 3271, 17, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco out_email out_publicas", "Nota fiscal de comunicação (internet): XML assinado, QR Code, PDF e declaração de quitação. Manda a nota por e-mail e busca os impostos aproximados no IBPT."],
   ["c_prefeitura", "fiscal", "/api/Prefeitura", "Login Prefeitura", "PrefeituraUser.routes.ts", "PrefeituraLogin.ts", 316, 10, "público com código por SMS", "dbMain", "out_twilio", "Acesso da prefeitura com código de verificação enviado por SMS (Twilio, ou Facilita Móvel como alternativa)."],
-  ["c_pix", "finan", "/api/Pix", "Pix", "Pix.routes.ts", "Pix.ts", 2395, 35, "nível 2 / 5; webhooks públicos", "dbMain mkauth", "out_efi", "Gera Pix, Pix Automático e recebe os webhooks da Efí. A regra do Pix Automático mora em services/PixAutomaticoService.ts."],
-  ["c_token", "finan", "/api/TokenAutoAtendimento", "Autoatendimento", "TokenAtendimento.routes.ts", "TokenAtendimento.ts", 1105, 15, "público (totem)", "mkauth", "out_efi out_paygo", "O totem: cliente consulta e paga fatura (Pix pela Efí ou cartão pela maquininha PayGo), abre chamado, faz cadastro."],
+  ["c_pix", "finan", "/api/Pix", "Pix", "Pix.routes.ts", "Pix.ts", 2295, 35, "nível 2 / 5; webhooks públicos", "dbMain mkauth", "out_efi", "Gera Pix, Pix Automático e recebe os webhooks da Efí. A regra do Pix Automático mora em services/PixAutomaticoService.ts."],
+  ["c_token", "finan", "/api/TokenAutoAtendimento", "Autoatendimento", "TokenAtendimento.routes.ts", "TokenAtendimento.ts", 1097, 15, "público (totem)", "mkauth", "out_efi out_paygo", "O totem: cliente consulta e paga fatura (valor pela regra única de utils/valorFatura.ts; Pix pela Efí ou cartão pela maquininha PayGo), abre chamado, faz cadastro."],
   ["c_totem", "finan", "/api/totem-solicitacao", "Registro do totem", "TotemSolicitacao.routes.ts", "TotemSolicitacao.ts", 31, 1, "público", "dbMain", "", "Registra os Pix pedidos no totem."],
   ["c_licenca", "finan", "/api/licenca", "Licenças", "Licenca.Routes.ts", "LicencaController.ts LicencaMensalidadeController.ts", 473, 24, "nível 5", "dbMain", "", "Licenças de software e mensalidades (geradas todo dia às 03:15, ou avulsas escolhendo o cliente)."],
   ["c_codef", "finan", "/api/codef", "Codef", "Codef.routes.ts", "Codef.ts", 206, 6, "nível 5", "dbMain", "", "Plano de contas e planilha da Codef (services/CodefService.ts)."],
@@ -547,7 +547,7 @@ add("pdns", { k: "db", x: 2730, y: 1400, tag: "createDns.ts", name: "Banco do Po
 [
   ["out_meta", "Graph API", "WhatsApp (saída)", "O outgoingWorker e o chat mandam mensagens pela Graph API da Meta.", [["controller/whatsapp/queues.ts", 169, "outgoingWorker"]]],
   ["out_fisco", "SEFIN · SEFAZ", "Fisco", "NFS-e vai para a SEFIN Nacional ou para a Fiorilli (prefeitura). NF-e e NFCom vão para a SEFAZ. Tudo em XML assinado com o certificado A1.", [["controller/NFSE.ts", 303, "enviarDpsNacional"], ["services/nfse/FiorilliProvider.ts", 0, "FiorilliProvider"]]],
-  ["out_efi", "API Efí", "Banco Efí (saída)", "Chamadas à Efí pelo SDK sdk-node-apis-efi: criar cobrança, gerar QR Code, consultar pagamentos.", [["services/PixAutomaticoService.ts", 97, "efi()"]]],
+  ["out_efi", "API Efí", "Banco Efí (saída)", "Chamadas à Efí pelo SDK sdk-node-apis-efi: criar cobrança, gerar QR Code, consultar pagamentos.", [["services/PixAutomaticoService.ts", 96, "efi()"]]],
   ["out_drive", "OneDrive", "OneDrive", "Destino dos backups, na pasta Backup, via Microsoft Graph (LargeFileUploadTask).", [["controller/Backup.ts", 227, "createUploadSession"]]],
   ["out_zapsign", "API ZapSign", "ZapSign", "Assinatura eletrônica de contratos e termos.", []],
   ["out_twilio", "Twilio · Facilita", "SMS", "Envia o código de verificação do login da prefeitura: Twilio Verify, ou a Facilita Móvel como alternativa.", [["controller/PrefeituraLogin.ts", 16, "twilio"], ["controller/PrefeituraLogin.ts", 245, "SendOtpFacilitaMovel"]]],
@@ -631,10 +631,10 @@ const MISSIONS = [
     S("in_efi", "Cliente pagou", "A Efí chama o webhook da cobrança do Pix Automático."),
     S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 73),
     S("router", "Esteira /api/Pix", "Os webhooks não têm AuthGuard: quem chama é o banco.", "routes/Pix.routes.ts", 135),
-    S("c_pix", "Anota e responde rápido", "PixAutomaticWebhookCobr registra a notificação e responde 200 { recebido: true } antes de processar.", "controller/Pix.ts", 856),
-    S("dbMain", "Notificação guardada", "Fica em PixAutomaticoNotificacao. Se o processamento falhar, a conferência das 04:00 pega de novo.", "services/PixAutomaticoService.ts", 106),
-    S("out_efi", "Confirma com o banco", "processarNotificacao consulta a cobrança na Efí (pixDetailAutomaticCharge) em vez de confiar só no corpo do webhook.", "services/PixAutomaticoService.ts", 177),
-    S("mkauth", "Dá baixa na fatura", "darBaixaNaMensalidade marca a fatura como paga no MK-Auth.", "services/PixAutomaticoService.ts", 280, { end: "pago" }),
+    S("c_pix", "Anota e responde rápido", "PixAutomaticWebhookCobr registra a notificação e responde 200 { recebido: true } antes de processar.", "controller/Pix.ts", 760),
+    S("dbMain", "Notificação guardada", "Fica em PixAutomaticoNotificacao. Se o processamento falhar, a conferência das 04:00 pega de novo.", "services/PixAutomaticoService.ts", 105),
+    S("out_efi", "Confirma com o banco", "processarNotificacao consulta a cobrança na Efí (pixDetailAutomaticCharge) em vez de confiar só no corpo do webhook.", "services/PixAutomaticoService.ts", 176),
+    S("mkauth", "Dá baixa na fatura", "darBaixaNaMensalidade marca a fatura como paga no MK-Auth.", "services/PixAutomaticoService.ts", 279, { end: "pago" }),
   ]},
   { id: "loc", title: "Técnico em campo", http: "POST /api/phone-location/position", item: "GPS", color: "#e07a5f", steps: [
     S("app_loc", "Celular manda a posição", "O app Expo roda uma tarefa em segundo plano que pega o GPS e envia, mesmo com o app fechado.", "backend/Localizacao_app/src/backgroundTask.ts", 12),
@@ -662,7 +662,7 @@ const MISSIONS = [
     S("dbMain", "Mensalidade gravada", "Linha em licenca_mensalidades, separada do MK-Auth de propósito.", "entities/LicencaMensalidade.ts", 0),
     S("out_efi", "Gera o Pix", "gerarPix cria a cobrança na Efí com a marca LICENCA nas informações adicionais, e sem o par ID/VALOR que o webhook usa para fatura de internet.", "services/LicencaMensalidadeService.ts", 344),
     S("in_efi", "Cliente pagou", "A Efí chama o webhook do Pix, o mesmo das faturas de internet."),
-    S("c_pix", "Desvia para licenças", "StatusUpdatePixTodosVencidos confere a cobrança na Efí e, achando a marca LICENCA, baixa a mensalidade de licença e para ali, sem tocar no MK-Auth.", "controller/Pix.ts", 538),
+    S("c_pix", "Desvia para licenças", "StatusUpdatePixTodosVencidos confere a cobrança na Efí e, achando a marca LICENCA, baixa a mensalidade de licença e para ali, sem tocar no MK-Auth.", "controller/Pix.ts", 442),
     S("dbMain", "Baixa por Pix", "baixarPorPix marca paga, com valor, horário e endToEndId. Pix repetido não mexe em nada.", "services/LicencaMensalidadeService.ts", 358, { end: "paga" }),
   ]},
   { id: "nfcom", title: "Emitir NFCom", http: "POST /api/NFCom/emitirNFCom", item: "XML", color: "#7fb3d5", steps: [
@@ -702,8 +702,9 @@ function guardSteps(o) {
     S("s_pix", "Volta com 403", "Está logado, mas não tem nível para essa tela.", null, null, { end: "403", err: 1 }));
   return s.concat(
     S("perm", "Nível " + o.perm + " ≥ 2: pode passar", "exigirPermissao(2) libera e chama next().", "middleware/PermissionGuard.ts", 11),
-    S("c_pix", "gerarPix", "Agora sim o controller trabalha.", "controller/Pix.ts", 948),
-    S("out_efi", "Cria a cobrança", "pixCreateLocation e pixGenerateQRCode na Efí.", "controller/Pix.ts", 969),
+    S("c_pix", "gerarPix", "Agora sim o controller trabalha.", "controller/Pix.ts", 852),
+    S("mkauth", "Calcula o valor", "valorCobrancaFatura: mensalidade − desconto do cadastro + serviços (Watch TV/câmeras em sis_sercontratos), com multa e juros só em atraso. É a mesma regra do bot, do totem e do Pix Automático.", "utils/valorFatura.ts", 92),
+    S("out_efi", "Cria a cobrança", "pixCreateLocation e pixGenerateQRCode na Efí.", "controller/Pix.ts", 873),
     S("s_pix", "QR Code na tela", "Resposta 200 com o Pix gerado.", null, null, { end: "200" }));
 }
 

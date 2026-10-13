@@ -212,7 +212,7 @@ export const PixAutomatico = () => {
 
   /**
    * Ao sair do campo de login, traz contrato, documento, plano e valor do
-   * cadastro. O valor é o da mensalidade em aberto, já com desconto — é o
+   * cadastro. O valor é o da mensalidade em aberto, já com desconto e serviços — é o
    * mesmo que a cobrança usa, então digitar à mão só abria espaço para erro.
    */
   async function carregarCliente(login: string) {

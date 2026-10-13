@@ -17,6 +17,10 @@ import { whatsappOutgoingQueue } from "./whatsapp/index";
 import ZapSign from "./ZapSign";
 import { liberarContratoPosPagamento } from "./servicoWeb/contrato";
 import pixAutomaticoService from "../services/PixAutomaticoService";
+import {
+  valorCobrancaFatura,
+  valorMensalidadeCliente,
+} from "../utils/valorFatura";
 import licencaMensalidadeService, {
   INFO_LICENCA,
 } from "../services/LicencaMensalidadeService";
@@ -96,120 +100,20 @@ class Pix {
     }
   };
 
+  // Regra única de todos os canais (utils/valorFatura): mensalidade -
+  // desconto do cadastro + serviços (Watch TV/câmeras), com multa e juros só
+  // em atraso.
   aplicarJuros_Desconto = async (
     valor: string | number,
     pppoe: string,
     dataVenc: Date | string,
-  ): Promise<number> => {
-    try {
-      // 🔹 Busca o cliente no banco de dados pelo login (pppoe)
-      const client = await this.clienteRepo.findOne({
-        where: { login: pppoe },
-      });
+  ): Promise<number> => valorCobrancaFatura(valor, pppoe, dataVenc);
 
-      // 🔹 Pega o desconto do cliente (ou 0 se não tiver)
-      const desconto = client?.desconto || 0;
-
-      // 🔹 Converte o valor recebido em número e aplica o desconto
-      let valorFinal = Number(valor) - desconto;
-
-      // 🔹 Garante que o valor nunca fique negativo
-      if (valorFinal < 0) valorFinal = 0;
-
-      // 🔹 Cria datas sem horário (somente dia/mês/ano)
-      const resetTime = (date: Date) => {
-        const d = new Date(date);
-        d.setHours(0, 0, 0, 0);
-        return d;
-      };
-
-      const dataHoje = resetTime(new Date());
-      const dataVencimento = resetTime(new Date(dataVenc));
-
-      console.log("📅 Data de hoje:", dataHoje.toLocaleDateString());
-      console.log(
-        "📆 Data de vencimento:",
-        dataVencimento.toLocaleDateString(),
-      );
-
-      // 🔹 Se ainda não venceu
-      if (dataVencimento > dataHoje) {
-        console.log("✅ Não está em atraso");
-        return Number(valorFinal.toFixed(2));
-      }
-
-      // 🔹 Se vence exatamente hoje
-      if (dataVencimento.getTime() === dataHoje.getTime()) {
-        console.log("📅 Vence hoje (sem juros ou multa)");
-        return Number(valorFinal.toFixed(2));
-      }
-
-      // 🔹 Se está em atraso
-      console.log("⚠️ Está em atraso!");
-
-      // Função auxiliar para calcular a diferença em dias entre duas datas
-      const differenceInDays = (d1: Date, d2: Date): number => {
-        const oneDay = 24 * 60 * 60 * 1000;
-        return Math.floor(Math.abs((d2.getTime() - d1.getTime()) / oneDay));
-      };
-
-      const diffInDays = differenceInDays(dataVencimento, dataHoje);
-      console.log("📆 Dias de atraso:", diffInDays);
-
-      // 🔹 Definições de multa e juros
-      const monthlyFine = 0.02; // 2% fixo
-      const dailyFine = 0.00033; // 0.033% ao dia
-
-      // 🔹 Multa de 2% sobre o valor original
-      const multaMensal = valorFinal * monthlyFine;
-
-      // 🔹 Juros diários (só após 4 dias de tolerância)
-      const multaDiaria =
-        diffInDays > 4 ? valorFinal * ((diffInDays - 4) * dailyFine) : 0;
-
-      // 🔹 Soma total das multas ao valor
-      valorFinal = valorFinal + multaMensal + multaDiaria;
-
-      console.log("💰 Valor base:", valor);
-      console.log("📈 Multa mensal:", multaMensal.toFixed(2));
-      console.log("📈 Multa diária:", multaDiaria.toFixed(2));
-      console.log("✅ Valor final com juros:", valorFinal.toFixed(2));
-
-      // 🔹 Retorna o valor arredondado com duas casas decimais
-      return Number(valorFinal.toFixed(2));
-    } catch (error) {
-      console.error("❌ Erro em aplicarJuros_Desconto:", error);
-      // 🔹 Em caso de erro, retorna o valor original sem alteração
-      return Number(valor);
-    }
-  };
-
+  // Mesma conta, sem multa e juros (atendente perdoou os juros).
   aplicar_Desconto = async (
     valor: string | number,
     pppoe: string,
-  ): Promise<number> => {
-    try {
-      // 🔹 Busca o cliente no banco de dados pelo login (pppoe)
-      const client = await this.clienteRepo.findOne({
-        where: { login: pppoe },
-      });
-
-      // 🔹 Pega o desconto do cliente (ou 0 se não tiver)
-      const desconto = client?.desconto || 0;
-
-      // 🔹 Converte o valor recebido em número e aplica o desconto
-      let valorFinal = Number(valor) - desconto;
-
-      // 🔹 Garante que o valor nunca fique negativo
-      if (valorFinal < 0) valorFinal = 0;
-
-      return Number(valorFinal.toFixed(2));
-    } catch (error) {
-      console.error("❌ Erro em aplicarJuros_Desconto:", error);
-      // 🔹 Em caso de erro, retorna o valor original sem alteração
-      return Number(valor);
-    }
-  };
+  ): Promise<number> => valorMensalidadeCliente(valor, pppoe);
 
   /**
    * Conferência manual: lê as cobranças do período na Efí e dá baixa nas
@@ -256,7 +160,8 @@ class Pix {
   /**
    * Dados do cliente para preencher o cadastro do Pix Automático pelo login.
    *
-   * O valor vem da mensalidade em aberto (já com o desconto do cadastro), que
+   * O valor vem da mensalidade em aberto (já com o desconto do cadastro e os
+   * serviços adicionais), que
    * é o mesmo cálculo usado na cobrança — digitar à mão abria espaço para a
    * recorrência nascer com valor diferente do que o cliente paga hoje.
    */
@@ -286,10 +191,9 @@ class Pix {
         order: { datavenc: "ASC" as const },
       });
 
-      const desconto = Number(cliente.desconto || 0);
       const valorFatura =
         fatura && fatura.valor !== undefined && fatura.valor !== null
-          ? Math.max(Number(fatura.valor) - desconto, 0)
+          ? await valorMensalidadeCliente(fatura.valor, login)
           : null;
 
       res.status(200).json({
@@ -1828,13 +1732,11 @@ class Pix {
             return null; // sai desta iteração
           }
 
-          const cadastroCliente = await this.clienteRepo.findOne({
-            where: { login: cliente.login },
-          });
-
-          console.log(Number(cliente.valor) - cadastroCliente?.desconto!);
-          const valorComDesconto =
-            Number(cliente.valor) - cadastroCliente?.desconto!;
+          // Mesma regra dos outros canais: mensalidade - desconto + serviços.
+          const valorComDesconto = await valorMensalidadeCliente(
+            cliente.valor,
+            cliente.login,
+          );
 
           // 🔹 Cria cobrança automática vinculada a uma recorrência
           const result = await efipay.pixCreateAutomaticCharge("", {
@@ -1930,13 +1832,11 @@ class Pix {
             return null; // sai desta iteração
           }
 
-          const cadastroCliente = await this.clienteRepo.findOne({
-            where: { login: cliente.login },
-          });
-
-          console.log(Number(cliente.valor) - cadastroCliente?.desconto!);
-          const valorComDesconto =
-            Number(cliente.valor) - cadastroCliente?.desconto!;
+          // Mesma regra dos outros canais: mensalidade - desconto + serviços.
+          const valorComDesconto = await valorMensalidadeCliente(
+            cliente.valor,
+            cliente.login,
+          );
 
           // 🔹 Cria cobrança automática vinculada a uma recorrência
           const result = await efipay.pixCreateAutomaticCharge("", {

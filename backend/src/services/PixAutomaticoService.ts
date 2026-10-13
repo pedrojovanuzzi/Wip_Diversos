@@ -6,9 +6,9 @@ import { Between, IsNull, Not } from "typeorm";
 import LocalDataSource from "../database/DataSource";
 import MkauthSource from "../database/MkauthSource";
 import { Faturas } from "../entities/Faturas";
-import { ClientesEntities } from "../entities/ClientesEntities";
 import { PixAutomaticoCobranca } from "../entities/PixAutomaticoCobranca";
 import { PixAutomaticoNotificacao } from "../entities/PixAutomaticoNotificacao";
+import { valorMensalidadeCliente } from "../utils/valorFatura";
 
 dotenv.config();
 
@@ -89,7 +89,6 @@ class PixAutomaticoService {
     PixAutomaticoNotificacao,
   );
   private faturaRepo = MkauthSource.getRepository(Faturas);
-  private clienteRepo = MkauthSource.getRepository(ClientesEntities);
 
   /** Login do cliente por recorrência, para não consultar a Efí repetidas vezes. */
   private loginPorRec = new Map<string, string>();
@@ -475,8 +474,8 @@ class PixAutomaticoService {
           continue;
         }
 
-        const cadastro = await this.clienteRepo.findOne({ where: { login } });
-        const valor = Number(fatura.valor) - Number(cadastro?.desconto || 0);
+        // Mesma regra dos outros canais: mensalidade - desconto + serviços.
+        const valor = await valorMensalidadeCliente(fatura.valor, login);
 
         const criada = await efipay.pixCreateAutomaticCharge("", {
           idRec: rec.idRec,
