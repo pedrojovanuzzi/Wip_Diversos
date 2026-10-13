@@ -43,6 +43,11 @@ Licenca.post(
   LicencaMensalidadeController.gerarMensalidades,
 );
 Licenca.post(
+  "/mensalidades/avulsa",
+  admin,
+  LicencaMensalidadeController.criarAvulsa,
+);
+Licenca.post(
   "/mensalidades/:id/pix",
   admin,
   LicencaMensalidadeController.gerarPix,

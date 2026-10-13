@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
-import { FaQrcode, FaCheck, FaUndo, FaSyncAlt, FaCopy } from "react-icons/fa";
+import {
+  FaQrcode,
+  FaCheck,
+  FaUndo,
+  FaSyncAlt,
+  FaCopy,
+  FaPlus,
+} from "react-icons/fa";
 import { QRCodeCanvas } from "qrcode.react";
 import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
@@ -21,6 +28,28 @@ interface Mensalidade {
   pagoEm: string | null;
   formaPagamento: string | null;
 }
+
+interface LicencaResumo {
+  id: number;
+  cliente_nome: string;
+  software: string | null;
+  status: string;
+}
+
+interface Configuracao {
+  software: string;
+  diaVencimento: number;
+  valor: string;
+}
+
+const avulsaVazia = {
+  licencaId: "",
+  competencia: "",
+  vencimento: "",
+  valor: "",
+  observacao: "",
+  gerarPix: true,
+};
 
 const campo =
   "border rounded px-2 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200";
@@ -64,6 +93,9 @@ export const MensalidadesLicenca = () => {
   const [status, setStatus] = useState("todos");
   const [loading, setLoading] = useState(false);
   const [pixAberto, setPixAberto] = useState<Mensalidade | null>(null);
+  const [avulsa, setAvulsa] = useState<typeof avulsaVazia | null>(null);
+  const [licencas, setLicencas] = useState<LicencaResumo[]>([]);
+  const [configs, setConfigs] = useState<Configuracao[]>([]);
 
   const { user } = useAuth();
   const token = user?.token;
@@ -113,6 +145,81 @@ export const MensalidadesLicenca = () => {
       carregar();
     } catch (error: any) {
       showError(error?.response?.data?.message || "Erro ao gerar.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** Abre o formulário e busca as licenças e as regras de cada software. */
+  const abrirAvulsa = async () => {
+    setAvulsa({ ...avulsaVazia, competencia });
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const [l, c] = await Promise.all([
+        axios.get(`${process.env.REACT_APP_URL}/licenca/listar`, { headers }),
+        axios.get(`${process.env.REACT_APP_URL}/licenca/mensalidades/config`, {
+          headers,
+        }),
+      ]);
+      setLicencas(
+        [...(l.data ?? [])].sort((a: LicencaResumo, b: LicencaResumo) =>
+          String(a.cliente_nome).localeCompare(String(b.cliente_nome)),
+        ),
+      );
+      setConfigs(c.data?.configuracoes ?? []);
+    } catch (error) {
+      console.error(error);
+      showError("Erro ao carregar as licenças.");
+    }
+  };
+
+  /** Ao escolher o cliente, sugere valor e vencimento da regra do software. */
+  const escolherLicenca = (licencaId: string) => {
+    if (!avulsa) return;
+    const licenca = licencas.find((l) => String(l.id) === licencaId);
+    const config = configs.find((c) => c.software === licenca?.software);
+    const proximo = { ...avulsa, licencaId };
+    if (config) {
+      proximo.valor = proximo.valor || String(Number(config.valor));
+      if (!proximo.vencimento && proximo.competencia) {
+        const [ano, mes] = proximo.competencia.split("-").map(Number);
+        const dia = Math.min(
+          config.diaVencimento,
+          new Date(ano, mes, 0).getDate(),
+        );
+        proximo.vencimento = `${proximo.competencia}-${String(dia).padStart(2, "0")}`;
+      }
+    }
+    setAvulsa(proximo);
+  };
+
+  const salvarAvulsa = async () => {
+    if (!avulsa) return;
+    if (!avulsa.licencaId) {
+      showError("Selecione o cliente.");
+      return;
+    }
+    try {
+      setLoading(true);
+      const resposta = await axios.post(
+        `${process.env.REACT_APP_URL}/licenca/mensalidades/avulsa`,
+        {
+          licencaId: Number(avulsa.licencaId),
+          competencia: avulsa.competencia,
+          vencimento: avulsa.vencimento || undefined,
+          valor: avulsa.valor,
+          observacao: avulsa.observacao,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const criada: Mensalidade = resposta.data;
+      const comPix = avulsa.gerarPix;
+      setAvulsa(null);
+      showSuccess("Cobrança criada.");
+      if (comPix) await gerarPix(criada);
+      else carregar();
+    } catch (error: any) {
+      showError(error?.response?.data?.message || "Erro ao criar a cobrança.");
     } finally {
       setLoading(false);
     }
@@ -208,6 +315,14 @@ export const MensalidadesLicenca = () => {
             className="inline-flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:bg-gray-400"
           >
             Gerar mensalidades do mês
+          </button>
+
+          <button
+            onClick={abrirAvulsa}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:bg-gray-400"
+          >
+            <FaPlus /> Nova cobrança avulsa
           </button>
 
           <span className="ml-auto text-sm text-gray-600">
@@ -339,6 +454,135 @@ export const MensalidadesLicenca = () => {
           </table>
         </div>
       </div>
+
+      {avulsa && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-600 bg-opacity-50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Nova cobrança avulsa
+              </h3>
+              <button
+                onClick={() => setAvulsa(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                X
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase text-gray-500">
+                  Cliente
+                </span>
+                <select
+                  className={campo}
+                  value={avulsa.licencaId}
+                  onChange={(e) => escolherLicenca(e.target.value)}
+                >
+                  <option value="">Selecione...</option>
+                  {licencas.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.cliente_nome}
+                      {l.software ? ` — ${l.software}` : ""}
+                      {l.status !== "ativo" ? ` (${l.status})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium uppercase text-gray-500">
+                    Competência
+                  </span>
+                  <input
+                    className={campo}
+                    type="month"
+                    value={avulsa.competencia}
+                    onChange={(e) =>
+                      setAvulsa({ ...avulsa, competencia: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium uppercase text-gray-500">
+                    Vencimento
+                  </span>
+                  <input
+                    className={campo}
+                    type="date"
+                    value={avulsa.vencimento}
+                    onChange={(e) =>
+                      setAvulsa({ ...avulsa, vencimento: e.target.value })
+                    }
+                  />
+                </label>
+              </div>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase text-gray-500">
+                  Valor (R$)
+                </span>
+                <input
+                  className={campo}
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={avulsa.valor}
+                  onChange={(e) =>
+                    setAvulsa({ ...avulsa, valor: e.target.value })
+                  }
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase text-gray-500">
+                  Observação
+                </span>
+                <input
+                  className={campo}
+                  value={avulsa.observacao}
+                  onChange={(e) =>
+                    setAvulsa({ ...avulsa, observacao: e.target.value })
+                  }
+                />
+              </label>
+
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={avulsa.gerarPix}
+                  onChange={(e) =>
+                    setAvulsa({ ...avulsa, gerarPix: e.target.checked })
+                  }
+                />
+                Já gerar o Pix
+              </label>
+            </div>
+
+            <p className="mt-3 text-xs text-gray-500">
+              Uma cobrança por cliente em cada competência. Vencimento e valor
+              em branco usam a regra do software.
+            </p>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setAvulsa(null)}
+                className="rounded border px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={salvarAvulsa}
+                disabled={loading}
+                className="rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:bg-gray-400"
+              >
+                Criar cobrança
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pixAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-600 bg-opacity-50 p-4">

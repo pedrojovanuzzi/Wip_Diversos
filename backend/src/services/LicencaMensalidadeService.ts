@@ -218,6 +218,73 @@ class LicencaMensalidadeService {
     return resumo;
   }
 
+  /**
+   * Cobrança avulsa de uma licença, criada na mão.
+   *
+   * Serve para cliente sem regra de software, licença que entrou no meio do
+   * mês ou valor diferente do configurado. Continua sendo uma por licença e
+   * competência: o índice único é o que impede a geração do mês de duplicar.
+   */
+  async criarAvulsa(dados: {
+    licencaId: number | string;
+    competencia?: string;
+    vencimento?: string;
+    valor?: number | string;
+    observacao?: string | null;
+  }) {
+    const licenca = await this.licencaRepo.findOne({
+      where: { id: Number(dados.licencaId) },
+    });
+    if (!licenca) throw new Error("Selecione a licença do cliente.");
+
+    const competencia = String(dados.competencia || competenciaDe()).trim();
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(competencia))
+      throw new Error("Competência inválida (use AAAA-MM).");
+
+    const existente = await this.mensalidadeRepo.findOne({
+      where: { licencaId: licenca.id, competencia },
+    });
+    if (existente) {
+      throw new Error(
+        `${licenca.cliente_nome} já tem mensalidade em ${competencia} (situação: ${existente.status}).`,
+      );
+    }
+
+    const config = licenca.software
+      ? await this.configRepo.findOne({ where: { software: licenca.software } })
+      : null;
+
+    let vencimento = String(dados.vencimento || "").slice(0, 10);
+    if (!vencimento) {
+      vencimento = vencimentoDaCompetencia(
+        competencia,
+        config?.diaVencimento ?? 10,
+      );
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimento))
+      throw new Error("Data de vencimento inválida.");
+
+    const valorInformado =
+      dados.valor === undefined || dados.valor === ""
+        ? config?.valor
+        : dados.valor;
+    const valor = Number(String(valorInformado ?? "").replace(",", "."));
+    if (!Number.isFinite(valor) || valor <= 0)
+      throw new Error("Informe o valor da cobrança.");
+
+    const mensalidade = this.mensalidadeRepo.create({
+      licencaId: licenca.id,
+      software: licenca.software,
+      clienteNome: licenca.cliente_nome,
+      competencia,
+      vencimento,
+      valor: valor.toFixed(2),
+      status: "aberta",
+      observacao: dados.observacao?.trim() || null,
+    });
+    return this.mensalidadeRepo.save(mensalidade);
+  }
+
   /** Mensalidades com filtro opcional de competência, status e software. */
   async listarMensalidades(filtros: {
     competencia?: string;

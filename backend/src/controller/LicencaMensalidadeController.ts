@@ -65,6 +65,19 @@ class LicencaMensalidadeController {
     }
   };
 
+  criarAvulsa = async (req: Request, res: Response) => {
+    try {
+      const mensalidade = await licencaMensalidadeService.criarAvulsa(
+        req.body ?? {},
+      );
+      res.status(200).json(mensalidade);
+    } catch (error: any) {
+      res
+        .status(400)
+        .json({ message: error?.message || "Erro ao criar a cobrança." });
+    }
+  };
+
   gerarPix = async (req: Request, res: Response) => {
     try {
       const mensalidade = await licencaMensalidadeService.gerarPix(
