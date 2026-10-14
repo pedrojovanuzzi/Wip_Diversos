@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { useSearchParams } from "react-router-dom";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
 // Ajuste o import do notification se necessário, baseando-me no BuscarNfe
@@ -87,6 +88,17 @@ export const GerenciarLicencas = () => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [aba, setAba] = useState<Aba>("licencas");
+  const [params] = useSearchParams();
+
+  // O sino de notificações abre direto numa aba (/licencas?aba=mensalidades).
+  useEffect(() => {
+    const pedida = params.get("aba") as Aba | null;
+    if (
+      pedida &&
+      ["licencas", "mensalidades", "notas", "configuracao"].includes(pedida)
+    )
+      setAba(pedida);
+  }, [params]);
 
   // Form states
   const [clienteNome, setClienteNome] = useState("");

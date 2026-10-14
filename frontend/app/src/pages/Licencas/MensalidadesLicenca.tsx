@@ -7,6 +7,8 @@ import {
   FaSyncAlt,
   FaCopy,
   FaPlus,
+  FaPen,
+  FaExternalLinkAlt,
 } from "react-icons/fa";
 import { QRCodeCanvas } from "qrcode.react";
 import { useAuth } from "../../context/AuthContext";
@@ -97,6 +99,7 @@ export const MensalidadesLicenca = () => {
   const [avulsa, setAvulsa] = useState<typeof avulsaVazia | null>(null);
   const [licencas, setLicencas] = useState<LicencaResumo[]>([]);
   const [configs, setConfigs] = useState<Configuracao[]>([]);
+  const [novoValor, setNovoValor] = useState<string | null>(null);
 
   const { user } = useAuth();
   const token = user?.token;
@@ -234,7 +237,7 @@ export const MensalidadesLicenca = () => {
         {},
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      setPixAberto(resposta.data);
+      abrirPix(resposta.data);
       showSuccess("Pix gerado.");
       carregar();
     } catch (error: any) {
@@ -261,9 +264,37 @@ export const MensalidadesLicenca = () => {
     }
   };
 
-  const copiar = async (texto: string) => {
+  const copiar = async (
+    texto: string,
+    mensagem = "Pix copia e cola copiado.",
+  ) => {
     await navigator.clipboard.writeText(texto);
-    showSuccess("Pix copia e cola copiado.");
+    showSuccess(mensagem);
+  };
+
+  const abrirPix = (m: Mensalidade | null) => {
+    setNovoValor(null);
+    setPixAberto(m);
+  };
+
+  /** Troca o valor; com Pix já gerado, a cobrança na Efí é alterada junto. */
+  const salvarValor = async () => {
+    if (!pixAberto || novoValor === null) return;
+    try {
+      setLoading(true);
+      const resposta = await axios.put(
+        `${process.env.REACT_APP_URL}/licenca/mensalidades/${pixAberto.id}/valor`,
+        { valor: novoValor },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      abrirPix(resposta.data);
+      showSuccess("Valor alterado.");
+      carregar();
+    } catch (error: any) {
+      showError(error?.response?.data?.message || "Erro ao alterar o valor.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const totalAberto = mensalidades
@@ -414,7 +445,7 @@ export const MensalidadesLicenca = () => {
                           {m.status !== "paga" && (
                             <button
                               onClick={() =>
-                                m.pixCopiaCola ? setPixAberto(m) : gerarPix(m)
+                                m.pixCopiaCola ? abrirPix(m) : gerarPix(m)
                               }
                               className="text-indigo-600 hover:text-indigo-900"
                               title={
@@ -598,7 +629,7 @@ export const MensalidadesLicenca = () => {
                 Pix da mensalidade
               </h3>
               <button
-                onClick={() => setPixAberto(null)}
+                onClick={() => abrirPix(null)}
                 className="text-gray-400 hover:text-gray-600"
               >
                 X
@@ -609,9 +640,48 @@ export const MensalidadesLicenca = () => {
               {pixAberto.clienteNome} — {pixAberto.software} —{" "}
               {pixAberto.competencia}
             </p>
-            <p className="mt-1 text-sm font-semibold text-gray-900">
-              {moeda(pixAberto.valor)}
-            </p>
+            {novoValor === null ? (
+              <div className="mt-1 flex items-center gap-2">
+                <p className="text-sm font-semibold text-gray-900">
+                  {moeda(pixAberto.valor)}
+                </p>
+                {pixAberto.status === "aberta" && (
+                  <button
+                    onClick={() =>
+                      setNovoValor(String(Number(pixAberto.valor)))
+                    }
+                    className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-900"
+                    title="Editar o valor"
+                  >
+                    <FaPen /> Editar valor
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  className={`${campo} w-32`}
+                  inputMode="decimal"
+                  autoFocus
+                  value={novoValor}
+                  onChange={(e) => setNovoValor(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && salvarValor()}
+                />
+                <button
+                  onClick={salvarValor}
+                  disabled={loading}
+                  className="rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:bg-gray-400"
+                >
+                  Salvar
+                </button>
+                <button
+                  onClick={() => setNovoValor(null)}
+                  className="rounded border px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
 
             {/* O QR é desenhado do próprio copia e cola. O link da Efí
                 (pixLink) é uma página de visualização, não uma imagem. */}
@@ -633,6 +703,45 @@ export const MensalidadesLicenca = () => {
                   <FaCopy /> Copiar Pix copia e cola
                 </button>
               </>
+            )}
+
+            {/* Página de pagamento da Efí ligada à location da cobrança: é
+                o link para mandar ao cliente pagar pelo navegador. */}
+            {pixAberto.pixLink && (
+              <div className="mt-4">
+                <span className="text-xs font-medium uppercase text-gray-500">
+                  Link de pagamento
+                </span>
+                <a
+                  href={pixAberto.pixLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 block break-all rounded bg-gray-100 p-3 text-xs text-indigo-700 hover:underline"
+                >
+                  {pixAberto.pixLink}
+                </a>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() =>
+                      copiar(
+                        pixAberto.pixLink as string,
+                        "Link de pagamento copiado.",
+                      )
+                    }
+                    className="inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                  >
+                    <FaCopy /> Copiar link
+                  </button>
+                  <a
+                    href={pixAberto.pixLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                  >
+                    <FaExternalLinkAlt /> Abrir
+                  </a>
+                </div>
+              </div>
             )}
 
             <p className="mt-4 text-xs text-gray-500">

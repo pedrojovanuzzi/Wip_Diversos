@@ -218,11 +218,13 @@ class Pix {
   };
 
   /**
-   * Pagamentos Pix recentes, para o sino de notificações.
+   * Notificações do sino.
    *
-   * Junta três origens, cada uma com o seu tipo, porque na tela elas são
-   * mostradas de formas diferentes: mensalidade paga por Pix comum, por Pix
-   * Automático, e mensalidade de licença de software.
+   * `pagamentos` são eventos de nível baixo (só informam): mensalidade paga
+   * por Pix comum, por Pix Automático e mensalidade de licença. `alertas` são
+   * de nível importante e refletem o estado atual — licença com mensalidade
+   * vencida aparece enquanto não for paga, e só para administrador, que é
+   * quem enxerga as licenças.
    */
   notificacoesPagamentos = async (
     req: Request,
@@ -249,6 +251,7 @@ class Pix {
 
       const pagamentos = faturas.map((f) => ({
         id: `fatura-${f.id}`,
+        nivel: "baixo",
         tipo: f.formapag === "pix_automatico" ? "automatico" : "normal",
         titulo: f.formapag === "pix_automatico" ? "Pix Automático" : "Pix",
         cliente: f.login,
@@ -274,6 +277,7 @@ class Pix {
         pagamentos.push(
           ...mensalidades.map((m) => ({
             id: `licenca-${m.id}`,
+            nivel: "baixo",
             tipo: "licenca",
             titulo: "Licença",
             cliente: m.clienteNome ?? "",
@@ -292,7 +296,29 @@ class Pix {
         (a, b) => new Date(b.pagoEm).getTime() - new Date(a.pagoEm).getTime(),
       );
 
-      res.status(200).json(pagamentos.slice(0, 30));
+      const alertas: any[] = [];
+      if ((req.user?.permission ?? 0) >= 5) {
+        try {
+          const vencidas = await licencaMensalidadeService.vencidas();
+          alertas.push(
+            ...vencidas.map((m) => ({
+              id: `licenca-vencida-${m.id}`,
+              nivel: "importante",
+              tipo: "licenca_vencida",
+              titulo: "Licença sem pagamento",
+              cliente: m.clienteNome ?? "",
+              referencia: `${m.software ?? "Licença"} ${m.competencia}`,
+              valor: Number(m.valor ?? 0),
+              vencimento: m.vencimento,
+            })),
+          );
+        } catch (erro: any) {
+          if (erro?.code !== "ER_NO_SUCH_TABLE" && erro?.errno !== 1146)
+            throw erro;
+        }
+      }
+
+      res.status(200).json({ pagamentos: pagamentos.slice(0, 30), alertas });
     } catch (error: any) {
       console.error("Erro ao listar pagamentos recentes:", error?.message);
       res.status(500).json({ error: "Erro ao listar pagamentos recentes." });

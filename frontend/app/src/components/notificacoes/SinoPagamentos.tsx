@@ -1,17 +1,37 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { FaBell, FaQrcode, FaDesktop } from "react-icons/fa";
+import { Link } from "react-router-dom";
+import {
+  FaBell,
+  FaQrcode,
+  FaDesktop,
+  FaExclamationTriangle,
+} from "react-icons/fa";
 import { MdAutorenew } from "react-icons/md";
 import { useAuth } from "../../context/AuthContext";
 
+/** Pagamento recebido: nível baixo, só informa. */
 interface Pagamento {
   id: string;
+  nivel?: "baixo";
   tipo: "normal" | "automatico" | "licenca";
   titulo: string;
   cliente: string;
   referencia: string;
   valor: number;
   pagoEm: string;
+}
+
+/** Alerta: nível importante, fica até o problema ser resolvido. */
+interface Alerta {
+  id: string;
+  nivel: "importante";
+  tipo: "licenca_vencida";
+  titulo: string;
+  cliente: string;
+  referencia: string;
+  valor: number;
+  vencimento: string;
 }
 
 /** De quanto em quanto tempo o sino pergunta se entrou pagamento. */
@@ -21,23 +41,14 @@ const INTERVALO_MS = 45_000;
 const CHAVE_VISTOS = "pix_notificacoes_vistos";
 const CHAVE_LISTA = "pix_notificacoes_lista";
 
-/** Cada origem tem a sua cor: dá para reconhecer sem ler o texto. */
-const ESTILOS = {
-  automatico: {
-    faixa: "border-l-4 border-indigo-500 bg-indigo-50",
-    selo: "bg-indigo-100 text-indigo-700",
-    icone: <MdAutorenew className="size-4" />,
-  },
-  normal: {
-    faixa: "border-l-4 border-emerald-500 bg-emerald-50",
-    selo: "bg-emerald-100 text-emerald-700",
-    icone: <FaQrcode className="size-3.5" />,
-  },
-  licenca: {
-    faixa: "border-l-4 border-amber-500 bg-amber-50",
-    selo: "bg-amber-100 text-amber-800",
-    icone: <FaDesktop className="size-3.5" />,
-  },
+/**
+ * Pagamento é nível baixo: tudo em cinza, só o ícone diz a origem
+ * (Pix comum, Pix Automático ou licença).
+ */
+const ICONES = {
+  automatico: <MdAutorenew className="size-4" />,
+  normal: <FaQrcode className="size-3.5" />,
+  licenca: <FaDesktop className="size-3.5" />,
 };
 
 function moeda(valor: number) {
@@ -57,6 +68,11 @@ function quando(data: string) {
   return d.toLocaleDateString("pt-BR");
 }
 
+function dataBR(data: string) {
+  const [ano, mes, dia] = String(data).slice(0, 10).split("-");
+  return dia ? `${dia}/${mes}/${ano}` : String(data);
+}
+
 function lerLista(): Pagamento[] {
   try {
     return JSON.parse(localStorage.getItem(CHAVE_LISTA) || "[]");
@@ -66,14 +82,17 @@ function lerLista(): Pagamento[] {
 }
 
 /**
- * Sino de pagamentos Pix, presente em todas as telas (vive na NavBar).
+ * Sino de notificações, presente em todas as telas (vive na NavBar).
  *
- * Pergunta ao servidor de tempos em tempos quais pagamentos entraram desde a
- * última consulta e mostra cada um com a cor da sua origem: Pix Automático,
- * Pix comum ou mensalidade de licença.
+ * Dois níveis:
+ * - baixo: pagamentos recebidos, em cinza. Acumulam e somem com "Limpar".
+ * - importante: licença com mensalidade vencida, em vermelho piscando. Vêm do
+ *   estado atual a cada consulta, então só somem quando a mensalidade é paga
+ *   (ou cancelada); "Limpar" não as apaga.
  */
 export const SinoPagamentos = () => {
   const [pagamentos, setPagamentos] = useState<Pagamento[]>(lerLista);
+  const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [aberto, setAberto] = useState(false);
   const [naoVistos, setNaoVistos] = useState(0);
   const painel = useRef<HTMLDivElement>(null);
@@ -97,7 +116,10 @@ export const SinoPagamentos = () => {
         },
       );
 
-      const novos: Pagamento[] = resposta.data ?? [];
+      const dados = resposta.data ?? {};
+      setAlertas(dados.alertas ?? []);
+
+      const novos: Pagamento[] = dados.pagamentos ?? [];
       if (novos.length === 0) return;
 
       setPagamentos((anteriores) => {
@@ -153,17 +175,37 @@ export const SinoPagamentos = () => {
 
   if (!token) return null;
 
+  const temAlerta = alertas.length > 0;
+
   return (
     <div ref={painel} className="fixed right-4 top-4 z-50">
       <button
         onClick={abrir}
-        title="Pagamentos recebidos"
-        className="relative flex size-11 items-center justify-center rounded-full bg-stone-800 text-white shadow-lg transition hover:bg-stone-700"
+        title={
+          temAlerta
+            ? `${alertas.length} licença(s) sem pagamento`
+            : "Notificações"
+        }
+        className={`relative flex size-11 items-center justify-center rounded-full text-white shadow-lg transition ${
+          temAlerta
+            ? "animate-pulse bg-red-600 ring-4 ring-red-300 hover:bg-red-700"
+            : "bg-stone-800 hover:bg-stone-700"
+        }`}
       >
         <FaBell className="size-5" />
-        {naoVistos > 0 && (
-          <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-            {naoVistos > 99 ? "99+" : naoVistos}
+        {(temAlerta || naoVistos > 0) && (
+          <span
+            className={`absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-bold ${
+              temAlerta ? "bg-white text-red-600" : "bg-gray-500 text-white"
+            }`}
+          >
+            {temAlerta
+              ? alertas.length > 99
+                ? "99+"
+                : alertas.length
+              : naoVistos > 99
+                ? "99+"
+                : naoVistos}
           </span>
         )}
       </button>
@@ -172,56 +214,82 @@ export const SinoPagamentos = () => {
         <div className="absolute right-0 mt-2 max-h-[70vh] w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl sm:w-96">
           <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
             <h3 className="text-sm font-semibold text-gray-900">
-              Pagamentos recebidos
+              Notificações
             </h3>
             {pagamentos.length > 0 && (
               <button
                 onClick={limpar}
+                title="Limpa os pagamentos. Alertas só somem quando forem resolvidos."
                 className="text-xs font-medium text-gray-500 hover:text-gray-700"
               >
-                Limpar
+                Limpar pagamentos
               </button>
             )}
           </div>
 
           <div className="max-h-[60vh] overflow-y-auto">
-            {pagamentos.length === 0 ? (
+            {alertas.map((a) => (
+              <Link
+                key={a.id}
+                to="/licencas?aba=mensalidades"
+                onClick={() => setAberto(false)}
+                className="block animate-pulse border-b border-red-200 border-l-4 border-l-red-600 bg-red-50 px-4 py-3 hover:bg-red-100"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
+                    <FaExclamationTriangle className="size-3" />
+                    {a.titulo}
+                  </span>
+                  <span className="text-sm font-bold text-red-700">
+                    {moeda(a.valor)}
+                  </span>
+                </div>
+                <p className="mt-1 truncate text-sm font-semibold text-red-900">
+                  {a.cliente || "-"}
+                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-xs text-red-700">
+                    {a.referencia}
+                  </span>
+                  <span className="shrink-0 text-xs font-medium text-red-700">
+                    venceu {dataBR(a.vencimento)}
+                  </span>
+                </div>
+              </Link>
+            ))}
+
+            {pagamentos.length === 0 && !temAlerta ? (
               <p className="px-4 py-8 text-center text-sm text-gray-500">
-                Nenhum pagamento recebido por enquanto.
+                Nenhuma notificação por enquanto.
               </p>
             ) : (
-              pagamentos.map((p) => {
-                const estilo = ESTILOS[p.tipo] ?? ESTILOS.normal;
-                return (
-                  <div
-                    key={p.id}
-                    className={`px-4 py-3 ${estilo.faixa} border-b border-gray-100`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${estilo.selo}`}
-                      >
-                        {estilo.icone}
-                        {p.titulo}
-                      </span>
-                      <span className="text-sm font-bold text-gray-900">
-                        {moeda(p.valor)}
-                      </span>
-                    </div>
-                    <p className="mt-1 truncate text-sm font-medium text-gray-800">
-                      {p.cliente || "-"}
-                    </p>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-xs text-gray-500">
-                        {p.referencia}
-                      </span>
-                      <span className="shrink-0 text-xs text-gray-400">
-                        {quando(p.pagoEm)}
-                      </span>
-                    </div>
+              pagamentos.map((p) => (
+                <div
+                  key={p.id}
+                  className="border-b border-gray-100 border-l-4 border-l-gray-300 bg-gray-50 px-4 py-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-600">
+                      {ICONES[p.tipo] ?? ICONES.normal}
+                      {p.titulo}
+                    </span>
+                    <span className="text-sm font-semibold text-gray-600">
+                      {moeda(p.valor)}
+                    </span>
                   </div>
-                );
-              })
+                  <p className="mt-1 truncate text-sm text-gray-600">
+                    {p.cliente || "-"}
+                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-xs text-gray-400">
+                      {p.referencia}
+                    </span>
+                    <span className="shrink-0 text-xs text-gray-400">
+                      {quando(p.pagoEm)}
+                    </span>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>

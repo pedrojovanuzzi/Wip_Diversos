@@ -92,6 +92,21 @@ class LicencaMensalidadeController {
     }
   };
 
+  alterarValor = async (req: Request, res: Response) => {
+    try {
+      const mensalidade = await licencaMensalidadeService.alterarValor(
+        Number(req.params.id),
+        req.body?.valor,
+      );
+      res.status(200).json(mensalidade);
+    } catch (error: any) {
+      console.error("Erro ao alterar valor de licença:", error?.message);
+      res
+        .status(400)
+        .json({ message: error?.message || "Erro ao alterar o valor." });
+    }
+  };
+
   emitirNfse = async (req: Request, res: Response) => {
     try {
       const mensalidade = await licencaMensalidadeService.emitirNfse(

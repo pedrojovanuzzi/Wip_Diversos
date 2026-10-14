@@ -352,6 +352,60 @@ class LicencaMensalidadeService {
   }
 
   /**
+   * Troca o valor de uma mensalidade em aberto.
+   *
+   * Se já houver Pix, a cobrança na Efí é alterada junto (PATCH na cob): o QR
+   * e o link continuam os mesmos, porque o valor é lido da location na hora
+   * do pagamento. Se a cobrança não aceitar a alteração (expirada, por
+   * exemplo), um Pix novo é gerado com o valor certo.
+   */
+  async alterarValor(mensalidadeId: number, valorInformado: string | number) {
+    const mensalidade = await this.mensalidadeRepo.findOne({
+      where: { id: mensalidadeId },
+    });
+    if (!mensalidade) throw new Error("Mensalidade não encontrada.");
+    if (mensalidade.status !== "aberta")
+      throw new Error("Só dá para alterar o valor de mensalidade em aberto.");
+
+    const valor = Number(String(valorInformado ?? "").replace(",", "."));
+    if (!Number.isFinite(valor) || valor <= 0)
+      throw new Error("Informe um valor maior que zero.");
+
+    mensalidade.valor = valor.toFixed(2);
+    await this.mensalidadeRepo.save(mensalidade);
+
+    if (!mensalidade.txid) return mensalidade;
+
+    try {
+      const efipay = new EfiPay(options);
+      await efipay.pixUpdateCharge(
+        { txid: mensalidade.txid },
+        { valor: { original: mensalidade.valor } },
+      );
+      return mensalidade;
+    } catch (erro: any) {
+      console.warn(
+        `⚠️ Licença: cobrança ${mensalidade.txid} não aceitou o valor novo, gerando outro Pix.`,
+        erro?.mensagem || erro?.message || erro,
+      );
+      return this.gerarPix(mensalidade.id);
+    }
+  }
+
+  /** Mensalidades em aberto com vencimento já passado, para o sino. */
+  async vencidas() {
+    const hoje = new Date();
+    const hojeTexto = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
+    return this.mensalidadeRepo
+      .createQueryBuilder("m")
+      .where("m.status = 'aberta'")
+      .andWhere("m.vencimento < :hoje", { hoje: hojeTexto })
+      .orderBy("m.vencimento", "ASC")
+      .take(50)
+      .getMany();
+  }
+
+  /**
    * Baixa vinda do webhook do Pix. Recebe o id da mensalidade que estava na
    * marca da cobrança, então não há como confundir com fatura de internet.
    */

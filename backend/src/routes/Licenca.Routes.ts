@@ -52,6 +52,11 @@ Licenca.post(
   admin,
   LicencaMensalidadeController.gerarPix,
 );
+Licenca.put(
+  "/mensalidades/:id/valor",
+  admin,
+  LicencaMensalidadeController.alterarValor,
+);
 Licenca.post(
   "/mensalidades/:id/nfse",
   admin,
