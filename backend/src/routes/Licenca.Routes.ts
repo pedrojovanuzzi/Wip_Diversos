@@ -62,6 +62,12 @@ Licenca.post(
   admin,
   LicencaMensalidadeController.emitirNfse,
 );
+// Põe as notas de licença na tabela `nfse`, para a busca de NFS-e achá-las.
+Licenca.post(
+  "/mensalidades/migrar-nfse",
+  admin,
+  LicencaMensalidadeController.migrarNotas,
+);
 Licenca.get(
   "/mensalidades/ultimo-rps",
   admin,

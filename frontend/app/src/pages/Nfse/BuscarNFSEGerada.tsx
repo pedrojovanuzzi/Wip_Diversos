@@ -698,7 +698,16 @@ export const BuscarNfseGerada = () => {
                               )}
                             </td>
                             <td className="px-6 py-4 text-left text-sm text-gray-500">
-                              {cliente.login}
+                              {cliente.licenca ? (
+                                <>
+                                  <span className="mr-1 inline-flex rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+                                    LICENÇA
+                                  </span>
+                                  {cliente.nome || cliente.login}
+                                </>
+                              ) : (
+                                cliente.login
+                              )}
                             </td>
                             <td className="px-6 py-4 text-left text-sm text-gray-500">
                               {cliente.nfse.competencia}

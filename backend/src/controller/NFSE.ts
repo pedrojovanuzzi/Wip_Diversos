@@ -279,7 +279,7 @@ class NFSEController {
    * real: o CNPJ e a inscrição de teste do .env eram do servidor de
    * homologação da Fiorilli, que não emite mais.
    */
-  private prestadorEmissao() {
+  public prestadorEmissao() {
     return {
       cnpj: process.env.MUNICIPIO_LOGIN || "",
       // A inscrição precisa ser igual à do Cadastro Nacional (CNC), que pode
@@ -1729,10 +1729,51 @@ class NFSEController {
       const clientePorLogin = new Map(
         clientesResponse.map((c) => [c.login, c]),
       );
-      const linhas = nfseResponse
-        .filter((nf) => clientePorLogin.has(nf.login))
-        .map((nf) => ({
-          ...clientePorLogin.get(nf.login)!,
+      // Notas de licença de software: o tomador não é cliente do MKAuth (a
+      // nota fica com login "LICENCA-<id>"), então vêm por uma busca à parte.
+      // Filtros que só existem no MKAuth (plano, vencimento...) as excluem.
+      const soFiltroDeCliente =
+        filters &&
+        ["plano", "vencimento", "cli_ativado", "nova_nfe"].some(
+          (k) => filters[k]?.length,
+        );
+      const notasLicenca = soFiltroDeCliente
+        ? []
+        : await nfseData.find({
+            where: {
+              login: Like("LICENCA-%"),
+              timestamp: Between(startDate, endDate) as any,
+              ambiente: ambiente,
+              status: status,
+              ...(cpf ? { cpfTomador: Like(`%${cpf}%`) } : {}),
+              ...(numeroNfseStr
+                ? {
+                    numeroNfe: Raw(
+                      (alias) => `CAST(${alias} AS CHAR) LIKE :nfseNum`,
+                      { nfseNum: `%${numeroNfseStr}%` },
+                    ),
+                  }
+                : {}),
+            },
+          });
+
+      const linhas = [
+        ...nfseResponse
+          .filter((nf) => clientePorLogin.has(nf.login))
+          .map((nf) => ({ cliente: clientePorLogin.get(nf.login)!, nf })),
+        ...notasLicenca.map((nf) => ({
+          cliente: {
+            login: nf.login,
+            cpf_cnpj: nf.cpfTomador,
+            cli_ativado: "s",
+            licenca: true,
+            nome: nf.razaoSocialTomador,
+          },
+          nf,
+        })),
+      ]
+        .map(({ cliente, nf }) => ({
+          ...cliente,
           nfse: {
             id: nf.id,
             login: nf.login,

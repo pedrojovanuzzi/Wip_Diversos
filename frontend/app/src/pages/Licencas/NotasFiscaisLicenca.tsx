@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
-import { FaFileInvoiceDollar, FaSyncAlt } from "react-icons/fa";
+import { FaExchangeAlt, FaFileInvoiceDollar, FaSyncAlt } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
 
@@ -138,7 +138,7 @@ export const NotasFiscaisLicenca = () => {
       setLoading(true);
       await axios.post(
         `${process.env.REACT_APP_URL}/licenca/mensalidades/${m.id}/vincular-nfse`,
-        { numero, chave },
+        { numero, chave, ambiente },
         { headers: { Authorization: `Bearer ${token}` } },
       );
       showSuccess("Nota registrada.");
@@ -206,6 +206,38 @@ export const NotasFiscaisLicenca = () => {
     }
   };
 
+  /**
+   * Põe na busca de NFS-e as notas de licença que ainda não estão lá (as
+   * registradas pelo "Já emitida" antes disso, ou as que falharam ao gravar).
+   * Repetir não duplica.
+   */
+  const migrarNotas = async () => {
+    if (
+      !window.confirm(
+        `Enviar as notas de licença para a busca de NFS-e (ambiente: ${ambiente})? As que já estão lá não são duplicadas.`,
+      )
+    )
+      return;
+    try {
+      setLoading(true);
+      const resposta = await axios.post(
+        `${process.env.REACT_APP_URL}/licenca/mensalidades/migrar-nfse`,
+        { ambiente },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const r = resposta.data ?? {};
+      showSuccess(
+        `${r.criadas ?? 0} nota(s) criada(s), ${r.vinculadas ?? 0} vinculada(s), ${r.jaEstavam ?? 0} já estava(m) na busca.`,
+      );
+      if (r.erros?.length) showError(r.erros.join(" | "));
+      carregar();
+    } catch (error: any) {
+      showError(error?.response?.data?.message || "Erro ao migrar as notas.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const emitir = async () => {
     if (!emitindo) return;
     if (!password) {
@@ -264,6 +296,29 @@ export const NotasFiscaisLicenca = () => {
             className="inline-flex items-center gap-2 rounded bg-gray-700 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:bg-gray-400"
           >
             <FaSyncAlt /> Atualizar
+          </button>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase text-gray-500">
+              Ambiente
+            </span>
+            <select
+              className={`${campo} w-36`}
+              value={ambiente}
+              onChange={(e) => setAmbiente(e.target.value)}
+            >
+              <option value="homologacao">Homologação</option>
+              <option value="producao">Produção</option>
+            </select>
+          </label>
+
+          <button
+            onClick={migrarNotas}
+            disabled={loading}
+            title="Cria na busca de NFS-e as notas de licença que ainda não aparecem lá"
+            className="inline-flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:bg-gray-400"
+          >
+            <FaExchangeAlt /> Migrar notas para a busca de NFS-e
           </button>
 
           <p className="ml-auto max-w-xl text-xs text-gray-500">

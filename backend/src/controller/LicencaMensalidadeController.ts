@@ -136,6 +136,20 @@ class LicencaMensalidadeController {
     }
   };
 
+  migrarNotas = async (req: Request, res: Response) => {
+    try {
+      const ambiente = String(req.body?.ambiente || "producao");
+      res
+        .status(200)
+        .json(await licencaMensalidadeService.migrarNotasParaBusca(ambiente));
+    } catch (error: any) {
+      console.error("Erro ao migrar notas de licença:", error?.message);
+      res
+        .status(500)
+        .json({ message: error?.message || "Erro ao migrar as notas." });
+    }
+  };
+
   ultimoRps = async (req: Request, res: Response) => {
     try {
       const ambiente = String(req.query.ambiente || "homologacao");

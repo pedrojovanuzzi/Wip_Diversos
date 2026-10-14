@@ -9,6 +9,7 @@ import { LicencaMensalidade } from "../entities/LicencaMensalidade";
 import { LicencaMensalidadeConfig } from "../entities/LicencaMensalidadeConfig";
 import nfseController from "../controller/NFSE";
 import { NFSE } from "../entities/NFSE";
+import { In, IsNull, Not } from "typeorm";
 
 dotenv.config();
 
@@ -302,7 +303,9 @@ class LicencaMensalidadeService {
         licencaId: filtros.licencaId,
       });
 
-    return query.getMany();
+    const mensalidades = await query.getMany();
+    await this.sincronizarCancelamentos(mensalidades);
+    return mensalidades;
   }
 
   // ---------------------------------------------------------------------
@@ -556,7 +559,12 @@ class LicencaMensalidadeService {
    */
   async vincularNfse(
     mensalidadeId: number,
-    dados: { numero: string; chave?: string; emitidaEm?: string },
+    dados: {
+      numero: string;
+      chave?: string;
+      emitidaEm?: string;
+      ambiente?: string;
+    },
   ) {
     const mensalidade = await this.mensalidadeRepo.findOne({
       where: { id: mensalidadeId },
@@ -573,7 +581,165 @@ class LicencaMensalidadeService {
       : new Date();
     mensalidade.nfseErro = null;
 
+    // Por padrão a nota também entra na tabela `nfse`, para aparecer na
+    // busca de NFS-e (imprimir, baixar, cancelar) junto das outras.
+    await this.registrarNaBuscaNfse(mensalidade, dados.ambiente || "producao");
+
     return this.mensalidadeRepo.save(mensalidade);
+  }
+
+  /**
+   * Garante que a nota da mensalidade tenha a sua linha na tabela `nfse`,
+   * que é de onde a tela de busca de NFS-e lê.
+   *
+   * A emissão por aqui já grava essa linha; ficam de fora as notas
+   * registradas pelo "Já emitida" e as que falharam ao gravar depois de
+   * aceitas na prefeitura. Primeiro tenta achar a linha (pela chave ou pelo
+   * número); só cria se não existir. Devolve o que fez.
+   */
+  async registrarNaBuscaNfse(
+    mensalidade: LicencaMensalidade,
+    ambiente: string,
+  ): Promise<"ja_estava" | "vinculada" | "criada" | "sem_nota"> {
+    if (!mensalidade.nfseNumero) return "sem_nota";
+    const repo = LocalDataSource.getRepository(NFSE);
+
+    if (mensalidade.nfseId) {
+      const existente = await repo.findOne({
+        where: { id: mensalidade.nfseId },
+      });
+      if (existente) return "ja_estava";
+    }
+
+    const referencia = `LICENCA-${mensalidade.licencaId}`;
+    const numero = Number(mensalidade.nfseNumero) || 0;
+    const encontrada = mensalidade.nfseChave
+      ? await repo.findOne({ where: { chaveNfse: mensalidade.nfseChave } })
+      : await repo.findOne({
+          where: { login: referencia, numeroNfe: numero, ambiente },
+        });
+    if (encontrada) {
+      mensalidade.nfseId = encontrada.id;
+      return "vinculada";
+    }
+
+    const licenca = await this.licencaRepo.findOne({
+      where: { id: mensalidade.licencaId },
+    });
+    const emitidaEm = mensalidade.nfseEmitidaEm
+      ? new Date(mensalidade.nfseEmitidaEm)
+      : new Date();
+    const [ano, mes] = mensalidade.competencia.split("-").map(Number);
+    const { cnpj, inscricao } = nfseController.prestadorEmissao();
+
+    const registro = repo.create({
+      login: referencia,
+      // RPS desconhecido para nota registrada na mão: 0 não interfere na
+      // sugestão do próximo RPS, que usa o maior número gravado.
+      numeroRps: 0,
+      serieRps: "",
+      tipoRps: 1,
+      dataEmissao: emitidaEm,
+      competencia: new Date(ano, (mes || 1) - 1, 1),
+      valorServico: Number(mensalidade.valor),
+      aliquota: 0,
+      issRetido: 2,
+      responsavelRetencao: 1,
+      itemListaServico: "010501",
+      discriminacao: `Licenciamento de uso do software ${mensalidade.software ?? ""} - competencia ${mensalidade.competencia}`,
+      codigoMunicipio: 0,
+      exigibilidadeIss: 1,
+      cnpjPrestador: cnpj,
+      inscricaoMunicipalPrestador: inscricao,
+      cpfTomador: String(licenca?.documento || "").replace(/\D/g, ""),
+      razaoSocialTomador:
+        licenca?.razao_social ||
+        licenca?.cliente_nome ||
+        mensalidade.clienteNome ||
+        "",
+      enderecoTomador: licenca?.endereco || "",
+      numeroEndereco: licenca?.numero || "",
+      complemento: licenca?.complemento || undefined,
+      bairro: licenca?.bairro || "",
+      uf: licenca?.uf || "SP",
+      cep: String(licenca?.cep || "").replace(/\D/g, ""),
+      telefoneTomador:
+        String(licenca?.telefone || "").replace(/\D/g, "") || undefined,
+      emailTomador: licenca?.email || undefined,
+      optanteSimplesNacional: 1,
+      incentivoFiscal: 2,
+      ambiente,
+      status: mensalidade.nfseCanceladaEm ? "Cancelada" : "Ativa",
+      numeroNfe: numero,
+      modelo: "sefin",
+      chaveNfse: mensalidade.nfseChave || null,
+      idDps: null,
+      // A busca filtra por esta data: fica a da emissão, não a da migração.
+      timestamp: emitidaEm,
+    });
+    await repo.save(registro);
+    mensalidade.nfseId = registro.id;
+    return "criada";
+  }
+
+  /**
+   * Botão "Migrar notas para a busca": passa por todas as mensalidades com
+   * nota e garante a linha de cada uma na tabela `nfse`. Pode rodar quantas
+   * vezes quiser; o que já está lá não é duplicado.
+   */
+  async migrarNotasParaBusca(ambiente: string) {
+    const comNota = await this.mensalidadeRepo.find({
+      where: { nfseNumero: Not(IsNull()) },
+    });
+
+    const resumo = {
+      total: comNota.length,
+      jaEstavam: 0,
+      vinculadas: 0,
+      criadas: 0,
+      erros: [] as string[],
+    };
+    for (const mensalidade of comNota) {
+      try {
+        const feito = await this.registrarNaBuscaNfse(mensalidade, ambiente);
+        if (feito === "ja_estava") resumo.jaEstavam++;
+        if (feito === "vinculada") resumo.vinculadas++;
+        if (feito === "criada") resumo.criadas++;
+        if (feito === "vinculada" || feito === "criada")
+          await this.mensalidadeRepo.save(mensalidade);
+      } catch (erro: any) {
+        resumo.erros.push(
+          `Nota ${mensalidade.nfseNumero} (${mensalidade.clienteNome}): ${erro?.message || erro}`,
+        );
+      }
+    }
+    return resumo;
+  }
+
+  /**
+   * Nota cancelada pela tela de busca de NFS-e muda só a tabela `nfse`.
+   * Traz esse cancelamento para a mensalidade, senão ela seguiria mostrando
+   * a nota como válida.
+   */
+  private async sincronizarCancelamentos(mensalidades: LicencaMensalidade[]) {
+    const pendentes = mensalidades.filter(
+      (m) => m.nfseId && m.nfseNumero && !m.nfseCanceladaEm,
+    );
+    if (!pendentes.length) return;
+
+    const canceladas = await LocalDataSource.getRepository(NFSE).find({
+      where: {
+        id: In(pendentes.map((m) => m.nfseId as number)),
+        status: "Cancelada",
+      },
+      select: { id: true },
+    });
+    const ids = new Set(canceladas.map((n) => n.id));
+    for (const m of pendentes) {
+      if (!ids.has(m.nfseId as number)) continue;
+      m.nfseCanceladaEm = new Date();
+      await this.mensalidadeRepo.save(m);
+    }
   }
 
   /**
