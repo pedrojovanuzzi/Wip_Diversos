@@ -47,6 +47,10 @@ router.post(
   operador,
   powerdns.removerDominio.bind(powerdns),
 );
+router.post("/testarDominio", operador, powerdns.testarDominio.bind(powerdns));
+// Servidor, login e senha usados pelo "Testar domínio": configuração, nível 5.
+router.get("/config", protegido(5), powerdns.obterConfig.bind(powerdns));
+router.put("/config", protegido(5), powerdns.salvarConfig.bind(powerdns));
 router.get("/obterDominios", operador, powerdns.obterDominios.bind(powerdns));
 
 export default router;

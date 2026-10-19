@@ -28,6 +28,7 @@ import { PixAutomaticoNotificacao } from "../entities/PixAutomaticoNotificacao";
 import { LicencaMensalidade } from "../entities/LicencaMensalidade";
 import { LicencaMensalidadeConfig } from "../entities/LicencaMensalidadeConfig";
 import { ServidorAcesso } from "../entities/ServidorAcesso";
+import { PowerDnsConfig } from "../entities/PowerDnsConfig";
 import { ClientMonitor } from "../entities/ClientMonitor";
 import { ClientMonitorEvent } from "../entities/ClientMonitorEvent";
 import { TvWipConta } from "../entities/TvWipConta";
@@ -87,6 +88,7 @@ const AppDataSource = new DataSource({
     PixAutomaticoNotificacao,
     LicencaMensalidade,
     LicencaMensalidadeConfig,
+    PowerDnsConfig,
     StreamingTeste,
     AuditLog,
   ],

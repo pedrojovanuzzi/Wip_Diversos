@@ -493,7 +493,7 @@ const CTRLS = [
   ["c_analytics", "rede", "/api/ClientAnalytics", "Análise de clientes", "ClientAnalytics.routes.ts", "ClientAnalytics.ts", 1711, 20, "nível 2", "mkauth", "out_servers", "Diagnóstico do cliente: sinal, consumo, logs, monitoramento contínuo (ClientMonitorService)."],
   ["c_servidor", "rede", "/api/servidores-acesso", "Servidores de acesso", "ServidorAcesso.routes.ts", "ServidorAcesso.ts", 352, 7, "nível 5", "dbMain", "out_servers", "Cadastro dos concentradores e acesso por SSH/Telnet."],
   ["c_onu", "rede", "/api/Onu", "ONU", "Onu.routes.ts", "Onu.ts", 889, 7, "nível 2; ajustes nível 5", "", "out_olt", "Autoriza e desautoriza ONUs falando com a OLT por Telnet."],
-  ["c_powerdns", "rede", "/api/PowerDns", "PowerDNS", "PowerDns.routes.ts", "PowerDns.ts", 113, 5, "nível 2", "pdns", "", "Bloqueio de domínios no DNS: grava na tabela blocked_domains do banco do PowerDNS (utils/createDns.ts)."],
+  ["c_powerdns", "rede", "/api/PowerDns", "PowerDNS", "PowerDns.routes.ts", "PowerDns.ts", 313, 8, "nível 2; config nível 5", "pdns dbMain", "out_servers", "Bloqueio de domínios no DNS: grava na tabela blocked_domains do banco do PowerDNS (utils/createDns.ts). O botão Testar domínio roda dig @servidor_dns por SSH no servidor configurado em powerdns_config (login e senha cifrados, nível 5), ou local se não houver host."],
   ["c_dos", "rede", "/api/DosProtect", "Monitor DDoS", "DosProtect.Routes.ts", "DosProtect.ts", 572, 4, "AuthGuard", "dbMain", "out_servers out_mikrotik", "Eventos de ataque por minuto: tráfego lido pela API do MikroTik e contadores coletados por SSH."],
   ["c_serverlogs", "rede", "/api/ServerLogs", "Logs de servidor", "ServerLogs.Routes.ts", "ServerLogs.ts", 918, 6, "AuthGuard", "mkauth", "out_servers", "Busca logs por SFTP, lê PDF e planilhas."],
   ["c_pm2", "rede", "/api/pm2-logs", "Logs PM2", "Pm2Logs.routes.ts", "Pm2Logs.ts", 97, 2, "AuthGuard", "", "", "Roda 'pm2 jlist' na própria máquina do backend."],
@@ -564,7 +564,7 @@ add("pdns", { k: "db", x: 2730, y: 1400, tag: "createDns.ts", name: "Banco do Po
 
 // ---- Ferramentas e infraestrutura ----
 [
-  ["t_migr", "migration/", "90 migrações", "Histórico do banco principal em TypeORM. run-migrations.ts aplica as pendentes.", [["run-migrations.ts", 0, "run-migrations"]], ["dbMain"]],
+  ["t_migr", "migration/", "91 migrações", "Histórico do banco principal em TypeORM. run-migrations.ts aplica as pendentes.", [["run-migrations.ts", 0, "run-migrations"]], ["dbMain"]],
   ["t_tests", "vitest", "Testes", "Testes do robô do WhatsApp (controller/__tests__/whatsapp) e do fiscal (services/fiscal/__tests__).", [["backend/vitest.config.ts", 0, "vitest.config"]], []],
   ["t_docker", "docker-compose.yml", "Docker", "Sobe o Redis (filas) e o MediaMTX (câmeras). O backend em si roda com PM2.", [["backend/docker-compose.yml", 0, "docker-compose"]], ["redis", "out_mediamtx"]],
   ["t_scripts", "scripts", "Scripts avulsos", "Correções pontuais rodadas à mão: backfill-nfe-data.ts, cancelarNfse.ts, scripts/fix-chamados-abertos.ts, remove_log.js.", [["backfill-nfe-data.ts", 0, "backfill-nfe-data"], ["scripts/fix-chamados-abertos.ts", 0, "fix-chamados-abertos"]], ["dbMain", "mkauth"]],
