@@ -6,6 +6,10 @@ import { semAuditoria } from "../utils/auditoria";
 const router: Router = Router()
 
 //Routes
+// Todos os gráficos da tela de avaliações de uma vez (substitui as rotas Note*).
+router.get("/resumo", AuthGuard, Feedback.resumo);
+
+// Rotas antigas, uma por gráfico: ficam enquanto houver bundle antigo aberto.
 router.get("/NoteInternet/month", AuthGuard, Feedback.getNoteInternet_Month);
 router.get("/NoteInternet/year", AuthGuard, Feedback.getNoteInternet_Year);
 

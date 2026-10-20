@@ -194,49 +194,6 @@ const FeedbackLinkGenerator = () => {
   const [isMonthly, setMonthly] = useState(true);
   const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768);
 
-  const fetchNotes = async (type: string) => {
-    const period = isMonthly ? "month" : "year";
-    const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
-    try {
-      const response = await axios.get(endpoint, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Erro ao buscar notas:", error);
-      return [];
-    }
-  };
-
-  const fetchNotesTech = async (type: string): Promise<NoteTech[]> => {
-    const period = isMonthly ? "month" : "year";
-    const endpoint = `${process.env.REACT_APP_URL}/feedback/Note${type}/${period}`;
-    try {
-      const response = await axios.post(
-        endpoint,
-        { technician: selectedTechnician },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-      const parsedData: NoteTech[] = response.data.map((item: any) => ({
-        note: item.note,
-        count: Number(item.count),
-        login: item.login || "",
-      }));
-      return parsedData;
-    } catch (error: any) {
-      console.error("Erro ao buscar dados do técnico:", error);
-      return [];
-    }
-  };
-
   const createLink = async () => {
     if (!selectedTechnician) {
       alert("Selecione um técnico antes de gerar o link.");
@@ -285,28 +242,36 @@ const FeedbackLinkGenerator = () => {
         count: Number(item.count),
       }));
 
+    // Uma requisição só traz todos os gráficos (antes eram 6).
     const fetchAllNotes = async () => {
       try {
         setLoading(true);
-        const [internet, service, responseTime, recommend, solved] =
-          await Promise.all([
-            fetchNotes("Internet"),
-            fetchNotes("Service"),
-            fetchNotes("ResponseTime"),
-            fetchNotes("DoYouRecommend"),
-            fetchNotes("DoYouProblemAsSolved"),
-          ]);
+        const { data } = await axios.get(
+          `${process.env.REACT_APP_URL}/feedback/resumo`,
+          {
+            params: {
+              period: isMonthly ? "month" : "year",
+              technician: selectedTechnician || undefined,
+            },
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
 
         setNoteData({
-          internet,
-          service,
-          responseTime,
-          recommend: parseNoteData(recommend),
-          solved: parseNoteData(solved),
+          internet: data.internet ?? [],
+          service: data.service ?? [],
+          responseTime: data.responseTime ?? [],
+          recommend: parseNoteData(data.recommend ?? []),
+          solved: parseNoteData(data.solved ?? []),
         });
 
-        const tech = await fetchNotesTech("Technician");
-        settechNoteData({ technician: tech });
+        settechNoteData({
+          technician: (data.technician ?? []).map((item: any) => ({
+            note: item.note,
+            count: Number(item.count),
+            login: item.login || "",
+          })),
+        });
       } catch (error) {
         console.error("Erro ao buscar os dados:", error);
       } finally {

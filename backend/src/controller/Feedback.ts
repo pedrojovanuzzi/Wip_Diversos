@@ -27,6 +27,7 @@ class FeedbackController {
     this.doYouRecommend_Month = this.doYouRecommend_Month.bind(this);
     this.doYouRecommend_Year = this.doYouRecommend_Year.bind(this);
     this.feedbackOpnion = this.feedbackOpnion.bind(this);
+    this.resumo = this.resumo.bind(this);
   }
 
   public async createFeedbackLink(req: Request, res: Response) {
@@ -204,65 +205,135 @@ class FeedbackController {
   }
 
 
+  /**
+   * Todos os gráficos da tela de avaliações numa requisição só: lê as linhas
+   * do período uma vez e conta cada nota aqui, em vez de 6 consultas
+   * (6 conexões do pool) por abertura de tela.
+   *
+   * GET /feedback/resumo?period=month|year&technician=Nome
+   */
+  public async resumo(req: Request, res: Response) {
+    try {
+      const period = req.query.period === "year" ? "year" : "month";
+      const technician = String(req.query.technician ?? "").trim();
+      const { start, end } = this.getDateRange(period);
+
+      const linhas = await AppDataSource.getRepository(Feedback)
+        .createQueryBuilder("feedback")
+        .select([
+          "feedback.login AS login",
+          "feedback.note_internet AS note_internet",
+          "feedback.note_service AS note_service",
+          "feedback.note_response_time AS note_response_time",
+          "feedback.note_technician_service AS note_technician_service",
+          "feedback.you_problem_as_solved AS you_problem_as_solved",
+          "feedback.you_recomend AS you_recomend",
+        ])
+        .where("feedback.time BETWEEN :start AND :end", { start, end })
+        .getRawMany();
+
+      // Colunas antigas em produção podem ser BIT (chega Buffer) ou INT.
+      const valor = (v: unknown) => (Buffer.isBuffer(v) ? v[0] : v);
+      // Mesma comparação do MySQL (utf8mb4_0900_ai_ci): sem caixa nem acento.
+      const nome = (s: unknown) =>
+        String(s ?? "")
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .trim()
+          .toLowerCase();
+
+      const contar = (campo: string, filtro = (_l: any) => true) => {
+        const contagem = new Map<string, { note: unknown; count: number }>();
+        for (const linha of linhas) {
+          const note = valor(linha[campo]);
+          if (note === null || note === undefined || !filtro(linha)) continue;
+          const item = contagem.get(String(note)) ?? { note, count: 0 };
+          item.count += 1;
+          contagem.set(String(note), item);
+        }
+        return [...contagem.values()].sort(
+          (a, b) => Number(b.note) - Number(a.note),
+        );
+      };
+
+      res.status(200).json({
+        internet: contar("note_internet"),
+        service: contar("note_service"),
+        responseTime: contar("note_response_time"),
+        recommend: contar("you_recomend"),
+        solved: contar("you_problem_as_solved"),
+        technician: technician
+          ? contar(
+              "note_technician_service",
+              (l) => nome(l.login) === nome(technician),
+            ).map((n) => ({ ...n, login: technician }))
+          : [],
+      });
+    } catch (error) {
+      console.error("Erro ao montar resumo de feedback:", error);
+      res.status(500).send("Erro interno do servidor.");
+    }
+  }
+
   public async getNoteInternet_Month(req: Request, res: Response) {
-    this.getNote("note_internet", "month", res);
+    await this.getNote("note_internet", "month", res);
     return;
   }
 
   public async getNoteInternet_Year(req: Request, res: Response) {
-    this.getNote("note_internet", "year", res);
+    await this.getNote("note_internet", "year", res);
     return;
   }
 
   public async getNoteService_Month(req: Request, res: Response) {
-    this.getNote("note_service", "month", res);
+    await this.getNote("note_service", "month", res);
     return;
   }
 
   public async getNoteService_Year(req: Request, res: Response) {
-    this.getNote("note_service", "year", res);
+    await this.getNote("note_service", "year", res);
     return;
   }
 
   public async getNoteResponseTime_Month(req: Request, res: Response) {
-    this.getNote("note_response_time", "month", res);
+    await this.getNote("note_response_time", "month", res);
     return;
   }
 
   public async getNoteResponseTime_Year(req: Request, res: Response) {
-    this.getNote("note_response_time", "year", res);
+    await this.getNote("note_response_time", "year", res);
     return;
   }
 
   public async getTechnician_Month(req: Request, res: Response) {
     const {technician} = req.body    
-    this.getNoteTech("note_technician_service", technician, "month", res);
+    await this.getNoteTech("note_technician_service", technician, "month", res);
     return;
   }
 
   public async getTechnician_Year(req: Request, res: Response) {
     const {technician} = req.body
-    this.getNoteTech("note_technician_service", technician, "year", res);
+    await this.getNoteTech("note_technician_service", technician, "year", res);
     return;
   }
 
   public async doYouProblemAsSolved_Month(req: Request, res: Response) {
-    this.getNote("you_problem_as_solved", "month", res);
+    await this.getNote("you_problem_as_solved", "month", res);
     return;
   }
 
   public async doYouProblemAsSolved_Year(req: Request, res: Response) {
-    this.getNote("you_problem_as_solved", "year", res);
+    await this.getNote("you_problem_as_solved", "year", res);
     return;
   }
 
   public async doYouRecommend_Month(req: Request, res: Response) {
-    this.getNote("you_recomend", "month", res);
+    await this.getNote("you_recomend", "month", res);
     return;
   }
 
   public async doYouRecommend_Year(req: Request, res: Response) {
-    this.getNote("you_recomend", "year", res);
+    await this.getNote("you_recomend", "year", res);
     return;
   }
 
