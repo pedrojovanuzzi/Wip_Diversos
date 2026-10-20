@@ -240,7 +240,16 @@ class FeedbackController {
           .normalize("NFD")
           .replace(/[̀-ͯ]/g, "")
           .trim()
-          .toLowerCase();
+          .toLowerCase()
+          .replace(/\s+/g, " ");
+      // O seletor mostra o nome completo do funcionário ("ARNALDO MARCHI
+      // LUCIANO"), mas os links antigos e os da ficha técnica gravaram só o
+      // primeiro nome ("Arnaldo"): vale o nome inteiro ou o começo dele.
+      const alvo = nome(technician);
+      const mesmoTecnico = (login: unknown) => {
+        const l = nome(login);
+        return !!l && (l === alvo || alvo.startsWith(`${l} `));
+      };
 
       const contar = (campo: string, filtro = (_l: any) => true) => {
         const contagem = new Map<string, { note: unknown; count: number }>();
@@ -265,7 +274,7 @@ class FeedbackController {
         technician: technician
           ? contar(
               "note_technician_service",
-              (l) => nome(l.login) === nome(technician),
+              (l) => mesmoTecnico(l.login),
             ).map((n) => ({ ...n, login: technician }))
           : [],
       });
