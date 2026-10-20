@@ -1,6 +1,6 @@
 import { Router } from "express";
 import Codef from "../controller/Codef";
-import AuthGuard from "../middleware/AuthGuard";
+import AuthGuard, { AuthGuardComTokenNaUrl } from "../middleware/AuthGuard";
 
 const router: Router = Router();
 
@@ -18,7 +18,8 @@ const somenteAdmin = (req: any, res: any, next: any) => {
 };
 
 router.get("/", AuthGuard, somenteAdmin, Codef.apurar);
-router.get("/exportar", AuthGuard, somenteAdmin, Codef.exportar);
+// Token na URL: a planilha é baixada por link, que não manda cabeçalho.
+router.get("/exportar", AuthGuardComTokenNaUrl, somenteAdmin, Codef.exportar);
 router.get("/plano-contas", AuthGuard, somenteAdmin, Codef.listarRegras);
 router.post("/plano-contas", AuthGuard, somenteAdmin, Codef.classificar);
 router.delete(

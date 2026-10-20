@@ -1,9 +1,7 @@
 import { Request, Response } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
 import AppDataSource from "../database/DataSource";
 import { TimeRecord } from "../entities/TimeRecord";
 import { Employee } from "../entities/Employee";
-import { User } from "../entities/User";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
@@ -15,27 +13,6 @@ import { descreverAcao } from "../utils/auditoria";
 class TimeRecordController {
   private timeRepo = AppDataSource.getRepository(TimeRecord);
   private employeeRepo = AppDataSource.getRepository(Employee);
-
-  /** Nível de permissão do operador autenticado (0 se sem token válido). */
-  private async operatorPermission(req: Request): Promise<number> {
-    try {
-      const auth = req.headers["authorization"];
-      const token =
-        (auth && auth.split(" ")[1]) || (req.query.token as string);
-      if (!token) return 0;
-      const decoded = jwt.verify(
-        token,
-        String(process.env.JWT_SECRET),
-      ) as JwtPayload;
-      const user = await AppDataSource.getRepository(User).findOne({
-        where: { id: Number(decoded.id) },
-        select: ["id", "permission"],
-      });
-      return user?.permission ?? 0;
-    } catch {
-      return 0;
-    }
-  }
 
   isHoliday(date: Date): boolean {
     // Check Sunday (0)
@@ -68,9 +45,9 @@ class TimeRecordController {
         return;
       }
 
-      // Operador com permissão >= 5 dispensa a verificação de CPF.
-      const operatorPerm = await this.operatorPermission(req);
-      if (operatorPerm < 5) {
+      // Operador com permissão >= 5 dispensa a verificação de CPF. req.user
+      // vem do AuthOpcional da rota (vazio para quem bate o ponto sem login).
+      if ((req.user?.permission ?? 0) < 5) {
         const cleanCpfInput = cpf ? cpf.replace(/\D/g, "") : "";
         const cleanCpfStored = employee.cpf
           ? employee.cpf.replace(/\D/g, "")

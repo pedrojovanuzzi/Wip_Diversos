@@ -35,8 +35,6 @@ router.get("/users", AuthGuard, somenteAdmin, Auth.listUsers);
 router.put("/users/:id", AuthGuard, somenteAdmin, Auth.updateUser);
 router.delete("/users/:id", AuthGuard, somenteAdmin, Auth.deleteUser);
 router.post("/login", loginLimiter, Auth.Login);
-router.get("/getUser", Auth.getCurrentUser);
-router.post("/api", Auth.getToken);
 router.post("/validate", Auth.validateToken);
 
 export default router;

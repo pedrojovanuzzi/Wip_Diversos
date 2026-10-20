@@ -3,10 +3,11 @@ import { body, validationResult } from "express-validator";
 import DataSource from "../database/DataSource";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import { Not } from "typeorm";
 import { User } from "../entities/User";
 import { registrarLog, descreverAcao } from "../utils/auditoria";
+import { idDoUsuarioDaRequisicao, jwtSecret } from "../utils/jwt";
 
 // Login inexistente também passa por um bcrypt.compare, contra este hash:
 // sem isso ele responde bem mais rápido e denuncia quais logins existem.
@@ -24,14 +25,12 @@ const ERRO_LOGIN = {
 
 dotenv.config();
 
-const jwtSecret = String(process.env.JWT_SECRET);
-
 interface AuthenticatedRequest extends Request {
   user?: User | null;
 }
 
 function generateToken(id: string) {
-  return jwt.sign({ id }, jwtSecret, { expiresIn: "8h" });
+  return jwt.sign({ id }, jwtSecret(), { expiresIn: "8h" });
 }
 
 class Auth {
@@ -326,30 +325,6 @@ class Auth {
     }
   }
 
-  public async getToken(req: Request, res: Response) {
-    try {
-      const authHeader = req.headers["authorization"];
-      const token = authHeader && authHeader.split(" ")[1];
-
-      if (!token) {
-        res.status(401).json({ valid: false });
-        return;
-      }
-
-      jwt.verify(token, String(process.env.JWT_SECRET), (err, decoded) => {
-        if (err) {
-          res.status(401).json({ valid: false });
-          return;
-        }
-
-        res.json({ valid: true });
-        return;
-      });
-    } catch (error) {
-      res.status(401).json({ errors: [{ msg: "Ocorreu um Erro" }] });
-    }
-  }
-
   public async Login(req: Request, res: Response) {
     try {
       await body("login")
@@ -428,52 +403,27 @@ class Auth {
     }
   }
 
-  public async getCurrentUser(req: AuthenticatedRequest, res: Response) {
+  public async validateToken(req: Request, res: Response) {
     try {
-      const user = req.user;
-      res.status(200).json(user);
-    } catch (error) {
-      res.status(401).json({ errors: [{ msg: "Ocorreu um Erro" }] });
-    }
-  }
+      const id = idDoUsuarioDaRequisicao(req);
 
-  public validateToken(req: Request, res: Response) {
-    try {
-      const authHeader = req.headers.authorization;
-      const token = authHeader && authHeader.split(" ")[1];
-
-      if (!token) {
+      if (!id) {
         res.status(401).json({ valid: false });
         return;
       }
 
-      jwt.verify(
-        token,
-        String(process.env.JWT_SECRET),
-        async (err, decoded) => {
-          if (err) {
-            res.status(401).json({ valid: false });
-            return;
-          }
+      const user = await DataSource.getRepository(User).findOne({
+        where: { id },
+      });
 
-          const decodedUser = jwt.decode(token, { complete: true, json: true });
+      if (!user) {
+        res.status(401).json({ valid: false });
+        return;
+      }
 
-          const userRepository = DataSource.getRepository(User);
-          const user = await userRepository.findOne({
-            where: { id: (decodedUser?.payload as JwtPayload).id },
-          });
-
-          if (!user) {
-            res.status(401).json({ valid: false });
-            return;
-          }
-
-          // O hash da senha não sai para o navegador.
-          const { password: _senha, ...semSenha } = user;
-          res.json({ valid: true, user: semSenha });
-          return;
-        },
-      );
+      // O hash da senha não sai para o navegador.
+      const { password: _senha, ...semSenha } = user;
+      res.json({ valid: true, user: semSenha });
     } catch (error) {
       res.status(401).json({ errors: [{ msg: "Ocorreu um Erro" }] });
     }

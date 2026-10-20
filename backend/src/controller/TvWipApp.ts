@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import dotenv from "dotenv";
+import { jwtSecret, tokenDoCabecalho } from "../utils/jwt";
 
 import TvWipService from "../services/TvWipService";
 import TvWipCanaisService, {
@@ -141,7 +142,7 @@ class TvWipApp {
 
       const token = jwt.sign(
         { login: resultado.conta.login, escopo: ESCOPO },
-        String(process.env.JWT_SECRET),
+        jwtSecret(),
         { expiresIn: VALIDADE },
       );
 
@@ -174,11 +175,8 @@ class TvWipApp {
    * Deixa o login em `res.locals.loginTv` para as rotas seguintes.
    */
   public sessao = async (req: Request, res: Response, next: NextFunction) => {
-    const cabecalho = req.headers["authorization"];
-    const token =
-      (cabecalho && cabecalho.replace(/^Bearer\s+/i, "")) ||
-      (req.query.token as string) ||
-      "";
+    // Também na URL: o player de IPTV abre a playlist sem mandar cabeçalho.
+    const token = tokenDoCabecalho(req) || (req.query.token as string) || "";
 
     if (!token) {
       res.status(401).json({ ok: false, motivo: "SEM_TOKEN" });
@@ -188,7 +186,7 @@ class TvWipApp {
     try {
       const dados = jwt.verify(
         token,
-        String(process.env.JWT_SECRET),
+        jwtSecret(),
       ) as PayloadApp;
 
       // Token do painel não vale aqui: os escopos são separados.

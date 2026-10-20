@@ -440,7 +440,7 @@ add("in_watch", { k: "dock", x: 490, y: 1800, tag: "Watch Brasil", name: "Watch 
 // ---- Núcleo e portaria ----
 add("gate", { k: "core", x: 1050, y: 1000, tag: "app.ts", name: "Portão Express",
   desc: "server.ts sobe o Express na porta 3000. Toda requisição passa por cors, express.json, urlencoded e auditoriaMiddleware (grava criar/editar/remover de usuário logado em audit_logs). O 'trust proxy' faz req.ip ser o IP real visto pelo nginx.",
-  files: [["server.ts", 20, "listen(3000)"], ["app.ts", 73, "middleware()"], ["utils/auditoria.ts", 173, "auditoriaMiddleware"]] });
+  files: [["server.ts", 24, "listen(3000)"], ["app.ts", 73, "middleware()"], ["utils/auditoria.ts", 173, "auditoriaMiddleware"]] });
 add("router", { k: "core", x: 1210, y: 1000, tag: "app.ts", name: "Roteador 38 rotas",
   desc: "router() liga cada prefixo /api/... a um arquivo em routes/. Cada rota é uma máquina no bairro à direita.",
   files: [["app.ts", 81, "router()"]] });
@@ -448,8 +448,8 @@ add("limiter", { k: "guard", x: 1390, y: 640, tag: "rate-limit", name: "Contador
   desc: "express-rate-limit só na rota de login: 10 senhas erradas por IP a cada 15 minutos. Login certo não conta, para não travar o escritório inteiro saindo pelo mesmo IP.",
   files: [["routes/Auth.Routes.ts", 20, "loginLimiter"]] });
 add("auth", { k: "guard", x: 1390, y: 760, tag: "AuthGuard", name: "Confere o crachá",
-  desc: "Pega o token do header Authorization (ou ?token=), faz jwt.verify e carrega o User do banco em req.user. Sem token: 401 'Acesso Negado!'. Token ruim: 401 'Token Inválido'. Existe também AuthOpcional, para rotas públicas que mostram mais a quem está logado.",
-  files: [["middleware/AuthGuard.ts", 19, "AuthGuard"], ["middleware/AuthGuard.ts", 56, "AuthOpcional"]] });
+  desc: "Pega o token do header Authorization, faz jwt.verify, exige o id de um usuário do painel (token do app da TV WIP não vale) e carrega o User do banco em req.user, sem o hash da senha. ?token= na URL só em AuthGuardComTokenNaUrl (foto do ponto e exportação do Codef). Sem token: 401 'Acesso Negado!'. Token ruim: 401 'Token Inválido'. Existe também AuthOpcional, para rotas públicas que mostram mais a quem está logado.",
+  files: [["middleware/AuthGuard.ts", 59, "AuthGuard"], ["middleware/AuthGuard.ts", 68, "AuthGuardComTokenNaUrl"], ["middleware/AuthGuard.ts", 81, "AuthOpcional"], ["utils/jwt.ts", 43, "idDoUsuarioDoToken"]] });
 add("perm", { k: "guard", x: 1390, y: 880, tag: "PermissionGuard", name: "Confere o nível",
   desc: "protegido(n) = [AuthGuard, exigirPermissao(n)], sempre nessa ordem. Níveis: 1 consulta, 2 operador, 5 administrador. Abaixo do mínimo: 403 'Permissão insuficiente.' A regra para rota nova está em .claude/rules/rotas-seguras.md.",
   files: [["middleware/PermissionGuard.ts", 11, "exigirPermissao"], ["middleware/PermissionGuard.ts", 22, "protegido"], [".claude/rules/rotas-seguras.md", 0, "regra de rotas"]] });
@@ -465,10 +465,10 @@ const DIST = {
 };
 // [id, bairro, prefixo, nome, arquivo de rota, controllers, linhas, endpoints, portaria, bancos, externos, descrição]
 const CTRLS = [
-  ["c_auth", "equipe", "/api/auth", "Login e usuários", "Auth.Routes.ts", "Auth.ts", 483, 9, "login com limite de tentativas; usuários só nível 5", "dbMain", "", "Login, cadastro e edição de usuários. Senha com bcrypt, crachá JWT de 8 horas."],
+  ["c_auth", "equipe", "/api/auth", "Login e usuários", "Auth.Routes.ts", "Auth.ts", 433, 7, "login com limite de tentativas; usuários só nível 5", "dbMain", "", "Login, cadastro e edição de usuários. Senha com bcrypt, crachá JWT de 8 horas."],
   ["c_home", "equipe", "/api/", "Home", "Home.Routes.ts", "Home.ts", 8, 1, "AuthGuard", "", "", "Só confirma que o token vale."],
   ["c_auditoria", "equipe", "/api/auditoria", "Auditoria", "Auditoria.routes.ts", "Auditoria.ts", 86, 2, "nível 5", "dbMain", "", "Consulta o audit_logs que o auditoriaMiddleware grava."],
-  ["c_timetracking", "equipe", "/api/time-tracking", "Ponto eletrônico", "TimeTracking.routes.ts", "EmployeeController.ts TimeRecordController.ts DailyOvertimeController.ts ImageController.ts MonthlyReportSignatureController.ts", 898, 19, "bater ponto aberto; gestão nível 5", "dbMain", "", "Funcionários, registros de ponto com foto, horas extras e assinatura do relatório mensal. Feriados via date-holidays."],
+  ["c_timetracking", "equipe", "/api/time-tracking", "Ponto eletrônico", "TimeTracking.routes.ts", "EmployeeController.ts TimeRecordController.ts DailyOvertimeController.ts ImageController.ts MonthlyReportSignatureController.ts", 875, 19, "bater ponto aberto; gestão nível 5", "dbMain", "", "Funcionários, registros de ponto com foto, horas extras e assinatura do relatório mensal. Feriados via date-holidays."],
   ["c_phone", "equipe", "/api/phone-location", "Localização", "PhoneLocation.routes.ts", "PhoneLocation.ts", 155, 5, "/position público (device_token); resto AuthGuard", "dbMain", "", "Recebe a posição do app dos técnicos e lista para o painel."],
   ["c_files", "equipe", "/api/files", "Arquivos", "FileShare.routes.ts", "FileShare.ts", 113, 4, "nível 2; download por link", "dbMain", "", "Upload e compartilhamento de arquivos."],
   ["c_nfse", "fiscal", "/api/nfse", "NFS-e", "NFSE.routes.ts", "NFSE.ts", 2937, 13, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco out_publicas", "Emite, consulta, imprime e cancela NFS-e. Provedores em services/nfse (Fiorilli e SEFIN Nacional). Código do município vem do IBGE. A busca (BuscarNSFE) também traz as notas de licença (login LICENCA-<id>), que não são clientes do MKAuth."],
@@ -479,7 +479,7 @@ const CTRLS = [
   ["c_token", "finan", "/api/TokenAutoAtendimento", "Autoatendimento", "TokenAtendimento.routes.ts", "TokenAtendimento.ts", 1097, 15, "público (totem)", "mkauth", "out_efi out_paygo", "O totem: cliente consulta e paga fatura (valor pela regra única de utils/valorFatura.ts; Pix pela Efí ou cartão pela maquininha PayGo), abre chamado, faz cadastro."],
   ["c_totem", "finan", "/api/totem-solicitacao", "Registro do totem", "TotemSolicitacao.routes.ts", "TotemSolicitacao.ts", 31, 1, "público", "dbMain", "", "Registra os Pix pedidos no totem."],
   ["c_licenca", "finan", "/api/licenca", "Licenças", "Licenca.Routes.ts", "LicencaController.ts LicencaMensalidadeController.ts", 502, 26, "nível 5", "dbMain", "", "Licenças de software e mensalidades (geradas todo dia às 03:15, ou avulsas escolhendo o cliente). O valor de uma aberta pode ser editado: o Pix já gerado é alterado na Efí junto, e o link de pagamento aparece no modal. As NFS-e de licença também entram na tabela nfse (login LICENCA-<id>) e aparecem na busca de NFS-e; o botão \"Migrar notas para a busca\" leva as que faltam."],
-  ["c_codef", "finan", "/api/codef", "Codef", "Codef.routes.ts", "Codef.ts", 206, 6, "nível 5", "dbMain", "", "Plano de contas e planilha da Codef (services/CodefService.ts)."],
+  ["c_codef", "finan", "/api/codef", "Codef", "Codef.routes.ts", "Codef.ts", 207, 6, "nível 5", "dbMain", "", "Plano de contas e planilha da Codef (services/CodefService.ts)."],
   ["c_wahook", "atend", "/api/whatsappWebHook", "Webhook WhatsApp", "WhatsappWebHook.routes.ts", "whatsapp/index.ts", 0, 4, "público (quem chama é a Meta)", "apimk mkauth", "out_meta", "A porta do robô: recebe, tira duplicadas e põe na fila. A pasta controller/whatsapp tem 28 arquivos (handlers, services, testes)."],
   ["c_whatsapp", "atend", "/api/whatsapp", "Chat WhatsApp", "Whatsapp.Routes.ts", "Whatsapp.ts", 673, 7, "AuthGuard", "apimk mkauth", "out_meta", "Conversas para os atendentes, envio manual e disparo em massa."],
   ["c_watest", "atend", "/api/whatsapp-test", "Teste do robô", "WhatsappTest.routes.ts", "whatsapp/handlers/whatsapp-test.controller.ts", 435, 3, "AuthGuard", "apimk mkauth", "", "Simula conversas com o robô sem mandar mensagem de verdade."],
@@ -498,7 +498,7 @@ const CTRLS = [
   ["c_serverlogs", "rede", "/api/ServerLogs", "Logs de servidor", "ServerLogs.Routes.ts", "ServerLogs.ts", 918, 6, "AuthGuard", "mkauth", "out_servers", "Busca logs por SFTP, lê PDF e planilhas."],
   ["c_pm2", "rede", "/api/pm2-logs", "Logs PM2", "Pm2Logs.routes.ts", "Pm2Logs.ts", 97, 2, "AuthGuard", "", "", "Roda 'pm2 jlist' na própria máquina do backend."],
   ["c_backup", "rede", "/api/Backup", "Backup", "Backup.routes.ts", "Backup.ts", 400, 1, "AuthGuard (botão na Home)", "dbMain mkauth apimk", "out_drive", "mysqldump dos bancos e upload para o OneDrive. Também roda sozinho às 03:00."],
-  ["c_tvwip", "tv", "/api/tv-wip", "TV WIP", "TvWip.routes.ts", "TvWip.ts TvWipApp.ts", 957, 32, "nível 2; app da TV com token próprio", "dbMain canais", "", "Contas, pacotes, canais, EPG e notificações da TV WIP."],
+  ["c_tvwip", "tv", "/api/tv-wip", "TV WIP", "TvWip.routes.ts", "TvWip.ts TvWipApp.ts", 955, 32, "nível 2; app da TV com token próprio", "dbMain canais", "", "Contas, pacotes, canais, EPG e notificações da TV WIP."],
   ["c_streaming", "tv", "/api/streaming", "Streaming", "Streaming.Routes.ts", "Streaming.ts", 175, 7, "AuthGuard", "dbMain mkauth", "out_watch", "Assinantes e testes da Watch TV."],
   ["c_watch", "tv", "/api/watchbrasil/redirect", "Retorno Watch", "WatchBrasilWebhook.routes.ts", "", 0, 2, "público (redirect)", "", "out_watch", "Recebe o retorno do login OAuth da Watch Brasil. A lógica fica na própria rota."],
   ["c_cameras", "tv", "/api/cameras", "Câmeras", "Camera.routes.ts", "Camera.ts", 540, 16, "AuthGuard", "cams mkauth", "out_mediamtx", "Portal de câmeras: cadastro, planos de gravação e acesso ao vídeo pelo MediaMTX."],
@@ -527,7 +527,7 @@ add("cron", { k: "clock", x: 2725, y: 800, tag: "node-cron", name: "Relógio", l
   files: [["app.ts", 124, "backup 03:00"], ["app.ts", 141, "Pix dia 1º"], ["services/TvWipService.ts", 88, "TV WIP 03:10"], ["app.ts", 202, "licenças 03:15"], ["app.ts", 153, "conferência 04:00"]] });
 add("services", { k: "clock", x: 2535, y: 910, tag: "server.ts", name: "Serviços contínuos", links: ["c_analytics", "c_streaming", "c_tvwip", "c_cameras"],
   desc: "Ligados assim que o servidor sobe: ClientMonitorService (retoma monitoramentos e mede a cada tick), StreamingTesteService (timer que encerra testes da Watch TV vencidos) e TvWipService (agenda a varredura das 03:10). Quando o banco das câmeras conecta, os planos de gravação são carregados e relidos de tempos em tempos (setInterval), para uma mudança de plano valer sem reiniciar.",
-  files: [["server.ts", 22, "start()"], ["services/ClientMonitorService.ts", 82, "tick"], ["services/StreamingTesteService.ts", 28, "timer"], ["config/cameraStoragePlans.ts", 112, "releitura dos planos"]] });
+  files: [["server.ts", 27, "start()"], ["services/ClientMonitorService.ts", 82, "tick"], ["services/StreamingTesteService.ts", 28, "timer"], ["config/cameraStoragePlans.ts", 112, "releitura dos planos"]] });
 
 // ---- Bancos ----
 add("dbMain", { k: "db", x: 1680, y: 1400, tag: "DataSource.ts", name: "MySQL principal",
@@ -597,9 +597,9 @@ const MISSIONS = [
     S("gate", "Entra pelo portão", "cors, express.json (o corpo vira req.body) e auditoriaMiddleware.", "app.ts", 73),
     S("router", "Escolhe a esteira", "O prefixo /api/auth manda para routes/Auth.Routes.ts.", "app.ts", 81),
     S("limiter", "Passa pelo contador", "Menos de 10 erros deste IP nos últimos 15 minutos: pode seguir.", "routes/Auth.Routes.ts", 20),
-    S("c_auth", "Valida o formulário", "express-validator: login obrigatório e senha com 6+ caracteres. Se falhar, devolve 400.", "controller/Auth.ts", 353),
-    S("dbMain", "Procura o usuário", "userRepository.findOne({ where: { login } }) no MySQL principal.", "controller/Auth.ts", 375),
-    S("c_auth", "Confere a senha e faz o crachá", "bcrypt.compare na senha. Login inexistente também compara com um hash falso, para o tempo de resposta não entregar quais logins existem. Deu certo: jwt.sign({ id }) por 8 horas.", "controller/Auth.ts", 34),
+    S("c_auth", "Valida o formulário", "express-validator: login obrigatório e senha com 6+ caracteres. Se falhar, devolve 400.", "controller/Auth.ts", 328),
+    S("dbMain", "Procura o usuário", "userRepository.findOne({ where: { login } }) no MySQL principal.", "controller/Auth.ts", 350),
+    S("c_auth", "Confere a senha e faz o crachá", "bcrypt.compare na senha. Login inexistente também compara com um hash falso, para o tempo de resposta não entregar quais logins existem. Deu certo: jwt.sign({ id }) por 8 horas.", "controller/Auth.ts", 32),
     S("s_auth", "Crachá entregue", "O frontend guarda o token num cookie (context/AuthContext.tsx) e manda Authorization: Bearer <token> em todo pedido seguinte.", "frontend/app/src/context/AuthContext.tsx", 43, { end: "200" }),
   ]},
   { id: "whats", title: "Mensagem no WhatsApp", http: "POST /api/whatsappWebHook", item: "MSG", color: "#6fc277", steps: [
@@ -619,7 +619,7 @@ const MISSIONS = [
     S("s_nfse", "Operador escolhe os clientes", "Na tela /NFSE ele marca os clientes e envia alíquota, ambiente, último RPS e a senha do certificado.", "frontend/app/src/pages/Nfse", 0),
     S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 73),
     S("router", "Esteira /api/nfse", "Vai para routes/NFSE.routes.ts, que usa protegido(2).", "routes/NFSE.routes.ts", 44),
-    S("auth", "Confere o crachá", "AuthGuard: tira o token do header, jwt.verify e carrega req.user.", "middleware/AuthGuard.ts", 19),
+    S("auth", "Confere o crachá", "AuthGuard: tira o token do header, jwt.verify e carrega req.user.", "middleware/AuthGuard.ts", 22),
     S("perm", "Confere o nível", "exigirPermissao(2): operador ou acima pode seguir.", "middleware/PermissionGuard.ts", 11),
     S("c_nfse", "Abre a ordem de serviço", "iniciar calcula o próximo RPS, cria um registro em Jobs com status \"pendente\" e já responde 200 com o id do job. O trabalho pesado continua depois da resposta.", "controller/NFSE.ts", 471),
     S("jobs", "Produção em 2º plano", "processarGeracaoNfseJob roda sem await, em lotes de 50 clientes, atualizando \"processados\" a cada nota.", "controller/NFSE.ts", 644),
@@ -656,7 +656,7 @@ const MISSIONS = [
     S("s_licencas", "Ou o admin cria uma avulsa", "Na aba Mensalidades, \"Nova cobrança avulsa\": escolhe o cliente da licença, competência, vencimento e valor. Valor e vencimento em branco vêm da regra do software.", "frontend/app/src/pages/Licencas/MensalidadesLicenca.tsx", 200),
     S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 73),
     S("router", "Esteira /api/licenca", "routes/Licenca.Routes.ts: tudo de mensalidade é protegido(5).", "routes/Licenca.Routes.ts", 46),
-    S("auth", "Confere o crachá", "AuthGuard: jwt.verify e req.user.", "middleware/AuthGuard.ts", 19),
+    S("auth", "Confere o crachá", "AuthGuard: jwt.verify e req.user.", "middleware/AuthGuard.ts", 22),
     S("perm", "Confere o nível", "exigirPermissao(5): só administrador.", "middleware/PermissionGuard.ts", 11),
     S("c_licenca", "criarAvulsa", "Confere a licença e a competência e marca a cobrança como avulsa: ela convive com a mensalidade do mês e não conta para a geração.", "services/LicencaMensalidadeService.ts", 229),
     S("dbMain", "Mensalidade gravada", "Linha em licenca_mensalidades, separada do MK-Auth de propósito.", "entities/LicencaMensalidade.ts", 0),
@@ -670,7 +670,7 @@ const MISSIONS = [
     S("s_nfcom", "Operador escolhe as faturas", "Na tela /Nfcom ele marca as faturas dos clientes e envia a senha do certificado.", "frontend/app/src/pages/Nfcom/Nfcom.tsx", 0),
     S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 73),
     S("router", "Esteira /api/NFCom", "emitirNFCom usa o guard de operador (nível 2).", "routes/NFCom.routes.ts", 16),
-    S("auth", "Confere o crachá", "AuthGuard: jwt.verify e req.user.", "middleware/AuthGuard.ts", 19),
+    S("auth", "Confere o crachá", "AuthGuard: jwt.verify e req.user.", "middleware/AuthGuard.ts", 22),
     S("perm", "Confere o nível", "exigirPermissao(2): operador ou acima.", "middleware/PermissionGuard.ts", 11),
     S("mkauth", "Busca fatura e cliente", "gerarNfcom lê a fatura (Faturas) e o cliente (ClientesEntities) no MK-Auth e tira o desconto do cliente.", "controller/Nfcom.ts", 227),
     S("c_nfcom", "Abre o job e responde", "Cria um registro em Jobs e já responde 200 com o id. O resto continua sem await.", "controller/Nfcom.ts", 477),
@@ -690,14 +690,14 @@ function guardSteps(o) {
     S("router", "Esteira /api/Pix", "A rota /gerador usa protegido(2): precisa de crachá e de nível 2.", "routes/Pix.routes.ts", 16),
   ];
   if (o.tok === "none") return s.concat(
-    S("auth", "Barrado: sem crachá", "Não veio token no header nem em ?token=. Responde 401 { errors: [\"Acesso Negado!\"] } e a requisição nem chega no controller.", "middleware/AuthGuard.ts", 24, { err: 1 }),
+    S("auth", "Barrado: sem crachá", "Não veio token no header Authorization. Responde 401 { errors: [\"Acesso Negado!\"] } e a requisição nem chega no controller.", "middleware/AuthGuard.ts", 28, { err: 1 }),
     S("s_pix", "Volta com 401", "O frontend recebe o erro e manda o usuário para o login.", null, null, { end: "401", err: 1 }));
   if (o.tok === "bad") return s.concat(
-    S("auth", "Barrado: crachá vencido", "jwt.verify lança erro (o token passou das 8 horas ou foi adulterado). Responde 401 \"Token Inválido\".", "middleware/AuthGuard.ts", 46, { err: 1 }),
+    S("auth", "Barrado: crachá vencido", "jwt.verify lança erro (o token passou das 8 horas ou foi adulterado). Responde 401 \"Token Inválido\".", "middleware/AuthGuard.ts", 34, { err: 1 }),
     S("s_pix", "Volta com 401", "O usuário precisa logar de novo.", null, null, { end: "401", err: 1 }));
   s.push(
-    S("auth", "Crachá válido", "jwt.verify passou e o token tem o id do usuário.", "middleware/AuthGuard.ts", 30),
-    S("dbMain", "Carrega o usuário", "Busca id, login e permission do User e coloca em req.user.", "middleware/AuthGuard.ts", 34));
+    S("auth", "Crachá válido", "jwt.verify passou e o token tem o id de um usuário do painel.", "middleware/AuthGuard.ts", 33),
+    S("dbMain", "Carrega o usuário", "Busca id, login e permission do User e coloca em req.user.", "middleware/AuthGuard.ts", 40));
   if (+o.perm < 2) return s.concat(
     S("perm", "Barrado: nível " + o.perm + " < 2", "exigirPermissao(2) compara req.user.permission com o mínimo. Responde 403 \"Permissão insuficiente.\"", "middleware/PermissionGuard.ts", 13, { err: 1 }),
     S("s_pix", "Volta com 403", "Está logado, mas não tem nível para essa tela.", null, null, { end: "403", err: 1 }));
@@ -724,7 +724,7 @@ function autoMission(cid, entry) {
     S("gate", "Entra pelo portão", "cors, express.json e auditoriaMiddleware.", "app.ts", 73),
     S("router", "Esteira " + c.prefix, "O prefixo vai para " + rf + "." + (pub ? " Rota pública: " + c.guard + "." : ""), rf, 0),
   ];
-  if (!pub) steps.push(S("auth", "Confere o crachá", "AuthGuard: jwt.verify no token e carrega req.user. Sem token válido, para aqui com 401.", "middleware/AuthGuard.ts", 19));
+  if (!pub) steps.push(S("auth", "Confere o crachá", "AuthGuard: jwt.verify no token e carrega req.user. Sem token válido, para aqui com 401.", "middleware/AuthGuard.ts", 22));
   if (lvl) steps.push(S("perm", "Confere o nível", "exigirPermissao(" + lvl + "): nível " + lvl + " ou mais, senão 403. Portaria desta rota: " + c.guard + ".", "middleware/PermissionGuard.ts", 11));
   steps.push(S(cid, c.name + " trabalha", c.desc + " (" + c.eps + " endpoints" + (c.lines ? ", " + c.lines.toLocaleString("pt-BR") + " linhas" : "") + ")", cf, 0));
   c.dbs.forEach(d => steps.push(S(d, "Lê e grava: " + M[d].name, M[d].desc, M[d].files[0] && M[d].files[0][0], 0)));

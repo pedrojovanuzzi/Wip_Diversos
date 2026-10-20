@@ -1,4 +1,7 @@
 import "reflect-metadata";
+// Primeiro de tudo: sem JWT_SECRET este import já derruba o processo, antes de
+// os outros abrirem banco, Redis ou agendamento.
+import "./utils/jwt";
 
 import { App } from "./app"
 import { initQueues } from "./controller/whatsapp/index";

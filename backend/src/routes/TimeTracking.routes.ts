@@ -4,15 +4,19 @@ import TimeRecordController from "../controller/TimeRecordController";
 import DailyOvertimeController from "../controller/DailyOvertimeController";
 import ImageController from "../controller/ImageController";
 import MonthlyReportSignatureController from "../controller/MonthlyReportSignatureController";
-import AuthGuard, { AuthOpcional } from "../middleware/AuthGuard";
+import AuthGuard, {
+  AuthGuardComTokenNaUrl,
+  AuthOpcional,
+} from "../middleware/AuthGuard";
 import { protegido } from "../middleware/PermissionGuard";
 
 const TimeTrackingRoutes = Router();
 
 // Protected Image Route
+// Token na URL: a foto abre em <img src>, que não manda cabeçalho.
 TimeTrackingRoutes.get(
   "/image/:filename",
-  AuthGuard,
+  AuthGuardComTokenNaUrl,
   ImageController.serveImage,
 );
 
@@ -35,7 +39,12 @@ TimeTrackingRoutes.delete(
 
 // Time Record Routes
 // Público: quem bate o ponto se identifica pelo CPF (validado no controller).
-TimeTrackingRoutes.post("/clock-in", TimeRecordController.clockIn);
+// AuthOpcional só para administrador logado dispensar o CPF.
+TimeTrackingRoutes.post(
+  "/clock-in",
+  AuthOpcional,
+  TimeRecordController.clockIn,
+);
 TimeTrackingRoutes.get(
   "/records/:employeeId",
   somenteAdmin,

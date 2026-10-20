@@ -132,8 +132,9 @@ class Codef {
   /**
    * Baixa a planilha do ano.
    *
-   * O AuthGuard aceita o token na query, que é como o navegador consegue
-   * abrir o download direto sem passar por fetch.
+   * A rota usa AuthGuardComTokenNaUrl, que aceita o token na query: é como o
+   * navegador consegue abrir o download direto sem passar por fetch. O
+   * AuthGuard comum só lê o cabeçalho.
    */
   public exportar = async (req: Request, res: Response) => {
     try {
