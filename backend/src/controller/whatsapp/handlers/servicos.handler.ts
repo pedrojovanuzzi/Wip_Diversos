@@ -489,7 +489,9 @@ async function concluirWatchTv(celular: any, session: any) {
       `até o vencimento. Depois disso, *R$ ${reais(VALOR_STREAMER)}* por mês.`,
   );
 
-  deleteSession(celular);
+  // Pela marca, não por deleteSession: a fila grava a sessão depois do
+  // handler e a traria de volta parada em "ask_celular" (pedido em dobro).
+  session._deleted = true;
 }
 
 /**
@@ -603,7 +605,7 @@ export async function iniciarWatchTv(
 ` +
           `Digite *início* para voltar ao menu.`,
       );
-      deleteSession(celular);
+      session._deleted = true;
       return;
     }
 
@@ -682,7 +684,7 @@ export async function iniciarWatchTv(
   if (session.watchTvStep === "select_address") {
     const t = String(texto || "").toLowerCase();
     if (t === "inicio" || t === "início") {
-      deleteSession(celular);
+      session._deleted = true;
       await MensagensComuns(celular, "Tudo bem, voltamos ao início. 👋");
       return;
     }

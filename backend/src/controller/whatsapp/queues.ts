@@ -33,6 +33,21 @@ export const whatsappInactivityQueue = new Queue("whatsapp-inactivity", {
   connection: redisOptions,
 });
 
+const INACTIVITY_JOB_ID = (celular: string) => `inactivity-${celular}`;
+
+async function agendarInatividade(celular: string) {
+  await whatsappInactivityQueue.add(
+    "session-timeout",
+    { celular },
+    {
+      jobId: INACTIVITY_JOB_ID(celular),
+      delay: 900000,
+      removeOnComplete: true,
+      removeOnFail: true,
+    },
+  );
+}
+
 let incomingWorker: Worker;
 let outgoingWorker: Worker;
 let inactivityWorker: Worker;
@@ -90,9 +105,8 @@ export function initQueues() {
       await redisDedupWorker.set(PROCESSED_KEY(messageId), "1", "EX", 86400);
 
       // Cancela timer de inatividade anterior e reagenda para 15 min a partir de agora
-      const inactivityJobId = `inactivity-${celular}`;
       try {
-        const existingJob = await whatsappInactivityQueue.getJob(inactivityJobId);
+        const existingJob = await whatsappInactivityQueue.getJob(INACTIVITY_JOB_ID(celular));
         if (existingJob) await existingJob.remove();
       } catch (_) {}
 
@@ -104,6 +118,11 @@ export function initQueues() {
           `[BullMQ] Erro ao processar mensagem ${messageId}:`,
           err.message,
         );
+        // A sessão anterior continua no banco: sem o timer de volta ela
+        // ficaria parada nessa etapa para sempre.
+        try {
+          if (sessionDB) await agendarInatividade(celular);
+        } catch (_) {}
         if (lockAcquired) await releaseLock(celular);
         throw err;
       }
@@ -117,16 +136,7 @@ export function initQueues() {
         } else {
           await saveSession(celular, sessionContext, messageId);
           // Reagenda inatividade de 15 min para este usuário
-          await whatsappInactivityQueue.add(
-            "session-timeout",
-            { celular },
-            {
-              jobId: inactivityJobId,
-              delay: 900000,
-              removeOnComplete: true,
-              removeOnFail: true,
-            },
-          );
+          await agendarInatividade(celular);
         }
       } catch (saveErr: any) {
         console.error(`[BullMQ] Erro ao salvar sessão para ${celular} (stage: ${sessionContext.stage}):`, saveErr.message);

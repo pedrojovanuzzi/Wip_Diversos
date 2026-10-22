@@ -76,6 +76,29 @@ function limparPassosDeMudanca(session: any) {
 }
 
 /**
+ * Esquece o passo de todos os serviços. Cada serviço retoma de onde parou
+ * quando acha o seu passo na sessão; sem limpar, quem volta ao menu e escolhe
+ * o serviço de novo cai no meio da tentativa anterior.
+ */
+function limparPassosDeServicos(session: any) {
+  limparPassosDeMudanca(session);
+  session.watchTvStep = undefined;
+  session.trocaTitularidadeStep = undefined;
+  session.trocaPlanoStep = undefined;
+  session.wifiExtendidoStep = undefined;
+}
+
+/** "Início", "inicio " e "INICIO" valem igual: o bot pede com acento. */
+function ehComandoInicio(texto: any) {
+  const t = String(texto || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+  return t === "inicio";
+}
+
+/**
  * Termos exibidos antes de iniciar um serviço.
  *
  * `apenasScm` pula o termo de LGPD — usado pela Watch TV, onde o cliente já
@@ -194,8 +217,8 @@ export async function handleMessage(
       return;
     }
 
-    if (texto && texto.toLowerCase() === "inicio") {
-      limparPassosDeMudanca(session);
+    if (ehComandoInicio(texto)) {
+      limparPassosDeServicos(session);
       await boasVindas(celular);
       await MensagemBotao(
         celular,
@@ -302,6 +325,8 @@ export async function handleMessage(
     case "awaiting_service":
       if (verificaType(type)) {
         const t = texto.toLowerCase();
+        // Passo que sobrou de outra tentativa faria o serviço começar no meio.
+        limparPassosDeServicos(session);
         if (t === "instalaçao" || t === "instalação") {
           await LGPD(celular);
           session.stage = "lgpd_request";
@@ -778,8 +803,9 @@ export async function handleMessage(
             session.stage = "awaiting_cpf";
           }
         } else {
-          console.log(
-            "CPF/CNPJ inválido. Por favor, verifique e tente novamente.",
+          await MensagensComuns(
+            celular,
+            "❌ *CPF/CNPJ* inválido. Por favor, verifique e digite novamente, ou digite *início* para voltar.",
           );
           session.stage = "awaiting_cpf";
         }
@@ -808,9 +834,9 @@ export async function handleMessage(
           session.stage = "options_start";
         } else {
           const selectedIndex = parseInt(texto, 10) - 1;
-          const options = session.structuredData.length + 1;
+          const options = session.structuredData?.length ?? 0;
           if (!isNaN(selectedIndex)) {
-            if (selectedIndex < options) {
+            if (selectedIndex >= 0 && selectedIndex < options) {
               const selectedClient = session.structuredData[selectedIndex];
               console.log(selectedClient);
               console.log(
@@ -871,15 +897,15 @@ export async function handleMessage(
             "👉🏻 Caso queira voltar ao Menu Inicial digite *início*";
           await MensagensComuns(celular, messageText);
         } else {
-          if (!session.endHandled) {
-            let messageText2 = "Ainda Precisa de Ajuda? 🤓\n\n";
-            messageText2 += "*1* Sim \n\n";
-            messageText2 += "*2* Não \n\n";
-            await MensagensComuns(celular, messageText2);
-            session.endHandled = true;
-            session.stage = "end_talk";
-          }
-            }
+          // Sem trava de "já respondido": a etapa já muda para end_talk, e a
+          // trava ficava ligada de um atendimento para o outro, deixando o
+          // "continuar" sem resposta.
+          let messageText2 = "Ainda Precisa de Ajuda? 🤓\n\n";
+          messageText2 += "*1* Sim \n\n";
+          messageText2 += "*2* Não \n\n";
+          await MensagensComuns(celular, messageText2);
+          session.stage = "end_talk";
+        }
       } else {
         await MensagensComuns(
           celular,
@@ -899,7 +925,7 @@ export async function handleMessage(
           "Falar com Atendente",
         );
         session.stage = "options_start";
-        session.endHandled = false;
+        session.endHandled = undefined;
       } else if (
         texto == "2" ||
         texto.toLowerCase() === "não" ||
