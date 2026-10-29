@@ -53,13 +53,11 @@ export async function clienteJaTemStreaming(login: string): Promise<boolean> {
 }
 
 /**
- * De onde vem a Watch TV do cliente: da linha no contrato ou do plano combo.
- *
- * O combo nem sempre tem a linha de R$ 0,00 — plano trocado direto no MK-Auth,
- * ou cadastro anterior a essa linha —, e mesmo assim o cliente tem direito ao
- * streaming.
+ * O que o MK-Auth diz sobre a Watch TV do cliente: linha no contrato ou plano
+ * combo. Só alimenta `clientes_watchtv`; quem responde se o cliente tem a
+ * Watch TV é a tabela (`situacaoWatchTv`).
  */
-export async function origemWatchTv(
+async function evidenciaNoMkauth(
   login: string,
 ): Promise<"contrato" | "plano" | null> {
   if (await clienteJaTemStreaming(login)) return "contrato";
@@ -71,29 +69,96 @@ export async function origemWatchTv(
 }
 
 /**
- * Atualiza `clientes_watchtv` de um login. Chamado em todo lugar que põe ou
- * tira a Watch TV do cadastro; nunca derruba quem chamou.
+ * Valor de `clientes_watchtv` para um login, dada a evidência do MK-Auth.
+ *
+ * - Linha da Watch TV no contrato: tem (o cliente está pagando, ou é
+ *   colaborador). Vale mais que qualquer marcação.
+ * - Marcação manual: fica como o atendente deixou. É para isso que ela existe:
+ *   plano ou serviço com nome que o sistema não reconhece.
+ * - Senão, o plano decide: combo com streaming tem, os outros não.
+ */
+function valorWatchTv(
+  evidencia: "contrato" | "plano" | null,
+  atual: ClienteWatchTv | null,
+): { watchtv: number; origem: string | null } {
+  if (evidencia === "contrato") return { watchtv: 1, origem: "contrato" };
+  if (atual?.origem === "manual") {
+    return { watchtv: atual.watchtv ? 1 : 0, origem: "manual" };
+  }
+  if (evidencia === "plano") return { watchtv: 1, origem: "plano" };
+  return { watchtv: 0, origem: null };
+}
+
+/**
+ * Atualiza `clientes_watchtv` de um login a partir do MK-Auth. Chamado em todo
+ * lugar que põe ou tira a Watch TV do cadastro; nunca derruba quem chamou.
  */
 export async function sincronizarWatchTv(login?: string | null): Promise<void> {
   const l = String(login || "").trim();
   if (!l) return;
   try {
-    const origem = await origemWatchTv(l);
-    await AppDataSource.getRepository(ClienteWatchTv).upsert(
-      { login: l, watchtv: origem ? 1 : 0, origem },
-      ["login"],
-    );
+    const repo = AppDataSource.getRepository(ClienteWatchTv);
+    const atual = await repo.findOne({ where: { login: l } });
+    const v = valorWatchTv(await evidenciaNoMkauth(l), atual);
+    await repo.upsert({ login: l, ...v }, ["login"]);
   } catch (e: any) {
     console.error(`[WatchTv] Falha ao sincronizar ${l}:`, e?.message || e);
   }
 }
 
 /**
- * Recalcula `clientes_watchtv` inteira. Pega o que não passa pelo sistema:
- * plano trocado direto no MK-Auth e a carga inicial da tabela.
+ * Se o cliente tem a Watch TV. É a pergunta que o sistema todo faz, e a
+ * resposta é sempre `clientes_watchtv`: o MK-Auth só alimenta a tabela.
+ * Login que ainda não está nela é calculado e gravado na hora.
+ */
+export async function situacaoWatchTv(
+  login?: string | null,
+): Promise<{ tem: boolean; origem: string | null }> {
+  const l = String(login || "").trim();
+  if (!l) return { tem: false, origem: null };
+  const repo = AppDataSource.getRepository(ClienteWatchTv);
+  let linha = await repo.findOne({ where: { login: l } });
+  if (!linha) {
+    await sincronizarWatchTv(l);
+    linha = await repo.findOne({ where: { login: l } });
+  }
+  return { tem: !!linha?.watchtv, origem: linha?.origem ?? null };
+}
+
+export async function temWatchTv(login?: string | null): Promise<boolean> {
+  return (await situacaoWatchTv(login)).tem;
+}
+
+/**
+ * Marcação feita pelo atendente na tela de Serviços de Contrato. A
+ * sincronização diária não desfaz; só a linha do serviço no contrato passa
+ * por cima (quem paga a Watch TV tem a Watch TV).
+ */
+export async function marcarWatchTvManual(
+  login: string,
+  tem: boolean,
+): Promise<{ tem: boolean; origem: string }> {
+  const l = String(login || "").trim();
+  if (!tem && (await clienteJaTemStreaming(l))) {
+    throw new ErroConvite(
+      "A Watch TV está no contrato deste cliente. Remova o serviço antes de marcar que ele não tem.",
+      409,
+    );
+  }
+  await AppDataSource.getRepository(ClienteWatchTv).upsert(
+    { login: l, watchtv: tem ? 1 : 0, origem: "manual" },
+    ["login"],
+  );
+  return { tem, origem: "manual" };
+}
+
+/**
+ * Recalcula `clientes_watchtv` inteira pelo MK-Auth. Pega o que não passa
+ * pelo sistema (plano trocado direto no MK-Auth) e faz a carga inicial.
+ * Marcações manuais ficam como estão, pela mesma regra de `valorWatchTv`.
  */
 export async function sincronizarTodosWatchTv(): Promise<number> {
-  const origens = new Map<string, "contrato" | "plano">();
+  const evidencias = new Map<string, "contrato" | "plano">();
 
   const planos = await MkauthSource.getRepository(ClientesEntities)
     .createQueryBuilder("c")
@@ -105,10 +170,9 @@ export async function sincronizarTodosWatchTv(): Promise<number> {
     .getRawMany();
   for (const r of planos) {
     const l = String(r.login || "").trim();
-    if (l && planoTemSva(r.plano)) origens.set(l, "plano");
+    if (l && planoTemSva(r.plano)) evidencias.set(l, "plano");
   }
 
-  // A linha no contrato vale mais que o plano.
   const contratos = await MkauthSource.getRepository(SisSerContratos)
     .createQueryBuilder("s")
     .select("DISTINCT TRIM(s.login)", "login")
@@ -118,28 +182,31 @@ export async function sincronizarTodosWatchTv(): Promise<number> {
     .getRawMany();
   for (const r of contratos) {
     const l = String(r.login || "").trim();
-    if (l) origens.set(l, "contrato");
+    if (l) evidencias.set(l, "contrato");
   }
 
   const repo = AppDataSource.getRepository(ClienteWatchTv);
-  const linhas: Partial<ClienteWatchTv>[] = Array.from(origens, ([login, origem]) => ({
-    login,
-    watchtv: 1,
-    origem,
-  }));
+  const atuais = new Map(
+    (await repo.find()).map((a) => [a.login, a] as const),
+  );
 
-  // Quem estava marcado e não aparece mais perdeu o direito.
-  const marcados = await repo.find({ where: { watchtv: 1 }, select: { login: true } });
-  for (const m of marcados) {
-    if (!origens.has(m.login)) {
-      linhas.push({ login: m.login, watchtv: 0, origem: null });
+  // Só o que muda: logins com evidência e os que já estão na tabela.
+  const logins = new Set([...evidencias.keys(), ...atuais.keys()]);
+  const mudancas: Partial<ClienteWatchTv>[] = [];
+  let comWatch = 0;
+  for (const login of logins) {
+    const atual = atuais.get(login) ?? null;
+    const v = valorWatchTv(evidencias.get(login) ?? null, atual);
+    if (v.watchtv) comWatch += 1;
+    if (!atual || atual.watchtv !== v.watchtv || atual.origem !== v.origem) {
+      mudancas.push({ login, ...v });
     }
   }
 
-  for (let i = 0; i < linhas.length; i += 500) {
-    await repo.upsert(linhas.slice(i, i + 500), ["login"]);
+  for (let i = 0; i < mudancas.length; i += 500) {
+    await repo.upsert(mudancas.slice(i, i + 500), ["login"]);
   }
-  return origens.size;
+  return comWatch;
 }
 
 /**
@@ -154,7 +221,7 @@ export async function impedimentoWatchTv(
 ): Promise<string | null> {
   const l = String(login || "").trim();
   if (!l) return null;
-  if (!(await clienteJaTemStreaming(l))) return null;
+  if (!(await temWatchTv(l))) return null;
   return (
     "Este cadastro já tem a Watch TV ativa. Se estiver com dificuldade para " +
     "acessar, fale com o nosso atendimento."
@@ -448,8 +515,8 @@ export async function criarContaPeloConvite(params: {
     where: { login: convite.login },
   });
   if (!cliente) throw new ErroConvite("Cadastro não encontrado.", 404);
-  const origem = await origemWatchTv(convite.login);
-  if (!origem) {
+  const { tem, origem } = await situacaoWatchTv(convite.login);
+  if (!tem) {
     throw new ErroConvite(
       "A Watch TV não está mais no seu cadastro. Fale com o nosso atendimento.",
       409,

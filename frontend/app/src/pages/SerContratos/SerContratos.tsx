@@ -52,8 +52,11 @@ interface ListResponse {
   streamingConta?: { email: string | null; ativo: boolean } | null;
   /** Link ainda não usado para o cliente criar a conta. */
   streamingLink?: { link: string; expira_em: string } | null;
-  /** Plano combo com Watch TV, ainda sem a linha de R$ 0,00 no contrato. */
-  watchPeloPlano?: boolean;
+  /**
+   * Tem ou não a Watch TV, pela tabela clientes_watchtv — o que vale para o
+   * sistema todo. `origem`: "contrato", "plano" (combo) ou "manual".
+   */
+  watchtv?: { tem: boolean; origem: string | null };
   /** Conta de câmeras do cliente (null quando ainda não existe). */
   camera?: {
     storageGb: number;
@@ -69,6 +72,13 @@ interface ListResponse {
 }
 
 const VALOR_STREAMER_PADRAO = 49.9;
+
+/** De onde veio o valor de clientes_watchtv. */
+const ORIGEM_WATCHTV: Record<string, string> = {
+  contrato: "pelo serviço no contrato",
+  plano: "pelo plano combo",
+  manual: "marcado manualmente",
+};
 
 const formatBRL = (v: number) => Number(v || 0).toFixed(2).replace(".", ",");
 
@@ -277,6 +287,32 @@ Regravar com a descrição completa?`,
     }
   };
 
+  const [marcandoWatch, setMarcandoWatch] = useState(false);
+  const marcarWatchTv = async (tem: boolean) => {
+    if (!loaded) return;
+    if (
+      !window.confirm(
+        tem
+          ? "Marcar que este cliente TEM a Watch TV? Ele passa a poder criar a conta."
+          : "Marcar que este cliente NÃO TEM a Watch TV?",
+      )
+    )
+      return;
+    setMarcandoWatch(true);
+    try {
+      const res = await axios.post(
+        `${base}/sercontratos/watchtv`,
+        { login: loaded.login, watchtv: tem },
+        { headers },
+      );
+      setLoaded((l) => (l ? { ...l, watchtv: res.data } : l));
+    } catch (e: any) {
+      showMsg(e?.response?.data?.message || "Erro ao marcar a Watch TV.", "error");
+    } finally {
+      setMarcandoWatch(false);
+    }
+  };
+
   const addServico = async (
     tipo: "STREAMER" | "STREAMER_COLAB" | "CAMERA",
     extras?: Record<string, any>,
@@ -480,7 +516,7 @@ Regravar com a descrição completa?`,
   ).length || 0;
   const temStreaming = totalStreaming > 0 || totalStreamingColab > 0;
   // Combo com Watch TV conta como streaming mesmo sem a linha de R$ 0,00.
-  const temWatch = temStreaming || !!loaded?.watchPeloPlano;
+  const temWatch = loaded?.watchtv ? loaded.watchtv.tem : temStreaming;
   const valorStreamerUnit =
     loaded?.valoresUnitarios.STREAMER ?? VALOR_STREAMER_PADRAO;
   const nomeStreamingAtual =
@@ -737,12 +773,37 @@ Regravar com a descrição completa?`,
                       . Depois disso o cadastro sai da Watch Brasil sozinho.
                     </div>
                   )}
+                  <div className="mb-2 flex flex-wrap items-center gap-2 rounded border border-gray-200 p-2 text-xs">
+                    <span className="font-semibold text-gray-700">
+                      Watch TV:{" "}
+                      <span className={temWatch ? "text-green-700" : "text-red-700"}>
+                        {temWatch ? "tem (1)" : "não tem (0)"}
+                      </span>
+                    </span>
+                    {loaded.watchtv?.origem && (
+                      <span className="text-gray-500">
+                        · {ORIGEM_WATCHTV[loaded.watchtv.origem] ?? loaded.watchtv.origem}
+                      </span>
+                    )}
+                    {(user?.permission ?? 0) >= 2 && (
+                      <button
+                        onClick={() => marcarWatchTv(!temWatch)}
+                        disabled={marcandoWatch}
+                        className="ml-auto rounded bg-gray-100 px-2 py-1 font-semibold text-gray-700 hover:bg-gray-200 disabled:text-gray-400"
+                        title="Para plano ou serviço com nome que o sistema não reconhece. A sincronização diária não desfaz."
+                      >
+                        {temWatch ? "Marcar que não tem" : "Marcar que tem"}
+                      </button>
+                    )}
+                  </div>
                   {temWatch && (
                     <div className="bg-purple-50 p-2 rounded mb-2">
                       <span className="text-sm text-purple-800 font-semibold">
                         ✓ Cliente possui{" "}
                         {!temStreaming
-                          ? "Watch TV incluída no plano (combo)"
+                          ? loaded.watchtv?.origem === "manual"
+                            ? "Watch TV (marcada manualmente)"
+                            : "Watch TV incluída no plano (combo)"
                           : totalStreamingColab > 0
                             ? nomeStreamingColabAtual
                             : nomeStreamingAtual}

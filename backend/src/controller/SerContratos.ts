@@ -8,8 +8,11 @@ import { StreamingAssinante } from "../entities/StreamingAssinante";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { deleteTicket } from "../services/WatchBrasilService";
 import {
-  origemWatchTv,
+  ErroConvite,
+  marcarWatchTvManual,
+  situacaoWatchTv,
   sincronizarWatchTv,
+  temWatchTv,
   gerarConviteStreaming,
   linkAbertoDoLogin,
   registrarAssinanteStreaming,
@@ -165,8 +168,8 @@ class SerContratos {
           ? { email: assinante.email, ativo: assinante.ativo }
           : null,
         streamingLink: await linkAbertoDoLogin(login),
-        // Combo que inclui a Watch TV mas ainda sem a linha de R$ 0,00.
-        watchPeloPlano: (await origemWatchTv(login)) === "plano",
+        // O que vale para "tem Watch TV": a tabela clientes_watchtv.
+        watchtv: await situacaoWatchTv(login),
         camera: resumoCamera,
         nomesServicos: {
           STREAMER: nomeStreaming(VALORES.STREAMER),
@@ -580,7 +583,7 @@ class SerContratos {
       let login = "";
       for (const c of candidatos) {
         const l = String(c || "").trim();
-        if (l && (await origemWatchTv(l))) {
+        if (l && (await temWatchTv(l))) {
           login = l;
           break;
         }
@@ -589,8 +592,8 @@ class SerContratos {
       if (!login) {
         res.status(400).json({
           message:
-            "Este cadastro não tem a Watch TV: nem no contrato, nem no plano. " +
-            "Adicione o serviço antes de gerar o link.",
+            "Este cadastro está marcado sem Watch TV. Adicione o serviço ou " +
+            "marque que ele tem Watch TV em Serviços de Contrato.",
         });
         return;
       }
@@ -621,6 +624,38 @@ class SerContratos {
     } catch (error: any) {
       console.error("Erro ao gerar link da Watch TV:", error);
       res.status(500).json({ message: "Erro ao gerar o link." });
+    }
+  }
+
+  /**
+   * POST /watchtv — marca à mão se o cliente tem a Watch TV (clientes_watchtv).
+   * Para plano ou serviço com nome que o sistema não reconhece; a
+   * sincronização diária não desfaz.
+   */
+  public async marcarWatchTv(req: Request, res: Response) {
+    try {
+      const login = String(req.body?.login || "").trim();
+      const tem = req.body?.watchtv;
+      if (!login || typeof tem !== "boolean") {
+        res.status(400).json({ message: "login e watchtv (true/false) obrigatórios." });
+        return;
+      }
+      const cliente = await MkauthSource.getRepository(ClientesEntities).findOne({
+        where: { login },
+        select: { login: true },
+      });
+      if (!cliente) {
+        res.status(404).json({ message: "Cliente não cadastrado." });
+        return;
+      }
+      res.json(await marcarWatchTvManual(login, tem));
+    } catch (error: any) {
+      if (error instanceof ErroConvite) {
+        res.status(error.status).json({ message: error.message });
+        return;
+      }
+      console.error("Erro ao marcar Watch TV:", error);
+      res.status(500).json({ message: "Erro ao marcar a Watch TV." });
     }
   }
 
