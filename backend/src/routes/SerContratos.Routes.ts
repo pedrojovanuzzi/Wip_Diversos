@@ -17,5 +17,7 @@ router.post("/streaming/convert", AuthGuard, SerContratos.convertStreamingTipo);
 router.post("/streaming/link", AuthGuard, SerContratos.gerarLinkStreaming);
 // Libera ou tira a Watch TV sem passar pelo contrato: operação, nível 2.
 router.post("/watchtv", protegido(2), SerContratos.marcarWatchTv);
+// Consulta a conta na Watch Brasil (devolve e-mail e telefone): nível 2.
+router.get("/streaming/watch/:login", protegido(2), SerContratos.conferirWatch);
 
 export default router;

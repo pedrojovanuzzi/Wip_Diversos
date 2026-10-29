@@ -21,7 +21,7 @@ import { StreamingAssinante } from "../entities/StreamingAssinante";
 import { StreamingConvite } from "../entities/StreamingConvite";
 import { ClienteWatchTv } from "../entities/ClienteWatchTv";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
-import { deleteTicket, insertAssinante } from "./WatchBrasilService";
+import { deleteTicket, getTicket, insertAssinante } from "./WatchBrasilService";
 import { VALOR_STREAMER } from "../config/servicosAdicionais";
 import { PLANOS_COM_SVA, planoTemSva } from "../config/planosComSva";
 import {
@@ -703,4 +703,160 @@ export async function contratarStreamingDoPlano(params: {
     valor: 0,
     solicitacaoId: params.solicitacaoId,
   });
+}
+
+/** Um ticket como a Watch Brasil devolveu, nos campos que interessam. */
+type TicketWatch = {
+  ticket: string | null;
+  email: string | null;
+  telefone: string | null;
+  ativo: boolean | null;
+  pacote: string | null;
+};
+
+/** Primeiro campo presente, aceitando as grafias que a API costuma usar. */
+function campo(obj: any, nomes: string[]): any {
+  if (!obj || typeof obj !== "object") return undefined;
+  const chaves = Object.keys(obj);
+  for (const n of nomes) {
+    const k = chaves.find((c) => c.toLowerCase() === n.toLowerCase());
+    if (k && obj[k] !== null && obj[k] !== undefined && obj[k] !== "") {
+      return obj[k];
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Tickets dentro da resposta de /v2/tickets/get. A coleção da Watch não traz
+ * exemplo de retorno, então aceita `Result` em lista ou objeto e nomes de
+ * campo em qualquer caixa; o JSON cru vai junto para a tela.
+ */
+function ticketsDaResposta(resp: any): TicketWatch[] {
+  const bruto = resp?.Result ?? resp?.result ?? resp?.data ?? null;
+  const lista = Array.isArray(bruto) ? bruto : bruto ? [bruto] : [];
+  return lista
+    .filter((t) => t && typeof t === "object")
+    .map((t) => {
+      const status = campo(t, ["ativo", "status", "st_ticket", "fl_ativo", "pStatus"]);
+      return {
+        ticket: campo(t, ["ticket", "pTicket", "cd_ticket", "ds_ticket"]) ?? null,
+        email:
+          campo(t, ["email", "emailusuario", "email_usuario", "ds_email", "pEmail"]) ??
+          null,
+        telefone: campo(t, ["phone", "telefone", "celular", "ds_telefone", "pPhone"]) ?? null,
+        ativo:
+          status === undefined
+            ? null
+            : status === true ||
+              ["true", "1", "ativo", "a", "s"].includes(String(status).toLowerCase()),
+        pacote: campo(t, ["pacote", "id_pacote", "pPacote", "ds_pacote"]) ?? null,
+      };
+    })
+    .filter((t) => t.ticket || t.email);
+}
+
+/** Resultado de uma consulta na Watch, ou o erro dela. */
+async function consultarWatch(params: {
+  email?: string;
+  assinanteIDIntegracao?: string;
+  pacote?: string;
+}) {
+  try {
+    const resp: any = await getTicket(params);
+    const erro =
+      resp?.HasError === true ? String(resp?.ErrorMessage || "erro sem mensagem") : null;
+    return {
+      encontrado: !erro && ticketsDaResposta(resp).length > 0,
+      tickets: erro ? [] : ticketsDaResposta(resp),
+      erro,
+      resposta: resp,
+    };
+  } catch (e: any) {
+    return {
+      encontrado: false,
+      tickets: [] as TicketWatch[],
+      erro: `${e?.response?.status ? `HTTP ${e.response.status}: ` : ""}${motivoDaWatch(e)}`,
+      resposta: e?.response?.data ?? null,
+    };
+  }
+}
+
+/**
+ * Confere o cliente direto na Watch Brasil e compara com o que está guardado
+ * aqui (`streaming_assinantes`), para saber se a conta existe de verdade lá.
+ *
+ * Consulta pelo ID de integração (o id do cliente no MK-Auth, que é o que o
+ * sistema envia no insert) e pelo e-mail guardado, porque um cadastro feito
+ * fora do sistema pode existir só por e-mail.
+ */
+export async function conferirContaNaWatch(login: string) {
+  const l = String(login || "").trim();
+  const cliente = await MkauthSource.getRepository(ClientesEntities).findOne({
+    where: { login: l },
+    select: { id: true, login: true },
+  });
+  if (!cliente) throw new ErroConvite("Cliente não cadastrado.", 404);
+
+  const local = await AppDataSource.getRepository(StreamingAssinante).findOne({
+    where: { login: l },
+  });
+  const pacote = local?.pacote || undefined;
+  const idIntegracao = local?.assinante_id_integracao || String(cliente.id);
+
+  const porId = await consultarWatch({ assinanteIDIntegracao: idIntegracao, pacote });
+  const porEmail = local?.email
+    ? await consultarWatch({ email: local.email, pacote })
+    : null;
+
+  const tickets = [...porId.tickets, ...(porEmail?.tickets ?? [])];
+  const naWatch = tickets[0] ?? null;
+
+  // O que não bate entre o nosso registro e a Watch.
+  const divergencias: string[] = [];
+  if (local?.ticket && !tickets.some((t) => t.ticket === local.ticket)) {
+    divergencias.push(
+      `O ticket guardado aqui (${local.ticket}) não apareceu na Watch.`,
+    );
+  }
+  if (!local?.ticket && naWatch) {
+    divergencias.push(
+      "A Watch tem um ticket para este cliente, mas o sistema não guardou nenhum.",
+    );
+  }
+  if (
+    local?.email &&
+    naWatch?.email &&
+    String(naWatch.email).toLowerCase() !== local.email.toLowerCase()
+  ) {
+    divergencias.push(
+      `E-mail diferente: aqui ${local.email}, na Watch ${naWatch.email}.`,
+    );
+  }
+  if (local && naWatch?.ativo !== null && naWatch?.ativo !== undefined && naWatch.ativo !== local.ativo) {
+    divergencias.push(
+      `Status diferente: aqui ${local.ativo ? "ativo" : "inativo"}, na Watch ${naWatch.ativo ? "ativo" : "inativo"}.`,
+    );
+  }
+
+  return {
+    login: l,
+    cadastradoNaWatch: tickets.length > 0,
+    local: local
+      ? {
+          ticket: local.ticket || null,
+          email: local.email || null,
+          telefone: local.phone || null,
+          ativo: local.ativo,
+          idIntegracao,
+          atualizadoEm: local.updated_at,
+        }
+      : null,
+    naWatch,
+    divergencias,
+    consultas: [
+      { por: `ID de integração ${idIntegracao}`, ...porId },
+      ...(porEmail ? [{ por: `e-mail ${local?.email}`, ...porEmail }] : []),
+    ],
+  };
 }

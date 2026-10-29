@@ -288,6 +288,28 @@ Regravar com a descrição completa?`,
     }
   };
 
+  // Consulta direta na Watch Brasil, para ver se a conta existe mesmo lá.
+  const [conferindoWatch, setConferindoWatch] = useState(false);
+  const [conferenciaWatch, setConferenciaWatch] = useState<any | null>(null);
+  const conferirWatch = async () => {
+    if (!loaded) return;
+    setConferindoWatch(true);
+    try {
+      const res = await axios.get(
+        `${base}/sercontratos/streaming/watch/${encodeURIComponent(loaded.login)}`,
+        { headers },
+      );
+      setConferenciaWatch(res.data);
+    } catch (e: any) {
+      showMsg(
+        e?.response?.data?.message || "Erro ao consultar a Watch Brasil.",
+        "error",
+      );
+    } finally {
+      setConferindoWatch(false);
+    }
+  };
+
   const [marcandoWatch, setMarcandoWatch] = useState(false);
   const marcarWatchTv = async (tem: boolean) => {
     if (!loaded) return;
@@ -796,6 +818,16 @@ Regravar com a descrição completa?`,
                         {temWatch ? "Marcar que não tem" : "Marcar que tem"}
                       </button>
                     )}
+                    {(user?.permission ?? 0) >= 2 && (
+                      <button
+                        onClick={conferirWatch}
+                        disabled={conferindoWatch}
+                        className="rounded bg-indigo-100 px-2 py-1 font-semibold text-indigo-800 hover:bg-indigo-200 disabled:text-gray-400"
+                        title="Consulta a Watch Brasil agora e compara com o que está guardado aqui"
+                      >
+                        {conferindoWatch ? "Consultando..." : "Conferir na Watch"}
+                      </button>
+                    )}
                   </div>
                   {temWatch && (
                     <div className="bg-purple-50 p-2 rounded mb-2">
@@ -1163,6 +1195,118 @@ Regravar com a descrição completa?`,
                   className="flex-1 py-2 bg-purple-600 text-white rounded font-semibold hover:bg-purple-700 disabled:bg-gray-400"
                 >
                   {adding ? "Adicionando..." : "Confirmar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Popup: conferência da conta direto na Watch Brasil */}
+        {conferenciaWatch && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <BsCollectionPlay className="text-2xl text-purple-600" />
+                <h2 className="text-xl font-bold text-gray-800">
+                  Conta na Watch Brasil
+                </h2>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">
+                Cliente <b>{conferenciaWatch.login}</b>
+              </p>
+
+              <div
+                className={`mb-3 rounded p-3 text-sm font-semibold ${
+                  conferenciaWatch.cadastradoNaWatch
+                    ? conferenciaWatch.divergencias.length
+                      ? "bg-amber-50 text-amber-900 border border-amber-300"
+                      : "bg-green-50 text-green-800 border border-green-200"
+                    : "bg-red-50 text-red-800 border border-red-200"
+                }`}
+              >
+                {conferenciaWatch.cadastradoNaWatch
+                  ? conferenciaWatch.divergencias.length
+                    ? "Cadastrado na Watch, mas com diferenças em relação ao sistema."
+                    : "Cadastrado na Watch e igual ao que está guardado aqui."
+                  : "Não encontrado na Watch Brasil."}
+              </div>
+
+              {conferenciaWatch.divergencias.length > 0 && (
+                <ul className="mb-3 list-disc pl-5 text-sm text-amber-900">
+                  {conferenciaWatch.divergencias.map((d: string) => (
+                    <li key={d}>{d}</li>
+                  ))}
+                </ul>
+              )}
+
+              <table className="mb-3 w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-xs uppercase text-gray-600">
+                    <th className="p-2 text-left"></th>
+                    <th className="p-2 text-left">Neste sistema</th>
+                    <th className="p-2 text-left">Na Watch</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(
+                    [
+                      ["Ticket", "ticket"],
+                      ["E-mail", "email"],
+                      ["Celular", "telefone"],
+                    ] as const
+                  ).map(([rotulo, k]) => (
+                    <tr key={k} className="border-t border-gray-100">
+                      <td className="p-2 font-semibold text-gray-600">{rotulo}</td>
+                      <td className="p-2 break-all">
+                        {conferenciaWatch.local?.[k] || "—"}
+                      </td>
+                      <td className="p-2 break-all">
+                        {conferenciaWatch.naWatch?.[k] || "—"}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-gray-100">
+                    <td className="p-2 font-semibold text-gray-600">Status</td>
+                    <td className="p-2">
+                      {conferenciaWatch.local
+                        ? conferenciaWatch.local.ativo
+                          ? "ativo"
+                          : "inativo"
+                        : "sem conta"}
+                    </td>
+                    <td className="p-2">
+                      {conferenciaWatch.naWatch?.ativo === true
+                        ? "ativo"
+                        : conferenciaWatch.naWatch?.ativo === false
+                          ? "inativo"
+                          : "—"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {conferenciaWatch.consultas.map((c: any) => (
+                <details key={c.por} className="mb-2 rounded border border-gray-200 p-2 text-xs">
+                  <summary className="cursor-pointer font-semibold text-gray-700">
+                    Consulta por {c.por}:{" "}
+                    {c.erro
+                      ? `erro — ${c.erro}`
+                      : c.encontrado
+                        ? "encontrado"
+                        : "nada encontrado"}
+                  </summary>
+                  <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all bg-gray-50 p-2">
+                    {JSON.stringify(c.resposta, null, 2)}
+                  </pre>
+                </details>
+              ))}
+
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={() => setConferenciaWatch(null)}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded font-semibold hover:bg-gray-300"
+                >
+                  Fechar
                 </button>
               </div>
             </div>

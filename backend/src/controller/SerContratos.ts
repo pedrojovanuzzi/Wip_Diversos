@@ -9,6 +9,7 @@ import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { deleteTicket } from "../services/WatchBrasilService";
 import {
   ErroConvite,
+  conferirContaNaWatch,
   marcarWatchTvManual,
   situacaoWatchTv,
   sincronizarWatchTv,
@@ -658,6 +659,28 @@ class SerContratos {
     } catch (error: any) {
       console.error("Erro ao gerar link da Watch TV:", error);
       res.status(500).json({ message: "Erro ao gerar o link." });
+    }
+  }
+
+  /**
+   * GET /streaming/watch/:login — consulta o cliente direto na Watch Brasil e
+   * compara com o nosso registro, para saber se a conta existe mesmo lá.
+   */
+  public async conferirWatch(req: Request, res: Response) {
+    try {
+      const login = String(req.params.login || "").trim();
+      if (!login) {
+        res.status(400).json({ message: "login é obrigatório." });
+        return;
+      }
+      res.json(await conferirContaNaWatch(login));
+    } catch (error: any) {
+      if (error instanceof ErroConvite) {
+        res.status(error.status).json({ message: error.message });
+        return;
+      }
+      console.error("Erro ao conferir na Watch Brasil:", error);
+      res.status(500).json({ message: "Erro ao consultar a Watch Brasil." });
     }
   }
 

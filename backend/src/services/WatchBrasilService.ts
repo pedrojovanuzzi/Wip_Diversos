@@ -290,6 +290,25 @@ export async function insertAssinante(input: InsertAssinanteInput) {
   });
 }
 
+/**
+ * Consulta o ticket na Watch Brasil (GET /v2/tickets/get), por e-mail ou pelo
+ * ID de integração (o id do cliente no MK-Auth). Na Watch o e-mail é a chave
+ * do assinante.
+ */
+export async function getTicket(input: {
+  email?: string;
+  assinanteIDIntegracao?: string;
+  pacote?: string;
+}) {
+  return getWithAuth("/v2/tickets/get", {
+    pPacote: input.pacote || PACOTE_DEFAULT,
+    ...(input.email ? { pEmailUsuario: input.email } : {}),
+    ...(input.assinanteIDIntegracao
+      ? { pAssinanteIDIntegracao: input.assinanteIDIntegracao }
+      : {}),
+  });
+}
+
 export async function deleteTicket(ticket: string) {
   return postWithAuth("/v1/tickets/delete", { pTicket: ticket });
 }
