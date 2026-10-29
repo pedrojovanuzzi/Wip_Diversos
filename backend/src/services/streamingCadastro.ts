@@ -5,14 +5,22 @@
  * atendente adiciona à mão, e o webhook do ZapSign, quando o cliente assina o
  * Contrato de SVA. Para não divergirem, o registro na Watch Brasil e a
  * gravação em `sis_ser_contratos` moram aqui.
+ *
+ * A conta na Watch Brasil quem cria é o próprio cliente, por um link
+ * (`streaming_convites`): a Watch recusa e-mail que já está em outra conta, e
+ * só o cliente sabe qual e-mail pode usar.
  */
 
+import crypto from "crypto";
+import { IsNull, MoreThan } from "typeorm";
 import MkauthSource from "../database/MkauthSource";
 import AppDataSource from "../database/DataSource";
 import { SisSerContratos } from "../entities/SisSerContratos";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { StreamingAssinante } from "../entities/StreamingAssinante";
-import { insertAssinante } from "./WatchBrasilService";
+import { StreamingConvite } from "../entities/StreamingConvite";
+import { SolicitacaoServico } from "../entities/SolicitacaoServico";
+import { deleteTicket, insertAssinante } from "./WatchBrasilService";
 import { VALOR_STREAMER } from "../config/servicosAdicionais";
 import { planoTemSva } from "../config/planosComSva";
 import {
@@ -180,19 +188,248 @@ export async function gravarServicoNoContrato(params: {
 
 export type ResultadoContratacao = {
   /**
-   * `sem_acesso`: o serviço está no cadastro (e será cobrado), mas a conta na
-   * Watch Brasil não foi criada — o atendimento precisa ativar.
+   * `aguardando_conta`: o serviço está no cadastro (e será cobrado), e o
+   * cliente ainda precisa criar a conta pelo `link` — o atendimento envia.
+   * `adicionado` e `sem_acesso` são de solicitações antigas, de antes do link.
    */
-  status: "adicionado" | "sem_acesso" | "ja_tinha" | "erro" | "nao_aplica";
+  status:
+    | "aguardando_conta"
+    | "adicionado"
+    | "sem_acesso"
+    | "ja_tinha"
+    | "erro"
+    | "nao_aplica";
   motivo?: string;
   /** Nome comercial gravado no contrato, quando gravou. */
   servico?: string;
   /** E-mail que recebeu o acesso — é para ele que a Watch TV escreve. */
   email?: string;
+  /** Link para o cliente criar a conta da Watch TV. */
+  link?: string;
 };
 
+/** Quantos dias o link de criação de conta vale. */
+const VALIDADE_CONVITE_DIAS = 7;
+
+const FRONT_URL = (process.env.URL || "http://localhost:3001").replace(
+  /\/$/,
+  "",
+);
+
+export function linkDoConvite(token: string): string {
+  return `${FRONT_URL}/WatchTv/Conta/${token}`;
+}
+
+/** Link ainda não usado e dentro do prazo, do mais novo para o mais velho. */
+async function conviteAberto(login: string) {
+  return AppDataSource.getRepository(StreamingConvite).findOne({
+    where: { login, usado_em: IsNull(), expira_em: MoreThan(new Date()) },
+    order: { id: "DESC" },
+  });
+}
+
+/** Link aberto do login, para as telas mostrarem que ainda falta enviar. */
+export async function linkAbertoDoLogin(
+  login: string,
+): Promise<{ link: string; expira_em: Date } | null> {
+  const c = await conviteAberto(login);
+  return c ? { link: linkDoConvite(c.token), expira_em: c.expira_em } : null;
+}
+
 /**
- * Coloca o streaming no cadastro depois que o cliente assina o contrato.
+ * Link para o cliente criar a conta da Watch TV.
+ *
+ * Reaproveita o link aberto do mesmo login: se o atendente clicar de novo, o
+ * cliente que já recebeu o primeiro não fica com um link morto.
+ */
+export async function gerarConviteStreaming(params: {
+  login: string;
+  usuario?: string | null;
+  solicitacaoId?: number | null;
+}) {
+  const login = String(params.login || "").trim();
+  const repo = AppDataSource.getRepository(StreamingConvite);
+
+  let convite = await conviteAberto(login);
+  if (!convite) {
+    convite = repo.create({
+      token: crypto.randomBytes(24).toString("hex"),
+      login,
+      criado_por: params.usuario || null,
+      solicitacao_id: params.solicitacaoId ?? null,
+      expira_em: new Date(
+        Date.now() + VALIDADE_CONVITE_DIAS * 24 * 60 * 60 * 1000,
+      ),
+    });
+    await repo.save(convite);
+  } else if (params.solicitacaoId && !convite.solicitacao_id) {
+    convite.solicitacao_id = params.solicitacaoId;
+    await repo.save(convite);
+  }
+
+  return { link: linkDoConvite(convite.token), expira_em: convite.expira_em };
+}
+
+/** Erro que pode ser mostrado ao cliente na página do link. */
+export class ErroConvite extends Error {
+  constructor(
+    message: string,
+    public status = 400,
+  ) {
+    super(message);
+  }
+}
+
+/** Link válido, ou o motivo de não valer. */
+async function conviteValido(token: string) {
+  const convite = await AppDataSource.getRepository(StreamingConvite).findOne({
+    where: { token: String(token || "") },
+  });
+  if (!convite) throw new ErroConvite("Link inválido.", 404);
+  if (convite.usado_em) {
+    throw new ErroConvite(
+      "Este link já foi usado. Se precisar refazer a conta, peça um novo link ao atendimento.",
+      410,
+    );
+  }
+  if (convite.expira_em.getTime() < Date.now()) {
+    throw new ErroConvite(
+      "Este link expirou. Peça um novo link ao atendimento.",
+      410,
+    );
+  }
+  return convite;
+}
+
+/** O que a página do link mostra antes do cliente preencher. */
+export async function dadosDoConvite(token: string) {
+  const convite = await conviteValido(token);
+  const cliente = await MkauthSource.getRepository(ClientesEntities).findOne({
+    where: { login: convite.login },
+    select: { nome: true },
+  });
+  const assinante = await AppDataSource.getRepository(
+    StreamingAssinante,
+  ).findOne({ where: { login: convite.login } });
+  return {
+    // Só o primeiro nome: a página é pública.
+    nome: String(cliente?.nome || "").trim().split(/\s+/)[0] || null,
+    substituiConta: Boolean(assinante?.ticket),
+  };
+}
+
+/** Texto da recusa da Watch Brasil, para o log e para o cliente. */
+function motivoDaWatch(e: any): string {
+  const data = e?.response?.data;
+  return String(
+    data?.ErrorMessage ||
+      data?.message ||
+      data?.Message ||
+      (data ? JSON.stringify(data).slice(0, 300) : "") ||
+      e?.message ||
+      e,
+  );
+}
+
+/**
+ * Cliente criando (ou refazendo) a conta pelo link.
+ *
+ * Se o cadastro já tinha conta, o ticket antigo sai da Watch Brasil antes:
+ * o assinante novo usa o mesmo ID de integração (o id do cliente), e a conta
+ * velha continuaria liberada com o e-mail anterior.
+ */
+export async function criarContaPeloConvite(params: {
+  token: string;
+  email: string;
+  phone: string;
+}) {
+  const convite = await conviteValido(params.token);
+  const email = String(params.email || "").trim().toLowerCase();
+  const phone = String(params.phone || "").replace(/\D/g, "");
+  if (!emailValido(email)) throw new ErroConvite("Informe um e-mail válido.");
+  if (!celularValido(phone)) {
+    throw new ErroConvite("Informe o celular com DDD.");
+  }
+
+  const cliente = await MkauthSource.getRepository(ClientesEntities).findOne({
+    where: { login: convite.login },
+  });
+  if (!cliente) throw new ErroConvite("Cadastro não encontrado.", 404);
+  if (!(await clienteJaTemStreaming(convite.login))) {
+    throw new ErroConvite(
+      "A Watch TV não está mais no seu cadastro. Fale com o nosso atendimento.",
+      409,
+    );
+  }
+
+  const streamingRepo = AppDataSource.getRepository(StreamingAssinante);
+  const anterior = await streamingRepo.findOne({
+    where: { login: convite.login },
+  });
+  if (anterior?.ticket) {
+    try {
+      await deleteTicket(anterior.ticket);
+    } catch (e: any) {
+      // Ticket que já não existe lá não pode travar a conta nova.
+      console.error(
+        "[WatchTvConta] Falha ao remover a conta anterior:",
+        motivoDaWatch(e),
+      );
+    }
+    anterior.ticket = null as any;
+    await streamingRepo.save(anterior);
+  }
+
+  // Teste em andamento continua com o mesmo prazo.
+  const expiraTeste =
+    anterior?.teste_expira_em && anterior.teste_expira_em.getTime() > Date.now()
+      ? anterior.teste_expira_em
+      : null;
+
+  try {
+    await registrarAssinanteStreaming({ cliente, email, phone, expiraTeste });
+  } catch (e: any) {
+    console.error(
+      `[WatchTvConta] Watch Brasil recusou ${convite.login} (${email}):`,
+      motivoDaWatch(e),
+    );
+    throw new ErroConvite(
+      "A Watch TV não aceitou este e-mail. Ele pode já estar em uso em outra " +
+        "conta: tente outro e-mail ou fale com o nosso atendimento.",
+      422,
+    );
+  }
+
+  convite.usado_em = new Date();
+  convite.email_usado = email;
+  await AppDataSource.getRepository(StreamingConvite).save(convite);
+
+  // A solicitação mostrava o link pendente; agora mostra a conta criada.
+  if (convite.solicitacao_id) {
+    const solRepo = AppDataSource.getRepository(SolicitacaoServico);
+    const sol = await solRepo.findOne({ where: { id: convite.solicitacao_id } });
+    if (sol?.dados?.servico_cadastro) {
+      sol.dados = {
+        ...sol.dados,
+        servico_cadastro: {
+          ...sol.dados.servico_cadastro,
+          status: "adicionado",
+          email,
+          motivo: undefined,
+          link: undefined,
+          conta_criada_em: new Date().toISOString(),
+        },
+      };
+      await solRepo.save(sol);
+    }
+  }
+
+  return { email };
+}
+
+/**
+ * Coloca o streaming no cadastro depois que o cliente assina o contrato e
+ * gera o link para ele criar a conta.
  *
  * Não mexe em faturas: o proporcional dos dias de uso é lançado pelo
  * atendimento, e apagar títulos em aberto a partir de um webhook seria
@@ -204,10 +441,9 @@ export type ResultadoContratacao = {
  */
 export async function contratarStreamingAposAssinatura(params: {
   login: string;
-  email?: string;
-  phone?: string;
   usuario?: string;
   valor?: number;
+  solicitacaoId?: number | null;
 }): Promise<ResultadoContratacao> {
   const login = String(params.login || "").trim();
   if (!login || login === "Desconhecido" || login === "Não informado") {
@@ -227,12 +463,8 @@ export async function contratarStreamingAposAssinatura(params: {
     return { status: "ja_tinha" };
   }
 
-  // O serviço entra no cadastro primeiro: o cliente assinou o contrato, e essa
-  // é a parte que não pode se perder. A ativação na Watch Brasil depende de um
-  // callback externo (`/api/watchbrasil/redirect`) que pode demorar ou falhar;
-  // se ela ficasse na frente, uma falha temporária apagaria a contratação — e o
-  // webhook do ZapSign não tenta de novo, porque a solicitação já está marcada
-  // como assinada.
+  // O serviço entra no cadastro já na assinatura; a conta na Watch Brasil só
+  // depois, quando o cliente usar o link.
   const salvo = await gravarServicoNoContrato({
     login,
     tipo: "STREAMER",
@@ -244,34 +476,20 @@ export async function contratarStreamingAposAssinatura(params: {
   // ele usou ficam guardados para entrar no proporcional.
   await encerrarTeste(login, "convertido");
 
-  const email = String(params.email || cliente.email || "").trim();
-  const phone = String(
-    params.phone || cliente.celular || cliente.fone || "",
-  ).replace(/\D/g, "");
-  if (!email || !phone) {
-    return {
-      status: "sem_acesso",
-      servico: salvo.nome,
-      motivo:
-        "Serviço adicionado ao cadastro, mas o cliente está sem e-mail ou " +
-        "celular: ative o acesso pela tela de Serviços de Contrato.",
-    };
-  }
+  const { link } = await gerarConviteStreaming({
+    login,
+    usuario: params.usuario || "assinatura",
+    solicitacaoId: params.solicitacaoId,
+  });
 
-  try {
-    await registrarAssinanteStreaming({ cliente, email, phone });
-  } catch (e: any) {
-    return {
-      status: "sem_acesso",
-      servico: salvo.nome,
-      motivo:
-        `Serviço adicionado ao cadastro, mas a Watch Brasil recusou a ` +
-        `ativação: ${e?.message || e}. Refaça a ativação pela tela de ` +
-        `Serviços de Contrato.`,
-    };
-  }
-
-  return { status: "adicionado", servico: salvo.nome, email };
+  return {
+    status: "aguardando_conta",
+    servico: salvo.nome,
+    link,
+    motivo:
+      "Serviço adicionado ao cadastro. Envie o link ao cliente para ele " +
+      "criar a conta da Watch TV.",
+  };
 }
 
 /** Validação simples de e-mail, só para não mandar lixo à Watch Brasil. */
@@ -296,16 +514,14 @@ export function celularValido(celular?: string | null): boolean {
 export async function contratarStreamingDoPlano(params: {
   login: string;
   plano?: string | null;
-  email?: string;
-  phone?: string;
+  solicitacaoId?: number | null;
 }): Promise<ResultadoContratacao> {
   if (!planoTemSva(params.plano)) return { status: "nao_aplica" };
 
   return contratarStreamingAposAssinatura({
     login: params.login,
-    email: params.email,
-    phone: params.phone,
     usuario: "plano",
     valor: 0,
+    solicitacaoId: params.solicitacaoId,
   });
 }

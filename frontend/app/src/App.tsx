@@ -75,6 +75,7 @@ import { WhatsappTeste } from "./pages/whatsapp/WhatsappTeste";
 import PhoneLocationMap from "./pages/PhoneLocation/PhoneLocationMap";
 import { CamerasAdmin } from "./pages/Cameras/CamerasAdmin";
 import CameraSetup from "./pages/Cameras/CameraSetup";
+import WatchTvConta from "./pages/WatchTvConta/WatchTvConta";
 import FileShareManager from "./pages/FileShare/FileShareManager";
 import GerarLinksServico from "./pages/ServicosWeb/GerarLinksServico";
 import SolicitacaoServicoPublica from "./pages/ServicosWeb/SolicitacaoServicoPublica";
@@ -714,6 +715,7 @@ function App() {
             }
           />
           <Route path="/Cameras/Setup/:uuid" element={<CameraSetup />} />
+          <Route path="/WatchTv/Conta/:token" element={<WatchTvConta />} />
           <Route path="/TimeTracking/ClockIn" element={<TimeClock />} />
           <Route
             path="/TimeTracking/Admin"

@@ -30,7 +30,9 @@ import {
   ListItemText,
 } from "@mui/material";
 import moment from "moment";
+import { MdContentCopy } from "react-icons/md";
 import { useAuth } from "../../context/AuthContext";
+import LinkContaWatchTv from "../../components/LinkContaWatchTv";
 
 // Em que ponto do link o cliente parou. Serviços de cliente novo (Instalação)
 // não passam por CPF nem por forma de pagamento.
@@ -283,6 +285,41 @@ const SolicitacoesServico = () => {
     await navigator.clipboard.writeText(link);
     setLinkCopiado(link);
     setTimeout(() => setLinkCopiado(null), 2000);
+  };
+
+  // Watch TV (avulsa ou do plano combo) que já entrou no cadastro: o cliente
+  // cria a conta por um link. Gerar de novo serve para refazer a conta.
+  const [watchLink, setWatchLink] = useState<{
+    link: string;
+    expira_em: string;
+    substitui: boolean;
+  } | null>(null);
+  const watchNoCadastro = (service: any) =>
+    ["aguardando_conta", "adicionado", "sem_acesso", "ja_tinha"].includes(
+      service?.dados?.servico_cadastro?.status,
+    ) && !!(service?.dados?.login || service?.login_cliente);
+
+  const gerarLinkWatch = async (service: any) => {
+    setLoadingAction(service.id);
+    try {
+      const res = await axios.post(
+        `${process.env.REACT_APP_URL}/sercontratos/streaming/link`,
+        {
+          login: service.dados?.login || service.login_cliente,
+          solicitacaoId: service.id,
+        },
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+      );
+      setWatchLink({
+        ...res.data,
+        substitui: service.dados?.servico_cadastro?.status === "adicionado",
+      });
+      fetchServices(page);
+    } catch (e: any) {
+      alert(e?.response?.data?.message || "Erro ao gerar o link da Watch TV.");
+    } finally {
+      setLoadingAction(null);
+    }
   };
 
   const handleConsultarCpf = async (id: number) => {
@@ -1088,6 +1125,43 @@ const SolicitacoesServico = () => {
                         </Tooltip>
                       )}
                     </Stack>
+
+                    {/* Watch TV no cadastro: o link da conta tem que chamar a
+                        atenção, senão o cliente fica cobrado e sem acesso. */}
+                    {service.dados?.servico_cadastro?.link ? (
+                      <Tooltip title="O cliente ainda não criou a conta da Watch TV. Clique para copiar o link e envie a ele.">
+                        <Chip
+                          size="small"
+                          color="warning"
+                          clickable
+                          icon={<MdContentCopy />}
+                          label={
+                            linkCopiado === service.dados.servico_cadastro.link
+                              ? "Copiado!"
+                              : "Enviar link Watch TV"
+                          }
+                          onClick={() =>
+                            copiarLinkWeb(service.dados.servico_cadastro.link)
+                          }
+                          sx={{ mt: 0.5, fontWeight: 700 }}
+                        />
+                      </Tooltip>
+                    ) : (
+                      watchNoCadastro(service) && (
+                        <Tooltip title="Gerar link para o cliente criar a conta da Watch TV (substitui a atual, se houver)">
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            color="secondary"
+                            clickable
+                            disabled={loadingAction === service.id}
+                            label="Link conta Watch"
+                            onClick={() => gerarLinkWatch(service)}
+                            sx={{ mt: 0.5, height: 20, fontSize: "0.65rem" }}
+                          />
+                        </Tooltip>
+                      )
+                    )}
                   </TableCell>
                   <TableCell>
                     {service.dados?.consultaConsultCenter ? (
@@ -1378,12 +1452,37 @@ const SolicitacoesServico = () => {
                   }
                 >
                   {detailsTarget.dados.servico_cadastro.status === "adicionado"
-                    ? `${detailsTarget.dados.servico_cadastro.servico} adicionado ao cadastro e ativado.`
+                    ? `${detailsTarget.dados.servico_cadastro.servico || "Watch TV"} adicionado ao cadastro e ativado` +
+                      (detailsTarget.dados.servico_cadastro.email
+                        ? ` (conta: ${detailsTarget.dados.servico_cadastro.email}).`
+                        : ".")
                     : detailsTarget.dados.servico_cadastro.status === "ja_tinha"
                       ? "O cliente já tinha o serviço no cadastro."
                       : detailsTarget.dados.servico_cadastro.motivo ||
                         "Não foi possível adicionar o serviço ao cadastro."}
                 </Alert>
+              )}
+              {detailsTarget?.dados?.servico_cadastro?.link ? (
+                <LinkContaWatchTv
+                  link={detailsTarget.dados.servico_cadastro.link}
+                  substitui={
+                    detailsTarget.dados.servico_cadastro.status === "adicionado"
+                  }
+                />
+              ) : (
+                watchNoCadastro(detailsTarget) && (
+                  <Box>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="secondary"
+                      disabled={loadingAction === detailsTarget.id}
+                      onClick={() => gerarLinkWatch(detailsTarget)}
+                    >
+                      Gerar link para o cliente criar/refazer a conta da Watch TV
+                    </Button>
+                  </Box>
+                )
               )}
               <Typography variant="body2">
                 <strong>Serviço:</strong> {detailsTarget?.servico || "-"}
@@ -1756,6 +1855,27 @@ const SolicitacoesServico = () => {
             >
               Ver detalhes mesmo assim
             </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={!!watchLink}
+          onClose={() => setWatchLink(null)}
+          fullWidth
+          maxWidth="sm"
+        >
+          <DialogTitle>Link da conta Watch TV</DialogTitle>
+          <DialogContent>
+            {watchLink && (
+              <LinkContaWatchTv
+                link={watchLink.link}
+                expiraEm={watchLink.expira_em}
+                substitui={watchLink.substitui}
+              />
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setWatchLink(null)}>Fechar</Button>
           </DialogActions>
         </Dialog>
       </Box>

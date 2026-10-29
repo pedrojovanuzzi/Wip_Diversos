@@ -3,6 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
+import LinkContaWatchTv from "../../components/LinkContaWatchTv";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import {
   BsTrash,
@@ -47,6 +48,10 @@ interface ListResponse {
   valoresUnitarios: Record<string, number>;
   /** Preenchido quando a assinatura em curso é um teste com prazo. */
   streamingTesteExpiraEm?: string | null;
+  /** Conta na Watch Brasil; null quando o cliente ainda não criou. */
+  streamingConta?: { email: string | null; ativo: boolean } | null;
+  /** Link ainda não usado para o cliente criar a conta. */
+  streamingLink?: { link: string; expira_em: string } | null;
   /** Conta de câmeras do cliente (null quando ainda não existe). */
   camera?: {
     storageGb: number;
@@ -247,6 +252,26 @@ Regravar com a descrição completa?`,
       setLoaded(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Link para o cliente criar (ou refazer) a conta da Watch TV. Fica salvo no
+  // `loaded`, e o quadro do streaming mostra em destaque até ele ser usado.
+  const [gerandoLinkWatch, setGerandoLinkWatch] = useState(false);
+  const gerarLinkWatch = async () => {
+    if (!loaded) return;
+    setGerandoLinkWatch(true);
+    try {
+      const res = await axios.post(
+        `${base}/sercontratos/streaming/link`,
+        { login: loaded.login },
+        { headers },
+      );
+      setLoaded((l) => (l ? { ...l, streamingLink: res.data } : l));
+    } catch (e: any) {
+      showMsg(e?.response?.data?.message || "Erro ao gerar o link.", "error");
+    } finally {
+      setGerandoLinkWatch(false);
     }
   };
 
@@ -709,14 +734,46 @@ Regravar com a descrição completa?`,
                     </div>
                   )}
                   {temStreaming && (
-                    <div className="flex items-center bg-purple-50 p-2 rounded mb-2">
+                    <div className="bg-purple-50 p-2 rounded mb-2">
                       <span className="text-sm text-purple-800 font-semibold">
                         ✓ Cliente possui{" "}
                         {totalStreamingColab > 0
                           ? nomeStreamingColabAtual
                           : nomeStreamingAtual}
                       </span>
+                      <p className="text-xs text-purple-700 mt-0.5">
+                        {loaded.streamingConta
+                          ? `Conta na Watch TV: ${loaded.streamingConta.email || "criada"}`
+                          : "Conta na Watch TV ainda não criada."}
+                      </p>
                     </div>
+                  )}
+                  {temStreaming && loaded.streamingLink && (
+                    <div className="mb-2">
+                      <LinkContaWatchTv
+                        link={loaded.streamingLink.link}
+                        expiraEm={loaded.streamingLink.expira_em}
+                        substitui={!!loaded.streamingConta}
+                      />
+                    </div>
+                  )}
+                  {temStreaming && !loaded.streamingLink && (
+                    <button
+                      onClick={gerarLinkWatch}
+                      disabled={gerandoLinkWatch}
+                      className={`w-full py-2 mb-2 rounded font-semibold text-white disabled:bg-gray-400 ${
+                        loaded.streamingConta
+                          ? "bg-purple-500 hover:bg-purple-600"
+                          : "bg-amber-600 hover:bg-amber-700"
+                      }`}
+                      title="O cliente escolhe o e-mail e o celular; se já houver conta, ela é substituída"
+                    >
+                      {gerandoLinkWatch
+                        ? "Gerando..."
+                        : loaded.streamingConta
+                          ? "Gerar link para o cliente refazer a conta"
+                          : "Gerar link para o cliente criar a conta"}
+                    </button>
                   )}
                   <div className="flex flex-col gap-2">
                     {!temStreaming && (
@@ -878,10 +935,33 @@ Regravar com a descrição completa?`,
                           </td>
                           <td className="p-2 text-gray-600">{it.insuser}</td>
                           <td className="p-2 text-center">
-                            {tagDoItem(it) === "STREAMER" ? (
-                              <span className="text-gray-300" title="Streaming pago não pode ser removido por aqui">
-                                —
-                              </span>
+                            {tagDoItem(it) === "STREAMER" ||
+                            tagDoItem(it) === "STREAMER_COLAB" ? (
+                              <div className="flex items-center justify-center gap-3">
+                                <button
+                                  onClick={gerarLinkWatch}
+                                  disabled={gerandoLinkWatch}
+                                  className="whitespace-nowrap rounded bg-amber-500 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-600 disabled:bg-gray-400"
+                                  title="Link para o cliente criar a conta da Watch TV (substitui a atual, se houver)"
+                                >
+                                  {loaded.streamingLink
+                                    ? "Link gerado ↑"
+                                    : "Link da conta"}
+                                </button>
+                                {tagDoItem(it) === "STREAMER" ? (
+                                  <span className="text-gray-300" title="Streaming pago não pode ser removido por aqui">
+                                    —
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => removeItem(it.id)}
+                                    disabled={removingId === it.id}
+                                    className="text-red-600 hover:text-red-800 disabled:text-gray-400"
+                                  >
+                                    <BsTrash />
+                                  </button>
+                                )}
+                              </div>
                             ) : tagDoItem(it) === "CAMERA" ? (
                               <span className="text-gray-300" title="Para remover, exclua o cliente em Gerenciar Câmeras">
                                 —

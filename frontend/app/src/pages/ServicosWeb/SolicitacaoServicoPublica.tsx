@@ -145,6 +145,8 @@ const SolicitacaoServicoPublica: React.FC = () => {
     email?: string;
     /** Proporcional dos dias de uso, recalculado na assinatura. */
     cobranca?: string;
+    /** Página para o cliente criar a conta da Watch TV. */
+    link?: string;
   } | null>(null);
   /** Este serviço ainda tem a liberação do acesso depois de assinar. */
   const [acessoEsperado, setAcessoEsperado] = useState(false);
@@ -833,15 +835,39 @@ const SolicitacaoServicoPublica: React.FC = () => {
                           Contrato assinado. Obrigado!
                         </Alert>
 
-                        {/* A conta na Watch TV é criada assim que o
-                            contrato é assinado, com o e-mail informado no
-                            formulário — e é a Watch que envia o e-mail. */}
+                        {/* Depois da assinatura o serviço entra no cadastro
+                            e o cliente cria a conta da Watch TV pelo link. */}
                         {assinadoConfirmado && aguardandoAcesso && (
                           <Alert severity="info" sx={{ mt: 2 }}>
-                            Liberando o seu acesso à Watch TV… pode deixar
+                            Preparando o seu acesso à Watch TV… pode deixar
                             esta página aberta.
                           </Alert>
                         )}
+
+                        {acesso?.status === "aguardando_conta" &&
+                          acesso.link && (
+                            <Alert severity="success" sx={{ mt: 2 }}>
+                              Watch TV contratada! Falta só criar a sua conta:
+                              escolha o e-mail e o celular de acesso.
+                              <Box sx={{ mt: 1.5 }}>
+                                <Button
+                                  variant="contained"
+                                  color="success"
+                                  startIcon={<MdOpenInNew />}
+                                  href={acesso.link}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Criar minha conta da Watch TV
+                                </Button>
+                              </Box>
+                              {acesso.cobranca && (
+                                <Box sx={{ mt: 1 }}>
+                                  Cobrança: {acesso.cobranca}
+                                </Box>
+                              )}
+                            </Alert>
+                          )}
 
                         {acesso?.status === "adicionado" && (
                           <Alert severity="success" sx={{ mt: 2 }}>

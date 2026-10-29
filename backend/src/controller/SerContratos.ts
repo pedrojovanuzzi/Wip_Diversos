@@ -5,8 +5,14 @@ import { In } from "typeorm";
 import { SisSerContratos } from "../entities/SisSerContratos";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { StreamingAssinante } from "../entities/StreamingAssinante";
+import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { deleteTicket } from "../services/WatchBrasilService";
-import { registrarAssinanteStreaming } from "../services/streamingCadastro";
+import {
+  clienteJaTemStreaming,
+  gerarConviteStreaming,
+  linkAbertoDoLogin,
+  registrarAssinanteStreaming,
+} from "../services/streamingCadastro";
 import { planFor, normalizeStorageGb } from "../config/cameraStoragePlans";
 import {
   VALOR_STREAMER,
@@ -152,6 +158,12 @@ class SerContratos {
         total: Number(total.toFixed(2)),
         valoresUnitarios: VALORES,
         streamingTesteExpiraEm: assinante?.teste_expira_em ?? null,
+        // Conta na Watch Brasil e link ainda não usado, para a tela mostrar
+        // quando falta o cliente criar a conta.
+        streamingConta: assinante?.ticket
+          ? { email: assinante.email, ativo: assinante.ativo }
+          : null,
+        streamingLink: await linkAbertoDoLogin(login),
         camera: resumoCamera,
         nomesServicos: {
           STREAMER: nomeStreaming(VALORES.STREAMER),
@@ -535,6 +547,60 @@ class SerContratos {
     } catch (error: any) {
       console.error("Erro ao remover sercontratos:", error);
       res.status(500).json({ message: "Erro ao remover." });
+    }
+  }
+
+  /**
+   * POST /streaming/link — link para o cliente criar (ou refazer) a conta da
+   * Watch TV. Vale para o streaming avulso e para o do plano combo; usar o
+   * link substitui a conta anterior na Watch Brasil.
+   */
+  public async gerarLinkStreaming(req: Request, res: Response) {
+    try {
+      const login = String(req.body?.login || "").trim();
+      const solicitacaoId = Number(req.body?.solicitacaoId) || null;
+      if (!login) {
+        res.status(400).json({ message: "login é obrigatório." });
+        return;
+      }
+      if (!(await clienteJaTemStreaming(login))) {
+        res.status(400).json({
+          message:
+            "Este cadastro não tem a Watch TV no contrato. Adicione o serviço antes de gerar o link.",
+        });
+        return;
+      }
+      const r = await gerarConviteStreaming({
+        login,
+        usuario: req.user?.login || null,
+        solicitacaoId,
+      });
+
+      // Gerado a partir de uma solicitação: a linha dela passa a mostrar o
+      // link em destaque até o cliente usar.
+      if (solicitacaoId) {
+        const solRepo = AppDataSource.getRepository(SolicitacaoServico);
+        const sol = await solRepo.findOne({ where: { id: solicitacaoId } });
+        if (sol) {
+          const sc = sol.dados?.servico_cadastro || {};
+          sol.dados = {
+            ...(sol.dados || {}),
+            servico_cadastro: {
+              ...sc,
+              status:
+                !sc.status || sc.status === "sem_acesso"
+                  ? "aguardando_conta"
+                  : sc.status,
+              link: r.link,
+            },
+          };
+          await solRepo.save(sol);
+        }
+      }
+      res.json(r);
+    } catch (error: any) {
+      console.error("Erro ao gerar link da Watch TV:", error);
+      res.status(500).json({ message: "Erro ao gerar o link." });
     }
   }
 

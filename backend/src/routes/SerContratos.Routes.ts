@@ -13,5 +13,6 @@ router.post("/", AuthGuard, SerContratos.add);
 router.delete("/:id", AuthGuard, SerContratos.remove);
 router.post("/remove-by-type", AuthGuard, SerContratos.removeAllOfTypeForLogin);
 router.post("/streaming/convert", AuthGuard, SerContratos.convertStreamingTipo);
+router.post("/streaming/link", AuthGuard, SerContratos.gerarLinkStreaming);
 
 export default router;

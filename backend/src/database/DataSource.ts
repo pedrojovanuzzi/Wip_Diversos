@@ -23,6 +23,7 @@ import { DeclaracaoQuitacao } from "../entities/DeclaracaoQuitacao";
 import { FileShare } from "../entities/FileShare";
 import { ServiceLink } from "../entities/ServiceLink";
 import { StreamingTeste } from "../entities/StreamingTeste";
+import { StreamingConvite } from "../entities/StreamingConvite";
 import { PixAutomaticoCobranca } from "../entities/PixAutomaticoCobranca";
 import { PixAutomaticoNotificacao } from "../entities/PixAutomaticoNotificacao";
 import { LicencaMensalidade } from "../entities/LicencaMensalidade";
@@ -90,6 +91,7 @@ const AppDataSource = new DataSource({
     LicencaMensalidadeConfig,
     PowerDnsConfig,
     StreamingTeste,
+    StreamingConvite,
     AuditLog,
   ],
   migrations: [

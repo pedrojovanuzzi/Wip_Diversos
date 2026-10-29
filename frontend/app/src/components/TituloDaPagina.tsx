@@ -83,6 +83,7 @@ const TITULOS: Record<string, string> = {
 
   "/Cameras/Admin": "Câmeras",
   "/Cameras/Setup/:uuid": "Configurar Câmera",
+  "/WatchTv/Conta/:token": "Conta da Watch TV",
 
   "/TimeTracking/Admin": "Ponto — Administração",
   "/TimeTracking/ClockIn": "Registrar Ponto",

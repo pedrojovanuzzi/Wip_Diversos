@@ -1657,6 +1657,7 @@ class ServiceLinkController {
         status?: string;
         email?: string;
         cobranca?: string;
+        link?: string;
       } | null = null;
       // A página precisa saber que ainda vem um passo depois da assinatura,
       // senão ela para de perguntar antes de o acesso ficar pronto.
@@ -1683,6 +1684,9 @@ class ServiceLinkController {
             email: sc.email || (solicitacao?.dados as any)?.email_watch,
             // Proporcional recalculado na assinatura, quando o uso começa.
             cobranca: (solicitacao?.dados as any)?.cobranca_proporcional,
+            // Quem abriu esta página é o próprio cliente: ele já cria a conta
+            // da Watch TV daqui, sem esperar o atendimento mandar o link.
+            link: sc.status === "aguardando_conta" ? sc.link : undefined,
           };
         }
         // Espelha o pagamento confirmado na solicitação de serviço.

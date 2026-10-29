@@ -328,14 +328,13 @@ function veioDaWeb(solicitacao: SolicitacaoServico): boolean {
 }
 
 /**
- * Avisa o cliente, no WhatsApp, que o acesso saiu.
+ * Avisa o cliente, no WhatsApp, que a Watch TV entrou no cadastro.
  *
- * O e-mail com as instruções é enviado pela própria Watch TV quando a conta é
- * criada; aqui só apontamos para onde olhar.
+ * A conta de acesso o próprio cliente cria, pelo link que o atendimento envia
+ * — quem decide mandar é o atendimento, depois de conferir o pedido.
  */
-async function avisarAcessoLiberado(
+async function avisarAguardandoConta(
   solicitacao: SolicitacaoServico,
-  email?: string,
   /** Proporcional dos dias de uso, recalculado na assinatura. */
   cobranca?: string,
 ) {
@@ -348,55 +347,11 @@ async function avisarAcessoLiberado(
 
   await Whatsapp.MensagensComuns(
     celular,
-    `🎉 *Watch TV liberada!*
-
-` +
-      (email
-        ? `📧 A Watch TV enviou um e-mail para *${email}* com as instruções de ` +
-          `acesso e a criação da sua senha.
-
-`
-        : `📧 A Watch TV enviou um e-mail com as instruções de acesso.
-
-`) +
-      `Se não encontrar, confira a caixa de *spam* ou *promoções*.` +
+    `📺 *Watch TV contratada!*\n\n` +
+      `Em instantes nossa equipe envia o link para você criar a sua conta, ` +
+      `escolhendo o e-mail e o celular de acesso.` +
       // O uso começa agora, então o proporcional é o da data da assinatura.
       (cobranca ? `\n\n📅 Cobrança: ${cobranca}` : ""),
-  );
-}
-
-/**
- * Avisa que a Watch TV do plano foi criada.
- *
- * Nos fluxos de plano (instalação, troca de plano, titularidade) ninguém
- * pergunta um e-mail de acesso: vale o do cadastro, e é para lá que a Watch
- * escreve.
- */
-async function avisarWatchTvDoPlano(
-  solicitacao: SolicitacaoServico,
-  email?: string,
-) {
-  const dados = (solicitacao.dados || {}) as any;
-  const bruto = String(
-    dados.telefone_conversa || dados.telefone || dados.celular || "",
-  ).replace(/\D/g, "");
-  if (!bruto) return;
-  const celular = bruto.startsWith("55") ? bruto : `55${bruto}`;
-
-  await Whatsapp.MensagensComuns(
-    celular,
-    `📺 *Watch TV incluída no seu plano!*
-
-` +
-      `Já deixamos a sua conta criada — não precisa fazer nada.
-
-` +
-      (email
-        ? `📧 As instruções de acesso chegam no e-mail cadastrado: *${email}*.`
-        : `📧 As instruções de acesso chegam no e-mail cadastrado.`) +
-      `
-
-Se não encontrar, confira a caixa de *spam* ou *promoções*.`,
   );
 }
 
@@ -1225,8 +1180,8 @@ class ZapSign {
                 case "watch tv":
                 case "contrato de sva": {
                   // Assinou o Contrato de SVA: o streaming entra no cadastro,
-                  // passa a compor a mensalidade, e a conta de acesso é criada
-                  // com o e-mail e o celular informados antes da assinatura.
+                  // passa a compor a mensalidade, e sai o link para o cliente
+                  // criar a conta de acesso.
                   const loginWatch = dados.login || solicitacao.login_cliente;
 
                   // Os dias de uso contam a partir de agora, não da data do
@@ -1249,18 +1204,16 @@ class ZapSign {
                   });
                   const r = await contratarStreamingAposAssinatura({
                     login: loginWatch,
-                    // Contato colhido antes da assinatura, no bot ou no site.
-                    email: dados.email_watch || dados.email,
-                    phone: dados.celular_watch || dados.telefone,
                     usuario: "assinatura",
+                    solicitacaoId: solicitacao.id,
                   });
 
-                  // A conta na Watch Brasil é quem dispara o e-mail de
-                  // boas-vindas; o cliente precisa saber onde procurar.
-                  if (r.status === "adicionado" && !veioDaWeb(solicitacao)) {
-                    await avisarAcessoLiberado(
+                  if (
+                    r.status === "aguardando_conta" &&
+                    !veioDaWeb(solicitacao)
+                  ) {
+                    await avisarAguardandoConta(
                       solicitacao,
-                      dados.email_watch || dados.email,
                       dados.cobranca_proporcional,
                     );
                   }
@@ -1338,8 +1291,7 @@ class ZapSign {
     const r = await contratarStreamingDoPlano({
       login,
       plano: dados?.plano,
-      email: dados?.email,
-      phone: dados?.celular || dados?.telefone,
+      solicitacaoId: solicitacao.id,
     });
     if (r.status === "nao_aplica") return r;
 
@@ -1355,8 +1307,8 @@ class ZapSign {
     };
     await repo.save(solicitacao);
 
-    if (r.status === "adicionado" && !veioDaWeb(solicitacao)) {
-      await avisarWatchTvDoPlano(solicitacao, r.email || dados?.email);
+    if (r.status === "aguardando_conta" && !veioDaWeb(solicitacao)) {
+      await avisarAguardandoConta(solicitacao);
     }
     return r;
   };
