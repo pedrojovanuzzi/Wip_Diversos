@@ -608,7 +608,7 @@ class WhatsappController {
         return;
       }
 
-      const { cpf, nome, cidade, plano, status, caixa_herm, slot, pon } =
+      const { cpf, nome, cidade, bairro, plano, status, caixa_herm, slot, pon } =
         req.body;
       const ClientRepository = MkauthSource.getRepository(ClientesEntities);
 
@@ -624,6 +624,7 @@ class WhatsappController {
 
       // Additional filters
       if (cidade) where.cidade = Like(`%${cidade}%`);
+      if (bairro) where.bairro = Like(`%${bairro}%`);
       if (plano) where.plano = Like(`%${plano}%`); // Partial match for plan usually better, or exact if dropdown
       if (caixa_herm) where.caixa_herm = Like(`%${caixa_herm}%`);
 
@@ -652,6 +653,7 @@ class WhatsappController {
           fone: true,
           cli_ativado: true,
           cidade: true,
+          bairro: true,
           plano: true,
           caixa_herm: true,
           porta_olt: true,

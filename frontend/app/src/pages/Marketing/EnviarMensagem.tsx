@@ -14,6 +14,7 @@ export const EnviarMensagem = () => {
   const [searchCpf, setSearchCpf] = useState("");
   const [searchNome, setSearchNome] = useState("");
   const [searchCidade, setSearchCidade] = useState("");
+  const [searchBairro, setSearchBairro] = useState("");
   const [searchPlano, setSearchPlano] = useState("");
   const [searchStatus, setSearchStatus] = useState("s"); // Default to Active ('s')
   const [searchCaixaHerm, setSearchCaixaHerm] = useState("");
@@ -120,6 +121,7 @@ export const EnviarMensagem = () => {
           cpf: cleanCpf,
           nome: searchNome,
           cidade: searchCidade,
+          bairro: searchBairro,
           plano: searchPlano,
           status: searchStatus === "all" ? undefined : searchStatus,
           caixa_herm: searchCaixaHerm,
@@ -285,6 +287,18 @@ export const EnviarMensagem = () => {
                     value={searchCidade}
                     onChange={(e) => setSearchCidade(e.target.value)}
                     placeholder="Digite a Cidade"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Bairro
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchBairro}
+                    onChange={(e) => setSearchBairro(e.target.value)}
+                    placeholder="Digite o Bairro"
                   />
                 </div>
                 <div>
