@@ -69,6 +69,12 @@ async function evidenciaNoMkauth(
 }
 
 /**
+ * Origens que a sincronização não desfaz: decididas por gente, não deduzidas
+ * do MK-Auth. "solicitacao" é a Watch TV que entrou por um contrato assinado.
+ */
+const ORIGENS_FIXAS = ["manual", "solicitacao"];
+
+/**
  * Valor de `clientes_watchtv` para um login, dada a evidência do MK-Auth.
  *
  * - Linha da Watch TV no contrato: tem (o cliente está pagando, ou é
@@ -82,8 +88,8 @@ function valorWatchTv(
   atual: ClienteWatchTv | null,
 ): { watchtv: number; origem: string | null } {
   if (evidencia === "contrato") return { watchtv: 1, origem: "contrato" };
-  if (atual?.origem === "manual") {
-    return { watchtv: atual.watchtv ? 1 : 0, origem: "manual" };
+  if (atual?.origem && ORIGENS_FIXAS.includes(atual.origem)) {
+    return { watchtv: atual.watchtv ? 1 : 0, origem: atual.origem };
   }
   if (evidencia === "plano") return { watchtv: 1, origem: "plano" };
   return { watchtv: 0, origem: null };
@@ -137,6 +143,7 @@ export async function temWatchTv(login?: string | null): Promise<boolean> {
 export async function marcarWatchTvManual(
   login: string,
   tem: boolean,
+  origem: "manual" | "solicitacao" = "manual",
 ): Promise<{ tem: boolean; origem: string }> {
   const l = String(login || "").trim();
   if (!tem && (await clienteJaTemStreaming(l))) {
@@ -146,10 +153,10 @@ export async function marcarWatchTvManual(
     );
   }
   await AppDataSource.getRepository(ClienteWatchTv).upsert(
-    { login: l, watchtv: tem ? 1 : 0, origem: "manual" },
+    { login: l, watchtv: tem ? 1 : 0, origem },
     ["login"],
   );
-  return { tem, origem: "manual" };
+  return { tem, origem };
 }
 
 /**

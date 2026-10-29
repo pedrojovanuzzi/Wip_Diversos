@@ -577,23 +577,57 @@ class SerContratos {
       const sol = solicitacaoId
         ? await solRepo.findOne({ where: { id: solicitacaoId } })
         : null;
-      const candidatos = sol
-        ? [sol.dados?.login, sol.login_cliente]
-        : [loginPedido];
+      const candidatos = Array.from(
+        new Set(
+          (sol ? [sol.dados?.login, sol.login_cliente] : [loginPedido])
+            .map((c) => String(c || "").trim())
+            .filter(Boolean),
+        ),
+      );
+
+      // Só vale login que existe no MK-Auth: é nele que a conta é criada.
+      const clienteRepo = MkauthSource.getRepository(ClientesEntities);
+      const existentes: string[] = [];
+      for (const l of candidatos) {
+        if (await clienteRepo.findOne({ where: { login: l }, select: { login: true } })) {
+          existentes.push(l);
+        }
+      }
+
       let login = "";
-      for (const c of candidatos) {
-        const l = String(c || "").trim();
-        if (l && (await temWatchTv(l))) {
+      for (const l of existentes) {
+        if (await temWatchTv(l)) {
           login = l;
           break;
         }
       }
 
+      // Contrato com a Watch TV já assinado nesta solicitação é prova de que o
+      // cliente tem o serviço, mesmo que o MK-Auth não mostre (nome de plano
+      // ou de serviço que o sistema não reconhece). Fica marcado na tabela.
+      const statusComWatch = ["aguardando_conta", "adicionado", "sem_acesso"];
+      if (
+        !login &&
+        existentes.length > 0 &&
+        sol?.assinado &&
+        statusComWatch.includes(sol.dados?.servico_cadastro?.status)
+      ) {
+        login = existentes[0];
+        await marcarWatchTvManual(login, true, "solicitacao");
+      }
+
       if (!login) {
+        const conferidos = candidatos.length
+          ? candidatos
+              .map((l) =>
+                existentes.includes(l) ? l : `${l} (não existe no MK-Auth)`,
+              )
+              .join(", ")
+          : "nenhum login informado";
         res.status(400).json({
           message:
-            "Este cadastro está marcado sem Watch TV. Adicione o serviço ou " +
-            "marque que ele tem Watch TV em Serviços de Contrato.",
+            `Este cadastro está marcado sem Watch TV (login conferido: ${conferidos}). ` +
+            "Adicione o serviço ou marque que ele tem Watch TV em Serviços de Contrato.",
         });
         return;
       }

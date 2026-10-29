@@ -78,6 +78,7 @@ const ORIGEM_WATCHTV: Record<string, string> = {
   contrato: "pelo serviço no contrato",
   plano: "pelo plano combo",
   manual: "marcado manualmente",
+  solicitacao: "pelo contrato assinado na solicitação",
 };
 
 const formatBRL = (v: number) => Number(v || 0).toFixed(2).replace(".", ",");
