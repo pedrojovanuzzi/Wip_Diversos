@@ -24,6 +24,7 @@ import { FileShare } from "../entities/FileShare";
 import { ServiceLink } from "../entities/ServiceLink";
 import { StreamingTeste } from "../entities/StreamingTeste";
 import { StreamingConvite } from "../entities/StreamingConvite";
+import { ClienteWatchTv } from "../entities/ClienteWatchTv";
 import { PixAutomaticoCobranca } from "../entities/PixAutomaticoCobranca";
 import { PixAutomaticoNotificacao } from "../entities/PixAutomaticoNotificacao";
 import { LicencaMensalidade } from "../entities/LicencaMensalidade";
@@ -92,6 +93,7 @@ const AppDataSource = new DataSource({
     PowerDnsConfig,
     StreamingTeste,
     StreamingConvite,
+    ClienteWatchTv,
     AuditLog,
   ],
   migrations: [

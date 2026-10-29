@@ -52,6 +52,8 @@ interface ListResponse {
   streamingConta?: { email: string | null; ativo: boolean } | null;
   /** Link ainda não usado para o cliente criar a conta. */
   streamingLink?: { link: string; expira_em: string } | null;
+  /** Plano combo com Watch TV, ainda sem a linha de R$ 0,00 no contrato. */
+  watchPeloPlano?: boolean;
   /** Conta de câmeras do cliente (null quando ainda não existe). */
   camera?: {
     storageGb: number;
@@ -477,6 +479,8 @@ Regravar com a descrição completa?`,
     (i) => tagDoItem(i) === "STREAMER_COLAB",
   ).length || 0;
   const temStreaming = totalStreaming > 0 || totalStreamingColab > 0;
+  // Combo com Watch TV conta como streaming mesmo sem a linha de R$ 0,00.
+  const temWatch = temStreaming || !!loaded?.watchPeloPlano;
   const valorStreamerUnit =
     loaded?.valoresUnitarios.STREAMER ?? VALOR_STREAMER_PADRAO;
   const nomeStreamingAtual =
@@ -733,13 +737,15 @@ Regravar com a descrição completa?`,
                       . Depois disso o cadastro sai da Watch Brasil sozinho.
                     </div>
                   )}
-                  {temStreaming && (
+                  {temWatch && (
                     <div className="bg-purple-50 p-2 rounded mb-2">
                       <span className="text-sm text-purple-800 font-semibold">
                         ✓ Cliente possui{" "}
-                        {totalStreamingColab > 0
-                          ? nomeStreamingColabAtual
-                          : nomeStreamingAtual}
+                        {!temStreaming
+                          ? "Watch TV incluída no plano (combo)"
+                          : totalStreamingColab > 0
+                            ? nomeStreamingColabAtual
+                            : nomeStreamingAtual}
                       </span>
                       <p className="text-xs text-purple-700 mt-0.5">
                         {loaded.streamingConta
@@ -748,7 +754,7 @@ Regravar com a descrição completa?`,
                       </p>
                     </div>
                   )}
-                  {temStreaming && loaded.streamingLink && (
+                  {temWatch && loaded.streamingLink && (
                     <div className="mb-2">
                       <LinkContaWatchTv
                         link={loaded.streamingLink.link}
@@ -757,7 +763,7 @@ Regravar com a descrição completa?`,
                       />
                     </div>
                   )}
-                  {temStreaming && !loaded.streamingLink && (
+                  {temWatch && !loaded.streamingLink && (
                     <button
                       onClick={gerarLinkWatch}
                       disabled={gerandoLinkWatch}
@@ -776,7 +782,7 @@ Regravar com a descrição completa?`,
                     </button>
                   )}
                   <div className="flex flex-col gap-2">
-                    {!temStreaming && (
+                    {!temWatch && (
                       <>
                         <button
                           onClick={() => openStreamingForm("STREAMER")}

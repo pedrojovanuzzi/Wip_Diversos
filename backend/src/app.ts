@@ -49,6 +49,7 @@ import BackupController from "./controller/Backup";
 import PixController from "./controller/Pix";
 import pixAutomaticoService from "./services/PixAutomaticoService";
 import licencaMensalidadeService from "./services/LicencaMensalidadeService";
+import { sincronizarTodosWatchTv } from "./services/streamingCadastro";
 // import DosProtectController from "./controller/DosProtect";
 
 const backup = new BackupController();
@@ -68,6 +69,7 @@ export class App {
     this.agendarBackup();
     this.agendarPixAutomatico();
     this.agendarMensalidadesDeLicenca();
+    this.agendarWatchTv();
     // this.verificaDDOS();
   }
 
@@ -209,6 +211,22 @@ export class App {
     setTimeout(() => gerar("inicialização"), 60_000);
 
     console.log("📅 Agendador de mensalidades de licença");
+  }
+
+  private agendarWatchTv() {
+    // Plano trocado direto no MK-Auth não passa pelo sistema: a passada diária
+    // acerta clientes_watchtv. Ao subir, faz também a carga inicial.
+    const sincronizar = (origem: string) =>
+      sincronizarTodosWatchTv()
+        .then((n) =>
+          console.log(`📺 clientes_watchtv sincronizada (${origem}): ${n} com Watch TV.`),
+        )
+        .catch((err) =>
+          console.error(`❌ Falha ao sincronizar clientes_watchtv (${origem}):`, err),
+        );
+
+    cron.schedule("20 3 * * *", () => sincronizar("agendamento diário"));
+    setTimeout(() => sincronizar("inicialização"), 90_000);
   }
 
   // private verificaDDOS(){

@@ -19,10 +19,11 @@ import { SisSerContratos } from "../entities/SisSerContratos";
 import { ClientesEntities } from "../entities/ClientesEntities";
 import { StreamingAssinante } from "../entities/StreamingAssinante";
 import { StreamingConvite } from "../entities/StreamingConvite";
+import { ClienteWatchTv } from "../entities/ClienteWatchTv";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { deleteTicket, insertAssinante } from "./WatchBrasilService";
 import { VALOR_STREAMER } from "../config/servicosAdicionais";
-import { planoTemSva } from "../config/planosComSva";
+import { PLANOS_COM_SVA, planoTemSva } from "../config/planosComSva";
 import {
   diasDeTesteUsados,
   encerrarTeste,
@@ -49,6 +50,96 @@ export async function clienteJaTemStreaming(login: string): Promise<boolean> {
     })
     .getCount();
   return total > 0;
+}
+
+/**
+ * De onde vem a Watch TV do cliente: da linha no contrato ou do plano combo.
+ *
+ * O combo nem sempre tem a linha de R$ 0,00 — plano trocado direto no MK-Auth,
+ * ou cadastro anterior a essa linha —, e mesmo assim o cliente tem direito ao
+ * streaming.
+ */
+export async function origemWatchTv(
+  login: string,
+): Promise<"contrato" | "plano" | null> {
+  if (await clienteJaTemStreaming(login)) return "contrato";
+  const cliente = await MkauthSource.getRepository(ClientesEntities).findOne({
+    where: { login },
+    select: { plano: true },
+  });
+  return planoTemSva(cliente?.plano) ? "plano" : null;
+}
+
+/**
+ * Atualiza `clientes_watchtv` de um login. Chamado em todo lugar que põe ou
+ * tira a Watch TV do cadastro; nunca derruba quem chamou.
+ */
+export async function sincronizarWatchTv(login?: string | null): Promise<void> {
+  const l = String(login || "").trim();
+  if (!l) return;
+  try {
+    const origem = await origemWatchTv(l);
+    await AppDataSource.getRepository(ClienteWatchTv).upsert(
+      { login: l, watchtv: origem ? 1 : 0, origem },
+      ["login"],
+    );
+  } catch (e: any) {
+    console.error(`[WatchTv] Falha ao sincronizar ${l}:`, e?.message || e);
+  }
+}
+
+/**
+ * Recalcula `clientes_watchtv` inteira. Pega o que não passa pelo sistema:
+ * plano trocado direto no MK-Auth e a carga inicial da tabela.
+ */
+export async function sincronizarTodosWatchTv(): Promise<number> {
+  const origens = new Map<string, "contrato" | "plano">();
+
+  const planos = await MkauthSource.getRepository(ClientesEntities)
+    .createQueryBuilder("c")
+    .select(["c.login AS login", "c.plano AS plano"])
+    .where("UPPER(c.plano) LIKE :p", { p: "%STREAM%" })
+    .orWhere("UPPER(TRIM(c.plano)) IN (:...lista)", {
+      lista: PLANOS_COM_SVA.map((p) => p.toUpperCase()),
+    })
+    .getRawMany();
+  for (const r of planos) {
+    const l = String(r.login || "").trim();
+    if (l && planoTemSva(r.plano)) origens.set(l, "plano");
+  }
+
+  // A linha no contrato vale mais que o plano.
+  const contratos = await MkauthSource.getRepository(SisSerContratos)
+    .createQueryBuilder("s")
+    .select("DISTINCT TRIM(s.login)", "login")
+    .where(`${sqlTagServico("s.nome")} IN (:...tipos)`, {
+      tipos: TIPOS_STREAMING,
+    })
+    .getRawMany();
+  for (const r of contratos) {
+    const l = String(r.login || "").trim();
+    if (l) origens.set(l, "contrato");
+  }
+
+  const repo = AppDataSource.getRepository(ClienteWatchTv);
+  const linhas: Partial<ClienteWatchTv>[] = Array.from(origens, ([login, origem]) => ({
+    login,
+    watchtv: 1,
+    origem,
+  }));
+
+  // Quem estava marcado e não aparece mais perdeu o direito.
+  const marcados = await repo.find({ where: { watchtv: 1 }, select: { login: true } });
+  for (const m of marcados) {
+    if (!origens.has(m.login)) {
+      linhas.push({ login: m.login, watchtv: 0, origem: null });
+    }
+  }
+
+  for (let i = 0; i < linhas.length; i += 500) {
+    await repo.upsert(linhas.slice(i, i + 500), ["login"]);
+  }
+  return origens.size;
 }
 
 /**
@@ -172,7 +263,7 @@ export async function gravarServicoNoContrato(params: {
 }) {
   const { login, tipo, valor, usuario = "sistema", storageGb } = params;
   const repo = MkauthSource.getRepository(SisSerContratos);
-  return repo.save(
+  const salvo = await repo.save(
     repo.create({
       cfop_serc: CFOP_DEFAULT,
       // O boleto imprime este campo literalmente em "Valor adicional:".
@@ -184,6 +275,8 @@ export async function gravarServicoNoContrato(params: {
       login,
     }),
   );
+  if (TIPOS_STREAMING.includes(tipo)) await sincronizarWatchTv(login);
+  return salvo;
 }
 
 export type ResultadoContratacao = {
@@ -355,7 +448,8 @@ export async function criarContaPeloConvite(params: {
     where: { login: convite.login },
   });
   if (!cliente) throw new ErroConvite("Cadastro não encontrado.", 404);
-  if (!(await clienteJaTemStreaming(convite.login))) {
+  const origem = await origemWatchTv(convite.login);
+  if (!origem) {
     throw new ErroConvite(
       "A Watch TV não está mais no seu cadastro. Fale com o nosso atendimento.",
       409,
@@ -398,6 +492,17 @@ export async function criarContaPeloConvite(params: {
         "conta: tente outro e-mail ou fale com o nosso atendimento.",
       422,
     );
+  }
+
+  // Combo sem a linha no contrato: entra agora, por R$ 0,00, para o cadastro
+  // mostrar o serviço como nos combos que já passaram pela assinatura.
+  if (origem === "plano") {
+    await gravarServicoNoContrato({
+      login: convite.login,
+      tipo: "STREAMER",
+      valor: 0,
+      usuario: "plano",
+    });
   }
 
   convite.usado_em = new Date();

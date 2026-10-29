@@ -276,7 +276,7 @@ ol.steps li.err button { color: var(--bad); }
     <summary>Trilha de estudo</summary>
     <ol>
       <li><div><b>Veja o mapa inteiro.</b> Aperte "Ver tudo". À esquerda ficam as telas (React, Next e o app de localização), no meio a portaria e as 39 rotas agrupadas por assunto, à direita os serviços externos e embaixo os bancos.</div></li>
-      <li><div><b>Ligue a fábrica.</b> Leia <code>backend/src/server.ts</code> e <code>app.ts</code> inteiros. São curtos e mostram tudo que sobe: middlewares, as 39 rotas, os 4 agendamentos e as filas.</div></li>
+      <li><div><b>Ligue a fábrica.</b> Leia <code>backend/src/server.ts</code> e <code>app.ts</code> inteiros. São curtos e mostram tudo que sobe: middlewares, as 39 rotas, os 5 agendamentos e as filas.</div></li>
       <li><div><b>Entenda a portaria.</b> <code>middleware/AuthGuard.ts</code> e <code>PermissionGuard.ts</code>. Rode o pedido "Portaria" com as 3 opções de token e os 3 níveis. Repare que a tela também confere o nível (<code>frontend/app/src/App.tsx</code>), mas quem protege de verdade é o backend.</div></li>
       <li><div><b>Siga um pedido simples de ponta a ponta.</b> Login: a tela <code>pages/auth</code> → <code>routes/Auth.Routes.ts</code> → <code>controller/Auth.ts</code> → banco.</div></li>
       <li><div><b>Aprenda as filas.</b> A pasta <code>controller/whatsapp/</code> é a parte mais bem organizada (handlers, services, testes). Leia <code>queues.ts</code> e depois o <code>switch</code> do <code>message.handler.ts</code>.</div></li>
@@ -441,10 +441,10 @@ add("in_watch", { k: "dock", x: 490, y: 1800, tag: "Watch Brasil", name: "Watch 
 // ---- Núcleo e portaria ----
 add("gate", { k: "core", x: 1050, y: 1000, tag: "app.ts", name: "Portão Express",
   desc: "server.ts sobe o Express na porta 3000. Toda requisição passa por cors, express.json, urlencoded e auditoriaMiddleware (grava criar/editar/remover de usuário logado em audit_logs). O 'trust proxy' faz req.ip ser o IP real visto pelo nginx.",
-  files: [["server.ts", 24, "listen(3000)"], ["app.ts", 74, "middleware()"], ["utils/auditoria.ts", 173, "auditoriaMiddleware"]] });
+  files: [["server.ts", 24, "listen(3000)"], ["app.ts", 76, "middleware()"], ["utils/auditoria.ts", 173, "auditoriaMiddleware"]] });
 add("router", { k: "core", x: 1210, y: 1000, tag: "app.ts", name: "Roteador 39 rotas",
   desc: "router() liga cada prefixo /api/... a um arquivo em routes/. Cada rota é uma máquina no bairro à direita.",
-  files: [["app.ts", 82, "router()"]] });
+  files: [["app.ts", 84, "router()"]] });
 add("limiter", { k: "guard", x: 1390, y: 640, tag: "rate-limit", name: "Contador de tentativas",
   desc: "express-rate-limit só na rota de login: 10 senhas erradas por IP a cada 15 minutos. Login certo não conta, para não travar o escritório inteiro saindo pelo mesmo IP.",
   files: [["routes/Auth.Routes.ts", 20, "loginLimiter"]] });
@@ -484,7 +484,7 @@ const CTRLS = [
   ["c_wahook", "atend", "/api/whatsappWebHook", "Webhook WhatsApp", "WhatsappWebHook.routes.ts", "whatsapp/index.ts", 0, 4, "público (quem chama é a Meta)", "apimk mkauth", "out_meta", "A porta do robô: recebe, tira duplicadas e põe na fila. A pasta controller/whatsapp tem 28 arquivos (handlers, services, testes)."],
   ["c_whatsapp", "atend", "/api/whatsapp", "Chat WhatsApp", "Whatsapp.Routes.ts", "Whatsapp.ts", 675, 7, "AuthGuard", "apimk mkauth", "out_meta", "Conversas para os atendentes, envio manual e disparo em massa."],
   ["c_watest", "atend", "/api/whatsapp-test", "Teste do robô", "WhatsappTest.routes.ts", "whatsapp/handlers/whatsapp-test.controller.ts", 435, 3, "AuthGuard", "apimk mkauth", "", "Simula conversas com o robô sem mandar mensagem de verdade."],
-  ["c_zapsign", "atend", "/api/zapsign", "ZapSign", "ZapSign.routes.ts", "ZapSign.ts", 1969, 5, "AuthGuard", "apimk dbMain mkauth", "out_zapsign out_publicas", "Contratos e termos para assinatura eletrônica. Busca a cidade do cliente no IBGE."],
+  ["c_zapsign", "atend", "/api/zapsign", "ZapSign", "ZapSign.routes.ts", "ZapSign.ts", 1972, 5, "AuthGuard", "apimk dbMain mkauth", "out_zapsign out_publicas", "Contratos e termos para assinatura eletrônica. Busca a cidade do cliente no IBGE."],
   ["c_zaptpl", "atend", "/api/zapsign-templates", "Modelos ZapSign", "ZapSignTemplates.routes.ts", "ZapSignTemplatesController.ts", 151, 3, "AuthGuard", "apimk", "out_zapsign", "Modelos de documento usados pelo ZapSign."],
   ["c_solic", "atend", "/api/solicitacao-servico", "Solicitações", "SolicitacaoServico.routes.ts", "SolicitacaoServico.ts", 1514, 12, "AuthGuard", "apimk dbMain mkauth", "out_consult", "Pedidos de serviço (mudança, troca de plano...) vindos do robô e dos links. Consulta o CPF na ConsultCenter antes de aprovar."],
   ["c_servlink", "atend", "/api/service-links", "Links de serviço", "ServiceLink.routes.ts", "servicoWeb/ServiceLink.ts", 1724, 12, "AuthGuard; link /s/:token público", "dbMain mkauth", "out_publicas out_email", "Links que o cliente abre para contratar serviço. Catálogo e contrato em controller/servicoWeb. Preenche o endereço pelo ViaCEP e avisa por e-mail."],
@@ -500,11 +500,11 @@ const CTRLS = [
   ["c_pm2", "rede", "/api/pm2-logs", "Logs PM2", "Pm2Logs.routes.ts", "Pm2Logs.ts", 97, 2, "AuthGuard", "", "", "Roda 'pm2 jlist' na própria máquina do backend."],
   ["c_backup", "rede", "/api/Backup", "Backup", "Backup.routes.ts", "Backup.ts", 400, 1, "AuthGuard (botão na Home)", "dbMain mkauth apimk", "out_drive", "mysqldump dos bancos e upload para o OneDrive. Também roda sozinho às 03:00."],
   ["c_tvwip", "tv", "/api/tv-wip", "TV WIP", "TvWip.routes.ts", "TvWip.ts TvWipApp.ts", 955, 32, "nível 2; app da TV com token próprio", "dbMain canais", "", "Contas, pacotes, canais, EPG e notificações da TV WIP."],
-  ["c_streaming", "tv", "/api/streaming", "Streaming", "Streaming.Routes.ts", "Streaming.ts", 175, 7, "AuthGuard", "dbMain mkauth", "out_watch", "Assinantes e testes da Watch TV."],
+  ["c_streaming", "tv", "/api/streaming", "Streaming", "Streaming.Routes.ts", "Streaming.ts", 177, 7, "AuthGuard", "dbMain mkauth", "out_watch", "Assinantes e testes da Watch TV."],
   ["c_watchconta", "tv", "/api/watchtv-conta", "Conta Watch TV", "WatchTvConta.routes.ts", "WatchTvConta.ts", 49, 2, "público (token aleatório do link, com prazo, uso único e limite de tentativas)", "dbMain mkauth", "out_watch", "Página do link em que o próprio cliente cria a conta da Watch TV com o e-mail e o celular dele. Se o cadastro já tinha conta, o ticket antigo sai da Watch Brasil antes. A regra mora em services/streamingCadastro.ts (tabela streaming_convites)."],
   ["c_watch", "tv", "/api/watchbrasil/redirect", "Retorno Watch", "WatchBrasilWebhook.routes.ts", "", 0, 2, "público (redirect)", "", "out_watch", "Recebe o retorno do login OAuth da Watch Brasil. A lógica fica na própria rota."],
   ["c_cameras", "tv", "/api/cameras", "Câmeras", "Camera.routes.ts", "Camera.ts", 540, 16, "AuthGuard", "cams mkauth", "out_mediamtx", "Portal de câmeras: cadastro, planos de gravação e acesso ao vídeo pelo MediaMTX."],
-  ["c_sercontratos", "tv", "/api/sercontratos", "Contratos SVA", "SerContratos.Routes.ts", "SerContratos.ts", 755, 8, "AuthGuard", "dbMain mkauth", "out_watch", "Contratos de serviços adicionais (streaming, câmeras). Gera o link para o cliente criar ou refazer a conta da Watch TV (POST /streaming/link), usado também pela tela de Solicitações."],
+  ["c_sercontratos", "tv", "/api/sercontratos", "Contratos SVA", "SerContratos.Routes.ts", "SerContratos.ts", 776, 8, "AuthGuard", "dbMain mkauth", "out_watch", "Contratos de serviços adicionais (streaming, câmeras). Gera o link para o cliente criar ou refazer a conta da Watch TV (POST /streaming/link), usado também pela tela de Solicitações."],
 ];
 const cnt = {};
 CTRLS.forEach(([id, d, prefix, name, rf, cf, lines, eps, guard, dbs, ext, desc]) => {
@@ -524,9 +524,9 @@ add("worker", { k: "worker", x: 2725, y: 690, tag: "queues.ts", name: "Robô do 
 add("jobs", { k: "worker", x: 2535, y: 800, tag: "tabela Jobs", name: "Produção em 2º plano", links: ["c_nfse", "c_nfe", "c_nfcom", "dbMain"],
   desc: "Não é BullMQ: é uma função chamada sem await, que vai atualizando um registro na tabela Jobs (pendente → processando → concluido/erro). Roda dentro do processo do Node, então, se o servidor reiniciar no meio, não é retomado sozinho.",
   files: [["controller/NFSE.ts", 545, "processarGeracaoNfseJob"], ["entities/Jobs.ts", 0, "Jobs"]] });
-add("cron", { k: "clock", x: 2725, y: 800, tag: "node-cron", name: "Relógio", links: ["c_backup", "c_pix", "c_licenca", "c_tvwip"],
-  desc: "Agendado no app.ts: 03:00 todo dia, backup. 03:00 do dia 1º, cobranças do Pix Automático. 03:15 todo dia, mensalidades de licença. 04:00 todo dia, conferência do Pix Automático. E no TvWipService: 03:10 todo dia, varredura da TV WIP (fuso de São Paulo). Pix, licenças e TV WIP também rodam quando o servidor sobe, para recuperar o que se perdeu com a máquina desligada.",
-  files: [["app.ts", 126, "backup 03:00"], ["app.ts", 143, "Pix dia 1º"], ["services/TvWipService.ts", 88, "TV WIP 03:10"], ["app.ts", 204, "licenças 03:15"], ["app.ts", 155, "conferência 04:00"]] });
+add("cron", { k: "clock", x: 2725, y: 800, tag: "node-cron", name: "Relógio", links: ["c_backup", "c_pix", "c_licenca", "c_tvwip", "c_sercontratos"],
+  desc: "Agendado no app.ts: 03:00 todo dia, backup. 03:00 do dia 1º, cobranças do Pix Automático. 03:15 todo dia, mensalidades de licença. 03:20 todo dia, recalcula a tabela clientes_watchtv (1 = tem direito à Watch TV, pelo contrato ou pelo plano combo). 04:00 todo dia, conferência do Pix Automático. E no TvWipService: 03:10 todo dia, varredura da TV WIP (fuso de São Paulo). Pix, licenças, TV WIP e Watch TV também rodam quando o servidor sobe, para recuperar o que se perdeu com a máquina desligada.",
+  files: [["app.ts", 128, "backup 03:00"], ["app.ts", 145, "Pix dia 1º"], ["services/TvWipService.ts", 88, "TV WIP 03:10"], ["app.ts", 206, "licenças 03:15"], ["app.ts", 228, "Watch TV 03:20"], ["app.ts", 157, "conferência 04:00"]] });
 add("services", { k: "clock", x: 2535, y: 910, tag: "server.ts", name: "Serviços contínuos", links: ["c_analytics", "c_streaming", "c_tvwip", "c_cameras"],
   desc: "Ligados assim que o servidor sobe: ClientMonitorService (retoma monitoramentos e mede a cada tick), StreamingTesteService (timer que encerra testes da Watch TV vencidos) e TvWipService (agenda a varredura das 03:10). Quando o banco das câmeras conecta, os planos de gravação são carregados e relidos de tempos em tempos (setInterval), para uma mudança de plano valer sem reiniciar.",
   files: [["server.ts", 27, "start()"], ["services/ClientMonitorService.ts", 82, "tick"], ["services/StreamingTesteService.ts", 28, "timer"], ["config/cameraStoragePlans.ts", 112, "releitura dos planos"]] });
@@ -566,7 +566,7 @@ add("pdns", { k: "db", x: 2730, y: 1400, tag: "createDns.ts", name: "Banco do Po
 
 // ---- Ferramentas e infraestrutura ----
 [
-  ["t_migr", "migration/", "92 migrações", "Histórico do banco principal em TypeORM. run-migrations.ts aplica as pendentes.", [["run-migrations.ts", 0, "run-migrations"]], ["dbMain"]],
+  ["t_migr", "migration/", "93 migrações", "Histórico do banco principal em TypeORM. run-migrations.ts aplica as pendentes.", [["run-migrations.ts", 0, "run-migrations"]], ["dbMain"]],
   ["t_tests", "vitest", "Testes", "Testes do robô do WhatsApp (controller/__tests__/whatsapp) e do fiscal (services/fiscal/__tests__).", [["backend/vitest.config.ts", 0, "vitest.config"]], []],
   ["t_docker", "docker-compose.yml", "Docker", "Sobe o Redis (filas) e o MediaMTX (câmeras). O backend em si roda com PM2.", [["backend/docker-compose.yml", 0, "docker-compose"]], ["redis", "out_mediamtx"]],
   ["t_scripts", "scripts", "Scripts avulsos", "Correções pontuais rodadas à mão: backfill-nfe-data.ts, cancelarNfse.ts, scripts/fix-chamados-abertos.ts, remove_log.js.", [["backfill-nfe-data.ts", 0, "backfill-nfe-data"], ["scripts/fix-chamados-abertos.ts", 0, "fix-chamados-abertos"]], ["dbMain", "mkauth"]],
@@ -596,8 +596,8 @@ const S = (m, t, d, f, l, x = {}) => ({ m, t, d, f, l, ...x });
 const MISSIONS = [
   { id: "login", title: "Login", http: "POST /api/auth/login", item: "REQ", color: "#d9a62c", steps: [
     S("s_auth", "Funcionário clica em Entrar", "A tela de login envia { login, password }.", "frontend/app/src/pages/auth", 0),
-    S("gate", "Entra pelo portão", "cors, express.json (o corpo vira req.body) e auditoriaMiddleware.", "app.ts", 74),
-    S("router", "Escolhe a esteira", "O prefixo /api/auth manda para routes/Auth.Routes.ts.", "app.ts", 82),
+    S("gate", "Entra pelo portão", "cors, express.json (o corpo vira req.body) e auditoriaMiddleware.", "app.ts", 76),
+    S("router", "Escolhe a esteira", "O prefixo /api/auth manda para routes/Auth.Routes.ts.", "app.ts", 84),
     S("limiter", "Passa pelo contador", "Menos de 10 erros deste IP nos últimos 15 minutos: pode seguir.", "routes/Auth.Routes.ts", 20),
     S("c_auth", "Valida o formulário", "express-validator: login obrigatório e senha com 6+ caracteres. Se falhar, devolve 400.", "controller/Auth.ts", 328),
     S("dbMain", "Procura o usuário", "userRepository.findOne({ where: { login } }) no MySQL principal.", "controller/Auth.ts", 350),
@@ -606,7 +606,7 @@ const MISSIONS = [
   ]},
   { id: "whats", title: "Mensagem no WhatsApp", http: "POST /api/whatsappWebHook", item: "MSG", color: "#6fc277", steps: [
     S("in_meta", "Cliente manda \"oi\"", "A Meta entrega a mensagem no webhook."),
-    S("gate", "Entra pelo portão", "Os mesmos middlewares de sempre.", "app.ts", 74),
+    S("gate", "Entra pelo portão", "Os mesmos middlewares de sempre.", "app.ts", 76),
     S("router", "Rota pública", "/api/whatsappWebHook não tem AuthGuard: quem chama é a Meta, não um funcionário.", "routes/WhatsappWebHook.routes.ts", 7),
     S("c_wahook", "Recebe e despacha", "Grava o messageId no Redis por 24h (SET NX) para ignorar mensagem repetida, enfileira e responde 200 na hora, para a Meta não reenviar.", "controller/whatsapp/handlers/webhook.handler.ts", 38),
     S("redis", "Fila de entrada", "O job entra em whatsapp-incoming.", "controller/whatsapp/handlers/webhook.handler.ts", 188),
@@ -619,7 +619,7 @@ const MISSIONS = [
   ]},
   { id: "nfse", title: "Emitir NFS-e", http: "POST /api/nfse", item: "RPS", color: "#6ea6e6", steps: [
     S("s_nfse", "Operador escolhe os clientes", "Na tela /NFSE ele marca os clientes e envia alíquota, ambiente, último RPS e a senha do certificado.", "frontend/app/src/pages/Nfse", 0),
-    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 74),
+    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 76),
     S("router", "Esteira /api/nfse", "Vai para routes/NFSE.routes.ts, que usa protegido(2).", "routes/NFSE.routes.ts", 44),
     S("auth", "Confere o crachá", "AuthGuard: tira o token do header, jwt.verify e carrega req.user.", "middleware/AuthGuard.ts", 22),
     S("perm", "Confere o nível", "exigirPermissao(2): operador ou acima pode seguir.", "middleware/PermissionGuard.ts", 11),
@@ -631,7 +631,7 @@ const MISSIONS = [
   ]},
   { id: "pix", title: "Pix pago", http: "POST /api/Pix/PixAutomatico/webhookCobr", item: "PIX", color: "#4fc3b0", steps: [
     S("in_efi", "Cliente pagou", "A Efí chama o webhook da cobrança do Pix Automático."),
-    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 74),
+    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 76),
     S("router", "Esteira /api/Pix", "Os webhooks não têm AuthGuard: quem chama é o banco.", "routes/Pix.routes.ts", 135),
     S("c_pix", "Anota e responde rápido", "PixAutomaticWebhookCobr registra a notificação e responde 200 { recebido: true } antes de processar.", "controller/Pix.ts", 786),
     S("dbMain", "Notificação guardada", "Fica em PixAutomaticoNotificacao. Se o processamento falhar, a conferência das 04:00 pega de novo.", "services/PixAutomaticoService.ts", 105),
@@ -640,7 +640,7 @@ const MISSIONS = [
   ]},
   { id: "loc", title: "Técnico em campo", http: "POST /api/phone-location/position", item: "GPS", color: "#e07a5f", steps: [
     S("app_loc", "Celular manda a posição", "O app Expo roda uma tarefa em segundo plano que pega o GPS e envia, mesmo com o app fechado.", "backend/Localizacao_app/src/backgroundTask.ts", 12),
-    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 74),
+    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 76),
     S("router", "Esteira /api/phone-location", "A rota /position é pública: o celular se identifica pelo device_token no corpo, não por login.", "routes/PhoneLocation.routes.ts", 8),
     S("c_phone", "Confere o aparelho", "updatePosition valida o device_token e atualiza a posição.", "controller/PhoneLocation.ts", 96),
     S("dbMain", "Posição salva", "Fica na tabela PhoneLocation.", "entities/PhoneLocation.ts", 0),
@@ -648,15 +648,15 @@ const MISSIONS = [
     S("s_phonelocation", "Técnicos no mapa", "O painel mostra onde cada técnico está.", "frontend/app/src/pages/PhoneLocation", 0, { end: "200" }),
   ]},
   { id: "backup", title: "Backup das 03:00", http: "cron \"0 3 * * *\"", item: "SQL", color: "#b58be0", steps: [
-    S("cron", "O relógio bate 03:00", "node-cron dispara o agendamento. Ninguém precisa pedir nada.", "app.ts", 126),
+    S("cron", "O relógio bate 03:00", "node-cron dispara o agendamento. Ninguém precisa pedir nada.", "app.ts", 128),
     S("c_backup", "gerarTodos", "BackupController percorre a lista de bancos.", "controller/Backup.ts", 376),
     S("dbMain", "mysqldump", "Gera um .sql de cada banco. Se um falhar, pula e segue com os outros.", "controller/Backup.ts", 189),
     S("out_drive", "Sobe para o OneDrive", "Cria uma sessão de upload no Microsoft Graph e envia o arquivo para a pasta Backup.", "controller/Backup.ts", 227, { end: "salvo" }),
   ]},
   { id: "licenca", title: "Mensalidade de licença", http: "POST /api/licenca/mensalidades/avulsa", item: "R$", color: "#c9b458", steps: [
-    S("cron", "O relógio bate 03:15", "Todo dia o agendamento roda gerarMensalidades: uma mensalidade por licença ativa cujo software tem regra com \"gerar todo mês\". Repetir não duplica.", "app.ts", 204),
+    S("cron", "O relógio bate 03:15", "Todo dia o agendamento roda gerarMensalidades: uma mensalidade por licença ativa cujo software tem regra com \"gerar todo mês\". Repetir não duplica.", "app.ts", 206),
     S("s_licencas", "Ou o admin cria uma avulsa", "Na aba Mensalidades, \"Nova cobrança avulsa\": escolhe o cliente da licença, competência, vencimento e valor. Valor e vencimento em branco vêm da regra do software.", "frontend/app/src/pages/Licencas/MensalidadesLicenca.tsx", 200),
-    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 74),
+    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 76),
     S("router", "Esteira /api/licenca", "routes/Licenca.Routes.ts: tudo de mensalidade é protegido(5).", "routes/Licenca.Routes.ts", 46),
     S("auth", "Confere o crachá", "AuthGuard: jwt.verify e req.user.", "middleware/AuthGuard.ts", 22),
     S("perm", "Confere o nível", "exigirPermissao(5): só administrador.", "middleware/PermissionGuard.ts", 11),
@@ -670,7 +670,7 @@ const MISSIONS = [
   ]},
   { id: "nfcom", title: "Emitir NFCom", http: "POST /api/NFCom/emitirNFCom", item: "XML", color: "#7fb3d5", steps: [
     S("s_nfcom", "Operador escolhe as faturas", "Na tela /Nfcom ele marca as faturas dos clientes e envia a senha do certificado.", "frontend/app/src/pages/Nfcom/Nfcom.tsx", 0),
-    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 74),
+    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 76),
     S("router", "Esteira /api/NFCom", "emitirNFCom usa o guard de operador (nível 2).", "routes/NFCom.routes.ts", 16),
     S("auth", "Confere o crachá", "AuthGuard: jwt.verify e req.user.", "middleware/AuthGuard.ts", 22),
     S("perm", "Confere o nível", "exigirPermissao(2): operador ou acima.", "middleware/PermissionGuard.ts", 11),
@@ -688,7 +688,7 @@ const MISSIONS = [
 function guardSteps(o) {
   const s = [
     S("s_pix", "Funcionário pede um Pix", "A tela /Pix já confere o nível no App.tsx, mas isso só esconde a tela: quem protege de verdade é o backend. O pedido vai " + (o.tok === "none" ? "sem token." : o.tok === "bad" ? "com um token vencido." : "com o token no header."), "frontend/app/src/App.tsx", 488),
-    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 74),
+    S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 76),
     S("router", "Esteira /api/Pix", "A rota /gerador usa protegido(2): precisa de crachá e de nível 2.", "routes/Pix.routes.ts", 16),
   ];
   if (o.tok === "none") return s.concat(
@@ -723,7 +723,7 @@ function autoMission(cid, entry) {
     S(entry, ext ? E.name + " chama a rota" : "Abre a tela " + E.name,
       ext ? E.desc : (E.paths ? "Endereços: " + E.paths.map(p => p[0]).join(", ") + ". " : "") + "A tela chama " + c.prefix + ".",
       E.dir || (E.files[0] || [])[0] || null, 0),
-    S("gate", "Entra pelo portão", "cors, express.json e auditoriaMiddleware.", "app.ts", 74),
+    S("gate", "Entra pelo portão", "cors, express.json e auditoriaMiddleware.", "app.ts", 76),
     S("router", "Esteira " + c.prefix, "O prefixo vai para " + rf + "." + (pub ? " Rota pública: " + c.guard + "." : ""), rf, 0),
   ];
   if (!pub) steps.push(S("auth", "Confere o crachá", "AuthGuard: jwt.verify no token e carrega req.user. Sem token válido, para aqui com 401.", "middleware/AuthGuard.ts", 22));

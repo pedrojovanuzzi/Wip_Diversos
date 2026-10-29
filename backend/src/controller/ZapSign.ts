@@ -34,6 +34,7 @@ import { planoTemSva } from "../config/planosComSva";
 import {
   contratarStreamingAposAssinatura,
   contratarStreamingDoPlano,
+  sincronizarWatchTv,
 } from "../services/streamingCadastro";
 import { diasDeTesteUsados } from "../services/streamingTesteHistorico";
 import {
@@ -1293,6 +1294,8 @@ class ZapSign {
       plano: dados?.plano,
       solicitacaoId: solicitacao.id,
     });
+    // O plano mudou: entrar num combo dá direito à Watch TV, sair dele tira.
+    await sincronizarWatchTv(login);
     if (r.status === "nao_aplica") return r;
 
     console.log(

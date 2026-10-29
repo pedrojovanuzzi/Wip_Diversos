@@ -8,7 +8,8 @@ import { StreamingAssinante } from "../entities/StreamingAssinante";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { deleteTicket } from "../services/WatchBrasilService";
 import {
-  clienteJaTemStreaming,
+  origemWatchTv,
+  sincronizarWatchTv,
   gerarConviteStreaming,
   linkAbertoDoLogin,
   registrarAssinanteStreaming,
@@ -164,6 +165,8 @@ class SerContratos {
           ? { email: assinante.email, ativo: assinante.ativo }
           : null,
         streamingLink: await linkAbertoDoLogin(login),
+        // Combo que inclui a Watch TV mas ainda sem a linha de R$ 0,00.
+        watchPeloPlano: (await origemWatchTv(login)) === "plano",
         camera: resumoCamera,
         nomesServicos: {
           STREAMER: nomeStreaming(VALORES.STREAMER),
@@ -485,6 +488,8 @@ class SerContratos {
         throw e;
       });
 
+      if (STREAMING_TYPES.has(tipoNorm)) await sincronizarWatchTv(login);
+
       const faturasLimpeza = (res as any).locals?.faturasLimpeza;
       res.status(201).json({
         message: expiraTeste
@@ -543,6 +548,9 @@ class SerContratos {
       }
 
       await repo.delete(id);
+      if (STREAMING_TYPES.has(tagDoServico(item.nome))) {
+        await sincronizarWatchTv(item.login);
+      }
       res.json({ ok: true, streaming: streamingNote });
     } catch (error: any) {
       console.error("Erro ao remover sercontratos:", error);
@@ -557,16 +565,32 @@ class SerContratos {
    */
   public async gerarLinkStreaming(req: Request, res: Response) {
     try {
-      const login = String(req.body?.login || "").trim();
+      const loginPedido = String(req.body?.login || "").trim();
       const solicitacaoId = Number(req.body?.solicitacaoId) || null;
-      if (!login) {
-        res.status(400).json({ message: "login é obrigatório." });
-        return;
+
+      // Vindo de uma solicitação, o login sai dela: na instalação o cadastro
+      // pode ter sido criado com um login diferente do reservado no pedido.
+      const solRepo = AppDataSource.getRepository(SolicitacaoServico);
+      const sol = solicitacaoId
+        ? await solRepo.findOne({ where: { id: solicitacaoId } })
+        : null;
+      const candidatos = sol
+        ? [sol.dados?.login, sol.login_cliente]
+        : [loginPedido];
+      let login = "";
+      for (const c of candidatos) {
+        const l = String(c || "").trim();
+        if (l && (await origemWatchTv(l))) {
+          login = l;
+          break;
+        }
       }
-      if (!(await clienteJaTemStreaming(login))) {
+
+      if (!login) {
         res.status(400).json({
           message:
-            "Este cadastro não tem a Watch TV no contrato. Adicione o serviço antes de gerar o link.",
+            "Este cadastro não tem a Watch TV: nem no contrato, nem no plano. " +
+            "Adicione o serviço antes de gerar o link.",
         });
         return;
       }
@@ -578,24 +602,20 @@ class SerContratos {
 
       // Gerado a partir de uma solicitação: a linha dela passa a mostrar o
       // link em destaque até o cliente usar.
-      if (solicitacaoId) {
-        const solRepo = AppDataSource.getRepository(SolicitacaoServico);
-        const sol = await solRepo.findOne({ where: { id: solicitacaoId } });
-        if (sol) {
-          const sc = sol.dados?.servico_cadastro || {};
-          sol.dados = {
-            ...(sol.dados || {}),
-            servico_cadastro: {
-              ...sc,
-              status:
-                !sc.status || sc.status === "sem_acesso"
-                  ? "aguardando_conta"
-                  : sc.status,
-              link: r.link,
-            },
-          };
-          await solRepo.save(sol);
-        }
+      if (sol) {
+        const sc = sol.dados?.servico_cadastro || {};
+        sol.dados = {
+          ...(sol.dados || {}),
+          servico_cadastro: {
+            ...sc,
+            status:
+              !sc.status || sc.status === "sem_acesso"
+                ? "aguardando_conta"
+                : sc.status,
+            link: r.link,
+          },
+        };
+        await solRepo.save(sol);
       }
       res.json(r);
     } catch (error: any) {
@@ -744,6 +764,7 @@ class SerContratos {
         .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: login })
         .andWhere(`${sqlTagServico("nome")} = :tipo`, { tipo })
         .execute();
+      if (STREAMING_TYPES.has(tipo)) await sincronizarWatchTv(login);
       res.json({ removed: result.affected || 0 });
     } catch (error: any) {
       console.error("Erro ao remover em lote:", error);

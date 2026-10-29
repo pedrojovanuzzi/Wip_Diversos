@@ -10,6 +10,7 @@ import {
   deleteTicket,
   getPacote,
 } from "../services/WatchBrasilService";
+import { sincronizarWatchTv } from "../services/streamingCadastro";
 
 class Streaming {
   public async list(_req: Request, res: Response) {
@@ -163,6 +164,7 @@ class Streaming {
       } catch (e: any) {
         console.error("Erro ao remover sissercontratos STREAMER:", e?.message);
       }
+      await sincronizarWatchTv(assinante.login);
 
       res.json({ ok: true, remoteNote, contratosRemoved });
     } catch (e: any) {

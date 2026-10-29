@@ -6,6 +6,7 @@ import { SisSerContratos } from "../entities/SisSerContratos";
 import { sqlTagServico } from "./servicosAdicionaisNomes";
 import { deleteTicket } from "./WatchBrasilService";
 import { encerrarTeste } from "./streamingTesteHistorico";
+import { sincronizarWatchTv } from "./streamingCadastro";
 
 /** Tags de streaming em sis_ser_contratos. */
 const TIPOS_STREAMING = ["STREAMER", "STREAMER_COLAB"];
@@ -94,6 +95,7 @@ class StreamingTesteService {
     await encerrarTeste(assinante.login, "expirou");
 
     await AppDataSource.getRepository(StreamingAssinante).delete(assinante.id);
+    await sincronizarWatchTv(assinante.login);
 
     console.log(
       `[StreamingTeste] Teste encerrado: ${assinante.login} removido da Watch Brasil` +
