@@ -1239,6 +1239,14 @@ Regravar com a descrição completa?`,
                 </ul>
               )}
 
+              {conferenciaWatch.avisos?.length > 0 && (
+                <ul className="mb-3 list-disc pl-5 text-sm text-blue-900">
+                  {conferenciaWatch.avisos.map((a: string) => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
+              )}
+
               <table className="mb-3 w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-xs uppercase text-gray-600">
@@ -1282,6 +1290,26 @@ Regravar com a descrição completa?`,
                           : "—"}
                     </td>
                   </tr>
+                  {conferenciaWatch.naWatch && (
+                    <>
+                      <tr className="border-t border-gray-100">
+                        <td className="p-2 font-semibold text-gray-600">E-mail de acesso</td>
+                        <td className="p-2">—</td>
+                        <td className="p-2">
+                          {conferenciaWatch.naWatch.emailEnviado === true
+                            ? "enviado"
+                            : conferenciaWatch.naWatch.emailEnviado === false
+                              ? "não enviado"
+                              : "—"}
+                        </td>
+                      </tr>
+                      <tr className="border-t border-gray-100">
+                        <td className="p-2 font-semibold text-gray-600">Criado em</td>
+                        <td className="p-2">—</td>
+                        <td className="p-2">{conferenciaWatch.naWatch.criadoEm || "—"}</td>
+                      </tr>
+                    </>
+                  )}
                 </tbody>
               </table>
 

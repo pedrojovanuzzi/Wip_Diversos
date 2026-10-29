@@ -712,6 +712,9 @@ type TicketWatch = {
   telefone: string | null;
   ativo: boolean | null;
   pacote: string | null;
+  /** Se a Watch já mandou o e-mail de boas-vindas com o acesso. */
+  emailEnviado: boolean | null;
+  criadoEm: string | null;
 };
 
 /** Primeiro campo presente, aceitando as grafias que a API costuma usar. */
@@ -727,13 +730,20 @@ function campo(obj: any, nomes: string[]): any {
   return undefined;
 }
 
+/** "true", 1, "ativo"... como booleano; null quando o campo não veio. */
+function comoBooleano(v: any): boolean | null {
+  if (v === undefined) return null;
+  return v === true || ["true", "1", "ativo", "a", "s"].includes(String(v).toLowerCase());
+}
+
 /**
- * Tickets dentro da resposta de /v2/tickets/get. A coleção da Watch não traz
- * exemplo de retorno, então aceita `Result` em lista ou objeto e nomes de
- * campo em qualquer caixa; o JSON cru vai junto para a tela.
+ * Tickets dentro da resposta de /v2/tickets/get. A Watch devolve
+ * `{ Result: { list: [ { Ticket, EmailUsuario, Status, telefone, ... } ] } }`;
+ * aceita também `Result` como lista ou objeto solto, por garantia.
  */
 function ticketsDaResposta(resp: any): TicketWatch[] {
-  const bruto = resp?.Result ?? resp?.result ?? resp?.data ?? null;
+  const resultado = resp?.Result ?? resp?.result ?? resp?.data ?? null;
+  const bruto = resultado?.list ?? resultado?.List ?? resultado;
   const lista = Array.isArray(bruto) ? bruto : bruto ? [bruto] : [];
   return lista
     .filter((t) => t && typeof t === "object")
@@ -745,12 +755,10 @@ function ticketsDaResposta(resp: any): TicketWatch[] {
           campo(t, ["email", "emailusuario", "email_usuario", "ds_email", "pEmail"]) ??
           null,
         telefone: campo(t, ["phone", "telefone", "celular", "ds_telefone", "pPhone"]) ?? null,
-        ativo:
-          status === undefined
-            ? null
-            : status === true ||
-              ["true", "1", "ativo", "a", "s"].includes(String(status).toLowerCase()),
+        ativo: comoBooleano(status),
         pacote: campo(t, ["pacote", "id_pacote", "pPacote", "ds_pacote"]) ?? null,
+        emailEnviado: comoBooleano(campo(t, ["EmailEnviado", "email_enviado"])),
+        criadoEm: campo(t, ["DataCriacao", "data_criacao"]) ?? null,
       };
     })
     .filter((t) => t.ticket || t.email);
@@ -810,7 +818,12 @@ export async function conferirContaNaWatch(login: string) {
     : null;
 
   const tickets = [...porId.tickets, ...(porEmail?.tickets ?? [])];
-  const naWatch = tickets[0] ?? null;
+  // A mesma conta aparece nas duas consultas: compara com o ticket guardado
+  // aqui, se a Watch tiver ele; senão, com o primeiro que veio.
+  const naWatch =
+    tickets.find((t) => local?.ticket && t.ticket === local.ticket) ??
+    tickets[0] ??
+    null;
 
   // O que não bate entre o nosso registro e a Watch.
   const divergencias: string[] = [];
@@ -833,6 +846,13 @@ export async function conferirContaNaWatch(login: string) {
       `E-mail diferente: aqui ${local.email}, na Watch ${naWatch.email}.`,
     );
   }
+  // A Watch guarda o celular com o 55 na frente; aqui fica sem.
+  const semDdi = (v: any) => String(v || "").replace(/D/g, "").replace(/^55(?=d{10,11}$)/, "");
+  if (local?.phone && naWatch?.telefone && semDdi(local.phone) !== semDdi(naWatch.telefone)) {
+    divergencias.push(
+      `Celular diferente: aqui ${local.phone}, na Watch ${naWatch.telefone}.`,
+    );
+  }
   if (local && naWatch?.ativo !== null && naWatch?.ativo !== undefined && naWatch.ativo !== local.ativo) {
     divergencias.push(
       `Status diferente: aqui ${local.ativo ? "ativo" : "inativo"}, na Watch ${naWatch.ativo ? "ativo" : "inativo"}.`,
@@ -842,6 +862,12 @@ export async function conferirContaNaWatch(login: string) {
   return {
     login: l,
     cadastradoNaWatch: tickets.length > 0,
+    // Não é erro de sincronização, mas explica o cliente que diz não ter
+    // recebido nada.
+    avisos:
+      naWatch?.emailEnviado === false
+        ? ["A Watch ainda não enviou o e-mail de acesso para este cliente."]
+        : [],
     local: local
       ? {
           ticket: local.ticket || null,
