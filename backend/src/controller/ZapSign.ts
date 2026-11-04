@@ -34,6 +34,7 @@ import { planoTemSva } from "../config/planosComSva";
 import {
   contratarStreamingAposAssinatura,
   contratarStreamingDoPlano,
+  gerarConviteStreaming,
   sincronizarWatchTv,
 } from "../services/streamingCadastro";
 import { diasDeTesteUsados } from "../services/streamingTesteHistorico";
@@ -338,6 +339,37 @@ const TEMPLATE_LINK_WATCH = "watch_tv_cadastro";
  * Devolve para onde foi, para a tela de solicitações mostrar. Falha não sobe:
  * o link continua na tela de solicitações para o atendimento copiar.
  */
+/**
+ * Decide se o link da conta sai agora, depois de a Watch TV entrar (ou já
+ * estar) no cadastro.
+ *
+ * `ja_tinha` acontece quando o ZapSign reentrega o evento, mas também quando
+ * o streaming já estava no contrato (cadastro de teste, marcação manual). Se
+ * o link ainda não foi a esta solicitação, ele vai: o cliente acabou de
+ * assinar e espera recebê-lo. A reentrega não repete, porque o envio fica
+ * gravado em `servico_cadastro.link_enviado_para`.
+ */
+async function enviarLinkWatchTvSePreciso(
+  solicitacao: SolicitacaoServico,
+  r: { status: string; link?: string },
+  login: string,
+) {
+  if (r.status === "aguardando_conta") {
+    return enviarLinkWatchTv(solicitacao, r.link);
+  }
+  const jaEnviado = (solicitacao.dados as any)?.servico_cadastro
+    ?.link_enviado_para;
+  if (r.status === "ja_tinha" && !jaEnviado) {
+    const { link } = await gerarConviteStreaming({
+      login,
+      usuario: "assinatura",
+      solicitacaoId: solicitacao.id,
+    });
+    return enviarLinkWatchTv(solicitacao, link);
+  }
+  return {};
+}
+
 async function enviarLinkWatchTv(
   solicitacao: SolicitacaoServico,
   link?: string,
@@ -1246,10 +1278,11 @@ class ZapSign {
                     solicitacaoId: solicitacao.id,
                   });
 
-                  const envio =
-                    r.status === "aguardando_conta"
-                      ? await enviarLinkWatchTv(solicitacao, r.link)
-                      : {};
+                  const envio = await enviarLinkWatchTvSePreciso(
+                    solicitacao,
+                    r,
+                    loginWatch,
+                  );
                   console.log(
                     `[ZapSign Webhook] Watch TV de ${loginWatch}: ${r.status}` +
                       (r.motivo ? ` — ${r.motivo}` : ""),
@@ -1336,10 +1369,7 @@ class ZapSign {
         (r.motivo ? ` — ${r.motivo}` : ""),
     );
 
-    const envio =
-      r.status === "aguardando_conta"
-        ? await enviarLinkWatchTv(solicitacao, r.link)
-        : {};
+    const envio = await enviarLinkWatchTvSePreciso(solicitacao, r, login);
 
     const repo = AppDataSource.getRepository(SolicitacaoServico);
     solicitacao.dados = {
