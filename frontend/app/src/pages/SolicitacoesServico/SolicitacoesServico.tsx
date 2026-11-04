@@ -262,16 +262,7 @@ const SolicitacoesServico = () => {
         );
         return;
       }
-      // Os links guardados não dizem se o bot chegou a enviar; a Watch TV
-      // nunca envia sozinha, e é a única que precisa do aviso reforçado.
-      const svc = (service.servico || "").toLowerCase();
-      setLinksOrigem(
-        svc.includes("watch tv") || svc.includes("sva")
-          ? "manual"
-          : service.origem === "web"
-            ? "web"
-            : "bot",
-      );
+      setLinksOrigem(service.origem === "web" ? "web" : "bot");
       setLinksMensagem(null);
       setLinksWeb(data.links);
     } catch (e: any) {

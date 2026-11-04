@@ -31,15 +31,6 @@ function veioDaWeb(solicitacao: SolicitacaoServico): boolean {
   return (solicitacao.dados as any)?.origem === "web";
 }
 
-/**
- * Serviços cujo link de assinatura nunca sai sozinho pelo WhatsApp.
- *
- * O termo do SVA autoriza uma cobrança na mensalidade do cliente, então quem
- * decide enviar é o atendimento, depois de conferir o pedido — o bot mandar
- * direto abriria espaço para pedido feito em nome de terceiro.
- */
-const ENVIO_DE_LINK_MANUAL = ["watch tv", "sva"];
-
 class SolicitacaoServicoController {
   private isConsultaCpfConcluida(solicitacao: SolicitacaoServico): boolean {
     return Boolean(
@@ -1282,13 +1273,7 @@ class SolicitacaoServicoController {
       // Envia o link de assinatura ao cliente via WhatsApp
       // Solicitação do site não tem conversa no WhatsApp: o link volta na resposta.
       const origemWebAssinatura = veioDaWeb(solicitacao);
-      // A Watch TV não sai sozinha pelo bot: o termo autoriza uma cobrança na
-      // mensalidade, então quem manda o link é o atendimento, depois de
-      // conferir o pedido.
-      const envioManual = ENVIO_DE_LINK_MANUAL.some((s) =>
-        servicoNorm.includes(s),
-      );
-      const enviarPeloBot = !origemWebAssinatura && !envioManual;
+      const enviarPeloBot = !origemWebAssinatura;
       const msgAssinatura = urlDocumentoExtra
         ? `📄 *Aqui estão os seus links de assinatura:*\n\n` +
           `1) Contrato: ${zapSignUrl}\n` +

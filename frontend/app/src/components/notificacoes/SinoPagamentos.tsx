@@ -7,8 +7,7 @@ import {
   FaDesktop,
   FaExclamationTriangle,
   FaTv,
-  FaCopy,
-  FaWhatsapp,
+  FaExternalLinkAlt,
   FaCheck,
   FaTimes,
 } from "react-icons/fa";
@@ -43,20 +42,24 @@ interface Alerta {
 }
 
 /**
- * Pendência: nível atenção (laranja). Watch TV no cadastro esperando o
- * cliente receber o link e criar a conta.
+ * Pendência: nível atenção (laranja). Watch TV avulsa que entrou no cadastro:
+ * o link da conta já foi sozinho ao cliente, mas as mensalidades o
+ * atendimento ajusta à mão.
  */
 interface Pendencia {
   id: string;
   nivel: "atencao";
-  tipo: "watch_conta";
+  tipo: "watch_mensalidade";
   titulo: string;
   cliente: string;
   login: string;
-  celular: string;
-  link: string;
+  /** Proporcional dos dias de uso, já formatado ("12,34"). */
+  valorProporcional: string;
+  /** Fatura que recebe o proporcional ("10/12/2026"). */
+  vencimentoProporcional: string;
+  /** Valor cheio que entra nas faturas seguintes ("29,90"). */
+  valorMensal: string;
   criadoEm: string;
-  expiraEm: string;
 }
 
 /** De quanto em quanto tempo o sino pergunta se entrou pagamento. */
@@ -65,10 +68,10 @@ const INTERVALO_MS = 45_000;
 /** Guarda o que já foi visto, para o contador não zerar a cada página. */
 const CHAVE_VISTOS = "pix_notificacoes_vistos";
 const CHAVE_LISTA = "pix_notificacoes_lista";
-/** Pendências que este atendente marcou como enviadas. */
-const CHAVE_ENVIADOS = "watch_links_enviados";
+/** Pendências que este atendente marcou como ajustadas. */
+const CHAVE_ENVIADOS = "watch_mensalidades_ajustadas";
 /** Pendências que já apareceram no canto da tela, para não repetir. */
-const CHAVE_AVISADOS = "watch_links_avisados";
+const CHAVE_AVISADOS = "watch_mensalidades_avisadas";
 
 function lerIds(chave: string): Set<string> {
   try {
@@ -86,18 +89,15 @@ function gravarIds(chave: string, ids: Set<string>) {
   }
 }
 
-function linkWhatsapp(p: Pendencia) {
-  const numero = String(p.celular || "").replace(/\D/g, "");
-  const texto =
-    `Olá${p.cliente ? `, ${p.cliente.split(" ")[0]}` : ""}! ` +
-    `A sua Watch TV já está liberada. Para começar a assistir, crie a sua ` +
-    `conta por este link: ${p.link}`;
-  const destino = numero
-    ? numero.startsWith("55")
-      ? numero
-      : `55${numero}`
-    : "";
-  return `https://wa.me/${destino}?text=${encodeURIComponent(texto)}`;
+/** O que lançar no MK-Auth, em uma frase. */
+function oQueAjustar(p: Pendencia) {
+  const proximo = p.valorProporcional
+    ? `R$ ${p.valorProporcional} na fatura${p.vencimentoProporcional ? ` de ${p.vencimentoProporcional}` : ""}`
+    : "o proporcional na próxima fatura";
+  const seguintes = p.valorMensal
+    ? `R$ ${p.valorMensal} nas seguintes`
+    : "o valor da Watch TV nas seguintes";
+  return `${proximo} e ${seguintes}`;
 }
 
 /**
@@ -145,9 +145,9 @@ function lerLista(): Pagamento[] {
  *
  * Três níveis:
  * - baixo: pagamentos recebidos, em cinza. Acumulam e somem com "Limpar".
- * - atenção: Watch TV esperando o link ser enviado ao cliente, em laranja.
- *   Some quando o cliente cria a conta, quando o link vence ou quando o
- *   atendente marca "Já enviei". A primeira vez também aparece no canto da tela.
+ * - atenção: Watch TV avulsa no cadastro com as mensalidades por ajustar, em
+ *   laranja. Some quando a solicitação é finalizada ou quando o atendente
+ *   marca "Já ajustei". A primeira vez também aparece no canto da tela.
  * - importante: licença com mensalidade vencida, em vermelho piscando. Vêm do
  *   estado atual a cada consulta, então só somem quando a mensalidade é paga
  *   (ou cancelada); "Limpar" não as apaga.
@@ -160,7 +160,6 @@ export const SinoPagamentos = () => {
     lerIds(CHAVE_ENVIADOS),
   );
   const [avisos, setAvisos] = useState<Pendencia[]>([]);
-  const [copiado, setCopiado] = useState<string | null>(null);
   const [aberto, setAberto] = useState(false);
   const [naoVistos, setNaoVistos] = useState(0);
   const painel = useRef<HTMLDivElement>(null);
@@ -258,19 +257,6 @@ export const SinoPagamentos = () => {
     setNaoVistos(0);
   };
 
-  const copiar = async (p: Pendencia) => {
-    try {
-      await navigator.clipboard.writeText(p.link);
-      setCopiado(p.id);
-      setTimeout(
-        () => setCopiado((atual) => (atual === p.id ? null : atual)),
-        2000,
-      );
-    } catch {
-      window.prompt("Copie o link:", p.link);
-    }
-  };
-
   const marcarEnviado = (id: string) => {
     setEnviados((atuais) => {
       const novos = new Set(atuais).add(id);
@@ -293,32 +279,24 @@ export const SinoPagamentos = () => {
     pendentes.some((p) => p.id === a.id),
   );
 
-  /** Botões de copiar, WhatsApp e "Já enviei", iguais no sino e no canto. */
+  /** Botões de abrir a solicitação e "Já ajustei", iguais no sino e no canto. */
   const acoes = (p: Pendencia) => (
     <div className="mt-2 flex flex-wrap gap-1.5">
-      <button
-        onClick={() => copiar(p)}
+      <Link
+        to="/solicitacoes-servico"
+        onClick={() => setAberto(false)}
         className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-medium text-orange-800 ring-1 ring-orange-300 hover:bg-orange-100"
       >
-        <FaCopy className="size-3" />
-        {copiado === p.id ? "Copiado!" : "Copiar link"}
-      </button>
-      <a
-        href={linkWhatsapp(p)}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex items-center gap-1 rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700"
-      >
-        <FaWhatsapp className="size-3" />
-        WhatsApp
-      </a>
+        <FaExternalLinkAlt className="size-3" />
+        Ver solicitação
+      </Link>
       <button
         onClick={() => marcarEnviado(p.id)}
-        title="Tira o aviso desta tela. Ele some para todos quando o cliente criar a conta."
+        title="Tira o aviso desta tela. Ele some para todos quando a solicitação for finalizada."
         className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
       >
         <FaCheck className="size-3" />
-        Já enviei
+        Já ajustei
       </button>
     </div>
   );
@@ -340,15 +318,15 @@ export const SinoPagamentos = () => {
                 </span>
                 <button
                   onClick={() => fecharAviso(p.id)}
-                  title="Fechar. Continua no sino até o link ser enviado."
+                  title="Fechar. Continua no sino até as mensalidades serem ajustadas."
                   className="text-orange-500 hover:text-orange-700"
                 >
                   <FaTimes className="size-3.5" />
                 </button>
               </div>
               <p className="mt-2 text-sm text-orange-900">
-                <b>{p.cliente || p.login}</b> já tem a Watch TV no cadastro.
-                Envie o link para criar a conta.
+                <b>{p.cliente || p.login}</b> assinou a Watch TV. Ajuste as
+                mensalidades no MK-Auth: {oQueAjustar(p)}.
               </p>
               {acoes(p)}
             </div>
@@ -362,7 +340,7 @@ export const SinoPagamentos = () => {
             temAlerta
               ? `${alertas.length} alerta(s) para resolver`
               : temPendencia
-                ? `${pendentes.length} link(s) da Watch TV para enviar`
+                ? `${pendentes.length} mensalidade(s) da Watch TV para ajustar`
                 : "Notificações"
           }
           className={`relative flex size-11 items-center justify-center rounded-full text-white shadow-lg transition ${
@@ -467,8 +445,8 @@ export const SinoPagamentos = () => {
                   <p className="mt-1 truncate text-sm font-semibold text-orange-900">
                     {p.cliente || "-"}
                   </p>
-                  <p className="truncate text-xs text-orange-700">
-                    {p.login} · link vale até {dataBR(p.expiraEm)}
+                  <p className="text-xs text-orange-700">
+                    {p.login} · {oQueAjustar(p)}
                   </p>
                   {acoes(p)}
                 </div>

@@ -25,8 +25,6 @@ import licencaMensalidadeService, {
   INFO_LICENCA,
 } from "../services/LicencaMensalidadeService";
 import { LicencaMensalidade } from "../entities/LicencaMensalidade";
-import { StreamingConvite } from "../entities/StreamingConvite";
-import { linkDoConvite } from "../services/streamingCadastro";
 
 dotenv.config();
 
@@ -359,54 +357,52 @@ class Pix {
         }
       }
 
-      // Watch TV no cadastro sem conta criada: alguém precisa mandar o link.
-      // Some sozinho quando o cliente usa o link ou ele vence. O link cria a
-      // conta do cliente e vem com o telefone dele: só para quem atende
-      // (nível 2), não para o nível de consulta.
+      // Watch TV avulsa que entrou no cadastro: o link da conta sai sozinho
+      // pelo WhatsApp, mas as mensalidades o atendimento ajusta à mão (o
+      // proporcional na próxima fatura e o valor cheio nas seguintes). Some
+      // quando a solicitação é finalizada. Só para quem atende (nível 2).
       const pendencias: any[] = [];
       if ((req.user?.permission ?? 0) >= 2) {
         try {
-          const convites = await LocalDataSource.getRepository(
-            StreamingConvite,
-          ).find({
-            where: { usado_em: IsNull(), expira_em: MoreThan(new Date()) },
-            order: { id: "DESC" },
-            take: 30,
-          });
-          const logins = [...new Set(convites.map((c) => c.login))];
-          const clientes = logins.length
-            ? await AppDataSource.getRepository(ClientesEntities).find({
-                select: { login: true, nome: true, celular: true },
-                where: { login: In(logins) },
-              })
-            : [];
-          const porLogin = new Map(clientes.map((c) => [c.login, c]));
-          const vistos = new Set<string>();
-          for (const c of convites) {
-            // Um aviso por cliente: vale o link mais novo.
-            if (vistos.has(c.login)) continue;
-            vistos.add(c.login);
-            const cliente = porLogin.get(c.login);
+          const desde = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+          const assinadas = await LocalDataSource.getRepository(
+            SolicitacaoServico,
+          )
+            .createQueryBuilder("s")
+            .where("LOWER(s.servico) IN (:...servicos)", {
+              servicos: ["watch tv", "contrato de sva"],
+            })
+            .andWhere("s.assinado = 1")
+            .andWhere("s.cancelado = 0")
+            .andWhere("s.finalizado = 0")
+            .andWhere("s.data_solicitacao >= :desde", { desde })
+            .andWhere(
+              "JSON_UNQUOTE(JSON_EXTRACT(s.dados, '$.servico_cadastro.status')) IN ('aguardando_conta', 'adicionado')",
+            )
+            .orderBy("s.id", "DESC")
+            .take(30)
+            .getMany();
+          for (const s of assinadas) {
+            const d = (s.dados || {}) as any;
             pendencias.push({
-              id: `watch-conta-${c.id}`,
+              id: `watch-mensalidade-${s.id}`,
               nivel: "atencao",
-              tipo: "watch_conta",
-              titulo: "Watch TV: enviar link",
-              cliente: cliente?.nome || c.login,
-              login: c.login,
-              celular: cliente?.celular || "",
-              link: linkDoConvite(c.token),
-              criadoEm: c.created_at,
-              expiraEm: c.expira_em,
+              tipo: "watch_mensalidade",
+              titulo: "Watch TV: ajustar mensalidades",
+              cliente: d.nome || s.login_cliente || "",
+              login: s.login_cliente || d.login || "",
+              valorProporcional: d.valor_proporcional || "",
+              vencimentoProporcional: d.vencimento_proporcional || "",
+              valorMensal: d.valor_sva || d.valor || "",
+              criadoEm: d.servico_cadastro?.em || s.data_solicitacao,
             });
           }
         } catch (erro: any) {
-          // Opcional: MK-Auth lento ou tabela ausente não derrubam o sino.
-          if (erro?.code !== "ER_NO_SUCH_TABLE" && erro?.errno !== 1146)
-            console.error(
-              "[Sino] Erro ao buscar links pendentes da Watch TV:",
-              erro?.message || erro,
-            );
+          // Opcional: falha aqui não derruba o sino.
+          console.error(
+            "[Sino] Erro ao buscar mensalidades da Watch TV para ajustar:",
+            erro?.message || erro,
+          );
         }
       }
 
