@@ -504,17 +504,31 @@ async function concluirWatchTv(celular: any, session: any) {
       await enviarLinkDocumentoExtra(celular, zapResponse);
     }
   } catch (e: any) {
+    // A resposta do ZapSign diz o motivo (template, campo, token); fica no
+    // log e na solicitação, para o atendimento ver na tela.
+    const motivo = e?.response?.data
+      ? JSON.stringify(e.response.data)
+      : e?.message || String(e);
     console.error(
-      "[WatchTV] Falha ao gerar o Contrato de SVA:",
-      e?.message || e,
+      `[WatchTV] Falha ao gerar o Contrato de SVA da solicitação ${solicitacao.id}:`,
+      motivo,
     );
+    try {
+      solicitacao.dados = {
+        ...solicitacao.dados,
+        contrato_erro: { data: new Date().toISOString(), motivo },
+      };
+      await AppDataSource.getRepository(SolicitacaoServico).save(solicitacao);
+    } catch {
+      // Sem gravar o motivo, o log acima ainda tem.
+    }
   }
 
   if (!signUrl) {
     await MensagensComuns(
       celular,
-      `✅ *Pedido registrado!*\n\nSua contratação da *Watch TV* foi enviada para a ` +
-        `nossa equipe. Em breve você recebe o *Contrato de SVA* para assinar.\n\n` +
+      `✅ *Pedido registrado!*\n\nNão conseguimos gerar o *Contrato de SVA* ` +
+        `agora; nossa equipe envia o link para assinar por aqui em instantes.\n\n` +
         `💰 Não há nada a pagar agora: a assinatura entra na sua mensalidade.`,
     );
   }
