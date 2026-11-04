@@ -1677,7 +1677,9 @@ class ZapSign {
         },
       );
 
-      return response.data;
+      // Wifi estendido no combo com streaming leva o Termo de Adesão SVA.
+      const extra = await documentoExtraDoPlano(params);
+      return { ...response.data, ...extra };
     } catch (error) {
       console.error("Error in createContractWifiExtendido:", error);
       throw error;

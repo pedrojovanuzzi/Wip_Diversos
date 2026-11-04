@@ -18,7 +18,7 @@ import {
 } from "../services/messaging.service";
 
 /** De onde o cliente veio, para retomar no lugar certo depois do aceite. */
-export type OrigemTermoSva = "instalacao" | "troca_plano";
+export type OrigemTermoSva = "instalacao" | "troca_plano" | "wifi_extendido";
 
 /**
  * Precisa pedir o aceite agora?
@@ -144,6 +144,15 @@ async function retomarDepoisDoTermo(celular: any, session: any) {
     const { handleAwaitingTrocaPlanoFlow } = await import("./servicos.handler");
     session.stage = "awaiting_troca_plano_flow";
     await handleAwaitingTrocaPlanoFlow(celular, original, session);
+    return;
+  }
+
+  if (origem === "wifi_extendido") {
+    const { handleAwaitingWifiExtendidoFlow } = await import(
+      "./servicos.handler"
+    );
+    session.stage = "awaiting_wifi_extendido_flow";
+    await handleAwaitingWifiExtendidoFlow(celular, original, session);
     return;
   }
 

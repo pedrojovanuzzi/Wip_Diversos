@@ -306,6 +306,8 @@ async function salvarSolicitacaoWifiExtendido(
     termo: session.contrato_cliente || "",
     rg: session.rg || "Não informado",
     plano: session.planoEscolhido || "Não informado",
+    // Combo com streaming: para onde vai o link de cadastro da Watch TV.
+    celular_link_watch: session.celularLinkWatch || "",
     observacao: session.observacaoWifiExtendido || "",
     valor: "0.00",
     valor_plano: session.valor_plano_atual || "",
@@ -2769,6 +2771,15 @@ export async function handleAwaitingWifiExtendidoFlow(
       return;
     }
 
+    // Combo com streaming: aceite do Termo SVA e celular do link da Watch TV
+    // antes de fechar, igual à troca para o combo. Depois volta aqui.
+    if (precisaAceitarTermoSva(session, planoEscolhido)) {
+      session.planoEscolhido = planoEscolhido;
+      session.observacaoWifiExtendido = payload.observacao || "";
+      await pedirAceiteTermoSva(celular, session, "wifi_extendido", texto);
+      return;
+    }
+
     session.planoEscolhido = planoEscolhido;
     session.observacaoWifiExtendido = payload.observacao || "";
     session.wifiExtendidoStep = null;
@@ -2876,6 +2887,8 @@ export async function handleAwaitingWifiExtendidoFlow(
         celular,
         `📄 *Aqui está o seu Link de Assinatura:* ${zapSignUrl}\n\nPor favor, *Assine* para formalizarmos o serviço! 🚀`,
       );
+      // Combo com streaming: o Termo de Adesão SVA vem junto.
+      await enviarLinkDocumentoExtra(celular, zapResponse);
       session.stage = "awaiting_signature_link";
     } catch (error: any) {
       console.error(

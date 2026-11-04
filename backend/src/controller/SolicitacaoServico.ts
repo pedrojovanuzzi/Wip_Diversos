@@ -1214,6 +1214,8 @@ class SolicitacaoServicoController {
           zapResponse = await ZapSign.createContractMudancaComodo(dados);
         } else if (servicoNorm === "alteração de plano" || servicoNorm === "alteracao de plano") {
           zapResponse = await ZapSign.createContractAlteracaoPlano(dados);
+        } else if (servicoNorm === "wifi extendido") {
+          zapResponse = await ZapSign.createContractWifiExtendido(dados);
         } else if (servicoNorm.includes("titularidade") && !servicoNorm.includes("novo titular")) {
           zapResponse = await ZapSign.createContractTrocaTitularidadeTitular(dados);
         } else if (servicoNorm.includes("titularidade") && servicoNorm.includes("novo titular")) {

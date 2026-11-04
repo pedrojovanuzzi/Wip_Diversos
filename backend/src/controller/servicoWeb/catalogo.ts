@@ -681,7 +681,10 @@ export async function resolverCampos(
         sva: planoTemSva(p.id),
       }));
     } else if (campo.fonte === "planos_wifi")
-      opcoes = await getPlanosWifiExtendido();
+      opcoes = (await getPlanosWifiExtendido()).map((p) => ({
+        ...p,
+        sva: planoTemSva(p.id),
+      }));
     else if (campo.fonte === "estados") opcoes = ESTADOS;
     else if (campo.fonte === "vencimentos") opcoes = VENCIMENTOS;
     campos.push({ ...campo, opcoes });

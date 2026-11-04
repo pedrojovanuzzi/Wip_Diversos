@@ -55,11 +55,21 @@ export async function getPlanosDoSistema() {
   }
 }
 
+/**
+ * Planos de wifi estendido fora do padrão `_EST_WIFI`, liberados por nome.
+ * O combo com streaming leva a Watch TV junto (planoTemSva), e o fluxo pede o
+ * aceite do Termo SVA e o celular do link, igual à troca para o combo.
+ */
+const PLANOS_WIFI_LIBERADOS = ["EST_COMBO_800M_STREAMING"];
+
 export async function getPlanosWifiExtendido() {
   try {
     const planoRepository = MkauthDataSource.getRepository(SisPlano);
     const planos = await planoRepository.find({
-      where: { nome: Like("\\_EST\\_WIFI%") },
+      where: [
+        { nome: Like("\\_EST\\_WIFI%") },
+        ...PLANOS_WIFI_LIBERADOS.map((nome) => ({ nome })),
+      ],
       order: { nome: "ASC" },
     });
 
