@@ -4,7 +4,7 @@ import AppDataSource from "../database/DataSource";
 import MkauthSource from "../database/MkauthSource";
 import { SolicitacaoServico } from "../entities/SolicitacaoServico";
 import { ChamadosEntities } from "../entities/ChamadosEntities";
-import { In } from "typeorm";
+import { In, IsNull, Not } from "typeorm";
 import moment from "moment-timezone";
 import { ConsultCenterService } from "../services/ConsultCenterService";
 import { MensagensComuns, enviarNotificacaoServico, gerarLancamentoServico } from "./whatsapp/index";
@@ -887,7 +887,7 @@ class SolicitacaoServicoController {
       // A fatura do pedido ficava aberta no MK-Auth: entrava na tela de NFS-e
       // e podia ser cobrada. Aberta, sai como o MK-Auth exclui (deltitulo +
       // datadel); paga, fica, porque o dinheiro entrou e o estorno é à mão.
-      let aviso: string | null = null;
+      const avisos: string[] = [];
       if (solicitacao.id_fatura) {
         try {
           const faturasRepo = MkauthSource.getRepository(Faturas);
@@ -896,12 +896,33 @@ class SolicitacaoServicoController {
           });
           if (fatura && !fatura.datadel) {
             if (fatura.status === "pago") {
-              aviso = `A fatura ${fatura.id} já foi paga e continua no MK-Auth.`;
+              avisos.push(`A fatura ${fatura.id} já foi paga e continua no MK-Auth.`);
             } else {
-              await faturasRepo.update(fatura.id, {
-                deltitulo: 1,
-                datadel: new Date(),
-              });
+              // Primeiro o Pix, para o QR já enviado parar de aceitar pagamento.
+              try {
+                await new Pix().removerPixServico(
+                  fatura.id,
+                  (solicitacao.dados as any)?.cpf,
+                );
+              } catch (err: any) {
+                console.error(
+                  `Erro ao remover o Pix da fatura ${fatura.id} na Efí:`,
+                  err?.mensagem || err?.message || err,
+                );
+                avisos.push(
+                  `Não foi possível desativar o Pix da fatura ${fatura.id} na Efí; ` +
+                    "se o cliente pagar, o sino avisa para estornar.",
+                );
+              }
+              // Só exclui se ainda não foi paga: o webhook pode ter baixado a
+              // fatura entre a leitura acima e esta linha.
+              const r = await faturasRepo.update(
+                { id: fatura.id, status: Not("pago"), datadel: IsNull() },
+                { deltitulo: 1, datadel: new Date() },
+              );
+              if (!r.affected) {
+                avisos.push(`A fatura ${fatura.id} acabou de ser paga e continua no MK-Auth.`);
+              }
             }
           }
         } catch (err: any) {
@@ -909,14 +930,14 @@ class SolicitacaoServicoController {
             `Erro ao excluir a fatura ${solicitacao.id_fatura} da solicitação ${solicitacao.id}:`,
             err?.message || err,
           );
-          aviso = `Não foi possível excluir a fatura ${solicitacao.id_fatura} no MK-Auth.`;
+          avisos.push(`Não foi possível excluir a fatura ${solicitacao.id_fatura} no MK-Auth.`);
         }
       }
 
       res.status(200).json({
         success: true,
-        message: aviso
-          ? `Solicitação cancelada. ${aviso}`
+        message: avisos.length
+          ? `Solicitação cancelada. ${avisos.join(" ")}`
           : "Solicitação cancelada com sucesso.",
       });
     } catch (error) {

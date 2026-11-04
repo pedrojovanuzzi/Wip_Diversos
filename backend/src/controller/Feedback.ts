@@ -349,7 +349,11 @@ class FeedbackController {
   /** GET /feedback/NoteFeedbackOpnion?mes=YYYY-MM (sem mes = mês atual) */
   public async feedbackOpnion(req: Request, res: Response) {
     try {
-      const mes = /^(\d{4})-(\d{2})$/.exec(String(req.query.mes ?? ""));
+      const mes = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(String(req.query.mes ?? ""));
+      if (req.query.mes !== undefined && !mes) {
+        res.status(400).send("Mês inválido. Use AAAA-MM.");
+        return;
+      }
       const { start, end } = mes
         ? {
             start: new Date(Number(mes[1]), Number(mes[2]) - 1, 1),

@@ -31,12 +31,15 @@ interface Pagamento {
 interface Alerta {
   id: string;
   nivel: "importante";
-  tipo: "licenca_vencida";
+  /** licenca_vencida: mensalidade sem pagar. pago_apos_cancelamento: Pix
+   *  de uma solicitação já cancelada, precisa estornar. */
+  tipo: "licenca_vencida" | "pago_apos_cancelamento";
   titulo: string;
   cliente: string;
   referencia: string;
   valor: number;
-  vencimento: string;
+  vencimento?: string;
+  pagoEm?: string;
 }
 
 /**
@@ -357,7 +360,7 @@ export const SinoPagamentos = () => {
           onClick={abrir}
           title={
             temAlerta
-              ? `${alertas.length} licença(s) sem pagamento`
+              ? `${alertas.length} alerta(s) para resolver`
               : temPendencia
                 ? `${pendentes.length} link(s) da Watch TV para enviar`
                 : "Notificações"
@@ -414,7 +417,11 @@ export const SinoPagamentos = () => {
               {alertas.map((a) => (
                 <Link
                   key={a.id}
-                  to="/licencas?aba=mensalidades"
+                  to={
+                    a.tipo === "pago_apos_cancelamento"
+                      ? "/solicitacoes-servico"
+                      : "/licencas?aba=mensalidades"
+                  }
                   onClick={() => setAberto(false)}
                   className="block animate-pulse border-b border-red-200 border-l-4 border-l-red-600 bg-red-50 px-4 py-3 hover:bg-red-100"
                 >
@@ -435,7 +442,9 @@ export const SinoPagamentos = () => {
                       {a.referencia}
                     </span>
                     <span className="shrink-0 text-xs font-medium text-red-700">
-                      venceu {dataBR(a.vencimento)}
+                      {a.tipo === "pago_apos_cancelamento"
+                        ? `pago ${dataBR(a.pagoEm ?? "")}`
+                        : `venceu ${dataBR(a.vencimento ?? "")}`}
                     </span>
                   </div>
                 </Link>

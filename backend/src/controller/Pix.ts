@@ -319,49 +319,95 @@ class Pix {
           if (erro?.code !== "ER_NO_SUCH_TABLE" && erro?.errno !== 1146)
             throw erro;
         }
+
+        // Pix pago depois de a solicitação ser cancelada: precisa estornar.
+        // Some 30 dias depois do pagamento.
+        try {
+          const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          const pagasCanceladas = await LocalDataSource.getRepository(
+            SolicitacaoServico,
+          )
+            .createQueryBuilder("s")
+            .where("s.cancelado = 1")
+            .andWhere(
+              "JSON_UNQUOTE(JSON_EXTRACT(s.dados, '$.pagamento_apos_cancelamento.data')) >= :desde",
+              { desde: desde.toISOString() },
+            )
+            .orderBy("s.id", "DESC")
+            .take(30)
+            .getMany();
+          alertas.push(
+            ...pagasCanceladas.map((s) => {
+              const p = (s.dados as any).pagamento_apos_cancelamento;
+              return {
+                id: `pago-cancelado-${s.id}`,
+                nivel: "importante",
+                tipo: "pago_apos_cancelamento",
+                titulo: "Pago depois de cancelar: estornar",
+                cliente: (s.dados as any)?.nome || s.login_cliente || "",
+                referencia: `${s.servico} · fatura ${p.fatura}`,
+                valor: Number(String(p.valor ?? 0).replace(",", ".")),
+                pagoEm: p.data,
+              };
+            }),
+          );
+        } catch (erro: any) {
+          console.error(
+            "[Sino] Erro ao buscar pagamentos de solicitações canceladas:",
+            erro?.message || erro,
+          );
+        }
       }
 
       // Watch TV no cadastro sem conta criada: alguém precisa mandar o link.
-      // Some sozinho quando o cliente usa o link ou ele vence.
+      // Some sozinho quando o cliente usa o link ou ele vence. O link cria a
+      // conta do cliente e vem com o telefone dele: só para quem atende
+      // (nível 2), não para o nível de consulta.
       const pendencias: any[] = [];
-      try {
-        const convites = await LocalDataSource.getRepository(
-          StreamingConvite,
-        ).find({
-          where: { usado_em: IsNull(), expira_em: MoreThan(new Date()) },
-          order: { id: "DESC" },
-          take: 30,
-        });
-        const logins = [...new Set(convites.map((c) => c.login))];
-        const clientes = logins.length
-          ? await AppDataSource.getRepository(ClientesEntities).find({
-              select: { login: true, nome: true, celular: true },
-              where: { login: In(logins) },
-            })
-          : [];
-        const porLogin = new Map(clientes.map((c) => [c.login, c]));
-        const vistos = new Set<string>();
-        for (const c of convites) {
-          // Um aviso por cliente: vale o link mais novo.
-          if (vistos.has(c.login)) continue;
-          vistos.add(c.login);
-          const cliente = porLogin.get(c.login);
-          pendencias.push({
-            id: `watch-conta-${c.id}`,
-            nivel: "atencao",
-            tipo: "watch_conta",
-            titulo: "Watch TV: enviar link",
-            cliente: cliente?.nome || c.login,
-            login: c.login,
-            celular: cliente?.celular || "",
-            link: linkDoConvite(c.token),
-            criadoEm: c.created_at,
-            expiraEm: c.expira_em,
+      if ((req.user?.permission ?? 0) >= 2) {
+        try {
+          const convites = await LocalDataSource.getRepository(
+            StreamingConvite,
+          ).find({
+            where: { usado_em: IsNull(), expira_em: MoreThan(new Date()) },
+            order: { id: "DESC" },
+            take: 30,
           });
+          const logins = [...new Set(convites.map((c) => c.login))];
+          const clientes = logins.length
+            ? await AppDataSource.getRepository(ClientesEntities).find({
+                select: { login: true, nome: true, celular: true },
+                where: { login: In(logins) },
+              })
+            : [];
+          const porLogin = new Map(clientes.map((c) => [c.login, c]));
+          const vistos = new Set<string>();
+          for (const c of convites) {
+            // Um aviso por cliente: vale o link mais novo.
+            if (vistos.has(c.login)) continue;
+            vistos.add(c.login);
+            const cliente = porLogin.get(c.login);
+            pendencias.push({
+              id: `watch-conta-${c.id}`,
+              nivel: "atencao",
+              tipo: "watch_conta",
+              titulo: "Watch TV: enviar link",
+              cliente: cliente?.nome || c.login,
+              login: c.login,
+              celular: cliente?.celular || "",
+              link: linkDoConvite(c.token),
+              criadoEm: c.created_at,
+              expiraEm: c.expira_em,
+            });
+          }
+        } catch (erro: any) {
+          // Opcional: MK-Auth lento ou tabela ausente não derrubam o sino.
+          if (erro?.code !== "ER_NO_SUCH_TABLE" && erro?.errno !== 1146)
+            console.error(
+              "[Sino] Erro ao buscar links pendentes da Watch TV:",
+              erro?.message || erro,
+            );
         }
-      } catch (erro: any) {
-        if (erro?.code !== "ER_NO_SUCH_TABLE" && erro?.errno !== 1146)
-          throw erro;
       }
 
       res
@@ -601,22 +647,39 @@ class Pix {
               ?.split(" -")[0];
             console.log(`[Webhook PIX] servicoNome extraído: "${servicoNome}"`);
 
-            // Busca prioritariamente pelo ID da fatura vinculada
-            let solicitacao = await localRepo.findOne({
-              where: {
-                id_fatura: Number(record_pppoe.id),
-                pago: false,
-                cancelado: false,
-              },
+            // Busca prioritariamente pelo ID da fatura vinculada, cancelada ou
+            // não: a fatura de um pedido cancelado não pode cair no fallback e
+            // dar baixa num outro pedido do mesmo serviço.
+            const ligada = await localRepo.findOne({
+              where: { id_fatura: Number(record_pppoe.id) },
               order: { data_solicitacao: "DESC" },
             });
+            let solicitacao =
+              ligada && !ligada.pago && !ligada.cancelado ? ligada : null;
             console.log(
-              `[Webhook PIX] solicitacao por id_fatura=${record_pppoe.id}: ${solicitacao ? `id=${solicitacao.id}` : "não encontrada"}`,
+              `[Webhook PIX] solicitacao por id_fatura=${record_pppoe.id}: ${ligada ? `id=${ligada.id}${ligada.cancelado ? " (cancelada)" : ""}${ligada.pago ? " (já paga)" : ""}` : "não encontrada"}`,
             );
 
-            // Fallback pelo login + serviço (fatura sem o vínculo gravado, ou
-            // uma fatura anterior da mesma solicitação que acabou paga).
-            if (!solicitacao && servicoNome) {
+            // Pago depois de cancelado: o dinheiro entrou e alguém precisa
+            // estornar. Fica gravado no pedido e o sino avisa o admin.
+            if (ligada?.cancelado) {
+              ligada.dados = {
+                ...(ligada.dados || {}),
+                pagamento_apos_cancelamento: {
+                  data: new Date().toISOString(),
+                  fatura: record_pppoe.id,
+                  valor: update.valor,
+                },
+              };
+              await localRepo.save(ligada);
+              console.warn(
+                `[Webhook PIX] fatura ${record_pppoe.id} paga depois de cancelar a solicitação ${ligada.id}: estornar`,
+              );
+            }
+
+            // Fallback pelo login + serviço, só para fatura sem pedido ligado
+            // (vínculo não gravado, ou uma fatura anterior da mesma solicitação).
+            if (!ligada && servicoNome) {
               solicitacao = await localRepo.findOne({
                 where: {
                   login_cliente: record_pppoe.login,
@@ -632,7 +695,7 @@ class Pix {
             }
             // Sem vínculo e sem achar pelo texto da obs: avisa no log em vez
             // de falhar calado, para alguém ligar a solicitação à mão.
-            if (!solicitacao) {
+            if (!solicitacao && !ligada) {
               console.warn(
                 `[Webhook PIX] fatura de serviço ${record_pppoe.id} paga sem solicitação ligada (login=${record_pppoe.login}, obs="${record_pppoe.obs}")`,
               );
@@ -1260,6 +1323,45 @@ class Pix {
       console.error("❌ Erro ao gerar PIX de serviço:", error);
       throw error;
     }
+  };
+
+  /**
+   * Tira da Efí os Pix de serviço ainda pagáveis de uma fatura (o "ID" do
+   * infoAdicionais). Ao cancelar a solicitação, o QR já enviado ao cliente
+   * continuava valendo e o dinheiro caía numa fatura excluída. O Pix de
+   * serviço expira em 1 hora, então basta olhar as últimas horas.
+   *
+   * Devolve quantas cobranças saíram. Erro da Efí sobe para quem chamou.
+   */
+  removerPixServico = async (idFatura: number, cpf?: string) => {
+    const doc = String(cpf || "").replace(/\D/g, "");
+    const fim = new Date();
+    const inicio = new Date(fim.getTime() - 3 * 60 * 60 * 1000);
+    const efipay = new EfiPay(options);
+
+    // Os tipos do SDK não trazem a paginação nem o status da remoção, mas a
+    // API da Efí aceita os dois.
+    const resp = await efipay.pixListCharges({
+      inicio: inicio.toISOString(),
+      fim: fim.toISOString(),
+      status: "ATIVA",
+      ...(doc.length === 11 ? { cpf: doc } : {}),
+      ...(doc.length === 14 ? { cnpj: doc } : {}),
+      "paginacao.itensPorPagina": 1000,
+    } as any);
+
+    const daFatura = (resp?.cobs || []).filter((c: any) =>
+      (c.infoAdicionais || []).some(
+        (i: any) => i?.nome === "ID" && String(i.valor) === String(idFatura),
+      ),
+    );
+    for (const cob of daFatura) {
+      await efipay.pixUpdateCharge(
+        { txid: cob.txid },
+        { status: "REMOVIDA_PELO_USUARIO_RECEBEDOR" } as any,
+      );
+    }
+    return daFatura.length;
   };
 
   // Gera um Pix único somando as mensalidades vencidas do cliente

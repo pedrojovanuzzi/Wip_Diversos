@@ -86,8 +86,6 @@ type Resultado = {
     url_documento_extra?: string | null;
     nome_documento_extra?: string | null;
   } | null;
-  /** Servico que entra na mensalidade: o que sera somado a proxima fatura. */
-  cobranca?: string | null;
   /** Opção paga: o contrato só é gerado depois do Pix confirmado. */
   contrato_apos_pagamento?: boolean;
   /** Troca de titularidade: termo de adesão do novo titular. */
@@ -143,8 +141,6 @@ const SolicitacaoServicoPublica: React.FC = () => {
   const [acesso, setAcesso] = useState<{
     status?: string;
     email?: string;
-    /** Proporcional dos dias de uso, recalculado na assinatura. */
-    cobranca?: string;
     /** Página para o cliente criar a conta da Watch TV. */
     link?: string;
   } | null>(null);
@@ -767,18 +763,6 @@ const SolicitacaoServicoPublica: React.FC = () => {
                   </>
                 )}
 
-                {resultado.cobranca && (
-                  <>
-                    <Divider sx={{ my: 3 }} />
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      Cobrança
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Nada a pagar agora: {resultado.cobranca}
-                    </Typography>
-                  </>
-                )}
-
                 {resultado.aguardando_novo_titular && (
                   <>
                     <Divider sx={{ my: 3 }} />
@@ -861,11 +845,6 @@ const SolicitacaoServicoPublica: React.FC = () => {
                                   Criar minha conta da Watch TV
                                 </Button>
                               </Box>
-                              {acesso.cobranca && (
-                                <Box sx={{ mt: 1 }}>
-                                  Cobrança: {acesso.cobranca}
-                                </Box>
-                              )}
                             </Alert>
                           )}
 
@@ -876,12 +855,6 @@ const SolicitacaoServicoPublica: React.FC = () => {
                             {acesso.email ? " para " : " "}
                             {acesso.email && <b>{acesso.email}</b>}. Se não
                             encontrar, confira a caixa de spam.
-                            {acesso.cobranca && (
-                              <>
-                                <br />
-                                Cobrança: {acesso.cobranca}
-                              </>
-                            )}
                           </Alert>
                         )}
 

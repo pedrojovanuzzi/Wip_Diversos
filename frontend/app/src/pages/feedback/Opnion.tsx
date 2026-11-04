@@ -44,7 +44,9 @@ export const Opnion = () => {
     return date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
   }
 
-  async function getFeed(mesBuscado: string) {
+  // Troca de mês cancela a busca anterior: senão uma resposta lenta chega
+  // por último e mostra as opiniões de outro mês sob o título deste.
+  async function getFeed(mesBuscado: string, signal: AbortSignal) {
     setCarregando(true);
     try {
       const response = await fetch(
@@ -55,24 +57,24 @@ export const Opnion = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
+          signal,
         },
       );
-      if (response.ok) {
-        const data = await response.json();
-        setFeedback(data);
-      } else {
-        setFeedback([]);
-      }
+      const data = response.ok ? await response.json() : [];
+      if (!signal.aborted) setFeedback(data);
     } catch (error) {
+      if (signal.aborted) return;
       console.error("Erro ao mostrar feedbacks:", error);
       setFeedback([]);
     } finally {
-      setCarregando(false);
+      if (!signal.aborted) setCarregando(false);
     }
   }
 
   useEffect(() => {
-    getFeed(mes);
+    const controle = new AbortController();
+    getFeed(mes, controle.signal);
+    return () => controle.abort();
   }, [mes]);
 
   const people = (feedback || []).map((client) => ({

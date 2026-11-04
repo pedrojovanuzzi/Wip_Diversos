@@ -29,7 +29,7 @@ export default async function OpnionPage({
 }) {
   const { mes: mesParam } = await searchParams;
   const atual = mesAtual();
-  const mes = /^\d{4}-\d{2}$/.test(mesParam ?? "") ? mesParam! : atual;
+  const mes = /^\d{4}-(0[1-9]|1[0-2])$/.test(mesParam ?? "") ? mesParam! : atual;
 
   // Página pública: tentamos carregar, mas se a rota do backend exigir token,
   // o user (se logado) já entra no apiFetch via cookie.

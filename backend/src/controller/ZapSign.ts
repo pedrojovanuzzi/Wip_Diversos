@@ -334,11 +334,7 @@ function veioDaWeb(solicitacao: SolicitacaoServico): boolean {
  * A conta de acesso o próprio cliente cria, pelo link que o atendimento envia
  * — quem decide mandar é o atendimento, depois de conferir o pedido.
  */
-async function avisarAguardandoConta(
-  solicitacao: SolicitacaoServico,
-  /** Proporcional dos dias de uso, recalculado na assinatura. */
-  cobranca?: string,
-) {
+async function avisarAguardandoConta(solicitacao: SolicitacaoServico) {
   const dados = (solicitacao.dados || {}) as any;
   const bruto = String(
     dados.telefone_conversa || dados.telefone || dados.celular || "",
@@ -350,9 +346,7 @@ async function avisarAguardandoConta(
     celular,
     `📺 *Watch TV contratada!*\n\n` +
       `Em instantes nossa equipe envia o link para você criar a sua conta, ` +
-      `escolhendo o e-mail e o celular de acesso.` +
-      // O uso começa agora, então o proporcional é o da data da assinatura.
-      (cobranca ? `\n\n📅 Cobrança: ${cobranca}` : ""),
+      `escolhendo o e-mail e o celular de acesso.`,
   );
 }
 
@@ -1213,10 +1207,7 @@ class ZapSign {
                     r.status === "aguardando_conta" &&
                     !veioDaWeb(solicitacao)
                   ) {
-                    await avisarAguardandoConta(
-                      solicitacao,
-                      dados.cobranca_proporcional,
-                    );
+                    await avisarAguardandoConta(solicitacao);
                   }
                   console.log(
                     `[ZapSign Webhook] Watch TV de ${loginWatch}: ${r.status}` +

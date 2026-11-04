@@ -1639,9 +1639,6 @@ class ServiceLinkController {
       solicitacao_id: solicitacao.id,
       chamado: chamadoId,
       pix,
-      // Serviço que entra na mensalidade: o cliente vê o que será somado à
-      // próxima fatura no lugar de um Pix.
-      cobranca: dadosSolicitacao.cobranca_proporcional ?? null,
       zapsign,
       contrato_apos_pagamento: contratoAposPagamento,
       protocolo: chamadoId || `SOL-${solicitacao.id}`,
@@ -1694,8 +1691,6 @@ class ServiceLinkController {
             // O e-mail que a Watch usou: nos planos é o do cadastro, na
             // contratação avulsa é o que o cliente informou.
             email: sc.email || (solicitacao?.dados as any)?.email_watch,
-            // Proporcional recalculado na assinatura, quando o uso começa.
-            cobranca: (solicitacao?.dados as any)?.cobranca_proporcional,
             // Quem abriu esta página é o próprio cliente: ele já cria a conta
             // da Watch TV daqui, sem esperar o atendimento mandar o link.
             link: sc.status === "aguardando_conta" ? sc.link : undefined,

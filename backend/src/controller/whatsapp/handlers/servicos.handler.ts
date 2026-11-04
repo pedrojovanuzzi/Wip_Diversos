@@ -482,11 +482,7 @@ async function concluirWatchTv(celular: any, session: any) {
     celular,
     `✅ *Pedido registrado!*\n\nSua contratação da *Watch TV* foi enviada para a ` +
       `nossa equipe. Em breve você recebe o *Contrato de SVA* para assinar.\n\n` +
-      `💰 Não há nada a pagar agora: a assinatura entra na sua mensalidade.\n` +
-      `📅 Na fatura de *${dataBR(proporcional.vencimento)}* entram ` +
-      `*R$ ${reais(proporcional.valor)}*, referentes aos ` +
-      `*${proporcional.dias} ${proporcional.dias === 1 ? "dia" : "dias"}* de uso ` +
-      `até o vencimento. Depois disso, *R$ ${reais(VALOR_STREAMER)}* por mês.`,
+      `💰 Não há nada a pagar agora: a assinatura entra na sua mensalidade.`,
   );
 
   // Pela marca, não por deleteSession: a fila grava a sessão depois do
