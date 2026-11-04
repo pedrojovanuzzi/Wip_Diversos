@@ -884,9 +884,40 @@ class SolicitacaoServicoController {
       };
       await repository.save(solicitacao);
 
+      // A fatura do pedido ficava aberta no MK-Auth: entrava na tela de NFS-e
+      // e podia ser cobrada. Aberta, sai como o MK-Auth exclui (deltitulo +
+      // datadel); paga, fica, porque o dinheiro entrou e o estorno é à mão.
+      let aviso: string | null = null;
+      if (solicitacao.id_fatura) {
+        try {
+          const faturasRepo = MkauthSource.getRepository(Faturas);
+          const fatura = await faturasRepo.findOne({
+            where: { id: solicitacao.id_fatura },
+          });
+          if (fatura && !fatura.datadel) {
+            if (fatura.status === "pago") {
+              aviso = `A fatura ${fatura.id} já foi paga e continua no MK-Auth.`;
+            } else {
+              await faturasRepo.update(fatura.id, {
+                deltitulo: 1,
+                datadel: new Date(),
+              });
+            }
+          }
+        } catch (err: any) {
+          console.error(
+            `Erro ao excluir a fatura ${solicitacao.id_fatura} da solicitação ${solicitacao.id}:`,
+            err?.message || err,
+          );
+          aviso = `Não foi possível excluir a fatura ${solicitacao.id_fatura} no MK-Auth.`;
+        }
+      }
+
       res.status(200).json({
         success: true,
-        message: "Solicitação cancelada com sucesso.",
+        message: aviso
+          ? `Solicitação cancelada. ${aviso}`
+          : "Solicitação cancelada com sucesso.",
       });
     } catch (error) {
       console.error("Erro ao cancelar solicitação:", error);

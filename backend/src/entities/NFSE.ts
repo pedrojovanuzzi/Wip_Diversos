@@ -114,6 +114,13 @@ export class NFSE {
   @Column({ name: "id_dps", type: "varchar", length: 60, nullable: true })
   idDps!: string | null;
 
+  /**
+   * Fatura do MK-Auth (sis_lanc.id) que originou a nota. Nula nas notas
+   * avulsas, nas de serviços adicionais e nas emitidas antes desta coluna.
+   */
+  @Column({ name: "id_fatura", type: "int", nullable: true })
+  idFatura!: number | null;
+
   @Column({
     name: "timestamp",
     type: "timestamp",

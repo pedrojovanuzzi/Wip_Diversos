@@ -346,9 +346,16 @@ class FeedbackController {
     return;
   }
 
+  /** GET /feedback/NoteFeedbackOpnion?mes=YYYY-MM (sem mes = mês atual) */
   public async feedbackOpnion(req: Request, res: Response) {
     try {
-      const { start, end } = this.getDateRange("month");
+      const mes = /^(\d{4})-(\d{2})$/.exec(String(req.query.mes ?? ""));
+      const { start, end } = mes
+        ? {
+            start: new Date(Number(mes[1]), Number(mes[2]) - 1, 1),
+            end: new Date(Number(mes[1]), Number(mes[2]), 0, 23, 59, 59),
+          }
+        : this.getDateRange("month");
       const feedbackRepository = AppDataSource.getRepository(Feedback);
       const field = "opnion"
       const feedbackCounts = await feedbackRepository
@@ -362,7 +369,7 @@ class FeedbackController {
         .groupBy(`feedback.${field}`)
         .addGroupBy("feedback.login")
         .addGroupBy("feedback.time")
-        .orderBy(`feedback.${field}`, "DESC")
+        .orderBy("feedback.time", "DESC")
         .getRawMany();
   
       res.status(200).send(feedbackCounts);

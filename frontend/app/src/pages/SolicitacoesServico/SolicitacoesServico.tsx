@@ -466,12 +466,12 @@ const SolicitacoesServico = () => {
 
     setLoadingAction(id);
     try {
-      await axios.post(
+      const response = await axios.post(
         `${process.env.REACT_APP_URL}/solicitacao-servico/cancelar/${id}`,
         { motivo },
         { headers: { Authorization: `Bearer ${user?.token}` } },
       );
-      alert("Solicitação cancelada com sucesso.");
+      alert(response.data?.message || "Solicitação cancelada com sucesso.");
       fetchServices(page);
     } catch (error: any) {
       console.error("Erro ao cancelar solicitação:", error);

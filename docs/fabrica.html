@@ -472,11 +472,11 @@ const CTRLS = [
   ["c_timetracking", "equipe", "/api/time-tracking", "Ponto eletrônico", "TimeTracking.routes.ts", "EmployeeController.ts TimeRecordController.ts DailyOvertimeController.ts ImageController.ts MonthlyReportSignatureController.ts", 875, 19, "bater ponto aberto; gestão nível 5", "dbMain", "", "Funcionários, registros de ponto com foto, horas extras e assinatura do relatório mensal. Feriados via date-holidays."],
   ["c_phone", "equipe", "/api/phone-location", "Localização", "PhoneLocation.routes.ts", "PhoneLocation.ts", 155, 5, "/position público (device_token); resto AuthGuard", "dbMain", "", "Recebe a posição do app dos técnicos e lista para o painel."],
   ["c_files", "equipe", "/api/files", "Arquivos", "FileShare.routes.ts", "FileShare.ts", 113, 4, "nível 2; download por link", "dbMain", "", "Upload e compartilhamento de arquivos."],
-  ["c_nfse", "fiscal", "/api/nfse", "NFS-e", "NFSE.routes.ts", "NFSE.ts", 2937, 13, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco out_publicas", "Emite, consulta, imprime e cancela NFS-e. Provedores em services/nfse (Fiorilli e SEFIN Nacional). Código do município vem do IBGE. A busca (BuscarNSFE) também traz as notas de licença (login LICENCA-<id>), que não são clientes do MKAuth."],
+  ["c_nfse", "fiscal", "/api/nfse", "NFS-e", "NFSE.routes.ts", "NFSE.ts", 3020, 13, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco out_publicas", "Emite, consulta, imprime e cancela NFS-e. Provedores em services/nfse (Fiorilli e SEFIN Nacional). Código do município vem do IBGE. A busca (BuscarNSFE) também traz as notas de licença (login LICENCA-<id>), que não são clientes do MKAuth. Cada nota guarda a fatura de origem (id_fatura): a tela só lista o que ainda não tem nota, e fatura de serviço só depois de paga."],
   ["c_nfe", "fiscal", "/api/NFEletronica", "NF-e", "NFE.Routes.ts", "NFE.ts", 3594, 17, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco", "NF-e de comodato: monta XML, assina com certificado A1, gera DANFE em PDF. O maior arquivo do projeto."],
   ["c_nfcom", "fiscal", "/api/NFCom", "NFCom", "NFCom.routes.ts", "Nfcom.ts", 3271, 17, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco out_email out_publicas", "Nota fiscal de comunicação (internet): XML assinado, QR Code, PDF e declaração de quitação. Manda a nota por e-mail e busca os impostos aproximados no IBPT."],
   ["c_prefeitura", "fiscal", "/api/Prefeitura", "Login Prefeitura", "PrefeituraUser.routes.ts", "PrefeituraLogin.ts", 316, 10, "público com código por SMS", "dbMain", "out_twilio", "Acesso da prefeitura com código de verificação enviado por SMS (Twilio, ou Facilita Móvel como alternativa)."],
-  ["c_pix", "finan", "/api/Pix", "Pix", "Pix.routes.ts", "Pix.ts", 2321, 35, "nível 2 / 5; webhooks públicos", "dbMain mkauth", "out_efi", "Gera Pix, Pix Automático e recebe os webhooks da Efí. A regra do Pix Automático mora em services/PixAutomaticoService.ts. notificacoesPagamentos alimenta o sino: pagamentos em cinza (nível baixo) e, para admin, licença vencida piscando em vermelho."],
+  ["c_pix", "finan", "/api/Pix", "Pix", "Pix.routes.ts", "Pix.ts", 2385, 35, "nível 2 / 5; webhooks públicos", "dbMain mkauth", "out_efi", "Gera Pix, Pix Automático e recebe os webhooks da Efí. A regra do Pix Automático mora em services/PixAutomaticoService.ts. notificacoesPagamentos alimenta o sino: pagamentos em cinza (nível baixo) , Watch TV esperando o link da conta em laranja (também no canto da tela) e, para admin, licença vencida piscando em vermelho."],
   ["c_token", "finan", "/api/TokenAutoAtendimento", "Autoatendimento", "TokenAtendimento.routes.ts", "TokenAtendimento.ts", 1097, 15, "público (totem)", "mkauth", "out_efi out_paygo", "O totem: cliente consulta e paga fatura (valor pela regra única de utils/valorFatura.ts; Pix pela Efí ou cartão pela maquininha PayGo), abre chamado, faz cadastro."],
   ["c_totem", "finan", "/api/totem-solicitacao", "Registro do totem", "TotemSolicitacao.routes.ts", "TotemSolicitacao.ts", 31, 1, "público", "dbMain", "", "Registra os Pix pedidos no totem."],
   ["c_licenca", "finan", "/api/licenca", "Licenças", "Licenca.Routes.ts", "LicencaController.ts LicencaMensalidadeController.ts", 502, 26, "nível 5", "dbMain", "", "Licenças de software e mensalidades (geradas todo dia às 03:15, ou avulsas escolhendo o cliente). O valor de uma aberta pode ser editado: o Pix já gerado é alterado na Efí junto, e o link de pagamento aparece no modal. As NFS-e de licença também entram na tabela nfse (login LICENCA-<id>) e aparecem na busca de NFS-e; o botão \"Migrar notas para a busca\" leva as que faltam."],
@@ -486,11 +486,11 @@ const CTRLS = [
   ["c_watest", "atend", "/api/whatsapp-test", "Teste do robô", "WhatsappTest.routes.ts", "whatsapp/handlers/whatsapp-test.controller.ts", 435, 3, "AuthGuard", "apimk mkauth", "", "Simula conversas com o robô sem mandar mensagem de verdade."],
   ["c_zapsign", "atend", "/api/zapsign", "ZapSign", "ZapSign.routes.ts", "ZapSign.ts", 1972, 5, "AuthGuard", "apimk dbMain mkauth", "out_zapsign out_publicas", "Contratos e termos para assinatura eletrônica. Busca a cidade do cliente no IBGE."],
   ["c_zaptpl", "atend", "/api/zapsign-templates", "Modelos ZapSign", "ZapSignTemplates.routes.ts", "ZapSignTemplatesController.ts", 151, 3, "AuthGuard", "apimk", "out_zapsign", "Modelos de documento usados pelo ZapSign."],
-  ["c_solic", "atend", "/api/solicitacao-servico", "Solicitações", "SolicitacaoServico.routes.ts", "SolicitacaoServico.ts", 1514, 12, "AuthGuard", "apimk dbMain mkauth", "out_consult", "Pedidos de serviço (mudança, troca de plano...) vindos do robô e dos links. Consulta o CPF na ConsultCenter antes de aprovar."],
-  ["c_servlink", "atend", "/api/service-links", "Links de serviço", "ServiceLink.routes.ts", "servicoWeb/ServiceLink.ts", 1724, 12, "AuthGuard; link /s/:token público", "dbMain mkauth", "out_publicas out_email", "Links que o cliente abre para contratar serviço. Catálogo e contrato em controller/servicoWeb. Preenche o endereço pelo ViaCEP e avisa por e-mail."],
+  ["c_solic", "atend", "/api/solicitacao-servico", "Solicitações", "SolicitacaoServico.routes.ts", "SolicitacaoServico.ts", 1545, 12, "AuthGuard", "apimk dbMain mkauth", "out_consult", "Pedidos de serviço (mudança, troca de plano...) vindos do robô e dos links. Consulta o CPF na ConsultCenter antes de aprovar. Cancelar exclui a fatura do pedido no MK-Auth se ainda estiver aberta."],
+  ["c_servlink", "atend", "/api/service-links", "Links de serviço", "ServiceLink.routes.ts", "servicoWeb/ServiceLink.ts", 1736, 12, "AuthGuard; link /s/:token público", "dbMain mkauth", "out_publicas out_email", "Links que o cliente abre para contratar serviço. Catálogo e contrato em controller/servicoWeb. Preenche o endereço pelo ViaCEP e avisa por e-mail."],
   ["c_chamados", "atend", "/api/chamados", "Chamados", "Chamados.Routes.ts", "Chamados.ts", 1122, 13, "AuthGuard", "mkauth", "", "Chamados e gráficos de instalação, direto do MK-Auth."],
   ["c_ficha", "atend", "/api/chamados-ficha", "Ficha técnica", "ChamadoFichaTecnica.routes.ts", "ChamadoFichaTecnica.ts", 550, 6, "AuthGuard", "dbMain mkauth", "", "Ficha técnica do atendimento, gerada em PDF (pdfkit)."],
-  ["c_feedback", "atend", "/api/feedback", "Feedback", "Feedback.routes.ts", "Feedback.ts", 379, 17, "AuthGuard; avaliação pública", "dbMain", "", "Link de avaliação do técnico e painel de notas (todos os gráficos em GET /resumo)."],
+  ["c_feedback", "atend", "/api/feedback", "Feedback", "Feedback.routes.ts", "Feedback.ts", 386, 17, "AuthGuard; avaliação pública", "dbMain", "", "Link de avaliação do técnico e painel de notas (todos os gráficos em GET /resumo) e opiniões por mês (?mes=YYYY-MM)."],
   ["c_analytics", "rede", "/api/ClientAnalytics", "Análise de clientes", "ClientAnalytics.routes.ts", "ClientAnalytics.ts", 1711, 20, "nível 2", "mkauth", "out_servers", "Diagnóstico do cliente: sinal, consumo, logs, monitoramento contínuo (ClientMonitorService)."],
   ["c_servidor", "rede", "/api/servidores-acesso", "Servidores de acesso", "ServidorAcesso.routes.ts", "ServidorAcesso.ts", 352, 7, "nível 5", "dbMain", "out_servers", "Cadastro dos concentradores e acesso por SSH/Telnet."],
   ["c_onu", "rede", "/api/Onu", "ONU", "Onu.routes.ts", "Onu.ts", 889, 7, "nível 2; ajustes nível 5", "", "out_olt", "Autoriza e desautoriza ONUs falando com a OLT por Telnet."],
@@ -561,15 +561,15 @@ add("pdns", { k: "db", x: 2730, y: 1400, tag: "createDns.ts", name: "Banco do Po
   ["out_email", "SMTP Mailgun", "E-mail", "nodemailer pelo SMTP do Mailgun: o robô e os links de serviço avisam a equipe, e a NFCom vai por e-mail para o cliente.", [["controller/whatsapp/services/email.service.ts", 3, "transporter"], ["controller/Email.ts", 7, "transporter"]]],
   ["out_paygo", "ControlPay", "PayGo (cartão)", "TEF de cartão no totem: cria a intenção de venda no ControlPay e acompanha o status até a maquininha aprovar.", [["controller/TokenAtendimento.ts", 43, "PAYGO_BASE"]]],
   ["out_consult", "ConsultCenter", "Consulta de CPF", "Consulta de negativação (Pefin, Refin, protesto, cheque) antes de aprovar uma solicitação de serviço.", [["services/ConsultCenterService.ts", 31, "consultarDebitos"]]],
-  ["out_publicas", "IBGE · ViaCEP · IBPT", "APIs públicas", "IBGE para código de município (NFS-e, cadastro, ZapSign), ViaCEP para endereço pelo CEP (robô e links) e IBPT para os impostos aproximados da NFCom.", [["controller/NFSE.ts", 93, "IBGE"], ["controller/servicoWeb/ServiceLink.ts", 1322, "ViaCEP"], ["controller/Nfcom.ts", 599, "IBPT"]]],
+  ["out_publicas", "IBGE · ViaCEP · IBPT", "APIs públicas", "IBGE para código de município (NFS-e, cadastro, ZapSign), ViaCEP para endereço pelo CEP (robô e links) e IBPT para os impostos aproximados da NFCom.", [["controller/NFSE.ts", 93, "IBGE"], ["controller/servicoWeb/ServiceLink.ts", 1334, "ViaCEP"], ["controller/Nfcom.ts", 599, "IBPT"]]],
 ].forEach(([id, tag, name, desc, files], i) => add(id, { k: "out", x: 3030, y: 170 + i * 100, tag, name, desc, files }));
 
 // ---- Ferramentas e infraestrutura ----
 [
-  ["t_migr", "migration/", "93 migrações", "Histórico do banco principal em TypeORM. run-migrations.ts aplica as pendentes.", [["run-migrations.ts", 0, "run-migrations"]], ["dbMain"]],
+  ["t_migr", "migration/", "94 migrações", "Histórico do banco principal em TypeORM. run-migrations.ts aplica as pendentes.", [["run-migrations.ts", 0, "run-migrations"]], ["dbMain"]],
   ["t_tests", "vitest", "Testes", "Testes do robô do WhatsApp (controller/__tests__/whatsapp) e do fiscal (services/fiscal/__tests__).", [["backend/vitest.config.ts", 0, "vitest.config"]], []],
   ["t_docker", "docker-compose.yml", "Docker", "Sobe o Redis (filas) e o MediaMTX (câmeras). O backend em si roda com PM2.", [["backend/docker-compose.yml", 0, "docker-compose"]], ["redis", "out_mediamtx"]],
-  ["t_scripts", "scripts", "Scripts avulsos", "Correções pontuais rodadas à mão: backfill-nfe-data.ts, cancelarNfse.ts, scripts/fix-chamados-abertos.ts, remove_log.js.", [["backfill-nfe-data.ts", 0, "backfill-nfe-data"], ["scripts/fix-chamados-abertos.ts", 0, "fix-chamados-abertos"]], ["dbMain", "mkauth"]],
+  ["t_scripts", "scripts", "Scripts avulsos", "Correções pontuais rodadas à mão: backfill-nfe-data.ts, cancelarNfse.ts, scripts/fix-chamados-abertos.ts, remove_log.js. scripts/mkauth-teste.ts cria o banco local mkradius_teste com 10 clientes mock; com MKAUTH_TESTE=true no .env o MkauthSource passa a usar esse banco.", [["backfill-nfe-data.ts", 0, "backfill-nfe-data"], ["scripts/fix-chamados-abertos.ts", 0, "fix-chamados-abertos"], ["scripts/mkauth-teste.ts", 0, "mkauth-teste"], ["database/MkauthSource.ts", 16, "MKAUTH_TESTE"]], ["dbMain", "mkauth"]],
   ["t_onu", "extract_onu.py", "Extrator de ONUs", "Script Python na raiz: lê uma lista de ONUs exportada da OLT e gera um UPDATE em SQL.", [["extract_onu.py", 0, "extract_onu.py"]], ["mkauth"]],
   ["t_cc", "CodeCharta", "Mapa CodeCharta", "backend.cc.json.gz: a 'cidade' do código (tamanho e complexidade de cada arquivo). Abra em codecharta.com.", [["backend.cc.json.gz", 0, "backend.cc.json.gz"]], []],
 ].forEach(([id, tag, name, desc, files, links], i) => add(id, { k: "tool", x: 1110 + (i % 2) * 240, y: 1300 + Math.floor(i / 2) * 120, tag, name, desc, files, links }));
@@ -625,7 +625,7 @@ const MISSIONS = [
     S("perm", "Confere o nível", "exigirPermissao(2): operador ou acima pode seguir.", "middleware/PermissionGuard.ts", 11),
     S("c_nfse", "Abre a ordem de serviço", "iniciar calcula o próximo RPS, cria um registro em Jobs com status \"pendente\" e já responde 200 com o id do job. O trabalho pesado continua depois da resposta.", "controller/NFSE.ts", 471),
     S("jobs", "Produção em 2º plano", "processarGeracaoNfseJob roda sem await, em lotes de 50 clientes, atualizando \"processados\" a cada nota.", "controller/NFSE.ts", 644),
-    S("mkauth", "Busca cliente e fatura", "prepareRpsData lê ClientesEntities e Faturas no MK-Auth para montar o XML.", "controller/NFSE.ts", 828),
+    S("mkauth", "Busca cliente e fatura", "prepareRpsData lê ClientesEntities e Faturas no MK-Auth para montar o XML.", "controller/NFSE.ts", 829),
     S("out_fisco", "Envia para o fisco", "enviarDpsNacional assina o XML com o certificado A1 e envia.", "controller/NFSE.ts", 303),
     S("dbMain", "Guarda e fecha o job", "Salva cada NFSE e marca o Job como \"concluido\" ou \"erro\". A tela vai consultando o job até terminar.", "controller/NFSE.ts", 818, { end: "concluido" }),
   ]},
@@ -633,7 +633,7 @@ const MISSIONS = [
     S("in_efi", "Cliente pagou", "A Efí chama o webhook da cobrança do Pix Automático."),
     S("gate", "Entra pelo portão", "Middlewares de sempre.", "app.ts", 76),
     S("router", "Esteira /api/Pix", "Os webhooks não têm AuthGuard: quem chama é o banco.", "routes/Pix.routes.ts", 135),
-    S("c_pix", "Anota e responde rápido", "PixAutomaticWebhookCobr registra a notificação e responde 200 { recebido: true } antes de processar.", "controller/Pix.ts", 786),
+    S("c_pix", "Anota e responde rápido", "PixAutomaticWebhookCobr registra a notificação e responde 200 { recebido: true } antes de processar.", "controller/Pix.ts", 850),
     S("dbMain", "Notificação guardada", "Fica em PixAutomaticoNotificacao. Se o processamento falhar, a conferência das 04:00 pega de novo.", "services/PixAutomaticoService.ts", 105),
     S("out_efi", "Confirma com o banco", "processarNotificacao consulta a cobrança na Efí (pixDetailAutomaticCharge) em vez de confiar só no corpo do webhook.", "services/PixAutomaticoService.ts", 176),
     S("mkauth", "Dá baixa na fatura", "darBaixaNaMensalidade marca a fatura como paga no MK-Auth.", "services/PixAutomaticoService.ts", 279, { end: "pago" }),
@@ -665,7 +665,7 @@ const MISSIONS = [
     S("out_efi", "Gera o Pix", "gerarPix cria a cobrança na Efí com a marca LICENCA nas informações adicionais, e sem o par ID/VALOR que o webhook usa para fatura de internet.", "services/LicencaMensalidadeService.ts", 347),
     S("out_efi", "Valor editado", "No modal do Pix, \"Editar valor\" chama PUT /mensalidades/:id/valor. alterarValor troca o valor e faz PATCH na cobrança da Efí: QR e link de pagamento continuam os mesmos. Se a Efí recusar (cobrança expirada), gera um Pix novo.", "services/LicencaMensalidadeService.ts", 365),
     S("in_efi", "Cliente pagou", "A Efí chama o webhook do Pix, o mesmo das faturas de internet."),
-    S("c_pix", "Desvia para licenças", "StatusUpdatePixTodosVencidos confere a cobrança na Efí e, achando a marca LICENCA, baixa a mensalidade de licença e para ali, sem tocar no MK-Auth.", "controller/Pix.ts", 468),
+    S("c_pix", "Desvia para licenças", "StatusUpdatePixTodosVencidos confere a cobrança na Efí e, achando a marca LICENCA, baixa a mensalidade de licença e para ali, sem tocar no MK-Auth.", "controller/Pix.ts", 516),
     S("dbMain", "Baixa por Pix", "baixarPorPix marca paga, com valor, horário e endToEndId. Pix repetido não mexe em nada.", "services/LicencaMensalidadeService.ts", 415, { end: "paga" }),
   ]},
   { id: "nfcom", title: "Emitir NFCom", http: "POST /api/NFCom/emitirNFCom", item: "XML", color: "#7fb3d5", steps: [
@@ -705,9 +705,9 @@ function guardSteps(o) {
     S("s_pix", "Volta com 403", "Está logado, mas não tem nível para essa tela.", null, null, { end: "403", err: 1 }));
   return s.concat(
     S("perm", "Nível " + o.perm + " ≥ 2: pode passar", "exigirPermissao(2) libera e chama next().", "middleware/PermissionGuard.ts", 11),
-    S("c_pix", "gerarPix", "Agora sim o controller trabalha.", "controller/Pix.ts", 878),
+    S("c_pix", "gerarPix", "Agora sim o controller trabalha.", "controller/Pix.ts", 942),
     S("mkauth", "Calcula o valor", "valorCobrancaFatura: mensalidade − desconto do cadastro + serviços (Watch TV/câmeras em sis_sercontratos), com multa e juros só em atraso. É a mesma regra do bot, do totem e do Pix Automático.", "utils/valorFatura.ts", 92),
-    S("out_efi", "Cria a cobrança", "pixCreateLocation e pixGenerateQRCode na Efí.", "controller/Pix.ts", 899),
+    S("out_efi", "Cria a cobrança", "pixCreateLocation e pixGenerateQRCode na Efí.", "controller/Pix.ts", 963),
     S("s_pix", "QR Code na tela", "Resposta 200 com o Pix gerado.", null, null, { end: "200" }));
 }
 

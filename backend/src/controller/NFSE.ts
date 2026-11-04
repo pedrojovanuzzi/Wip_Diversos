@@ -716,6 +716,7 @@ class NFSEController {
             numeroNfe: currentNfseNumber - 1,
             modelo: "sefin",
             idDps,
+            idFatura: rpsData?.id ?? null,
           });
           entitiesToSave.push({ entidade: novoRegistro, idDps, bid });
         }
@@ -853,9 +854,11 @@ class NFSEController {
     // Fetch IBGE code
     const ibgeId = await codigoIbgeDaCidade(ClientData?.cidade);
 
-    let val = ClientData?.desconto
-      ? Number(rpsData?.valor) - Number(ClientData?.desconto)
-      : Number(rpsData?.valor);
+    // O desconto do cadastro é da mensalidade; taxa de serviço vai cheia.
+    let val =
+      ClientData?.desconto && rpsData?.tipo !== "servicos"
+        ? Number(rpsData?.valor) - Number(ClientData?.desconto)
+        : Number(rpsData?.valor);
 
     // Calc reduced value for display/db
     let valorReduzido = Number(reducao) === 0 ? val : Number(val) * reducao;
@@ -2095,6 +2098,76 @@ class NFSEController {
     );
   }
 
+  /**
+   * Notas já emitidas (não canceladas, fora as de serviços adicionais) para
+   * a tela de emissão por fatura:
+   *
+   * - `faturas`: ids das faturas que já têm nota (coluna id_fatura).
+   * - `mesesMensalidade`: "LOGIN|AAAA-MM" em que já saiu a nota da
+   *   mensalidade. Uma por cliente por mês, como sempre foi; a nota de um
+   *   serviço avulso não conta aqui.
+   * - `mesesSemFatura`: notas antigas ou avulsas, sem id_fatura. Não dá para
+   *   saber de qual fatura vieram, então continuam tirando o mês inteiro do
+   *   cliente da lista, para nunca sair nota repetida.
+   */
+  private async notasDasFaturas(opts: {
+    logins: string[];
+    inicio: Date;
+    fim: Date;
+    ambiente: string;
+  }): Promise<{
+    faturas: Set<number>;
+    mesesMensalidade: Set<string>;
+    mesesSemFatura: Set<string>;
+  }> {
+    const emitidas = {
+      faturas: new Set<number>(),
+      mesesMensalidade: new Set<string>(),
+      mesesSemFatura: new Set<string>(),
+    };
+    if (!opts.logins.length) return emitidas;
+
+    const notas = await AppDataSource.getRepository(NFSE).find({
+      where: {
+        login: In(opts.logins),
+        ambiente: opts.ambiente === "homologacao" ? "homologacao" : "producao",
+        status: Not("Cancelada"),
+        competencia: Between(opts.inicio, opts.fim),
+        discriminacao: Not(Like("Servicos adicionais%")),
+      },
+      select: { login: true, competencia: true, idFatura: true },
+    });
+
+    // Tipo da fatura de cada nota: só a de serviço fica fora da regra
+    // "uma nota de mensalidade por mês".
+    const ids = [
+      ...new Set(notas.map((n) => Number(n.idFatura)).filter((id) => id > 0)),
+    ];
+    const tipoPorFatura = new Map<number, string>();
+    if (ids.length) {
+      const faturas = await MkauthSource.getRepository(Faturas).find({
+        where: { id: In(ids) },
+        select: { id: true, tipo: true },
+      });
+      for (const f of faturas) tipoPorFatura.set(Number(f.id), f.tipo);
+    }
+
+    for (const n of notas) {
+      const chave = `${chaveLogin(n.login)}|${mesAno(n.competencia)}`;
+      const idFatura = Number(n.idFatura);
+      if (idFatura > 0) {
+        emitidas.faturas.add(idFatura);
+        if (tipoPorFatura.get(idFatura) !== "servicos") {
+          emitidas.mesesMensalidade.add(chave);
+        }
+      } else {
+        emitidas.mesesSemFatura.add(chave);
+        emitidas.mesesMensalidade.add(chave);
+      }
+    }
+    return emitidas;
+  }
+
   async BuscarClientes(req: Request, res: Response) {
     const { cpf, filters, dateFilter, ambiente } = req.body;
     const ClientRepository = MkauthSource.getRepository(ClientesEntities);
@@ -2147,6 +2220,7 @@ class NFSEController {
           datavenc: true,
           tipo: true,
           valor: true,
+          status: true,
         },
         order: { id: "DESC" },
       });
@@ -2157,26 +2231,35 @@ class NFSEController {
         clientesResponse.map((c) => [c.login, c]),
       );
 
-      // Fatura cujo cliente já tem NFSE da mensalidade naquele mês (a nota
-      // grava o vencimento da fatura como competência) não aparece de novo.
+      // Tira da lista o que já tem nota (a nota grava o vencimento da fatura
+      // como competência). Ver notasDasFaturas para as regras.
       const inicioMes = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
       const fimMes = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0);
-      const jaEmitidas = await this.notasEmitidasPorMes({
+      const emitidas = await this.notasDasFaturas({
         logins: [...new Set(faturasResponse.map((f) => f.login))],
         inicio: inicioMes,
         fim: fimMes,
         ambiente,
-        servicosAdicionais: false,
       });
+      const jaTemNota = (f: Faturas) => {
+        if (emitidas.faturas.has(Number(f.id))) return true;
+        const chave = `${chaveLogin(f.login)}|${mesAno(f.datavenc)}`;
+        return f.tipo === "servicos"
+          ? emitidas.mesesSemFatura.has(chave)
+          : emitidas.mesesMensalidade.has(chave);
+      };
 
       const arr = faturasResponse
         .filter((f) => clientePorLogin.has(f.login))
-        .filter(
-          (f) =>
-            !jaEmitidas.has(`${chaveLogin(f.login)}|${mesAno(f.datavenc)}`),
-        )
+        // Serviço avulso só tem nota depois de pago: a fatura nasce junto
+        // com o pedido, antes do Pix.
+        .filter((f) => f.tipo !== "servicos" || f.status === "pago")
+        .filter((f) => !jaTemNota(f))
         .map((f) => {
           const cliente = clientePorLogin.get(f.login)!;
+          // O desconto do cadastro é da mensalidade; taxa de serviço vai cheia
+          // (o mesmo cálculo de prepareRpsData).
+          const desconto = f.tipo === "servicos" ? 0 : cliente.desconto || 0;
           return {
             ...cliente,
             fatura: {
@@ -2184,7 +2267,7 @@ class NFSEController {
               login: f.login,
               datavenc: new Date(f.datavenc).toLocaleDateString("pt-BR"),
               tipo: f.tipo,
-              valor: (Number(f.valor) - (cliente.desconto || 0)).toFixed(2),
+              valor: (Number(f.valor) - desconto).toFixed(2),
             },
           };
         })

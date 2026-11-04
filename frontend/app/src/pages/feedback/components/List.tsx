@@ -22,14 +22,14 @@ export default function List({ people }: ListProps) {
             Opiniões dos clientes
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Feedbacks mais recentes recebidos pela pesquisa de satisfação.
+            Feedbacks recebidos pela pesquisa de satisfação no mês escolhido.
           </p>
         </div>
       </div>
 
       {(!people || people.length === 0) && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-10 text-center text-slate-500">
-          Nenhuma opinião registrada ainda.
+          Nenhuma opinião registrada neste mês.
         </div>
       )}
 

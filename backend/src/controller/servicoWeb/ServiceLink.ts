@@ -46,6 +46,15 @@ import { diasDeTesteUsados } from "../../services/streamingTesteHistorico";
 
 const MAX_TENTATIVAS_CPF = 5;
 
+/** O MK-Auth guarda o documento só com dígitos ou com máscara, conforme quem cadastrou. */
+function formatosDocumento(digitos: string): string[] {
+  const mascara =
+    digitos.length === 11
+      ? digitos.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
+      : digitos.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+  return [digitos, mascara];
+}
+
 /** Todo link vale por 1 dia — não é configurável ao gerar. */
 const VALIDADE_DIAS = 1;
 
@@ -646,7 +655,10 @@ class ServiceLinkController {
         return;
       }
 
-      const where: any = { cpf_cnpj: cpf, cli_ativado: "s" };
+      const where: any = {
+        cpf_cnpj: In(formatosDocumento(cpf)),
+        cli_ativado: "s",
+      };
       // Link gerado para um cliente específico só abre para aquele cadastro.
       if (link.login_cliente) where.login = link.login_cliente;
 
@@ -752,7 +764,7 @@ class ServiceLinkController {
           select: CAMPOS_CLIENTE,
           where: {
             login: String(req.body?.login || "").trim(),
-            cpf_cnpj: cpf,
+            cpf_cnpj: In(formatosDocumento(cpf)),
             cli_ativado: "s",
           },
         },

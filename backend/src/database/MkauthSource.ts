@@ -13,12 +13,28 @@ import { SisSerContratos } from "../entities/SisSerContratos";
 
 dotenv.config();
 
+// MKAUTH_TESTE=true troca o MK-Auth de verdade pelo banco local criado por
+// scripts/mkauth-teste.ts. As variáveis *_API ficam intactas: o Redis do
+// WhatsApp e o backup também as usam.
+const TESTE = process.env.MKAUTH_TESTE === "true";
+if (TESTE) {
+  console.warn(
+    `⚠️  MK-Auth de TESTE: ${process.env.MKAUTH_TESTE_HOST || "127.0.0.1"}/${process.env.MKAUTH_TESTE_DATABASE || "mkradius_teste"}`,
+  );
+}
+
 const AppDataSource = new DataSource({
   type: "mysql",
-  host: process.env.DATABASE_HOST_API,
-  port: 3306,
-  username: process.env.DATABASE_USERNAME_API,
-  password: process.env.DATABASE_PASSWORD_API,
+  host: TESTE
+    ? process.env.MKAUTH_TESTE_HOST || "127.0.0.1"
+    : process.env.DATABASE_HOST_API,
+  port: TESTE ? Number(process.env.MKAUTH_TESTE_PORT || 3306) : 3306,
+  username: TESTE
+    ? process.env.MKAUTH_TESTE_USER || "root"
+    : process.env.DATABASE_USERNAME_API,
+  password: TESTE
+    ? process.env.MKAUTH_TESTE_PASSWORD || ""
+    : process.env.DATABASE_PASSWORD_API,
   entities: [
     ChamadosEntities,
     ClientesEntities,
@@ -32,7 +48,9 @@ const AppDataSource = new DataSource({
     SisSerContratos,
   ],
   synchronize: false,
-  database: process.env.DATABASE_API,
+  database: TESTE
+    ? process.env.MKAUTH_TESTE_DATABASE || "mkradius_teste"
+    : process.env.DATABASE_API,
   // Aumenta tolerancia a queries pesadas no radacct (busca por IP).
   extra: {
     connectTimeout: 60_000,

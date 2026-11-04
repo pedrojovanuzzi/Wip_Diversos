@@ -14,11 +14,16 @@ import { ClientesEntities } from "../entities/ClientesEntities";
  * é gerado, e não só na hora de salvar o cadastro.
  */
 
-/** Normaliza um nome para o formato de login do MKAuth. */
+/**
+ * Normaliza um nome para o formato de login do MKAuth: sem acento, espaço nem
+ * pontuação. O robô do WhatsApp já limpava o nome antes; o link da web não, e
+ * nascia login como "JOÃODASILVA", que o RADIUS e o roteador não aceitam bem.
+ */
 export function loginBaseDoNome(nome: string): string {
   return String(nome || "")
-    .trim()
-    .replace(/\s+/g, "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
     .toUpperCase();
 }
 

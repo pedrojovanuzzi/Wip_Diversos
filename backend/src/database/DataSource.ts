@@ -105,6 +105,23 @@ AppDataSource.initialize()
   .then(async () => {
     console.log("Data Source has been initialized!");
 
+    // A entidade NFSE já lê "id_fatura". Se o deploy subir antes de rodarem a
+    // migração, toda consulta à tabela falharia; aqui a coluna é criada na
+    // hora, do mesmo jeito que a migração 1785800000000 faz.
+    try {
+      const colunas = (await AppDataSource.query(
+        "SHOW COLUMNS FROM `nfse` LIKE 'id_fatura'",
+      )) as unknown[];
+      if (colunas.length === 0) {
+        await AppDataSource.query(
+          "ALTER TABLE `nfse` ADD COLUMN `id_fatura` INT NULL, ADD INDEX `idx_nfse_id_fatura` (`id_fatura`)",
+        );
+        console.log("🧱 Coluna nfse.id_fatura criada.");
+      }
+    } catch (err: any) {
+      console.error("Erro ao garantir nfse.id_fatura:", err?.message || err);
+    }
+
     // Cleanup stale jobs
     const jobsRepo = AppDataSource.getRepository(Jobs);
     const result = await jobsRepo

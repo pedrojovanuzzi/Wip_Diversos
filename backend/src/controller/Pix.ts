@@ -25,6 +25,8 @@ import licencaMensalidadeService, {
   INFO_LICENCA,
 } from "../services/LicencaMensalidadeService";
 import { LicencaMensalidade } from "../entities/LicencaMensalidade";
+import { StreamingConvite } from "../entities/StreamingConvite";
+import { linkDoConvite } from "../services/streamingCadastro";
 
 dotenv.config();
 
@@ -224,7 +226,8 @@ class Pix {
    * por Pix comum, por Pix Automático e mensalidade de licença. `alertas` são
    * de nível importante e refletem o estado atual — licença com mensalidade
    * vencida aparece enquanto não for paga, e só para administrador, que é
-   * quem enxerga as licenças.
+   * quem enxerga as licenças. `pendencias` são de nível atenção (laranja):
+   * Watch TV no cadastro esperando o cliente receber o link e criar a conta.
    */
   notificacoesPagamentos = async (
     req: Request,
@@ -318,7 +321,52 @@ class Pix {
         }
       }
 
-      res.status(200).json({ pagamentos: pagamentos.slice(0, 30), alertas });
+      // Watch TV no cadastro sem conta criada: alguém precisa mandar o link.
+      // Some sozinho quando o cliente usa o link ou ele vence.
+      const pendencias: any[] = [];
+      try {
+        const convites = await LocalDataSource.getRepository(
+          StreamingConvite,
+        ).find({
+          where: { usado_em: IsNull(), expira_em: MoreThan(new Date()) },
+          order: { id: "DESC" },
+          take: 30,
+        });
+        const logins = [...new Set(convites.map((c) => c.login))];
+        const clientes = logins.length
+          ? await AppDataSource.getRepository(ClientesEntities).find({
+              select: { login: true, nome: true, celular: true },
+              where: { login: In(logins) },
+            })
+          : [];
+        const porLogin = new Map(clientes.map((c) => [c.login, c]));
+        const vistos = new Set<string>();
+        for (const c of convites) {
+          // Um aviso por cliente: vale o link mais novo.
+          if (vistos.has(c.login)) continue;
+          vistos.add(c.login);
+          const cliente = porLogin.get(c.login);
+          pendencias.push({
+            id: `watch-conta-${c.id}`,
+            nivel: "atencao",
+            tipo: "watch_conta",
+            titulo: "Watch TV: enviar link",
+            cliente: cliente?.nome || c.login,
+            login: c.login,
+            celular: cliente?.celular || "",
+            link: linkDoConvite(c.token),
+            criadoEm: c.created_at,
+            expiraEm: c.expira_em,
+          });
+        }
+      } catch (erro: any) {
+        if (erro?.code !== "ER_NO_SUCH_TABLE" && erro?.errno !== 1146)
+          throw erro;
+      }
+
+      res
+        .status(200)
+        .json({ pagamentos: pagamentos.slice(0, 30), alertas, pendencias });
     } catch (error: any) {
       console.error("Erro ao listar pagamentos recentes:", error?.message);
       res.status(500).json({ error: "Erro ao listar pagamentos recentes." });
@@ -548,27 +596,33 @@ class Pix {
         if (record_pppoe.tipo === "servicos") {
           try {
             const localRepo = LocalDataSource.getRepository(SolicitacaoServico);
-            const servicoNome = record_pppoe.obs
+            const servicoNome = (record_pppoe.obs || "")
               .split("Serviço: ")[1]
               ?.split(" -")[0];
             console.log(`[Webhook PIX] servicoNome extraído: "${servicoNome}"`);
 
             // Busca prioritariamente pelo ID da fatura vinculada
             let solicitacao = await localRepo.findOne({
-              where: { id_fatura: Number(record_pppoe.id), pago: false },
+              where: {
+                id_fatura: Number(record_pppoe.id),
+                pago: false,
+                cancelado: false,
+              },
               order: { data_solicitacao: "DESC" },
             });
             console.log(
               `[Webhook PIX] solicitacao por id_fatura=${record_pppoe.id}: ${solicitacao ? `id=${solicitacao.id}` : "não encontrada"}`,
             );
 
-            // Fallback pelo login + serviço
+            // Fallback pelo login + serviço (fatura sem o vínculo gravado, ou
+            // uma fatura anterior da mesma solicitação que acabou paga).
             if (!solicitacao && servicoNome) {
               solicitacao = await localRepo.findOne({
                 where: {
                   login_cliente: record_pppoe.login,
                   servico: servicoNome,
                   pago: false,
+                  cancelado: false,
                 },
                 order: { data_solicitacao: "DESC" },
               });
@@ -576,8 +630,18 @@ class Pix {
                 `[Webhook PIX] solicitacao por login+serviço: ${solicitacao ? `id=${solicitacao.id}` : "não encontrada"}`,
               );
             }
+            // Sem vínculo e sem achar pelo texto da obs: avisa no log em vez
+            // de falhar calado, para alguém ligar a solicitação à mão.
+            if (!solicitacao) {
+              console.warn(
+                `[Webhook PIX] fatura de serviço ${record_pppoe.id} paga sem solicitação ligada (login=${record_pppoe.login}, obs="${record_pppoe.obs}")`,
+              );
+            }
 
             if (solicitacao) {
+              if (!solicitacao.id_fatura) {
+                solicitacao.id_fatura = Number(record_pppoe.id);
+              }
               solicitacao.pago = true;
               await localRepo.save(solicitacao);
               console.log(
