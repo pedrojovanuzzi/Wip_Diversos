@@ -257,9 +257,16 @@ const SolicitacoesServico = () => {
       );
       const temLink = data?.links?.pix || data?.links?.assinatura;
       if (!temLink) {
-        alert(
-          "Nenhum link foi gerado ainda para esta solicitação. Use \"Enviar assinatura\" no menu (…) para gerar o contrato.",
+        // Sem link ainda: gera o contrato na hora (o mesmo que "Enviar
+        // assinatura", sem criar cadastro no MK-Auth) e já mostra os links.
+        // No pedido do bot, o link também vai ao cliente pelo WhatsApp.
+        const gerado = await axios.post(
+          `${process.env.REACT_APP_URL}/solicitacao-servico/enviar-assinatura/${service.id}`,
+          { criarCadastro: false },
+          { headers: { Authorization: `Bearer ${user?.token}` } },
         );
+        tratarResposta(gerado.data, "Contrato gerado.");
+        fetchServices(page);
         return;
       }
       setLinksOrigem(service.origem === "web" ? "web" : "bot");
