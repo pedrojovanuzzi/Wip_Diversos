@@ -522,7 +522,13 @@ export async function criarContaPeloConvite(params: {
     where: { login: convite.login },
   });
   if (!cliente) throw new ErroConvite("Cadastro não encontrado.", 404);
-  const { tem, origem } = await situacaoWatchTv(convite.login);
+  let { tem, origem } = await situacaoWatchTv(convite.login);
+  if (!tem) {
+    // A tabela só é recalculada quando o sistema mexe no cadastro ou na
+    // sincronização diária: confere o MK-Auth de novo antes de recusar.
+    await sincronizarWatchTv(convite.login);
+    ({ tem, origem } = await situacaoWatchTv(convite.login));
+  }
   if (!tem) {
     throw new ErroConvite(
       "A Watch TV não está mais no seu cadastro. Fale com o nosso atendimento.",
@@ -639,6 +645,10 @@ export async function contratarStreamingAposAssinatura(params: {
   // Webhook do ZapSign reentrega evento: sem isso o serviço entraria duas
   // vezes no contrato.
   if (await clienteJaTemStreaming(login)) {
+    // A linha já estava no contrato, mas clientes_watchtv pode não saber
+    // (linha posta direto no MK-Auth): sem isso o link da conta seria
+    // recusado com "a Watch TV não está mais no seu cadastro".
+    await sincronizarWatchTv(login);
     return { status: "ja_tinha" };
   }
 
