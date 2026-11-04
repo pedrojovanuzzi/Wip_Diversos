@@ -377,7 +377,10 @@ class Pix {
             .andWhere("s.finalizado = 0")
             .andWhere("s.data_solicitacao >= :desde", { desde })
             .andWhere(
-              "JSON_UNQUOTE(JSON_EXTRACT(s.dados, '$.servico_cadastro.status')) IN ('aguardando_conta', 'adicionado')",
+              // ja_tinha: a linha já estava no contrato (cadastro de teste,
+              // marcação manual), mas o cliente assinou agora e a cobrança
+              // ainda precisa ser conferida.
+              "JSON_UNQUOTE(JSON_EXTRACT(s.dados, '$.servico_cadastro.status')) IN ('aguardando_conta', 'adicionado', 'ja_tinha')",
             )
             .orderBy("s.id", "DESC")
             .take(30)

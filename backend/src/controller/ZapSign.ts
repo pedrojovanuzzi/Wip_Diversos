@@ -370,6 +370,25 @@ async function enviarLinkWatchTvSePreciso(
   return {};
 }
 
+/**
+ * O que gravar em `servico_cadastro` depois da assinatura.
+ *
+ * Reentrega do ZapSign volta como `ja_tinha`: o primeiro registro (status,
+ * link e para onde foi) fica, senão a tela e o sino perderiam o que
+ * aconteceu de fato.
+ */
+function registroDoCadastro(
+  solicitacao: SolicitacaoServico,
+  r: Record<string, any>,
+  envio: Record<string, any>,
+) {
+  const anterior = (solicitacao.dados as any)?.servico_cadastro;
+  if (r.status === "ja_tinha" && anterior?.status) {
+    return { ...anterior, ...envio };
+  }
+  return { ...r, ...envio, em: new Date().toISOString() };
+}
+
 async function enviarLinkWatchTv(
   solicitacao: SolicitacaoServico,
   link?: string,
@@ -1276,11 +1295,7 @@ class ZapSign {
                   // atendimento vê o que ficou pendente.
                   solicitacao.dados = {
                     ...solicitacao.dados,
-                    servico_cadastro: {
-                      ...r,
-                      ...envio,
-                      em: new Date().toISOString(),
-                    },
+                    servico_cadastro: registroDoCadastro(solicitacao, r, envio),
                   };
                   await repo.save(solicitacao);
                   break;
@@ -1359,7 +1374,7 @@ class ZapSign {
     const repo = AppDataSource.getRepository(SolicitacaoServico);
     solicitacao.dados = {
       ...(solicitacao.dados || {}),
-      servico_cadastro: { ...r, ...envio, em: new Date().toISOString() },
+      servico_cadastro: registroDoCadastro(solicitacao, r, envio),
     };
     await repo.save(solicitacao);
     return r;
