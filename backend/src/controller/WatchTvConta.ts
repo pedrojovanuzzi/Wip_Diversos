@@ -10,10 +10,19 @@ import {
  * da conta. A autenticação é o próprio token do link (aleatório, com prazo e
  * de uso único).
  */
+/**
+ * O botão do template watch_tv_cadastro foi aprovado com "{{1}}" escrito na
+ * URL base, e a Meta ainda põe o token depois: chega "{{1}}<token>". O token
+ * é hexadecimal, então o que sobra antes dele é só esse resto.
+ */
+function tokenDoLink(bruto: string): string {
+  return String(bruto || "").replace(/^(\{\{\d+\}\})+/, "");
+}
+
 class WatchTvConta {
   public async abrir(req: Request, res: Response) {
     try {
-      res.json(await dadosDoConvite(req.params.token));
+      res.json(await dadosDoConvite(tokenDoLink(req.params.token)));
     } catch (e: any) {
       responderErro(res, e, "Erro ao abrir o link.");
     }
@@ -26,7 +35,7 @@ class WatchTvConta {
         celular?: string;
       };
       const r = await criarContaPeloConvite({
-        token: req.params.token,
+        token: tokenDoLink(req.params.token),
         email: email || "",
         phone: celular || "",
       });

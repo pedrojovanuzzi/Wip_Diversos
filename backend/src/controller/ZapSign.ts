@@ -389,11 +389,6 @@ async function enviarLinkWatchTv(
   if (!bruto) return { link_erro: "Sem celular para enviar o link." };
   const celular = bruto.startsWith("55") ? bruto : `55${bruto}`;
 
-  // O link também vai escrito, em texto: o botão do template depende da URL
-  // cadastrada na Meta, e o cliente não pode ficar sem um link que funcione.
-  // O texto só chega se houver conversa aberta nas últimas 24 h; o template
-  // chega sempre.
-  let motivo: string | null = null;
   try {
     await Whatsapp.MensagemTemplate(
       celular,
@@ -403,26 +398,16 @@ async function enviarLinkWatchTv(
       [],
       token,
     );
+    return { link_enviado_para: celular };
   } catch (e: any) {
-    motivo = e?.response?.data?.error?.message || e?.message || String(e);
+    const motivo =
+      e?.response?.data?.error?.message || e?.message || String(e);
     console.error(
-      `[ZapSign Webhook] Falha ao enviar o template da Watch TV para ${celular}:`,
+      `[ZapSign Webhook] Falha ao enviar o link da Watch TV para ${celular}:`,
       motivo,
     );
+    return { link_erro: `Não foi possível enviar para ${celular}: ${motivo}` };
   }
-  await Whatsapp.MensagensComuns(
-    celular,
-    `📺 *Sua Watch TV está pronta!*\n\n` +
-      `Crie a sua conta por este link, escolhendo o e-mail e o celular de ` +
-      `acesso:\n${link}`,
-  );
-
-  return motivo
-    ? {
-        link_enviado_para: celular,
-        link_erro: `Template não enviado (${motivo}); foi só a mensagem de texto.`,
-      }
-    : { link_enviado_para: celular };
 }
 
 // Todas as funções createContract* aceitam Record<string, any> e usam
