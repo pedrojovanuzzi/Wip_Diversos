@@ -6,6 +6,7 @@ import {
   textoCobrancaProporcional,
 } from "../../services/cobrancaProporcional";
 import {
+  celularValido,
   impedimentoPlanoComSva,
   impedimentoWatchTv,
 } from "../../services/streamingCadastro";
@@ -446,13 +447,19 @@ export const CATALOGO: ServicoWeb[] = [
         required: true,
       },
       {
+        // Recebe pelo WhatsApp o link para criar a conta, quando o serviço
+        // ficar pronto (template watch_tv_cadastro).
         name: "celular_watch",
-        label: "Celular para acessar a Watch TV",
+        label: "Celular com DDD para receber o link de cadastro da Watch TV",
         type: "text",
         required: true,
       },
       CAMPO_OBSERVACAO,
     ],
+    validarFormulario: async (formulario) =>
+      celularValido(formulario.celular_watch)
+        ? null
+        : "Informe o celular com DDD para receber o link da Watch TV.",
     // Watch TV é única por cadastro: quem já tem não passa da identificação.
     impedimento: (cliente) => impedimentoWatchTv(cliente?.login),
     criarContrato: (params) => ZapSign.createContratoSva(params),
@@ -566,8 +573,9 @@ export const CATALOGO: ServicoWeb[] = [
 
 /**
  * Recusa o formulário quando o plano escolhido inclui SVA e o cliente não
- * marcou o aceite do Termo de Adesão. Mesma exigência que o bot faz na
- * conversa, logo depois da escolha do plano.
+ * marcou o aceite do Termo de Adesão, ou não disse para qual celular vai o
+ * link de cadastro da Watch TV. Mesma exigência que o bot faz na conversa,
+ * logo depois da escolha do plano.
  */
 export async function exigirAceiteSva(
   formulario: Record<string, any>,
@@ -576,11 +584,16 @@ export async function exigirAceiteSva(
   if (!planoTemSva(plano)) return null;
   const aceitou =
     formulario.aceite_sva === true || formulario.aceite_sva === "true";
-  if (aceitou) return null;
-  return (
-    "Este plano inclui a Watch TV, um Serviço de Valor Adicionado. Marque o " +
-    "aceite do Termo de Adesão SVA para continuar."
-  );
+  if (!aceitou) {
+    return (
+      "Este plano inclui a Watch TV, um Serviço de Valor Adicionado. Marque o " +
+      "aceite do Termo de Adesão SVA para continuar."
+    );
+  }
+  if (!celularValido(formulario.celular_link_watch)) {
+    return "Informe o celular com DDD para receber o link da Watch TV.";
+  }
+  return null;
 }
 
 export function buscarServico(id: string): ServicoWeb | undefined {

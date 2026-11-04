@@ -1193,6 +1193,8 @@ class ServiceLinkController {
       estado: formulario.estado || "",
       cep: String(formulario.cep || ""),
       plano: formulario.plano_escolhido || dadosTitular.plano || "A definir",
+      // Plano combo: para onde vai o link de cadastro da Watch TV.
+      celular_link_watch: String(formulario.celular_link_watch || ""),
       vencimento: formulario.vencimento || "",
       observacao: formulario.observacao || "",
       valor: "0.00",

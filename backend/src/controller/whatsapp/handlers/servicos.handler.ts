@@ -266,6 +266,8 @@ async function salvarSolicitacaoAlteracaoPlano(
     termo: session.contrato_cliente || "",
     rg: session.rg || "Não informado",
     plano: session.planoEscolhido || "Não informado",
+    // Plano combo: para onde vai o link de cadastro da Watch TV.
+    celular_link_watch: session.celularLinkWatch || "",
     observacao: session.observacaoTrocaPlano || "",
     valor: "0.00",
     valor_plano: session.valor_plano_atual || "",
@@ -390,6 +392,8 @@ async function salvarSolicitacaoWatchTv(session: any, celularConversa: string) {
     email_watch: session.email_watch || session.email || "",
     celular_watch:
       session.celular_watch || session.celularCliente || celularConversa,
+    // Para onde vai o link de cadastro da Watch TV, pedido logo acima.
+    celular_link_watch: session.celular_watch || "",
     // Sem Pix: a assinatura entra na mensalidade. O que se registra é o
     // proporcional aos dias até o próximo vencimento, para o atendimento
     // lançar na fatura — mesma conta que o site faz.
@@ -654,25 +658,38 @@ export async function iniciarWatchTv(
     }
     session.email_watch = email;
     session.watchTvStep = "ask_celular";
-    await MensagensComuns(
+    // Este celular recebe o link de cadastro da Watch TV quando o serviço
+    // ficar pronto (template watch_tv_cadastro).
+    await MensagemBotao(
       celular,
-      `📧 Anotado: *${email}*
-
-` + `📱 Agora me diga o *celular com DDD* para o cadastro na Watch TV.`,
+      `📧 Anotado: *${email}*\n\n` +
+        `📱 Assim que a Watch TV estiver pronta, enviamos pelo WhatsApp o ` +
+        `*link para você criar a sua conta*. Para qual *celular com DDD* ` +
+        `devemos mandar?\n\nOu toque abaixo para usar este mesmo número.`,
+      "Usar este número",
     );
     return;
   }
 
   if (session.watchTvStep === "ask_celular") {
-    const cel = String(texto || "").trim();
+    // Sem o 55: o mesmo formato do celular informado no cadastro.
+    const cel = String(
+      String(texto || "").trim().toLowerCase() === "usar este número"
+        ? celular
+        : texto,
+    )
+      .replace(/\D/g, "")
+      .replace(/^55(?=\d{10,11}$)/, "");
     if (!celularValido(cel)) {
-      await MensagensComuns(
+      await MensagemBotao(
         celular,
-        "❌ Celular inválido. Digite com DDD, por exemplo *14999998888*.",
+        "❌ Celular inválido. Digite com DDD, por exemplo *14999998888*.\n\n" +
+          "Ou toque abaixo para usar este mesmo número.",
+        "Usar este número",
       );
       return;
     }
-    session.celular_watch = cel.replace(/\D/g, "");
+    session.celular_watch = cel;
     await concluirWatchTv(celular, session);
     return;
   }

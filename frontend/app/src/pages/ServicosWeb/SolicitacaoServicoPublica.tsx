@@ -242,6 +242,10 @@ const SolicitacaoServicoPublica: React.FC = () => {
       c.type === "select" &&
       (c.opcoes || []).some((o) => o.sva && o.id === valores[c.name]),
   );
+  // DDD + número, sem o 55 (mesma regra do backend).
+  const celularLinkWatchValido = [10, 11].includes(
+    String(valores.celular_link_watch || "").replace(/\D/g, "").length,
+  );
 
   const chamar = async (caminho: string, corpo: any) => {
     setErro(null);
@@ -681,13 +685,37 @@ const SolicitacaoServicoPublica: React.FC = () => {
                       }
                     />
                   )}
+                  {/* Quando a Watch TV ficar pronta, o link para criar a
+                      conta vai pelo WhatsApp para este número. */}
+                  {planoComSva && (
+                    <TextField
+                      fullWidth
+                      required
+                      label="Celular com DDD para receber o link de cadastro da Watch TV"
+                      inputMode="tel"
+                      value={valores.celular_link_watch || ""}
+                      onChange={(e) =>
+                        setValores((v) => ({
+                          ...v,
+                          celular_link_watch: e.target.value,
+                        }))
+                      }
+                      error={
+                        !!valores.celular_link_watch && !celularLinkWatchValido
+                      }
+                      helperText="Enviamos o link pelo WhatsApp assim que a Watch TV estiver pronta."
+                    />
+                  )}
                   <Button
                     size="large"
                     variant="contained"
                     color="success"
                     onClick={handleEnviar}
                     disabled={
-                      enviando || (planoComSva && valores.aceite_sva !== "true")
+                      enviando ||
+                      (planoComSva &&
+                        (valores.aceite_sva !== "true" ||
+                          !celularLinkWatchValido))
                     }
                     startIcon={
                       enviando ? (

@@ -11,6 +11,7 @@
  */
 
 import { planoTemSva } from "../../../config/planosComSva";
+import { celularValido } from "../../../services/streamingCadastro";
 import {
   MensagemBotao,
   MensagensComuns,
@@ -60,7 +61,8 @@ export async function pedirAceiteTermoSva(
 /**
  * Resposta do cliente ao termo.
  *
- * Aceitou: o passo que foi interrompido roda de novo, agora até o fim.
+ * Aceitou: pede o celular que recebe o link de cadastro da Watch TV, e então
+ * o passo que foi interrompido roda de novo, agora até o fim.
  * Recusou: o atendimento encerra, porque sem o termo o plano não pode ser
  * contratado.
  */
@@ -71,32 +73,34 @@ export async function handleTermoSva(
 ) {
   const t = String(texto || "").trim().toLowerCase();
 
-  if (t === "sim aceito") {
-    session.aceitouTermoSva = true;
-    const origem: OrigemTermoSva = session.termoSvaOrigem;
-    const original = session.termoSvaTexto;
-    session.termoSvaOrigem = undefined;
-    session.termoSvaTexto = undefined;
-
-    if (origem === "troca_plano") {
-      const { handleAwaitingTrocaPlanoFlow } = await import("./servicos.handler");
-      session.stage = "awaiting_troca_plano_flow";
-      await handleAwaitingTrocaPlanoFlow(celular, original, session);
+  // Segundo passo: o celular que recebe o link de cadastro da Watch TV.
+  if (session.termoSvaPasso === "celular_link") {
+    // Sem o 55: o mesmo formato do celular informado no cadastro.
+    const numero = String(t === USAR_ESTE_NUMERO.toLowerCase() ? celular : texto)
+      .replace(/\D/g, "")
+      .replace(/^55(?=\d{10,11}$)/, "");
+    if (!celularValido(numero)) {
+      await pedirCelularLinkWatch(
+        celular,
+        "❌ Celular inválido. Digite com DDD, por exemplo *14999998888*.",
+      );
       return;
     }
+    session.celularLinkWatch = numero;
+    session.termoSvaPasso = undefined;
+    await retomarDepoisDoTermo(celular, session);
+    return;
+  }
 
-    const { handleAwaitingFlowCadastro, handleFinalRegister } = await import(
-      "./cadastro.handler"
+  if (t === "sim aceito") {
+    session.aceitouTermoSva = true;
+    session.termoSvaPasso = "celular_link";
+    await pedirCelularLinkWatch(
+      celular,
+      "📱 Assim que a Watch TV estiver pronta, enviamos pelo WhatsApp o " +
+        "*link para você criar a sua conta*.\n\nPara qual *celular com DDD* " +
+        "devemos mandar?",
     );
-    // O cadastro tem dois caminhos: o formulário do WhatsApp, que volta como
-    // JSON, e o passo a passo, que termina no botão de aceite.
-    if (original && original.trim().startsWith("{")) {
-      session.stage = "awaiting_flow_cadastro";
-      await handleAwaitingFlowCadastro(celular, original, session);
-    } else {
-      session.stage = "final_register";
-      await handleFinalRegister(celular, "sim, li e aceito", session);
-    }
     return;
   }
 
@@ -116,4 +120,43 @@ export async function handleTermoSva(
     "Sim Aceito",
     "Não",
   );
+}
+
+/** Título do botão que usa o número desta conversa (limite de 20 caracteres). */
+const USAR_ESTE_NUMERO = "Usar este número";
+
+async function pedirCelularLinkWatch(celular: any, texto: string) {
+  await MensagemBotao(
+    celular,
+    `${texto}\n\nOu toque abaixo para usar este mesmo número.`,
+    USAR_ESTE_NUMERO,
+  );
+}
+
+/** Aceite e celular em mãos: o passo que foi interrompido roda de novo. */
+async function retomarDepoisDoTermo(celular: any, session: any) {
+  const origem: OrigemTermoSva = session.termoSvaOrigem;
+  const original = session.termoSvaTexto;
+  session.termoSvaOrigem = undefined;
+  session.termoSvaTexto = undefined;
+
+  if (origem === "troca_plano") {
+    const { handleAwaitingTrocaPlanoFlow } = await import("./servicos.handler");
+    session.stage = "awaiting_troca_plano_flow";
+    await handleAwaitingTrocaPlanoFlow(celular, original, session);
+    return;
+  }
+
+  const { handleAwaitingFlowCadastro, handleFinalRegister } = await import(
+    "./cadastro.handler"
+  );
+  // O cadastro tem dois caminhos: o formulário do WhatsApp, que volta como
+  // JSON, e o passo a passo, que termina no botão de aceite.
+  if (original && original.trim().startsWith("{")) {
+    session.stage = "awaiting_flow_cadastro";
+    await handleAwaitingFlowCadastro(celular, original, session);
+  } else {
+    session.stage = "final_register";
+    await handleFinalRegister(celular, "sim, li e aceito", session);
+  }
 }

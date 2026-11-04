@@ -328,6 +328,8 @@ export async function handleAwaitingFlowCadastro(
         plano: planoFlow,
         vencimento: dadosFlow.vencimento,
         telefone_conversa: celular,
+        // Plano combo: para onde vai o link de cadastro da Watch TV.
+        celular_link_watch: session.celularLinkWatch || "",
         ...(debitoAnterior.temDebito && { alertaDebitoAnterior: debitoAnterior }),
       };
       await repo.save(novaSolicitacao);
@@ -478,6 +480,8 @@ export async function handleFinalRegister(
       plano: session.planoEscolhido,
       vencimento: session.vencimentoEscolhido,
       telefone_conversa: celular,
+      // Plano combo: para onde vai o link de cadastro da Watch TV.
+      celular_link_watch: session.celularLinkWatch || "",
     };
     await repo.save(novaSolicitacao);
 

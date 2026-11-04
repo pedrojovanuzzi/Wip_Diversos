@@ -323,31 +323,59 @@ const waUrl = isSandbox
   ? `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID_TEST}/messages`
   : `https://graph.facebook.com/v22.0/${process.env.WA_PHONE_NUMBER_ID}/messages`;
 
-/** Solicitação feita pelo site não tem conversa aberta no WhatsApp. */
-function veioDaWeb(solicitacao: SolicitacaoServico): boolean {
-  return (solicitacao.dados as any)?.origem === "web";
-}
+/** Template aprovado na Meta: botão "Cadastre-se" com o token no fim da URL. */
+const TEMPLATE_LINK_WATCH = "watch_tv_cadastro";
 
 /**
- * Avisa o cliente, no WhatsApp, que a Watch TV entrou no cadastro.
+ * Manda ao cliente, pelo template do WhatsApp, o link para criar a conta da
+ * Watch TV, assim que o serviço entra no cadastro (Watch TV avulsa ou combo).
  *
- * A conta de acesso o próprio cliente cria, pelo link que o atendimento envia
- * — quem decide mandar é o atendimento, depois de conferir o pedido.
+ * Vai para o celular que o cliente escolheu para receber o link
+ * (`celular_link_watch`, pedido no bot e no site); pedidos antigos, sem esse
+ * campo, caem no celular de acesso informado ou no da conversa. Template, e
+ * não texto, porque o número escolhido pode não ter conversa aberta.
+ *
+ * Devolve para onde foi, para a tela de solicitações mostrar. Falha não sobe:
+ * o link continua no sino para o atendimento mandar à mão.
  */
-async function avisarAguardandoConta(solicitacao: SolicitacaoServico) {
+async function enviarLinkWatchTv(
+  solicitacao: SolicitacaoServico,
+  link?: string,
+): Promise<{ link_enviado_para?: string; link_erro?: string }> {
+  const token = String(link || "").split("/").pop();
+  if (!token) return { link_erro: "Link não gerado." };
+
   const dados = (solicitacao.dados || {}) as any;
   const bruto = String(
-    dados.telefone_conversa || dados.telefone || dados.celular || "",
+    dados.celular_link_watch ||
+      dados.celular_watch ||
+      dados.telefone_conversa ||
+      dados.telefone ||
+      dados.celular ||
+      "",
   ).replace(/\D/g, "");
-  if (!bruto) return;
+  if (!bruto) return { link_erro: "Sem celular para enviar o link." };
   const celular = bruto.startsWith("55") ? bruto : `55${bruto}`;
 
-  await Whatsapp.MensagensComuns(
-    celular,
-    `📺 *Watch TV contratada!*\n\n` +
-      `Em instantes nossa equipe envia o link para você criar a sua conta, ` +
-      `escolhendo o e-mail e o celular de acesso.`,
-  );
+  try {
+    await Whatsapp.MensagemTemplate(
+      celular,
+      TEMPLATE_LINK_WATCH,
+      "pt_BR",
+      [],
+      [],
+      token,
+    );
+    return { link_enviado_para: celular };
+  } catch (e: any) {
+    const motivo =
+      e?.response?.data?.error?.message || e?.message || String(e);
+    console.error(
+      `[ZapSign Webhook] Falha ao enviar o link da Watch TV para ${celular}:`,
+      motivo,
+    );
+    return { link_erro: `Não foi possível enviar para ${celular}: ${motivo}` };
+  }
 }
 
 // Todas as funções createContract* aceitam Record<string, any> e usam
@@ -1203,12 +1231,10 @@ class ZapSign {
                     solicitacaoId: solicitacao.id,
                   });
 
-                  if (
-                    r.status === "aguardando_conta" &&
-                    !veioDaWeb(solicitacao)
-                  ) {
-                    await avisarAguardandoConta(solicitacao);
-                  }
+                  const envio =
+                    r.status === "aguardando_conta"
+                      ? await enviarLinkWatchTv(solicitacao, r.link)
+                      : {};
                   console.log(
                     `[ZapSign Webhook] Watch TV de ${loginWatch}: ${r.status}` +
                       (r.motivo ? ` — ${r.motivo}` : ""),
@@ -1219,6 +1245,7 @@ class ZapSign {
                     ...solicitacao.dados,
                     servico_cadastro: {
                       ...r,
+                      ...envio,
                       em: new Date().toISOString(),
                     },
                   };
@@ -1294,16 +1321,17 @@ class ZapSign {
         (r.motivo ? ` — ${r.motivo}` : ""),
     );
 
+    const envio =
+      r.status === "aguardando_conta"
+        ? await enviarLinkWatchTv(solicitacao, r.link)
+        : {};
+
     const repo = AppDataSource.getRepository(SolicitacaoServico);
     solicitacao.dados = {
       ...(solicitacao.dados || {}),
-      servico_cadastro: { ...r, em: new Date().toISOString() },
+      servico_cadastro: { ...r, ...envio, em: new Date().toISOString() },
     };
     await repo.save(solicitacao);
-
-    if (r.status === "aguardando_conta" && !veioDaWeb(solicitacao)) {
-      await avisarAguardandoConta(solicitacao);
-    }
     return r;
   };
 
