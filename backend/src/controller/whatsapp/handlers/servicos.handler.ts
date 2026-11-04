@@ -353,10 +353,9 @@ async function cobrancaWatchTv(session: any) {
 /**
  * Solicitação de contratação da Watch TV.
  *
- * Nasce sem contrato: o Contrato de SVA é gerado depois, pela tela de
- * solicitações — é lá que o atendimento confere os dados antes de mandar o
- * cliente assinar. O Termo de Adesão SVA não entra aqui: ele acompanha o
- * plano combo no cadastro, junto do contrato do plano.
+ * O Contrato de SVA é gerado logo depois, em concluirWatchTv, e vai ao
+ * cliente na própria conversa. O Termo de Adesão SVA não entra aqui: ele
+ * acompanha o plano combo no cadastro, junto do contrato do plano.
  */
 async function salvarSolicitacaoWatchTv(session: any, celularConversa: string) {
   const repo = AppDataSource.getRepository(SolicitacaoServico);
@@ -467,8 +466,8 @@ async function concluirWatchTv(celular: any, session: any) {
     `Endereço: ${session.endereco_watch_tv || "-"}, ${session.numero_watch_tv || "-"}\n` +
     `Assinatura: R$ ${reais(VALOR_STREAMER)} por mês, na mensalidade.\n` +
     `Cobrança: ${textoCobrancaProporcional(proporcional)}\n\n` +
-    `O Contrato de SVA será enviado para assinatura pelo atendimento, e o ` +
-    `proporcional lançado na fatura.`;
+    `O Contrato de SVA foi enviado ao cliente pelo WhatsApp; o proporcional ` +
+    `entra na fatura pelo atendimento.`;
 
   try {
     await criarChamadoMkauth(
@@ -482,12 +481,43 @@ async function concluirWatchTv(celular: any, session: any) {
     console.error("[WatchTV] Falha ao abrir o chamado:", e?.message || e);
   }
 
-  await MensagensComuns(
-    celular,
-    `✅ *Pedido registrado!*\n\nSua contratação da *Watch TV* foi enviada para a ` +
-      `nossa equipe. Em breve você recebe o *Contrato de SVA* para assinar.\n\n` +
-      `💰 Não há nada a pagar agora: a assinatura entra na sua mensalidade.`,
-  );
+  // O Contrato de SVA sai aqui mesmo, na conversa aberta (texto, sem
+  // template). Se o ZapSign falhar, o atendimento envia pela tela de
+  // solicitações ("Enviar assinatura"), que reaproveita o mesmo documento.
+  let signUrl: string | null = null;
+  try {
+    const zapResponse = await ZapSign.createContratoSva(solicitacao.dados);
+    signUrl = zapResponse?.signers?.[0]?.sign_url ?? null;
+    if (signUrl) {
+      solicitacao.token_zapsign = zapResponse.token;
+      solicitacao.dados = { ...solicitacao.dados, sign_url: signUrl };
+      await AppDataSource.getRepository(SolicitacaoServico).save(solicitacao);
+    }
+    if (signUrl) {
+      await MensagensComuns(
+        celular,
+        `✅ *Pedido registrado!*\n\n` +
+          `💰 Não há nada a pagar agora: a assinatura entra na sua mensalidade.\n\n` +
+          `📄 *Assine o Contrato de SVA para liberarmos a Watch TV:* ${signUrl}\n\n` +
+          `Assim que você assinar, enviamos o link para criar a sua conta. 🚀`,
+      );
+      await enviarLinkDocumentoExtra(celular, zapResponse);
+    }
+  } catch (e: any) {
+    console.error(
+      "[WatchTV] Falha ao gerar o Contrato de SVA:",
+      e?.message || e,
+    );
+  }
+
+  if (!signUrl) {
+    await MensagensComuns(
+      celular,
+      `✅ *Pedido registrado!*\n\nSua contratação da *Watch TV* foi enviada para a ` +
+        `nossa equipe. Em breve você recebe o *Contrato de SVA* para assinar.\n\n` +
+        `💰 Não há nada a pagar agora: a assinatura entra na sua mensalidade.`,
+    );
+  }
 
   // Pela marca, não por deleteSession: a fila grava a sessão depois do
   // handler e a traria de volta parada em "ask_celular" (pedido em dobro).
