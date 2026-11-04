@@ -1102,6 +1102,20 @@ class SolicitacaoServicoController {
       };
       await repository.save(solicitacao);
 
+      // Cadastro novo no plano combo: a Watch TV entra junto, igual a quando
+      // o contrato é assinado. Depois do save acima, que senão apagaria o
+      // registro que esta chamada grava na solicitação.
+      if (deveCriarCadastro && loginCliente) {
+        try {
+          await ZapSign.ativarWatchTvDoPlano(solicitacao, loginCliente, dados);
+        } catch (eSva: any) {
+          console.error(
+            `[CriarSemAssinatura] Erro ao ativar a Watch TV do plano (${loginCliente}):`,
+            eSva?.message || eSva,
+          );
+        }
+      }
+
       const partes: string[] = [];
       if (deveCriarCadastro) partes.push("Cadastro criado");
       if (!jaTemChamado) partes.push("chamado criado");

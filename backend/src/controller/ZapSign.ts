@@ -1344,13 +1344,14 @@ class ZapSign {
   };
 
   /**
-   * Plano com SVA acabou de entrar num cadastro: cria a conta na Watch Brasil,
-   * registra o resultado na solicitação e avisa o cliente.
+   * Plano com SVA acabou de entrar num cadastro: põe o streaming no contrato
+   * por R$ 0,00, registra o resultado na solicitação e manda ao cliente o link
+   * para criar a conta.
    *
-   * Vale para instalação, troca de plano e titularidade — em todos, o plano é
-   * gravado no cadastro e o streaming vem junto, por R$ 0,00.
+   * Vale para instalação, troca de plano e titularidade, assinadas pelo
+   * ZapSign ou criadas sem assinatura pela tela de solicitações.
    */
-  private ativarWatchTvDoPlano = async (
+  ativarWatchTvDoPlano = async (
     solicitacao: SolicitacaoServico,
     login: string,
     dados: any,
