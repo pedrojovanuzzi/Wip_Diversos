@@ -58,6 +58,8 @@ router.post("/BuscarClientesServicos", operador, semAuditoria, NFSE.BuscarClient
 router.post("/EmitirNfseServicos", operador, NFSE.EmitirNfseServicos);
 
 router.post("/imprimirNFSE", operador, NFSE.imprimirNFSE);
+// Relatório em PDF que vai dentro do ZIP (XMLs + PDFs) da tela de busca.
+router.post("/gerarRelatorioPdf", operador, semAuditoria, NFSE.gerarRelatorioPdf);
 
 router.post("/setSessionPassword", operador, NFSE.setPassword);
 

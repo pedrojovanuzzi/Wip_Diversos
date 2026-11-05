@@ -5,11 +5,17 @@ import DanfseNacional from "./DanfseNacional";
 
 interface PDFNFSEProps {
   dados: any[];
+  /** Mostra fora da impressão (usado para capturar o PDF que vai no ZIP). */
+  naTela?: boolean;
 }
 
-const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(({ dados }, ref) => {
+const PDFNFSE = forwardRef<HTMLDivElement, PDFNFSEProps>(
+  ({ dados, naTela }, ref) => {
   return (
-    <div className="hidden print:block text-xs m-1" ref={ref}>
+    <div
+      className={`${naTela ? "block" : "hidden print:block"} text-xs m-1`}
+      ref={ref}
+    >
       {dados.map((item, i) =>
         // Nota nacional: DANFSe montado a partir do XML da própria nota.
         item?.xml ? (

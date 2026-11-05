@@ -8,6 +8,7 @@ import axios from "axios";
 import moment from "moment-timezone";
 import { In, Between, IsNull, Not, Like, Raw } from "typeorm";
 import { parseStringPromise } from "xml2js";
+import PDFDocument from "pdfkit";
 
 import AppDataSource from "../database/DataSource";
 import MkauthSource from "../database/MkauthSource";
@@ -226,6 +227,7 @@ class NFSEController {
     this.BuscarClientes = this.BuscarClientes.bind(this);
     this.removerAcentos = this.removerAcentos.bind(this);
     this.GerarNfseAvulsa = this.GerarNfseAvulsa.bind(this);
+    this.gerarRelatorioPdf = this.gerarRelatorioPdf.bind(this);
   }
 
   private configureProvider(ambiente: string = "producao") {
@@ -961,6 +963,184 @@ class NFSEController {
     console.log(result);
 
     res.status(200).json(result);
+  }
+
+  /**
+   * Relatório em PDF das NFS-e selecionadas (vai dentro do ZIP da tela de
+   * busca). Só lê o banco: não consulta a prefeitura nem a API nacional.
+   */
+  async gerarRelatorioPdf(req: Request, res: Response) {
+    try {
+      const { id, ambiente, dateFilter } = req.body;
+      const ids = (Array.isArray(id) ? id : [])
+        .map(Number)
+        .filter((n: number) => Number.isInteger(n) && n > 0);
+      if (!ids.length) {
+        res.status(400).json({ error: "Selecione ao menos uma nota." });
+        return;
+      }
+
+      const notas = await AppDataSource.getRepository(NFSE).find({
+        where: { id: In(ids), ...(ambiente ? { ambiente } : {}) },
+        order: { numeroNfe: "ASC", id: "ASC" },
+      });
+      if (!notas.length) {
+        res.status(404).json({ error: "Nenhuma nota encontrada." });
+        return;
+      }
+
+      const dataBR = (d: any) =>
+        d ? moment.tz(d, "America/Sao_Paulo").format("DD/MM/YYYY") : "";
+      const fmtDoc = (v: string) => {
+        const d = String(v || "").replace(/\D/g, "");
+        if (d.length === 11)
+          return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+        if (d.length === 14)
+          return d.replace(
+            /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
+            "$1.$2.$3/$4-$5",
+          );
+        return v || "";
+      };
+      const iss = (n: NFSE) =>
+        (Number(n.valorServico) || 0) * ((Number(n.aliquota) || 0) / 100);
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=relatorio_nfse.pdf",
+      );
+
+      const doc = new PDFDocument({ margin: 30, size: "A4" });
+      doc.pipe(res);
+
+      // Cabeçalho
+      doc.rect(0, 0, 595.28, 100).fill("#1e293b");
+      doc.fillColor("white").font("Helvetica-Bold").fontSize(20);
+      doc.text("Relatório de NFS-e", 30, 30);
+      doc.font("Helvetica").fontSize(10);
+      doc.text(`Gerado em: ${moment().tz("America/Sao_Paulo").format("DD/MM/YYYY HH:mm")}`, 30, 60);
+      let periodo = "Notas selecionadas";
+      if (dateFilter?.start && dateFilter?.end) {
+        const fmt = (iso: string) =>
+          String(iso).substring(0, 10).split("-").reverse().join("/");
+        periodo = `${fmt(dateFilter.start)} a ${fmt(dateFilter.end)}`;
+      }
+      doc.text(
+        `Período: ${periodo} · Ambiente: ${ambiente === "homologacao" ? "Homologação" : "Produção"}`,
+        30,
+        75,
+      );
+      doc.text(`Total de notas: ${notas.length}`, 365, 60, {
+        width: 200,
+        align: "right",
+      });
+
+      const cols = [
+        { key: "nfse", title: "Nº NFS-E", x: 30, w: 40 },
+        { key: "rps", title: "RPS", x: 70, w: 35 },
+        { key: "tomador", title: "TOMADOR", x: 105, w: 120 },
+        { key: "doc", title: "CPF/CNPJ", x: 225, w: 70 },
+        { key: "comp", title: "COMPET.", x: 295, w: 45 },
+        { key: "emissao", title: "EMISSÃO", x: 340, w: 45 },
+        { key: "valor", title: "VALOR", x: 385, w: 55, right: true },
+        { key: "iss", title: "ISS", x: 440, w: 45, right: true },
+        { key: "status", title: "STATUS", x: 490, w: 75 },
+      ];
+      const cell = (txt: string, c: (typeof cols)[number], y: number) =>
+        doc.text(txt, c.x + 3, y, {
+          width: c.w - 6,
+          align: c.right ? "right" : "left",
+          lineBreak: false,
+          ellipsis: true,
+          height: 10,
+        });
+      const cabecalhoTabela = (y: number) => {
+        doc.rect(30, y, 535, 20).fill("#e2e8f0");
+        doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(7);
+        cols.forEach((c) => cell(c.title, c, y + 6));
+        doc.fillColor("black").font("Helvetica").fontSize(7);
+      };
+
+      let y = 120;
+      cabecalhoTabela(y);
+      y += 20;
+
+      let qtdAtivas = 0;
+      let qtdCanceladas = 0;
+      let valorAtivas = 0;
+      let issAtivas = 0;
+      let valorCanceladas = 0;
+
+      notas.forEach((n, i) => {
+        if (y > 780) {
+          doc.addPage();
+          y = 30;
+          cabecalhoTabela(y);
+          y += 20;
+        }
+        const cancelada = n.status === "Cancelada";
+        const valor = Number(n.valorServico) || 0;
+        if (cancelada) {
+          qtdCanceladas++;
+          valorCanceladas += valor;
+        } else {
+          qtdAtivas++;
+          valorAtivas += valor;
+          issAtivas += iss(n);
+        }
+
+        if (i % 2 === 1) doc.rect(30, y, 535, 14).fill("#f8fafc");
+        doc.fillColor(cancelada ? "#b91c1c" : "black");
+        const linha: Record<string, string> = {
+          nfse: String(n.numeroNfe ?? ""),
+          rps: `${n.numeroRps ?? ""}${n.serieRps ? `/${n.serieRps}` : ""}`,
+          tomador: n.razaoSocialTomador || n.login || "",
+          doc: fmtDoc(n.cpfTomador),
+          comp: dataBR(n.competencia),
+          emissao: dataBR(n.dataEmissao),
+          valor: formatBRL(valor),
+          iss: formatBRL(iss(n)),
+          status: n.status || "",
+        };
+        cols.forEach((c) => cell(linha[c.key], c, y + 4));
+        y += 14;
+      });
+      doc.fillColor("black");
+
+      // Resumo
+      if (y > 700) {
+        doc.addPage();
+        y = 30;
+      }
+      y += 16;
+      doc.moveTo(30, y).lineTo(565, y).strokeColor("#94a3b8").stroke();
+      y += 10;
+      doc.font("Helvetica-Bold").fontSize(10).text("Resumo", 30, y);
+      y += 16;
+      doc.font("Helvetica").fontSize(9);
+      const resumo: [string, string][] = [
+        ["Notas ativas", `${qtdAtivas}`],
+        ["Valor das ativas", `R$ ${formatBRL(valorAtivas)}`],
+        ["ISS das ativas", `R$ ${formatBRL(issAtivas)}`],
+        ["Notas canceladas", `${qtdCanceladas}`],
+        ["Valor das canceladas", `R$ ${formatBRL(valorCanceladas)}`],
+      ];
+      resumo.forEach(([rotulo, valor]) => {
+        doc.text(rotulo, 30, y, { width: 150 });
+        doc.text(valor, 180, y, { width: 120, align: "right" });
+        y += 14;
+      });
+
+      doc.end();
+    } catch (error) {
+      console.error("Erro ao gerar relatório de NFS-e:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Erro ao gerar o relatório." });
+      } else {
+        res.end();
+      }
+    }
   }
 
   /**
@@ -1921,7 +2101,10 @@ class NFSEController {
           extractedData.CompNfse.Nfse.InfNfse.DeclaracaoPrestacaoServico.InfDeclaracaoPrestacaoServico.Tomador.Endereco.Cidade =
             ibgeResponse.data.nome;
         }
-        return { status: "success", data: extractedData };
+        // XML da nota para o ZIP. Não vai em `xml`: a tela usa esse campo para
+        // escolher o DANFSe nacional na impressão.
+        const xmlAbrasf = new XMLSerializer().serializeToString(nfseNode);
+        return { status: "success", data: extractedData, xmlAbrasf };
       } else {
         return {
           status: "error",

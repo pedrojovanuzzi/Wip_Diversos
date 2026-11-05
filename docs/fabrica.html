@@ -280,7 +280,7 @@ ol.steps li.err button { color: var(--bad); }
       <li><div><b>Entenda a portaria.</b> <code>middleware/AuthGuard.ts</code> e <code>PermissionGuard.ts</code>. Rode o pedido "Portaria" com as 3 opções de token e os 3 níveis. Repare que a tela também confere o nível (<code>frontend/app/src/App.tsx</code>), mas quem protege de verdade é o backend.</div></li>
       <li><div><b>Siga um pedido simples de ponta a ponta.</b> Login: a tela <code>pages/auth</code> → <code>routes/Auth.Routes.ts</code> → <code>controller/Auth.ts</code> → banco.</div></li>
       <li><div><b>Aprenda as filas.</b> A pasta <code>controller/whatsapp/</code> é a parte mais bem organizada (handlers, services, testes). Leia <code>queues.ts</code> e depois o <code>switch</code> do <code>message.handler.ts</code>.</div></li>
-      <li><div><b>Só então as máquinas gigantes.</b> <code>NFE.ts</code> (3.594 linhas), <code>Nfcom.ts</code> (3.271), <code>NFSE.ts</code> (2.937) e <code>Pix.ts</code> (2.486). Não leia de cima a baixo: clique na tela, veja qual rota ela chama e siga a partir do método.</div></li>
+      <li><div><b>Só então as máquinas gigantes.</b> <code>NFE.ts</code> (3.594 linhas), <code>Nfcom.ts</code> (3.271), <code>NFSE.ts</code> (3.203) e <code>Pix.ts</code> (2.486). Não leia de cima a baixo: clique na tela, veja qual rota ela chama e siga a partir do método.</div></li>
     </ol>
   </details>
   <details class="pane gloss" id="gloss">
@@ -472,7 +472,7 @@ const CTRLS = [
   ["c_timetracking", "equipe", "/api/time-tracking", "Ponto eletrônico", "TimeTracking.routes.ts", "EmployeeController.ts TimeRecordController.ts DailyOvertimeController.ts ImageController.ts MonthlyReportSignatureController.ts", 875, 19, "bater ponto aberto; gestão nível 5", "dbMain", "", "Funcionários, registros de ponto com foto, horas extras e assinatura do relatório mensal. Feriados via date-holidays."],
   ["c_phone", "equipe", "/api/phone-location", "Localização", "PhoneLocation.routes.ts", "PhoneLocation.ts", 155, 5, "/position público (device_token); resto AuthGuard", "dbMain", "", "Recebe a posição do app dos técnicos e lista para o painel."],
   ["c_files", "equipe", "/api/files", "Arquivos", "FileShare.routes.ts", "FileShare.ts", 113, 4, "nível 2; download por link", "dbMain", "", "Upload e compartilhamento de arquivos."],
-  ["c_nfse", "fiscal", "/api/nfse", "NFS-e", "NFSE.routes.ts", "NFSE.ts", 3020, 13, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco out_publicas", "Emite, consulta, imprime e cancela NFS-e. Provedores em services/nfse (Fiorilli e SEFIN Nacional). Código do município vem do IBGE. A busca (BuscarNSFE) também traz as notas de licença (login LICENCA-<id>), que não são clientes do MKAuth. Cada nota guarda a fatura de origem (id_fatura): a tela só lista o que ainda não tem nota, e fatura de serviço só depois de paga."],
+  ["c_nfse", "fiscal", "/api/nfse", "NFS-e", "NFSE.routes.ts", "NFSE.ts", 3203, 14, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco out_publicas", "Emite, consulta, imprime e cancela NFS-e. Provedores em services/nfse (Fiorilli e SEFIN Nacional). Código do município vem do IBGE. A busca (BuscarNSFE) também traz as notas de licença (login LICENCA-<id>), que não são clientes do MKAuth. O botão \"Baixar ZIP\" da busca monta no navegador xmls/, pdfs/ (mesmo layout da impressão) e o relatório de gerarRelatorioPdf. Cada nota guarda a fatura de origem (id_fatura): a tela só lista o que ainda não tem nota, e fatura de serviço só depois de paga."],
   ["c_nfe", "fiscal", "/api/NFEletronica", "NF-e", "NFE.Routes.ts", "NFE.ts", 3594, 17, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco", "NF-e de comodato: monta XML, assina com certificado A1, gera DANFE em PDF. O maior arquivo do projeto."],
   ["c_nfcom", "fiscal", "/api/NFCom", "NFCom", "NFCom.routes.ts", "Nfcom.ts", 3271, 17, "nível 2; cancelar nível 5", "dbMain mkauth", "out_fisco out_email out_publicas", "Nota fiscal de comunicação (internet): XML assinado, QR Code, PDF e declaração de quitação. Manda a nota por e-mail e busca os impostos aproximados no IBPT."],
   ["c_prefeitura", "fiscal", "/api/Prefeitura", "Login Prefeitura", "PrefeituraUser.routes.ts", "PrefeituraLogin.ts", 316, 10, "público com código por SMS", "dbMain", "out_twilio", "Acesso da prefeitura com código de verificação enviado por SMS (Twilio, ou Facilita Móvel como alternativa)."],
@@ -523,7 +523,7 @@ add("worker", { k: "worker", x: 2725, y: 690, tag: "queues.ts", name: "Robô do 
   files: [["controller/whatsapp/queues.ts", 45, "initQueues"], ["controller/whatsapp/handlers/message.handler.ts", 107, "handleMessage"]] });
 add("jobs", { k: "worker", x: 2535, y: 800, tag: "tabela Jobs", name: "Produção em 2º plano", links: ["c_nfse", "c_nfe", "c_nfcom", "dbMain"],
   desc: "Não é BullMQ: é uma função chamada sem await, que vai atualizando um registro na tabela Jobs (pendente → processando → concluido/erro). Roda dentro do processo do Node, então, se o servidor reiniciar no meio, não é retomado sozinho.",
-  files: [["controller/NFSE.ts", 545, "processarGeracaoNfseJob"], ["entities/Jobs.ts", 0, "Jobs"]] });
+  files: [["controller/NFSE.ts", 547, "processarGeracaoNfseJob"], ["entities/Jobs.ts", 0, "Jobs"]] });
 add("cron", { k: "clock", x: 2725, y: 800, tag: "node-cron", name: "Relógio", links: ["c_backup", "c_pix", "c_licenca", "c_tvwip", "c_sercontratos"],
   desc: "Agendado no app.ts: 03:00 todo dia, backup. 03:00 do dia 1º, cobranças do Pix Automático. 03:15 todo dia, mensalidades de licença. 03:20 todo dia, recalcula a tabela clientes_watchtv pelo MK-Auth (1 = tem a Watch TV, pelo contrato ou pelo plano combo), sem mexer no que o atendente marcou à mão. 04:00 todo dia, conferência do Pix Automático. E no TvWipService: 03:10 todo dia, varredura da TV WIP (fuso de São Paulo). Pix, licenças, TV WIP e Watch TV também rodam quando o servidor sobe, para recuperar o que se perdeu com a máquina desligada.",
   files: [["app.ts", 128, "backup 03:00"], ["app.ts", 145, "Pix dia 1º"], ["services/TvWipService.ts", 88, "TV WIP 03:10"], ["app.ts", 206, "licenças 03:15"], ["app.ts", 228, "Watch TV 03:20"], ["app.ts", 157, "conferência 04:00"]] });
@@ -548,7 +548,7 @@ add("pdns", { k: "db", x: 2730, y: 1400, tag: "createDns.ts", name: "Banco do Po
 // ---- Saída: serviços externos ----
 [
   ["out_meta", "Graph API", "WhatsApp (saída)", "O outgoingWorker e o chat mandam mensagens pela Graph API da Meta.", [["controller/whatsapp/queues.ts", 169, "outgoingWorker"]]],
-  ["out_fisco", "SEFIN · SEFAZ", "Fisco", "NFS-e vai para a SEFIN Nacional ou para a Fiorilli (prefeitura). NF-e e NFCom vão para a SEFAZ. Tudo em XML assinado com o certificado A1.", [["controller/NFSE.ts", 303, "enviarDpsNacional"], ["services/nfse/FiorilliProvider.ts", 0, "FiorilliProvider"]]],
+  ["out_fisco", "SEFIN · SEFAZ", "Fisco", "NFS-e vai para a SEFIN Nacional ou para a Fiorilli (prefeitura). NF-e e NFCom vão para a SEFAZ. Tudo em XML assinado com o certificado A1.", [["controller/NFSE.ts", 305, "enviarDpsNacional"], ["services/nfse/FiorilliProvider.ts", 0, "FiorilliProvider"]]],
   ["out_efi", "API Efí", "Banco Efí (saída)", "Chamadas à Efí pelo SDK sdk-node-apis-efi: criar cobrança, gerar QR Code, consultar pagamentos.", [["services/PixAutomaticoService.ts", 96, "efi()"]]],
   ["out_drive", "OneDrive", "OneDrive", "Destino dos backups, na pasta Backup, via Microsoft Graph (LargeFileUploadTask).", [["controller/Backup.ts", 227, "createUploadSession"]]],
   ["out_zapsign", "API ZapSign", "ZapSign", "Assinatura eletrônica de contratos e termos.", []],
@@ -561,7 +561,7 @@ add("pdns", { k: "db", x: 2730, y: 1400, tag: "createDns.ts", name: "Banco do Po
   ["out_email", "SMTP Mailgun", "E-mail", "nodemailer pelo SMTP do Mailgun: o robô e os links de serviço avisam a equipe, e a NFCom vai por e-mail para o cliente.", [["controller/whatsapp/services/email.service.ts", 3, "transporter"], ["controller/Email.ts", 7, "transporter"]]],
   ["out_paygo", "ControlPay", "PayGo (cartão)", "TEF de cartão no totem: cria a intenção de venda no ControlPay e acompanha o status até a maquininha aprovar.", [["controller/TokenAtendimento.ts", 43, "PAYGO_BASE"]]],
   ["out_consult", "ConsultCenter", "Consulta de CPF", "Consulta de negativação (Pefin, Refin, protesto, cheque) antes de aprovar uma solicitação de serviço.", [["services/ConsultCenterService.ts", 31, "consultarDebitos"]]],
-  ["out_publicas", "IBGE · ViaCEP · IBPT", "APIs públicas", "IBGE para código de município (NFS-e, cadastro, ZapSign), ViaCEP para endereço pelo CEP (robô e links) e IBPT para os impostos aproximados da NFCom.", [["controller/NFSE.ts", 93, "IBGE"], ["controller/servicoWeb/ServiceLink.ts", 1334, "ViaCEP"], ["controller/Nfcom.ts", 599, "IBPT"]]],
+  ["out_publicas", "IBGE · ViaCEP · IBPT", "APIs públicas", "IBGE para código de município (NFS-e, cadastro, ZapSign), ViaCEP para endereço pelo CEP (robô e links) e IBPT para os impostos aproximados da NFCom.", [["controller/NFSE.ts", 94, "IBGE"], ["controller/servicoWeb/ServiceLink.ts", 1334, "ViaCEP"], ["controller/Nfcom.ts", 599, "IBPT"]]],
 ].forEach(([id, tag, name, desc, files], i) => add(id, { k: "out", x: 3030, y: 170 + i * 100, tag, name, desc, files }));
 
 // ---- Ferramentas e infraestrutura ----
@@ -623,11 +623,11 @@ const MISSIONS = [
     S("router", "Esteira /api/nfse", "Vai para routes/NFSE.routes.ts, que usa protegido(2).", "routes/NFSE.routes.ts", 44),
     S("auth", "Confere o crachá", "AuthGuard: tira o token do header, jwt.verify e carrega req.user.", "middleware/AuthGuard.ts", 22),
     S("perm", "Confere o nível", "exigirPermissao(2): operador ou acima pode seguir.", "middleware/PermissionGuard.ts", 11),
-    S("c_nfse", "Abre a ordem de serviço", "iniciar calcula o próximo RPS, cria um registro em Jobs com status \"pendente\" e já responde 200 com o id do job. O trabalho pesado continua depois da resposta.", "controller/NFSE.ts", 471),
-    S("jobs", "Produção em 2º plano", "processarGeracaoNfseJob roda sem await, em lotes de 50 clientes, atualizando \"processados\" a cada nota.", "controller/NFSE.ts", 644),
-    S("mkauth", "Busca cliente e fatura", "prepareRpsData lê ClientesEntities e Faturas no MK-Auth para montar o XML.", "controller/NFSE.ts", 829),
-    S("out_fisco", "Envia para o fisco", "enviarDpsNacional assina o XML com o certificado A1 e envia.", "controller/NFSE.ts", 303),
-    S("dbMain", "Guarda e fecha o job", "Salva cada NFSE e marca o Job como \"concluido\" ou \"erro\". A tela vai consultando o job até terminar.", "controller/NFSE.ts", 818, { end: "concluido" }),
+    S("c_nfse", "Abre a ordem de serviço", "iniciar calcula o próximo RPS, cria um registro em Jobs com status \"pendente\" e já responde 200 com o id do job. O trabalho pesado continua depois da resposta.", "controller/NFSE.ts", 473),
+    S("jobs", "Produção em 2º plano", "processarGeracaoNfseJob roda sem await, em lotes de 50 clientes, atualizando \"processados\" a cada nota.", "controller/NFSE.ts", 646),
+    S("mkauth", "Busca cliente e fatura", "prepareRpsData lê ClientesEntities e Faturas no MK-Auth para montar o XML.", "controller/NFSE.ts", 831),
+    S("out_fisco", "Envia para o fisco", "enviarDpsNacional assina o XML com o certificado A1 e envia.", "controller/NFSE.ts", 305),
+    S("dbMain", "Guarda e fecha o job", "Salva cada NFSE e marca o Job como \"concluido\" ou \"erro\". A tela vai consultando o job até terminar.", "controller/NFSE.ts", 820, { end: "concluido" }),
   ]},
   { id: "pix", title: "Pix pago", http: "POST /api/Pix/PixAutomatico/webhookCobr", item: "PIX", color: "#4fc3b0", steps: [
     S("in_efi", "Cliente pagou", "A Efí chama o webhook da cobrança do Pix Automático."),

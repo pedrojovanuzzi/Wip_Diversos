@@ -9,6 +9,9 @@ import { IoArrowUpCircleOutline } from "react-icons/io5";
 
 import PopUpCancelNFSE, { CodigoMotivo } from "./Components/PopUpCancelNFSE";
 import { MdContentCopy } from "react-icons/md";
+import { FiDownload } from "react-icons/fi";
+import { saveAs } from "file-saver";
+import { montarZipNfse } from "./Components/zipNfse";
 import PDFNFSE from "./Components/PDFNFSE";
 import { useReactToPrint } from "react-to-print";
 import Success from "./Components/Success";
@@ -66,6 +69,7 @@ export const BuscarNfseGerada = () => {
   const [password, setPassword] = useState<string>("");
 
   const [loading, setLoading] = useState(false);
+  const [zipProgresso, setZipProgresso] = useState<string | null>(null);
 
   const { user } = useAuth();
   const token = user?.token;
@@ -148,6 +152,37 @@ export const BuscarNfseGerada = () => {
       console.error("Erro ao imprimir NFS-e:", erro);
       showError(erro?.response?.data?.error || "Erro ao imprimir a NFS-e.");
       setLoading(false);
+    }
+  };
+
+  // ZIP com xmls/, pdfs/ e relatorio_nfse.pdf das notas selecionadas.
+  const baixarZip = async () => {
+    if (clientesSelecionados.length === 0) return;
+    const notas = clientesSelecionados.map((id) => {
+      const nf = clientes.find((c) => c.nfse?.id === id)?.nfse;
+      return { id, numeroNfse: nf?.numeroNfse, numeroRps: nf?.numero_rps };
+    });
+    try {
+      setZipProgresso(`0/${notas.length}`);
+      const { blob, falhas, semRelatorio } = await montarZipNfse({
+        notas,
+        ambiente: ambiente || "homologacao",
+        token,
+        dateFilter,
+        onProgresso: (feitas, total) => setZipProgresso(`${feitas}/${total}`),
+      });
+      saveAs(blob, "nfse_export.zip");
+      const avisos = [
+        falhas ? `${falhas} nota(s) com erro (veja a pasta erros/)` : "",
+        semRelatorio ? "o relatório não pôde ser gerado" : "",
+      ].filter(Boolean);
+      if (avisos.length) showError(`ZIP baixado, mas ${avisos.join(" e ")}.`);
+      else showSuccess("ZIP baixado com sucesso!");
+    } catch (erro: any) {
+      console.error("Erro ao montar ZIP de NFS-e:", erro);
+      showError("Erro ao gerar o ZIP das NFS-e.");
+    } finally {
+      setZipProgresso(null);
     }
   };
 
@@ -562,6 +597,19 @@ export const BuscarNfseGerada = () => {
                     >
                       <BsFiletypeDoc />
                       Imprimir ({clientesSelecionados.length})
+                    </button>
+                    <button
+                      className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-500 transition-all flex items-center gap-2 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      onClick={baixarZip}
+                      disabled={
+                        clientesSelecionados.length === 0 || !!zipProgresso
+                      }
+                      title="XMLs, PDFs e relatório das notas selecionadas"
+                    >
+                      <FiDownload />
+                      {zipProgresso
+                        ? `Gerando ZIP (${zipProgresso})...`
+                        : `Baixar ZIP (${clientesSelecionados.length})`}
                     </button>
                     {permission! >= 5 && (
                       <button
