@@ -1038,23 +1038,35 @@ class NFSEController {
 
       const cols = [
         { key: "nfse", title: "Nº NFS-E", x: 30, w: 40 },
-        { key: "rps", title: "RPS", x: 70, w: 35 },
-        { key: "tomador", title: "TOMADOR", x: 105, w: 120 },
-        { key: "doc", title: "CPF/CNPJ", x: 225, w: 70 },
-        { key: "comp", title: "COMPET.", x: 295, w: 45 },
-        { key: "emissao", title: "EMISSÃO", x: 340, w: 45 },
-        { key: "valor", title: "VALOR", x: 385, w: 55, right: true },
-        { key: "iss", title: "ISS", x: 440, w: 45, right: true },
-        { key: "status", title: "STATUS", x: 490, w: 75 },
-      ];
-      const cell = (txt: string, c: (typeof cols)[number], y: number) =>
+        { key: "rps", title: "RPS", x: 70, w: 62, inteiro: true },
+        { key: "tomador", title: "TOMADOR", x: 132, w: 100 },
+        { key: "doc", title: "CPF/CNPJ", x: 232, w: 68 },
+        { key: "comp", title: "COMPET.", x: 300, w: 44 },
+        { key: "emissao", title: "EMISSÃO", x: 344, w: 44 },
+        { key: "valor", title: "VALOR", x: 388, w: 54, right: true },
+        { key: "iss", title: "ISS", x: 442, w: 44, right: true },
+        { key: "status", title: "STATUS", x: 486, w: 79 },
+      ] as { key: string; title: string; x: number; w: number; right?: boolean; inteiro?: boolean }[];
+      const cell = (txt: string, c: (typeof cols)[number], y: number) => {
+        // Coluna "inteiro" (RPS) nunca corta: se não couber, diminui a fonte.
+        const tamanho = 7;
+        let reduzida = false;
+        if (c.inteiro) {
+          const larguraTexto = doc.fontSize(tamanho).widthOfString(txt);
+          if (larguraTexto > c.w - 6) {
+            doc.fontSize(Math.max(4, (tamanho * (c.w - 6)) / larguraTexto));
+            reduzida = true;
+          }
+        }
         doc.text(txt, c.x + 3, y, {
           width: c.w - 6,
           align: c.right ? "right" : "left",
           lineBreak: false,
-          ellipsis: true,
+          ellipsis: !c.inteiro,
           height: 10,
         });
+        if (reduzida) doc.fontSize(tamanho);
+      };
       const cabecalhoTabela = (y: number) => {
         doc.rect(30, y, 535, 20).fill("#e2e8f0");
         doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(7);

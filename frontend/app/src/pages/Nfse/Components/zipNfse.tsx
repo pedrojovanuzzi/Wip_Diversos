@@ -74,6 +74,13 @@ async function notaEmPdf(item: any): Promise<Blob> {
       backgroundColor: "#ffffff",
       useCORS: true,
       logging: false,
+      // Com o reset do Tailwind (img { display: block }) o html2canvas desenha
+      // o texto mais para baixo, e as linhas das caixas cortam os valores.
+      onclone: (doc) => {
+        const style = doc.createElement("style");
+        style.textContent = "img { display: inline-block !important; }";
+        doc.head.appendChild(style);
+      },
     });
 
     const pdf = new jsPDF("p", "mm", "a4");
