@@ -11,30 +11,36 @@ ORIGEM=$(cd "$(dirname "$0")" && pwd)
 [ "$(id -u)" = "0" ] || { echo "Rode como root."; exit 1; }
 [ -d "$ADDONS" ] || { echo "Não achei $ADDONS. Isto é um servidor MK-Auth?"; exit 1; }
 
-mkdir -p "$DESTINO"
+mkdir -p "$DESTINO/provedores"
 for f in index.php lib.php retorno.php cron.php manifest.json .htaccess; do
   cp "$ORIGEM/$f" "$DESTINO/$f"
 done
+cp "$ORIGEM"/provedores/*.php "$DESTINO/provedores/"
+printf 'Require all denied\n' > "$DESTINO/provedores/.htaccess"
 
-# O addons.class.php é do MK-Auth (confere o login do painel). Cada addon leva
-# uma cópia; pegamos a de outro addon já instalado.
-if [ ! -f "$DESTINO/addons.class.php" ]; then
-  CLASSE=$(find "$ADDONS" -maxdepth 2 -name addons.class.php ! -path "$DESTINO/*" | head -1)
-  [ -n "$CLASSE" ] || { echo "Não achei addons.class.php em nenhum addon de $ADDONS."; exit 1; }
-  cp "$CLASSE" "$DESTINO/addons.class.php"
-fi
+# O addons.class.php é do MK-Auth (confere o login do painel). O próprio
+# MK-Auth (scripts/addons.php, a cada 5 min) mantém em cada addon um link para
+# include/addons.inc.hhvm; fazemos o mesmo link para não esperar a rodada.
+CLASSE=/opt/mk-auth/include/addons.inc.hhvm
+[ -f "$CLASSE" ] || { echo "Não achei $CLASSE (MK-Auth sem suporte a addons?)."; exit 1; }
+ln -sfn "$CLASSE" "$DESTINO/addons.class.php"
 
-chown -R www-data:www-data "$DESTINO"
-chmod 640 "$DESTINO"/*.php
+# Permissões só nos arquivos do addon: nunca seguir links, senão o chmod
+# atinge o addons.inc.hhvm do MK-Auth e derruba todos os addons.
+chown -R -h www-data:www-data "$DESTINO"
+find "$DESTINO" -type f -name '*.php' -exec chmod 640 {} +
+chmod 644 "$CLASSE" 2>/dev/null || true
 
-# Item no menu Provedor.
-if ! grep -q 'addons/split_efi/' "$ADDONS/addon.js"; then
-  cat >> "$ADDONS/addon.js" <<'EOF'
+# Item no menu Provedor. Sempre reescreve a linha (tira a antiga e põe a atual),
+# para uma reinstalação levar mudanças de texto/ícone. picone = classe do ícone
+# (Bootstrap Icons e Font Awesome 4 já vêm no painel).
+sed -i '/^\/\/ SPLIT EFI$/d; /addons\/split_efi\//d' "$ADDONS/addon.js"
+sed -i -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$ADDONS/addon.js"   # tira linhas em branco do fim
+cat >> "$ADDONS/addon.js" <<'EOF'
 
 // SPLIT EFI
-add_menu.provedor('{"plink": "' + window.location.protocol + '//' + window.location.host + '/admin/addons/split_efi/", "ptext": "Split Efi"}');
+add_menu.provedor('{"plink": "' + window.location.protocol + '//' + window.location.host + '/admin/addons/split_efi/", "ptext": "Split Efi", "picone": "bi bi-cash-coin"}');
 EOF
-fi
 
 # Agendamento: de 5 em 5 minutos.
 cat > /etc/cron.d/split_efi <<'EOF'

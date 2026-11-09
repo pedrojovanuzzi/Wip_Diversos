@@ -1,9 +1,9 @@
 <?php
 /**
  * Agendamento do split (roda pelo /etc/cron.d/split_efi, como root, de 5 em 5 min).
- * 1. passa para a conta do split os clientes novos da conta Efí de origem;
- * 2. registra na Efí, com repasse, os títulos novos da conta do split;
- * 3. acompanha os já registrados (apagado, pago por fora, valor ou vencimento mudou).
+ * Não mexe em cliente nenhum: quem entra no split é escolhido à mão na tela.
+ * 1. registra no banco, com repasse, os títulos novos das contas dos perfis ativos;
+ * 2. acompanha os já registrados (apagado, pago por fora, valor ou vencimento mudou).
  */
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
@@ -18,11 +18,17 @@ if (!$trava || !flock($trava, LOCK_EX | LOCK_NB)) {
 
 try {
     garantir_tabelas();
-    if (cfg('ativo', '0') === '1') {
-        mover_clientes();
-        registrar_pendentes();
+    foreach (perfis() as $p) {
+        if ((int) $p['ativo'] !== 1) {
+            continue;
+        }
+        try {
+            registrar_pendentes($p);
+        } catch (Throwable $e) {
+            log_split('erro', "Cron, perfil {$p['id']}: " . $e->getMessage());
+        }
     }
-    // Mesmo desativado, cuida do que já está na Efí.
+    // Mesmo com perfil desativado, cuida do que já está no banco.
     sincronizar();
 } catch (Throwable $e) {
     log_split('erro', 'Cron: ' . $e->getMessage());

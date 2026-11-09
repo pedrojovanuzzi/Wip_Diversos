@@ -1,16 +1,17 @@
 <?php
 /**
- * Addon SPLIT EFI para o MK-Auth.
+ * Addon de SPLIT DE PAGAMENTO para o MK-Auth.
  *
- * O MK-Auth registra boletos na Efí pelo código interno dele, sem split. Este
- * addon tira os clientes da conta Efí do MK-Auth (sis_boleto com gateway
- * 'gnet') e coloca numa conta própria com gateway 'fat', que o MK-Auth não
- * registra em lugar nenhum. O próprio addon registra cada título dessa conta
- * na Efí já com o repasse (items[].marketplace.repasses) e dá a baixa quando a
- * Efí avisa o pagamento.
+ * O MK-Auth registra boletos no banco pelo código interno dele, sem split. Este
+ * addon trabalha com PERFIS: cada perfil liga um banco (provedor: Efí, Sicoob...)
+ * a uma conta de cobrança própria no sis_boleto, com gateway 'fat' (o MK-Auth
+ * gera o título mas não registra em banco nenhum). Os clientes são escolhidos
+ * À MÃO na tela: ao colocar um cliente no perfil, a conta dele vira a conta do
+ * perfil (a anterior fica guardada para desfazer). O cron registra cada título
+ * novo dessas contas no banco já com o repasse para o parceiro, e o retorno.php
+ * dá a baixa quando o banco avisa o pagamento.
  *
- * Só funções aqui. Quem usa: index.php (painel), cron.php (agendamento) e
- * retorno.php (aviso da Efí).
+ * Só funções aqui. Quem usa: index.php (painel), cron.php e retorno.php.
  */
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === realpath(__FILE__)) {
@@ -20,13 +21,23 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === realpath(__FILE__)) {
 
 // conexao.php fica em /opt/mk-auth/include (include_path do MK-Auth, web e CLI).
 include_once('conexao.php');
+require_once __DIR__ . '/provedores/Provedor.php';
+require_once __DIR__ . '/provedores/efi.php';
+require_once __DIR__ . '/provedores/sicoob.php';
 
-const SPLIT_FORMAPAG = 'gerencianet';    // igual à baixa nativa, para os relatórios
-const SPLIT_COLETOR = 'addon.split';      // diferente de 'url.retorno': mostra quem deu a baixa
+const SPLIT_COLETOR = 'addon.split';   // diferente de 'url.retorno': mostra quem deu a baixa
 const SPLIT_MAX_TENTATIVAS = 5;
-const SPLIT_LOTE = 50;                     // títulos por rodada do cron
+const SPLIT_LOTE = 50;                  // títulos por rodada do cron, por perfil
+const SPLIT_POR_PAGINA = 100;           // clientes por página na seleção (padrão)
+const SPLIT_POR_PAGINA_OPCOES = [100, 500, 1500];
 
-// ---------------------------------------------------------------- banco
+/** Bancos que o addon conhece: chave => classe. */
+function provedores_disponiveis(): array
+{
+    return ['efi' => 'ProvedorEfi', 'sicoob' => 'ProvedorSicoob'];
+}
+
+// ---------------------------------------------------------------- banco de dados
 
 function db(): mysqli
 {
@@ -73,6 +84,11 @@ function q1(string $sql, array $params = []): ?array
     return $r[0] ?? null;
 }
 
+function coluna_existe(string $tabela, string $coluna): bool
+{
+    return (bool) q1("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?", [$tabela, $coluna]);
+}
+
 function garantir_tabelas(): void
 {
     db()->query("CREATE TABLE IF NOT EXISTS addon_split_config (
@@ -80,17 +96,34 @@ function garantir_tabelas(): void
         valor TEXT NULL
     ) DEFAULT CHARSET=utf8");
 
-    // Conta que cada cliente tinha antes de entrar no split (para desfazer).
+    // Um perfil por banco/parceiro. config = JSON com os campos do provedor.
+    db()->query("CREATE TABLE IF NOT EXISTS addon_split_perfis (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(60) NOT NULL,
+        provedor VARCHAR(20) NOT NULL,
+        conta_origem INT NULL,
+        conta_split INT NULL,
+        ambiente VARCHAR(12) NOT NULL DEFAULT 'homologacao',
+        ativo TINYINT(1) NOT NULL DEFAULT 0,
+        config TEXT NULL,
+        criado_em DATETIME NOT NULL,
+        atualizado_em DATETIME NOT NULL
+    ) DEFAULT CHARSET=utf8");
+
+    // Clientes escolhidos à mão para um perfil, com a conta que tinham antes.
     db()->query("CREATE TABLE IF NOT EXISTS addon_split_clientes (
         login VARCHAR(64) NOT NULL PRIMARY KEY,
+        perfil_id INT NULL,
         conta_anterior VARCHAR(11) NOT NULL,
         movido_em DATETIME NOT NULL
     ) DEFAULT CHARSET=utf8");
 
     // Um registro por título do sis_lanc que o addon tentou registrar.
+    // charge_id = id da cobrança no banco (qualquer provedor).
     db()->query("CREATE TABLE IF NOT EXISTS addon_split_titulos (
         id_lanc INT NOT NULL PRIMARY KEY,
-        charge_id VARCHAR(32) NULL,
+        perfil_id INT NULL,
+        charge_id VARCHAR(64) NULL,
         situacao VARCHAR(20) NOT NULL,
         valor DECIMAL(12,2) NULL,
         vencimento DATE NULL,
@@ -112,6 +145,41 @@ function garantir_tabelas(): void
         mensagem TEXT NOT NULL,
         KEY k_data (data)
     ) DEFAULT CHARSET=utf8");
+
+    // Instalações da versão 0.1 (um perfil só, sem perfil_id).
+    if (!coluna_existe('addon_split_clientes', 'perfil_id')) {
+        db()->query("ALTER TABLE addon_split_clientes ADD perfil_id INT NULL AFTER login");
+    }
+    if (!coluna_existe('addon_split_titulos', 'perfil_id')) {
+        db()->query("ALTER TABLE addon_split_titulos ADD perfil_id INT NULL AFTER id_lanc");
+        db()->query("ALTER TABLE addon_split_titulos MODIFY charge_id VARCHAR(64) NULL");
+    }
+    migrar_config_antiga();
+}
+
+/** A 0.1 guardava um perfil Efí só em addon_split_config. Vira o perfil 1. */
+function migrar_config_antiga(): void
+{
+    if (q1("SELECT id FROM addon_split_perfis LIMIT 1") || cfg('conta_origem') === null) {
+        return;
+    }
+    $agora = date('Y-m-d H:i:s');
+    q("INSERT INTO addon_split_perfis (nome, provedor, conta_origem, conta_split, ambiente, ativo, config, criado_em, atualizado_em)
+       VALUES ('Efí', 'efi', ?, ?, ?, ?, ?, ?, ?)", [
+        (int) cfg('conta_origem', '0') ?: null,
+        (int) cfg('conta_split', '0') ?: null,
+        cfg('ambiente', 'homologacao') === 'producao' ? 'producao' : 'homologacao',
+        cfg('ativo', '0') === '1' ? 1 : 0,
+        json_encode(['payee_code' => (string) cfg('payee_code', ''), 'percentual' => (string) cfg('percentual', '')]),
+        $agora, $agora,
+    ]);
+    $id = (int) db()->insert_id;
+    q("UPDATE addon_split_clientes SET perfil_id = ? WHERE perfil_id IS NULL", [$id]);
+    q("UPDATE addon_split_titulos SET perfil_id = ? WHERE perfil_id IS NULL", [$id]);
+    foreach (['conta_origem', 'conta_split', 'ambiente', 'ativo', 'payee_code', 'percentual'] as $c) {
+        q("DELETE FROM addon_split_config WHERE chave = ?", [$c]);
+    }
+    log_split('info', "Configuração da versão anterior virou o perfil $id (Efí).");
 }
 
 function cfg(string $chave, ?string $padrao = null): ?string
@@ -142,184 +210,187 @@ function uuid4(): string
     return strtoupper(vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($b), 4)));
 }
 
-// ---------------------------------------------------------------- configuração
+// ---------------------------------------------------------------- configuração geral
 
-/** Contas do MK-Auth que registram na Efí pelo próprio MK-Auth. */
-function contas_efi(): array
+/** Endereço público do MK-Auth, só esquema://host[:porta]. */
+function url_base(): string
 {
-    return q("SELECT id, nome FROM sis_boleto WHERE gateway = 'gnet' AND (delconta IS NULL OR delconta <> 's') ORDER BY id");
+    return rtrim((string) cfg('url_base', ''), '/');
 }
 
-function conta_origem(): ?array
+function token_retorno(): string
 {
-    $id = (int) cfg('conta_origem', '0');
+    $t = (string) cfg('token_retorno', '');
+    if ($t === '') {
+        $t = bin2hex(random_bytes(24));
+        cfg_set('token_retorno', $t);
+    }
+    return $t;
+}
+
+function url_retorno(int $perfilId): string
+{
+    return url_base() . '/admin/addons/split_efi/retorno.php?p=' . $perfilId . '&t=' . rawurlencode(token_retorno());
+}
+
+// ---------------------------------------------------------------- perfis
+
+function perfis(): array
+{
+    return array_map('perfil_decodificar', q("SELECT * FROM addon_split_perfis ORDER BY id"));
+}
+
+function perfil(int $id): ?array
+{
+    $p = q1("SELECT * FROM addon_split_perfis WHERE id = ?", [$id]);
+    return $p ? perfil_decodificar($p) : null;
+}
+
+function perfil_decodificar(array $p): array
+{
+    $p['config'] = json_decode((string) ($p['config'] ?? ''), true) ?: [];
+    return $p;
+}
+
+function conta(int $id): ?array
+{
     return $id ? q1("SELECT * FROM sis_boleto WHERE id = ?", [$id]) : null;
 }
 
-function conta_split_id(): int
+function provedor(array $perfil): Provedor
 {
-    return (int) cfg('conta_split', '0');
+    $classe = provedores_disponiveis()[$perfil['provedor']] ?? null;
+    if (!$classe) {
+        throw new RuntimeException("Banco desconhecido: {$perfil['provedor']}.");
+    }
+    return new $classe($perfil, conta((int) $perfil['conta_origem']));
 }
 
-function ambiente(): string
+/** Contas do MK-Auth que servem de origem para o banco do perfil. */
+function contas_origem(string $provedor): array
 {
-    return cfg('ambiente', 'homologacao') === 'producao' ? 'producao' : 'homologacao';
+    $classe = provedores_disponiveis()[$provedor] ?? null;
+    if (!$classe) {
+        return [];
+    }
+    return q("SELECT id, nome FROM sis_boleto WHERE (" . $classe::filtroContasOrigem() . ")
+                AND (delconta IS NULL OR delconta <> 's') ORDER BY id");
 }
 
-/** Percentual do parceiro em centésimos de ponto (Efí: 2500 = 25%). */
-function percentual_efi(): int
+/** O que falta para o perfil poder ser ativado. Vazio = pronto. */
+function pendencias_perfil(array $perfil): array
 {
-    return (int) round(((float) str_replace(',', '.', cfg('percentual', '0'))) * 100);
+    $f = provedor($perfil)->pendencias();
+    if (!preg_match('#^https?://#', url_base())) {
+        $f[] = 'Informe o endereço público do MK-Auth (para o banco avisar o pagamento).';
+    }
+    return $f;
 }
-
-function url_retorno(): string
-{
-    $base = rtrim((string) cfg('url_base', ''), '/');
-    return $base . '/admin/addons/split_efi/retorno.php?t=' . rawurlencode((string) cfg('token_retorno', ''));
-}
-
-/** O que falta para poder registrar. Lista vazia = pronto. */
-function pendencias_config(): array
-{
-    $faltas = [];
-    $origem = conta_origem();
-    if (!$origem) {
-        $faltas[] = 'Escolha a conta Efí de origem.';
-    } else {
-        [$id, $secret] = credenciais($origem);
-        if ($id === '' || $secret === '') {
-            $faltas[] = 'A conta de origem não tem Client ID/Secret de ' . (ambiente() === 'producao' ? 'produção' : 'homologação') . '.';
-        }
-    }
-    if (trim((string) cfg('payee_code', '')) === '') {
-        $faltas[] = 'Informe o payee_code da conta parceira.';
-    }
-    $p = percentual_efi();
-    if ($p <= 0 || $p >= 10000) {
-        $faltas[] = 'O percentual tem que ser maior que 0 e menor que 100.';
-    }
-    if (!preg_match('#^https?://#', (string) cfg('url_base', ''))) {
-        $faltas[] = 'Informe o endereço público do MK-Auth (para a Efí avisar o pagamento).';
-    }
-    return $faltas;
-}
-
-// ---------------------------------------------------------------- Efí (API de Cobranças)
-
-function credenciais(array $conta): array
-{
-    if (ambiente() === 'producao') {
-        return [trim((string) $conta['cliente_id_gnet']), trim((string) $conta['cliente_secret_gnet'])];
-    }
-    return [trim((string) $conta['cliente_id_teste_gnet']), trim((string) $conta['cliente_secret_teste_gnet'])];
-}
-
-function efi_base(): string
-{
-    return ambiente() === 'producao'
-        ? 'https://cobrancas.api.efipay.com.br'
-        : 'https://cobrancas-h.api.efipay.com.br';
-}
-
-function http_json(string $metodo, string $url, array $headers, ?array $corpo): array
-{
-    $ch = curl_init($url);
-    $hs = array_merge(['Content-Type: application/json', 'Accept: application/json'], $headers);
-    curl_setopt_array($ch, [
-        CURLOPT_CUSTOMREQUEST => $metodo,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $hs,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_CONNECTTIMEOUT => 10,
-    ]);
-    if ($corpo !== null) {
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($corpo, JSON_UNESCAPED_UNICODE));
-    }
-    $txt = curl_exec($ch);
-    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $erro = curl_error($ch);
-    curl_close($ch);
-    if ($txt === false) {
-        throw new RuntimeException("Efí sem resposta: $erro");
-    }
-    $json = json_decode($txt, true);
-    return [$status, is_array($json) ? $json : ['_texto' => substr($txt, 0, 500)]];
-}
-
-function efi_token(bool $renovar = false): string
-{
-    $amb = ambiente();
-    $cache = json_decode((string) cfg("token_$amb", ''), true);
-    if (!$renovar && $cache && ($cache['ate'] ?? 0) > time() + 30) {
-        return $cache['token'];
-    }
-    $origem = conta_origem();
-    if (!$origem) {
-        throw new RuntimeException('Conta de origem não configurada.');
-    }
-    [$id, $secret] = credenciais($origem);
-    [$st, $r] = http_json('POST', efi_base() . '/v1/authorize', [
-        'Authorization: Basic ' . base64_encode("$id:$secret"),
-    ], ['grant_type' => 'client_credentials']);
-    if ($st !== 200 || empty($r['access_token'])) {
-        throw new RuntimeException('Efí recusou as credenciais: ' . efi_erro($r));
-    }
-    cfg_set("token_$amb", json_encode([
-        'token' => $r['access_token'],
-        'ate' => time() + (int) ($r['expires_in'] ?? 600),
-    ]));
-    return $r['access_token'];
-}
-
-function efi(string $metodo, string $caminho, ?array $corpo = null): array
-{
-    [$st, $r] = http_json($metodo, efi_base() . $caminho, ['Authorization: Bearer ' . efi_token()], $corpo);
-    if ($st === 401) {
-        [$st, $r] = http_json($metodo, efi_base() . $caminho, ['Authorization: Bearer ' . efi_token(true)], $corpo);
-    }
-    if ($st < 200 || $st >= 300) {
-        throw new RuntimeException("Efí $metodo $caminho ($st): " . efi_erro($r));
-    }
-    return $r;
-}
-
-function efi_erro(array $r): string
-{
-    $d = $r['error_description'] ?? $r['_texto'] ?? $r;
-    if (is_array($d)) {
-        $d = json_encode($d, JSON_UNESCAPED_UNICODE);
-    }
-    return mb_substr((string) $d, 0, 500);
-}
-
-// ---------------------------------------------------------------- ativar / desativar
 
 /**
- * Cria (uma vez) a conta de cobrança do split, copiando a conta de origem com
- * gateway 'fat': o MK-Auth gera o título, mas não registra em banco nenhum.
+ * Cria ou atualiza um perfil. $dados: nome, provedor, conta_origem, ambiente e
+ * os campos do provedor. Campo 'password' em branco mantém o valor salvo.
  */
-function garantir_conta_split(): int
+function salvar_perfil(?int $id, array $dados): int
 {
-    $id = conta_split_id();
-    if ($id && q1("SELECT id FROM sis_boleto WHERE id = ?", [$id])) {
+    $atual = $id ? perfil($id) : null;
+    if ($id && !$atual) {
+        throw new RuntimeException('Perfil não encontrado.');
+    }
+    $provedor = $atual ? $atual['provedor'] : (string) ($dados['provedor'] ?? '');
+    $classe = provedores_disponiveis()[$provedor] ?? null;
+    if (!$classe) {
+        throw new RuntimeException('Escolha o banco do perfil.');
+    }
+    $nome = trim((string) ($dados['nome'] ?? '')) ?: $classe::nome();
+    $origem = (int) ($dados['conta_origem'] ?? 0);
+    if ($origem && !in_array($origem, array_map('intval', array_column(contas_origem($provedor), 'id')), true)) {
+        throw new RuntimeException('Conta de origem inválida para este banco.');
+    }
+    if ($atual && (int) $atual['ativo'] === 1 && $origem !== (int) $atual['conta_origem']) {
+        throw new RuntimeException('Desative o perfil antes de trocar a conta de origem.');
+    }
+    $ambiente = ($dados['ambiente'] ?? '') === 'producao' ? 'producao' : 'homologacao';
+    // Trocar de ambiente com o perfil ativo faria o cron cancelar cobranças de
+    // homologação usando a credencial de produção (e vice-versa).
+    if ($atual && (int) $atual['ativo'] === 1 && $ambiente !== $atual['ambiente']) {
+        throw new RuntimeException('Desative o perfil antes de trocar o ambiente.');
+    }
+
+    $config = $atual['config'] ?? [];
+    foreach ($classe::campos() as [$chave, $rotulo, $tipo]) {
+        $v = trim((string) ($dados[$chave] ?? ''));
+        if ($tipo === 'password' && $v === '') {
+            continue; // em branco = mantém
+        }
+        if ($tipo === 'percent' && $v !== '') {
+            $v = str_replace([',', '%', ' '], ['.', '', ''], $v);
+            if (!is_numeric($v)) {
+                throw new RuntimeException("$rotulo: use só números, por exemplo 10 ou 10,5.");
+            }
+            $v = number_format((float) $v, 2, '.', '');
+        }
+        $config[$chave] = mb_substr($v, 0, 255);
+    }
+
+    $agora = date('Y-m-d H:i:s');
+    $json = json_encode($config, JSON_UNESCAPED_UNICODE);
+    if ($atual) {
+        q("UPDATE addon_split_perfis SET nome = ?, conta_origem = ?, ambiente = ?, config = ?, atualizado_em = ? WHERE id = ?",
+          [mb_substr($nome, 0, 60), $origem ?: null, $ambiente, $json, $agora, $id]);
         return $id;
     }
-    $origem = conta_origem();
+    q("INSERT INTO addon_split_perfis (nome, provedor, conta_origem, ambiente, ativo, config, criado_em, atualizado_em)
+       VALUES (?, ?, ?, ?, 0, ?, ?, ?)", [mb_substr($nome, 0, 60), $provedor, $origem ?: null, $ambiente, $json, $agora, $agora]);
+    $novo = (int) db()->insert_id;
+    log_split('info', "Perfil $novo ($nome, {$classe::nome()}) criado.");
+    return $novo;
+}
+
+/** Apaga um perfil sem clientes e desativado. */
+function excluir_perfil(int $id): void
+{
+    $p = perfil($id);
+    if (!$p) {
+        throw new RuntimeException('Perfil não encontrado.');
+    }
+    if ((int) $p['ativo'] === 1) {
+        throw new RuntimeException('Desative o perfil antes de excluir.');
+    }
+    if (q1("SELECT login FROM addon_split_clientes WHERE perfil_id = ? LIMIT 1", [$id])) {
+        throw new RuntimeException('Tire todos os clientes do perfil antes de excluir.');
+    }
+    q("DELETE FROM addon_split_perfis WHERE id = ?", [$id]);
+    log_split('info', "Perfil $id ({$p['nome']}) excluído. A conta de cobrança {$p['conta_split']} continua no MK-Auth.");
+}
+
+/**
+ * Cria (uma vez) a conta de cobrança do perfil, copiando a conta de origem com
+ * gateway 'fat': o MK-Auth gera o título, mas não registra em banco nenhum.
+ */
+function garantir_conta_split(array $perfil): int
+{
+    $id = (int) $perfil['conta_split'];
+    if ($id && conta($id)) {
+        return $id;
+    }
+    $origem = conta((int) $perfil['conta_origem']);
     if (!$origem) {
         throw new RuntimeException('Conta de origem não configurada.');
     }
     $nova = $origem;
     unset($nova['id']);
     $nova['uuid_boleto'] = uuid4();
-    $nova['nome'] = 'EFI SPLIT (ADDON)';
+    $nova['nome'] = mb_substr('SPLIT ' . mb_strtoupper($perfil['nome']) . ' (ADDON)', 0, 50);
     $nova['utilizar'] = 'fatura';
     $nova['banco'] = 'proprio.php';
     $nova['gateway'] = 'fat';
     $nova['calc_boleto'] = 'nao';   // senão o MK-Auth recalcula a linha digitável
     $nova['delconta'] = 'n';
-    // Credenciais ficam só na conta de origem: a conta nova não fala com a Efí.
-    foreach (['cliente_id_gnet', 'cliente_secret_gnet', 'cliente_id_teste_gnet',
-              'cliente_secret_teste_gnet', 'token_gnet', 'id_conta_gnet', 'url_gnet'] as $c) {
+    // Credenciais ficam só na conta de origem: a conta nova não fala com banco nenhum.
+    foreach (['cliente_id_gnet', 'cliente_secret_gnet', 'cliente_id_teste_gnet', 'cliente_secret_teste_gnet',
+              'token_gnet', 'id_conta_gnet', 'url_gnet', 'token_juno', 'token_sjuno', 'galax_id', 'galax_hash',
+              'galax_tokenwebhook', 'iugu_token', 'token', 'token_bcash', 'token_pagseguro'] as $c) {
         if (array_key_exists($c, $nova)) {
             $nova[$c] = null;
         }
@@ -334,230 +405,278 @@ function garantir_conta_split(): int
     }
     $id = (int) db()->insert_id;
     $st->close();
-    cfg_set('conta_split', (string) $id);
-    log_split('info', "Conta de cobrança $id criada (cópia da conta {$origem['id']}, gateway fat).");
+    q("UPDATE addon_split_perfis SET conta_split = ?, atualizado_em = NOW() WHERE id = ?", [$id, (int) $perfil['id']]);
+    log_split('info', "Conta de cobrança $id criada para o perfil {$perfil['id']} (cópia da conta {$origem['id']}, gateway fat).");
     return $id;
 }
 
-/** Passa para a conta do split os clientes que estão na conta Efí de origem. */
-function mover_clientes(): int
+/** Liga o registro com split do perfil. Não move nenhum cliente. */
+function ativar_perfil(int $id): void
 {
-    $origem = (int) cfg('conta_origem', '0');
-    $split = conta_split_id();
-    if (!$origem || !$split) {
-        return 0;
+    $p = perfil($id);
+    if (!$p) {
+        throw new RuntimeException('Perfil não encontrado.');
     }
-    $clientes = q("SELECT login, conta FROM sis_cliente WHERE conta = ?", [(string) $origem]);
-    foreach ($clientes as $c) {
-        q("INSERT INTO addon_split_clientes (login, conta_anterior, movido_em) VALUES (?, ?, NOW())
-           ON DUPLICATE KEY UPDATE conta_anterior = VALUES(conta_anterior), movido_em = NOW()",
-          [$c['login'], (string) $c['conta']]);
-        q("UPDATE sis_cliente SET conta = ? WHERE login = ? AND conta = ?", [(string) $split, $c['login'], (string) $origem]);
+    $prov = provedor($p);
+    if (!$prov::implementado()) {
+        throw new RuntimeException('A integração com o ' . $prov::nome() . ' ainda não foi escrita.');
     }
-    if ($clientes) {
-        log_split('info', count($clientes) . " cliente(s) passaram da conta $origem para a conta $split.");
-    }
-    return count($clientes);
-}
-
-function ativar(): void
-{
-    $faltas = pendencias_config();
+    $faltas = pendencias_perfil($p);
     if ($faltas) {
         throw new RuntimeException(implode(' ', $faltas));
     }
-    efi_token(true); // falha aqui se a credencial estiver errada
-    garantir_conta_split();
-    cfg_set('ativo', '1');
-    mover_clientes();
-    log_split('info', 'Split ativado.');
+    $prov->testar();
+    garantir_conta_split($p);
+    q("UPDATE addon_split_perfis SET ativo = 1, atualizado_em = NOW() WHERE id = ?", [$id]);
+    log_split('info', "Perfil $id ({$p['nome']}) ativado.");
 }
 
 /**
- * Devolve cada cliente para a conta que tinha. Títulos já registrados pelo
- * addon continuam valendo na Efí e o retorno continua dando baixa neles.
+ * Desliga o perfil. Os clientes dele voltam para a conta anterior: se ficassem
+ * na conta 'fat', o MK-Auth geraria títulos sem registro em banco nenhum.
+ * O que já está no banco continua valendo e o retorno continua dando baixa.
  */
-function desativar(): int
+function desativar_perfil(int $id): int
 {
-    cfg_set('ativo', '0');
-    $split = conta_split_id();
-    $n = 0;
-    foreach (q("SELECT login, conta_anterior FROM addon_split_clientes") as $c) {
-        $n += (int) q("UPDATE sis_cliente SET conta = ? WHERE login = ? AND conta = ?",
-                      [$c['conta_anterior'], $c['login'], (string) $split]);
-        q("DELETE FROM addon_split_clientes WHERE login = ?", [$c['login']]);
+    $logins = array_column(q("SELECT login FROM addon_split_clientes WHERE perfil_id = ?", [$id]), 'login');
+    $n = $logins ? tirar_do_split($logins) : 0;
+    q("UPDATE addon_split_perfis SET ativo = 0, atualizado_em = NOW() WHERE id = ?", [$id]);
+    log_split('info', "Perfil $id desativado. $n cliente(s) voltaram para a conta anterior.");
+    return $n;
+}
+
+// ---------------------------------------------------------------- clientes (seleção manual)
+
+/**
+ * Lista clientes para a tela de seleção.
+ * $filtro: todos | fora (fora de qualquer split) | perfil (só os do perfil $perfilId).
+ * Devolve ['linhas' => [...], 'total' => n].
+ */
+function listar_clientes(string $busca, string $filtro, int $perfilId, int $pagina, int $porPagina = SPLIT_POR_PAGINA): array
+{
+    if (!in_array($porPagina, SPLIT_POR_PAGINA_OPCOES, true)) {
+        $porPagina = SPLIT_POR_PAGINA;
     }
-    log_split('info', "Split desativado. $n cliente(s) voltaram para a conta anterior.");
+    $onde = ['1=1'];
+    $par = [];
+    $busca = trim($busca);
+    if ($busca !== '') {
+        $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $busca) . '%';
+        $dig = preg_replace('/\D/', '', $busca);
+        $cond = 'c.nome LIKE ? OR c.login LIKE ?';
+        $par[] = $like;
+        $par[] = $like;
+        if (strlen($dig) >= 3) {
+            $cond .= " OR REPLACE(REPLACE(REPLACE(c.cpf_cnpj, '.', ''), '-', ''), '/', '') LIKE ?";
+            $par[] = '%' . $dig . '%';
+        }
+        $onde[] = "($cond)";
+    }
+    if ($filtro === 'fora') {
+        $onde[] = 's.login IS NULL';
+    } elseif ($filtro === 'perfil') {
+        $onde[] = 's.perfil_id = ?';
+        $par[] = $perfilId;
+    }
+    $where = implode(' AND ', $onde);
+    $total = (int) (q1("SELECT COUNT(*) n FROM sis_cliente c LEFT JOIN addon_split_clientes s ON s.login = c.login WHERE $where", $par)['n'] ?? 0);
+    $off = max(0, $pagina - 1) * $porPagina;
+    $linhas = q("SELECT c.login, c.nome, c.cpf_cnpj, c.cidade, c.cli_ativado, c.conta,
+                        b.nome AS conta_nome, s.perfil_id, p.nome AS perfil_nome, s.conta_anterior
+                   FROM sis_cliente c
+              LEFT JOIN addon_split_clientes s ON s.login = c.login
+              LEFT JOIN addon_split_perfis p ON p.id = s.perfil_id
+              LEFT JOIN sis_boleto b ON b.id = c.conta
+                  WHERE $where
+               ORDER BY c.nome
+                  LIMIT $porPagina OFFSET $off", $par);
+    return ['linhas' => $linhas, 'total' => $total];
+}
+
+/**
+ * Coloca os clientes escolhidos no perfil: guarda a conta atual e troca para a
+ * conta do split. Só com o perfil ativo (senão os títulos ficariam sem registro).
+ * Devolve [movidos, ignorados (já em outro perfil)].
+ */
+function colocar_no_split(int $perfilId, array $logins): array
+{
+    $p = perfil($perfilId);
+    if (!$p) {
+        throw new RuntimeException('Perfil não encontrado.');
+    }
+    if ((int) $p['ativo'] !== 1 || !(int) $p['conta_split']) {
+        throw new RuntimeException('Ative o perfil antes de colocar clientes nele.');
+    }
+    $split = (string) (int) $p['conta_split'];
+    $movidos = 0;
+    $ignorados = [];
+    foreach (array_unique(array_map('strval', $logins)) as $login) {
+        $cli = q1("SELECT login, conta FROM sis_cliente WHERE login = ?", [$login]);
+        if (!$cli) {
+            continue;
+        }
+        $ja = q1("SELECT perfil_id FROM addon_split_clientes WHERE login = ?", [$login]);
+        if ($ja) {
+            if ((int) $ja['perfil_id'] !== $perfilId) {
+                $ignorados[] = $login;
+            }
+            continue;
+        }
+        db()->begin_transaction();
+        try {
+            q("INSERT INTO addon_split_clientes (login, perfil_id, conta_anterior, movido_em) VALUES (?, ?, ?, NOW())",
+              [$login, $perfilId, (string) $cli['conta']]);
+            q("UPDATE sis_cliente SET conta = ? WHERE login = ?", [$split, $login]);
+            db()->commit();
+        } catch (Throwable $e) {
+            db()->rollback();
+            throw $e;
+        }
+        $movidos++;
+    }
+    if ($movidos) {
+        log_split('info', "$movidos cliente(s) colocados no perfil $perfilId ({$p['nome']}), conta $split.");
+    }
+    return [$movidos, $ignorados];
+}
+
+/** Devolve os clientes à conta que tinham antes. Devolve quantos voltaram. */
+function tirar_do_split(array $logins): int
+{
+    $n = 0;
+    foreach (array_unique(array_map('strval', $logins)) as $login) {
+        $s = q1("SELECT s.conta_anterior, p.conta_split FROM addon_split_clientes s
+                  LEFT JOIN addon_split_perfis p ON p.id = s.perfil_id WHERE s.login = ?", [$login]);
+        if (!$s) {
+            continue;
+        }
+        // Só devolve se o cliente ainda está na conta do split (alguém pode ter mudado à mão).
+        db()->begin_transaction();
+        try {
+            q("UPDATE sis_cliente SET conta = ? WHERE login = ? AND conta = ?",
+              [(string) $s['conta_anterior'], $login, (string) (int) $s['conta_split']]);
+            q("DELETE FROM addon_split_clientes WHERE login = ?", [$login]);
+            db()->commit();
+        } catch (Throwable $e) {
+            db()->rollback();
+            throw $e;
+        }
+        $n++;
+    }
+    if ($n) {
+        log_split('info', "$n cliente(s) tirados do split e devolvidos à conta anterior.");
+    }
     return $n;
 }
 
 // ---------------------------------------------------------------- registro dos títulos
 
-function so_digitos(?string $s): string
+function registrar_titulo(array $perfil, Provedor $prov, array $t): void
 {
-    return preg_replace('/\D/', '', (string) $s);
-}
-
-function corpo_cobranca(array $t, array $cli, array $origem): array
-{
-    $doc = so_digitos($cli['cpf_cnpj'] ?? '');
-    $nome = trim((string) $cli['nome']) ?: (string) $t['login'];
-    $customer = [];
-    if (strlen($doc) === 14) {
-        $customer['juridical_person'] = ['corporate_name' => mb_substr($nome, 0, 255), 'cnpj' => $doc];
-    } elseif (strlen($doc) === 11) {
-        $customer['name'] = mb_substr($nome, 0, 255);
-        $customer['cpf'] = $doc;
-    } else {
-        throw new RuntimeException('CPF/CNPJ inválido no cadastro do cliente.');
-    }
-    $fone = so_digitos($cli['celular'] ?: $cli['fone']);
-    if (strlen($fone) > 11 && str_starts_with($fone, '55')) {
-        $fone = substr($fone, 2);
-    }
-    if (preg_match('/^[1-9]{2}9?[0-9]{8}$/', $fone)) {
-        $customer['phone_number'] = $fone;
-    }
-    $email = trim((string) ($cli['email'] ?? ''));
-    if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $customer['email'] = $email;
-    }
-
-    $centavos = (int) round(((float) $t['valor']) * 100);
-    $venc = substr((string) $t['datavenc'], 0, 10);
-    if ($venc < date('Y-m-d')) {
-        $venc = date('Y-m-d'); // a Efí não aceita vencimento no passado
-    }
-    $item = 'Mensalidade ' . trim((string) ($t['referencia'] ?: date('m/Y', strtotime((string) $t['datavenc']))));
-
-    $billet = [
-        'expire_at' => $venc,
-        'customer' => $customer,
-        // MK-Auth guarda multa em % e juros em % ao dia; a Efí usa centésimos de ponto.
-        'configurations' => [
-            'fine' => max(0, min(1000, (int) round(((float) $origem['multa']) * 100))),
-            'interest' => max(0, min(330, (int) round(((float) $origem['juros']) * 1000))),
-        ],
-    ];
-    $msg = trim((string) ($origem['instr_linha1'] ?? ''));
-    if ($msg !== '') {
-        $billet['message'] = mb_substr($msg, 0, 500);
-    }
-
-    return [
-        'items' => [[
-            'name' => mb_substr($item, 0, 255),
-            'value' => $centavos,
-            'amount' => 1,
-            'marketplace' => [
-                'repasses' => [[
-                    'payee_code' => trim((string) cfg('payee_code')),
-                    'percentage' => percentual_efi(),
-                ]],
-            ],
-        ]],
-        'metadata' => [
-            'custom_id' => 'mk:' . $t['id'],
-            'notification_url' => url_retorno(),
-        ],
-        'payment' => ['banking_billet' => $billet],
-    ];
-}
-
-function registrar_titulo(array $t): void
-{
-    $origem = conta_origem();
-    $cli = q1("SELECT nome, cpf_cnpj, celular, fone, email FROM sis_cliente WHERE login = ?", [$t['login']]);
     $agora = date('Y-m-d H:i:s');
+    $venc = substr((string) $t['datavenc'], 0, 10);
     try {
+        $cli = q1("SELECT nome, cpf_cnpj, celular, fone, email, endereco, numero, bairro, cidade, estado, cep, complemento
+                     FROM sis_cliente WHERE login = ?", [$t['login']]);
         if (!$cli) {
             throw new RuntimeException('Cliente não encontrado no sis_cliente.');
         }
-        $r = efi('POST', '/v1/charge/one-step', corpo_cobranca($t, $cli, $origem));
-        $d = $r['data'] ?? [];
-        if (empty($d['charge_id']) || empty($d['barcode'])) {
-            throw new RuntimeException('Resposta da Efí sem charge_id/barcode.');
+        $r = $prov->registrar($t, $cli, url_retorno((int) $perfil['id']));
+        $cols = $r['sis_lanc'] ?? [];
+        if ($cols) {
+            $sets = implode(', ', array_map(fn($c) => "`$c` = ?", array_keys($cols)));
+            q("UPDATE sis_lanc SET $sets WHERE id = ?", array_merge(array_values($cols), [(int) $t['id']]));
         }
-        $link = $d['billet_link'] ?? $d['link'] ?? ($d['pdf']['charge'] ?? null);
-        q("UPDATE sis_lanc SET chave_gnet2 = ?, linhadig = ?, url = ? WHERE id = ? AND (chave_gnet2 IS NULL OR chave_gnet2 = '')",
-          [(string) $d['charge_id'], (string) $d['barcode'], (string) $link, (int) $t['id']]);
-        q("INSERT INTO addon_split_titulos (id_lanc, charge_id, situacao, valor, vencimento, percentual, payee_code, link, tentativas, erro, criado_em, atualizado_em)
-           VALUES (?, ?, 'registrado', ?, ?, ?, ?, ?, 1, NULL, ?, ?)
-           ON DUPLICATE KEY UPDATE charge_id = VALUES(charge_id), situacao = 'registrado', valor = VALUES(valor),
-             vencimento = VALUES(vencimento), percentual = VALUES(percentual), payee_code = VALUES(payee_code),
-             link = VALUES(link), tentativas = tentativas + 1, erro = NULL, atualizado_em = VALUES(atualizado_em)",
-          [(int) $t['id'], (string) $d['charge_id'], (string) $t['valor'], substr((string) $t['datavenc'], 0, 10),
-           percentual_efi(), trim((string) cfg('payee_code')), (string) $link, $agora, $agora]);
-        log_split('info', "Título {$t['id']} ({$t['login']}) registrado na Efí: charge {$d['charge_id']}.");
+        q("INSERT INTO addon_split_titulos (id_lanc, perfil_id, charge_id, situacao, valor, vencimento, percentual, payee_code, link, tentativas, erro, criado_em, atualizado_em)
+           VALUES (?, ?, ?, 'registrado', ?, ?, ?, ?, ?, 1, NULL, ?, ?)
+           ON DUPLICATE KEY UPDATE perfil_id = VALUES(perfil_id), charge_id = VALUES(charge_id), situacao = 'registrado',
+             valor = VALUES(valor), vencimento = VALUES(vencimento), percentual = VALUES(percentual),
+             payee_code = VALUES(payee_code), link = VALUES(link), tentativas = tentativas + 1, erro = NULL,
+             atualizado_em = VALUES(atualizado_em)",
+          [(int) $t['id'], (int) $perfil['id'], (string) $r['id'], (string) $t['valor'], $venc,
+           (int) round(((float) ($perfil['config']['percentual'] ?? 0)) * 100),
+           (string) ($perfil['config']['payee_code'] ?? $perfil['config']['fav_conta'] ?? ''),
+           mb_substr((string) ($r['link'] ?? ''), 0, 255), $agora, $agora]);
+        log_split('info', "Título {$t['id']} ({$t['login']}) registrado no " . $prov::nome() . ": {$r['id']}.");
     } catch (Throwable $e) {
-        q("INSERT INTO addon_split_titulos (id_lanc, situacao, valor, vencimento, tentativas, erro, criado_em, atualizado_em)
-           VALUES (?, 'erro', ?, ?, 1, ?, ?, ?)
+        q("INSERT INTO addon_split_titulos (id_lanc, perfil_id, situacao, valor, vencimento, tentativas, erro, criado_em, atualizado_em)
+           VALUES (?, ?, 'erro', ?, ?, 1, ?, ?, ?)
            ON DUPLICATE KEY UPDATE situacao = 'erro', tentativas = tentativas + 1, erro = VALUES(erro), atualizado_em = VALUES(atualizado_em)",
-          [(int) $t['id'], (string) $t['valor'], substr((string) $t['datavenc'], 0, 10), $e->getMessage(), $agora, $agora]);
+          [(int) $t['id'], (int) $perfil['id'], (string) $t['valor'], $venc, $e->getMessage(), $agora, $agora]);
         log_split('erro', "Título {$t['id']} ({$t['login']}): " . $e->getMessage());
     }
 }
 
-/** Títulos em aberto da conta do split que ainda não estão na Efí. */
-function registrar_pendentes(): int
+/** Títulos em aberto da conta do perfil que ainda não estão no banco. */
+function registrar_pendentes(array $perfil): int
 {
-    $split = conta_split_id();
-    if (!$split) {
+    $split = (int) $perfil['conta_split'];
+    if (!$split || (int) $perfil['ativo'] !== 1) {
         return 0;
     }
+    $prov = provedor($perfil);
     $pend = q("SELECT l.id, l.login, l.valor, l.datavenc, l.referencia
                  FROM sis_lanc l
             LEFT JOIN addon_split_titulos a ON a.id_lanc = l.id
                 WHERE l.numconta = ?
                   AND l.status = 'aberto'
                   AND (l.deltitulo = 0 OR l.deltitulo IS NULL)
-                  AND (l.chave_gnet2 IS NULL OR l.chave_gnet2 = '')
                   AND (a.id_lanc IS NULL OR (a.situacao IN ('erro','substituir') AND a.tentativas < ?))
              ORDER BY l.datavenc
                 LIMIT " . SPLIT_LOTE, [$split, SPLIT_MAX_TENTATIVAS]);
     foreach ($pend as $t) {
-        registrar_titulo($t);
+        registrar_titulo($perfil, $prov, $t);
     }
     return count($pend);
 }
 
 /**
  * Acompanha no MK-Auth o que aconteceu com os títulos já registrados:
- * apagado ou pago por outro meio → cancela na Efí; valor mudou → cancela e
- * registra de novo; vencimento mudou → atualiza na Efí.
+ * apagado ou pago por outro meio → cancela no banco; valor mudou → cancela e
+ * registra de novo; vencimento mudou → atualiza no banco.
  */
 function sincronizar(): void
 {
-    $regs = q("SELECT a.id_lanc, a.charge_id, a.valor AS valor_efi, a.vencimento AS venc_efi,
-                      l.id, l.status, l.deltitulo, l.valor, l.datavenc, l.formapag, l.coletor
+    $provs = [];
+    $regs = q("SELECT a.id_lanc, a.perfil_id, a.charge_id, a.valor AS valor_banco, a.vencimento AS venc_banco,
+                      l.id, l.status, l.deltitulo, l.valor, l.datavenc, l.coletor
                  FROM addon_split_titulos a
             LEFT JOIN sis_lanc l ON l.id = a.id_lanc
                 WHERE a.situacao = 'registrado'");
     foreach ($regs as $r) {
         try {
+            $pid = (int) $r['perfil_id'];
+            if (!isset($provs[$pid])) {
+                $p = perfil($pid);
+                $provs[$pid] = $p ? provedor($p) : null;
+            }
+            $prov = $provs[$pid];
+            if (!$prov) {
+                continue;
+            }
             $apagado = $r['id'] === null || (int) $r['deltitulo'] === 1;
-            $pago_fora = $r['status'] === 'pago' && $r['coletor'] !== SPLIT_COLETOR;
-            if ($apagado || $pago_fora || in_array($r['status'], ['cancelado', 'estornado'], true)) {
-                efi('PUT', "/v1/charge/{$r['charge_id']}/cancel");
+            $pagoFora = $r['status'] === 'pago' && $r['coletor'] !== SPLIT_COLETOR;
+            if ($apagado || $pagoFora || in_array($r['status'], ['cancelado', 'estornado'], true)) {
+                $prov->cancelar((string) $r['charge_id']);
                 q("UPDATE addon_split_titulos SET situacao = 'cancelado', atualizado_em = NOW() WHERE id_lanc = ?", [(int) $r['id_lanc']]);
-                log_split('info', "Charge {$r['charge_id']} cancelada na Efí (título {$r['id_lanc']} " . ($apagado ? 'apagado' : 'pago/cancelado por outro meio') . ').');
+                log_split('info', "Cobrança {$r['charge_id']} cancelada no " . $prov::nome() . " (título {$r['id_lanc']} " . ($apagado ? 'apagado' : 'pago/cancelado por outro meio') . ').');
                 continue;
             }
             if ($r['status'] !== 'aberto') {
                 continue;
             }
-            if (abs((float) $r['valor'] - (float) $r['valor_efi']) > 0.004) {
-                efi('PUT', "/v1/charge/{$r['charge_id']}/cancel");
+            if (abs((float) $r['valor'] - (float) $r['valor_banco']) > 0.004) {
+                $prov->cancelar((string) $r['charge_id']);
                 q("UPDATE sis_lanc SET chave_gnet2 = NULL, linhadig = NULL, url = NULL WHERE id = ?", [(int) $r['id']]);
                 q("UPDATE addon_split_titulos SET situacao = 'substituir', tentativas = 0, atualizado_em = NOW() WHERE id_lanc = ?", [(int) $r['id']]);
-                log_split('info', "Título {$r['id']} mudou de valor ({$r['valor_efi']} → {$r['valor']}): charge {$r['charge_id']} cancelada, vai ser registrado de novo.");
+                log_split('info', "Título {$r['id']} mudou de valor ({$r['valor_banco']} → {$r['valor']}): cobrança {$r['charge_id']} cancelada, vai ser registrada de novo.");
                 continue;
             }
             $venc = substr((string) $r['datavenc'], 0, 10);
-            if ($venc !== (string) $r['venc_efi'] && $venc >= date('Y-m-d')) {
-                efi('PUT', "/v1/charge/{$r['charge_id']}/billet", ['expire_at' => $venc]);
+            if ($venc !== (string) $r['venc_banco'] && $venc >= date('Y-m-d')) {
+                $prov->alterarVencimento((string) $r['charge_id'], $venc);
                 q("UPDATE addon_split_titulos SET vencimento = ?, atualizado_em = NOW() WHERE id_lanc = ?", [$venc, (int) $r['id']]);
-                log_split('info', "Vencimento do título {$r['id']} atualizado na Efí para $venc.");
+                log_split('info', "Vencimento do título {$r['id']} atualizado no " . $prov::nome() . " para $venc.");
             }
         } catch (Throwable $e) {
             log_split('erro', "Sincronizar título {$r['id_lanc']}: " . $e->getMessage());
@@ -567,20 +686,44 @@ function sincronizar(): void
 
 // ---------------------------------------------------------------- baixa
 
-/** Dá baixa num título pago na Efí. Devolve true se baixou agora. */
-function baixar(int $idLanc, float $valorPago, string $dataPag, string $chargeId): bool
+/** Aplica os eventos que o provedor tirou do aviso do banco. Devolve quantos baixou. */
+function aplicar_eventos(array $perfil, Provedor $prov, array $eventos): int
+{
+    $baixados = 0;
+    foreach ($eventos as $ev) {
+        $reg = q1("SELECT id_lanc FROM addon_split_titulos WHERE charge_id = ? AND perfil_id = ?",
+                  [(string) $ev['id'], (int) $perfil['id']]);
+        if (!$reg) {
+            continue; // cobrança que não é deste perfil
+        }
+        $id = (int) $reg['id_lanc'];
+        if ($ev['situacao'] === 'pago') {
+            $valor = $ev['valor'] ?? (float) (q1("SELECT valor FROM sis_lanc WHERE id = ?", [$id])['valor'] ?? 0);
+            if (baixar($prov, $id, (float) $valor, $ev['data'] ?: date('Y-m-d H:i:s'), (string) $ev['id'])) {
+                $baixados++;
+            }
+        } elseif (in_array($ev['situacao'], ['cancelado', 'vencido'], true)) {
+            q("UPDATE addon_split_titulos SET situacao = IF(situacao = 'pago', situacao, ?), atualizado_em = NOW() WHERE id_lanc = ?",
+              [$ev['situacao'], $id]);
+        }
+    }
+    return $baixados;
+}
+
+/** Dá baixa num título pago no banco. Devolve true se baixou agora. */
+function baixar(Provedor $prov, int $idLanc, float $valorPago, string $dataPag, string $idBanco): bool
 {
     $n = q("UPDATE sis_lanc SET status = 'pago', datapag = ?, valorpag = ?, formapag = ?, coletor = ?
-             WHERE id = ? AND status <> 'pago' AND chave_gnet2 = ?",
-           [$dataPag, number_format($valorPago, 2, '.', ''), SPLIT_FORMAPAG, SPLIT_COLETOR, $idLanc, $chargeId]);
+             WHERE id = ? AND status <> 'pago'",
+           [$dataPag, number_format($valorPago, 2, '.', ''), $prov->formapag(), SPLIT_COLETOR, $idLanc]);
     q("UPDATE addon_split_titulos SET situacao = 'pago', atualizado_em = NOW() WHERE id_lanc = ?", [$idLanc]);
     if ($n < 1) {
         return false;
     }
-    // Mesmo lançamento de caixa que a baixa nativa da Efí faz.
+    // Mesmo lançamento de caixa que a baixa nativa faz.
     q("INSERT INTO sis_caixa (uuid_caixa, usuario, data, historico, complemento, entrada, saida, tipomov, planodecontas)
        VALUES (?, 'mk-bot', ?, ?, '', ?, 0, 'aut', 'Outros')",
-      [uuid4(), $dataPag, "Pagamento do titulo $idLanc com EfiPay", $valorPago]);
-    log_split('info', "Título $idLanc pago (R$ " . number_format($valorPago, 2, ',', '.') . ", charge $chargeId).");
+      [uuid4(), $dataPag, $prov->historicoCaixa($idLanc), $valorPago]);
+    log_split('info', "Título $idLanc pago (R$ " . number_format($valorPago, 2, ',', '.') . ", " . $prov::nome() . " $idBanco).");
     return true;
 }
