@@ -20,6 +20,8 @@ const TITULOS: Record<string, string> = {
   "/auth/login": "Entrar",
   "/Create": "Criar Usuário",
   "/licencas": "Licenças",
+  "/mensalidades": "Mensalidades",
+  "/mensalidades/:login": "Mensalidades do Cliente",
 
   "/feedbackCreate": "Pesquisa de Satisfação",
   "/feedback/Opnion": "Opiniões dos Clientes",

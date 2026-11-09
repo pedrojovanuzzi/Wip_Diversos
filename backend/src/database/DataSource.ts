@@ -42,6 +42,9 @@ import { TvWipNotificacao } from "../entities/TvWipNotificacao";
 import { CodefPlanoConta } from "../entities/CodefPlanoConta";
 import { CodefCompetencia } from "../entities/CodefCompetencia";
 import { AuditLog } from "../entities/AuditLog";
+import { MensalidadeNota } from "../entities/MensalidadeNota";
+import { MensalidadeBolix } from "../entities/MensalidadeBolix";
+import { MensalidadeConfig } from "../entities/MensalidadeConfig";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -95,6 +98,9 @@ const AppDataSource = new DataSource({
     StreamingConvite,
     ClienteWatchTv,
     AuditLog,
+    MensalidadeNota,
+    MensalidadeBolix,
+    MensalidadeConfig,
   ],
   migrations: [
     path.join(__dirname, "../migration/*.{ts,js}").replace(/\\/g, "/"),

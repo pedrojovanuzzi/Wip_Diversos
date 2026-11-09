@@ -165,6 +165,13 @@ const SECOES: SecaoMenu[] = [
         visivel: (p) => p >= 2,
       },
       {
+        to: "/mensalidades",
+        icon: ico(FaList),
+        title: "Mensalidades",
+        description: "Clientes do MK-Auth e os títulos de cada um",
+        visivel: (p) => p >= 2,
+      },
+      {
         to: "/calculadora-debitos",
         icon: ico(FaCalculator),
         title: "Calculadora de Débitos",

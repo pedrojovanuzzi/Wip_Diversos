@@ -79,6 +79,8 @@ import WatchTvConta from "./pages/WatchTvConta/WatchTvConta";
 import FileShareManager from "./pages/FileShare/FileShareManager";
 import GerarLinksServico from "./pages/ServicosWeb/GerarLinksServico";
 import SolicitacaoServicoPublica from "./pages/ServicosWeb/SolicitacaoServicoPublica";
+import { Mensalidades } from "./pages/Mensalidades/Mensalidades";
+import { MensalidadesCliente } from "./pages/Mensalidades/MensalidadesCliente";
 
 const isLocalhost =
   window.location.hostname === "localhost" ||
@@ -489,6 +491,26 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <Pix />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/mensalidades"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <Mensalidades />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/mensalidades/:login"
+            element={
+              user?.token && user.permission >= 2 ? (
+                <MensalidadesCliente />
               ) : (
                 <Navigate to="/auth/login" />
               )

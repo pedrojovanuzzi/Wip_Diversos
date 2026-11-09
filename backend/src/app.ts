@@ -42,6 +42,7 @@ import FileShareRoutes from "./routes/FileShare.routes";
 import ServiceLinkRoutes from "./routes/ServiceLink.routes";
 import CodefRoutes from "./routes/Codef.routes";
 import AuditoriaRoutes from "./routes/Auditoria.routes";
+import MensalidadesRoutes from "./routes/Mensalidades.routes";
 import { auditoriaMiddleware } from "./utils/auditoria";
 
 // Controllers (for scheduled tasks)
@@ -50,6 +51,7 @@ import PixController from "./controller/Pix";
 import pixAutomaticoService from "./services/PixAutomaticoService";
 import licencaMensalidadeService from "./services/LicencaMensalidadeService";
 import { sincronizarTodosWatchTv } from "./services/streamingCadastro";
+import { agendarGeracaoDeBoletos } from "./services/MensalidadesAutomacao";
 // import DosProtectController from "./controller/DosProtect";
 
 const backup = new BackupController();
@@ -70,6 +72,7 @@ export class App {
     this.agendarPixAutomatico();
     this.agendarMensalidadesDeLicenca();
     this.agendarWatchTv();
+    agendarGeracaoDeBoletos();
     // this.verificaDDOS();
   }
 
@@ -121,6 +124,7 @@ export class App {
     this.server.use("/api/service-links", ServiceLinkRoutes);
     this.server.use("/api/codef", CodefRoutes);
     this.server.use("/api/auditoria", AuditoriaRoutes);
+    this.server.use("/api/mensalidades", MensalidadesRoutes);
   }
 
   private agendarBackup() {
