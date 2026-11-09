@@ -1,0 +1,4 @@
+# Só index.php (painel, com login) e retorno.php (aviso da Efí, com token) são abertos pela web.
+<FilesMatch "^(lib|cron)\.php$|\.(sh|md|json|lock)$">
+    Require all denied
+</FilesMatch>
