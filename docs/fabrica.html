@@ -572,6 +572,7 @@ add("pdns", { k: "db", x: 2730, y: 1400, tag: "createDns.ts", name: "Banco do Po
   ["t_scripts", "scripts", "Scripts avulsos", "Correções pontuais rodadas à mão: backfill-nfe-data.ts, cancelarNfse.ts, scripts/fix-chamados-abertos.ts, remove_log.js. scripts/mkauth-teste.ts cria o banco local mkradius_teste com 10 clientes mock; com MKAUTH_TESTE=true no .env o MkauthSource passa a usar esse banco.", [["backfill-nfe-data.ts", 0, "backfill-nfe-data"], ["scripts/fix-chamados-abertos.ts", 0, "fix-chamados-abertos"], ["scripts/mkauth-teste.ts", 0, "mkauth-teste"], ["database/MkauthSource.ts", 16, "MKAUTH_TESTE"]], ["dbMain", "mkauth"]],
   ["t_onu", "extract_onu.py", "Extrator de ONUs", "Script Python na raiz: lê uma lista de ONUs exportada da OLT e gera um UPDATE em SQL.", [["extract_onu.py", 0, "extract_onu.py"]], ["mkauth"]],
   ["t_cc", "CodeCharta", "Mapa CodeCharta", "backend.cc.json.gz: a 'cidade' do código (tamanho e complexidade de cada arquivo). Abra em codecharta.com.", [["backend.cc.json.gz", 0, "backend.cc.json.gz"]], []],
+  ["t_split", "mkauth-addons/split_efi", "Addon Split Efí", "Addon PHP instalado no próprio servidor do MK-Auth (não roda no backend). Move os clientes da conta Efí do MK-Auth para uma conta 'fat' própria e registra cada título na API de Cobranças da Efí já com repasse (split) para a conta do parceiro; cron de 5 em 5 min e retorno.php para a baixa.", [["mkauth-addons/split_efi/README.md", 0, "README"], ["mkauth-addons/split_efi/lib.php", 0, "lib.php"], ["mkauth-addons/split_efi/retorno.php", 0, "retorno.php"]], ["mkauth", "out_efi"]],
 ].forEach(([id, tag, name, desc, files, links], i) => add(id, { k: "tool", x: 1110 + (i % 2) * 240, y: 1300 + Math.floor(i / 2) * 120, tag, name, desc, files, links }));
 
 const PLATES = [
@@ -579,7 +580,7 @@ const PLATES = [
   [40, 1250, 760, 260, "Frontend Next.js", "frontend/app_nextjs · migração em andamento"],
   [40, 1570, 760, 320, "Outros clientes e entradas", "app de celular, hotspot e webhooks"],
   [970, 540, 520, 560, "Portaria", "backend/src/app.ts + middleware/"],
-  [970, 1200, 520, 450, "Ferramentas", "fora do caminho das requisições"],
+  [970, 1200, 520, 570, "Ferramentas", "fora do caminho das requisições"],
   [1580, 80, 400, 380, "Equipe e acesso", ""],
   [1580, 480, 400, 270, "Fiscal", ""],
   [1580, 770, 400, 380, "Financeiro", ""],
@@ -1074,7 +1075,7 @@ let mission = MISSIONS[0], steps = [], idx = 0, playing = false, busy = false, t
 const guardOpts = { tok: "ok", perm: "2" };
 
 function link(f, l, label) {
-  const full = /^(frontend|backend|\.claude|extract_onu|docs)/.test(f) || f.includes(".cc.json") ? f : "backend/src/" + f;
+  const full = /^(frontend|backend|\.claude|extract_onu|docs|mkauth-addons)/.test(f) || f.includes(".cc.json") ? f : "backend/src/" + f;
   const isDir = !/\.[a-z]+$/i.test(full.split("/").pop());
   const a = document.createElement("a");
   a.href = REPO + (isDir ? "tree" : "blob") + "/main/" + full + (l > 1 ? "#L" + l : "");
