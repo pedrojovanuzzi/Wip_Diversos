@@ -1,6 +1,12 @@
 <?php
 // Login do painel do MK-Auth: o addons.class.php barra quem não está logado e monta $Manifest.
-include('addons.class.php');
+require __DIR__ . '/addons.class.php';
+// Se o addons.class.php não barrou nem montou o $Manifest, o login do MK-Auth
+// não respondeu como esperado: fecha a porta em vez de abrir a tela.
+if (!isset($Manifest) || !is_object($Manifest)) {
+    http_response_code(403);
+    exit('Acesso negado.');
+}
 require __DIR__ . '/lib.php';
 
 garantir_tabelas();
