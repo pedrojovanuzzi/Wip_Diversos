@@ -4,7 +4,12 @@ import AppDataSource from "../database/DataSource";
 import { MensalidadeConfig } from "../entities/MensalidadeConfig";
 import { MensalidadeBolix } from "../entities/MensalidadeBolix";
 import Email from "../controller/Email";
-import { bolixAtivos, canceladosManualmente, gerarBolix } from "./BolixEfi";
+import {
+  bolixAtivos,
+  canceladosManualmente,
+  conferirPagamentosNaEfi,
+  gerarBolix,
+} from "./BolixEfi";
 import { competenciaDoTitulo, dois, ErroDeUso } from "./mkauthTitulos";
 
 /**
@@ -321,11 +326,25 @@ export async function rodarGeracao(
   }
 }
 
+async function conferirPagamentos(quando: string) {
+  try {
+    const r = await conferirPagamentosNaEfi();
+    if (r.baixados)
+      console.log(`💰 Bolix (${quando}): ${r.baixados} pagos baixados no MK-Auth.`);
+  } catch (e) {
+    console.error(`[Mensalidades] erro ao conferir pagamentos na Efí (${quando}):`, e);
+  }
+}
+
 /**
- * Com a geração ligada, a cada 10 minutos gera o que faltar. Repetir não
- * duplica: título com bolix válido e mês já pago ficam de fora.
+ * A cada 5 minutos confere na Efí os bolix pagos (mesmo com a geração
+ * desligada: é o que garante a baixa se o aviso da Efí não chegar). Com a
+ * geração ligada, a cada 10 minutos gera o que faltar. Repetir não duplica:
+ * título com bolix válido e mês já pago ficam de fora.
  */
 export function agendarGeracaoDeBoletos() {
+  setTimeout(() => conferirPagamentos("início"), 30_000);
+  cron.schedule("*/5 * * * *", () => conferirPagamentos("agendamento"));
   cron.schedule("*/10 * * * *", async () => {
     try {
       if (rodando) return;
@@ -336,5 +355,11 @@ export function agendarGeracaoDeBoletos() {
       console.error("[Mensalidades] erro na geração automática de boletos:", e);
     }
   });
-  console.log("📅 Bolix das mensalidades: conferência a cada 10 minutos");
+  console.log(
+    "📅 Bolix das mensalidades: pagamentos na Efí a cada 5 minutos, geração a cada 10",
+  );
+  if (!process.env.EFI_BOLIX_NOTIFICACAO_URL)
+    console.warn(
+      "⚠️ EFI_BOLIX_NOTIFICACAO_URL vazio: os bolix saem sem aviso de pagamento da Efí; a baixa fica só na conferência a cada 5 minutos.",
+    );
 }

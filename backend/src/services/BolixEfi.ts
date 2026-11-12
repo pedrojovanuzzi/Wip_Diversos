@@ -431,6 +431,72 @@ export async function verificarBolix(tituloId: number) {
   return { status, baixado: false, motivo: "" };
 }
 
+/**
+ * Rede de segurança do aviso da Efí: lista na Efí os boletos criados desde o
+ * bolix ativo mais antigo e dá baixa nos que estão pagos. Cobre cobrança
+ * criada sem notification_url (EFI_BOLIX_NOTIFICACAO_URL vazio), aviso
+ * perdido com o servidor fora do ar e qualquer falha da rota pública.
+ */
+let conferindo = false;
+
+export async function conferirPagamentosNaEfi() {
+  if (conferindo) return { conferidos: 0, baixados: 0 };
+  conferindo = true;
+  try {
+    const ativos = await repo().find({
+      where: { situacao: "ativo" },
+      select: ["id", "charge_id", "criado_em"],
+    });
+    if (!ativos.length) return { conferidos: 0, baixados: 0 };
+    const nossos = new Set(ativos.map((b) => String(b.charge_id)));
+
+    const umAno = new Date();
+    umAno.setFullYear(umAno.getFullYear() - 1);
+    const maisAntigo = ativos.reduce(
+      (m, b) => (new Date(b.criado_em) < m ? new Date(b.criado_em) : m),
+      new Date(),
+    );
+    const inicio = isoDe(maisAntigo < umAno ? umAno : maisAntigo);
+
+    const pagos: string[] = [];
+    const LIMITE = 100; // máximo da Efí por página
+    for (let page = 1; page <= 100; page++) {
+      const r: any = await efi().listCharges({
+        charge_type: "billet",
+        begin_date: inicio,
+        end_date: hojeIso(),
+        limit: LIMITE,
+        page,
+      } as any);
+      const lista: any[] = r?.data || [];
+      for (const c of lista) {
+        const id = String(c?.id ?? c?.charge_id ?? "");
+        if (nossos.has(id) && PAGO.includes(String(c?.status))) pagos.push(id);
+      }
+      if (lista.length < LIMITE) break;
+    }
+
+    let baixados = 0;
+    for (const chargeId of pagos) {
+      try {
+        // O detalhe traz o valor pago (com multa/juros, se houver).
+        const d: any = await efi().detailCharge({ id: Number(chargeId) } as any);
+        const x = d?.data || d;
+        if (!PAGO.includes(String(x?.status))) continue;
+        const pago = Number(x?.paid_value || x?.total || 0);
+        const r = await baixarPorCobranca(chargeId, pago || undefined);
+        if (r.baixado) baixados++;
+        console.log(`[Bolix] conferência: cobrança ${chargeId} paga: ${JSON.stringify(r)}`);
+      } catch (e) {
+        console.error(`[Bolix] conferência: erro na cobrança ${chargeId}:`, e);
+      }
+    }
+    return { conferidos: ativos.length, baixados };
+  } finally {
+    conferindo = false;
+  }
+}
+
 /** Aviso da Efí: só traz o token; o histórico vem da própria Efí. */
 export async function processarNotificacao(token: string) {
   const r: any = await efi().getNotification({ token } as any);
