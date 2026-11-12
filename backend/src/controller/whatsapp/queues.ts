@@ -28,12 +28,13 @@ async function releaseLock(celular: string): Promise<void> {
   await redisDedupWorker.del(LOCK_KEY(celular));
 }
 
-// Fila de inatividade: jobs atrasados de 15 min por usuário
+// Fila de inatividade: jobs atrasados de 5 horas por usuário
 export const whatsappInactivityQueue = new Queue("whatsapp-inactivity", {
   connection: redisOptions,
 });
 
 const INACTIVITY_JOB_ID = (celular: string) => `inactivity-${celular}`;
+const INACTIVITY_DELAY_MS = 5 * 60 * 60 * 1000; // 5 horas
 
 async function agendarInatividade(celular: string) {
   await whatsappInactivityQueue.add(
@@ -41,7 +42,7 @@ async function agendarInatividade(celular: string) {
     { celular },
     {
       jobId: INACTIVITY_JOB_ID(celular),
-      delay: 900000,
+      delay: INACTIVITY_DELAY_MS,
       removeOnComplete: true,
       removeOnFail: true,
     },
@@ -104,7 +105,7 @@ export function initQueues() {
       // Marca como processado antes de executar (TTL 24h, igual ao dedup do webhook)
       await redisDedupWorker.set(PROCESSED_KEY(messageId), "1", "EX", 86400);
 
-      // Cancela timer de inatividade anterior e reagenda para 15 min a partir de agora
+      // Cancela timer de inatividade anterior e reagenda para 5 horas a partir de agora
       try {
         const existingJob = await whatsappInactivityQueue.getJob(INACTIVITY_JOB_ID(celular));
         if (existingJob) await existingJob.remove();
@@ -135,7 +136,7 @@ export function initQueues() {
           await deleteSession(celular);
         } else {
           await saveSession(celular, sessionContext, messageId);
-          // Reagenda inatividade de 15 min para este usuário
+          // Reagenda inatividade de 5 horas para este usuário
           await agendarInatividade(celular);
         }
       } catch (saveErr: any) {

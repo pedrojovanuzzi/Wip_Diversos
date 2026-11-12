@@ -518,7 +518,7 @@ CTRLS.forEach(([id, d, prefix, name, rf, cf, lines, eps, guard, dbs, ext, desc])
 
 // ---- Segundo plano ----
 add("redis", { k: "queue", x: 2535, y: 690, tag: "Redis · BullMQ", name: "Filas", links: ["c_wahook", "c_whatsapp", "worker"],
-  desc: "Três filas: whatsapp-incoming (mensagens que chegaram), whatsapp-outgoing (respostas a enviar) e whatsapp-inactivity (aviso após 15 min parado). O Redis sobe pelo backend/docker-compose.yml.",
+  desc: "Três filas: whatsapp-incoming (mensagens que chegaram), whatsapp-outgoing (respostas a enviar) e whatsapp-inactivity (aviso após 5 horas parado). O Redis sobe pelo backend/docker-compose.yml.",
   files: [["controller/whatsapp/services/messaging.service.ts", 7, "Queue(...)"], ["backend/docker-compose.yml", 2, "redis"]] });
 add("worker", { k: "worker", x: 2725, y: 690, tag: "queues.ts", name: "Robô do WhatsApp", links: ["apimk", "out_meta", "out_email", "out_publicas"],
   desc: "initQueues() (chamado pelo server.ts depois do listen) cria os workers. O de entrada roda handleMessage: uma máquina de estados com uns 40 estágios ('' → boas-vindas, awaiting_cpf, plan, troca_plano, mudanca_endereco...).",
@@ -616,7 +616,7 @@ const MISSIONS = [
     S("worker", "Robô pega o job", "Confere se já processou esta mensagem e pega um lock por celular, para não atender duas mensagens da mesma pessoa ao mesmo tempo.", "controller/whatsapp/queues.ts", 45),
     S("apimk", "Lê a sessão", "Busca em Sessions em que estágio a conversa desse celular parou.", "controller/whatsapp/queues.ts", 56),
     S("worker", "Máquina de estados", "handleMessage faz switch(stage). Estágio vazio: manda boas-vindas e o menu. Os próximos (awaiting_cpf, plan, troca_plano...) dependem da resposta.", "controller/whatsapp/handlers/message.handler.ts", 107),
-    S("apimk", "Salva o novo estágio", "saveSession grava o stage novo e agenda o aviso de inatividade de 15 min.", "controller/whatsapp/queues.ts", 118),
+    S("apimk", "Salva o novo estágio", "saveSession grava o stage novo e agenda o aviso de inatividade de 5 horas.", "controller/whatsapp/queues.ts", 138),
     S("redis", "Fila de saída", "A resposta que o handleMessage montou está em whatsapp-outgoing.", "controller/whatsapp/services/messaging.service.ts", 51),
     S("out_meta", "Resposta no celular", "O outgoingWorker envia pela Graph API da Meta.", "controller/whatsapp/queues.ts", 169, { end: "enviada" }),
   ]},
