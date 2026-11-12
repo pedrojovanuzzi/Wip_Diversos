@@ -1,3 +1,4 @@
+import axios from "axios";
 import path from "path";
 import EfiPay from "sdk-node-apis-efi";
 import MkauthSource from "../database/MkauthSource";
@@ -298,6 +299,46 @@ export async function cancelarBolixDoTitulo(tituloId: number, motivo: string) {
   } catch (e) {
     console.error(`[Bolix] erro ao cancelar bolix do título ${tituloId}:`, e);
   }
+}
+
+/**
+ * PDFs dos bolix para anexar no e-mail. O link vem da própria Efí (gravado
+ * no banco, nunca do pedido) e só se baixa de domínio da Efí. Boleto cujo PDF
+ * não baixar fica de fora: o e-mail ainda leva o link, a linha e o Pix.
+ */
+const PDF_MAXIMO = 5 * 1024 * 1024;
+
+export async function anexosDosBolix(lista: MensalidadeBolix[]) {
+  const anexos: { filename: string; content: Buffer; contentType: string }[] = [];
+  for (const b of lista) {
+    if (!b?.pdf) continue;
+    try {
+      const url = new URL(b.pdf);
+      if (
+        url.protocol !== "https:" ||
+        !/(^|\.)(sejaefi\.com\.br|gerencianet\.com\.br|efipay\.com\.br)$/.test(url.hostname)
+      )
+        throw new Error(`domínio fora da Efí: ${url.hostname}`);
+      const r = await axios.get<ArrayBuffer>(b.pdf, {
+        responseType: "arraybuffer",
+        timeout: 20_000,
+        maxContentLength: PDF_MAXIMO,
+      });
+      const content = Buffer.from(r.data);
+      if (content.subarray(0, 5).toString() !== "%PDF-")
+        throw new Error("a Efí não devolveu um PDF");
+      anexos.push({
+        filename: `boleto-${String(b.titulo_id).padStart(5, "0")}.pdf`,
+        content,
+        contentType: "application/pdf",
+      });
+    } catch (e: any) {
+      console.warn(
+        `[Bolix] PDF da cobrança ${b.charge_id} não anexado: ${e?.message || e}`,
+      );
+    }
+  }
+  return anexos;
 }
 
 /** Situação do bolix cancelado pelo botão: a geração automática não refaz. */

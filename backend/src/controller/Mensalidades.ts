@@ -4,6 +4,7 @@ import { EntityManager } from "typeorm";
 import MkauthSource from "../database/MkauthSource";
 import AppDataSource from "../database/DataSource";
 import { MensalidadeNota } from "../entities/MensalidadeNota";
+import { MensalidadeBolix } from "../entities/MensalidadeBolix";
 import Email from "./Email";
 import {
   agoraMk,
@@ -17,6 +18,7 @@ import {
   usuarioDe,
 } from "../services/mkauthTitulos";
 import {
+  anexosDosBolix,
   bolixAtivos,
   cancelarBolixDoTitulo,
   cancelarBolixManual,
@@ -943,6 +945,7 @@ class Mensalidades {
         `SELECT nome FROM sis_provedor LIMIT 1`,
       );
       const gerarBoletos = req.body?.gerarBoletos !== false;
+      const anexarPdf = req.body?.anexarPdf !== false;
       const email = new Email();
 
       const resultado = {
@@ -973,6 +976,7 @@ class Mensalidades {
           0,
         );
         const blocos: string[] = [];
+        const gerados: MensalidadeBolix[] = [];
         for (const t of doCliente) {
           const valor = Number(t.valor || 0) + Number(t.atrelados || 0);
           const linhas = [
@@ -981,6 +985,7 @@ class Mensalidades {
           if (gerarBoletos) {
             try {
               const bx = await gerarBolix(t.id, usuarioDe(req));
+              gerados.push(bx);
               if (bx.link) linhas.push(`Boleto: ${bx.link}`);
               if (bx.linha_digitavel)
                 linhas.push(`Linha digitável: ${bx.linha_digitavel}`);
@@ -1006,7 +1011,12 @@ class Mensalidades {
             .replace(/%total%/gi, reaisBr(total))
             .replace(/%titulos%/gi, blocoTitulos || "Nenhum título em aberto.");
         try {
-          await email.sendEmail(para, trocar(assunto), trocar(mensagem));
+          await email.sendEmail(
+            para,
+            trocar(assunto),
+            trocar(mensagem),
+            anexarPdf ? await anexosDosBolix(gerados) : undefined,
+          );
           resultado.enviados.push(c.login);
         } catch (e: any) {
           resultado.erros.push({
@@ -1047,7 +1057,21 @@ class Mensalidades {
       const email = String(c?.email || "").trim();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
         throw new ErroDeUso("O cliente não tem e-mail válido no cadastro.");
-      await new Email().sendEmail(email, assunto, mensagem);
+      // PDF dos boletos dos títulos escolhidos, se pedido. Os títulos são
+      // conferidos como do cliente; o PDF vem do bolix ativo gravado aqui.
+      let anexos: Awaited<ReturnType<typeof anexosDosBolix>> | undefined;
+      const ids: number[] = Array.isArray(req.body?.titulos)
+        ? req.body.titulos.map(Number).filter((n: number) => n > 0).slice(0, 50)
+        : [];
+      if (req.body?.anexarPdf && ids.length) {
+        const doCliente: { id: number }[] = await MkauthSource.query(
+          `SELECT id FROM sis_lanc WHERE id IN (?) AND login = ? AND deltitulo = 0`,
+          [ids, login],
+        );
+        const ativos = await bolixAtivos(doCliente.map((t) => Number(t.id)));
+        anexos = await anexosDosBolix(Array.from(ativos.values()));
+      }
+      await new Email().sendEmail(email, assunto, mensagem, anexos);
       await MkauthSource.transaction((m) =>
         registrarAtividade(m, req, `enviou titulos por e-mail para ${login}`),
       );

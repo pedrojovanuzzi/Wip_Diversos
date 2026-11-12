@@ -43,6 +43,7 @@ export function EnviarLote({
       "Olá, %nome%.\n\nSeguem seus títulos em aberto:\n\n%titulos%\n\nTotal: %total%\n\nQualquer dúvida, estamos à disposição.\n%provedor%",
     pularSemTitulo: true,
     gerarBoletos: true,
+    anexarPdf: true,
   });
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -175,6 +176,17 @@ export function EnviarLote({
               onChange={(e) => setF({ ...f, gerarBoletos: e.target.checked })}
             />
             Gerar o boleto com Pix (bolix da Efí) dos títulos em aberto
+          </label>
+          <label
+            className={`flex items-center gap-2 text-[15px] cursor-pointer mt-1 ${f.gerarBoletos ? "" : "opacity-50"}`}
+          >
+            <input
+              type="checkbox"
+              disabled={!f.gerarBoletos}
+              checked={f.gerarBoletos && f.anexarPdf}
+              onChange={(e) => setF({ ...f, anexarPdf: e.target.checked })}
+            />
+            Anexar o PDF dos boletos no e-mail
           </label>
           <div className="text-[12px] text-[#7a7a7a] mt-3">
             Variáveis: {VARIAVEIS.map(([v, d]) => `${v} = ${d}`).join(" · ")}

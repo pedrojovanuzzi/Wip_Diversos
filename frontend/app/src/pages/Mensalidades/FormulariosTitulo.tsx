@@ -700,6 +700,8 @@ export function EnviarTitulos({
     assunto: `${provedor?.nome || "Wip Telecom"} - ${titulos.length > 1 ? "seus títulos" : `título ${numeroTitulo(titulos[0]?.id || 0)}`}`,
     mensagem: "",
   });
+  const [anexarPdf, setAnexarPdf] = useState(true);
+  const emAberto = titulos.filter((t) => t.status !== "pago").map((t) => t.id);
   const [preparando, setPreparando] = useState(true);
   const { enviando, executar } = useEnvio(() => {}, onFechar);
 
@@ -758,7 +760,12 @@ export function EnviarTitulos({
         onSubmit={(e) => {
           e.preventDefault();
           executar(
-            () => api.enviar(cliente.login, f),
+            () =>
+              api.enviar(cliente.login, {
+                ...f,
+                anexarPdf: anexarPdf && emAberto.length > 0,
+                titulos: emAberto,
+              }),
             "E-mail enviado.",
             "Erro ao enviar.",
           );
@@ -785,6 +792,16 @@ export function EnviarTitulos({
             required
           />
         </CampoMk>
+        {emAberto.length > 0 && (
+          <label className="flex items-center gap-2 text-[15px] cursor-pointer mb-2">
+            <input
+              type="checkbox"
+              checked={anexarPdf}
+              onChange={(e) => setAnexarPdf(e.target.checked)}
+            />
+            Anexar o PDF {emAberto.length > 1 ? "dos boletos" : "do boleto"} no e-mail
+          </label>
+        )}
         <BotoesMk rotulo="Enviar" enviando={enviando} onCancelar={onFechar} />
       </form>
     </JanelaMk>

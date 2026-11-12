@@ -5,6 +5,7 @@ import { MensalidadeConfig } from "../entities/MensalidadeConfig";
 import { MensalidadeBolix } from "../entities/MensalidadeBolix";
 import Email from "../controller/Email";
 import {
+  anexosDosBolix,
   bolixAtivos,
   canceladosManualmente,
   conferirPagamentosNaEfi,
@@ -277,6 +278,7 @@ export async function rodarGeracao(
               para,
               `${provedor?.nome || "Wip Telecom"} - boleto da mensalidade`,
               linhas.join("\n"),
+              await anexosDosBolix([b]),
             );
             resumo.emails++;
           } catch (e: any) {
