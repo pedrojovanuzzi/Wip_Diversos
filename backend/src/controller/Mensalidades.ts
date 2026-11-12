@@ -222,7 +222,7 @@ class Mensalidades {
 
       const clientes = await MkauthSource.query(
         `SELECT c.id, c.uuid_cliente AS uuid, c.login, c.nome, c.plano, c.ip,
-                c.ramal, c.bloqueado, c.cli_ativado,
+                c.ramal, c.bloqueado, c.cli_ativado, c.status_corte,
                 (SELECT COUNT(*) FROM sis_lanc l
                   WHERE l.login = c.login AND l.deltitulo = 0
                     AND l.status IN ('aberto', 'vencido')) AS abertos

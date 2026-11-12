@@ -18,6 +18,8 @@ interface ClienteMk {
   ramal: string | null;
   bloqueado: string;
   cli_ativado: string;
+  /** full | down (redução de velocidade) | bloq, como no MK-Auth. */
+  status_corte: string | null;
   abertos: number;
 }
 
@@ -269,7 +271,19 @@ export function Mensalidades() {
                         <span className="text-[#f14668] mr-1">+</span>
                         {c.login}
                       </td>
-                      <td className="px-1 pt-0.5">{c.plano}</td>
+                      <td className="px-1 pt-0.5">
+                        <span className="relative">
+                          {c.plano}
+                          {c.status_corte === "down" && (
+                            <span
+                              title="Em redução de velocidade (down)"
+                              className="absolute -top-2 -right-9 h-[13px] px-1.5 rounded-full bg-[#8a7000] text-[#ffe08a] text-[9px] leading-[13px] font-normal"
+                            >
+                              down
+                            </span>
+                          )}
+                        </span>
+                      </td>
                       <td className="px-1 pt-0.5">{c.ip}</td>
                       <td className="px-1 pt-0.5">{c.ramal}</td>
                       <td className="px-1 pt-0.5">

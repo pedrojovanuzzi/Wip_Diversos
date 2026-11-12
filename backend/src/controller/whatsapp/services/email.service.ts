@@ -21,6 +21,9 @@ export function sendServiceEmail(msg: any) {
     to: process.env.EMAIL_FINANCEIRO,
     subject: `🛠️ Serviço Solicitado 🛠️`,
     html: msg,
+    // Sem rastreamento de cliques do Mailgun (o domínio dele não tem DNS e
+    // os links quebram). Ver controller/Email.ts.
+    headers: { "X-Mailgun-Track-Clicks": "no" },
   };
   transporter.sendMail(options);
 }

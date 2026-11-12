@@ -33,6 +33,11 @@ class Email {
         subject,
         text,
         attachments,
+        // Sem rastreamento de cliques do Mailgun: ele troca cada link por um
+        // do domínio email.noreply... (que não tem DNS, então o link quebra) e
+        // ainda reescreve o pedaço "qrcodespix.sejaefi.com/..." do meio do
+        // Pix copia e cola, inutilizando o código.
+        headers: { "X-Mailgun-Track-Clicks": "no" },
       });
 
       // O Mailgun pode aceitar a conexão mas rejeitar o destinatário.
