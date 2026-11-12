@@ -33,6 +33,7 @@ import {
 } from "./FormulariosTitulo";
 import { exportarCsv, imprimirRecibo, imprimirTitulos } from "./impressao";
 import { BolixTitulo } from "./BolixTitulo";
+import { SeloWipDiversos } from "./SeloWipDiversos";
 
 type Janela =
   | {
@@ -160,6 +161,7 @@ export function MensalidadesCliente() {
       <div className="px-3 sm:px-4 pb-10">
         {/* "CLIENTES • DETALHES • NOME" */}
         <div className="text-center my-6 text-[15px] uppercase">
+          <SeloWipDiversos />
           <button
             type="button"
             onClick={() => navigate(-1)}

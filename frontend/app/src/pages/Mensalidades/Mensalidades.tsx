@@ -7,6 +7,7 @@ import { FaCog, FaEnvelope } from "react-icons/fa";
 import { cabecalhoTabela, linhaZebra, paginaMk } from "./mkauthEstilo";
 import { EnviarLote } from "./EnviarLote";
 import { ConfiguracoesMensalidades } from "./ConfiguracoesMensalidades";
+import { SeloWipDiversos } from "./SeloWipDiversos";
 
 interface ClienteMk {
   id: number;
@@ -141,6 +142,7 @@ export function Mensalidades() {
       <div className="px-3 sm:px-4 pb-10">
         {/* Trilha, como "CLIENTES • TODOS 00011" */}
         <div className="text-center my-6 text-[15px] uppercase">
+          <SeloWipDiversos />
           <Link to="/mensalidades" className="text-[#3273dc] hover:underline">
             Clientes
           </Link>
