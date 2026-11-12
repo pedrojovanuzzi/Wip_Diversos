@@ -19,6 +19,7 @@ import {
 import {
   bolixAtivos,
   cancelarBolixDoTitulo,
+  cancelarBolixManual,
   gerarBolix,
   processarNotificacao,
   verificarBolix,
@@ -857,6 +858,15 @@ class Mensalidades {
       res.json(b);
     } catch (error) {
       responderErro(res, error, "bolix");
+    }
+  };
+
+  /** Cancela na Efí o bolix ativo do título (o título segue em aberto). */
+  cancelarBolix = async (req: Request, res: Response) => {
+    try {
+      res.json(await cancelarBolixManual(Number(req.params.id), usuarioDe(req)));
+    } catch (error) {
+      responderErro(res, error, "cancelarBolix");
     }
   };
 

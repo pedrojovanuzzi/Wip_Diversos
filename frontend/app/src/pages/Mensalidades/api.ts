@@ -117,6 +117,8 @@ export function apiMensalidades(token?: string) {
       post<{ status: string; baixado: boolean; motivo: string }>(
         `/titulos/${id}/bolix/verificar`,
       ),
+    cancelarBolix: (id: number) =>
+      post<{ cancelado: boolean }>(`/titulos/${id}/bolix/cancelar`),
     notas: (id: number) => get<any[]>(`/titulos/${id}/notas`),
     adicionarNota: (id: number, texto: string) =>
       post(`/titulos/${id}/notas`, { texto }),

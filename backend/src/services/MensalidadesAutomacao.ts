@@ -4,7 +4,7 @@ import AppDataSource from "../database/DataSource";
 import { MensalidadeConfig } from "../entities/MensalidadeConfig";
 import { MensalidadeBolix } from "../entities/MensalidadeBolix";
 import Email from "../controller/Email";
-import { bolixAtivos, gerarBolix } from "./BolixEfi";
+import { bolixAtivos, canceladosManualmente, gerarBolix } from "./BolixEfi";
 import { competenciaDoTitulo, dois, ErroDeUso } from "./mkauthTitulos";
 
 /**
@@ -43,7 +43,7 @@ export interface ResumoExecucao {
     login: string;
     titulo: number;
     competencia: string;
-    motivo?: "pago" | "cobrado";
+    motivo?: "pago" | "cobrado" | "cancelado";
   }[];
   emails: number;
   erros: { login: string; titulo: number; erro: string }[];
@@ -195,6 +195,8 @@ export async function rodarGeracao(
       mesesPagos.add(`${b.login_cliente}|${b.competencia}`);
 
     const ativos = await bolixAtivos(titulos.map((t) => t.id));
+    // Boleto cancelado pelo botão na tela: não volta sozinho.
+    const cancelados = await canceladosManualmente(titulos.map((t) => t.id));
     const [provedor] = await MkauthSource.query(
       `SELECT nome FROM sis_provedor LIMIT 1`,
     );
@@ -223,6 +225,10 @@ export async function rodarGeracao(
       }
       const competencia = competenciaDoTitulo(t);
       const chave = `${t.login}|${competencia}`;
+      if (cancelados.has(t.id)) {
+        resumo.mesPago.push({ login: t.login, titulo: t.id, competencia, motivo: "cancelado" });
+        continue;
+      }
       if (competencia && mesesPagos.has(chave)) {
         resumo.mesPago.push({ login: t.login, titulo: t.id, competencia, motivo: "pago" });
         continue;

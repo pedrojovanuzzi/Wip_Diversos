@@ -24,7 +24,7 @@ interface Resumo {
     login: string;
     titulo: number;
     competencia: string;
-    motivo?: "pago" | "cobrado";
+    motivo?: "pago" | "cobrado" | "cancelado";
   }[];
   emails: number;
   erros: { login: string; titulo: number; erro: string }[];
@@ -79,14 +79,18 @@ function ResumoExecucao({ r }: { r: Resumo }) {
         <details className="mb-2">
           <summary className="cursor-pointer font-bold">
             Pulados ({r.mesPago.length}): títulos em aberto de um mês que o
-            cliente já pagou ou que já tem boleto em outro título;
-            provavelmente duplicados no MK-Auth
+            cliente já pagou, que já tem boleto em outro título ou cujo boleto
+            foi cancelado na tela
           </summary>
           <ul className="list-disc pl-6 mt-1">
             {r.mesPago.map((m) => (
               <li key={m.titulo}>
                 {m.login} · título {numeroTitulo(m.titulo)} · {m.competencia} ·{" "}
-                {m.motivo === "cobrado" ? "mês já tem boleto" : "mês já pago"}
+                {m.motivo === "cobrado"
+                  ? "mês já tem boleto"
+                  : m.motivo === "cancelado"
+                    ? "boleto cancelado na tela"
+                    : "mês já pago"}
               </li>
             ))}
           </ul>

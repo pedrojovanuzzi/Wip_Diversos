@@ -300,6 +300,68 @@ export async function cancelarBolixDoTitulo(tituloId: number, motivo: string) {
   }
 }
 
+/** Situação do bolix cancelado pelo botão: a geração automática não refaz. */
+export const CANCELADO_MANUAL = "cancelado_manual";
+
+/**
+ * Botão "Cancelar boleto": cancela na Efí a cobrança ativa do título. Ao
+ * contrário de cancelarBolixDoTitulo, falha se a Efí recusar (cobrança já
+ * paga, por exemplo), para o operador não achar que cancelou. O título no
+ * MK-Auth continua em aberto; só perde a linha digitável deste boleto.
+ */
+export async function cancelarBolixManual(tituloId: number, usuario: string) {
+  const b = await bolixAtivo(tituloId);
+  if (!b) throw new ErroDeUso("Este título não tem boleto ativo para cancelar.");
+  try {
+    await efi().cancelCharge({ id: Number(b.charge_id) } as any);
+  } catch (e) {
+    // Já cancelada na Efí (por fora): só acerta o nosso registro.
+    let status = "";
+    try {
+      const r: any = await efi().detailCharge({ id: Number(b.charge_id) } as any);
+      status = String((r?.data || r)?.status || "");
+    } catch {
+      /* fica com o erro do cancelamento */
+    }
+    if (PAGO.includes(status))
+      throw new ErroDeUso(
+        "A cobrança já foi paga na Efí. Use \"Verificar pagamento\" para dar baixa.",
+      );
+    if (status !== "canceled")
+      throw new ErroDeUso(`Efí não cancelou o boleto: ${erroEfi(e)}`);
+  }
+  console.log(
+    `[Bolix] ${usuario} cancelou a cobrança ${b.charge_id} do título ${tituloId}`,
+  );
+  await repo().update({ id: b.id }, { situacao: CANCELADO_MANUAL });
+  if (b.linha_digitavel)
+    await MkauthSource.query(
+      `UPDATE sis_lanc SET linhadig = '' WHERE id = ? AND linhadig = ?`,
+      [tituloId, b.linha_digitavel],
+    );
+  return { cancelado: true, charge_id: b.charge_id };
+}
+
+/** Títulos cujo último bolix foi cancelado pelo botão (a automação pula). */
+export async function canceladosManualmente(ids: number[]) {
+  if (!ids.length) return new Set<number>();
+  const linhas: { titulo_id: number; situacao: string }[] = await repo()
+    .createQueryBuilder("b")
+    .select(["b.titulo_id AS titulo_id", "b.situacao AS situacao"])
+    .where("b.titulo_id IN (:...ids)", { ids })
+    .orderBy("b.id", "DESC")
+    .getRawMany();
+  const vistos = new Set<number>();
+  const cancelados = new Set<number>();
+  for (const l of linhas) {
+    const id = Number(l.titulo_id);
+    if (vistos.has(id)) continue;
+    vistos.add(id);
+    if (l.situacao === CANCELADO_MANUAL) cancelados.add(id);
+  }
+  return cancelados;
+}
+
 /** Dá baixa no título da cobrança paga. Seguro de chamar mais de uma vez. */
 async function baixarPorCobranca(chargeId: string, valorPagoCentavos?: number) {
   const b = await repo().findOne({ where: { charge_id: chargeId } });

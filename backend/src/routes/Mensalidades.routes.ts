@@ -47,6 +47,8 @@ router.post(
   operador,
   Mensalidades.verificarBolix,
 );
+// Cancelar cobrança: nível 5 (.claude/rules/rotas-seguras.md).
+router.post("/titulos/:id/bolix/cancelar", admin, Mensalidades.cancelarBolix);
 
 // Pública: é a Efí quem chama (notification_url do bolix). Vem só um token,
 // que o controller confere na própria Efí com as nossas credenciais antes de

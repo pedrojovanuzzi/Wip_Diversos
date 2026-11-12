@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
 import { ApiMensalidades, Bolix, mensagemDeErro, Titulo } from "./api";
 import { JanelaMk } from "./JanelaMk";
@@ -63,9 +64,33 @@ export function BolixTitulo({
   onFeito: () => void;
 }) {
   const { showError, showSuccess } = useNotification();
+  const { user } = useAuth();
+  // Cancelar cobrança é nível 5, como no backend.
+  const podeCancelar = (user?.permission || 0) >= 5;
   const [b, setB] = useState<Bolix | null>(null);
   const [erro, setErro] = useState("");
-  const [ocupado, setOcupado] = useState<"" | "gerar" | "verificar">("gerar");
+  const [ocupado, setOcupado] = useState<"" | "gerar" | "verificar" | "cancelar">(
+    "gerar",
+  );
+  const [confirmando, setConfirmando] = useState(false);
+  const [cancelado, setCancelado] = useState("");
+
+  const cancelar = async () => {
+    if (!b) return;
+    setOcupado("cancelar");
+    try {
+      await api.cancelarBolix(titulo.id);
+      showSuccess(`Boleto ${b.charge_id} cancelado na Efí.`);
+      setCancelado(String(b.charge_id));
+      setB(null);
+      onFeito();
+    } catch (e) {
+      showError(mensagemDeErro(e, "Erro ao cancelar o boleto na Efí."));
+    } finally {
+      setOcupado("");
+      setConfirmando(false);
+    }
+  };
 
   const gerar = useCallback(
     async (forcar = false) => {
@@ -73,6 +98,7 @@ export function BolixTitulo({
       setErro("");
       try {
         setB(await api.bolix(titulo.id, forcar));
+        setCancelado("");
         if (forcar) showSuccess("Boleto gerado de novo na Efí.");
         onFeito();
       } catch (e) {
@@ -121,6 +147,30 @@ export function BolixTitulo({
       largura={760}
     >
       {ocupado === "gerar" && !b && <p className="py-4">Gerando na Efí...</p>}
+      {cancelado && !b && ocupado !== "gerar" && (
+        <div className="py-2 text-[15px]">
+          <p className="mb-3">
+            Boleto (cobrança Efí {cancelado}) cancelado. O título continua em
+            aberto no MK-Auth e a geração automática não cria outro sozinha.
+          </p>
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              onClick={() => gerar()}
+              className="h-[30px] px-3 rounded bg-[#3273dc] text-white"
+            >
+              Gerar novo boleto
+            </button>
+            <button
+              type="button"
+              onClick={onFechar}
+              className="h-[30px] px-3 rounded bg-[#ffdd57] text-[rgba(0,0,0,.7)]"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
       {erro && (
         <div className="py-2">
           <p className="text-[#f14668] mb-3">{erro}</p>
@@ -207,6 +257,17 @@ export function BolixTitulo({
             >
               {ocupado === "gerar" ? "Gerando..." : "Gerar de novo"}
             </button>
+            {podeCancelar && !confirmando && (
+              <button
+                type="button"
+                disabled={!!ocupado}
+                onClick={() => setConfirmando(true)}
+                className="h-[30px] px-3 rounded bg-[#f14668] text-white disabled:opacity-60"
+                title="Cancela este boleto na Efí; o título continua em aberto"
+              >
+                Cancelar boleto
+              </button>
+            )}
             <button
               type="button"
               onClick={onFechar}
@@ -215,6 +276,32 @@ export function BolixTitulo({
               Fechar
             </button>
           </div>
+          {confirmando && (
+            <div className="mt-3 p-3 rounded border border-[#f14668] text-[14px]">
+              <p className="mb-2">
+                Cancelar na Efí o boleto {b.charge_id}? A linha digitável e o
+                Pix deixam de valer. O título continua em aberto.
+              </p>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  disabled={!!ocupado}
+                  onClick={cancelar}
+                  className="h-[30px] px-3 rounded bg-[#f14668] text-white disabled:opacity-60"
+                >
+                  {ocupado === "cancelar" ? "Cancelando..." : "Sim, cancelar"}
+                </button>
+                <button
+                  type="button"
+                  disabled={ocupado === "cancelar"}
+                  onClick={() => setConfirmando(false)}
+                  className="h-[30px] px-3 rounded bg-[#363636] text-white"
+                >
+                  Não
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </JanelaMk>
