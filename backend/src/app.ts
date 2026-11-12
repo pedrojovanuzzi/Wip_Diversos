@@ -52,6 +52,7 @@ import pixAutomaticoService from "./services/PixAutomaticoService";
 import licencaMensalidadeService from "./services/LicencaMensalidadeService";
 import { sincronizarTodosWatchTv } from "./services/streamingCadastro";
 import { agendarGeracaoDeBoletos } from "./services/MensalidadesAutomacao";
+import { agendarLembretes } from "./services/MensalidadesLembretes";
 // import DosProtectController from "./controller/DosProtect";
 
 const backup = new BackupController();
@@ -73,6 +74,7 @@ export class App {
     this.agendarMensalidadesDeLicenca();
     this.agendarWatchTv();
     agendarGeracaoDeBoletos();
+    agendarLembretes();
     // this.verificaDDOS();
   }
 

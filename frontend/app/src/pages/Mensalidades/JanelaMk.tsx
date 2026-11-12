@@ -11,12 +11,15 @@ export function JanelaMk({
   onFechar,
   children,
   largura = 900,
+  corpoClassName = "p-4 sm:p-6",
 }: {
   titulo: React.ReactNode;
   subtitulo?: React.ReactNode;
   onFechar: () => void;
   children: React.ReactNode;
   largura?: number;
+  /** Classes do corpo (padrão: fundo branco com respiro). */
+  corpoClassName?: string;
 }) {
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onFechar();
@@ -28,37 +31,38 @@ export function JanelaMk({
     <div
       // Abaixo do aviso de Sucesso/Erro do sistema (z-[100]), que precisa
       // aparecer por cima desta janela.
-      className="fixed inset-0 z-[90] bg-black/50 flex items-start justify-center overflow-y-auto p-2 sm:p-6"
+      className="fixed inset-0 z-[90] bg-black/50 flex items-start justify-center overflow-y-auto p-0 sm:p-6"
       onMouseDown={(e) => e.target === e.currentTarget && onFechar()}
     >
       <div
         role="dialog"
         aria-modal="true"
-        className="bg-white w-full shadow-xl text-left"
+        // No celular ocupa a tela inteira; do sm para cima é uma janela.
+        className="bg-white w-full min-h-full sm:min-h-0 shadow-xl text-left sm:rounded-lg"
         style={{ maxWidth: largura, fontFamily: FONTE_MK, color: "#4a4a4a" }}
       >
-        <div className="bg-[#363636] text-white px-4 sm:px-10 py-5 flex justify-between items-start gap-4">
-          <div>
-            <h2 className="text-[26px] font-semibold leading-tight">{titulo}</h2>
-            {subtitulo && <p className="text-[15px] mt-1">{subtitulo}</p>}
+        <div className="sticky top-0 z-10 sm:rounded-t-lg bg-[#363636] text-white px-4 sm:px-8 py-3 sm:py-5 flex justify-between items-start gap-4">
+          <div className="min-w-0">
+            <h2 className="text-[20px] sm:text-[26px] font-semibold leading-tight">{titulo}</h2>
+            {subtitulo && <p className="text-[13px] sm:text-[15px] mt-0.5 opacity-90">{subtitulo}</p>}
           </div>
           <button
             type="button"
             onClick={onFechar}
             aria-label="Fechar"
-            className="text-2xl leading-none opacity-80 hover:opacity-100"
+            className="w-9 h-9 -mr-2 rounded-full text-2xl leading-none opacity-80 hover:opacity-100 hover:bg-white/10"
           >
             ×
           </button>
         </div>
-        <div className="p-3">{children}</div>
+        <div className={corpoClassName}>{children}</div>
       </div>
     </div>
   );
 }
 
 export const inputMk =
-  "w-full h-[30px] border border-[#dbdbdb] rounded px-2 text-[15px] bg-white focus:outline-none focus:border-[#3273dc] disabled:bg-[#f5f5f5]";
+  "w-full h-[36px] border border-[#dbdbdb] rounded-md px-3 text-[15px] bg-white focus:outline-none focus:border-[#3273dc] focus:ring-2 focus:ring-[#3273dc]/15 disabled:bg-[#f5f5f5]";
 
 export function CampoMk({
   rotulo,
@@ -69,7 +73,7 @@ export function CampoMk({
 }) {
   return (
     <label className="block mb-3">
-      <strong className="block text-[15px] mb-1">{rotulo}</strong>
+      <strong className="block text-[13px] font-semibold text-[#363636] mb-1">{rotulo}</strong>
       {children}
     </label>
   );
@@ -87,18 +91,18 @@ export function BotoesMk({
   perigo?: boolean;
 }) {
   return (
-    <div className="flex gap-1 mt-4">
+    <div className="flex flex-col-reverse sm:flex-row gap-2 mt-5 pt-3 border-t border-[#eef0f2]">
       <button
         type="submit"
         disabled={enviando}
-        className={`h-[30px] px-3 rounded text-white text-[15px] disabled:opacity-60 ${perigo ? "bg-[#f14668]" : "bg-[#3273dc]"}`}
+        className={`h-[36px] px-4 rounded-md text-white text-[14px] font-semibold disabled:opacity-60 ${perigo ? "bg-[#f14668] hover:bg-[#e03a5b]" : "bg-[#3273dc] hover:bg-[#2763c4]"}`}
       >
         {enviando ? "Aguarde..." : rotulo}
       </button>
       <button
         type="button"
         onClick={onCancelar}
-        className="h-[30px] px-3 rounded bg-[#ffdd57] text-[rgba(0,0,0,.7)] text-[15px]"
+        className="h-[36px] px-4 rounded-md bg-white border border-[#dbdbdb] text-[#363636] text-[14px] font-semibold hover:border-[#3273dc] hover:text-[#3273dc]"
       >
         Cancelar
       </button>

@@ -30,7 +30,7 @@ function Copiavel({ rotulo, texto }: { rotulo: string; texto: string }) {
           readOnly
           value={texto}
           onFocus={(e) => e.target.select()}
-          className="flex-1 min-w-0 h-[30px] border border-[#dbdbdb] rounded px-2 text-[14px] font-mono bg-[#f5f5f5]"
+          className="flex-1 min-w-0 h-[36px] border border-[#dbdbdb] rounded-md px-3 text-[14px] font-mono bg-[#f5f5f5]"
         />
         <button
           type="button"
@@ -39,7 +39,7 @@ function Copiavel({ rotulo, texto }: { rotulo: string; texto: string }) {
               ?.writeText(texto)
               .then(() => showSuccess(`${rotulo} copiado.`))
           }
-          className="h-[30px] px-3 rounded bg-[#363636] text-white text-[14px]"
+          className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-[#363636] text-white text-[14px]"
         >
           Copiar
         </button>
@@ -157,14 +157,14 @@ export function BolixTitulo({
             <button
               type="button"
               onClick={() => gerar()}
-              className="h-[30px] px-3 rounded bg-[#3273dc] text-white"
+              className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-[#3273dc] text-white"
             >
               Gerar novo boleto
             </button>
             <button
               type="button"
               onClick={onFechar}
-              className="h-[30px] px-3 rounded bg-[#ffdd57] text-[rgba(0,0,0,.7)]"
+              className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-white border border-[#dbdbdb] text-[#363636] hover:border-[#3273dc]"
             >
               Fechar
             </button>
@@ -177,7 +177,7 @@ export function BolixTitulo({
           <button
             type="button"
             onClick={() => gerar()}
-            className="h-[30px] px-3 rounded bg-[#3273dc] text-white"
+            className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-[#3273dc] text-white"
           >
             Tentar de novo
           </button>
@@ -225,7 +225,7 @@ export function BolixTitulo({
                 href={b.pdf}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="h-[30px] px-3 rounded bg-[#3273dc] text-white inline-flex items-center"
+                className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-[#3273dc] text-white inline-flex items-center"
               >
                 Abrir PDF
               </a>
@@ -235,7 +235,7 @@ export function BolixTitulo({
                 href={b.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="h-[30px] px-3 rounded bg-[#3e8ed0] text-white inline-flex items-center"
+                className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-[#3e8ed0] text-white inline-flex items-center"
               >
                 Ver boleto
               </a>
@@ -244,7 +244,7 @@ export function BolixTitulo({
               type="button"
               disabled={!!ocupado}
               onClick={verificar}
-              className="h-[30px] px-3 rounded bg-[#48c774] text-white disabled:opacity-60"
+              className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-[#48c774] text-white disabled:opacity-60"
             >
               {ocupado === "verificar" ? "Consultando..." : "Verificar pagamento"}
             </button>
@@ -252,7 +252,7 @@ export function BolixTitulo({
               type="button"
               disabled={!!ocupado}
               onClick={() => gerar(true)}
-              className="h-[30px] px-3 rounded bg-[#363636] text-white disabled:opacity-60"
+              className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-[#363636] text-white disabled:opacity-60"
               title="Cancela este boleto na Efí e cria outro"
             >
               {ocupado === "gerar" ? "Gerando..." : "Gerar de novo"}
@@ -262,7 +262,7 @@ export function BolixTitulo({
                 type="button"
                 disabled={!!ocupado}
                 onClick={() => setConfirmando(true)}
-                className="h-[30px] px-3 rounded bg-[#f14668] text-white disabled:opacity-60"
+                className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-[#f14668] text-white disabled:opacity-60"
                 title="Cancela este boleto na Efí; o título continua em aberto"
               >
                 Cancelar boleto
@@ -271,7 +271,7 @@ export function BolixTitulo({
             <button
               type="button"
               onClick={onFechar}
-              className="h-[30px] px-3 rounded bg-[#ffdd57] text-[rgba(0,0,0,.7)]"
+              className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-white border border-[#dbdbdb] text-[#363636] hover:border-[#3273dc]"
             >
               Fechar
             </button>
@@ -287,7 +287,7 @@ export function BolixTitulo({
                   type="button"
                   disabled={!!ocupado}
                   onClick={cancelar}
-                  className="h-[30px] px-3 rounded bg-[#f14668] text-white disabled:opacity-60"
+                  className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-[#f14668] text-white disabled:opacity-60"
                 >
                   {ocupado === "cancelar" ? "Cancelando..." : "Sim, cancelar"}
                 </button>
@@ -295,7 +295,7 @@ export function BolixTitulo({
                   type="button"
                   disabled={ocupado === "cancelar"}
                   onClick={() => setConfirmando(false)}
-                  className="h-[30px] px-3 rounded bg-[#363636] text-white"
+                  className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-[#363636] text-white"
                 >
                   Não
                 </button>

@@ -13,10 +13,8 @@ import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
 import { apiMensalidades, Detalhe, mensagemDeErro, Titulo } from "./api";
 import {
-  cabecalhoTabela,
   dataCurta,
   diasDoVencimento,
-  linhaZebra,
   numeroTitulo,
   paginaMk,
   reais,
@@ -31,9 +29,11 @@ import {
   NovoTitulo,
   ReceberTitulo,
 } from "./FormulariosTitulo";
-import { exportarCsv, imprimirRecibo, imprimirTitulos } from "./impressao";
+import { exportarCsv, imprimirRecibo } from "./impressao";
 import { BolixTitulo } from "./BolixTitulo";
 import { SeloWipDiversos } from "./SeloWipDiversos";
+import { AutomaticoCliente } from "./AutomaticoCliente";
+import { cabecalhoGrade, caixinha, Celula } from "./ConfigUi";
 
 type Janela =
   | {
@@ -47,27 +47,39 @@ type Janela =
   | { tipo: "excluir"; titulos: Titulo[] }
   | { tipo: "removerAtrelado"; titulo: Titulo; atrelado: number; descricao: string };
 
-/** Links pequenos em negrito separados por "|", como no MK-Auth. */
+/** Ações de um título: botões pequenos (no MK-Auth eram links com "|"). */
 function Acoes({
   itens,
 }: {
-  itens: ({ rotulo: string; onClick: () => void; destaque?: boolean } | false)[];
+  itens: (
+    | { rotulo: string; onClick: () => void; destaque?: boolean; principal?: boolean }
+    | false
+  )[];
 }) {
   return (
-    <div className="text-[12px] font-bold text-[#46484a]">
+    <div className="flex flex-wrap gap-1.5">
       {itens.filter(Boolean).map((i) => {
-        const it = i as { rotulo: string; onClick: () => void; destaque?: boolean };
+        const it = i as {
+          rotulo: string;
+          onClick: () => void;
+          destaque?: boolean;
+          principal?: boolean;
+        };
         return (
-          <React.Fragment key={it.rotulo}>
-            <button
-              type="button"
-              onClick={it.onClick}
-              className={`hover:underline ${it.destaque ? "text-[#00d1b2]" : ""}`}
-            >
-              {it.rotulo}
-            </button>
-            <span className="mx-1">|</span>
-          </React.Fragment>
+          <button
+            key={it.rotulo}
+            type="button"
+            onClick={it.onClick}
+            className={`h-[26px] px-2.5 rounded-full border text-[12px] font-semibold transition-colors ${
+              it.principal
+                ? "bg-[#3273dc] border-[#3273dc] text-white hover:bg-[#2763c4]"
+                : it.destaque
+                  ? "bg-[#ebfffc] border-[#9fe8dd] text-[#00947e] hover:border-[#00947e]"
+                  : "bg-white border-[#dbdbdb] text-[#4a4a4a] hover:border-[#3273dc] hover:text-[#3273dc]"
+            }`}
+          >
+            {it.rotulo}
+          </button>
         );
       })}
     </div>
@@ -76,11 +88,13 @@ function Acoes({
 
 function BotaoBarra({
   titulo,
+  rotulo,
   cor,
   onClick,
   children,
 }: {
   titulo: string;
+  rotulo: string;
   cor: string;
   onClick: () => void;
   children: React.ReactNode;
@@ -91,13 +105,51 @@ function BotaoBarra({
       title={titulo}
       aria-label={titulo}
       onClick={onClick}
-      className="w-[25px] h-[25px] flex items-center justify-center rounded-[3px] text-white text-[14px]"
+      className="h-[34px] px-3 inline-flex items-center gap-2 rounded-md text-white text-[13px] font-semibold hover:brightness-95"
       style={{ background: cor }}
     >
       {children}
+      <span className="hidden sm:inline">{rotulo}</span>
     </button>
   );
 }
+
+/** "vence em 5 dias", "vence hoje", "venceu há 3 dias". */
+function prazoDe(venc: string | null) {
+  if (!venc) return { texto: "", atrasado: false };
+  const v = new Date(venc);
+  v.setHours(0, 0, 0, 0);
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const dias = diasDoVencimento(venc);
+  if (v.getTime() < hoje.getTime())
+    return { texto: `há ${dias} dia${dias === 1 ? "" : "s"}`, atrasado: true };
+  if (dias === 0) return { texto: "hoje", atrasado: false };
+  return { texto: `em ${dias} dia${dias === 1 ? "" : "s"}`, atrasado: false };
+}
+
+function SeloStatus({ status }: { status: string }) {
+  const cor =
+    status === "vencido"
+      ? "bg-[#feecf0] text-[#cc0f35] border-[#fbcbd6]"
+      : status === "pago"
+        ? "bg-[#effaf3] text-[#257942] border-[#c8eed6]"
+        : "bg-[#eef3fc] text-[#2160c4] border-[#cddcf7]";
+  return (
+    <span
+      className={`inline-block px-2 rounded-full border text-[11px] leading-[20px] font-bold ${cor}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+const CARTAO =
+  "bg-white rounded-lg border border-[#e3e6ea] shadow-[0_1px_2px_rgba(0,0,0,.04)] overflow-hidden";
+const GRADE_ABERTOS =
+  "md:grid-cols-[28px_minmax(0,.9fr)_minmax(0,1fr)_minmax(0,.8fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,.9fr)]";
+const GRADE_PAGOS =
+  "md:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,.7fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]";
 
 export function MensalidadesCliente() {
   const { login = "" } = useParams();
@@ -111,6 +163,7 @@ export function MensalidadesCliente() {
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
   const [abertosMais, setAbertosMais] = useState<Set<number>>(new Set());
   const [janela, setJanela] = useState<Janela | null>(null);
+  const [imprimindo, setImprimindo] = useState(false);
 
   const carregar = useCallback(() => {
     setErro("");
@@ -154,225 +207,123 @@ export function MensalidadesCliente() {
     acao(selecionadosLista);
   };
 
+  // Imprimir: abre a aba já no clique (senão o navegador bloqueia) e põe
+  // nela o PDF com os boletos da Efí quando o backend terminar.
+  const imprimirBoletos = async (titulos: Titulo[]) => {
+    if (imprimindo) return;
+    const aba = window.open("", "_blank");
+    aba?.document.write(
+      `<title>Boletos</title><p style="font-family:sans-serif;padding:24px">Gerando os boletos de ${titulos.length} título(s)...</p>`,
+    );
+    setImprimindo(true);
+    try {
+      const { pdf, faltaram } = await api.pdfBoletos(titulos.map((t) => t.id));
+      const url = URL.createObjectURL(pdf);
+      if (aba) aba.location.href = url;
+      else if (!window.open(url, "_blank"))
+        showError("O navegador bloqueou a janela de impressão.");
+      setTimeout(() => URL.revokeObjectURL(url), 5 * 60_000);
+      if (faltaram) showError(`Ficaram de fora: ${faltaram}`);
+      carregar();
+    } catch (e) {
+      aba?.close();
+      showError(mensagemDeErro(e, "Erro ao gerar o PDF dos boletos."));
+    } finally {
+      setImprimindo(false);
+    }
+  };
+
+  const cli = dados?.cliente;
 
   return (
     <div style={paginaMk}>
       <NavBar />
-      <div className="px-3 sm:px-4 pb-10">
-        {/* "CLIENTES • DETALHES • NOME" */}
-        <div className="text-center my-6 text-[15px] uppercase">
-          <SeloWipDiversos />
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="text-[#3273dc] uppercase hover:underline"
-          >
-            Clientes
-          </button>
-          <span className="mx-2">•</span>
-          <Link
-            to={`/mensalidades/${encodeURIComponent(login)}`}
-            className="text-[#3273dc] hover:underline"
-          >
-            Detalhes
-          </Link>
-          <span className="mx-2">•</span>
-          {dados?.cliente.nome || login}
-        </div>
-
-        {/* Só a aba Financeiro: Eventos e Suporte ficam no próprio MK-Auth. */}
-        <div className="flex border-b border-[#dbdbdb] mb-4">
-          <span className="flex items-center gap-2 px-4 sm:px-16 py-2 text-[#3273dc] border border-[#dbdbdb] border-b-white -mb-px rounded-t bg-white">
-            <FaMoneyBillAlt /> Financeiro
-          </span>
-        </div>
-
-        {(
-          <>
-            {erro && <p className="text-center py-6">{erro}</p>}
-            {!dados && !erro && <p className="text-center py-6">Carregando...</p>}
-
-            {dados && (
-              <>
-                <h2 className="font-bold text-[15px] mb-2 pb-2 border-b border-[#ededed]">
-                  Titulos do cliente
-                </h2>
-                {dados.abertos.length === 0 ? (
-                  <p className="text-center font-bold py-2 mb-8">
-                    Não existem lançamentos para o cliente
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto border border-[#ededed] mb-8">
-                    <table className="w-full border-separate border-spacing-0 min-w-[700px]">
-                      <thead>
-                        <tr className={cabecalhoTabela}>
-                          <th className="px-1 py-0.5">
-                            <label className="flex items-center gap-1 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={todosMarcados}
-                                onChange={() =>
-                                  setSelecionados(
-                                    todosMarcados
-                                      ? new Set()
-                                      : new Set(dados.abertos.map((t) => t.id)),
-                                  )
-                                }
-                              />
-                              Titulo
-                            </label>
-                          </th>
-                          <th className="px-1 py-0.5">Tipo</th>
-                          <th className="px-1 py-0.5">Status</th>
-                          <th className="px-1 py-0.5">Vencimento</th>
-                          <th className="px-1 py-0.5">Nossonumero</th>
-                          <th className="px-1 py-0.5">Valor</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dados.abertos.map((t, i) => {
-                          const temItens = t.atrelados.length > 0;
-                          const aberto = abertosMais.has(t.id);
-                          return (
-                            <React.Fragment key={t.id}>
-                              <tr
-                                className={`${linhaZebra(i)} ${
-                                  // O MK-Auth pinta de vermelho o título vencido.
-                                  t.status === "vencido" ? "text-[#f14668] font-bold" : ""
-                                }`}
-                              >
-                                <td className="px-1 pt-0.5 whitespace-nowrap">
-                                  <input
-                                    type="checkbox"
-                                    className="mr-1 align-middle"
-                                    checked={selecionados.has(t.id)}
-                                    onChange={() =>
-                                      setSelecionados((s) => alternar(s, t.id))
-                                    }
-                                    aria-label={`Selecionar título ${numeroTitulo(t.id)}`}
-                                  />
-                                  <button
-                                    type="button"
-                                    disabled={!temItens}
-                                    onClick={() =>
-                                      setAbertosMais((s) => alternar(s, t.id))
-                                    }
-                                    className={`mr-1 w-3 ${temItens ? "text-[#4a4a4a]" : "invisible"}`}
-                                    aria-label="Ver lançamentos atrelados"
-                                  >
-                                    {aberto ? "−" : "+"}
-                                  </button>
-                                  {numeroTitulo(t.id)}
-                                </td>
-                                <td className="px-1 pt-0.5">{t.tipo}</td>
-                                <td className="px-1 pt-0.5">{t.status}</td>
-                                <td className="px-1 pt-0.5">
-                                  {dataCurta(t.datavenc)} [ {diasDoVencimento(t.datavenc)} ]
-                                </td>
-                                <td className="px-1 pt-0.5">{t.nossonum}</td>
-                                <td className="px-1 pt-0.5">{reais(t.valorTotal)}</td>
-                              </tr>
-                              <tr className={linhaZebra(i)}>
-                                <td colSpan={6} className="px-1 pb-0.5">
-                                  <Acoes
-                                    itens={[
-                                      {
-                                        rotulo: "Boleto",
-                                        destaque: !!t.bolix,
-                                        onClick: () => setJanela({ tipo: "boleto", titulo: t }),
-                                      },
-                                      {
-                                        rotulo: "Receber",
-                                        onClick: () => setJanela({ tipo: "receber", titulo: t }),
-                                      },
-                                      {
-                                        rotulo: "Alterar",
-                                        onClick: () => setJanela({ tipo: "alterar", titulo: t }),
-                                      },
-                                      {
-                                        rotulo: "Enviar",
-                                        onClick: () => setJanela({ tipo: "enviar", titulos: [t] }),
-                                      },
-                                      {
-                                        rotulo: "Informações",
-                                        onClick: () => setJanela({ tipo: "info", id: t.id }),
-                                      },
-                                      {
-                                        rotulo: "Notas",
-                                        destaque: t.notas > 0,
-                                        onClick: () => setJanela({ tipo: "notas", titulo: t }),
-                                      },
-                                      t.tipo === "mensalidade" && {
-                                        rotulo: "Atrelar",
-                                        onClick: () => setJanela({ tipo: "atrelar", titulo: t }),
-                                      },
-                                    ]}
-                                  />
-                                </td>
-                              </tr>
-                              {aberto && temItens && (
-                                <tr>
-                                  <td colSpan={6} className="p-0">
-                                    <table className="w-full border-separate border-spacing-0">
-                                      <thead>
-                                        <tr className="bg-[#ff3860] text-white font-bold uppercase text-left text-[15px]">
-                                          <th className="px-1 py-0.5 pl-6">Descrição</th>
-                                          <th className="px-1 py-0.5 w-[8%]">Tipo</th>
-                                          <th className="px-1 py-0.5 w-[8%]">Valor</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {t.atrelados.map((a) => (
-                                          <tr key={a.id}>
-                                            <td className="px-1 py-0.5">
-                                              {admin ? (
-                                                <button
-                                                  type="button"
-                                                  title="Remover lançamento"
-                                                  onClick={() =>
-                                                    setJanela({
-                                                      tipo: "removerAtrelado",
-                                                      titulo: t,
-                                                      atrelado: a.id,
-                                                      descricao: a.descricao || a.tipo,
-                                                    })
-                                                  }
-                                                  className="text-[#f14668] mr-1 align-middle"
-                                                >
-                                                  <FaTrashAlt />
-                                                </button>
-                                              ) : (
-                                                <span className="inline-block w-[18px]" />
-                                              )}
-                                              {a.descricao}
-                                            </td>
-                                            <td className="px-1 py-0.5">{a.tipo}</td>
-                                            <td className="px-1 py-0.5">{reais(a.valor)}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </td>
-                                </tr>
-                              )}
-                            </React.Fragment>
-                          );
-                        })}
-                        <tr>
-                          <td colSpan={5} />
-                          <td className="px-1 pt-3 pb-1 font-bold">
-                            {reais(dados.totalAberto)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+      <div className="max-w-[1500px] mx-auto px-3 sm:px-6 pt-5 pb-10">
+        {/* Cabeçalho do cliente */}
+        <div className="mb-4">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[#7a7a7a] mb-1">
+            <SeloWipDiversos />
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="text-[#3273dc] font-semibold hover:underline"
+            >
+              ‹ Clientes
+            </button>
+            <span>/</span>
+            <Link
+              to={`/mensalidades/${encodeURIComponent(login)}`}
+              className="text-[#3273dc] hover:underline"
+            >
+              Detalhes
+            </Link>
+          </div>
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-[22px] sm:text-[26px] font-bold text-[#363636] leading-tight break-words">
+                {cli?.nome || login}
+              </h1>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[13px] text-[#7a7a7a]">
+                <span className="font-mono">{cli?.login || login}</span>
+                {cli?.plano && <span>{cli.plano}</span>}
+                {cli?.venc && <span>vence dia {cli.venc}</span>}
+                {cli?.bloqueado === "sim" && (
+                  <span className="px-2 rounded-full bg-[#feecf0] text-[#cc0f35] border border-[#fbcbd6] text-[11px] leading-[20px] font-bold">
+                    bloqueado
+                  </span>
                 )}
+                {cli?.status_corte === "down" && (
+                  <span
+                    title="Em redução de velocidade (down)"
+                    className="px-2 rounded-full bg-[#fff3c4] text-[#8a7000] border border-[#ffe08a] text-[11px] leading-[20px] font-bold"
+                  >
+                    down
+                  </span>
+                )}
+                {cli?.cli_ativado === "n" && (
+                  <span className="px-2 rounded-full bg-[#f5f6f8] text-[#7a7a7a] border border-[#e3e6ea] text-[11px] leading-[20px] font-bold">
+                    desativado
+                  </span>
+                )}
+              </div>
+            </div>
+            {dados?.automatico && (
+              <AutomaticoCliente
+                api={api}
+                login={login}
+                isento={dados.cliente.isento === "sim"}
+                estado={dados.automatico}
+                podeMudar={admin}
+                onMudou={(automatico) => setDados({ ...dados, automatico })}
+              />
+            )}
+          </div>
+        </div>
 
-                {/* Barra de ícones */}
-                <div className="flex gap-1 mb-8">
+        {erro && <p className={`${CARTAO} text-center py-10`}>{erro}</p>}
+        {!dados && !erro && (
+          <p className={`${CARTAO} text-center py-10 text-[#7a7a7a]`}>Carregando...</p>
+        )}
+
+        {dados && (
+          <>
+            {/* Títulos em aberto */}
+            <section className={`${CARTAO} mb-5`}>
+              <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 sm:px-4 py-3 border-b border-[#e3e6ea]">
+                <h2 className="font-bold text-[16px] text-[#363636] flex items-center gap-2">
+                  <FaMoneyBillAlt className="text-[#3273dc]" /> Títulos do cliente
+                </h2>
+                {dados.abertos.length > 0 && (
+                  <span className="text-[13px] text-[#7a7a7a]">
+                    {dados.abertos.length} em aberto ·{" "}
+                    <b className="text-[#363636]">{reais(dados.totalAberto)}</b>
+                  </span>
+                )}
+                {/* Barra de ações */}
+                <div className="flex flex-wrap gap-1.5 sm:ml-auto">
                   <BotaoBarra
                     titulo="Adicionar titulos"
+                    rotulo="Novo título"
                     cor="#48c774"
                     onClick={() => setJanela({ tipo: "novo" })}
                   >
@@ -380,29 +331,27 @@ export function MensalidadesCliente() {
                   </BotaoBarra>
                   {dados.abertos.length > 0 && (
                     <>
-                      {admin && (
-                        <BotaoBarra
-                          titulo="Deletar titulos"
-                          cor="#f14668"
-                          onClick={exigirSelecao((t) =>
-                            setJanela({ tipo: "excluir", titulos: t }),
-                          )}
-                        >
-                          <FaTrashAlt />
-                        </BotaoBarra>
-                      )}
                       <BotaoBarra
-                        titulo="Imprimir titulos"
+                        titulo="Enviar mensagem"
+                        rotulo="Enviar"
+                        cor="#3273dc"
+                        onClick={exigirSelecao((t) =>
+                          setJanela({ tipo: "enviar", titulos: t }),
+                        )}
+                      >
+                        <FaEnvelope />
+                      </BotaoBarra>
+                      <BotaoBarra
+                        titulo="Imprimir os boletos (PDF da Efí) dos títulos marcados"
+                        rotulo={imprimindo ? "Gerando..." : "Imprimir"}
                         cor="#3e8ed0"
-                        onClick={exigirSelecao((t) => {
-                          if (!imprimirTitulos(dados, t))
-                            showError("O navegador bloqueou a janela de impressão.");
-                        })}
+                        onClick={exigirSelecao(imprimirBoletos)}
                       >
                         <FaPrint />
                       </BotaoBarra>
                       <BotaoBarra
                         titulo="Exportar para excel"
+                        rotulo="Excel"
                         cor="#00c4a7"
                         onClick={() =>
                           exportarCsv(
@@ -413,97 +362,304 @@ export function MensalidadesCliente() {
                       >
                         <FaFileExcel />
                       </BotaoBarra>
-                      <BotaoBarra
-                        titulo="Enviar mensagem"
-                        cor="#3273dc"
-                        onClick={exigirSelecao((t) =>
-                          setJanela({ tipo: "enviar", titulos: t }),
-                        )}
-                      >
-                        <FaEnvelope />
-                      </BotaoBarra>
+                      {admin && (
+                        <BotaoBarra
+                          titulo="Deletar titulos"
+                          rotulo="Deletar"
+                          cor="#f14668"
+                          onClick={exigirSelecao((t) =>
+                            setJanela({ tipo: "excluir", titulos: t }),
+                          )}
+                        >
+                          <FaTrashAlt />
+                        </BotaoBarra>
+                      )}
                     </>
                   )}
                 </div>
+              </header>
 
-                <h2 className="font-bold text-[15px] mb-2 pb-2 border-b border-[#ededed]">
-                  Pagos anteriormente
-                </h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-separate border-spacing-0 min-w-[760px]">
-                    <thead>
-                      <tr className={cabecalhoTabela}>
-                        <th className="px-1 py-0.5">Titulo</th>
-                        <th className="px-1 py-0.5">Vencimento</th>
-                        <th className="px-1 py-0.5">Coletor</th>
-                        <th className="px-1 py-0.5">Forma</th>
-                        <th className="px-1 py-0.5">Retornos</th>
-                        <th className="px-1 py-0.5">Pagamento</th>
-                        <th className="px-1 py-0.5">Valor</th>
-                        <th className="px-1 py-0.5">Valor pago</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dados.pagos.map((t, i) => (
-                        <React.Fragment key={t.id}>
-                          <tr className={linhaZebra(i)}>
-                            <td className="px-1 pt-0.5">{numeroTitulo(t.id)}</td>
-                            <td className="px-1 pt-0.5">{dataCurta(t.datavenc)}</td>
-                            <td className="px-1 pt-0.5">{t.coletor}</td>
-                            <td className="px-1 pt-0.5">{t.formapag}</td>
-                            <td className="px-1 pt-0.5">
-                              {String(t.num_retornos ?? 0).padStart(3, "0")}
-                            </td>
-                            <td className="px-1 pt-0.5">{dataCurta(t.datapag)}</td>
-                            <td className="px-1 pt-0.5">{reais(t.valorTotal)}</td>
-                            <td className="px-1 pt-0.5">{reais(t.valorpag)}</td>
-                          </tr>
-                          <tr className={linhaZebra(i)}>
-                            <td colSpan={8} className="px-1 pb-0.5">
-                              <Acoes
-                                itens={[
-                                  {
-                                    rotulo: "Informações",
-                                    onClick: () => setJanela({ tipo: "info", id: t.id }),
-                                  },
-                                  {
-                                    rotulo: "Recibo",
-                                    onClick: () => {
-                                      if (!imprimirRecibo(dados, t))
-                                        showError("O navegador bloqueou a janela do recibo.");
-                                    },
-                                  },
-                                  admin && {
-                                    rotulo: "Estornar",
-                                    onClick: () => setJanela({ tipo: "estornar", titulo: t }),
-                                  },
-                                  {
-                                    rotulo: "Notas",
-                                    destaque: t.notas > 0,
-                                    onClick: () => setJanela({ tipo: "notas", titulo: t }),
-                                  },
-                                  {
-                                    rotulo: "Enviar",
-                                    onClick: () => setJanela({ tipo: "enviar", titulos: [t] }),
-                                  },
-                                ]}
-                              />
-                            </td>
-                          </tr>
-                        </React.Fragment>
-                      ))}
-                      {dados.pagos.length === 0 && (
-                        <tr>
-                          <td colSpan={8} className="px-1 py-2 text-[15px]">
-                            Nenhum título pago.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
+              {dados.abertos.length === 0 ? (
+                <p className="text-center py-10 text-[15px] text-[#7a7a7a]">
+                  Não existem lançamentos para o cliente
+                </p>
+              ) : (
+                <>
+                  <div className={`${cabecalhoGrade} ${GRADE_ABERTOS}`}>
+                    <input
+                      type="checkbox"
+                      className={caixinha}
+                      checked={todosMarcados}
+                      aria-label="Marcar todos os títulos"
+                      onChange={() =>
+                        setSelecionados(
+                          todosMarcados
+                            ? new Set()
+                            : new Set(dados.abertos.map((t) => t.id)),
+                        )
+                      }
+                    />
+                    <span>Título</span>
+                    <span>Tipo</span>
+                    <span>Status</span>
+                    <span>Vencimento</span>
+                    <span>Nosso número</span>
+                    <span className="text-right">Valor</span>
+                  </div>
+                  {/* No celular não há cabeçalho: "marcar todos" fica aqui. */}
+                  <label className="md:hidden flex items-center gap-2 px-3 py-2 border-b border-[#eef0f2] text-[13px] font-semibold">
+                    <input
+                      type="checkbox"
+                      className={caixinha}
+                      checked={todosMarcados}
+                      onChange={() =>
+                        setSelecionados(
+                          todosMarcados
+                            ? new Set()
+                            : new Set(dados.abertos.map((t) => t.id)),
+                        )
+                      }
+                    />
+                    Marcar todos
+                  </label>
+
+                  {dados.abertos.map((t) => {
+                    const temItens = t.atrelados.length > 0;
+                    const aberto = abertosMais.has(t.id);
+                    const vencido = t.status === "vencido";
+                    const prazo = prazoDe(t.datavenc);
+                    const marcado = selecionados.has(t.id);
+                    return (
+                      <div
+                        key={t.id}
+                        className={`border-b border-[#eef0f2] last:border-b-0 border-l-4 ${
+                          vencido ? "border-l-[#f14668]" : "border-l-transparent"
+                        } ${marcado ? "bg-[#f3f7fe]" : ""}`}
+                      >
+                        <div
+                          className={`grid grid-cols-[28px_minmax(0,1fr)] ${GRADE_ABERTOS} items-start md:items-center gap-x-3 px-3 sm:px-4 pt-2.5 text-[14px] ${
+                            // O MK-Auth pinta de vermelho o título vencido.
+                            vencido ? "text-[#cc0f35] font-bold" : ""
+                          }`}
+                        >
+                          <div className="pt-0.5 md:pt-0">
+                            <input
+                              type="checkbox"
+                              className={caixinha}
+                              checked={marcado}
+                              onChange={() => setSelecionados((s) => alternar(s, t.id))}
+                              aria-label={`Selecionar título ${numeroTitulo(t.id)}`}
+                            />
+                          </div>
+                          <div className="min-w-0 flex flex-col gap-0.5 md:contents">
+                            <Celula rotulo="Título" className="font-mono font-bold">
+                              {numeroTitulo(t.id)}
+                              {temItens && (
+                                <button
+                                  type="button"
+                                  onClick={() => setAbertosMais((s) => alternar(s, t.id))}
+                                  className="ml-2 px-1.5 rounded-full border border-[#dbdbdb] bg-white text-[11px] leading-[18px] font-sans font-semibold text-[#4a4a4a] hover:border-[#3273dc]"
+                                  aria-label="Ver lançamentos atrelados"
+                                  title="Ver lançamentos atrelados"
+                                >
+                                  {aberto ? "−" : "+"} {t.atrelados.length}
+                                </button>
+                              )}
+                            </Celula>
+                            <Celula rotulo="Tipo">{t.tipo}</Celula>
+                            <Celula rotulo="Status">
+                              <SeloStatus status={t.status} />
+                            </Celula>
+                            <Celula rotulo="Vencimento">
+                              {dataCurta(t.datavenc)}{" "}
+                              <span
+                                className={`text-[12px] font-normal ${
+                                  prazo.atrasado ? "text-[#cc0f35]" : "text-[#7a7a7a]"
+                                }`}
+                                title="Dias até o vencimento (ou de atraso)"
+                              >
+                                · {prazo.texto}
+                              </span>
+                            </Celula>
+                            <Celula rotulo="Nosso nº" className={`truncate text-[#7a7a7a] font-normal ${t.nossonum ? "" : "max-md:hidden"}`}>
+                              {t.nossonum}
+                            </Celula>
+                            <Celula rotulo="Valor" className="md:text-right font-bold">
+                              {reais(t.valorTotal)}
+                            </Celula>
+                          </div>
+                        </div>
+                        <div className="px-3 sm:px-4 pt-2 pb-2.5 pl-[43px] sm:pl-[47px]">
+                          <Acoes
+                            itens={[
+                              {
+                                rotulo: "Boleto",
+                                destaque: !!t.bolix,
+                                onClick: () => setJanela({ tipo: "boleto", titulo: t }),
+                              },
+                              {
+                                rotulo: "Receber",
+                                onClick: () => setJanela({ tipo: "receber", titulo: t }),
+                              },
+                              {
+                                rotulo: "Alterar",
+                                onClick: () => setJanela({ tipo: "alterar", titulo: t }),
+                              },
+                              {
+                                rotulo: "Enviar",
+                                onClick: () => setJanela({ tipo: "enviar", titulos: [t] }),
+                              },
+                              {
+                                rotulo: "Informações",
+                                onClick: () => setJanela({ tipo: "info", id: t.id }),
+                              },
+                              {
+                                rotulo: "Notas",
+                                destaque: t.notas > 0,
+                                onClick: () => setJanela({ tipo: "notas", titulo: t }),
+                              },
+                              t.tipo === "mensalidade" && {
+                                rotulo: "Atrelar",
+                                onClick: () => setJanela({ tipo: "atrelar", titulo: t }),
+                              },
+                            ]}
+                          />
+                        </div>
+                        {aberto && temItens && (
+                          <div className="mx-3 sm:mx-4 mb-3 ml-[43px] sm:ml-[47px] rounded-md border border-[#fbcbd6] overflow-hidden text-[13px]">
+                            <div className="grid grid-cols-[minmax(0,1fr)_90px_100px] gap-x-3 px-3 py-1.5 bg-[#feecf0] text-[#cc0f35] text-[11px] font-bold uppercase tracking-wide">
+                              <span>Descrição</span>
+                              <span>Tipo</span>
+                              <span className="text-right">Valor</span>
+                            </div>
+                            {t.atrelados.map((a) => (
+                              <div
+                                key={a.id}
+                                className="grid grid-cols-[minmax(0,1fr)_90px_100px] gap-x-3 px-3 py-1.5 border-t border-[#fde3e9] items-center"
+                              >
+                                <span className="min-w-0 break-words">
+                                  {admin && (
+                                    <button
+                                      type="button"
+                                      title="Remover lançamento"
+                                      aria-label="Remover lançamento"
+                                      onClick={() =>
+                                        setJanela({
+                                          tipo: "removerAtrelado",
+                                          titulo: t,
+                                          atrelado: a.id,
+                                          descricao: a.descricao || a.tipo,
+                                        })
+                                      }
+                                      className="text-[#f14668] mr-2 align-middle hover:text-[#cc0f35]"
+                                    >
+                                      <FaTrashAlt />
+                                    </button>
+                                  )}
+                                  {a.descricao}
+                                </span>
+                                <span>{a.tipo}</span>
+                                <span className="text-right">{reais(a.valor)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <div className="flex justify-end items-baseline gap-3 px-3 sm:px-4 py-3 bg-[#fafbfc] border-t border-[#e3e6ea]">
+                    <span className="text-[12px] uppercase tracking-wide text-[#7a7a7a]">
+                      Total em aberto
+                    </span>
+                    <span className="text-[18px] font-bold text-[#363636]">
+                      {reais(dados.totalAberto)}
+                    </span>
+                  </div>
+                </>
+              )}
+            </section>
+
+            {/* Pagos */}
+            <section className={CARTAO}>
+              <header className="flex flex-wrap items-center gap-3 px-3 sm:px-4 py-3 border-b border-[#e3e6ea]">
+                <h2 className="font-bold text-[16px] text-[#363636]">Pagos anteriormente</h2>
+                {dados.pagos.length > 0 && (
+                  <span className="text-[13px] text-[#7a7a7a]">{dados.pagos.length} título(s)</span>
+                )}
+              </header>
+              {dados.pagos.length === 0 ? (
+                <p className="text-center py-8 text-[15px] text-[#7a7a7a]">Nenhum título pago.</p>
+              ) : (
+                <>
+                  <div className={`${cabecalhoGrade} ${GRADE_PAGOS}`}>
+                    <span>Título</span>
+                    <span>Vencimento</span>
+                    <span>Coletor</span>
+                    <span>Forma</span>
+                    <span>Retornos</span>
+                    <span>Pagamento</span>
+                    <span className="text-right">Valor</span>
+                    <span className="text-right">Valor pago</span>
+                  </div>
+                  {dados.pagos.map((t) => (
+                    <div key={t.id} className="border-b border-[#eef0f2] last:border-b-0">
+                      <div
+                        className={`flex flex-col gap-0.5 md:grid ${GRADE_PAGOS} md:items-center md:gap-x-3 px-3 sm:px-4 pt-2.5 text-[14px]`}
+                      >
+                        <Celula rotulo="Título" className="font-mono font-bold">
+                          {numeroTitulo(t.id)}
+                        </Celula>
+                        <Celula rotulo="Vencimento">{dataCurta(t.datavenc)}</Celula>
+                        <Celula rotulo="Coletor" className={`truncate ${t.coletor ? "" : "max-md:hidden"}`}>
+                          {t.coletor}
+                        </Celula>
+                        <Celula rotulo="Forma">{t.formapag}</Celula>
+                        <Celula rotulo="Retornos">
+                          {String(t.num_retornos ?? 0).padStart(3, "0")}
+                        </Celula>
+                        <Celula rotulo="Pagamento">{dataCurta(t.datapag)}</Celula>
+                        <Celula rotulo="Valor" className="md:text-right">
+                          {reais(t.valorTotal)}
+                        </Celula>
+                        <Celula rotulo="Valor pago" className="md:text-right font-bold text-[#257942]">
+                          {reais(t.valorpag)}
+                        </Celula>
+                      </div>
+                      <div className="px-3 sm:px-4 pt-2 pb-2.5">
+                        <Acoes
+                          itens={[
+                            {
+                              rotulo: "Informações",
+                              onClick: () => setJanela({ tipo: "info", id: t.id }),
+                            },
+                            {
+                              rotulo: "Recibo",
+                              onClick: () => {
+                                if (!imprimirRecibo(dados, t))
+                                  showError("O navegador bloqueou a janela do recibo.");
+                              },
+                            },
+                            admin && {
+                              rotulo: "Estornar",
+                              onClick: () => setJanela({ tipo: "estornar", titulo: t }),
+                            },
+                            {
+                              rotulo: "Notas",
+                              destaque: t.notas > 0,
+                              onClick: () => setJanela({ tipo: "notas", titulo: t }),
+                            },
+                            {
+                              rotulo: "Enviar",
+                              onClick: () => setJanela({ tipo: "enviar", titulos: [t] }),
+                            },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </section>
           </>
         )}
       </div>

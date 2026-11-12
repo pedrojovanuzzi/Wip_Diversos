@@ -2,7 +2,8 @@ import type React from "react";
 
 // Visual copiado do MK-Auth (admin/clientes.hhvm e cliente_det.hhvm), que usa
 // Bulma: fonte do sistema, texto #4a4a4a, cabeçalho de tabela preto e linhas
-// alternando com #f5f5f5.
+// alternando com #f5f5f5. As telas de Mensalidades hoje usam cartões sobre
+// um fundo cinza claro; as cores e a fonte continuam as do MK-Auth.
 export const FONTE_MK =
   'BlinkMacSystemFont, -apple-system, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
@@ -10,7 +11,7 @@ export const paginaMk: React.CSSProperties = {
   fontFamily: FONTE_MK,
   color: "#4a4a4a",
   fontSize: 16,
-  background: "#fff",
+  background: "#f5f6f8",
   textAlign: "left",
   minHeight: "100vh",
 };

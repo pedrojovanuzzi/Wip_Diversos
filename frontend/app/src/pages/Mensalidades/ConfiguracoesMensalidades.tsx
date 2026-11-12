@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNotification } from "../../context/NotificationContext";
-import { CampoMk, inputMk, JanelaMk } from "./JanelaMk";
+import { JanelaMk } from "./JanelaMk";
 import { mensagemDeErro } from "./api";
 import { numeroTitulo } from "./mkauthEstilo";
+import { LembretesEmail } from "./LembretesEmail";
+import { Botao, Cartao, Confirmacao, Interruptor, Numero, Selo } from "./ConfigUi";
 
 interface Config {
   gerarBoletos: boolean;
-  diasAntecedencia: number;
-  incluirVencidos: boolean;
-  enviarEmail: boolean;
 }
 
 interface Resumo {
@@ -26,89 +25,108 @@ interface Resumo {
     competencia: string;
     motivo?: "pago" | "cobrado" | "cancelado";
   }[];
-  emails: number;
   erros: { login: string; titulo: number; erro: string }[];
+  titulosCriados?: {
+    login: string;
+    titulo: number;
+    competencia: string;
+    vencimento: string;
+    valor: number;
+  }[];
+  desligados?: number;
 }
 
 const base = () => `${process.env.REACT_APP_URL}/mensalidades/config`;
+const reais = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const dataBr = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 
-function Marcar({
-  checked,
-  onChange,
+/** Lista dobrável do resumo (isentos criados, pulados, erros). */
+function Lista({
+  titulo,
+  cor,
+  aberta,
   children,
 }: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
+  titulo: React.ReactNode;
+  cor?: string;
+  aberta?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex items-start gap-2 text-[15px] cursor-pointer mb-2">
-      <input
-        type="checkbox"
-        className="mt-1"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span>{children}</span>
-    </label>
+    <details open={aberta} className="group rounded-md border border-[#eef0f2] mt-2">
+      <summary
+        className="cursor-pointer select-none px-3 py-2 font-semibold text-[13px] list-none flex items-center gap-2"
+        style={{ color: cor }}
+      >
+        <span className="transition-transform group-open:rotate-90 text-[10px]">▶</span>
+        {titulo}
+      </summary>
+      <ul className="border-t border-[#eef0f2] divide-y divide-[#f3f4f6] text-[13px]">
+        {children}
+      </ul>
+    </details>
   );
+}
+
+function Linha({ children }: { children: React.ReactNode }) {
+  return <li className="px-3 py-1.5 break-words">{children}</li>;
 }
 
 function ResumoExecucao({ r }: { r: Resumo }) {
   const quando = new Date(r.inicio).toLocaleString("pt-BR");
   return (
-    <div className="text-[14px]">
-      <p className="mb-2">
-        <b>{quando}</b> · {r.origem === "manual" ? `manual (${r.usuario})` : "agendamento"}
+    <div>
+      <p className="text-[13px] text-[#7a7a7a] mb-3">
+        <b className="text-[#4a4a4a]">{quando}</b> ·{" "}
+        {r.origem === "manual" ? `manual (${r.usuario})` : "automática"}
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3">
-        {[
-          ["Analisados", r.analisados],
-          ["Gerados", r.gerados],
-          ["Já tinham", r.jaTinham],
-          ["Pulados", r.mesPago.length],
-          ["E-mails", r.emails],
-        ].map(([rotulo, n]) => (
-          <div key={rotulo as string} className="border border-[#ededed] rounded px-2 py-1">
-            <div className="text-[12px] text-[#7a7a7a]">{rotulo}</div>
-            <div className="text-[18px] font-bold">{n}</div>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <Numero rotulo="Analisados" valor={r.analisados} />
+        <Numero rotulo="Boletos gerados" valor={r.gerados} destaque={r.gerados > 0} />
+        <Numero rotulo="Já tinham" valor={r.jaTinham} />
+        <Numero rotulo="Pulados" valor={r.mesPago.length} />
       </div>
+      {!!r.desligados && (
+        <p className="mt-2 text-[12px] text-[#7a7a7a]">
+          {r.desligados} título(s) de clientes com o boleto automático desligado
+          ficaram de fora.
+        </p>
+      )}
+      {!!r.titulosCriados?.length && (
+        <Lista titulo={`Mensalidades de isentos criadas (${r.titulosCriados.length})`} cor="#257942" aberta>
+          {r.titulosCriados.map((c) => (
+            <Linha key={c.titulo}>
+              <b>{c.login}</b> · título {numeroTitulo(c.titulo)} · vence {dataBr(c.vencimento)} ·{" "}
+              {reais(c.valor)}
+            </Linha>
+          ))}
+        </Lista>
+      )}
       {r.mesPago.length > 0 && (
-        <details className="mb-2">
-          <summary className="cursor-pointer font-bold">
-            Pulados ({r.mesPago.length}): títulos em aberto de um mês que o
-            cliente já pagou, que já tem boleto em outro título ou cujo boleto
-            foi cancelado na tela
-          </summary>
-          <ul className="list-disc pl-6 mt-1">
-            {r.mesPago.map((m) => (
-              <li key={m.titulo}>
-                {m.login} · título {numeroTitulo(m.titulo)} · {m.competencia} ·{" "}
+        <Lista titulo={`Pulados (${r.mesPago.length})`}>
+          {r.mesPago.map((m) => (
+            <Linha key={m.titulo}>
+              <b>{m.login}</b> · título {numeroTitulo(m.titulo)} · {m.competencia} ·{" "}
+              <span className="text-[#7a7a7a]">
                 {m.motivo === "cobrado"
-                  ? "mês já tem boleto"
+                  ? "mês já tem boleto em outro título"
                   : m.motivo === "cancelado"
                     ? "boleto cancelado na tela"
                     : "mês já pago"}
-              </li>
-            ))}
-          </ul>
-        </details>
+              </span>
+            </Linha>
+          ))}
+        </Lista>
       )}
       {r.erros.length > 0 && (
-        <details open>
-          <summary className="cursor-pointer font-bold text-[#f14668]">
-            Erros ({r.erros.length})
-          </summary>
-          <ul className="list-disc pl-6 mt-1">
-            {r.erros.map((e, i) => (
-              <li key={i}>
-                {e.login} · título {numeroTitulo(e.titulo)}: {e.erro}
-              </li>
-            ))}
-          </ul>
-        </details>
+        <Lista titulo={`Erros (${r.erros.length})`} cor="#cc0f35" aberta>
+          {r.erros.map((e, i) => (
+            <Linha key={i}>
+              <b>{e.login}</b> · título {numeroTitulo(e.titulo)}: {e.erro}
+            </Linha>
+          ))}
+        </Lista>
       )}
     </div>
   );
@@ -125,6 +143,7 @@ export function ConfiguracoesMensalidades({
   const { showError, showSuccess } = useNotification();
   const headers = { Authorization: `Bearer ${token}` };
   const [cfg, setCfg] = useState<Config | null>(null);
+  const [salvo, setSalvo] = useState<Config | null>(null);
   const [ultima, setUltima] = useState<Resumo | null>(null);
   const [ambiente, setAmbiente] = useState({ sandbox: false, notificacao: false });
   const [salvando, setSalvando] = useState(false);
@@ -138,6 +157,7 @@ export function ConfiguracoesMensalidades({
       .get(base(), { headers })
       .then(({ data }) => {
         setCfg(data.config);
+        setSalvo(data.config);
         setUltima(data.ultima);
         setRodando(!!data.situacao?.rodando);
         setVerificadoEm(data.ultimaVerificacao || null);
@@ -154,6 +174,7 @@ export function ConfiguracoesMensalidades({
     try {
       const { data } = await axios.put(base(), cfg, { headers });
       setCfg(data.config);
+      setSalvo(data.config);
       showSuccess("Configurações salvas.");
     } catch (err) {
       showError(mensagemDeErro(err, "Erro ao salvar."));
@@ -199,146 +220,94 @@ export function ConfiguracoesMensalidades({
     }
   };
 
+  const mudou = !!cfg && !!salvo && cfg.gerarBoletos !== salvo.gerarBoletos;
+
   return (
-    <JanelaMk titulo="Configurações" subtitulo="mensalidades" onFechar={onFechar}>
-      {!cfg && <p className="py-4">Carregando...</p>}
+    <JanelaMk
+      titulo="Configurações"
+      subtitulo="mensalidades"
+      onFechar={onFechar}
+      corpoClassName="p-3 sm:p-5 bg-[#f5f6f8] sm:rounded-b-lg space-y-4"
+    >
+      {!cfg && <p className="py-6 text-center text-[14px]">Carregando...</p>}
       {cfg && (
         <>
           <form onSubmit={salvar}>
-            <h3 className="font-bold text-[15px] mb-2 pb-2 border-b border-[#ededed]">
-              Gerar boletos (bolix da Efí)
-            </h3>
-            <p className="text-[13px] text-[#7a7a7a] mb-3">
-              A cada 10 minutos confere as mensalidades em aberto e gera o
-              boleto com Pix das que ainda não têm, logo depois de o MK-Auth
-              criar a mensalidade. Um mês que o cliente já pagou, ou que já tem
-              boleto, nunca é cobrado de novo.
-            </p>
-            <Marcar
-              checked={cfg.gerarBoletos}
-              onChange={(v) => setCfg({ ...cfg, gerarBoletos: v })}
-            >
-              <b>Gerar boletos automaticamente</b>{" "}
-              <span className="text-[13px] text-[#7a7a7a]">
-                (confere a cada 10 minutos)
-              </span>
-            </Marcar>
-            {verificadoEm && (
-              <p className="text-[13px] text-[#7a7a7a] -mt-1 mb-2 ml-6">
-                Última conferência: {new Date(verificadoEm).toLocaleString("pt-BR")}
-              </p>
-            )}
-            <div className="grid sm:grid-cols-2 gap-x-3 mt-2">
-              <CampoMk rotulo="Dias antes do vencimento">
-                <input
-                  type="number"
-                  min={0}
-                  max={60}
-                  className={inputMk}
-                  value={cfg.diasAntecedencia}
-                  onChange={(e) =>
-                    setCfg({ ...cfg, diasAntecedencia: Number(e.target.value) })
-                  }
-                  required
+            <Cartao
+              icone="🧾"
+              titulo="Boleto automático (Efí)"
+              descricao="A cada minuto, gera o boleto com Pix das mensalidades a vencer que ainda não têm, dos clientes com o boleto automático ligado. Mês já pago, ou que já tem boleto, nunca é cobrado de novo."
+              direita={
+                <Interruptor
+                  ligado={cfg.gerarBoletos}
+                  onChange={(v) => setCfg({ ...cfg, gerarBoletos: v })}
+                  title="Depois de mudar, clique em Salvar"
                 />
-              </CampoMk>
-            </div>
-            <Marcar
-              checked={cfg.incluirVencidos}
-              onChange={(v) => setCfg({ ...cfg, incluirVencidos: v })}
+              }
+              rodape={
+                <>
+                  <Botao type="submit" variante="primario" disabled={salvando || !mudou}>
+                    {salvando ? "Salvando..." : "Salvar"}
+                  </Botao>
+                  <Botao
+                    variante="contorno"
+                    disabled={rodando}
+                    onClick={() => setConfirmarRodar(true)}
+                  >
+                    {rodando
+                      ? andamento.total
+                        ? `Gerando... ${andamento.feitos} de ${andamento.total}`
+                        : "Gerando..."
+                      : "Rodar agora"}
+                  </Botao>
+                  {mudou && (
+                    <span className="text-[12px] text-[#946c00] sm:ml-1">
+                      Alteração ainda não salva.
+                    </span>
+                  )}
+                </>
+              }
             >
-              Incluir mensalidades já vencidas{" "}
-              <span className="text-[13px] text-[#7a7a7a]">
-                (o boleto vence no dia, com multa e juros; se ele vencer sem
-                pagamento, é refeito no dia seguinte)
-              </span>
-            </Marcar>
-            <Marcar
-              checked={cfg.enviarEmail}
-              onChange={(v) => setCfg({ ...cfg, enviarEmail: v })}
-            >
-              Mandar o boleto por e-mail ao cliente quando for gerado
-            </Marcar>
-            <div className="text-[13px] mt-3 mb-1 space-y-1">
-              <p>
-                Efí: <b>{ambiente.sandbox ? "homologação (sandbox)" : "produção"}</b>
-              </p>
-              <p>
-                Aviso de pagamento:{" "}
-                {ambiente.notificacao ? (
-                  <b className="text-[#48c774]">configurado</b>
-                ) : (
-                  <b className="text-[#f14668]">
-                    sem EFI_BOLIX_NOTIFICACAO_URL no .env (a baixa só acontece
-                    pelo "Verificar pagamento")
-                  </b>
+              <div className="flex flex-wrap gap-2">
+                <Selo cor={ambiente.sandbox ? "amarelo" : "verde"}>
+                  Efí: {ambiente.sandbox ? "homologação (sandbox)" : "produção"}
+                </Selo>
+                <Selo
+                  cor={ambiente.notificacao ? "verde" : "vermelho"}
+                  title={
+                    ambiente.notificacao
+                      ? "A Efí avisa o pagamento na hora."
+                      : "Sem EFI_BOLIX_NOTIFICACAO_URL no .env: a baixa fica na conferência a cada 5 minutos."
+                  }
+                >
+                  Aviso de pagamento: {ambiente.notificacao ? "configurado" : "não configurado"}
+                </Selo>
+                {verificadoEm && (
+                  <Selo>Última conferência: {new Date(verificadoEm).toLocaleString("pt-BR")}</Selo>
                 )}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-1 mt-4">
-              <button
-                type="submit"
-                disabled={salvando}
-                className="h-[30px] px-3 rounded bg-[#3273dc] text-white disabled:opacity-60"
-              >
-                {salvando ? "Salvando..." : "Salvar"}
-              </button>
-              <button
-                type="button"
-                disabled={rodando}
-                onClick={() => setConfirmarRodar(true)}
-                className="h-[30px] px-3 rounded bg-[#48c774] text-white disabled:opacity-60"
-              >
-                {rodando
-                  ? andamento.total
-                    ? `Gerando... ${andamento.feitos} de ${andamento.total}`
-                    : "Gerando..."
-                  : "Rodar agora"}
-              </button>
-              <button
-                type="button"
-                onClick={onFechar}
-                className="h-[30px] px-3 rounded bg-[#ffdd57] text-[rgba(0,0,0,.7)]"
-              >
-                Fechar
-              </button>
-            </div>
-            {confirmarRodar && (
-              <div className="mt-3 p-3 border border-[#ffdd57] bg-[#fffbeb] text-[14px]">
-                <p className="mb-2">
-                  Gera agora, na Efí{ambiente.sandbox ? " (sandbox)" : ""}, os
-                  boletos que faltam com as configurações <b>salvas</b>
-                  {cfg.enviarEmail ? " e manda os e-mails aos clientes" : ""}.
-                  Continuar?
-                </p>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={rodar}
-                    className="h-[28px] px-3 rounded bg-[#48c774] text-white"
-                  >
-                    Gerar agora
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmarRodar(false)}
-                    className="h-[28px] px-3 rounded bg-[#ffdd57]"
-                  >
-                    Cancelar
-                  </button>
-                </div>
               </div>
-            )}
+              {confirmarRodar && (
+                <Confirmacao
+                  confirmar="Gerar agora"
+                  onConfirmar={rodar}
+                  onCancelar={() => setConfirmarRodar(false)}
+                >
+                  Gera agora, na Efí{ambiente.sandbox ? " (sandbox)" : ""}, os boletos que
+                  faltam, com as configurações <b>salvas</b>. Continuar?
+                </Confirmacao>
+              )}
+            </Cartao>
           </form>
 
-          <h3 className="font-bold text-[15px] mt-6 mb-2 pb-2 border-b border-[#ededed]">
-            Última execução
-          </h3>
-          {ultima ? (
-            <ResumoExecucao r={ultima} />
-          ) : (
-            <p className="text-[14px]">Ainda não rodou.</p>
-          )}
+          <Cartao icone="📊" titulo="Última execução">
+            {ultima ? (
+              <ResumoExecucao r={ultima} />
+            ) : (
+              <p className="text-[14px] text-[#7a7a7a]">Ainda não rodou.</p>
+            )}
+          </Cartao>
+
+          <LembretesEmail token={token} />
         </>
       )}
     </JanelaMk>

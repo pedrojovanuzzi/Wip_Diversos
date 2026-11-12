@@ -61,6 +61,19 @@ export interface Detalhe {
     plano: string | null;
     email: string | null;
     obs: string | null;
+    /** "sim" quando o MK-Auth não cobra o cliente (o mk-bot não cria título). */
+    isento?: string | null;
+    /** Dia do vencimento, bloqueio e corte, como no cadastro do MK-Auth. */
+    venc?: string | null;
+    bloqueado?: string | null;
+    cli_ativado?: string | null;
+    status_corte?: string | null;
+  };
+  /** Interruptor "boleto automático" do cliente no Wip Diversos. */
+  automatico: {
+    automatico: boolean;
+    atualizadoPor: string | null;
+    atualizadoEm: string | null;
   };
   abertos: Titulo[];
   pagos: Titulo[];
@@ -117,8 +130,37 @@ export function apiMensalidades(token?: string) {
       post<{ status: string; baixado: boolean; motivo: string }>(
         `/titulos/${id}/bolix/verificar`,
       ),
+    definirAutomatico: (login: string, automatico: boolean) =>
+      put<Detalhe["automatico"]>(`${c(login)}/automatico`, { automatico }),
     cancelarBolix: (id: number) =>
       post<{ cancelado: boolean }>(`/titulos/${id}/bolix/cancelar`),
+    /**
+     * PDF com os boletos dos títulos (gera o bolix que faltar). `faltaram`:
+     * títulos que ficaram de fora e o motivo.
+     */
+    pdfBoletos: async (ids: number[]) => {
+      try {
+        const r = await axios.post<Blob>(
+          base() + "/titulos/boletos/pdf",
+          { ids },
+          { headers, responseType: "blob" },
+        );
+        const f = r.headers["x-boletos-faltaram"];
+        return { pdf: r.data, faltaram: f ? decodeURIComponent(String(f)) : "" };
+      } catch (e: any) {
+        // Com responseType blob, o erro também chega como Blob: vira JSON
+        // para o mensagemDeErro ler a mensagem do backend.
+        const d = e?.response?.data;
+        if (d instanceof Blob) {
+          try {
+            e.response.data = JSON.parse(await d.text());
+          } catch {
+            // não era JSON
+          }
+        }
+        throw e;
+      }
+    },
     notas: (id: number) => get<any[]>(`/titulos/${id}/notas`),
     adicionarNota: (id: number, texto: string) =>
       post(`/titulos/${id}/notas`, { texto }),

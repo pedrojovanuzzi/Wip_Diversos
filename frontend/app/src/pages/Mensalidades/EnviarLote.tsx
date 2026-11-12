@@ -99,7 +99,7 @@ export function EnviarLote({
           <button
             type="button"
             onClick={onFechar}
-            className="h-[30px] px-3 rounded bg-[#3273dc] text-white mt-2"
+            className="h-[36px] px-4 rounded-md font-semibold text-[14px] bg-[#3273dc] text-white mt-2"
           >
             Fechar
           </button>

@@ -28,7 +28,10 @@ export class MensalidadeBolix {
   @Column({ type: "bigint" })
   charge_id!: string;
 
-  /** ativo | pago | cancelado | substituido | cancelado_manual (botão) */
+  /**
+   * ativo | pago | cancelado | substituido | cancelado_manual (botão) |
+   * estornado (pago e depois estornado na tela: não conta como mês pago)
+   */
   @Column({ type: "varchar", length: 16, default: "ativo" })
   situacao!: string;
 

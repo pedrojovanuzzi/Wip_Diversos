@@ -45,6 +45,9 @@ import { AuditLog } from "../entities/AuditLog";
 import { MensalidadeNota } from "../entities/MensalidadeNota";
 import { MensalidadeBolix } from "../entities/MensalidadeBolix";
 import { MensalidadeConfig } from "../entities/MensalidadeConfig";
+import { MensalidadeEmailEnvio } from "../entities/MensalidadeEmailEnvio";
+import { MensalidadeCliente } from "../entities/MensalidadeCliente";
+import { MensalidadeTituloCriado } from "../entities/MensalidadeTituloCriado";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -101,6 +104,9 @@ const AppDataSource = new DataSource({
     MensalidadeNota,
     MensalidadeBolix,
     MensalidadeConfig,
+    MensalidadeEmailEnvio,
+    MensalidadeCliente,
+    MensalidadeTituloCriado,
   ],
   migrations: [
     path.join(__dirname, "../migration/*.{ts,js}").replace(/\\/g, "/"),

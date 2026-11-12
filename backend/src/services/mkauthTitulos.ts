@@ -202,3 +202,94 @@ export function competenciaDoTitulo(t: {
     ? ""
     : `${d.getFullYear()}-${dois(d.getMonth() + 1)}`;
 }
+
+/**
+ * Cria um título no sis_lanc como o "Novo título" do MK-Auth grava (copiado
+ * comparando o banco antes e depois da mesma ação feita lá). `venc` é
+ * "AAAA-MM-DD". A referência segue o mesref do cliente ("ant": a mensalidade
+ * cobra o mês anterior ao vencimento). Não registra atividade nem recalcula
+ * tit_abertos: quem chama faz, uma vez por cliente.
+ */
+export interface DadosTituloMk {
+  nome: string;
+  conta: number;
+  mesref: string;
+  cfop_plano: string | null;
+  gateway: string | null;
+  multa: number;
+  juros: number;
+}
+
+/** O que inserirTituloMk precisa do cliente e da conta de cobrança. */
+export async function lerDadosTituloMk(
+  m: EntityManager,
+  login: string,
+): Promise<DadosTituloMk> {
+  const [c] = await m.query(
+    `SELECT c.nome, c.conta, c.mesref, p.cfop_plano
+       FROM sis_cliente c LEFT JOIN sis_plano p ON p.nome = c.plano
+      WHERE c.login = ? LIMIT 1`,
+    [login],
+  );
+  if (!c) throw new ErroDeUso("Cliente não encontrado.");
+  const conta = Number(c.conta) || 1;
+  const [b] = await m.query(
+    `SELECT gateway, multa, juros FROM sis_boleto WHERE id = ? LIMIT 1`,
+    [conta],
+  );
+  return {
+    nome: String(c.nome || login),
+    conta,
+    mesref: String(c.mesref || ""),
+    cfop_plano: c.cfop_plano || null,
+    gateway: b?.gateway || null,
+    multa: Number(b?.multa || 0),
+    juros: Number(b?.juros || 0),
+  };
+}
+
+export async function inserirTituloMk(
+  m: EntityManager,
+  login: string,
+  venc: string,
+  tipo: string,
+  valor: number,
+  descricao: string,
+  usuario: string,
+  /** Já lidos (várias parcelas do mesmo cliente): poupa as consultas. */
+  dados?: DadosTituloMk,
+): Promise<{ id: number; referencia: string }> {
+  const c = dados ?? (await lerDadosTituloMk(m, login));
+  const [a, mes] = venc.split("-").map(Number);
+  const ref = new Date(a, mes - 1 - (c.mesref === "ant" ? 1 : 0), 1);
+  const referencia = `${MESES_ABREV[ref.getMonth()]}/${ref.getFullYear()}`;
+  const r = await m.query(
+    `INSERT INTO sis_lanc
+       (datavenc, nossonum, status, login, tipo, cfop_lanc, obs,
+        processamento, aviso, usergerou, valorger, linhadig, valor, imp,
+        referencia, tipocob, numconta, gerourem, percmulta, percmora,
+        deltitulo, num_recibos, num_retornos, alt_venc, uuid_lanc)
+     VALUES (?, ?, 'aberto', ?, ?, ?, ?, ?, 'nao', ?, 'completo', '', ?,
+             'nao', ?, 'fat', ?, 1, ?, ?, 0, 0, 0, 0, ?)`,
+    [
+      `${venc} 00:00:00`,
+      // Conta Efí: o MK-Auth marca "gerencianet" e registra o boleto quando
+      // ele é aberto. Banco comum: o MK-Auth numera depois
+      // (view vtab_sem_nossonum).
+      c.gateway === "gnet" ? "gerencianet" : null,
+      login,
+      tipo,
+      tipo === "mensalidade" ? c.cfop_plano || "5307" : "X949",
+      descricao,
+      agoraMk(),
+      usuario,
+      valor.toFixed(2),
+      referencia,
+      c.conta,
+      c.multa.toFixed(2),
+      c.juros.toFixed(2),
+      crypto.randomUUID(),
+    ],
+  );
+  return { id: Number(r.insertId), referencia };
+}

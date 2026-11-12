@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import crypto from "crypto";
 import { EntityManager } from "typeorm";
+import { PDFDocument } from "pdf-lib";
 import MkauthSource from "../database/MkauthSource";
 import AppDataSource from "../database/DataSource";
 import { MensalidadeNota } from "../entities/MensalidadeNota";
@@ -11,6 +11,8 @@ import {
   baixarTitulo,
   dois,
   ErroDeUso,
+  inserirTituloMk,
+  lerDadosTituloMk,
   lancarCaixa,
   multaMoraDoTitulo,
   recalcularAbertos,
@@ -34,6 +36,22 @@ import {
   ultimaExecucao,
   ultimaVerificacao,
 } from "../services/MensalidadesAutomacao";
+import {
+  enviarLembreteTeste,
+  lembretesRodando,
+  lerLembretes,
+  rodarLembretes,
+  salvarLembretes,
+  ultimaExecucaoLembretes,
+  ultimosEnvios,
+  VARIAVEIS_LEMBRETE,
+} from "../services/MensalidadesLembretes";
+import {
+  automaticoDoCliente,
+  clientesComAutomatico,
+  definirAutomatico,
+  definirAutomaticoVarios,
+} from "../services/MensalidadesIsentos";
 
 /**
  * Tela "Mensalidades": a lista de clientes do MK-Auth (admin/clientes.hhvm) e,
@@ -82,20 +100,6 @@ const POR_PAGINA = [50, 100];
 const FORMAS_PAGAMENTO = ["dinheiro", "cheque", "cartao", "vale", "outros"];
 const TIPOS_TITULO = ["mensalidade", "servicos", "outros"];
 const TIPOS_ATRELADO = ["servicos", "outros", "desconto"];
-const MESES = [
-  "JAN",
-  "FEV",
-  "MAR",
-  "ABR",
-  "MAI",
-  "JUN",
-  "JUL",
-  "AGO",
-  "SET",
-  "OUT",
-  "NOV",
-  "DEZ",
-];
 
 // Envio em lote é sequencial (o SMTP usa uma conexão só); acima disso a
 // requisição demoraria demais.
@@ -154,8 +158,10 @@ const nivelDe = (req: Request) => Number((req as any).user?.permission || 0);
 
 
 async function tituloOuErro(m: EntityManager, id: number) {
+  // FOR UPDATE: clique duplo (ou duas telas) em Receber/Estornar/Alterar
+  // espera a primeira transação e lê o título já mudado, sem repetir a ação.
   const [t] = await m.query(
-    `SELECT * FROM sis_lanc WHERE id = ? AND deltitulo = 0 LIMIT 1`,
+    `SELECT * FROM sis_lanc WHERE id = ? AND deltitulo = 0 LIMIT 1 FOR UPDATE`,
     [id],
   );
   if (!t) throw new ErroDeUso("Título não encontrado.");
@@ -193,6 +199,25 @@ function urlMkauth() {
   return process.env.MKAUTH_URL || "";
 }
 
+/** WHERE da lista de clientes (tipo + busca), o mesmo da tela. */
+function filtroClientes(q: Request["query"]) {
+  const tipo = FILTROS_TIPO[String(q.tipo || "todos")]
+    ? String(q.tipo || "todos")
+    : "todos";
+  const busca = String(q.busca || "").trim();
+  const coluna = CAMPOS_BUSCA[String(q.campo || "nome")];
+  const where = [FILTROS_TIPO[tipo]];
+  const params: any[] = [];
+  if (busca && coluna) {
+    where.push(`${coluna} LIKE ?`);
+    params.push(`%${busca}%`);
+  }
+  return { whereSql: where.join(" AND "), params };
+}
+
+// "Selecionar todos" e o automático em massa trabalham com até tantos clientes.
+const SELECAO_MAXIMA = 20000;
+
 // ---------- controller ----------
 
 class Mensalidades {
@@ -203,19 +228,7 @@ class Mensalidades {
         ? porPaginaPedida
         : 50;
       const pagina = Math.max(1, Math.floor(Number(req.query.pagina) || 1));
-      const tipo = FILTROS_TIPO[String(req.query.tipo || "todos")]
-        ? String(req.query.tipo || "todos")
-        : "todos";
-      const busca = String(req.query.busca || "").trim();
-      const coluna = CAMPOS_BUSCA[String(req.query.campo || "nome")];
-
-      const where = [FILTROS_TIPO[tipo]];
-      const params: any[] = [];
-      if (busca && coluna) {
-        where.push(`${coluna} LIKE ?`);
-        params.push(`%${busca}%`);
-      }
-      const whereSql = where.join(" AND ");
+      const { whereSql, params } = filtroClientes(req.query);
 
       const [{ total }] = await MkauthSource.query(
         `SELECT COUNT(*) AS total FROM sis_cliente c WHERE ${whereSql}`,
@@ -224,7 +237,8 @@ class Mensalidades {
 
       const clientes = await MkauthSource.query(
         `SELECT c.id, c.uuid_cliente AS uuid, c.login, c.nome, c.plano, c.ip,
-                c.ramal, c.bloqueado, c.cli_ativado, c.status_corte,
+                c.ramal, c.bloqueado, c.cli_ativado, c.status_corte, c.isento,
+                c.observacao, DATE_FORMAT(c.rem_obs, '%d/%m/%Y %H:%i') AS rem_obs,
                 (SELECT COUNT(*) FROM sis_lanc l
                   WHERE l.login = c.login AND l.deltitulo = 0
                     AND l.status IN ('aberto', 'vencido')) AS abertos
@@ -235,6 +249,9 @@ class Mensalidades {
         [...params, porPagina, (pagina - 1) * porPagina],
       );
 
+      const ligados = await clientesComAutomatico(
+        clientes.map((c: any) => String(c.login)),
+      );
       res.json({
         total: Number(total),
         pagina,
@@ -242,10 +259,68 @@ class Mensalidades {
         clientes: clientes.map((c: any) => ({
           ...c,
           abertos: Number(c.abertos),
+          automatico: ligados.has(String(c.login)),
         })),
       });
     } catch (error) {
       responderErro(res, error, "listarClientes");
+    }
+  };
+
+  /** "Selecionar todos": os logins de todas as páginas do filtro atual. */
+  loginsDoFiltro = async (req: Request, res: Response) => {
+    try {
+      const { whereSql, params } = filtroClientes(req.query);
+      const linhas: { login: string }[] = await MkauthSource.query(
+        `SELECT c.login FROM sis_cliente c WHERE ${whereSql}
+          ORDER BY c.nome ASC, c.id ASC LIMIT ?`,
+        [...params, SELECAO_MAXIMA + 1],
+      );
+      if (linhas.length > SELECAO_MAXIMA)
+        throw new ErroDeUso(
+          `Mais de ${SELECAO_MAXIMA} clientes no filtro: refine a busca.`,
+        );
+      res.json({ logins: linhas.map((l) => String(l.login)) });
+    } catch (error) {
+      responderErro(res, error, "loginsDoFiltro");
+    }
+  };
+
+  /** Liga ou desliga o boleto automático dos clientes marcados. */
+  definirAutomaticoVarios = async (req: Request, res: Response) => {
+    try {
+      const logins: string[] = Array.isArray(req.body?.logins)
+        ? req.body.logins.map(String).filter(Boolean)
+        : [];
+      if (typeof req.body?.automatico !== "boolean")
+        throw new ErroDeUso("Informe se o automático fica ligado ou desligado.");
+      if (!logins.length) throw new ErroDeUso("Marque pelo menos um cliente.");
+      if (logins.length > SELECAO_MAXIMA)
+        throw new ErroDeUso(`No máximo ${SELECAO_MAXIMA} clientes de uma vez.`);
+      // Só logins que existem no MK-Auth.
+      const existentes = new Set<string>();
+      for (let i = 0; i < logins.length; i += 1000) {
+        const r: { login: string }[] = await MkauthSource.query(
+          `SELECT login FROM sis_cliente WHERE login IN (?)`,
+          [logins.slice(i, i + 1000)],
+        );
+        r.forEach((x) => existentes.add(String(x.login)));
+      }
+      const n = await definirAutomaticoVarios(
+        Array.from(existentes),
+        req.body.automatico,
+        usuarioDe(req),
+      );
+      await MkauthSource.transaction((m) =>
+        registrarAtividade(
+          m,
+          req,
+          `${req.body.automatico ? "ligou" : "desligou"} o boleto automatico do wip diversos para ${n} clientes`,
+        ),
+      );
+      res.json({ alterados: n, ignorados: logins.length - n });
+    } catch (error) {
+      responderErro(res, error, "definirAutomaticoVarios");
     }
   };
 
@@ -254,7 +329,7 @@ class Mensalidades {
       const login = String(req.params.login || "");
       const [cliente] = await MkauthSource.query(
         `SELECT id, uuid_cliente AS uuid, login, nome, plano, ip, email,
-                bloqueado, cli_ativado, venc, obs
+                bloqueado, cli_ativado, venc, obs, isento, status_corte
            FROM sis_cliente WHERE login = ? LIMIT 1`,
         [login],
       );
@@ -339,9 +414,30 @@ class Mensalidades {
         provedor: provedor || null,
         mkauthUrl: urlMkauth(),
         nivel: nivelDe(req),
+        automatico: await automaticoDoCliente(login),
       });
     } catch (error) {
       responderErro(res, error, "faturasDoCliente");
+    }
+  };
+
+  /**
+   * Interruptor "boleto automático" do cliente: desligado, a engrenagem não
+   * cria mensalidade de isento, não gera bolix e não manda lembrete para ele.
+   */
+  definirAutomatico = async (req: Request, res: Response) => {
+    try {
+      const login = String(req.params.login || "");
+      if (typeof req.body?.automatico !== "boolean")
+        throw new ErroDeUso("Informe se o automático fica ligado ou desligado.");
+      const [c] = await MkauthSource.query(
+        `SELECT nome FROM sis_cliente WHERE login = ? LIMIT 1`,
+        [login],
+      );
+      if (!c) throw new ErroDeUso("Cliente não encontrado.");
+      res.json(await definirAutomatico(login, req.body.automatico, usuarioDe(req)));
+    } catch (error) {
+      responderErro(res, error, "definirAutomatico");
     }
   };
 
@@ -480,6 +576,12 @@ class Mensalidades {
         await registrarAtividade(m, req, `estornou o titulo de numero ${id}`);
         await recalcularAbertos(m, t.login);
       });
+      // O bolix pago deste título deixa de contar como "mês pago": senão a
+      // geração (e a mensalidade do isento) pularia o mês para sempre.
+      await AppDataSource.getRepository(MensalidadeBolix).update(
+        { titulo_id: id, situacao: "pago" },
+        { situacao: "estornado" },
+      );
       res.json({ ok: true });
     } catch (error) {
       responderErro(res, error, "estornar");
@@ -618,58 +720,27 @@ class Mensalidades {
 
       const criados: number[] = [];
       await MkauthSource.transaction(async (m) => {
-        const [c] = await m.query(
-          `SELECT c.nome, c.conta, c.mesref, p.cfop_plano
-             FROM sis_cliente c LEFT JOIN sis_plano p ON p.nome = c.plano
-            WHERE c.login = ? LIMIT 1`,
-          [login],
-        );
-        if (!c) throw new ErroDeUso("Cliente não encontrado.");
-        const [conta] = await m.query(
-          `SELECT gateway, multa, juros FROM sis_boleto WHERE id = ? LIMIT 1`,
-          [Number(c.conta) || 1],
-        );
+        // Uma leitura do cliente para todas as parcelas.
+        const c = await lerDadosTituloMk(m, login);
 
         for (let i = 0; i < parcelas; i++) {
           const venc = somarMeses(vencimento, i);
-          const [a, mes] = venc.split("-").map(Number);
-          // mesref "ant": a mensalidade cobra o mês anterior ao vencimento.
-          const ref = new Date(a, mes - 1 - (c.mesref === "ant" ? 1 : 0), 1);
-          const referencia = `${MESES[ref.getMonth()]}/${ref.getFullYear()}`;
-          const r = await m.query(
-            `INSERT INTO sis_lanc
-               (datavenc, nossonum, status, login, tipo, cfop_lanc, obs,
-                processamento, aviso, usergerou, valorger, linhadig, valor, imp,
-                referencia, tipocob, numconta, gerourem, percmulta, percmora,
-                deltitulo, num_recibos, num_retornos, alt_venc, uuid_lanc)
-             VALUES (?, ?, 'aberto', ?, ?, ?, ?, ?, 'nao', ?, 'completo', '', ?,
-                     'nao', ?, 'fat', ?, 1, ?, ?, 0, 0, 0, 0, ?)`,
-            [
-              `${venc} 00:00:00`,
-              // Conta Efí: o MK-Auth marca "gerencianet" e registra o boleto
-              // quando ele é aberto. Banco comum: o MK-Auth numera depois
-              // (view vtab_sem_nossonum).
-              conta?.gateway === "gnet" ? "gerencianet" : null,
-              login,
-              tipo,
-              tipo === "mensalidade" ? c.cfop_plano || "5307" : "X949",
-              descricao,
-              agoraMk(),
-              usuario,
-              final.toFixed(2),
-              referencia,
-              Number(c.conta) || 1,
-              Number(conta?.multa || 0).toFixed(2),
-              Number(conta?.juros || 0).toFixed(2),
-              crypto.randomUUID(),
-            ],
+          const { id } = await inserirTituloMk(
+            m,
+            login,
+            venc,
+            tipo,
+            final,
+            descricao,
+            usuario,
+            c,
           );
-          criados.push(r.insertId);
+          criados.push(id);
         }
         await registrarAtividade(
           m,
           req,
-          `adicionou lancamentos para o cliente ${String(c.nome || login).toLowerCase()}`,
+          `adicionou lancamentos para o cliente ${c.nome.toLowerCase()}`,
         );
         await recalcularAbertos(m, login);
       });
@@ -849,6 +920,53 @@ class Mensalidades {
     res.status(202).json({ iniciado: true });
   };
 
+  // ---------- lembretes de boleto por e-mail (engrenagem) ----------
+
+  lembretes = async (_req: Request, res: Response) => {
+    try {
+      res.json({
+        config: await lerLembretes(),
+        ultima: await ultimaExecucaoLembretes(),
+        rodando: lembretesRodando(),
+        envios: await ultimosEnvios(30),
+        variaveis: VARIAVEIS_LEMBRETE,
+      });
+    } catch (error) {
+      responderErro(res, error, "lembretes");
+    }
+  };
+
+  salvarLembretes = async (req: Request, res: Response) => {
+    try {
+      res.json({ config: await salvarLembretes(req.body || {}, usuarioDe(req)) });
+    } catch (error) {
+      responderErro(res, error, "salvarLembretes");
+    }
+  };
+
+  /** "Enviar agora": todas as etapas, em segundo plano (pausa entre e-mails). */
+  rodarLembretes = async (req: Request, res: Response) => {
+    if (lembretesRodando()) {
+      res.status(409).json({ message: "O envio de e-mails já está rodando." });
+      return;
+    }
+    rodarLembretes("manual", usuarioDe(req)).catch((e) =>
+      console.error("[Mensalidades] erro no Enviar agora dos lembretes:", e),
+    );
+    res.status(202).json({ iniciado: true });
+  };
+
+  /** Manda o lembrete de um título para um e-mail de teste (não registra). */
+  testarLembrete = async (req: Request, res: Response) => {
+    try {
+      const para = String(req.body?.para || "").trim();
+      const titulo = Number(req.body?.titulo);
+      res.json(await enviarLembreteTeste(para, titulo, usuarioDe(req)));
+    } catch (error) {
+      responderErro(res, error, "testarLembrete");
+    }
+  };
+
   // ---------- bolix da Efí ----------
 
   /** Gera (ou devolve o que já existe) o bolix do título, com o QR do Pix. */
@@ -860,6 +978,71 @@ class Mensalidades {
       res.json(b);
     } catch (error) {
       responderErro(res, error, "bolix");
+    }
+  };
+
+  /**
+   * Botão "Imprimir": um PDF só com os boletos (bolix da Efí) dos títulos
+   * marcados, na ordem do vencimento. Título sem bolix válido ganha um, como
+   * no botão Boleto. Os que não deram certo vão no cabeçalho X-Boletos-Faltaram.
+   */
+  pdfBoletos = async (req: Request, res: Response) => {
+    try {
+      const ids: number[] = Array.from(
+        new Set<number>(
+          (Array.isArray(req.body?.ids) ? req.body.ids : [])
+            .map((x: unknown) => Math.floor(Number(x)))
+            .filter((n: number) => Number.isFinite(n) && n > 0),
+        ),
+      );
+      if (!ids.length) throw new ErroDeUso("Marque os títulos para imprimir.");
+      if (ids.length > 50) throw new ErroDeUso("No máximo 50 boletos por vez.");
+
+      const titulos: any[] = await MkauthSource.query(
+        `SELECT id, status FROM sis_lanc
+          WHERE id IN (?) AND deltitulo = 0
+          ORDER BY datavenc ASC, id ASC`,
+        [ids],
+      );
+      const faltaram: string[] = [];
+      for (const id of ids)
+        if (!titulos.some((t) => Number(t.id) === id))
+          faltaram.push(`${String(id).padStart(5, "0")}: não encontrado`);
+
+      const usuario = usuarioDe(req);
+      const pdf = await PDFDocument.create();
+      for (const t of titulos) {
+        const numero = String(t.id).padStart(5, "0");
+        if (t.status === "pago") {
+          faltaram.push(`${numero}: já está pago`);
+          continue;
+        }
+        try {
+          const b = await gerarBolix(Number(t.id), usuario);
+          const [anexo] = await anexosDosBolix([b]);
+          if (!anexo) throw new Error("a Efí não devolveu o PDF");
+          const doc = await PDFDocument.load(anexo.content);
+          const paginas = await pdf.copyPages(doc, doc.getPageIndices());
+          paginas.forEach((p) => pdf.addPage(p));
+        } catch (e: any) {
+          faltaram.push(`${numero}: ${String(e?.message || e).slice(0, 120)}`);
+        }
+      }
+      if (!pdf.getPageCount())
+        throw new ErroDeUso(`Nenhum boleto para imprimir. ${faltaram.join("; ")}`);
+
+      const bytes = await pdf.save();
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", 'inline; filename="boletos.pdf"');
+      if (faltaram.length)
+        res.setHeader(
+          "X-Boletos-Faltaram",
+          encodeURIComponent(faltaram.join("; ").slice(0, 1500)),
+        );
+      res.setHeader("Access-Control-Expose-Headers", "X-Boletos-Faltaram");
+      res.send(Buffer.from(bytes));
+    } catch (error) {
+      responderErro(res, error, "pdf dos boletos");
     }
   };
 

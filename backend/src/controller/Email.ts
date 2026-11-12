@@ -24,7 +24,9 @@ class Email {
     to: string,
     subject: string,
     text: string,
-    attachments?: any[]
+    attachments?: any[],
+    /** Versão HTML; o `text` vai junto para quem não lê HTML. */
+    html?: string,
   ) {
     try {
       const info = await transporter.sendMail({
@@ -32,6 +34,7 @@ class Email {
         to,
         subject,
         text,
+        ...(html ? { html } : {}),
         attachments,
         // Sem rastreamento de cliques do Mailgun: ele troca cada link por um
         // do domínio email.noreply... (que não tem DNS, então o link quebra) e

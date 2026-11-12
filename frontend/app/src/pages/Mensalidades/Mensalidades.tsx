@@ -3,11 +3,14 @@ import axios from "axios";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
-import { FaCog, FaEnvelope } from "react-icons/fa";
-import { cabecalhoTabela, linhaZebra, paginaMk } from "./mkauthEstilo";
+import { FaCog, FaEnvelope, FaSearch } from "react-icons/fa";
+import { paginaMk } from "./mkauthEstilo";
+import { Botao, cabecalhoGrade, caixinha, campo as campoUi, Celula } from "./ConfigUi";
 import { EnviarLote } from "./EnviarLote";
 import { ConfiguracoesMensalidades } from "./ConfiguracoesMensalidades";
 import { SeloWipDiversos } from "./SeloWipDiversos";
+import { LEGENDA_ISENTO } from "./AutomaticoCliente";
+import { useNotification } from "../../context/NotificationContext";
 
 interface ClienteMk {
   id: number;
@@ -21,7 +24,15 @@ interface ClienteMk {
   cli_ativado: string;
   /** full | down (redução de velocidade) | bloq, como no MK-Auth. */
   status_corte: string | null;
+  /** "sim": o MK-Auth não cobra (o Wip Diversos pode criar a mensalidade). */
+  isento: string | null;
+  /** "sim": em observação (liberado até rem_obs, ex.: depois de pagar). */
+  observacao: string | null;
+  /** Até quando fica em observação, "dd/mm/aaaa hh:mm". */
+  rem_obs: string | null;
   abertos: number;
+  /** Boleto automático do Wip Diversos ligado para o cliente. */
+  automatico: boolean;
 }
 
 // Mesmas opções do "Filtro" da busca de clientes do MK-Auth (as que fazem
@@ -70,6 +81,11 @@ export function Mensalidades() {
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const [enviandoLote, setEnviandoLote] = useState(false);
   const [configurando, setConfigurando] = useState(false);
+  const [recarga, setRecarga] = useState(0);
+  const [ocupado, setOcupado] = useState<"" | "todos" | "ligar" | "desligar">("");
+  const [confirmarAuto, setConfirmarAuto] = useState<boolean | null>(null);
+  const { showError, showSuccess } = useNotification();
+  const headers = { Authorization: `Bearer ${token}` };
   const podeEnviarLote = (user?.permission || 0) >= 5;
 
   const mudar = useCallback(
@@ -108,7 +124,7 @@ export function Mensalidades() {
     return () => {
       cancelado = true;
     };
-  }, [token, pagina, porPagina, tipo, campo, busca]);
+  }, [token, pagina, porPagina, tipo, campo, busca, recarga]);
 
   const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
   const rotuloTipo = TIPOS.find((t) => t.valor === tipo)?.rotulo || "TODOS";
@@ -129,6 +145,42 @@ export function Mensalidades() {
       clientes.forEach((c) => (todosDaPagina ? n.delete(c.login) : n.add(c.login)));
       return n;
     });
+  // Todos os clientes do filtro atual, de todas as páginas.
+  const selecionarTodos = async () => {
+    setOcupado("todos");
+    try {
+      const { data } = await axios.get(
+        `${process.env.REACT_APP_URL}/mensalidades/clientes/logins`,
+        { params: { tipo, campo, busca }, headers },
+      );
+      setMarcados(new Set(data.logins as string[]));
+    } catch (e: any) {
+      showError(e?.response?.data?.message || "Erro ao selecionar os clientes.");
+    } finally {
+      setOcupado("");
+    }
+  };
+
+  const definirAutomatico = async (automatico: boolean) => {
+    setConfirmarAuto(null);
+    setOcupado(automatico ? "ligar" : "desligar");
+    try {
+      const { data } = await axios.put(
+        `${process.env.REACT_APP_URL}/mensalidades/clientes/automatico`,
+        { logins: Array.from(marcados), automatico },
+        { headers },
+      );
+      showSuccess(
+        `Boleto automático ${automatico ? "ligado" : "desligado"} para ${data.alterados} cliente(s).`,
+      );
+      setRecarga((n) => n + 1);
+    } catch (e: any) {
+      showError(e?.response?.data?.message || "Erro ao mudar o boleto automático.");
+    } finally {
+      setOcupado("");
+    }
+  };
+
   const marcar = (login: string) =>
     setMarcados((m) => {
       const n = new Set(m);
@@ -136,51 +188,100 @@ export function Mensalidades() {
       return n;
     });
 
+  const GRADE =
+    "md:grid-cols-[28px_minmax(0,1.2fr)_minmax(0,1.3fr)_minmax(0,.9fr)_minmax(0,.5fr)_minmax(0,2fr)_190px]";
+
   return (
     <div style={paginaMk}>
       <NavBar />
-      <div className="px-3 sm:px-4 pb-10">
-        {/* Trilha, como "CLIENTES • TODOS 00011" */}
-        <div className="text-center my-6 text-[15px] uppercase">
-          <SeloWipDiversos />
-          <Link to="/mensalidades" className="text-[#3273dc] hover:underline">
-            Clientes
-          </Link>
-          <span className="mx-2">•</span>
-          <select
-            value={tipo}
-            onChange={(e) => mudar({ tipo: e.target.value, pagina: 1 })}
-            className="bg-transparent uppercase cursor-pointer outline-none"
-            aria-label="Tipo de cliente"
-          >
-            {TIPOS.map((t) => (
-              <option key={t.valor} value={t.valor}>
-                {t.rotulo}
-              </option>
-            ))}
-          </select>{" "}
-          {String(total).padStart(5, "0")}
+      <div className={`max-w-[1500px] mx-auto px-3 sm:px-6 pt-5 ${marcados.size ? "pb-44" : "pb-10"}`}>
+        {/* Título da página */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h1 className="text-[22px] sm:text-[26px] font-bold text-[#363636] leading-tight">
+                <Link to="/mensalidades" className="hover:text-[#3273dc]">
+                  Mensalidades
+                </Link>
+              </h1>
+              <SeloWipDiversos />
+            </div>
+            <p className="text-[13px] text-[#7a7a7a] mt-0.5">
+              {carregando ? "Carregando..." : `${total} cliente(s) · ${rotuloTipo.toLowerCase()}`}
+            </p>
+          </div>
+          {/* Engrenagem: longe do sino do canto. */}
+          {podeEnviarLote && (
+            <button
+              type="button"
+              onClick={() => setConfigurando(true)}
+              title="Configurações"
+              aria-label="Configurações"
+              className="h-[38px] px-4 inline-flex items-center gap-2 rounded-md bg-white border border-[#dbdbdb] text-[#363636] text-[14px] font-semibold hover:border-[#3273dc] hover:text-[#3273dc] shadow-[0_1px_2px_rgba(0,0,0,.04)]"
+            >
+              <FaCog /> <span className="hidden sm:inline">Configurações</span>
+            </button>
+          )}
         </div>
 
-        {/* Caixa de busca */}
-        <form onSubmit={pesquisar} className="mb-5">
-          <div className="flex flex-col sm:flex-row gap-1 sm:items-end">
-            <label className="flex-1">
-              <strong className="block mb-1 text-[15px]">Procurar por:</strong>
+        {/* Filtros e busca */}
+        <div className="bg-white rounded-lg border border-[#e3e6ea] shadow-[0_1px_2px_rgba(0,0,0,.04)] p-3 sm:p-4 mb-4">
+          <div
+            role="tablist"
+            aria-label="Tipo de cliente"
+            className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-[#f1f2f4] mb-3 max-w-full"
+          >
+            {TIPOS.map((t) => (
+              <button
+                key={t.valor}
+                type="button"
+                role="tab"
+                aria-selected={tipo === t.valor}
+                onClick={() => mudar({ tipo: t.valor, pagina: 1 })}
+                className={`h-[30px] px-3 rounded-md text-[13px] font-semibold capitalize transition-colors ${
+                  tipo === t.valor
+                    ? "bg-white text-[#3273dc] shadow-[0_1px_2px_rgba(0,0,0,.08)]"
+                    : "text-[#7a7a7a] hover:text-[#363636]"
+                }`}
+              >
+                {t.rotulo.toLowerCase()}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={pesquisar} className="flex flex-col sm:flex-row gap-2">
+            <label className="relative flex-1">
+              <span className="sr-only">Procurar por:</span>
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b5b5b5] text-[13px]" />
               <input
                 value={textoBusca}
                 onChange={(e) => setTextoBusca(e.target.value)}
                 placeholder="digite aqui o que deseja encontrar"
                 maxLength={255}
-                className="w-full h-[30px] border border-[#dbdbdb] rounded px-2 text-[15px] placeholder-[#b5b5b5] focus:outline-none focus:border-[#3273dc]"
+                className={`${campoUi} pl-9 ${busca ? "pr-9" : ""}`}
               />
+              {busca && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTextoBusca("");
+                    mudar({ busca: "", pagina: 1 });
+                  }}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full text-[#7a7a7a] hover:bg-[#f1f2f4]"
+                  title="Limpar busca"
+                  aria-label="Limpar busca"
+                >
+                  ✕
+                </button>
+              )}
             </label>
-            <label className="sm:w-[170px]">
-              <strong className="block mb-1 text-[15px]">Filtro:</strong>
+            <label className="sm:w-[190px]">
+              <span className="sr-only">Filtro:</span>
               <select
                 value={campoBusca}
                 onChange={(e) => setCampoBusca(e.target.value)}
-                className="w-full h-[30px] border border-[#dbdbdb] rounded px-2 text-[15px] bg-white"
+                className={campoUi}
+                title="Procurar em"
               >
                 {CAMPOS.map((c) => (
                   <option key={c.valor} value={c.valor}>
@@ -189,169 +290,43 @@ export function Mensalidades() {
                 ))}
               </select>
             </label>
-            <div className="flex gap-1">
-              {busca && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTextoBusca("");
-                    mudar({ busca: "", pagina: 1 });
-                  }}
-                  className="h-[30px] px-3 rounded bg-[#363636] text-white text-sm"
-                  title="Limpar busca"
-                >
-                  ✕
-                </button>
-              )}
-              <button
-                type="submit"
-                className="h-[30px] px-3 rounded bg-[#363636] text-white text-sm"
-              >
-                IR
-              </button>
-              {/* Engrenagem: fica junto do IR, longe do sino do canto. */}
-              {podeEnviarLote && (
-                <button
-                  type="button"
-                  onClick={() => setConfigurando(true)}
-                  title="Configurações"
-                  aria-label="Configurações"
-                  className="h-[30px] w-[30px] flex items-center justify-center rounded bg-[#363636] text-white text-sm"
-                >
-                  <FaCog />
-                </button>
-              )}
-            </div>
-          </div>
-        </form>
-
-        {/* Lista */}
-        <div className="overflow-x-auto">
-          <table className="w-full border-separate border-spacing-0 min-w-[640px]">
-            <thead>
-              <tr className={cabecalhoTabela}>
-                <th className="px-1 py-0.5 w-[30%]">
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={todosDaPagina}
-                      onChange={marcarPagina}
-                      aria-label="Marcar todos os clientes da página"
-                    />
-                    Login
-                  </label>
-                </th>
-                <th className="px-1 py-0.5 w-[20%]">Plano</th>
-                <th className="px-1 py-0.5 w-[10%]">IP</th>
-                <th className="px-1 py-0.5 w-[10%]">Ramal</th>
-                <th className="px-1 py-0.5">Nome</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clientes.map((c, i) => {
-                const bloqueado = c.bloqueado === "sim";
-                const cor = bloqueado
-                  ? "text-[#f14668] font-bold"
-                  : c.cli_ativado === "n"
-                    ? "text-[#b5b5b5]"
-                    : "";
-                return (
-                  <React.Fragment key={c.id}>
-                    <tr
-                      className={`${linhaZebra(i)} ${cor} cursor-pointer hover:bg-[#eef3fc]`}
-                      onClick={() => abrir(c)}
-                    >
-                      <td className="px-1 pt-0.5 whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          className="mr-1 align-middle"
-                          checked={marcados.has(c.login)}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() => marcar(c.login)}
-                          aria-label={`Marcar ${c.login}`}
-                        />
-                        <span className="text-[#f14668] mr-1">+</span>
-                        {c.login}
-                      </td>
-                      <td className="px-1 pt-0.5">
-                        <span className="relative">
-                          {c.plano}
-                          {c.status_corte === "down" && (
-                            <span
-                              title="Em redução de velocidade (down)"
-                              className="absolute -top-2 -right-9 h-[13px] px-1.5 rounded-full bg-[#8a7000] text-[#ffe08a] text-[9px] leading-[13px] font-normal"
-                            >
-                              down
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-1 pt-0.5">{c.ip}</td>
-                      <td className="px-1 pt-0.5">{c.ramal}</td>
-                      <td className="px-1 pt-0.5">
-                        <span className="relative">
-                          {c.nome}
-                          {c.abertos > 0 && (
-                            <span
-                              title={`${c.abertos} título(s) em aberto`}
-                              className="absolute -top-2 -right-4 min-w-[18px] h-[13px] px-1 rounded-full bg-[#48c774] text-white text-[9px] leading-[13px] text-center font-normal"
-                            >
-                              {c.abertos}
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                    </tr>
-                    <tr className={linhaZebra(i)}>
-                      <td colSpan={5} className="px-1 pb-0.5">
-                        <button
-                          type="button"
-                          onClick={() => abrir(c)}
-                          className="text-[12px] font-bold text-[#46484a] hover:underline"
-                        >
-                          Faturas
-                        </button>
-                        <span className="text-[12px] text-[#46484a]"> |</span>
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                );
-              })}
-              {!carregando && clientes.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="text-center py-6 text-[15px]">
-                    {erro || "Nenhum cliente encontrado."}
-                  </td>
-                </tr>
-              )}
-              {carregando && (
-                <tr>
-                  <td colSpan={5} className="text-center py-6 text-[15px]">
-                    Carregando...
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+            <Botao type="submit" variante="primario">
+              Buscar
+            </Botao>
+          </form>
         </div>
 
-        {/* Ações dos clientes marcados */}
-        {podeEnviarLote && (
-          <div className="flex flex-wrap items-center gap-2 mt-4 text-[14px]">
-            <button
-              type="button"
-              title="Enviar mensagem aos clientes marcados"
-              aria-label="Enviar mensagem aos clientes marcados"
-              disabled={!marcados.size}
-              onClick={() => setEnviandoLote(true)}
-              className="h-[25px] px-2 flex items-center gap-2 rounded-[3px] text-white bg-[#3273dc] disabled:opacity-40"
-            >
-              <FaEnvelope /> Enviar mensagem / boleto
-            </button>
-            <span>
-              {marcados.size
-                ? `${marcados.size} cliente(s) marcado(s)`
-                : "Marque os clientes na caixinha ao lado do login."}
+        {/* Lista */}
+        <div className="bg-white rounded-lg border border-[#e3e6ea] shadow-[0_1px_2px_rgba(0,0,0,.04)] overflow-hidden">
+          {/* Barra da seleção */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 sm:px-4 py-2.5 border-b border-[#e3e6ea] text-[13px]">
+            <label className="inline-flex items-center gap-2 cursor-pointer font-semibold">
+              <input
+                type="checkbox"
+                className={caixinha}
+                checked={todosDaPagina}
+                onChange={marcarPagina}
+                aria-label="Marcar todos os clientes da página"
+              />
+              Marcar a página
+            </label>
+            {podeEnviarLote && (
+              <button
+                type="button"
+                disabled={!!ocupado || !total}
+                onClick={selecionarTodos}
+                className="text-[#3273dc] font-semibold hover:underline disabled:opacity-40"
+                title="Marca todos os clientes deste filtro, de todas as páginas"
+              >
+                {ocupado === "todos" ? "Selecionando..." : `Selecionar todos (${total})`}
+              </button>
+            )}
+            <span className="sm:ml-auto text-[#7a7a7a]">
+              {marcados.size ? (
+                <b className="text-[#363636]">{marcados.size} cliente(s) marcado(s)</b>
+              ) : (
+                "Nenhum cliente marcado"
+              )}
             </span>
             {marcados.size > 0 && (
               <button
@@ -359,40 +334,187 @@ export function Mensalidades() {
                 onClick={() => setMarcados(new Set())}
                 className="text-[#3273dc] hover:underline"
               >
-                limpar
+                limpar seleção
               </button>
             )}
           </div>
-        )}
+
+          <div className={`${cabecalhoGrade} ${GRADE}`}>
+            <span />
+            <span>Login</span>
+            <span>Plano</span>
+            <span>IP</span>
+            <span>Ramal</span>
+            <span>Nome</span>
+            <span>Boleto automático</span>
+          </div>
+
+          {clientes.map((c) => {
+            const bloqueado = c.bloqueado === "sim";
+            const observacao = c.observacao === "sim";
+            const desativado = c.cli_ativado === "n";
+            // Mesmas cores do MK-Auth: bloqueado vermelho, em observação
+            // verde, desativado cinza (a linha inteira).
+            const cor = bloqueado
+              ? "text-[#cc0f35] font-bold"
+              : observacao
+                ? "text-[#257942] font-bold"
+                : desativado
+                  ? "text-[#b5b5b5]"
+                  : "";
+            const faixa = bloqueado
+              ? "border-l-[#f14668]"
+              : observacao
+                ? "border-l-[#48c774]"
+                : desativado
+                  ? "border-l-[#dbdbdb]"
+                  : "border-l-transparent";
+            const marcado = marcados.has(c.login);
+            return (
+              <div
+                key={c.id}
+                role="link"
+                tabIndex={0}
+                onClick={() => abrir(c)}
+                onKeyDown={(e) => e.key === "Enter" && abrir(c)}
+                title={
+                  observacao && !bloqueado
+                    ? `Em observação${c.rem_obs ? ` até ${c.rem_obs}` : ""}`
+                    : undefined
+                }
+                className={`grid grid-cols-[28px_minmax(0,1fr)] ${GRADE} items-start md:items-center gap-x-3 px-3 sm:px-4 py-2.5 border-b border-[#eef0f2] last:border-b-0 border-l-4 ${faixa} ${cor} ${
+                  marcado ? "bg-[#f3f7fe]" : "bg-white"
+                } cursor-pointer hover:bg-[#f7f9fd] focus:outline-none focus-visible:bg-[#f7f9fd] text-[14px]`}
+              >
+                <div className="pt-0.5 md:pt-0">
+                  <input
+                    type="checkbox"
+                    className={caixinha}
+                    checked={marcado}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => marcar(c.login)}
+                    aria-label={`Marcar ${c.login}`}
+                  />
+                </div>
+                <div className="min-w-0 flex flex-col gap-0.5 md:contents">
+                  <Celula rotulo="Login" className="truncate font-mono text-[13px]">
+                    {c.login}
+                  </Celula>
+                  <Celula rotulo="Plano">
+                    <span className="inline-flex flex-wrap items-center gap-1.5 align-middle">
+                      <span className="truncate">{c.plano}</span>
+                      {c.status_corte === "down" && (
+                        <span
+                          title="Em redução de velocidade (down)"
+                          className="px-1.5 rounded-full bg-[#fff3c4] text-[#8a7000] border border-[#ffe08a] text-[10px] leading-[16px] font-bold"
+                        >
+                          down
+                        </span>
+                      )}
+                      {c.isento === "sim" && (
+                        <span
+                          title={LEGENDA_ISENTO}
+                          className="px-1.5 rounded-full bg-[#48c774] text-white text-[10px] leading-[16px] font-bold"
+                        >
+                          isento
+                        </span>
+                      )}
+                    </span>
+                  </Celula>
+                  <Celula rotulo="IP" className={`truncate font-mono text-[13px] ${c.ip ? "" : "max-md:hidden"}`}>
+                    {c.ip}
+                  </Celula>
+                  <Celula rotulo="Ramal" className={`truncate ${c.ramal ? "" : "max-md:hidden"}`}>
+                    {c.ramal}
+                  </Celula>
+                  <Celula className="order-first md:order-none max-md:text-[15px] max-md:font-semibold">
+                    <span className="inline-flex flex-wrap items-center gap-1.5">
+                      <span>{c.nome}</span>
+                      {bloqueado && (
+                        <span className="px-1.5 rounded-full bg-[#feecf0] border border-[#fbcbd6] text-[10px] leading-[16px] font-bold">
+                          bloqueado
+                        </span>
+                      )}
+                      {observacao && !bloqueado && (
+                        <span className="px-1.5 rounded-full bg-[#effaf3] border border-[#c8eed6] text-[10px] leading-[16px] font-bold">
+                          em observação
+                        </span>
+                      )}
+                      {c.abertos > 0 && (
+                        <span
+                          title={`${c.abertos} título(s) em aberto`}
+                          className="min-w-[20px] px-1.5 rounded-full bg-[#48c774] text-white text-[10px] leading-[16px] text-center font-bold"
+                        >
+                          {c.abertos}
+                        </span>
+                      )}
+                    </span>
+                  </Celula>
+                  <div className="flex items-center justify-between gap-2 mt-1 md:mt-0">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2 rounded-full border text-[11px] leading-[20px] font-bold whitespace-nowrap ${
+                        c.automatico
+                          ? "bg-[#effaf3] text-[#257942] border-[#c8eed6]"
+                          : "bg-[#f5f6f8] text-[#9aa0a6] border-[#e3e6ea]"
+                      }`}
+                      title={
+                        c.automatico
+                          ? "A engrenagem gera o boleto e manda os lembretes deste cliente"
+                          : "Nada automático para este cliente (marque e clique em Ativar boleto automático)"
+                      }
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${c.automatico ? "bg-[#48c774]" : "bg-[#c4c8cc]"}`}
+                      />
+                      {c.automatico ? "automático" : "sem automático"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        abrir(c);
+                      }}
+                      className="text-[12px] font-bold text-[#3273dc] hover:underline whitespace-nowrap"
+                    >
+                      Faturas ›
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {!carregando && clientes.length === 0 && (
+            <p className="text-center py-10 text-[15px] text-[#7a7a7a]">
+              {erro || "Nenhum cliente encontrado."}
+            </p>
+          )}
+          {carregando && (
+            <p className="text-center py-10 text-[15px] text-[#7a7a7a]">Carregando...</p>
+          )}
+        </div>
 
         {/* Paginação */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-4 text-[14px]">
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-4 text-[13px] text-[#7a7a7a]">
           <label className="flex items-center gap-2">
             Resultados por página:
             <select
               value={porPagina}
               onChange={(e) => mudar({ porPagina: e.target.value, pagina: 1 })}
-              className="h-[28px] border border-[#dbdbdb] rounded px-1 bg-white"
+              className="h-[32px] border border-[#dbdbdb] rounded-md px-2 bg-white text-[#363636]"
             >
               <option value={50}>50</option>
               <option value={100}>100</option>
             </select>
           </label>
           <div className="flex items-center gap-1">
-            <BotaoPagina
-              desativado={pagina <= 1}
-              onClick={() => mudar({ pagina: 1 })}
-            >
+            <BotaoPagina desativado={pagina <= 1} onClick={() => mudar({ pagina: 1 })}>
               «
             </BotaoPagina>
-            <BotaoPagina
-              desativado={pagina <= 1}
-              onClick={() => mudar({ pagina: pagina - 1 })}
-            >
+            <BotaoPagina desativado={pagina <= 1} onClick={() => mudar({ pagina: pagina - 1 })}>
               ‹
             </BotaoPagina>
             <span className="px-2">
-              página {pagina} de {totalPaginas}
+              página <b className="text-[#363636]">{pagina}</b> de {totalPaginas}
             </span>
             <BotaoPagina
               desativado={pagina >= totalPaginas}
@@ -409,6 +531,82 @@ export function Mensalidades() {
           </div>
         </div>
       </div>
+
+      {/* Ações dos clientes marcados: barra fixa embaixo */}
+      {podeEnviarLote && marcados.size > 0 && (
+        <div className="fixed bottom-0 inset-x-0 z-40 px-2 sm:px-6 pb-2 sm:pb-4 pointer-events-none">
+          <div
+            className="pointer-events-auto max-w-[1100px] mx-auto bg-white rounded-lg border border-[#dbdbdb] shadow-[0_8px_30px_rgba(0,0,0,.18)] p-3 text-[14px]"
+            style={{ fontFamily: paginaMk.fontFamily }}
+          >
+            {confirmarAuto === null ? (
+              <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
+                <span className="font-bold text-[#363636] sm:mr-1">
+                  {marcados.size} marcado(s):
+                </span>
+                <Botao
+                  variante="primario"
+                  title="Enviar mensagem aos clientes marcados"
+                  aria-label="Enviar mensagem aos clientes marcados"
+                  disabled={!!ocupado}
+                  onClick={() => setEnviandoLote(true)}
+                  className="inline-flex items-center justify-center gap-2"
+                >
+                  <FaEnvelope /> Enviar mensagem / boleto
+                </Botao>
+                <Botao
+                  variante="sucesso"
+                  disabled={!!ocupado}
+                  onClick={() => setConfirmarAuto(true)}
+                >
+                  {ocupado === "ligar" ? "Ativando..." : "Ativar boleto automático"}
+                </Botao>
+                <Botao disabled={!!ocupado} onClick={() => setConfirmarAuto(false)}>
+                  {ocupado === "desligar" ? "Desativando..." : "Desativar boleto automático"}
+                </Botao>
+                <button
+                  type="button"
+                  onClick={() => setMarcados(new Set())}
+                  className="sm:ml-auto text-[13px] text-[#7a7a7a] hover:text-[#363636] hover:underline"
+                >
+                  limpar seleção
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p className="mb-3">
+                  {confirmarAuto ? (
+                    <>
+                      <b>Ativar</b> o boleto automático de{" "}
+                      <b>{marcados.size} cliente(s)</b>? A engrenagem passa a gerar o
+                      boleto deles na Efí (e a mensalidade, se forem isentos) e a
+                      mandar os lembretes por e-mail.
+                    </>
+                  ) : (
+                    <>
+                      <b>Desativar</b> o boleto automático de{" "}
+                      <b>{marcados.size} cliente(s)</b>? Nada automático para eles; os
+                      botões manuais continuam funcionando.
+                    </>
+                  )}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Botao
+                    variante={confirmarAuto ? "sucesso" : "escuro"}
+                    onClick={() => definirAutomatico(confirmarAuto)}
+                  >
+                    {confirmarAuto ? "Sim, ativar" : "Sim, desativar"}
+                  </Botao>
+                  <Botao variante="leve" onClick={() => setConfirmarAuto(null)}>
+                    Cancelar
+                  </Botao>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {configurando && (
         <ConfiguracoesMensalidades
           token={token}
@@ -441,7 +639,7 @@ function BotaoPagina({
       type="button"
       disabled={desativado}
       onClick={onClick}
-      className="h-[28px] min-w-[28px] px-2 rounded bg-[#363636] text-white disabled:opacity-30"
+      className="h-[32px] min-w-[32px] px-2 rounded-md bg-white border border-[#dbdbdb] text-[#363636] hover:border-[#3273dc] hover:text-[#3273dc] disabled:opacity-40 disabled:hover:border-[#dbdbdb] disabled:hover:text-[#363636]"
     >
       {children}
     </button>

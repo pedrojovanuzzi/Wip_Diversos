@@ -409,7 +409,7 @@ export async function canceladosManualmente(ids: number[]) {
   return cancelados;
 }
 
-/** Dá baixa no título da cobrança paga. Seguro de chamar mais de uma vez. */
+/** Dá baixa no título da cobrança paga. Seguro de chamar mais de uma vez (e ao mesmo tempo). */
 async function baixarPorCobranca(chargeId: string, valorPagoCentavos?: number) {
   const b = await repo().findOne({ where: { charge_id: chargeId } });
   if (!b) {
@@ -417,6 +417,9 @@ async function baixarPorCobranca(chargeId: string, valorPagoCentavos?: number) {
     return { baixado: false, motivo: "cobrança desconhecida" };
   }
   if (b.situacao === "pago") return { baixado: false, motivo: "já baixado" };
+  // Estornado na tela: a Efí continua dizendo "pago", mas não baixa de novo.
+  if (b.situacao === "estornado")
+    return { baixado: false, motivo: "pagamento estornado na tela" };
 
   const valor =
     valorPagoCentavos && valorPagoCentavos > 0
@@ -424,8 +427,10 @@ async function baixarPorCobranca(chargeId: string, valorPagoCentavos?: number) {
       : Number(b.valor);
   let baixado = false;
   await MkauthSource.transaction(async (m) => {
+    // FOR UPDATE: o aviso da Efí, a conferência de 5 em 5 minutos e o botão
+    // podem chegar juntos; o segundo espera o primeiro e já lê "pago".
     const [t] = await m.query(
-      `SELECT * FROM sis_lanc WHERE id = ? LIMIT 1`,
+      `SELECT * FROM sis_lanc WHERE id = ? LIMIT 1 FOR UPDATE`,
       [b.titulo_id],
     );
     if (!t) return;
@@ -449,6 +454,14 @@ async function baixarPorCobranca(chargeId: string, valorPagoCentavos?: number) {
         Math.max(0, valor - Number(t.valor || 0) - multa),
       ),
     });
+    // Como no pagamento pelo Pix (controller/Pix.ts, que também faz só para
+    // mensalidade): cliente em observação por 24 h, para o MK-Auth liberar
+    // já. Serviço ou "outros" pago não libera quem deve a mensalidade.
+    if (t.tipo === "mensalidade")
+      await m.query(
+        `UPDATE sis_cliente SET observacao = 'sim', rem_obs = ? WHERE login = ?`,
+        [agoraMk(new Date(Date.now() + 24 * 60 * 60 * 1000)), t.login],
+      );
     baixado = true;
   });
   await repo().update(

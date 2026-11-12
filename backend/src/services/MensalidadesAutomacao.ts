@@ -3,23 +3,26 @@ import MkauthSource from "../database/MkauthSource";
 import AppDataSource from "../database/DataSource";
 import { MensalidadeConfig } from "../entities/MensalidadeConfig";
 import { MensalidadeBolix } from "../entities/MensalidadeBolix";
-import Email from "../controller/Email";
 import {
-  anexosDosBolix,
   bolixAtivos,
   canceladosManualmente,
   conferirPagamentosNaEfi,
   gerarBolix,
 } from "./BolixEfi";
-import { competenciaDoTitulo, dois, ErroDeUso } from "./mkauthTitulos";
+import { competenciaDoTitulo, ErroDeUso } from "./mkauthTitulos";
+import {
+  clientesComAutomatico,
+  criarMensalidadesDeIsentos,
+  ResultadoIsentos,
+} from "./MensalidadesIsentos";
 
 /**
  * Engrenagem da tela Mensalidades: geração automática do bolix da Efí.
  *
  * O MK-Auth continua criando as mensalidades. Com a geração ligada, a cada
- * 10 minutos gera-se o bolix das mensalidades em aberto que ainda não têm,
- * dentro dos dias de antecedência (o boleto sai logo depois de o MK-Auth
- * criar a mensalidade). Nunca se cobra o mesmo mês duas vezes:
+ * minuto gera-se o bolix de todas as mensalidades a vencer, em aberto, que
+ * ainda não têm (o boleto sai logo depois de a mensalidade ser criada, pelo
+ * MK-Auth ou pelo Wip Diversos). Nunca se cobra o mesmo mês duas vezes:
  * - título com bolix ativo não ganha outro;
  * - se o cliente já tem a mesma competência (AAAA-MM) paga, seja num título
  *   do MK-Auth ou num bolix nosso, o título em aberto daquele mês é pulado
@@ -28,12 +31,6 @@ import { competenciaDoTitulo, dois, ErroDeUso } from "./mkauthTitulos";
 
 export interface ConfigGeracao {
   gerarBoletos: boolean;
-  /** Gera para mensalidades que vencem até N dias à frente. */
-  diasAntecedencia: number;
-  /** Também gera para mensalidades já vencidas (vencem hoje, com juros). */
-  incluirVencidos: boolean;
-  /** Manda o bolix por e-mail ao cliente quando gera. */
-  enviarEmail: boolean;
 }
 
 export interface ResumoExecucao {
@@ -51,8 +48,11 @@ export interface ResumoExecucao {
     competencia: string;
     motivo?: "pago" | "cobrado" | "cancelado";
   }[];
-  emails: number;
   erros: { login: string; titulo: number; erro: string }[];
+  /** Mensalidades de isentos criadas nesta execução. */
+  titulosCriados?: ResultadoIsentos["criados"];
+  /** Títulos de clientes com o automático desligado (ficaram de fora). */
+  desligados?: number;
 }
 
 const CHAVE = "geracao_boletos";
@@ -63,17 +63,9 @@ const LIMITE_POR_EXECUCAO = 2000;
 
 export const CONFIG_PADRAO: ConfigGeracao = {
   gerarBoletos: false,
-  diasAntecedencia: 10,
-  incluirVencidos: false,
-  enviarEmail: false,
 };
 
 const repo = () => AppDataSource.getRepository(MensalidadeConfig);
-
-const hojeIso = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${dois(d.getMonth() + 1)}-${dois(d.getDate())}`;
-};
 
 async function ler<T>(chave: string): Promise<T | null> {
   const r = await repo().findOne({ where: { chave } });
@@ -94,9 +86,13 @@ async function gravar(chave: string, valor: unknown, usuario: string | null) {
 }
 
 export async function lerConfig(): Promise<ConfigGeracao> {
-  // "horario" era da versão que rodava uma vez por dia: fica de fora.
-  const { horario: _antigo, ...salva } = ((await ler<any>(CHAVE)) || {}) as any;
-  return { ...CONFIG_PADRAO, ...salva };
+  // Só os campos atuais: "horario", "diasAntecedencia", "incluirVencidos",
+  // "enviarEmail" e "criarIsentos" eram de versões antigas e ficam de fora.
+  const salva = ((await ler<any>(CHAVE)) || {}) as any;
+  return {
+    gerarBoletos:
+      salva.gerarBoletos === undefined ? CONFIG_PADRAO.gerarBoletos : salva.gerarBoletos === true,
+  };
 }
 
 export async function ultimaExecucao() {
@@ -116,16 +112,6 @@ export async function salvarConfig(
   const nova: ConfigGeracao = { ...atual };
   if (entrada.gerarBoletos !== undefined)
     nova.gerarBoletos = entrada.gerarBoletos === true;
-  if (entrada.incluirVencidos !== undefined)
-    nova.incluirVencidos = entrada.incluirVencidos === true;
-  if (entrada.enviarEmail !== undefined)
-    nova.enviarEmail = entrada.enviarEmail === true;
-  if (entrada.diasAntecedencia !== undefined) {
-    const n = Math.floor(Number(entrada.diasAntecedencia));
-    if (!Number.isFinite(n) || n < 0 || n > 60)
-      throw new ErroDeUso("Dias de antecedência: de 0 a 60.");
-    nova.diasAntecedencia = n;
-  }
   await gravar(CHAVE, nova, usuario);
   return nova;
 }
@@ -158,23 +144,55 @@ export async function rodarGeracao(
     gerados: 0,
     jaTinham: 0,
     mesPago: [],
-    emails: 0,
     erros: [],
   };
   try {
-    const titulos: any[] = await MkauthSource.query(
-      `SELECT l.id, l.login, l.referencia, l.datavenc, l.valor, l.tipo,
-              c.nome, c.email
-         FROM sis_lanc l
+    // Primeiro a mensalidade dos isentos com o boleto automático ativado
+    // (o mk-bot do MK-Auth não cria para eles), para o bolix dela sair já
+    // nesta execução. Ver services/MensalidadesIsentos.ts.
+    // Um erro aqui não impede os bolix dos outros clientes.
+    try {
+      const isentos = await criarMensalidadesDeIsentos(usuario);
+      resumo.titulosCriados = isentos.criados;
+      resumo.erros.push(...isentos.erros);
+    } catch (e: any) {
+      resumo.erros.push({
+        login: "-",
+        titulo: 0,
+        erro: `mensalidades dos isentos: ${String(e?.message || e).slice(0, 180)}`,
+      });
+    }
+
+    // Janela: todas as mensalidades a vencer (sem prazo, como o MK-Auth).
+    const janela = `FROM sis_lanc l
          JOIN sis_cliente c ON c.login = l.login AND c.cli_ativado = 's'
         WHERE l.deltitulo = 0 AND l.tipo = 'mensalidade'
           AND l.status IN ('aberto', 'vencido')
-          AND l.datavenc < CURDATE() + INTERVAL ? DAY
-          ${cfg.incluirVencidos ? "" : "AND l.datavenc >= CURDATE()"}
-        ORDER BY l.datavenc ASC, l.id ASC
-        LIMIT ?`,
-      [cfg.diasAntecedencia + 1, LIMITE_POR_EXECUCAO],
+          AND l.datavenc >= CURDATE()`;
+    // Só clientes com o boleto automático ligado na tela (padrão: desligado).
+    // O filtro vai no SQL, antes do LIMIT: senão títulos de clientes
+    // desligados ocupariam o limite e os ligados nunca seriam gerados.
+    const ligados = Array.from(await clientesComAutomatico());
+    const [{ n: naJanela }] = await MkauthSource.query(
+      `SELECT COUNT(*) AS n ${janela}`,
+      [],
     );
+    const titulos: any[] = ligados.length
+      ? await MkauthSource.query(
+          `SELECT l.id, l.login, l.referencia, l.datavenc, l.valor, l.tipo,
+                  c.nome, c.email
+             ${janela} AND l.login IN (?)
+            ORDER BY l.datavenc ASC, l.id ASC
+            LIMIT ?`,
+          [ligados, LIMITE_POR_EXECUCAO],
+        )
+      : [];
+    const [{ n: dosLigados }] = ligados.length
+      ? await MkauthSource.query(`SELECT COUNT(*) AS n ${janela} AND l.login IN (?)`, [
+          ligados,
+        ])
+      : [{ n: 0 }];
+    resumo.desligados = Math.max(0, Number(naJanela) - Number(dosLigados));
     resumo.analisados = titulos.length;
     if (!titulos.length) return resumo;
 
@@ -203,20 +221,9 @@ export async function rodarGeracao(
     const ativos = await bolixAtivos(titulos.map((t) => t.id));
     // Boleto cancelado pelo botão na tela: não volta sozinho.
     const cancelados = await canceladosManualmente(titulos.map((t) => t.id));
-    const [provedor] = await MkauthSource.query(
-      `SELECT nome FROM sis_provedor LIMIT 1`,
-    );
-    const email = cfg.enviarEmail ? new Email() : null;
-
-    // Bolix ativo que já venceu: com "incluir vencidas", é refeito no dia
-    // (vence hoje, com multa e juros); sem isso o cliente ficaria com um
-    // boleto vencido na mão.
-    const hoje = hojeIso();
-    const valeAinda = (t: any) => {
-      const b = ativos.get(t.id);
-      if (!b) return false;
-      return !cfg.incluirVencidos || String(b.vencimento).slice(0, 10) >= hoje;
-    };
+    // Só mensalidades a vencer: título com bolix ativo já está cobrado.
+    // (O e-mail ao cliente sai pelos lembretes, não aqui.)
+    const valeAinda = (t: any) => ativos.has(t.id);
 
     // Mês já cobrado num bolix ainda válido de outro título do cliente.
     const cobrados = new Set<string>();
@@ -250,45 +257,10 @@ export async function rodarGeracao(
     }
     progresso.total = fila.length;
 
-    const processar = async ({ t, competencia }: { t: any; competencia: string }) => {
+    const processar = async ({ t }: { t: any }) => {
       try {
-        const b = await gerarBolix(t.id, "automatico");
+        await gerarBolix(t.id, "automatico");
         resumo.gerados++;
-        const para = String(t.email || "").trim();
-        if (email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(para)) {
-          const [a, m] = competencia.split("-");
-          const venc = new Date(`${b.vencimento}T12:00:00`).toLocaleDateString("pt-BR");
-          const valor = Number(b.valor).toLocaleString("pt-BR", {
-            minimumFractionDigits: 2,
-          });
-          const linhas = [
-            `Olá, ${t.nome}.`,
-            "",
-            `Sua mensalidade${a ? ` de ${m}/${a}` : ""} vence em ${venc}, no valor de R$ ${valor}.`,
-            "",
-            b.link ? `Boleto: ${b.link}` : "",
-            b.linha_digitavel ? `Linha digitável: ${b.linha_digitavel}` : "",
-            b.pix_copia_cola ? `Pix copia e cola: ${b.pix_copia_cola}` : "",
-            "",
-            "Se já pagou, desconsidere esta mensagem.",
-            provedor?.nome || "",
-          ].filter((l, i, arr) => l !== "" || arr[i - 1] !== "");
-          try {
-            await email.sendEmail(
-              para,
-              `${provedor?.nome || "Wip Telecom"} - boleto da mensalidade`,
-              linhas.join("\n"),
-              await anexosDosBolix([b]),
-            );
-            resumo.emails++;
-          } catch (e: any) {
-            resumo.erros.push({
-              login: t.login,
-              titulo: t.id,
-              erro: `e-mail: ${String(e?.message || e).slice(0, 150)}`,
-            });
-          }
-        }
       } catch (e: any) {
         if (resumo.erros.length < 200)
           resumo.erros.push({
@@ -312,10 +284,13 @@ export async function rodarGeracao(
     resumo.fim = new Date().toISOString();
     rodando = false;
     const semNovidade =
-      origem === "agendamento" && !resumo.gerados && !resumo.erros.length;
+      origem === "agendamento" &&
+      !resumo.gerados &&
+      !resumo.erros.length &&
+      !resumo.titulosCriados?.length;
     try {
       await gravar(CHAVE_VERIFICACAO, resumo.fim, usuario);
-      // A conferência de 10 em 10 minutos sem nada para fazer não apaga o
+      // A conferência de minuto em minuto sem nada para fazer não apaga o
       // resumo da última vez que algo foi gerado.
       if (!semNovidade) await gravar(CHAVE_ULTIMA, resumo, usuario);
     } catch (e) {
@@ -341,13 +316,13 @@ async function conferirPagamentos(quando: string) {
 /**
  * A cada 5 minutos confere na Efí os bolix pagos (mesmo com a geração
  * desligada: é o que garante a baixa se o aviso da Efí não chegar). Com a
- * geração ligada, a cada 10 minutos gera o que faltar. Repetir não duplica:
+ * geração ligada, a cada minuto gera o que faltar. Repetir não duplica:
  * título com bolix válido e mês já pago ficam de fora.
  */
 export function agendarGeracaoDeBoletos() {
   setTimeout(() => conferirPagamentos("início"), 30_000);
   cron.schedule("*/5 * * * *", () => conferirPagamentos("agendamento"));
-  cron.schedule("*/10 * * * *", async () => {
+  cron.schedule("* * * * *", async () => {
     try {
       if (rodando) return;
       const cfg = await lerConfig();
@@ -358,7 +333,7 @@ export function agendarGeracaoDeBoletos() {
     }
   });
   console.log(
-    "📅 Bolix das mensalidades: pagamentos na Efí a cada 5 minutos, geração a cada 10",
+    "📅 Bolix das mensalidades: pagamentos na Efí a cada 5 minutos, geração a cada minuto",
   );
   if (!process.env.EFI_BOLIX_NOTIFICACAO_URL)
     console.warn(

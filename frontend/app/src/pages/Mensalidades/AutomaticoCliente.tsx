@@ -1,0 +1,104 @@
+import React, { useState } from "react";
+import { useNotification } from "../../context/NotificationContext";
+import { ApiMensalidades, Detalhe, mensagemDeErro } from "./api";
+
+export const LEGENDA_ISENTO =
+  "Isento no MK-Auth: o robô do MK-Auth não cria a mensalidade dele. O Wip Diversos cria a mensalidade e gera o boleto do isento, mas só se o boleto automático estiver ativado neste cliente. Sem ativar, nada é gerado sozinho.";
+
+/**
+ * Interruptor "Boleto automático" na página do cliente. Desligado, a
+ * engrenagem não toca este cliente (nem mensalidade de isento, nem bolix,
+ * nem lembrete por e-mail); os botões manuais continuam valendo.
+ * Só nível 5 muda; os outros só veem.
+ */
+export function AutomaticoCliente({
+  api,
+  login,
+  isento,
+  estado,
+  podeMudar,
+  onMudou,
+}: {
+  api: ApiMensalidades;
+  login: string;
+  isento: boolean;
+  estado: Detalhe["automatico"];
+  podeMudar: boolean;
+  onMudou: (e: Detalhe["automatico"]) => void;
+}) {
+  const { showError, showSuccess } = useNotification();
+  const [salvando, setSalvando] = useState(false);
+  const ligado = estado.automatico;
+
+  const mudar = async () => {
+    setSalvando(true);
+    try {
+      const novo = await api.definirAutomatico(login, !ligado);
+      onMudou(novo);
+      showSuccess(
+        novo.automatico
+          ? "Boleto automático ligado para este cliente."
+          : "Boleto automático desligado: a engrenagem não mexe mais neste cliente.",
+      );
+    } catch (e) {
+      showError(mensagemDeErro(e, "Erro ao mudar o boleto automático."));
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const explicacao = ligado
+    ? isento
+      ? "Cliente isento no MK-Auth: o Wip Diversos cria a mensalidade e gera o boleto."
+      : "A engrenagem gera o boleto e manda os lembretes deste cliente."
+    : "Nada automático para este cliente (boleto, mensalidade de isento e lembretes). Os botões manuais continuam funcionando.";
+
+  return (
+    <div className="flex flex-col items-start lg:items-end gap-1.5 text-[13px] shrink-0">
+      <div className="flex flex-wrap items-center gap-2">
+        {isento && (
+          <span
+            title={LEGENDA_ISENTO}
+            className="px-2.5 rounded-full bg-[#48c774] text-white font-bold text-[11px] leading-[22px]"
+          >
+            ISENTO NO MK-AUTH
+          </span>
+        )}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={ligado}
+        disabled={!podeMudar || salvando}
+        onClick={mudar}
+        title={
+          (podeMudar ? "" : "Só administrador (nível 5) muda. ") +
+          explicacao +
+          (estado.atualizadoPor ? ` Última mudança: ${estado.atualizadoPor}.` : "")
+        }
+        className={`flex items-center gap-2 rounded-full pl-1 pr-3 py-1 font-bold shadow-[0_1px_2px_rgba(0,0,0,.06)] disabled:cursor-not-allowed ${
+          ligado ? "bg-[#effaf3] text-[#257942]" : "bg-[#feecf0] text-[#cc0f35]"
+        } ${salvando ? "opacity-60" : ""}`}
+      >
+        <span
+          className={`relative w-[34px] h-[20px] rounded-full transition-colors ${
+            ligado ? "bg-[#48c774]" : "bg-[#f14668]"
+          }`}
+        >
+          <span
+            className={`absolute top-[3px] w-[14px] h-[14px] rounded-full bg-white transition-all ${
+              ligado ? "left-[17px]" : "left-[3px]"
+            }`}
+          />
+        </span>
+        Boleto automático {ligado ? "ligado" : "desligado"}
+      </button>
+      </div>
+      {isento && (
+        <p className="text-[12px] text-[#7a7a7a] max-w-[460px] leading-snug lg:text-right">
+          O MK-Auth não gera a mensalidade de isento; o Wip Diversos gera
+          (mensalidade e boleto), mas só com o boleto automático ativado.
+        </p>
+      )}
+    </div>
+  );
+}

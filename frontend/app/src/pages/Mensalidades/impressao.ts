@@ -54,22 +54,6 @@ ${t.recibo ? `<p style="font-size:11px;color:#666">Autenticação: ${esc(t.recib
   return abrirParaImprimir(`Recibo ${numeroTitulo(t.id)}`, corpo);
 }
 
-/** Lista dos títulos selecionados (botão de impressora da barra). */
-export function imprimirTitulos(d: Detalhe, titulos: Titulo[]) {
-  const linhas = titulos
-    .map(
-      (t) => `<tr><td>${numeroTitulo(t.id)}</td><td>${esc(t.tipo)}</td><td>${esc(t.status)}</td>
-<td>${dataCurta(t.datavenc)}</td><td>${esc(t.nossonum)}</td><td>${esc(t.linhadig)}</td><td class="dir">${reais(t.valorTotal)}</td></tr>`,
-    )
-    .join("");
-  const total = titulos.reduce((s, t) => s + t.valorTotal, 0);
-  const corpo = `${cabecalho(d)}
-<h2>Titulos do cliente: ${esc(d.cliente.nome)} (${esc(d.cliente.login)})</h2>
-<table><thead><tr><th>Titulo</th><th>Tipo</th><th>Status</th><th>Vencimento</th><th>Nossonumero</th><th>Linha digitavel</th><th class="dir">Valor</th></tr></thead>
-<tbody>${linhas}<tr><td colspan="6"></td><td class="dir"><b>${reais(total)}</b></td></tr></tbody></table>`;
-  return abrirParaImprimir("Titulos", corpo);
-}
-
 /** Exportar para excel: CSV com ; e BOM, que o Excel abre direto. */
 export function exportarCsv(d: Detalhe, titulos: Titulo[]) {
   const cab = [
