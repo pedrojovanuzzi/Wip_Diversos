@@ -327,8 +327,14 @@ export async function anexosDosBolix(lista: MensalidadeBolix[]) {
       const content = Buffer.from(r.data);
       if (content.subarray(0, 5).toString() !== "%PDF-")
         throw new Error("a Efí não devolveu um PDF");
+      // boleto-<vencimento DD-MM-AAAA>-<título>.pdf
+      const venc =
+        typeof b.vencimento === "string"
+          ? b.vencimento.slice(0, 10)
+          : isoDe(b.vencimento);
+      const [a, m, d] = venc.split("-");
       anexos.push({
-        filename: `boleto-${String(b.titulo_id).padStart(5, "0")}.pdf`,
+        filename: `boleto-${d}-${m}-${a}-${String(b.titulo_id).padStart(5, "0")}.pdf`,
         content,
         contentType: "application/pdf",
       });
