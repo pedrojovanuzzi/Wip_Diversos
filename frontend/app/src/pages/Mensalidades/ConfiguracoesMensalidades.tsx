@@ -9,6 +9,8 @@ import { Botao, Cartao, Confirmacao, Interruptor, Numero, Selo } from "./ConfigU
 
 interface Config {
   gerarBoletos: boolean;
+  splitAdicionais: boolean;
+  splitPayeeCode: string;
 }
 
 interface Resumo {
@@ -41,7 +43,7 @@ const reais = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataBr = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 
-/** Lista dobrável do resumo (isentos criados, pulados, erros). */
+/** Lista dobrável do resumo (mensalidades criadas, pulados, erros). */
 function Lista({
   titulo,
   cor,
@@ -94,7 +96,7 @@ function ResumoExecucao({ r }: { r: Resumo }) {
         </p>
       )}
       {!!r.titulosCriados?.length && (
-        <Lista titulo={`Mensalidades de isentos criadas (${r.titulosCriados.length})`} cor="#257942" aberta>
+        <Lista titulo={`Mensalidades criadas (${r.titulosCriados.length})`} cor="#257942" aberta>
           {r.titulosCriados.map((c) => (
             <Linha key={c.titulo}>
               <b>{c.login}</b> · título {numeroTitulo(c.titulo)} · vence {dataBr(c.vencimento)} ·{" "}
@@ -221,6 +223,12 @@ export function ConfiguracoesMensalidades({
   };
 
   const mudou = !!cfg && !!salvo && cfg.gerarBoletos !== salvo.gerarBoletos;
+  const mudouSplit =
+    !!cfg &&
+    !!salvo &&
+    (cfg.splitAdicionais !== salvo.splitAdicionais ||
+      cfg.splitPayeeCode.trim() !== salvo.splitPayeeCode);
+  const payeeOk = /^[A-Za-z0-9]{8,64}$/.test(cfg?.splitPayeeCode.trim() || "");
 
   return (
     <JanelaMk
@@ -295,6 +303,78 @@ export function ConfiguracoesMensalidades({
                   Gera agora, na Efí{ambiente.sandbox ? " (sandbox)" : ""}, os boletos que
                   faltam, com as configurações <b>salvas</b>. Continuar?
                 </Confirmacao>
+              )}
+            </Cartao>
+          </form>
+
+          <form onSubmit={salvar}>
+            <Cartao
+              icone="🤝"
+              titulo="Split dos serviços adicionais (Efí)"
+              descricao={
+                <>
+                  No boleto da Efí, cada serviço adicional do título (as linhas
+                  “Valor adicional: …”, como câmera e streaming) vai{" "}
+                  <b>inteiro para a conta do parceiro</b>. A mensalidade, a multa
+                  e os juros ficam na conta da Wip. Vale para os boletos gerados
+                  depois de salvar; título sem adicional sai sem repasse.
+                </>
+              }
+              direita={
+                <Interruptor
+                  ligado={cfg.splitAdicionais}
+                  onChange={(v) => setCfg({ ...cfg, splitAdicionais: v })}
+                  title="Depois de mudar, clique em Salvar"
+                />
+              }
+              rodape={
+                <>
+                  <Botao
+                    type="submit"
+                    variante="primario"
+                    disabled={
+                      salvando ||
+                      !mudouSplit ||
+                      (cfg.splitAdicionais && !payeeOk) ||
+                      (!!cfg.splitPayeeCode.trim() && !payeeOk)
+                    }
+                  >
+                    {salvando ? "Salvando..." : "Salvar"}
+                  </Botao>
+                  {mudouSplit && (
+                    <span className="text-[12px] text-[#946c00] sm:ml-1">
+                      Alteração ainda não salva.
+                    </span>
+                  )}
+                </>
+              }
+            >
+              <label className="block text-[13px] font-semibold mb-1" htmlFor="split-payee">
+                payee_code do parceiro
+              </label>
+              <input
+                id="split-payee"
+                className="w-full sm:max-w-md border border-[#d9dde2] rounded px-2 py-1.5 text-[14px] font-mono"
+                value={cfg.splitPayeeCode}
+                maxLength={64}
+                spellCheck={false}
+                autoComplete="off"
+                onChange={(e) => setCfg({ ...cfg, splitPayeeCode: e.target.value })}
+                placeholder="Identificador de conta Efí do parceiro"
+              />
+              <p className="text-[12px] text-[#7a7a7a] mt-1">
+                No painel Efí do parceiro: API &gt; Introdução &gt; Identificador de
+                conta. Tem que ser uma conta diferente da que emite o boleto.
+              </p>
+              {!!cfg.splitPayeeCode.trim() && !payeeOk && (
+                <p className="text-[12px] text-[#c0392b] mt-1">
+                  Use só letras e números (8 a 64).
+                </p>
+              )}
+              {cfg.splitAdicionais && !cfg.splitPayeeCode.trim() && (
+                <p className="text-[12px] text-[#c0392b] mt-1">
+                  Informe o payee_code para ligar o split.
+                </p>
               )}
             </Cartao>
           </form>

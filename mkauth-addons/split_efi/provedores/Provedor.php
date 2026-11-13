@@ -63,7 +63,10 @@ abstract class Provedor
 
     /**
      * Registra o título no banco já com o split.
-     * $t: linha do sis_lanc (id, login, valor, datavenc, referencia).
+     * $t: linha do sis_lanc (id, login, valor, datavenc, referencia) e, em
+     *     $t['composicao'], a divisão feita por composicao_titulo(): 'empresa'
+     *     (fica na conta que emite) e 'adicionais' (cada um vai inteiro para o
+     *     parceiro). O boleto é a soma dos dois ('total').
      * $cli: linha do sis_cliente (nome, cpf_cnpj, celular, fone, email, endereço).
      * $urlRetorno: endereço que o banco deve chamar ao mudar a situação.
      * Devolve: ['id' => id no banco, 'linhadig' => ..., 'link' => ..., 'sis_lanc' => [coluna => valor]]
@@ -106,12 +109,6 @@ abstract class Provedor
     protected function producao(): bool
     {
         return ($this->perfil['ambiente'] ?? '') === 'producao';
-    }
-
-    /** Percentual do parceiro como número (10.5 = 10,5%). */
-    protected function percentual(): float
-    {
-        return (float) str_replace(',', '.', $this->cfg('percentual', '0'));
     }
 
     protected static function digitos(?string $s): string

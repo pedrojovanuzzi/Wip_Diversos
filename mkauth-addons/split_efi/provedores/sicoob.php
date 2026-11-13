@@ -10,7 +10,9 @@
  * O que se sabe: a API v3 usa OAuth2 client_credentials com certificado A1
  * (mTLS), e o registro de boleto aceita "rateioCreditos" (repasse do crédito
  * para outra conta, inclusive de outro banco). O formato exato dos campos do
- * rateio ainda precisa ser conferido na documentação.
+ * rateio ainda precisa ser conferido na documentação. O rateio tem que seguir a
+ * mesma regra da Efí: só a soma dos serviços adicionais ($t['composicao']['repasse'])
+ * vai para o parceiro.
  */
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === realpath(__FILE__)) {
@@ -43,8 +45,7 @@ class ProvedorSicoob extends Provedor
     public static function campos(): array
     {
         return [
-            ['percentual', '% para o parceiro', 'percent', 'O resto fica na conta Sicoob que emite o boleto.', true, null],
-            ['fav_nome', 'Nome do titular da conta do parceiro', 'text', '', true, null],
+            ['fav_nome', 'Nome do titular da conta do parceiro', 'text', 'O parceiro recebe o valor dos serviços adicionais do título; a mensalidade fica na conta Sicoob que emite o boleto.', true, null],
             ['fav_documento', 'CPF/CNPJ do titular', 'text', 'Só números.', true, null],
             ['fav_banco', 'Banco do parceiro (código)', 'text', 'Ex.: 756 (Sicoob), 001, 237.', true, null],
             ['fav_agencia', 'Agência do parceiro', 'text', 'Sem dígito.', true, null],
@@ -67,10 +68,6 @@ class ProvedorSicoob extends Provedor
             if ($obrig && $this->cfg($chave) === '') {
                 $f[] = "Preencha: $rotulo.";
             }
-        }
-        $p = $this->percentual();
-        if ($p <= 0 || $p >= 100) {
-            $f[] = 'O percentual tem que ser maior que 0 e menor que 100.';
         }
         $cert = $this->cfg('cert_pem');
         if ($cert !== '' && !is_readable($cert)) {

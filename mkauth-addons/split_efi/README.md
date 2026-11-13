@@ -1,12 +1,14 @@
 # Addon de Split de Pagamento (MK-Auth)
 
-Registra os boletos no banco **já com o split**: um percentual fixo de cada boleto vai
-direto para a conta de um parceiro, e o resto fica na conta da Wip. O addon funciona com
-mais de um banco:
+Registra os boletos no banco **já com o split**: a soma dos **serviços adicionais** do
+título (as linhas "Valor adicional: ..." que o MK-Auth atrela ao título no `sis_mlanc`,
+como câmeras e streaming) vai inteira para a conta de um parceiro, e a **mensalidade**
+fica toda na conta da Wip. Título sem serviço adicional sai sem repasse. Não existe mais
+percentual. O addon funciona com mais de um banco:
 
 | Banco | Situação | Como o repasse é feito |
 |---|---|---|
-| Efí | pronto | `items[].marketplace.repasses` (`payee_code` + percentual) na API de Cobranças |
+| Efí | pronto | um item por parte do boleto: a mensalidade sem repasse e cada adicional com `marketplace.repasses` de 100% (`payee_code`) |
 | Sicoob | em construção | `rateioCreditos` da API Cobrança Bancária v3; os campos já existem, o registro ainda não |
 
 ## Como funciona
@@ -27,11 +29,19 @@ código não manda repasse. O addon faz o registro no lugar do MK-Auth:
    **Tirar do split** devolve o cliente à conta anterior. Um cliente fica em um perfil
    só por vez.
 4. **Registro.** De 5 em 5 minutos, o cron registra no banco, com o repasse, cada título
-   novo das contas dos perfis ativos. Depois o addon preenche no `sis_lanc` o que o banco
+   novo das contas dos perfis ativos. O boleto é o título inteiro:
+   - **mensalidade** (fica na Wip): `sis_lanc.valor` + atrelados que não são
+     "Valor adicional" − atrelados de desconto;
+   - **adicionais** (vão para o parceiro): cada atrelado "Valor adicional: ...".
+
+   O valor total e o do repasse ficam em `addon_split_titulos` (`valor`, `valor_repasse`).
+   Depois o addon preenche no `sis_lanc` o que o banco
    devolve (na Efí: `chave_gnet2`, `linhadig` e `url`).
 5. **Acompanhamento** dos títulos já registrados:
    - apagado no MK-Auth, ou pago por outro meio: cancela no banco;
-   - valor mudou: cancela e registra de novo;
+   - valor mudou (inclusive um adicional atrelado ou tirado): cancela e registra de novo;
+   - registrado pela regra antiga, de percentual (`valor_repasse` vazio): cancela e
+     registra de novo pela regra dos adicionais;
    - vencimento mudou: atualiza no banco.
 6. **Baixa.** O banco avisa em `retorno.php?p=<perfil>&t=<token>`. O provedor confere o
    aviso no próprio banco, e o addon dá a baixa do jeito da baixa nativa (`formapag` do

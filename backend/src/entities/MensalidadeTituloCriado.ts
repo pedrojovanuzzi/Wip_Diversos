@@ -7,11 +7,11 @@ import {
 } from "typeorm";
 
 /**
- * Mensalidades que o Wip Diversos criou no MK-Auth para clientes isentos
- * (o robô do MK-Auth, mk-bot, não gera para eles). A chave única
+ * Mensalidades que o Wip Diversos criou no MK-Auth para clientes com o
+ * boleto automático ativado. A chave única
  * (login, competência) é a trava contra duplicar: dois processos não criam
  * o mesmo mês juntos. O mês volta a ser criado se o título for excluído ou
- * ficar em atraso (ver reservarMes em services/MensalidadesIsentos.ts).
+ * ficar em atraso (ver reservarMes em services/MensalidadesCriacao.ts).
  */
 @Entity("mensalidade_titulo_criado")
 @Index("uq_mensalidade_titulo_criado", ["login", "competencia"], { unique: true })

@@ -61,8 +61,6 @@ export interface Detalhe {
     plano: string | null;
     email: string | null;
     obs: string | null;
-    /** "sim" quando o MK-Auth não cobra o cliente (o mk-bot não cria título). */
-    isento?: string | null;
     /** Dia do vencimento, bloqueio e corte, como no cadastro do MK-Auth. */
     venc?: string | null;
     bloqueado?: string | null;

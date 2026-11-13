@@ -17,6 +17,7 @@ export const EnviarMensagem = () => {
   const [searchBairro, setSearchBairro] = useState("");
   const [searchPlano, setSearchPlano] = useState("");
   const [searchStatus, setSearchStatus] = useState("s"); // Default to Active ('s')
+  const [searchGrupo, setSearchGrupo] = useState("");
   const [searchCaixaHerm, setSearchCaixaHerm] = useState("");
   const [searchSlot, setSearchSlot] = useState("");
   const [searchPon, setSearchPon] = useState("");
@@ -123,6 +124,7 @@ export const EnviarMensagem = () => {
           cidade: searchCidade,
           bairro: searchBairro,
           plano: searchPlano,
+          grupo: searchGrupo,
           status: searchStatus === "all" ? undefined : searchStatus,
           caixa_herm: searchCaixaHerm,
           slot: searchSlot,
@@ -326,6 +328,18 @@ export const EnviarMensagem = () => {
                     <option value="s">Ativo</option>
                     <option value="n">Inativo</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Grupo
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchGrupo}
+                    onChange={(e) => setSearchGrupo(e.target.value)}
+                    placeholder="Digite o Grupo"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">

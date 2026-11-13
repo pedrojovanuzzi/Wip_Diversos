@@ -476,7 +476,7 @@ if ($sel) {
         $resumo[$r['situacao']] = (int) $r['n'];
     }
     $nErro = $resumo['erro'] ?? 0;
-    $titulos = q("SELECT a.id_lanc, a.charge_id, a.situacao, a.valor, a.vencimento, a.tentativas, a.erro, a.atualizado_em, l.login
+    $titulos = q("SELECT a.id_lanc, a.charge_id, a.situacao, a.valor, a.valor_repasse, a.vencimento, a.tentativas, a.erro, a.atualizado_em, l.login
                     FROM addon_split_titulos a LEFT JOIN sis_lanc l ON l.id = a.id_lanc
                    WHERE a.perfil_id = ?
                 ORDER BY a.atualizado_em DESC LIMIT 30", [$pid]);
@@ -751,7 +751,7 @@ $logs = q("SELECT data, nivel, mensagem FROM addon_split_log ORDER BY id DESC LI
     <li><b>Crie um perfil</b> para cada banco e parceiro (por exemplo, “Efí – Parceiro João”).</li>
     <li><b>Preencha e ative.</b> Ao ativar, o addon testa a credencial e cria uma conta de cobrança própria do perfil no MK-Auth (“SPLIT … (ADDON)”).</li>
     <li><b>Escolha os clientes</b> na lista do perfil. A conta de cobrança deles passa a ser a do perfil; a anterior fica guardada.</li>
-    <li><b>A cada 5 minutos</b> o addon registra no banco os boletos novos desses clientes, já com o repasse para o parceiro. Quando o cliente paga, o banco avisa e a baixa é automática.</li>
+    <li><b>A cada 5 minutos</b> o addon registra no banco os boletos novos desses clientes. Os serviços adicionais do título (as linhas “Valor adicional: …”, como câmeras e streaming) vão inteiros para o parceiro; a mensalidade fica toda na conta que emite o boleto. Quando o cliente paga, o banco avisa e a baixa é automática.</li>
     <li><b>Tirar do split</b> (ou desativar o perfil) devolve o cliente para a conta anterior. Boletos já registrados continuam valendo.</li>
   </ol>
 </details>
@@ -953,6 +953,7 @@ $logs = q("SELECT data, nivel, mensagem FROM addon_split_log ORDER BY id DESC LI
           <span class="sefi-passo-n">2</span>
           <h3>Parceiro e repasse (<?php echo h($bancoNome); ?>)</h3>
         </div>
+        <p class="help">O parceiro recebe a soma dos serviços adicionais de cada título (as linhas “Valor adicional: …”). A mensalidade, os outros atrelados e os descontos ficam na conta que emite o boleto. Título sem serviço adicional sai sem repasse.</p>
         <?php if (!$campos): ?>
           <p class="fraco">Este banco não tem campos para preencher.</p>
         <?php endif; ?>
@@ -1236,7 +1237,7 @@ $logs = q("SELECT data, nivel, mensagem FROM addon_split_log ORDER BY id DESC LI
 <?php else: ?>
   <table class="sefi-tab">
     <thead>
-      <tr><th>Título</th><th>Cliente</th><th>Valor</th><th>Vencimento</th><th>Situação</th><th>Tentativas</th><th>Id no <?php echo h($bancoNome); ?></th><th>Erro</th><th>Atualizado</th></tr>
+      <tr><th>Título</th><th>Cliente</th><th>Valor</th><th title="Soma dos serviços adicionais do título, que vai para o parceiro.">Repasse</th><th>Vencimento</th><th>Situação</th><th>Tentativas</th><th>Id no <?php echo h($bancoNome); ?></th><th>Erro</th><th>Atualizado</th></tr>
     </thead>
     <tbody>
     <?php foreach ($titulos as $t): ?>
@@ -1249,6 +1250,7 @@ $logs = q("SELECT data, nivel, mensagem FROM addon_split_log ORDER BY id DESC LI
         <td><?php echo (int) $t['id_lanc']; ?></td>
         <td><?php echo $t['login'] !== null && $t['login'] !== '' ? h($t['login']) : '<span class="fraco">—</span>'; ?></td>
         <td class="num"><?php echo h(sefi_reais($t['valor'])); ?></td>
+        <td class="num"><?php echo $t['valor_repasse'] !== null ? h(sefi_reais($t['valor_repasse'])) : '<span class="fraco" title="Registrado pela regra antiga, de percentual. O addon refaz este boleto.">—</span>'; ?></td>
         <td><?php echo h(sefi_data($t['vencimento'])); ?></td>
         <td><span class="sefi-tag <?php echo h($sit[1]); ?>" title="<?php echo h($sit[2]); ?>"><?php echo h($sit[0]); ?></span></td>
         <td class="num"><?php echo (int) $t['tentativas']; ?></td>

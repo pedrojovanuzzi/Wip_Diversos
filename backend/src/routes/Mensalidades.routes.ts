@@ -20,6 +20,9 @@ router.post("/config/lembretes/rodar", admin, Mensalidades.rodarLembretes);
 router.post("/config/lembretes/teste", admin, Mensalidades.testarLembrete);
 
 router.get("/clientes", operador, Mensalidades.listarClientes);
+// Relatório Wip 1 / Wip 2 para Excel: CPF e endereço de todos os clientes,
+// então nível 5 (dados pessoais).
+router.get("/relatorio", admin, Mensalidades.relatorio);
 // "Selecionar todos": logins de todas as páginas do filtro (só nível 5 usa:
 // é para o envio em lote e o automático em massa).
 router.get("/clientes/logins", admin, Mensalidades.loginsDoFiltro);

@@ -11,7 +11,7 @@ export class MensalidadeCliente {
   login!: string;
 
   /**
-   * 1 = a engrenagem cuida do cliente (mensalidade de isento, bolix e
+   * 1 = a engrenagem cuida do cliente (mensalidade, bolix e
    * lembrete por e-mail). 0 = nada automático; os botões manuais continuam.
    */
   @Column({ type: "tinyint", default: 0 })

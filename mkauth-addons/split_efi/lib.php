@@ -30,6 +30,10 @@ const SPLIT_MAX_TENTATIVAS = 5;
 const SPLIT_LOTE = 50;                  // títulos por rodada do cron, por perfil
 const SPLIT_POR_PAGINA = 100;           // clientes por página na seleção (padrão)
 const SPLIT_POR_PAGINA_OPCOES = [100, 500, 1500];
+// O MK-Auth atrela ao título (sis_mlanc) uma linha por serviço adicional do
+// contrato (sis_sercontratos), com este começo de descrição. É isso que vai
+// para o parceiro; a mensalidade fica toda na conta que emite o boleto.
+const SPLIT_PREFIXO_ADICIONAL = 'Valor adicional';
 
 /** Bancos que o addon conhece: chave => classe. */
 function provedores_disponiveis(): array
@@ -153,6 +157,11 @@ function garantir_tabelas(): void
     if (!coluna_existe('addon_split_titulos', 'perfil_id')) {
         db()->query("ALTER TABLE addon_split_titulos ADD perfil_id INT NULL AFTER id_lanc");
         db()->query("ALTER TABLE addon_split_titulos MODIFY charge_id VARCHAR(64) NULL");
+    }
+    // Repasse em reais (soma dos serviços adicionais). NULL = registrado pela
+    // regra antiga, de percentual: o sincronizar() refaz esses boletos.
+    if (!coluna_existe('addon_split_titulos', 'valor_repasse')) {
+        db()->query("ALTER TABLE addon_split_titulos ADD valor_repasse DECIMAL(12,2) NULL AFTER valor");
     }
     migrar_config_antiga();
 }
@@ -571,11 +580,48 @@ function tirar_do_split(array $logins): int
 
 // ---------------------------------------------------------------- registro dos títulos
 
+/**
+ * Como o título se divide. Os atrelados do sis_mlanc entram como a tela do
+ * MK-Auth soma (desconto subtrai):
+ * - adicionais: as linhas "Valor adicional: ..." — vão inteiras para o parceiro;
+ * - empresa: sis_lanc.valor + os outros atrelados - descontos — fica na conta
+ *   que emite o boleto.
+ * Devolve ['empresa' => float, 'adicionais' => [['desc' => ..., 'valor' => float]], 'repasse' => float, 'total' => float].
+ */
+function composicao_titulo(array $t): array
+{
+    $empresa = (float) $t['valor'];
+    $adicionais = [];
+    $repasse = 0.0;
+    $linhas = q("SELECT valor, tipo, `desc` AS descricao FROM sis_mlanc
+                  WHERE idlanc = ? AND (deltitulo = 0 OR deltitulo IS NULL) ORDER BY id", [(int) $t['id']]);
+    foreach ($linhas as $m) {
+        $v = round((float) $m['valor'], 2);
+        $desc = trim((string) $m['descricao']);
+        if ($m['tipo'] === 'desconto') {
+            $empresa -= $v;
+        } elseif ($v > 0 && stripos($desc, SPLIT_PREFIXO_ADICIONAL) === 0) {
+            $adicionais[] = ['desc' => $desc, 'valor' => $v];
+            $repasse += $v;
+        } else {
+            $empresa += $v;
+        }
+    }
+    $empresa = round($empresa, 2);
+    $repasse = round($repasse, 2);
+    return ['empresa' => $empresa, 'adicionais' => $adicionais, 'repasse' => $repasse, 'total' => round($empresa + $repasse, 2)];
+}
+
 function registrar_titulo(array $perfil, Provedor $prov, array $t): void
 {
     $agora = date('Y-m-d H:i:s');
     $venc = substr((string) $t['datavenc'], 0, 10);
+    $comp = composicao_titulo($t);
+    $t['composicao'] = $comp;
     try {
+        if ($comp['empresa'] < 0) {
+            throw new RuntimeException('Os descontos do título passam do valor da mensalidade.');
+        }
         $cli = q1("SELECT nome, cpf_cnpj, celular, fone, email, endereco, numero, bairro, cidade, estado, cep, complemento
                      FROM sis_cliente WHERE login = ?", [$t['login']]);
         if (!$cli) {
@@ -587,22 +633,25 @@ function registrar_titulo(array $perfil, Provedor $prov, array $t): void
             $sets = implode(', ', array_map(fn($c) => "`$c` = ?", array_keys($cols)));
             q("UPDATE sis_lanc SET $sets WHERE id = ?", array_merge(array_values($cols), [(int) $t['id']]));
         }
-        q("INSERT INTO addon_split_titulos (id_lanc, perfil_id, charge_id, situacao, valor, vencimento, percentual, payee_code, link, tentativas, erro, criado_em, atualizado_em)
-           VALUES (?, ?, ?, 'registrado', ?, ?, ?, ?, ?, 1, NULL, ?, ?)
+        $fmt = fn($v) => number_format((float) $v, 2, '.', '');
+        q("INSERT INTO addon_split_titulos (id_lanc, perfil_id, charge_id, situacao, valor, valor_repasse, vencimento, percentual, payee_code, link, tentativas, erro, criado_em, atualizado_em)
+           VALUES (?, ?, ?, 'registrado', ?, ?, ?, NULL, ?, ?, 1, NULL, ?, ?)
            ON DUPLICATE KEY UPDATE perfil_id = VALUES(perfil_id), charge_id = VALUES(charge_id), situacao = 'registrado',
-             valor = VALUES(valor), vencimento = VALUES(vencimento), percentual = VALUES(percentual),
+             valor = VALUES(valor), valor_repasse = VALUES(valor_repasse), vencimento = VALUES(vencimento), percentual = NULL,
              payee_code = VALUES(payee_code), link = VALUES(link), tentativas = tentativas + 1, erro = NULL,
              atualizado_em = VALUES(atualizado_em)",
-          [(int) $t['id'], (int) $perfil['id'], (string) $r['id'], (string) $t['valor'], $venc,
-           (int) round(((float) ($perfil['config']['percentual'] ?? 0)) * 100),
+          [(int) $t['id'], (int) $perfil['id'], (string) $r['id'], $fmt($comp['total']), $fmt($comp['repasse']), $venc,
            (string) ($perfil['config']['payee_code'] ?? $perfil['config']['fav_conta'] ?? ''),
            mb_substr((string) ($r['link'] ?? ''), 0, 255), $agora, $agora]);
-        log_split('info', "Título {$t['id']} ({$t['login']}) registrado no " . $prov::nome() . ": {$r['id']}.");
+        log_split('info', "Título {$t['id']} ({$t['login']}) registrado no " . $prov::nome() . ": {$r['id']} (total R$ "
+            . number_format($comp['total'], 2, ',', '.') . ', repasse R$ ' . number_format($comp['repasse'], 2, ',', '.') . ').');
     } catch (Throwable $e) {
-        q("INSERT INTO addon_split_titulos (id_lanc, perfil_id, situacao, valor, vencimento, tentativas, erro, criado_em, atualizado_em)
-           VALUES (?, ?, 'erro', ?, ?, 1, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE situacao = 'erro', tentativas = tentativas + 1, erro = VALUES(erro), atualizado_em = VALUES(atualizado_em)",
-          [(int) $t['id'], (int) $perfil['id'], (string) $t['valor'], $venc, $e->getMessage(), $agora, $agora]);
+        q("INSERT INTO addon_split_titulos (id_lanc, perfil_id, situacao, valor, valor_repasse, vencimento, tentativas, erro, criado_em, atualizado_em)
+           VALUES (?, ?, 'erro', ?, ?, ?, 1, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE situacao = 'erro', valor = VALUES(valor), valor_repasse = VALUES(valor_repasse),
+             tentativas = tentativas + 1, erro = VALUES(erro), atualizado_em = VALUES(atualizado_em)",
+          [(int) $t['id'], (int) $perfil['id'], number_format($comp['total'], 2, '.', ''), number_format($comp['repasse'], 2, '.', ''),
+           $venc, $e->getMessage(), $agora, $agora]);
         log_split('erro', "Título {$t['id']} ({$t['login']}): " . $e->getMessage());
     }
 }
@@ -638,8 +687,8 @@ function registrar_pendentes(array $perfil): int
 function sincronizar(): void
 {
     $provs = [];
-    $regs = q("SELECT a.id_lanc, a.perfil_id, a.charge_id, a.valor AS valor_banco, a.vencimento AS venc_banco,
-                      l.id, l.status, l.deltitulo, l.valor, l.datavenc, l.coletor
+    $regs = q("SELECT a.id_lanc, a.perfil_id, a.charge_id, a.valor AS valor_banco, a.valor_repasse AS repasse_banco,
+                      a.vencimento AS venc_banco, l.id, l.status, l.deltitulo, l.valor, l.datavenc, l.coletor
                  FROM addon_split_titulos a
             LEFT JOIN sis_lanc l ON l.id = a.id_lanc
                 WHERE a.situacao = 'registrado'");
@@ -665,11 +714,21 @@ function sincronizar(): void
             if ($r['status'] !== 'aberto') {
                 continue;
             }
-            if (abs((float) $r['valor'] - (float) $r['valor_banco']) > 0.004) {
+            // Valor do título com os atrelados (um adicional atrelado ou tirado
+            // muda o total e o repasse). repasse_banco NULL = boleto da regra
+            // antiga, de percentual: refaz pela regra dos adicionais.
+            $comp = composicao_titulo($r);
+            $mudou = abs($comp['total'] - (float) $r['valor_banco']) > 0.004
+                  || $r['repasse_banco'] === null
+                  || abs($comp['repasse'] - (float) $r['repasse_banco']) > 0.004;
+            if ($mudou) {
                 $prov->cancelar((string) $r['charge_id']);
                 q("UPDATE sis_lanc SET chave_gnet2 = NULL, linhadig = NULL, url = NULL WHERE id = ?", [(int) $r['id']]);
                 q("UPDATE addon_split_titulos SET situacao = 'substituir', tentativas = 0, atualizado_em = NOW() WHERE id_lanc = ?", [(int) $r['id']]);
-                log_split('info', "Título {$r['id']} mudou de valor ({$r['valor_banco']} → {$r['valor']}): cobrança {$r['charge_id']} cancelada, vai ser registrada de novo.");
+                $motivo = $r['repasse_banco'] === null
+                    ? 'registrado pela regra antiga de percentual'
+                    : "mudou de valor ({$r['valor_banco']} → {$comp['total']}, repasse {$r['repasse_banco']} → {$comp['repasse']})";
+                log_split('info', "Título {$r['id']} $motivo: cobrança {$r['charge_id']} cancelada, vai ser registrada de novo.");
                 continue;
             }
             $venc = substr((string) $r['datavenc'], 0, 10);

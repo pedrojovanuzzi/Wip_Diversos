@@ -608,7 +608,7 @@ class WhatsappController {
         return;
       }
 
-      const { cpf, nome, cidade, bairro, plano, status, caixa_herm, slot, pon } =
+      const { cpf, nome, cidade, bairro, plano, grupo, status, caixa_herm, slot, pon } =
         req.body;
       const ClientRepository = MkauthSource.getRepository(ClientesEntities);
 
@@ -627,6 +627,8 @@ class WhatsappController {
       if (bairro) where.bairro = Like(`%${bairro}%`);
       if (plano) where.plano = Like(`%${plano}%`); // Partial match for plan usually better, or exact if dropdown
       if (caixa_herm) where.caixa_herm = Like(`%${caixa_herm}%`);
+      // Grupo do cadastro no MK-Auth (sis_cliente.grupo)
+      if (grupo) where.grupo = Like(`%${grupo}%`);
 
       // Status filter (cli_ativado)
       if (status) {
@@ -655,6 +657,7 @@ class WhatsappController {
           cidade: true,
           bairro: true,
           plano: true,
+          grupo: true,
           caixa_herm: true,
           porta_olt: true,
         },

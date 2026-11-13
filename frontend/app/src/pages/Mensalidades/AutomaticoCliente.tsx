@@ -2,26 +2,21 @@ import React, { useState } from "react";
 import { useNotification } from "../../context/NotificationContext";
 import { ApiMensalidades, Detalhe, mensagemDeErro } from "./api";
 
-export const LEGENDA_ISENTO =
-  "Isento no MK-Auth: o robô do MK-Auth não cria a mensalidade dele. O Wip Diversos cria a mensalidade e gera o boleto do isento, mas só se o boleto automático estiver ativado neste cliente. Sem ativar, nada é gerado sozinho.";
-
 /**
  * Interruptor "Boleto automático" na página do cliente. Desligado, a
- * engrenagem não toca este cliente (nem mensalidade de isento, nem bolix,
+ * engrenagem não toca este cliente (nem mensalidade, nem bolix,
  * nem lembrete por e-mail); os botões manuais continuam valendo.
  * Só nível 5 muda; os outros só veem.
  */
 export function AutomaticoCliente({
   api,
   login,
-  isento,
   estado,
   podeMudar,
   onMudou,
 }: {
   api: ApiMensalidades;
   login: string;
-  isento: boolean;
   estado: Detalhe["automatico"];
   podeMudar: boolean;
   onMudou: (e: Detalhe["automatico"]) => void;
@@ -48,22 +43,12 @@ export function AutomaticoCliente({
   };
 
   const explicacao = ligado
-    ? isento
-      ? "Cliente isento no MK-Auth: o Wip Diversos cria a mensalidade e gera o boleto."
-      : "A engrenagem gera o boleto e manda os lembretes deste cliente."
-    : "Nada automático para este cliente (boleto, mensalidade de isento e lembretes). Os botões manuais continuam funcionando.";
+    ? "A engrenagem cria as mensalidades que faltam, gera o boleto e manda os lembretes deste cliente."
+    : "Nada automático para este cliente (mensalidade, boleto e lembretes). Os botões manuais continuam funcionando.";
 
   return (
     <div className="flex flex-col items-start lg:items-end gap-1.5 text-[13px] shrink-0">
       <div className="flex flex-wrap items-center gap-2">
-        {isento && (
-          <span
-            title={LEGENDA_ISENTO}
-            className="px-2.5 rounded-full bg-[#48c774] text-white font-bold text-[11px] leading-[22px]"
-          >
-            ISENTO NO MK-AUTH
-          </span>
-        )}
       <button
         type="button"
         role="switch"
@@ -93,12 +78,6 @@ export function AutomaticoCliente({
         Boleto automático {ligado ? "ligado" : "desligado"}
       </button>
       </div>
-      {isento && (
-        <p className="text-[12px] text-[#7a7a7a] max-w-[460px] leading-snug lg:text-right">
-          O MK-Auth não gera a mensalidade de isento; o Wip Diversos gera
-          (mensalidade e boleto), mas só com o boleto automático ativado.
-        </p>
-      )}
     </div>
   );
 }

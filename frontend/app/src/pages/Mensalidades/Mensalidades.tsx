@@ -3,13 +3,12 @@ import axios from "axios";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { NavBar } from "../../components/navbar/NavBar";
 import { useAuth } from "../../context/AuthContext";
-import { FaCog, FaEnvelope, FaSearch } from "react-icons/fa";
+import { FaCog, FaEnvelope, FaFileExcel, FaSearch } from "react-icons/fa";
 import { paginaMk } from "./mkauthEstilo";
 import { Botao, cabecalhoGrade, caixinha, campo as campoUi, Celula } from "./ConfigUi";
 import { EnviarLote } from "./EnviarLote";
 import { ConfiguracoesMensalidades } from "./ConfiguracoesMensalidades";
 import { SeloWipDiversos } from "./SeloWipDiversos";
-import { LEGENDA_ISENTO } from "./AutomaticoCliente";
 import { useNotification } from "../../context/NotificationContext";
 
 interface ClienteMk {
@@ -24,8 +23,6 @@ interface ClienteMk {
   cli_ativado: string;
   /** full | down (redução de velocidade) | bloq, como no MK-Auth. */
   status_corte: string | null;
-  /** "sim": o MK-Auth não cobra (o Wip Diversos pode criar a mensalidade). */
-  isento: string | null;
   /** "sim": em observação (liberado até rem_obs, ex.: depois de pagar). */
   observacao: string | null;
   /** Até quando fica em observação, "dd/mm/aaaa hh:mm". */
@@ -210,8 +207,16 @@ export function Mensalidades() {
               {carregando ? "Carregando..." : `${total} cliente(s) · ${rotuloTipo.toLowerCase()}`}
             </p>
           </div>
-          {/* Engrenagem: longe do sino do canto. */}
+          {/* Relatório e engrenagem: longe do sino do canto. */}
           {podeEnviarLote && (
+            <div className="flex flex-wrap gap-2">
+            <Link
+              to="/mensalidades/relatorio"
+              title="Relatório Wip 1 / Wip 2 para Excel"
+              className="h-[38px] px-4 inline-flex items-center gap-2 rounded-md bg-white border border-[#dbdbdb] text-[#363636] text-[14px] font-semibold hover:border-[#3273dc] hover:text-[#3273dc] shadow-[0_1px_2px_rgba(0,0,0,.04)]"
+            >
+              <FaFileExcel className="text-[#257942]" /> <span>Relatório</span>
+            </Link>
             <button
               type="button"
               onClick={() => setConfigurando(true)}
@@ -221,6 +226,7 @@ export function Mensalidades() {
             >
               <FaCog /> <span className="hidden sm:inline">Configurações</span>
             </button>
+            </div>
           )}
         </div>
 
@@ -411,14 +417,6 @@ export function Mensalidades() {
                           down
                         </span>
                       )}
-                      {c.isento === "sim" && (
-                        <span
-                          title={LEGENDA_ISENTO}
-                          className="px-1.5 rounded-full bg-[#48c774] text-white text-[10px] leading-[16px] font-bold"
-                        >
-                          isento
-                        </span>
-                      )}
                     </span>
                   </Celula>
                   <Celula rotulo="IP" className={`truncate font-mono text-[13px] ${c.ip ? "" : "max-md:hidden"}`}>
@@ -578,9 +576,9 @@ export function Mensalidades() {
                   {confirmarAuto ? (
                     <>
                       <b>Ativar</b> o boleto automático de{" "}
-                      <b>{marcados.size} cliente(s)</b>? A engrenagem passa a gerar o
-                      boleto deles na Efí (e a mensalidade, se forem isentos) e a
-                      mandar os lembretes por e-mail.
+                      <b>{marcados.size} cliente(s)</b>? A engrenagem passa a criar
+                      as mensalidades que faltam, gerar o boleto deles na Efí e mandar
+                      os lembretes por e-mail.
                     </>
                   ) : (
                     <>

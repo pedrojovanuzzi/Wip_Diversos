@@ -12,9 +12,9 @@ import {
 import { competenciaDoTitulo, ErroDeUso } from "./mkauthTitulos";
 import {
   clientesComAutomatico,
-  criarMensalidadesDeIsentos,
-  ResultadoIsentos,
-} from "./MensalidadesIsentos";
+  criarMensalidadesAutomaticas,
+  ResultadoCriacao,
+} from "./MensalidadesCriacao";
 
 /**
  * Engrenagem da tela Mensalidades: geração automática do bolix da Efí.
@@ -31,7 +31,17 @@ import {
 
 export interface ConfigGeracao {
   gerarBoletos: boolean;
+  /**
+   * Split do bolix: os serviços adicionais do título (atrelados "Valor
+   * adicional: ...") vão inteiros para a conta Efí do parceiro; a mensalidade
+   * fica na conta da Wip.
+   */
+  splitAdicionais: boolean;
+  /** Identificador de conta Efí do parceiro que recebe os adicionais. */
+  splitPayeeCode: string;
 }
+
+export const PAYEE_CODE_VALIDO = /^[A-Za-z0-9]{8,64}$/;
 
 export interface ResumoExecucao {
   inicio: string;
@@ -49,8 +59,8 @@ export interface ResumoExecucao {
     motivo?: "pago" | "cobrado" | "cancelado";
   }[];
   erros: { login: string; titulo: number; erro: string }[];
-  /** Mensalidades de isentos criadas nesta execução. */
-  titulosCriados?: ResultadoIsentos["criados"];
+  /** Mensalidades criadas nesta execução (clientes com o automático ligado). */
+  titulosCriados?: ResultadoCriacao["criados"];
   /** Títulos de clientes com o automático desligado (ficaram de fora). */
   desligados?: number;
 }
@@ -63,6 +73,8 @@ const LIMITE_POR_EXECUCAO = 2000;
 
 export const CONFIG_PADRAO: ConfigGeracao = {
   gerarBoletos: false,
+  splitAdicionais: false,
+  splitPayeeCode: "",
 };
 
 const repo = () => AppDataSource.getRepository(MensalidadeConfig);
@@ -92,6 +104,8 @@ export async function lerConfig(): Promise<ConfigGeracao> {
   return {
     gerarBoletos:
       salva.gerarBoletos === undefined ? CONFIG_PADRAO.gerarBoletos : salva.gerarBoletos === true,
+    splitAdicionais: salva.splitAdicionais === true,
+    splitPayeeCode: typeof salva.splitPayeeCode === "string" ? salva.splitPayeeCode : "",
   };
 }
 
@@ -112,6 +126,14 @@ export async function salvarConfig(
   const nova: ConfigGeracao = { ...atual };
   if (entrada.gerarBoletos !== undefined)
     nova.gerarBoletos = entrada.gerarBoletos === true;
+  if (entrada.splitPayeeCode !== undefined)
+    nova.splitPayeeCode = String(entrada.splitPayeeCode || "").trim();
+  if (entrada.splitAdicionais !== undefined)
+    nova.splitAdicionais = entrada.splitAdicionais === true;
+  if (nova.splitPayeeCode && !PAYEE_CODE_VALIDO.test(nova.splitPayeeCode))
+    throw new ErroDeUso("payee_code inválido: use só letras e números (8 a 64).");
+  if (nova.splitAdicionais && !nova.splitPayeeCode)
+    throw new ErroDeUso("Informe o payee_code do parceiro para ligar o split.");
   await gravar(CHAVE, nova, usuario);
   return nova;
 }
@@ -147,19 +169,19 @@ export async function rodarGeracao(
     erros: [],
   };
   try {
-    // Primeiro a mensalidade dos isentos com o boleto automático ativado
-    // (o mk-bot do MK-Auth não cria para eles), para o bolix dela sair já
-    // nesta execução. Ver services/MensalidadesIsentos.ts.
+    // Primeiro as mensalidades que faltam dos clientes com o boleto
+    // automático ativado, para o bolix delas sair já nesta execução.
+    // Ver services/MensalidadesCriacao.ts.
     // Um erro aqui não impede os bolix dos outros clientes.
     try {
-      const isentos = await criarMensalidadesDeIsentos(usuario);
-      resumo.titulosCriados = isentos.criados;
-      resumo.erros.push(...isentos.erros);
+      const criacao = await criarMensalidadesAutomaticas(usuario);
+      resumo.titulosCriados = criacao.criados;
+      resumo.erros.push(...criacao.erros);
     } catch (e: any) {
       resumo.erros.push({
         login: "-",
         titulo: 0,
-        erro: `mensalidades dos isentos: ${String(e?.message || e).slice(0, 180)}`,
+        erro: `criar mensalidades: ${String(e?.message || e).slice(0, 180)}`,
       });
     }
 

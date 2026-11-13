@@ -17,15 +17,15 @@ import {
  *
  * 1. Interruptor "boleto automático" por cliente (mensalidade_cliente).
  *    Começa DESLIGADO para todos: só quem tem automatico = 1 entra na
- *    engrenagem (mensalidade de isento, bolix e lembrete por e-mail). Liga-se
- *    na página do cliente ou marcando vários na lista.
+ *    engrenagem (mensalidade, bolix e lembrete por e-mail). Liga-se na
+ *    página do cliente ou marcando vários na lista.
  *
- * 2. Mensalidade dos clientes isentos. O robô do MK-Auth (mk-bot, opção
- *    auto_titulos) mantém as mensalidades de quem não é isento; para o
- *    isento ele não cria nada. Para o isento com o boleto automático ativado
- *    (e a geração da engrenagem ligada), cria-se a próxima mensalidade que
- *    vence dentro dos dias de antecedência, e o resto da engrenagem gera o
- *    bolix dela. Contra duplicar (o mk-bot continua ligado):
+ * 2. Mensalidade de quem tem o boleto automático ativado, isento no MK-Auth
+ *    ou não: o interruptor é o que decide. O cliente fica com N mensalidades
+ *    a vencer em aberto, como o robô do MK-Auth (mk-bot, opção auto_titulos)
+ *    faz, e o resto da engrenagem gera o bolix delas. Título que o mk-bot já
+ *    criou conta como o mês cobrado. Contra duplicar (o mk-bot continua
+ *    ligado):
  *    - não cria se o cliente já tem título vivo daquele mês (qualquer
  *      status, criado por qualquer um), pela referência ou pelo vencimento;
  *    - não cria se o mês já foi pago num bolix nosso;
@@ -102,9 +102,9 @@ export async function definirAutomaticoVarios(
   return unicos.length;
 }
 
-// ---------- mensalidade dos isentos ----------
+// ---------- mensalidades do boleto automático ----------
 
-export interface ResultadoIsentos {
+export interface ResultadoCriacao {
   criados: { login: string; titulo: number; competencia: string; vencimento: string; valor: number }[];
   erros: { login: string; titulo: number; erro: string }[];
 }
@@ -137,8 +137,8 @@ async function titulosParaManter() {
 }
 
 /**
- * Como o robô do MK-Auth faz para os outros clientes: cada isento com o
- * boleto automático ativado fica sempre com N mensalidades a vencer em
+ * Como o robô do MK-Auth faz: cada cliente ativo com o boleto automático
+ * ativado fica sempre com N mensalidades a vencer em
  * aberto (N = auto_titulos). Anda mês a mês a partir do próximo vencimento:
  * mês com título em aberto conta; mês pago (título ou bolix) não conta e é
  * pulado; mês vazio é criado. Para quando chega a N. Mensalidade em atraso
@@ -147,14 +147,14 @@ async function titulosParaManter() {
  * Dois processos juntos param no mesmo ponto: o mês que o outro está
  * criando (reserva ocupada) conta como em aberto.
  */
-export async function criarMensalidadesDeIsentos(
+export async function criarMensalidadesAutomaticas(
   usuario: string,
-): Promise<ResultadoIsentos> {
-  const resultado: ResultadoIsentos = { criados: [], erros: [] };
+): Promise<ResultadoCriacao> {
+  const resultado: ResultadoCriacao = { criados: [], erros: [] };
   const clientes: any[] = await MkauthSource.query(
     `SELECT c.login, c.venc, c.mesref, c.desconto, c.acrescimo, p.valor AS valor_plano
        FROM sis_cliente c JOIN sis_plano p ON p.nome = c.plano
-      WHERE c.cli_ativado = 's' AND c.isento = 'sim'`,
+      WHERE c.cli_ativado = 's'`,
   );
   if (!clientes.length) return resultado;
   const ligados = await clientesComAutomatico(clientes.map((c) => c.login));
@@ -214,7 +214,7 @@ export async function criarMensalidadesDeIsentos(
             await registrarAtividade(
               m,
               AUTOR,
-              `wip diversos criou a mensalidade ${r.referencia} do cliente isento ${login.toLowerCase()}`,
+              `wip diversos criou a mensalidade ${r.referencia} do cliente ${login.toLowerCase()}`,
             );
             await recalcularAbertos(m, login);
           });
@@ -227,7 +227,7 @@ export async function criarMensalidadesDeIsentos(
           await criadoRepo().update({ id: reserva.id }, { titulo_id: tituloId });
           emAberto++;
           resultado.criados.push({ login, titulo: tituloId, competencia, vencimento: vencIso, valor });
-          console.log(`[Isentos] ${usuario}: mensalidade ${competencia} de ${login} criada (título ${tituloId}).`);
+          console.log(`[Mensalidades] ${usuario}: mensalidade ${competencia} de ${login} criada (título ${tituloId}).`);
         } catch (e: any) {
           // Falhou: libera o mês para tentar de novo na próxima conferência
           // e não cria os meses depois dele fora de ordem.
@@ -244,7 +244,7 @@ export async function criarMensalidadesDeIsentos(
       resultado.erros.push({
         login,
         titulo: 0,
-        erro: `mensalidade do isento: ${String(e?.message || e).slice(0, 180)}`,
+        erro: `mensalidade automática: ${String(e?.message || e).slice(0, 180)}`,
       });
     }
   }

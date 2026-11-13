@@ -5,7 +5,7 @@ vi.mock("../../database/DataSource", () => ({ default: {} }));
 vi.mock("../../database/MkauthSource", () => ({ default: {} }));
 vi.mock("../../controller/Email", () => ({ default: class {} }));
 vi.mock("../BolixEfi", () => ({}));
-vi.mock("../MensalidadesIsentos", () => ({}));
+vi.mock("../MensalidadesCriacao", () => ({}));
 
 import { montar } from "../MensalidadesLembretes";
 

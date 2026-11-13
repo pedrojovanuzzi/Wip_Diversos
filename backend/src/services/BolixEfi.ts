@@ -4,6 +4,7 @@ import EfiPay from "sdk-node-apis-efi";
 import MkauthSource from "../database/MkauthSource";
 import AppDataSource from "../database/DataSource";
 import { MensalidadeBolix } from "../entities/MensalidadeBolix";
+import { MensalidadeConfig } from "../entities/MensalidadeConfig";
 import {
   agoraMk,
   Autor,
@@ -44,6 +45,27 @@ function efi() {
 }
 
 const repo = () => AppDataSource.getRepository(MensalidadeBolix);
+
+/**
+ * Split da engrenagem (chave "geracao_boletos" do mensalidade_config, a mesma
+ * de MensalidadesAutomacao.lerConfig; lida aqui para não importar em círculo).
+ * Devolve o payee_code do parceiro, ou null com o split desligado.
+ */
+async function payeeDoSplit(): Promise<string | null> {
+  const r = await AppDataSource.getRepository(MensalidadeConfig).findOne({
+    where: { chave: "geracao_boletos" },
+  });
+  try {
+    const c = r ? JSON.parse(r.valor) : null;
+    const payee = String(c?.splitPayeeCode || "").trim();
+    return c?.splitAdicionais === true && /^[A-Za-z0-9]{8,64}$/.test(payee) ? payee : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Atrelado do MK-Auth que é serviço adicional do contrato (câmera, streaming...). */
+const PREFIXO_ADICIONAL = /^\s*valor adicional/i;
 const AUTOR_EFI: Autor = { usuario: "efi", ip: "efi" };
 const PAGO = ["paid", "settled"];
 const digitos = (s: unknown) => String(s ?? "").replace(/\D/g, "");
@@ -137,6 +159,30 @@ async function gerarBolixSemTrava(
   if (!c) throw new ErroDeUso("Cliente do título não encontrado.");
 
   const base = Number(t.valor || 0) + Number(t.atrelados || 0);
+  // Com o split ligado, os adicionais viram itens à parte, cada um com 100%
+  // de repasse para o parceiro; a mensalidade (com os outros atrelados e os
+  // descontos) fica na conta da Wip.
+  const payee = await payeeDoSplit();
+  const adicionais: { nome: string; valor: number }[] = payee
+    ? (
+        await MkauthSource.query(
+          `SELECT valor, tipo, \`desc\` AS descricao FROM sis_mlanc
+            WHERE idlanc = ? AND deltitulo = 0 ORDER BY id`,
+          [tituloId],
+        )
+      )
+        .filter(
+          (m: any) =>
+            m.tipo !== "desconto" &&
+            Number(m.valor) > 0 &&
+            PREFIXO_ADICIONAL.test(String(m.descricao || "")),
+        )
+        .map((m: any) => ({ nome: String(m.descricao).trim(), valor: Number(m.valor) }))
+    : [];
+  const somaAdicionais = adicionais.reduce((s, a) => s + centavos(a.valor), 0);
+  const centMensalidade = centavos(base) - somaAdicionais;
+  if (centMensalidade < 0)
+    throw new ErroDeUso("Os descontos do título passam do valor da mensalidade.");
   const vencOriginal = isoDe(t.datavenc);
   const hoje = hojeIso();
   const vencido = vencOriginal < hoje;
@@ -196,13 +242,20 @@ async function gerarBolixSemTrava(
   }
 
   const numero = String(t.id).padStart(5, "0");
-  const items: any[] = [
-    {
+  const items: any[] = [];
+  if (centMensalidade > 0)
+    items.push({
       name: `Titulo ${numero} - ${t.tipo || "mensalidade"}${t.referencia ? ` ${t.referencia}` : ""}`.slice(0, 255),
-      value: centavos(base),
+      value: centMensalidade,
       amount: 1,
-    },
-  ];
+    });
+  for (const a of adicionais)
+    items.push({
+      name: a.nome.slice(0, 255),
+      value: centavos(a.valor),
+      amount: 1,
+      marketplace: { repasses: [{ payee_code: payee, percentage: 10000 }] }, // 100%
+    });
   if (multa + mora > 0)
     items.push({
       name: `Multa e juros do titulo ${numero}`,

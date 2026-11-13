@@ -51,7 +51,7 @@ import {
   clientesComAutomatico,
   definirAutomatico,
   definirAutomaticoVarios,
-} from "../services/MensalidadesIsentos";
+} from "../services/MensalidadesCriacao";
 
 /**
  * Tela "Mensalidades": a lista de clientes do MK-Auth (admin/clientes.hhvm) e,
@@ -237,7 +237,7 @@ class Mensalidades {
 
       const clientes = await MkauthSource.query(
         `SELECT c.id, c.uuid_cliente AS uuid, c.login, c.nome, c.plano, c.ip,
-                c.ramal, c.bloqueado, c.cli_ativado, c.status_corte, c.isento,
+                c.ramal, c.bloqueado, c.cli_ativado, c.status_corte,
                 c.observacao, DATE_FORMAT(c.rem_obs, '%d/%m/%Y %H:%i') AS rem_obs,
                 (SELECT COUNT(*) FROM sis_lanc l
                   WHERE l.login = c.login AND l.deltitulo = 0
@@ -264,6 +264,76 @@ class Mensalidades {
       });
     } catch (error) {
       responderErro(res, error, "listarClientes");
+    }
+  };
+
+  /**
+   * Relatório para exportar em Excel, por mês de vencimento (AAAA-MM):
+   * - wip1: todas as mensalidades do mês (sis_lanc, tipo mensalidade);
+   * - wip2: os serviços dessas mensalidades, uma linha por serviço, com o
+   *   valor do serviço em "valor" (atrelados do título ou, sem eles, os
+   *   serviços do contrato do cliente).
+   * As colunas seguem a exportação do MK-Auth. Tem CPF e endereço de todos
+   * os clientes: nível 5 na rota.
+   */
+  relatorio = async (req: Request, res: Response) => {
+    try {
+      const aba = req.query.aba === "wip2" ? "wip2" : "wip1";
+      const mes = String(req.query.mes || "");
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes))
+        throw new ErroDeUso("Escolha o mês (AAAA-MM).");
+      const [ano, m] = mes.split("-").map(Number);
+      const inicio = `${mes}-01`;
+      const fim = `${m === 12 ? ano + 1 : ano}-${dois(m === 12 ? 1 : m + 1)}-01`;
+
+      const colunasTitulo = `
+        l.id AS titulo, l.login, c.nome, c.endereco, c.numero, c.complemento,
+        c.bairro, c.cidade, c.estado, c.cep, c.cpf_cnpj, c.fone AS telefone,
+        c.celular, c.opcelular AS operadora, c.email,
+        DATE_FORMAT(l.datavenc, '%d/%m/%Y') AS datavenc, l.nossonum,
+        DATE_FORMAT(l.datapag, '%d/%m/%Y') AS datapag,
+        l.valorpag, c.ramal, l.coletor, c.codigo, c.grupo, c.vendedor,
+        l.formapag, l.tarifa_paga, l.fchequebanco, l.fchequenumero,
+        l.fchequeagcc, l.fcartaobandeira, l.fcartaonumero, c.cli_ativado AS ativo,
+        l.status`;
+      const de = `FROM sis_lanc l LEFT JOIN sis_cliente c ON c.login = l.login`;
+      const onde = `l.deltitulo = 0 AND l.tipo = 'mensalidade'
+                    AND l.datavenc >= ? AND l.datavenc < ?`;
+
+      const linhas: any[] =
+        aba === "wip1"
+          ? await MkauthSource.query(
+              `SELECT ${colunasTitulo}, l.valor ${de}
+                WHERE ${onde} ORDER BY l.datavenc, c.nome, l.id`,
+              [inicio, fim],
+            )
+          : // Os serviços das mensalidades da Wip 1. O MK-Auth pode ter
+            // gravado as linhas "Valor adicional: ..." no título (sis_mlanc);
+            // se o título não as tem, valem os serviços do contrato do
+            // cliente (sis_sercontratos, incluir = sim), que o boleto soma
+            // na hora de imprimir. Descontos não entram (não são serviço).
+            await MkauthSource.query(
+              `SELECT * FROM (
+                 SELECT ${colunasTitulo}, m.valor, m.\`desc\` AS servico,
+                        'atrelado' AS tipo_servico, l.datavenc AS ord_venc, m.id AS ord_item
+                   ${de} JOIN sis_mlanc m ON m.idlanc = l.id AND m.deltitulo = 0
+                    AND m.tipo <> 'desconto'
+                  WHERE ${onde}
+                 UNION ALL
+                 SELECT ${colunasTitulo}, s.valor, CONCAT('Valor adicional: ', s.nome) AS servico,
+                        'contrato' AS tipo_servico, l.datavenc AS ord_venc, s.id AS ord_item
+                   ${de} JOIN sis_sercontratos s
+                     ON UPPER(TRIM(s.login)) = UPPER(TRIM(l.login)) AND s.incluir = 'sim'
+                  WHERE ${onde}
+                    AND NOT EXISTS (SELECT 1 FROM sis_mlanc m2
+                                     WHERE m2.idlanc = l.id AND m2.deltitulo = 0
+                                       AND m2.\`desc\` LIKE 'Valor adicional%')
+               ) r ORDER BY r.ord_venc, r.nome, r.titulo, r.tipo_servico, r.ord_item`,
+              [inicio, fim, inicio, fim],
+            );
+      res.json({ aba, mes, linhas });
+    } catch (error) {
+      responderErro(res, error, "relatorio");
     }
   };
 
@@ -329,7 +399,7 @@ class Mensalidades {
       const login = String(req.params.login || "");
       const [cliente] = await MkauthSource.query(
         `SELECT id, uuid_cliente AS uuid, login, nome, plano, ip, email,
-                bloqueado, cli_ativado, venc, obs, isento, status_corte
+                bloqueado, cli_ativado, venc, obs, status_corte
            FROM sis_cliente WHERE login = ? LIMIT 1`,
         [login],
       );
@@ -423,7 +493,7 @@ class Mensalidades {
 
   /**
    * Interruptor "boleto automático" do cliente: desligado, a engrenagem não
-   * cria mensalidade de isento, não gera bolix e não manda lembrete para ele.
+   * cria mensalidade, não gera bolix e não manda lembrete para ele.
    */
   definirAutomatico = async (req: Request, res: Response) => {
     try {
@@ -577,7 +647,7 @@ class Mensalidades {
         await recalcularAbertos(m, t.login);
       });
       // O bolix pago deste título deixa de contar como "mês pago": senão a
-      // geração (e a mensalidade do isento) pularia o mês para sempre.
+      // geração (e a criação da mensalidade) pularia o mês para sempre.
       await AppDataSource.getRepository(MensalidadeBolix).update(
         { titulo_id: id, situacao: "pago" },
         { situacao: "estornado" },

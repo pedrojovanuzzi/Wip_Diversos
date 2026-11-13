@@ -31,8 +31,7 @@ class ProvedorEfi extends Provedor
     {
         return [
             ['payee_code', 'payee_code do parceiro', 'text',
-             'Identificador de conta do parceiro na Efí (painel Efí > API > Introdução > Identificador de conta). Precisa ser uma conta diferente da que emite o boleto.', true, null],
-            ['percentual', '% para o parceiro', 'percent', 'O resto fica na conta Efí que emite o boleto.', true, null],
+             'Identificador de conta do parceiro na Efí (painel Efí > API > Introdução > Identificador de conta). Precisa ser uma conta diferente da que emite o boleto. Recebe o valor dos serviços adicionais do título; a mensalidade fica na conta Efí que emite o boleto.', true, null],
         ];
     }
 
@@ -69,10 +68,6 @@ class ProvedorEfi extends Provedor
         }
         if (!preg_match('/^[A-Za-z0-9]{8,64}$/', $this->cfg('payee_code'))) {
             $f[] = 'Informe o payee_code da conta parceira.';
-        }
-        $p = $this->percentual();
-        if ($p <= 0 || $p >= 100) {
-            $f[] = 'O percentual tem que ser maior que 0 e menor que 100.';
         }
         return $f;
     }
@@ -164,18 +159,37 @@ class ProvedorEfi extends Provedor
         if ($msg !== '') {
             $billet['message'] = mb_substr($msg, 0, 500);
         }
-        $item = 'Mensalidade ' . trim((string) ($t['referencia'] ?: date('m/Y', strtotime((string) $t['datavenc']))));
+        $comp = $t['composicao'] ?? ['empresa' => (float) $t['valor'], 'adicionais' => []];
+        $nomeMens = 'Mensalidade ' . trim((string) ($t['referencia'] ?: date('m/Y', strtotime((string) $t['datavenc']))));
 
-        $r = $this->api('POST', '/v1/charge/one-step', [
-            'items' => [[
-                'name' => mb_substr($item, 0, 255),
-                'value' => (int) round(((float) $t['valor']) * 100),
+        // O repasse da Efí é por item: a mensalidade vai sem repasse (fica toda
+        // na conta emissora) e cada serviço adicional vai com 100% para o parceiro.
+        $items = [];
+        $centMens = (int) round($comp['empresa'] * 100);
+        if ($centMens > 0) {
+            $items[] = ['name' => mb_substr($nomeMens, 0, 255), 'value' => $centMens, 'amount' => 1];
+        }
+        foreach ($comp['adicionais'] as $a) {
+            $cent = (int) round($a['valor'] * 100);
+            if ($cent <= 0) {
+                continue;
+            }
+            $items[] = [
+                'name' => mb_substr($a['desc'], 0, 255),
+                'value' => $cent,
                 'amount' => 1,
                 'marketplace' => ['repasses' => [[
                     'payee_code' => $this->cfg('payee_code'),
-                    'percentage' => (int) round($this->percentual() * 100), // 2500 = 25%
+                    'percentage' => 10000, // 10000 = 100%
                 ]]],
-            ]],
+            ];
+        }
+        if (!$items) {
+            throw new RuntimeException('Título sem valor a cobrar.');
+        }
+
+        $r = $this->api('POST', '/v1/charge/one-step', [
+            'items' => $items,
             'metadata' => ['custom_id' => 'mk:' . $t['id'], 'notification_url' => $urlRetorno],
             'payment' => ['banking_billet' => $billet],
         ]);

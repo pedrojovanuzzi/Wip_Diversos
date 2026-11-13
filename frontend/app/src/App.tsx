@@ -81,6 +81,7 @@ import GerarLinksServico from "./pages/ServicosWeb/GerarLinksServico";
 import SolicitacaoServicoPublica from "./pages/ServicosWeb/SolicitacaoServicoPublica";
 import { Mensalidades } from "./pages/Mensalidades/Mensalidades";
 import { MensalidadesCliente } from "./pages/Mensalidades/MensalidadesCliente";
+import { RelatorioMensalidades } from "./pages/Mensalidades/RelatorioMensalidades";
 
 const isLocalhost =
   window.location.hostname === "localhost" ||
@@ -501,6 +502,16 @@ function App() {
             element={
               user?.token && user.permission >= 2 ? (
                 <Mensalidades />
+              ) : (
+                <Navigate to="/auth/login" />
+              )
+            }
+          />
+          <Route
+            path="/mensalidades/relatorio"
+            element={
+              user?.token && user.permission >= 5 ? (
+                <RelatorioMensalidades />
               ) : (
                 <Navigate to="/auth/login" />
               )

@@ -291,7 +291,6 @@ export function MensalidadesCliente() {
               <AutomaticoCliente
                 api={api}
                 login={login}
-                isento={dados.cliente.isento === "sim"}
                 estado={dados.automatico}
                 podeMudar={admin}
                 onMudou={(automatico) => setDados({ ...dados, automatico })}

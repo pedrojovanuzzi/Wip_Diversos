@@ -7,7 +7,7 @@ import { MensalidadeEmailEnvio } from "../entities/MensalidadeEmailEnvio";
 import Email from "../controller/Email";
 import { anexosDosBolix, bolixAtivo, canceladosManualmente, gerarBolix } from "./BolixEfi";
 import { competenciaDoTitulo, dois, ErroDeUso } from "./mkauthTitulos";
-import { clientesComAutomatico } from "./MensalidadesIsentos";
+import { clientesComAutomatico } from "./MensalidadesCriacao";
 
 /**
  * Lembretes de boleto por e-mail (engrenagem da tela Mensalidades).
