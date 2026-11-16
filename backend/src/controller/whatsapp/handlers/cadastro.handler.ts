@@ -336,7 +336,7 @@ export async function handleAwaitingFlowCadastro(
 
       await Finalizar(resumoCadastro, celular, true);
       if (process.env.TEST_PHONE) {
-        await enviarNotificacaoServico(process.env.TEST_PHONE);
+        await enviarNotificacaoServico(process.env.TEST_PHONE, dadosFlow.nome);
       }
       session.stage = "awaiting_manual_review";
       return true;
@@ -487,7 +487,7 @@ export async function handleFinalRegister(
 
     await Finalizar(session.msgDadosFinais, celular, true);
     if (process.env.TEST_PHONE) {
-      await enviarNotificacaoServico(process.env.TEST_PHONE);
+      await enviarNotificacaoServico(process.env.TEST_PHONE, novaSolicitacao.dados?.nome);
     }
     session.stage = "awaiting_manual_review";
   } else if (

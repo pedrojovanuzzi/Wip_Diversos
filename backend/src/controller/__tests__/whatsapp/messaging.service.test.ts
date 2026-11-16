@@ -81,7 +81,7 @@ describe("messaging.service", () => {
   describe("enviarNotificacaoServico", () => {
     it("enfileira template notificacao_servico com destinatário correto", async () => {
       mockQueueAdd.mockResolvedValue({});
-      await enviarNotificacaoServico("5511999990002");
+      await enviarNotificacaoServico("5511999990002", "  Maria   Silva ");
 
       expect(mockQueueAdd).toHaveBeenCalledWith(
         "send-template",
@@ -92,11 +92,24 @@ describe("messaging.service", () => {
             template: expect.objectContaining({
               name: "notificacao_servico",
               language: { code: "pt_BR" },
+              components: [
+                {
+                  type: "header",
+                  parameters: [{ type: "text", text: "Maria Silva" }],
+                },
+              ],
             }),
           }),
         }),
         expect.any(Object),
       );
+    });
+
+    it("usa 'Cliente' quando não há nome", async () => {
+      mockQueueAdd.mockResolvedValue({});
+      await enviarNotificacaoServico("5511999990002");
+      const payload = (mockQueueAdd.mock.calls.at(-1) as any[])[1].payload;
+      expect(payload.template.components[0].parameters[0].text).toBe("Cliente");
     });
 
     it("não lança erro se a fila falhar", async () => {

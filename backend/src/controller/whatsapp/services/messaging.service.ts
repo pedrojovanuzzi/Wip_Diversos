@@ -73,7 +73,25 @@ export async function MensagensComuns(recipient_number: any, msg: any) {
   }
 }
 
-export async function enviarNotificacaoServico(recipient_number: any) {
+/**
+ * Cabeçalho dos templates de aviso à equipe: {{1}} = nome do cliente.
+ *   notificacao_servico    → "Serviço do {{1}} Solicitado"
+ *   notificacao_pagamento  → "Pagamento do {{1}} Concluido com Sucesso"
+ *   notificacao_assinatura → "Assinatura do {{1}} Concluida"
+ * A Meta recusa variável vazia, por isso o "Cliente" de reserva. O
+ * cabeçalho tem limite de 60 caracteres no total, então o nome é cortado.
+ */
+export function componentesNomeCliente(nome?: string | null) {
+  const texto = String(nome ?? "").replace(/\s+/g, " ").trim() || "Cliente";
+  return [
+    { type: "header", parameters: [{ type: "text", text: texto.slice(0, 30) }] },
+  ];
+}
+
+export async function enviarNotificacaoServico(
+  recipient_number: any,
+  nomeCliente?: string | null,
+) {
   try {
     await whatsappOutgoingQueue.add(
       "send-template",
@@ -87,6 +105,7 @@ export async function enviarNotificacaoServico(recipient_number: any) {
           template: {
             name: "notificacao_servico",
             language: { code: "pt_BR" },
+            components: componentesNomeCliente(nomeCliente),
           },
         },
         headers: authHeaders(),

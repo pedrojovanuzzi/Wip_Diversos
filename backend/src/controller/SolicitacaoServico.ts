@@ -494,7 +494,7 @@ class SolicitacaoServicoController {
           );
         }
 
-        if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
+        if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE, solicitacao.dados?.nome);
 
         if (!origemWeb) {
           await MensagensComuns(
@@ -660,7 +660,7 @@ class SolicitacaoServicoController {
           );
         }
 
-        if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
+        if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE, solicitacao.dados?.nome);
 
         if (!origemWeb) {
           await MensagensComuns(
@@ -726,7 +726,7 @@ class SolicitacaoServicoController {
         );
       }
 
-      if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
+      if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE, solicitacao.dados?.nome);
 
       if (!origemWeb) {
         await MensagensComuns(
@@ -833,7 +833,7 @@ class SolicitacaoServicoController {
         );
       }
 
-      if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
+      if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE, solicitacao.dados?.nome);
 
       res.status(200).json({ success: true, origemWeb, links });
     } catch (error) {
@@ -1334,7 +1334,7 @@ class SolicitacaoServicoController {
         }
       }
 
-      if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE);
+      if (process.env.TEST_PHONE) await enviarNotificacaoServico(process.env.TEST_PHONE, solicitacao.dados?.nome);
 
       const partes: string[] = [];
       partes.push(

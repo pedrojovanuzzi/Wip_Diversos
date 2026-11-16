@@ -17,6 +17,7 @@ import { whatsappOutgoingQueue } from "./whatsapp/index";
 import ZapSign from "./ZapSign";
 import { liberarContratoPosPagamento } from "./servicoWeb/contrato";
 import pixAutomaticoService from "../services/PixAutomaticoService";
+import { componentesNomeCliente } from "./whatsapp/services/messaging.service";
 import {
   valorCobrancaFatura,
   valorMensalidadeCliente,
@@ -727,6 +728,9 @@ class Pix {
                       template: {
                         name: "notificacao_pagamento",
                         language: { code: "pt_BR" },
+                        components: componentesNomeCliente(
+                          solicitacao?.dados?.nome || record_pppoe.login,
+                        ),
                       },
                     },
                     headers: {

@@ -2432,7 +2432,7 @@ export async function handleAwaitingTrocaPlanoFlow(
 
     await Finalizar(resumoAlteracaoPlano, celular, true);
     if (process.env.TEST_PHONE) {
-      await enviarNotificacaoServico(process.env.TEST_PHONE);
+      await enviarNotificacaoServico(process.env.TEST_PHONE, session.nome);
     }
 
     try {
@@ -2834,7 +2834,7 @@ export async function handleAwaitingWifiExtendidoFlow(
 
     await Finalizar(resumoWifiExtendido, celular, true);
     if (process.env.TEST_PHONE) {
-      await enviarNotificacaoServico(process.env.TEST_PHONE);
+      await enviarNotificacaoServico(process.env.TEST_PHONE, session.nome);
     }
 
     try {

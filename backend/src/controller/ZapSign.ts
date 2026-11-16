@@ -31,6 +31,7 @@ import {
 } from "../services/cobrancaProporcional";
 import { reservarLoginUnico } from "../services/loginCliente";
 import { planoTemSva } from "../config/planosComSva";
+import { componentesNomeCliente } from "./whatsapp/services/messaging.service";
 import {
   contratarStreamingAposAssinatura,
   contratarStreamingDoPlano,
@@ -1128,6 +1129,9 @@ class ZapSign {
                     language: {
                       code: "pt_BR",
                     },
+                    components: componentesNomeCliente(
+                      solicitacao.dados?.nome || solicitacao.login_cliente,
+                    ),
                   },
                 },
                 headers: {
