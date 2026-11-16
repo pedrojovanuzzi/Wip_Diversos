@@ -133,11 +133,16 @@ const APR_EQUIPAMENTOS: string[] = [
   "Uniforme Refletivo",
 ];
 
+/** Texto gravado quando o técnico não tem como responder um campo da APR. */
+const NAO_APLICAVEL = "NÃO APLICÁVEL";
+const APR_SERVICO_NA = "Não aplicável";
+
 const APR_SERVICOS: string[] = [
   "Instalação de sinal de internet em rádio e/ou fibra",
   "Mudança de local na residência",
   "Cancelamento de serviço",
   "Manutenção de rotina",
+  APR_SERVICO_NA,
 ];
 
 const APR_EQUIPAMENTOS_PADRAO: AprEquipamentoLinha[] = [
@@ -182,6 +187,11 @@ type CampoTextoProps = Omit<TextFieldProps, "value" | "onChange"> & {
   onValueChange: (v: string) => void;
   /** Normalização aplicada ao sair da composição (ex.: `upper`). */
   transformar?: (v: string) => string;
+  /**
+   * Mostra o botão "N/A" no fim do campo: preenche "NÃO APLICÁVEL" e trava
+   * o campo; clicar de novo limpa e libera.
+   */
+  naoAplicavel?: boolean;
 };
 
 const CampoTexto: React.FC<CampoTextoProps> = ({
@@ -190,11 +200,30 @@ const CampoTexto: React.FC<CampoTextoProps> = ({
   transformar,
   inputProps,
   sx,
+  naoAplicavel,
+  InputProps,
   ...rest
 }) => {
   const compondo = useRef(false);
   // Só o maiúsculo tem equivalente visual em CSS; um filtro de dígitos, não.
   const caixaAlta = transformar === upper;
+  const marcadoNa = !!naoAplicavel && value === NAO_APLICAVEL;
+
+  const botaoNa = naoAplicavel ? (
+    <InputAdornment position="end">
+      <Tooltip title={marcadoNa ? "Voltar a preencher" : "Não aplicável"}>
+        <Chip
+          label="N/A"
+          size="small"
+          clickable
+          color={marcadoNa ? "warning" : "default"}
+          variant={marcadoNa ? "filled" : "outlined"}
+          onClick={() => onValueChange(marcadoNa ? "" : NAO_APLICAVEL)}
+          sx={{ fontSize: 11, height: 22 }}
+        />
+      </Tooltip>
+    </InputAdornment>
+  ) : null;
 
   const emitir = (bruto: string) => {
     onValueChange(
@@ -219,7 +248,13 @@ const CampoTexto: React.FC<CampoTextoProps> = ({
         autoCapitalize: caixaAlta ? "characters" : "off",
         spellCheck: false,
         ...inputProps,
+        ...(marcadoNa && { readOnly: true }),
       }}
+      InputProps={
+        botaoNa
+          ? { ...InputProps, endAdornment: botaoNa }
+          : InputProps
+      }
       sx={
         caixaAlta
           ? {
@@ -587,12 +622,13 @@ const CriarFichaTecnica: React.FC = () => {
     );
   };
 
+  // "Não aplicável" exclui os demais serviços, e vice-versa.
   const alternarAprServico = (servico: string) => {
-    setAprServicos((prev) =>
-      prev.includes(servico)
-        ? prev.filter((s) => s !== servico)
-        : [...prev, servico],
-    );
+    setAprServicos((prev) => {
+      if (prev.includes(servico)) return prev.filter((s) => s !== servico);
+      if (servico === APR_SERVICO_NA) return [APR_SERVICO_NA];
+      return [...prev.filter((s) => s !== APR_SERVICO_NA), servico];
+    });
   };
 
   const validar = (): string | null => {
@@ -1420,6 +1456,7 @@ const CriarFichaTecnica: React.FC = () => {
               <CampoTexto
                 fullWidth
                 label="Área"
+                naoAplicavel
                 value={aprArea}
                 onValueChange={setAprArea}
                 transformar={upper}
@@ -1429,6 +1466,7 @@ const CriarFichaTecnica: React.FC = () => {
               <CampoTexto
                 fullWidth
                 label="Atividade"
+                naoAplicavel
                 value={aprAtividade}
                 onValueChange={setAprAtividade}
                 transformar={upper}
@@ -1456,6 +1494,7 @@ const CriarFichaTecnica: React.FC = () => {
                   size="small"
                   fullWidth
                   label={`Nome ${idx + 1}`}
+                  naoAplicavel
                   value={t.nome}
                   onValueChange={(v) =>
                     atualizarAprTrabalhador(idx, { nome: v })
@@ -1468,6 +1507,7 @@ const CriarFichaTecnica: React.FC = () => {
                   size="small"
                   fullWidth
                   label="Cargo"
+                  naoAplicavel
                   value={t.cargo}
                   onValueChange={(v) =>
                     atualizarAprTrabalhador(idx, { cargo: v })
@@ -1480,6 +1520,7 @@ const CriarFichaTecnica: React.FC = () => {
                   size="small"
                   fullWidth
                   label="RG"
+                  naoAplicavel
                   value={t.rg}
                   onValueChange={(v) => atualizarAprTrabalhador(idx, { rg: v })}
                 />
@@ -1558,6 +1599,7 @@ const CriarFichaTecnica: React.FC = () => {
                   size="small"
                   fullWidth
                   label={`${String(idx + 1).padStart(2, "0")} - Etapa da tarefa`}
+                  naoAplicavel
                   value={e.etapa}
                   onValueChange={(v) => atualizarAprEtapa(idx, { etapa: v })}
                   transformar={upper}
@@ -1568,6 +1610,7 @@ const CriarFichaTecnica: React.FC = () => {
                   size="small"
                   fullWidth
                   label="Riscos"
+                  naoAplicavel
                   value={e.riscos}
                   onValueChange={(v) => atualizarAprEtapa(idx, { riscos: v })}
                   transformar={upper}
@@ -1578,6 +1621,7 @@ const CriarFichaTecnica: React.FC = () => {
                   size="small"
                   fullWidth
                   label="Medidas de controle"
+                  naoAplicavel
                   value={e.medidas}
                   onValueChange={(v) => atualizarAprEtapa(idx, { medidas: v })}
                   transformar={upper}
@@ -1593,6 +1637,7 @@ const CriarFichaTecnica: React.FC = () => {
             fullWidth
             sx={{ mb: 2 }}
             label="Nome do responsável pela APR"
+            naoAplicavel
             value={aprResponsavel}
             onValueChange={setAprResponsavel}
             transformar={upper}
