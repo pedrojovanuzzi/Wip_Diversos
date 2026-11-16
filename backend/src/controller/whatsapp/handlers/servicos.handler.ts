@@ -25,7 +25,6 @@ import {
   MensagemFlowTrocaTitularidadeContato,
   MensagemFlowTrocaTitularidadeContratacao,
   MensagemFlowMudancaComodo,
-  enviarNotificacaoServico,
   Finalizar,
   boasVindas,
   whatsappOutgoingQueue,
@@ -1104,7 +1103,7 @@ export async function iniciarMudancaComodo(
           );
         }
 
-        await Finalizar(resumoMudanca, celular, true);
+        await Finalizar(resumoMudanca, celular, true, undefined, dadosSolicitacao.nome);
 
         if (session.formaPagamento === "Paga com Pix" && lancamento) {
           try {
@@ -2430,10 +2429,7 @@ export async function handleAwaitingTrocaPlanoFlow(
       );
     }
 
-    await Finalizar(resumoAlteracaoPlano, celular, true);
-    if (process.env.TEST_PHONE) {
-      await enviarNotificacaoServico(process.env.TEST_PHONE, session.nome);
-    }
+    await Finalizar(resumoAlteracaoPlano, celular, true, undefined, session.nome);
 
     try {
       const planoRecord = session.planoEscolhido
@@ -2832,10 +2828,7 @@ export async function handleAwaitingWifiExtendidoFlow(
       console.error("[Chamado] Erro ao criar chamado de wifi extendido:", e);
     }
 
-    await Finalizar(resumoWifiExtendido, celular, true);
-    if (process.env.TEST_PHONE) {
-      await enviarNotificacaoServico(process.env.TEST_PHONE, session.nome);
-    }
+    await Finalizar(resumoWifiExtendido, celular, true, undefined, session.nome);
 
     try {
       const planoRecord = session.planoEscolhido

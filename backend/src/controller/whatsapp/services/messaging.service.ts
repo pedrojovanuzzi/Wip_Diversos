@@ -734,9 +734,29 @@ export async function MensagensDeMidia(
   }
 }
 
-export async function Finalizar(msg: any, celular: any, keepSession = false, session?: any) {
+/**
+ * Fecha uma solicitação feita pelo WhatsApp: manda o resumo e o template
+ * notificacao_servico para a equipe (TEST_PHONE).
+ *
+ * O resumo é texto livre e a Meta só o entrega se a equipe falou com o
+ * número da empresa nas últimas 24h (erro 131047). O template chega sempre,
+ * por isso sai junto daqui, em todo fluxo que chama Finalizar.
+ */
+export async function Finalizar(
+  msg: any,
+  celular: any,
+  keepSession = false,
+  session?: any,
+  nomeCliente?: string | null,
+) {
   try {
     await MensagensComuns(process.env.TEST_PHONE, msg);
+    if (process.env.TEST_PHONE) {
+      await enviarNotificacaoServico(
+        process.env.TEST_PHONE,
+        nomeCliente || session?.dadosCompleto?.nome || session?.nome,
+      );
+    }
     if (!keepSession) {
       if (session) session._deleted = true;
       deleteSession(celular);

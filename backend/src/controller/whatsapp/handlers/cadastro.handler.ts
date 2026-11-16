@@ -23,7 +23,6 @@ import {
   MensagemLista,
   MensagemTermos,
   MensagemFlow,
-  enviarNotificacaoServico,
   Finalizar,
 } from "../services/messaging.service";
 
@@ -334,10 +333,7 @@ export async function handleAwaitingFlowCadastro(
       };
       await repo.save(novaSolicitacao);
 
-      await Finalizar(resumoCadastro, celular, true);
-      if (process.env.TEST_PHONE) {
-        await enviarNotificacaoServico(process.env.TEST_PHONE, dadosFlow.nome);
-      }
+      await Finalizar(resumoCadastro, celular, true, undefined, dadosFlow.nome);
       session.stage = "awaiting_manual_review";
       return true;
     }
@@ -485,10 +481,7 @@ export async function handleFinalRegister(
     };
     await repo.save(novaSolicitacao);
 
-    await Finalizar(session.msgDadosFinais, celular, true);
-    if (process.env.TEST_PHONE) {
-      await enviarNotificacaoServico(process.env.TEST_PHONE, novaSolicitacao.dados?.nome);
-    }
+    await Finalizar(session.msgDadosFinais, celular, true, undefined, novaSolicitacao.dados?.nome);
     session.stage = "awaiting_manual_review";
   } else if (
     texto.toLowerCase() === "não" ||

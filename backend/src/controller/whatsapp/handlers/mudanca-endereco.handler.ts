@@ -398,7 +398,7 @@ export async function iniciarMudanca(
             console.error("[Chamado] Erro ao criar chamado de mudança de endereço:", e);
           }
 
-          await Finalizar(resumoMudanca, celular, true);
+          await Finalizar(resumoMudanca, celular, true, undefined, dadosFlow.nome);
 
           if (formaPagto === "Paga com Pix" && lancamento) {
             try {
