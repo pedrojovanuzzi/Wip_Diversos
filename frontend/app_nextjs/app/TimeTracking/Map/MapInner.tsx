@@ -53,9 +53,11 @@ export default function MapInner({ user }: { user: User }) {
 
   const fetchData = async () => {
     try {
+      // As duas rotas exigem nível 5 no backend: sem o token voltava 401.
+      const auth = { headers: { Authorization: `Bearer ${user.token}` } };
       const [recordsRes, employeesRes] = await Promise.all([
-        axios.get(`${process.env.REACT_APP_URL}/time-tracking/map-records`),
-        axios.get(`${process.env.REACT_APP_URL}/time-tracking/employee`),
+        axios.get(`${process.env.REACT_APP_URL}/time-tracking/map-records`, auth),
+        axios.get(`${process.env.REACT_APP_URL}/time-tracking/employee`, auth),
       ]);
       setRecords(recordsRes.data);
       setEmployees(employeesRes.data);

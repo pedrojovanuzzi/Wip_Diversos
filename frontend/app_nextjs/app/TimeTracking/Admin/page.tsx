@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import EmployeeManagerClient from "./EmployeeManagerClient";
+import Tela from "./Tela";
 
 export const metadata = {
-  title: "Gerenciar Funcionários",
+  title: "Gestão de ponto — Wip Diversos",
 };
 
-export default async function EmployeeManagerPage() {
+export default async function Page() {
   const user = await requireUser(5);
   if (!user) redirect("/auth/login");
 
-  return <EmployeeManagerClient user={user} />;
+  return <Tela />;
 }

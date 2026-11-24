@@ -1,0 +1,650 @@
+"use client";
+
+import NavBar from "@/components/NavBar";
+import type { User } from "@/lib/auth";
+import React, { useState } from "react";
+import axios from "axios";
+import { useNotification } from "@/lib/NotificationContext";
+
+export default function EnviarMensagemClient({ user }: { user: User }) {
+  const token = user?.token;
+  const { showSuccess, showError } = useNotification();
+
+  // --- Main States ---
+  const [searchCpf, setSearchCpf] = useState("");
+  const [searchNome, setSearchNome] = useState("");
+  const [searchCidade, setSearchCidade] = useState("");
+  const [searchBairro, setSearchBairro] = useState("");
+  const [searchPlano, setSearchPlano] = useState("");
+  const [searchStatus, setSearchStatus] = useState("s"); // Default to Active ('s')
+  const [searchGrupo, setSearchGrupo] = useState("");
+  const [searchCaixaHerm, setSearchCaixaHerm] = useState("");
+  const [searchSlot, setSearchSlot] = useState("");
+  const [searchPon, setSearchPon] = useState("");
+
+  // Envia para todos os clientes da PON, sem depender da seleção da tabela
+  const [enviarPonInteira, setEnviarPonInteira] = useState(false);
+
+  const [clientes, setClientes] = useState<any[]>([]);
+  const [clientesSelecionados, setClientesSelecionados] = useState<any[]>([]);
+
+  // --- Message States ---
+  const [messageMode, setMessageMode] = useState<"text" | "template">("text");
+  const [messageText, setMessageText] = useState("");
+  const [templateName, setTemplateName] = useState("");
+  // Valores das variáveis do template, na ordem: {{1}}, {{2}}, ...
+  const [templateParams, setTemplateParams] = useState<string[]>([]);
+  const [templateHeaderParams, setTemplateHeaderParams] = useState<string[]>(
+    [],
+  );
+
+  type ParamSetter = React.Dispatch<React.SetStateAction<string[]>>;
+
+  const handleParamChange = (
+    setter: ParamSetter,
+    index: number,
+    value: string,
+  ) => setter((prev) => prev.map((p, i) => (i === index ? value : p)));
+
+  const handleAddParam = (setter: ParamSetter) =>
+    setter((prev) => [...prev, ""]);
+
+  const handleRemoveParam = (setter: ParamSetter, index: number) =>
+    setter((prev) => prev.filter((_, i) => i !== index));
+
+  const renderParamSection = (
+    titulo: string,
+    params: string[],
+    setter: ParamSetter,
+  ) => (
+    <div className="mb-3">
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-sm text-gray-700">{titulo}</span>
+        <button
+          type="button"
+          onClick={() => handleAddParam(setter)}
+          className="text-sm bg-gray-200 hover:bg-gray-300 rounded px-3 py-1"
+        >
+          + Variável
+        </button>
+      </div>
+
+      {params.length === 0 ? (
+        <p className="text-xs text-gray-500">Sem variáveis.</p>
+      ) : (
+        <div className="space-y-2">
+          {params.map((param, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 w-12 shrink-0">
+                {`{{${idx + 1}}}`}
+              </span>
+              <input
+                type="text"
+                className="flex-1 border rounded p-2"
+                value={param}
+                onChange={(e) =>
+                  handleParamChange(setter, idx, e.target.value)
+                }
+                placeholder="Valor da variável"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveParam(setter, idx)}
+                className="text-red-600 hover:text-red-800 px-2"
+                title="Remover"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const [loading, setLoading] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState<any>(null);
+
+  // --- Search Methods ---
+  const handleSearch = async () => {
+    // Only strip non-digits if it looks like a CPF/CNPJ search (numbers only or standard format).
+    // If it's empty, we might not want to send it.
+    // The backend uses 'Like', so sending empty string matches everything, which is fine if controlled.
+    // However, usually we want at least one filter or a limit. Backend has limit 100.
+
+    const cleanCpf = searchCpf.replace(/\D/g, "");
+
+    try {
+      setLoading(true);
+      const resposta = await axios.post(
+        `${process.env.REACT_APP_URL}/whatsapp/clients`,
+        {
+          cpf: cleanCpf,
+          nome: searchNome,
+          cidade: searchCidade,
+          bairro: searchBairro,
+          plano: searchPlano,
+          grupo: searchGrupo,
+          status: searchStatus === "all" ? undefined : searchStatus,
+          caixa_herm: searchCaixaHerm,
+          slot: searchSlot,
+          pon: searchPon,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      // Backend already sorts by name ASC
+      setClientes(resposta.data);
+      setClientesSelecionados([]);
+    } catch (erro) {
+      console.error("Erro ao Buscar Clientes:", erro);
+      showError("Erro ao buscar clientes.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckboxChange = (client: any) => {
+    setClientesSelecionados((prev) => {
+      const exists = prev.find((c) => c.id === client.id);
+      if (exists) {
+        return prev.filter((c) => c.id !== client.id);
+      } else {
+        return [...prev, client];
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (clientesSelecionados.length === clientes.length) {
+      setClientesSelecionados([]);
+    } else {
+      setClientesSelecionados([...clientes]);
+    }
+  };
+
+  // --- Send Method ---
+  const handleSend = async () => {
+    if (enviarPonInteira) {
+      if (!searchSlot.trim() || !searchPon.trim()) {
+        showError("Informe o Slot e a PON para enviar para a PON inteira.");
+        return;
+      }
+    } else if (clientesSelecionados.length === 0) {
+      showError("Selecione pelo menos um cliente.");
+      return;
+    }
+
+    if (messageMode === "text" && !messageText.trim()) {
+      showError("Digite uma mensagem.");
+      return;
+    }
+
+    if (messageMode === "template" && !templateName.trim()) {
+      showError("Digite o nome do template.");
+      return;
+    }
+
+    if (
+      messageMode === "template" &&
+      [...templateHeaderParams, ...templateParams].some((p) => !p.trim())
+    ) {
+      showError("Preencha todas as variáveis do template.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setBroadcastResult(null);
+
+      const payload = {
+        clientIds: enviarPonInteira
+          ? undefined
+          : clientesSelecionados.map((c) => c.id),
+        slot: enviarPonInteira ? searchSlot : undefined,
+        pon: enviarPonInteira ? searchPon : undefined,
+        status: enviarPonInteira ? searchStatus : undefined,
+        message: messageMode === "text" ? messageText : undefined,
+        templateName: messageMode === "template" ? templateName : undefined,
+        templateParams:
+          messageMode === "template" && templateParams.length > 0
+            ? templateParams
+            : undefined,
+        templateHeaderParams:
+          messageMode === "template" && templateHeaderParams.length > 0
+            ? templateHeaderParams
+            : undefined,
+      };
+
+      const response = await axios.post(
+        `${process.env.REACT_APP_URL}/whatsapp/broadcast`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      setBroadcastResult(response.data);
+      showSuccess(
+        `Processado: ${response.data.successCount} enviados, ${response.data.failureCount} falhas.`,
+      );
+    } catch (error: any) {
+      console.error("Erro ao enviar broadcast:", error);
+      showError(error.response?.data?.message || "Erro ao enviar mensagens.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <NavBar user={user} />
+      <div className="flex-1 p-6 md:ml-32 transition-all duration-300">
+        <div className="max-w-6xl mx-auto bg-white rounded-lg shadow p-6">
+          <h1 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">
+            Disparo de Mensagens WhatsApp
+          </h1>
+
+          {/* Search Section */}
+          <div className="mb-6 animate-fade-in">
+            <div className="mb-4 bg-gray-50 p-4 rounded border">
+              <h2 className="font-semibold mb-2">Filtros de Busca</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    CPF/CNPJ
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchCpf}
+                    onChange={(e) => setSearchCpf(e.target.value)}
+                    placeholder="Digite CPF/CNPJ"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Nome
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchNome}
+                    onChange={(e) => setSearchNome(e.target.value)}
+                    placeholder="Digite o Nome"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Cidade
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchCidade}
+                    onChange={(e) => setSearchCidade(e.target.value)}
+                    placeholder="Digite a Cidade"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Bairro
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchBairro}
+                    onChange={(e) => setSearchBairro(e.target.value)}
+                    placeholder="Digite o Bairro"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Plano
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchPlano}
+                    onChange={(e) => setSearchPlano(e.target.value)}
+                    placeholder="Digite o Plano"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Status
+                  </label>
+                  <select
+                    className="w-full border rounded p-2"
+                    value={searchStatus}
+                    onChange={(e) => setSearchStatus(e.target.value)}
+                  >
+                    <option value="all">Todos</option>
+                    <option value="s">Ativo</option>
+                    <option value="n">Inativo</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Grupo
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchGrupo}
+                    onChange={(e) => setSearchGrupo(e.target.value)}
+                    placeholder="Digite o Grupo"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Caixa Herm.
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchCaixaHerm}
+                    onChange={(e) => {
+                      const digits = e.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, 5);
+                      let formatted = digits;
+                      if (digits.length >= 3) {
+                        formatted = digits.split("").join("-");
+                      }
+                      setSearchCaixaHerm(formatted);
+                    }}
+                    placeholder="Ex: 3-2-5"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Slot
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchSlot}
+                    onChange={(e) =>
+                      setSearchSlot(e.target.value.replace(/\D/g, "").slice(0, 2))
+                    }
+                    placeholder="Ex: 13"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    PON
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    value={searchPon}
+                    onChange={(e) =>
+                      setSearchPon(e.target.value.replace(/\D/g, "").slice(0, 2))
+                    }
+                    placeholder="Ex: 14"
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={handleSearch}
+                  className="bg-green-600 text-white py-2 px-6 rounded hover:bg-green-700 transition-all font-bold"
+                >
+                  Buscar Clientes
+                </button>
+              </div>
+            </div>
+
+            {clientes.length > 0 && (
+              <div className="mt-4 border rounded overflow-hidden">
+                <div className="flex justify-between p-2 bg-gray-100 border-b items-center">
+                  <span className="font-semibold px-2">
+                    Total Encontrado: {clientes.length}
+                  </span>
+                  <span className="font-semibold px-2 text-green-600">
+                    Selecionados: {clientesSelecionados.length}
+                  </span>
+                </div>
+                <div className="max-h-96 overflow-y-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="p-3 w-10">
+                          <input
+                            type="checkbox"
+                            checked={
+                              clientes.length > 0 &&
+                              clientesSelecionados.length === clientes.length
+                            }
+                            onChange={handleSelectAll}
+                          />
+                        </th>
+                        <th className="p-3">Nome/Razão</th>
+                        <th className="p-3">Login</th>
+                        <th className="p-3">Telefone/Celular</th>
+                        <th className="p-3">Slot/PON</th>
+                        <th className="p-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {clientes.map((c) => (
+                        <tr key={c.id} className="hover:bg-gray-50">
+                          <td className="p-3">
+                            <input
+                              type="checkbox"
+                              checked={
+                                !!clientesSelecionados.find(
+                                  (sel) => sel.id === c.id,
+                                )
+                              }
+                              onChange={() => handleCheckboxChange(c)}
+                            />
+                          </td>
+                          <td className="p-3">{c.nome || c.razao_social}</td>
+                          <td className="p-3">{c.login}</td>
+                          <td className="p-3">{c.celular || c.fone || "-"}</td>
+                          <td className="p-3">
+                            {c.porta_olt
+                              ? `${c.porta_olt.substring(0, 2)}/${c.porta_olt.substring(2, 4)}`
+                              : "-"}
+                          </td>
+                          <td className="p-3">
+                            {c.cli_ativado === "s" ? (
+                              <span className="text-green-600 font-bold">
+                                Ativo
+                              </span>
+                            ) : (
+                              <span className="text-red-500">Inativo</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Message Configuration */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="bg-gray-50 p-4 rounded border">
+              <h2 className="font-semibold text-lg mb-3">
+                Configuração da Mensagem
+              </h2>
+
+              <div className="flex gap-4 mb-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="msgMode"
+                    checked={messageMode === "text"}
+                    onChange={() => setMessageMode("text")}
+                  />
+                  Texto Livre
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="msgMode"
+                    checked={messageMode === "template"}
+                    onChange={() => setMessageMode("template")}
+                  />
+                  Template
+                </label>
+              </div>
+
+              {messageMode === "text" ? (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Mensagem
+                  </label>
+                  <textarea
+                    className="w-full border rounded p-2 h-32"
+                    placeholder="Digite sua mensagem aqui..."
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    * Mensagens de texto livre podem falhar se a janela de 24h
+                    estiver fechada.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Nome do Template
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2"
+                    placeholder="ex: hello_world"
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    * O template deve estar aprovado no Gerenciador do WhatsApp.
+                  </p>
+
+                  <div className="mt-4 border-t pt-3">
+                    <label className="block text-sm font-medium mb-2">
+                      Variáveis do Template
+                    </label>
+
+                    {renderParamSection(
+                      "Cabeçalho",
+                      templateHeaderParams,
+                      setTemplateHeaderParams,
+                    )}
+                    {renderParamSection("Corpo", templateParams, setTemplateParams)}
+
+                    <p className="text-xs text-gray-500 mt-2">
+                      * Você pode usar os coringas <code>{"{nome}"}</code>,{" "}
+                      <code>{"{login}"}</code>, <code>{"{slot}"}</code>,{" "}
+                      <code>{"{pon}"}</code> e <code>{"{slotpon}"}</code>, que
+                      são substituídos pelos dados de cada cliente no envio.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded border flex flex-col justify-between">
+              <div>
+                <h2 className="font-semibold text-lg mb-3">Resumo do Envio</h2>
+
+                <label className="flex items-center gap-2 cursor-pointer mb-3">
+                  <input
+                    type="checkbox"
+                    checked={enviarPonInteira}
+                    onChange={(e) => setEnviarPonInteira(e.target.checked)}
+                  />
+                  Enviar para a PON inteira (ignora a seleção da tabela)
+                </label>
+
+                {enviarPonInteira ? (
+                  <p>
+                    Destinatários:{" "}
+                    <strong>
+                      Todos os clientes da PON {searchSlot || "?"}/
+                      {searchPon || "?"}
+                      {searchStatus === "all"
+                        ? ""
+                        : searchStatus === "s"
+                          ? " (ativos)"
+                          : " (inativos)"}
+                    </strong>
+                  </p>
+                ) : (
+                  <p>
+                    Total de Destinatários:{" "}
+                    <strong>{clientesSelecionados.length}</strong>
+                  </p>
+                )}
+                <p>
+                  Modo:{" "}
+                  <strong>
+                    {messageMode === "text" ? "Texto Livre" : "Template"}
+                  </strong>
+                </p>
+              </div>
+
+              <div className="mt-4">
+                <button
+                  onClick={handleSend}
+                  disabled={
+                    loading ||
+                    (enviarPonInteira
+                      ? !searchSlot.trim() || !searchPon.trim()
+                      : clientesSelecionados.length === 0)
+                  }
+                  className={`w-full py-3 rounded text-white font-bold transition-all ${
+                    loading ||
+                    (enviarPonInteira
+                      ? !searchSlot.trim() || !searchPon.trim()
+                      : clientesSelecionados.length === 0)
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-green-600 hover:bg-green-700 shadow-lg"
+                  }`}
+                >
+                  {loading ? "Enviando..." : "Enviar Mensagens"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Results/Errors */}
+          {broadcastResult && (
+            <div className="bg-white border rounded p-4 animate-fade-in">
+              <h3 className="font-bold mb-2">Resultado do Envio</h3>
+              <div className="flex gap-4 mb-2">
+                <span className="text-green-600">
+                  Sucesso: {broadcastResult.successCount}
+                </span>
+                <span className="text-red-600">
+                  Falhas: {broadcastResult.failureCount}
+                </span>
+              </div>
+              {broadcastResult.errors && broadcastResult.errors.length > 0 && (
+                <div className="bg-red-50 p-2 rounded max-h-40 overflow-y-auto text-sm">
+                  <p className="font-semibold text-red-700">
+                    Erros Detalhados:
+                  </p>
+                  <ul className="list-disc pl-5">
+                    {broadcastResult.errors.map((err: any, idx: number) => (
+                      <li key={idx}>
+                        Client ID {err.clientId}: {err.error}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

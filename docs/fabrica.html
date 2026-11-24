@@ -410,19 +410,23 @@ SCREENS.forEach(([dir, name, paths, apis], i) => add("s_" + dir.toLowerCase(), {
   desc: "Tela do app React (Create React App). Chama o backend com fetch/axios em process.env.REACT_APP_URL, mandando o token no header.",
 }));
 
-// ---- Telas já migradas para o Next.js (frontend/app_nextjs/app) ----
+// ---- Telas no Next.js (frontend/app_nextjs/app) ----
+// As 79 rotas do App.tsx antigo existem no Next. Parte foi portada à mão (pasta
+// da rota); o resto é cópia do React em app/_telas, carregada só no navegador.
 [
-  ["n_auth", "Login + Início", "app/auth, app/page.tsx", "c_auth c_backup"],
-  ["n_fiscal", "Notas fiscais", "app/NFSE, nfe, Nfcom, BuscarNfe, BuscarNfseGerada, GerarNotaDeServicoIndependente", "c_nfse c_nfe c_nfcom"],
+  ["n_auth", "Início · equipe", "app/auth, app/page.tsx, Create, auditoria, arquivos, TimeTracking, phone-location, grafico-instalacoes", "c_auth c_backup c_auditoria c_files c_timetracking c_phone c_chamados"],
+  ["n_fiscal", "Notas fiscais", "app/NFSE (+ ServicosAdicionais), nfe/comodato, NfeComodato, Nfcom (+ Buscar, DeclaracaoQuitacao, DeclaracoesQuitacao), BuscarNfe, BuscarNfseGerada, GerarNotaDeServicoIndependente, Prefeitura", "c_nfse c_nfe c_nfcom c_prefeitura"],
+  ["n_pix", "Pix · cobrança", "app/Pix (Admin, automatico, automaticoAdmin, findPaid, [tipo], Cancelar/Cobranca), mensalidades (+ relatorio, [login]), calculadora-debitos, codef", "c_pix c_mensalidades c_codef"],
   ["n_licencas", "Licenças", "app/licencas", "c_licenca"],
-  ["n_feedback", "Feedback", "app/feedback/Opnion", "c_feedback"],
-  ["n_infra", "ONU · DNS · Logs", "app/Onu, PowerDns, Pm2Logs, ServerLogs", "c_onu c_powerdns c_pm2 c_serverlogs"],
-  ["n_ponto", "Ponto eletrônico", "app/TimeTracking", "c_timetracking"],
+  ["n_whats", "WhatsApp · atendimento", "app/Whatsapp (+ [id]), (marketing)/whatsapp/broadcast, whatsapp-teste, solicitacoes-servico, servicos/links, s/[token], chamados/ficha-tecnica (+ nova), ZapSignConfig, zapsign-config, zapsign-teste", "c_whatsapp c_watest c_solic c_servlink c_ficha c_zapsign c_zaptpl"],
+  ["n_feedback", "Feedback", "app/feedback/Opnion, feedbackCreate, feedback/[technician]/[id]", "c_feedback"],
+  ["n_infra", "Rede · logs", "app/Onu, PowerDns, Pm2Logs, ServerLogs, LogViewer, ClientAnalytics (+ Logs, Servidores, SemQueue, Consumo, Monitor/[id]), DDDOS, ClientLogsSearch", "c_onu c_powerdns c_pm2 c_serverlogs c_analytics c_servidor c_dos"],
+  ["n_tv", "TV · câmeras · totem", "app/tv-wip, SerContratos, Streaming, Cameras/Admin, Cameras/Setup/[uuid], WatchTv/Conta/[token], TokenAutoAtendimento (+ pagar-fatura, criar-chamado, fazer-cadastro), doc/[fileName]", "c_tvwip c_sercontratos c_streaming c_cameras c_watchconta c_token c_totem"],
 ].forEach(([id, name, dirs, apis], i) => add(id, {
   k: "next", x: 130 + (i % 4) * 180, y: 1350 + Math.floor(i / 4) * 100, tag: "app_nextjs", name, apis: apis.split(" "),
   dir: "frontend/app_nextjs/app",
-  desc: "Migração incremental do React para Next.js 15 (App Router, porta 3001). O app React continua em produção; as páginas vão sendo copiadas para cá uma a uma. Pastas: " + dirs + ".",
-  files: [["frontend/app_nextjs/MIGRATION_INSTRUCTIONS.md", 0, "instruções da migração"]],
+  desc: "Next.js 15 (App Router, porta 3001). Todas as rotas do app React já existem aqui, com a mesma URL e o mesmo nível. As portadas à mão ficam na pasta da rota (page.tsx + Client); as outras são cópia do React em app/_telas, só com os imports trocados, e rodam só no navegador (dynamic com ssr: false). Pastas: " + dirs + ".",
+  files: [["frontend/app_nextjs/MIGRATION_INSTRUCTIONS.md", 0, "como a migração está organizada"], ["frontend/app_nextjs/lib/navigation.tsx", 0, "compatibilidade com o react-router"]],
 }));
 
 // ---- Outros clientes e entradas externas ----
@@ -579,7 +583,7 @@ add("pdns", { k: "db", x: 2730, y: 1400, tag: "createDns.ts", name: "Banco do Po
 
 const PLATES = [
   [40, 80, 760, 1110, "Frontend React", "frontend/app · 36 pastas de tela"],
-  [40, 1250, 760, 260, "Frontend Next.js", "frontend/app_nextjs · migração em andamento"],
+  [40, 1250, 760, 260, "Frontend Next.js", "frontend/app_nextjs · as 79 rotas"],
   [40, 1570, 760, 320, "Outros clientes e entradas", "app de celular, hotspot e webhooks"],
   [970, 540, 520, 560, "Portaria", "backend/src/app.ts + middleware/"],
   [970, 1200, 520, 570, "Ferramentas", "fora do caminho das requisições"],

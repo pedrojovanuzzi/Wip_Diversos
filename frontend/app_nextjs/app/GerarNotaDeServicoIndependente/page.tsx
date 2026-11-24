@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import GerarNotaIndependenteClient from "./GerarNotaIndependenteClient";
+import Tela from "./Tela";
 
 export const metadata = {
-  title: "Gerar Nota Independente — Wip Diversos",
+  title: "Nota de serviço independente — Wip Diversos",
 };
 
-export default async function GerarNotaIndependentePage() {
+export default async function Page() {
   const user = await requireUser(2);
   if (!user) redirect("/auth/login");
 
-  return <GerarNotaIndependenteClient user={user} />;
+  return <Tela />;
 }

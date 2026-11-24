@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Guard de rotas. Cobre só o subconjunto migrado nesta 1ª leva:
- *   - "/"            requer permission >= 1 (validação do user fica nos Server Components)
- *   - "/licencas"    requer permission >= 5
- *   - "/auth/login"  redireciona pra "/" se já houver cookie
- *   - "/feedback/Opnion" público
+ * Guard de rotas.
+ *   - PROTECTED_PREFIXES: exige o cookie "user" (o prefixo cobre as subrotas)
+ *   - PUBLIC_EXACT e /feedback/*: abertas
+ *   - "/auth/login" redireciona pra "/" se já houver cookie
+ *   - rota que não está em nenhuma lista fica aberta aqui (as públicas do app
+ *     antigo: /s/:token, /Prefeitura/*, /TokenAutoAtendimento/*, /doc/*,
+ *     /Cameras/Setup/*, /WatchTv/Conta/*)
  *
  * O middleware só verifica PRESENÇA do cookie. A validação real (e o nível de permissão)
  * acontece no Server Component via `requireUser(N)`, que pode redirecionar se necessário.
@@ -27,6 +29,34 @@ const PROTECTED_PREFIXES = [
   "/BuscarNfe",
   "/Nfcom",
   "/Nfcom/Buscar",
+  "/Pix",
+  "/Whatsapp",
+  "/whatsapp/broadcast",
+  "/NfeComodato",
+  "/LogViewer",
+  "/Create",
+  "/feedbackCreate",
+  "/arquivos",
+  "/servicos",
+  "/ClientAnalytics",
+  "/DDDOS",
+  "/ClientLogsSearch",
+  "/mensalidades",
+  "/calculadora-debitos",
+  "/auditoria",
+  "/codef",
+  "/tv-wip",
+  "/solicitacoes-servico",
+  "/phone-location",
+  "/chamados",
+  "/grafico-instalacoes",
+  "/SerContratos",
+  "/Streaming",
+  "/Cameras/Admin",
+  "/ZapSignConfig",
+  "/zapsign-config",
+  "/zapsign-teste",
+  "/whatsapp-teste",
 ];
 
 const PUBLIC_EXACT = new Set<string>([

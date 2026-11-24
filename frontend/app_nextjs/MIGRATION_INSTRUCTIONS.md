@@ -1,101 +1,171 @@
-# Instruções para continuar a migração React → Next.js
+# Migração React → Next.js
 
-Você está continuando uma migração **incremental** do app React (CRA) em
-[`../app`](../app) para Next.js 15 (App Router) em **`./`** (este diretório,
-`frontend/app_nextjs`). O app React permanece intocado e em produção — você só
-**adiciona** páginas no Next, página por página.
+O app React (CRA) em [`../app`](../app) foi migrado para Next.js 15 (App
+Router) neste diretório, `frontend/app_nextjs`. **As 79 rotas do `App.tsx`
+antigo existem aqui com a mesma URL e o mesmo nível de permissão**, mais o
+curinga `*` (`app/not-found.tsx` manda para a Home). O app React continua no ar
+até ser desligado. Não mexa em `../app`.
 
 ---
 
-## 1. Stack do Next
+## 1. Stack
 
 - **Next.js 15** (App Router) + **TypeScript** + **Tailwind v3**
 - **React 19** com Server Components / Server Actions
 - **npm** (não usar pnpm/yarn/bun)
 - Porta dev/start: **3001** (já fixada no `package.json`)
-- Variáveis de ambiente: usa as **mesmas do app antigo** (`REACT_APP_URL`,
-  `REACT_APP_BASE_URL`, etc.) — `next.config.js` já expõe pra Client Components
+- Variáveis de ambiente: as **mesmas do app antigo** (`REACT_APP_URL`,
+  `REACT_APP_BASE_URL`, etc.), expostas aos Client Components pelo `next.config.js`
+- MUI (`@mui/material` 6) com `AppRouterCacheProvider` no `app/layout.tsx`,
+  para os estilos saírem no SSR
 
-## 2. O que JÁ foi migrado (não refazer)
+## 2. Dois tipos de tela
 
-| Rota | Arquivos |
-|------|----------|
-| `/auth/login` | `app/auth/login/{page.tsx, LoginForm.tsx, actions.ts}` |
-| `/` | `app/{page.tsx, HomeBackupButton.tsx}` |
-| `/licencas` | `app/licencas/{page.tsx, LicencasClient.tsx, actions.ts}` |
-| `/feedback/Opnion` | `app/feedback/Opnion/{page.tsx, OpnionList.tsx}` |
-| `/Onu` + `/Onu/AutorizarOnu` + `/Onu/DesautorizarOnu` + `/Onu/Settings` | `app/Onu/...` |
-| `/PowerDns` | `app/PowerDns/{page.tsx, PowerDnsClient.tsx}` |
-| `/Pm2Logs` | `app/Pm2Logs/{page.tsx, Pm2LogsClient.tsx}` |
-| `/ServerLogs` (absorveu `/LogViewer`) | `app/ServerLogs/{page.tsx, ServerLogsClient.tsx}` |
+### 2.1 Telas nativas (portadas à mão)
 
-**Infra já pronta:**
-- `lib/auth.ts` — `getUser()`, `requireUser(N)`, `getTokenFromCookie()`, tipo `User`
-- `lib/api.ts` — `apiFetch<T>(path, opts)` (server-side, injeta JWT do cookie)
-- `lib/types.ts` — tipos compartilhados (`OnuData`, `WifiData`, `Folder`)
-- `middleware.ts` — guard de rota (precisa adicionar prefixos novos)
-- `components/NavBar.tsx` — NavBar completa adaptada (Client Component)
-- `components/Message.tsx`
+`page.tsx` (Server Component) + `<Nome>Client.tsx` (Client Component) na
+própria pasta da rota. O usuário chega por prop. São estas:
 
-## 3. Padrão obrigatório de migração
+| Rota | Pasta |
+|------|-------|
+| `/auth/login` | `app/auth/login/` |
+| `/` | `app/page.tsx`, `app/HomeBackupButton.tsx` |
+| `/feedback/Opnion` | `app/feedback/Opnion/` |
+| `/PowerDns`, `/Pm2Logs` | `app/PowerDns/`, `app/Pm2Logs/` |
+| `/nfe/comodato`, `/NfeComodato`, `/BuscarNfe` | `app/nfe/comodato/` (o `/NfeComodato` reusa o `ComodatoClient`), `app/BuscarNfe/` |
+| `/Pix` e subrotas (`/Pix/:tipo`, `/Admin`, `/automatico`, `/automaticoAdmin`, `/findPaid`, `/Cancelar/Cobranca`) | `app/Pix/` |
+| `/Whatsapp`, `/Whatsapp/:id` | `app/Whatsapp/` |
+| `/whatsapp/broadcast` | `app/(marketing)/whatsapp/broadcast/` (ver 7.1) |
 
-Para **cada rota** do app antigo (ver `../app/src/App.tsx` pra ver todas):
-
-### 3.1 Estrutura de arquivos
-
-Crie sempre **dois** arquivos:
+**Telas nativas que ficaram para trás.** Licenças, ONU (4 telas), ServerLogs,
+TimeTracking (4), NFS-e (3) e NFCom (2) tinham sido portadas em abril e o app
+antigo seguiu mudando (alertas de licença, seleção em lote da ONU, último RPS,
+exportação ZIP, hora extra manual, token no mapa do ponto...). Essas rotas
+passaram a usar a cópia atual em `_telas` (seção 2.2), e o `/LogViewer` voltou
+a ser a tela própria. Os arquivos nativos antigos dessas rotas **ficaram no
+disco sem uso** e podem ser apagados:
 
 ```
-app/<RotaIgualAoAppAntigo>/page.tsx       # Server Component (auth + SSR fetch)
-app/<RotaIgualAoAppAntigo>/<Nome>Client.tsx  # Client Component ("use client")
+app/licencas/{LicencasClient.tsx, actions.ts}
+app/Onu/{OnuHomeClient.tsx, components/}, app/Onu/{AutorizarOnu,DesautorizarOnu,Settings}/*Client.tsx
+app/ServerLogs/ServerLogsClient.tsx
+app/TimeTracking/{ClockIn,Admin,Map,Report}/*Client.tsx, app/TimeTracking/Map/MapInner.tsx
+app/NFSE/{NFSEClient.tsx, components/}
+app/BuscarNfseGerada/BuscarNfseGeradaClient.tsx
+app/GerarNotaDeServicoIndependente/GerarNotaIndependenteClient.tsx
+app/Nfcom/{NfcomClient.tsx, components/}, app/Nfcom/Buscar/BuscarNfcomClient.tsx
 ```
 
-Para subcomponentes específicos da página: `app/<Rota>/components/Foo.tsx`.
+Para saber se uma tela nativa ficou para trás: compare a data do último
+commit dela com a do arquivo de origem em `../app/src/pages`.
 
-### 3.2 Manter URLs idênticas ao app antigo
+### 2.2 Telas copiadas (`app/_telas`)
 
-NÃO renomeie rotas. Se o app antigo usa `/NFSE`, crie `app/NFSE/page.tsx` (com
-maiúsculas). Mesma case-sensitivity.
+As demais telas foram copiadas do app antigo **sem mudar a lógica nem o JSX**,
+só os imports. Ficam em `app/_telas/<pasta do app antigo>/` (o `_` impede o
+Next de criar rota ali). Cada rota tem dois arquivos curtos:
 
-### 3.3 Template do `page.tsx` (Server Component)
+```
+app/mensalidades/page.tsx   Server Component: requireUser(N) e metadata
+app/mensalidades/Tela.tsx   "use client" + dynamic(() => import("@/app/_telas/..."), { ssr: false })
+```
+
+A tela roda **só no navegador**, como no CRA: pode usar `window`,
+`localStorage` e libs DOM-only sem quebrar o servidor nem dar erro de
+hydration. A permissão continua conferida no servidor pelo `page.tsx`.
+
+Rotas assim: `/licencas`, `/Onu` (+ `/AutorizarOnu`, `/DesautorizarOnu`,
+`/Settings`), `/ServerLogs`, `/LogViewer`, `/TimeTracking/ClockIn` (+ `/Admin`,
+`/Map`, `/Report`), `/NFSE`, `/BuscarNfseGerada`,
+`/GerarNotaDeServicoIndependente`, `/Nfcom`, `/Nfcom/Buscar`, `/Create`, `/feedbackCreate`, `/feedback/:technician/:id`,
+`/arquivos`, `/servicos/links`, `/s/:token`, `/NFSE/ServicosAdicionais`,
+`/Nfcom/DeclaracaoQuitacao`, `/Nfcom/DeclaracoesQuitacao`, `/Prefeitura/Login`,
+`/Prefeitura/CodeOtp`, `/ClientAnalytics` (+ `/Logs`, `/Servidores`,
+`/SemQueue`, `/Consumo`, `/Monitor/:id`), `/DDDOS`, `/ClientLogsSearch`,
+`/mensalidades` (+ `/relatorio`, `/:login`), `/calculadora-debitos`,
+`/auditoria`, `/codef`, `/tv-wip`, `/solicitacoes-servico`, `/phone-location`,
+`/chamados/ficha-tecnica` (+ `/nova`), `/grafico-instalacoes`,
+`/TokenAutoAtendimento` (+ `/pagar-fatura`, `/criar-chamado`,
+`/fazer-cadastro`), `/doc/:fileName`, `/SerContratos`, `/Streaming`,
+`/Cameras/Admin`, `/Cameras/Setup/:uuid`, `/WatchTv/Conta/:token`,
+`/ZapSignConfig`, `/zapsign-config`, `/zapsign-teste`, `/whatsapp-teste`.
+
+`/zapsign-teste` e `/whatsapp-teste` dão 404 fora de `localhost`, como no app
+antigo (o `page.tsx` confere o header `host`).
+
+O que mudou na cópia:
+
+| App antigo | Em `_telas` |
+|------------|-------------|
+| `import { NavBar } from ".../navbar/NavBar"` | `import NavBar from "@/components/NavBar"` (sem prop: pega o usuário do `useAuth`) |
+| `useAuth` de `.../context/AuthContext` | `useAuth` de `@/lib/AuthContext` |
+| `useNotification` de `.../context/NotificationContext` | `@/lib/NotificationContext` |
+| `useNavigate`, `useParams`, `useSearchParams`, `useLocation`, `<Navigate>` | mesmos nomes, de `@/lib/navigation` |
+| `<Link to>` | `next/link` com `href`; `<Link state>` usa o `Link` de `@/lib/navigation` |
+| `import icon from ".../assets/icon.png"` | `const icon = "/assets/icon.png"` (arquivo em `public/assets`) |
+| `<Helmet><title>` | `metadata` do `page.tsx` |
+| `../../types`, `../../hooks/useIdleTimeout`, `../../components/{LinkContaWatchTv,SignatureModal,CpfVerificationModal,ErrorModal,Message}` | `@/lib/types`, `@/lib/useIdleTimeout`, `@/components/...` |
+
+### 2.3 Infra
+
+- `lib/auth.ts`: `getUser()`, `requireUser(N)`, `getTokenFromCookie()`, tipo `User`
+- `lib/AuthContext.tsx`: `useAuth()` no client. O `app/layout.tsx` preenche
+  com o `getUser()` do servidor
+- `lib/navigation.tsx`: compatibilidade com o react-router (seção 2.2). O
+  `state` do `navigate`/`Link` vai para o sessionStorage, preso ao caminho de
+  destino, e o `useLocation` da tela lê uma vez
+- `lib/api.ts`: `apiFetch<T>(path, opts)` (server-side, com o JWT do cookie)
+- `lib/types.ts`: tipos compartilhados
+- `lib/NotificationContext.tsx`: `useNotification()` (`showSuccess`,
+  `showError`, `addJob`), provider no layout
+- `components/NavBar.tsx` + `components/SinoPagamentos.tsx`: cópia da NavBar
+  atual do app antigo (menu por seções, busca, sino de pagamentos). A prop
+  `user` é opcional
+- `middleware.ts`: só confere se o cookie existe; o nível fica no `page.tsx`
+
+## 3. Mudança numa tela
+
+- **Mudou uma tela no app antigo?** Se ela está em `_telas`, copie de novo o
+  arquivo e refaça as trocas da tabela 2.2. Se é nativa, porte a mudança à mão.
+- **Tela nova** (que nunca existiu no app antigo): faça nativa, no padrão da
+  seção 4, com `next/navigation` direto (não use `lib/navigation`).
+- **Quer tirar uma tela de `_telas`** (SSR, Server Actions): faça a versão
+  nativa na pasta da rota, apague o `Tela.tsx` e o arquivo em `_telas` que
+  ficou sem uso.
+
+## 4. Padrão das telas nativas
+
+### 4.1 `page.tsx` (Server Component)
 
 ```ts
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { apiFetch } from "@/lib/api";  // só se for SSR-fetchar dados
 import FooClient from "./FooClient";
 
-export const metadata = { title: "Foo" };
+export const metadata = { title: "Foo — Wip Diversos" };
 
 export default async function FooPage() {
-  // Permissão mínima: olhar como o app antigo gateia (ver App.tsx)
+  // mesmo nível do App.tsx antigo
   const user = await requireUser(2);
   if (!user) redirect("/auth/login");
 
-  // Se a página puder fazer SSR de algum dado:
-  // const data = await apiFetch<Foo[]>("/foo/listar");
-
-  return <FooClient user={user} /* initialData={data} */ />;
+  return <FooClient user={user} />;
 }
 ```
 
-**Rotas públicas** (sem login): use `getUser()` em vez de `requireUser()` e
-NÃO faça `redirect`. Exemplo: `app/feedback/Opnion/page.tsx`.
+**Rota pública:** sem `requireUser`/`redirect`. **Só logado, qualquer nível**
+(`user?.token` no app antigo): `requireUser(0)`.
 
-### 3.4 Template do `<Nome>Client.tsx`
+### 4.2 `<Nome>Client.tsx`
 
 ```tsx
 "use client";
 
-import { useState } from "react";
-import axios from "axios";
 import NavBar from "@/components/NavBar";
 import type { User } from "@/lib/auth";
 
 export default function FooClient({ user }: { user: User }) {
   const token = user.token;
-  // estado, handlers, JSX iguais ao componente do app antigo
-
   return (
     <div>
       <NavBar user={user} />
@@ -105,159 +175,86 @@ export default function FooClient({ user }: { user: User }) {
 }
 ```
 
-### 3.5 Server Actions (mutations)
+### 4.3 Server Actions
 
-Use Server Actions para CREATE/UPDATE/DELETE quando possível
-(ver `app/licencas/actions.ts` como referência):
+Use para CREATE/UPDATE/DELETE quando der (ver `app/licencas/actions.ts`). Não
+use quando há progresso em tempo real, upload grande ou polling: aí `axios`
+direto no client (ver `app/Onu/OnuHomeClient.tsx`).
 
-```ts
-"use server";
-import { revalidatePath } from "next/cache";
-import { apiFetch } from "@/lib/api";
+### 4.4 Trocas do react-router (telas nativas)
 
-export async function createFooAction(input: FooInput) {
-  try {
-    await apiFetch("/foo/criar", { method: "POST", body: input });
-    revalidatePath("/foo");
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: "Erro ao criar foo." };
-  }
-}
+| React/CRA | Next |
+|-----------|------|
+| `<Link to="/x">` | `import Link from "next/link"`; `<Link href="/x">` |
+| `useNavigate()` + `navigate("/x")` | `useRouter()` + `router.push("/x")` |
+| `useLocation()` | `usePathname()` / `useSearchParams()` de `next/navigation` |
+| `useParams()` | `params` do `page.tsx` (`await params`) ou `useParams()` de `next/navigation` |
+| `navigate("/x", { state })` | search params (`?foo=bar`) |
+| `Cookies.set/remove` | `loginAction` / `logoutAction` em `app/auth/login/actions.ts` |
+
+### 4.5 SSR e hydration
+
+Nas telas nativas, **nunca** acesse no render inicial `window`, `document`,
+`localStorage`/`sessionStorage` ou `Date.now()`/`Math.random()` que mudem o
+markup. Ponha dentro de `useEffect`. Libs que tocam o DOM ao importar
+(leaflet, react-webcam, react-signature-canvas) entram com
+`dynamic(() => import("./X"), { ssr: false })`.
+
+## 5. Ao terminar
+
+1. Prefixo novo no `middleware.ts` (`PROTECTED_PREFIXES`). Rota pública não
+   precisa entrar em lista nenhuma.
+2. `npm run build`.
+3. Ao trocar entre `dev` e `build`, apague `.next` antes (`rm -rf .next`):
+   no Windows os artefatos se misturam.
+
+## 6. Dependências
+
+Já instaladas: `axios`, `@headlessui/react`, `@heroicons/react`, `react-icons`,
+`@mui/material`, `@mui/material-nextjs`, `@emotion/*`, `@mui/x-charts`,
+`recharts`, `leaflet`, `moment`, `date-fns`, `xlsx`, `qrcode.react`,
+`react-webcam`, `react-signature-canvas`, `react-to-print`, `file-saver`,
+`js-cookie` (o `TimeTrackingMap` lê o token do cookie, que o `loginAction`
+grava sem `httpOnly`), `html2canvas`, `jspdf`, `jszip`.
+
+Ao copiar tela nova, procure também `import("...")` dinâmico: o ZIP da busca
+de NFS-e só carrega `jszip`/`jspdf`/`html2canvas` ao clicar.
+
+Não trazer: `react-router-dom`, `react-scripts`, `react-helmet-async`,
+`web-vitals`, `@testing-library/*`.
+
+## 7. Regras
+
+- **NUNCA** modifique nada em `../app`.
+- Permissões iguais ao `App.tsx` antigo. Na migração, `/Nfcom` e
+  `/nfe/comodato` tinham ficado com nível 5 (o certo é 2) e `/Nfcom/Buscar`
+  com 5 (o certo é 1, é a tela de quem tem nível 1). Já corrigido.
+- Rota que no app antigo não tinha guard, mas cuja API exige nível (ex.:
+  `/Pix/findPaid`, `/Pix/:tipo`, `/Pix/Cancelar/Cobranca`,
+  `/GerarNotaDeServicoIndependente`): no Next ficou com o nível da API (2).
+- Tela com dois níveis (ex.: `/ZapSignConfig` N2 e `/zapsign-config` N5): dois
+  `page.tsx`, cada um com seu `requireUser(N)`, mesma tela.
+- As páginas de `../app` estão em CRLF. Ao copiar, não misture CRLF e LF no
+  mesmo arquivo (um `\r` solto já colou duas linhas numa migração).
+
+### 7.1 Rotas que só diferem em maiúsculas
+
+O Windows não diferencia maiúsculas de minúsculas nos nomes de pasta:
+`app/whatsapp` e `app/Whatsapp` são a **mesma pasta**, e a rota sai com a
+grafia errada. Ponha uma delas num **route group**, que não entra na URL:
+
+```
+app/Whatsapp/page.tsx                          → /Whatsapp
+app/(marketing)/whatsapp/broadcast/page.tsx    → /whatsapp/broadcast
 ```
 
-No client, dispare com `useTransition` + `router.refresh()` após sucesso.
+Pelo mesmo motivo as cópias ficam em `app/_telas/Mensalidades` e a rota em
+`app/mensalidades`. Confira no resumo do `npm run build` se a rota saiu com a
+grafia certa.
 
-**Quando NÃO usar Server Action:** chamadas que precisam de progresso em tempo
-real, upload de arquivos grandes, polling. Nesses casos use `axios` direto no
-Client Component (ver `app/Onu/OnuHomeClient.tsx`).
+## 8. Próximos passos
 
-## 4. Substituições obrigatórias
-
-| Original (React/CRA) | Substituir por (Next) |
-|----------------------|----------------------|
-| `import { Link } from "react-router-dom"` | `import Link from "next/link"` |
-| `<Link to="/x">` | `<Link href="/x">` |
-| `import { useNavigate } from "react-router-dom"` | `import { useRouter } from "next/navigation"` |
-| `const navigate = useNavigate(); navigate("/x")` | `const router = useRouter(); router.push("/x")` |
-| `import { useLocation } from "react-router-dom"` | `import { usePathname, useSearchParams } from "next/navigation"` |
-| `useParams()` | `useParams()` de `next/navigation` |
-| `import { useAuth } from ".../AuthContext"` | Receber `user: User` como **prop** vinda do Server Component |
-| `Cookies.set/get/remove` (js-cookie) | Para login/logout: usar `loginAction` / `logoutAction` em `app/auth/login/actions.ts`. Para ler no client: `document.cookie` cru (ver `app/HomeBackupButton.tsx`) |
-| `process.env.REACT_APP_URL` | **Mantém** `process.env.REACT_APP_URL` (já exposta) |
-| `useEffect` com `window.*` no body | OK, mas mover acesso a `window`/`document`/`localStorage` para **dentro** do `useEffect` (não no render inicial), senão quebra SSR |
-| `react-router` state em `navigate("/x", { state: {...} })` | Não existe no Next. Use **URL search params** (`?foo=bar`) ou **unifique as telas** num único Client Component (ver como `/ServerLogs` absorveu `/LogViewer`) |
-
-## 5. Bibliotecas DOM-only (SSR-incompatíveis)
-
-Quando a página usa **leaflet, react-leaflet, react-webcam, react-signature-canvas,
-chart.js, recharts, qrcode.react** (ou qualquer lib que toca `window`/`document` na
-importação), faça **dynamic import com `ssr: false`** dentro de um Client Component:
-
-```tsx
-"use client";
-import dynamic from "next/dynamic";
-const Map = dynamic(() => import("./MapInner"), { ssr: false });
-```
-
-Onde `MapInner.tsx` é um Client Component que faz o `import "leaflet"` etc.
-
-## 6. Hydration mismatch
-
-Já configurado `suppressHydrationWarning` no `<body>` (extensões tipo ColorZilla).
-Mas dentro dos seus componentes, **nunca** acesse no render inicial:
-- `window.*`
-- `document.*`
-- `localStorage` / `sessionStorage`
-- `Date.now()` / `Math.random()` que produzam markup diferente
-
-Coloque tudo isso dentro de `useEffect(() => { ... }, [])`.
-
-## 7. Ao terminar uma rota
-
-1. **Adicione o prefixo** ao `middleware.ts` em `PROTECTED_PREFIXES` (ou
-   `PUBLIC_EXACT` se for pública)
-2. Rode `npm run build` para validar tipos e bundling
-3. Se for trocar entre `dev` e `build`, **apague `.next`** primeiro
-   (`rm -rf .next`) — Windows mistura artefatos
-
-## 8. Instalação de novas dependências
-
-Se a página antiga usa uma lib que não está no `package.json` daqui, adicione:
-
-```bash
-cd frontend/app_nextjs
-npm install <pacote>
-```
-
-Pacotes que **NÃO** trazer: `react-router-dom`, `react-scripts`, `web-vitals`,
-`@testing-library/*`. O resto do `../app/package.json` é geralmente seguro.
-
-## 9. Próximas rotas a portar (ordem sugerida)
-
-Lista completa em `../app/src/App.tsx`. Sugestão de batches:
-
-**Batch 3 — TimeTracking (4 rotas)**
-- `/TimeTracking/ClockIn` — `../app/src/pages/TimeTracking/TimeClock.tsx` (público, usa webcam → dynamic import com ssr:false)
-- `/TimeTracking/Admin` — `EmployeeManager.tsx` (permission >= 5)
-- `/TimeTracking/Map` — `TimeTrackingMap.tsx` (leaflet → dynamic)
-- `/TimeTracking/Report` — `MonthlyReport.tsx`
-
-**Batch 4 — NFe / NFSe / NFCom**
-- `/NFSE` — `NFSE.tsx`
-- `/BuscarNfseGerada` — `BuscarNFSEGerada.tsx`
-- `/GerarNotaDeServicoIndependente`
-- `/nfe/comodato` (criar `app/nfe/comodato/page.tsx`) — `Comodato.tsx`
-- `/BuscarNfe` — `BuscarNfe.tsx`
-- `/Nfcom` — `Nfcom.tsx`
-- `/Nfcom/Buscar` — `SearchInterface.tsx`
-
-**Batch 5 — Pix (7 rotas)** — ver `../app/src/pages/Pix/`
-- `/Pix`, `/Pix/automatico`, `/Pix/automaticoAdmin`, `/Pix/Admin`, `/Pix/findPaid`,
-  `/Pix/:tipo` (rota dinâmica → `app/Pix/[tipo]/page.tsx`), `/Pix/Cancelar/Cobranca`
-
-**Batch 6 — WhatsApp**
-- `/Whatsapp` — `WhatsappChat.tsx`
-- `/Whatsapp/:id` — `userChat/userChat.tsx` (criar `app/Whatsapp/[id]/page.tsx`)
-- `/whatsapp/broadcast` — `EnviarMensagem.tsx`
-
-**Batch 7 — Diversos**
-- `/Create` — criar usuário
-- `/feedbackCreate`, `/feedback/:technician/:id` (rota dinâmica)
-- `/Prefeitura/Login`, `/Prefeitura/CodeOtp`
-- `/ClientAnalytics`, `/ClientAnalytics/Logs`
-- `/DDDOS`
-- `/solicitacoes-servico`
-- `/phone-location` (leaflet)
-- `/chamados/ficha-tecnica`, `/chamados/ficha-tecnica/nova`
-- `/TokenAutoAtendimento` (4 rotas, **públicas**)
-- `/doc/:fileName` (PdfViewer)
-- `/ZapSignConfig`, `/zapsign-config`, `/grafico-instalacoes`
-
-## 10. Regras finais
-
-- **NUNCA** modifique nada em `../app` (app React antigo). Só adicione no Next.
-- Mantenha permissões idênticas ao `App.tsx` antigo (`permission >= 1/2/5`).
-- Se uma página tem **rota dinâmica** (`/x/:id`), no Next vira
-  `app/x/[id]/page.tsx`, e os params chegam via:
-  ```ts
-  export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params;
-  }
-  ```
-- Não invente abstrações. Copie a estrutura visual e a lógica do componente
-  antigo o mais 1:1 possível. A migração é lift-and-shift; otimizações vêm
-  depois.
-- Quando uma página tem padrão **diferente** dos exemplos (ex.: usa Redux,
-  websocket, MUI complexo), pare e descreva o problema antes de continuar —
-  não chute.
-- Ao terminar um batch, rode `npm run build` e reporte o resultado.
-
-## 11. Como começar
-
-1. Leia `../app/src/App.tsx` para entender as rotas e permissões.
-2. Leia o componente antigo correspondente (ex.: `../app/src/pages/TimeTracking/TimeClock.tsx`).
-3. Crie os 2 arquivos seguindo o template (`page.tsx` + `<Nome>Client.tsx`).
-4. Atualize `middleware.ts` com a nova rota.
-5. `npm run build` para validar.
-6. Próxima rota.
+- Testar as telas logado, nos dois níveis (2 e 5), contra o backend real.
+- Trocar o app React pelo Next no deploy (porta 3001) e desligar o antigo.
+- Aos poucos, tornar nativas as telas de `_telas` que ganhem com SSR ou Server
+  Actions (seção 3).

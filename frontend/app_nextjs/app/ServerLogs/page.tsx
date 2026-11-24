@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import ServerLogsClient from "./ServerLogsClient";
+import Tela from "./Tela";
 
-export const metadata = { title: "Server Logs" };
+export const metadata = {
+  title: "Logs do servidor — Wip Diversos",
+};
 
-export default async function ServerLogsPage() {
+export default async function Page() {
   const user = await requireUser(2);
   if (!user) redirect("/auth/login");
-  return <ServerLogsClient user={user} />;
+
+  return <Tela />;
 }

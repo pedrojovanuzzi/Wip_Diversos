@@ -40,6 +40,7 @@ export const CpfVerificationModal: React.FC<CpfVerificationModalProps> = ({
 
   const formatCPF = (value: string) => {
     // 000.000.000-00
+    // Simple mask logic for display
     return value
       .replace(/\D/g, "")
       .replace(/(\d{3})(\d)/, "$1.$2")

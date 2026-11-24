@@ -1,0 +1,1406 @@
+"use client";
+
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import { useNavigate } from "@/lib/navigation";
+import NavBar from "@/components/NavBar";
+import { useAuth } from "@/lib/AuthContext";
+import LinkContaWatchTv from "@/components/LinkContaWatchTv";
+import { AiOutlineLoading3Quarters } from "react-icons/ai";
+import {
+  BsTrash,
+  BsCamera,
+  BsCollectionPlay,
+  BsGearFill,
+  BsTv,
+} from "react-icons/bs";
+
+interface ContratoItem {
+  id: number;
+  cfop_serc: string;
+  nome: string;
+  valor: number | string;
+  incluir: string;
+  data: string;
+  insuser: string;
+  login: string;
+  /** Descrição completa montada pelo backend ("WatchTV Brasil R$ 49,90"...). */
+  nomeExibicao?: string;
+  /**
+   * Tipo do serviço ("STREAMER" | "STREAMER_COLAB" | "CAMERA"), deduzido pelo
+   * backend. `nome` guarda a descrição que sai no boleto, então não serve mais
+   * para comparar tipo.
+   */
+  tag?: string;
+}
+
+interface ClienteComServico {
+  login: string;
+  nome: string | null;
+  ativo: boolean;
+  servicos: string[];
+  total: number;
+  ultima: string;
+}
+
+interface ListResponse {
+  login: string;
+  items: ContratoItem[];
+  total: number;
+  valoresUnitarios: Record<string, number>;
+  /** Preenchido quando a assinatura em curso é um teste com prazo. */
+  streamingTesteExpiraEm?: string | null;
+  /** Conta na Watch Brasil; null quando o cliente ainda não criou. */
+  streamingConta?: { email: string | null; ativo: boolean } | null;
+  /** Link ainda não usado para o cliente criar a conta. */
+  streamingLink?: { link: string; expira_em: string } | null;
+  /**
+   * Tem ou não a Watch TV, pela tabela clientes_watchtv — o que vale para o
+   * sistema todo. `origem`: "contrato", "plano" (combo) ou "manual".
+   */
+  watchtv?: { tem: boolean; origem: string | null };
+  /** Conta de câmeras do cliente (null quando ainda não existe). */
+  camera?: {
+    storageGb: number;
+    canais: number;
+    nome: string;
+  } | null;
+  /** Nomes comerciais dos serviços, montados pelo backend. */
+  nomesServicos?: {
+    STREAMER: string;
+    STREAMER_COLAB: string;
+    CAMERA: string | null;
+  };
+}
+
+const VALOR_STREAMER_PADRAO = 49.9;
+
+/** De onde veio o valor de clientes_watchtv. */
+const ORIGEM_WATCHTV: Record<string, string> = {
+  contrato: "pelo serviço no contrato",
+  plano: "pelo plano combo",
+  manual: "marcado manualmente",
+  solicitacao: "pelo contrato assinado na solicitação",
+};
+
+const formatBRL = (v: number) => Number(v || 0).toFixed(2).replace(".", ",");
+
+// Nomes comerciais (espelham o backend: config/servicosAdicionais.ts).
+const nomeStreaming = (valor: number = VALOR_STREAMER_PADRAO) =>
+  `WatchTV Brasil R$ ${formatBRL(valor)}`;
+const nomeStreamingColab = () => "WatchTV Brasil Colaborador (grátis)";
+const nomeCamera = (canais: number, gb: number) =>
+  `${canais} ${canais === 1 ? "Canal" : "Canais"} de Gravação em Nuvem ` +
+  `${gb} Gb de Armazenamento compartilhado`;
+
+/**
+ * Planos de armazenamento: vêm da tabela camera_planos (banco wip_cams),
+ * compartilhada com o portal de câmeras — não há lista fixa no código.
+ */
+interface PlanoArmazenamento {
+  gb: number;
+  priceBRL: number;
+  maxCameras: number;
+  ativo?: boolean;
+}
+
+/** Uma câmera a cada 5 GB, para cotas que não estejam na tabela. */
+const maxCamerasPorCota = (planos: PlanoArmazenamento[], gb: number) =>
+  planos.find((p) => p.gb === gb)?.maxCameras ||
+  Math.max(1, Math.floor(gb / 5));
+
+export const SerContratos: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [loginInput, setLoginInput] = useState("");
+  const [loaded, setLoaded] = useState<ListResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [removingId, setRemovingId] = useState<number | null>(null);
+  const [showStreamingForm, setShowStreamingForm] = useState(false);
+  const [streamingFormTipo, setStreamingFormTipo] = useState<
+    "STREAMER" | "STREAMER_COLAB"
+  >("STREAMER");
+  const [streamingForm, setStreamingForm] = useState({
+    email: "",
+    phone: "",
+  });
+  // Assinatura de teste: prazo em dias/horas/minutos (0 = sem prazo).
+  const [testeAtivo, setTesteAtivo] = useState(false);
+  const [teste, setTeste] = useState({ dias: 7, horas: 0, minutos: 0 });
+  const [streamingFormError, setStreamingFormError] = useState<string | null>(
+    null,
+  );
+  const [message, setMessage] = useState<{
+    text: string;
+    type: "success" | "error";
+  } | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [camLinkModal, setCamLinkModal] = useState<{
+    login: string;
+    setupLink: string | null;
+    status: string;
+    alreadyConfigured?: boolean;
+  } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+  // Plano de armazenamento escolhido ao adicionar Câmeras (padrão 5 GB).
+  const [cameraGb, setCameraGb] = useState(5);
+  // Clientes que já têm streaming/câmera: a tela abre com eles listados.
+  const [clientes, setClientes] = useState<ClienteComServico[] | null>(null);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [filtroClientes, setFiltroClientes] = useState("");
+  const [detalhando, setDetalhando] = useState(false);
+  const [planos, setPlanos] = useState<PlanoArmazenamento[]>([]);
+
+  const base = process.env.REACT_APP_URL;
+  const headers = { Authorization: `Bearer ${user?.token}` };
+
+  const showMsg = (text: string, type: "success" | "error") => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage(null), 4000);
+  };
+
+  const fetchClientes = useCallback(async () => {
+    setLoadingClientes(true);
+    try {
+      const res = await axios.get<{ clientes: ClienteComServico[] }>(
+        `${base}/sercontratos/clientes`,
+        { headers },
+      );
+      setClientes(res.data.clientes);
+    } catch (e) {
+      console.error("Erro ao carregar clientes com serviços:", e);
+      setClientes([]);
+    } finally {
+      setLoadingClientes(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  useEffect(() => {
+    fetchClientes();
+  }, [fetchClientes]);
+
+  useEffect(() => {
+    axios
+      .get<{ plans: PlanoArmazenamento[] }>(`${base}/cameras/admin/planos`, {
+        headers,
+      })
+      .then((res) => setPlanos(res.data.plans || []))
+      .catch((e) =>
+        console.error("Erro ao carregar os planos de armazenamento:", e),
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  /**
+   * Regrava os contratos antigos que ainda guardam a tag crua ("CAMERA",
+   * "STREAMER") com o nome comercial — é esse campo que o boleto imprime em
+   * "Valor adicional: ...". Roda primeiro em prévia e só aplica se confirmado.
+   */
+  const detalharNomes = async () => {
+    setDetalhando(true);
+    try {
+      const previa = await axios.post<{ analisados: number; alteracoes: number }>(
+        `${base}/sercontratos/detalhar-nomes`,
+        {},
+        { headers },
+      );
+      if (previa.data.alteracoes === 0) {
+        showMsg("Todos os contratos já estão com a descrição completa.", "success");
+        return;
+      }
+      const ok = window.confirm(
+        `${previa.data.alteracoes} contrato(s) de ${previa.data.analisados} ainda ` +
+          `mostram só a tag no boleto.
+
+Regravar com a descrição completa?`,
+      );
+      if (!ok) return;
+      const res = await axios.post<{ alteracoes: number }>(
+        `${base}/sercontratos/detalhar-nomes?aplicar=1`,
+        {},
+        { headers },
+      );
+      showMsg(`${res.data.alteracoes} contrato(s) atualizado(s).`, "success");
+      fetchClientes();
+    } catch (e: any) {
+      showMsg(
+        e?.response?.data?.message || "Erro ao detalhar os nomes.",
+        "error",
+      );
+    } finally {
+      setDetalhando(false);
+    }
+  };
+
+  const clientesFiltrados = useMemo(() => {
+    const termo = filtroClientes.trim().toUpperCase();
+    if (!termo) return clientes ?? [];
+    return (clientes ?? []).filter(
+      (c) =>
+        c.login.toUpperCase().includes(termo) ||
+        (c.nome || "").toUpperCase().includes(termo),
+    );
+  }, [clientes, filtroClientes]);
+
+  const fetchList = async (login?: string) => {
+    const target = (login ?? loginInput).trim();
+    if (!target) return;
+    setLoading(true);
+    setNotFound(false);
+    try {
+      const res = await axios.get<ListResponse>(
+        `${base}/sercontratos/${encodeURIComponent(target)}`,
+        { headers },
+      );
+      setLoaded(res.data);
+    } catch (e: any) {
+      if (e?.response?.status === 404) {
+        setNotFound(true);
+      } else {
+        showMsg(
+          e?.response?.data?.message || "Erro ao consultar cliente.",
+          "error",
+        );
+      }
+      setLoaded(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Link para o cliente criar (ou refazer) a conta da Watch TV. Fica salvo no
+  // `loaded`, e o quadro do streaming mostra em destaque até ele ser usado.
+  const [gerandoLinkWatch, setGerandoLinkWatch] = useState(false);
+  const gerarLinkWatch = async () => {
+    if (!loaded) return;
+    setGerandoLinkWatch(true);
+    try {
+      const res = await axios.post(
+        `${base}/sercontratos/streaming/link`,
+        { login: loaded.login },
+        { headers },
+      );
+      setLoaded((l) => (l ? { ...l, streamingLink: res.data } : l));
+    } catch (e: any) {
+      showMsg(e?.response?.data?.message || "Erro ao gerar o link.", "error");
+    } finally {
+      setGerandoLinkWatch(false);
+    }
+  };
+
+  // Consulta direta na Watch Brasil, para ver se a conta existe mesmo lá.
+  const [conferindoWatch, setConferindoWatch] = useState(false);
+  const [conferenciaWatch, setConferenciaWatch] = useState<any | null>(null);
+  const conferirWatch = async () => {
+    if (!loaded) return;
+    setConferindoWatch(true);
+    try {
+      const res = await axios.get(
+        `${base}/sercontratos/streaming/watch/${encodeURIComponent(loaded.login)}`,
+        { headers },
+      );
+      setConferenciaWatch(res.data);
+    } catch (e: any) {
+      showMsg(
+        e?.response?.data?.message || "Erro ao consultar a Watch Brasil.",
+        "error",
+      );
+    } finally {
+      setConferindoWatch(false);
+    }
+  };
+
+  const [marcandoWatch, setMarcandoWatch] = useState(false);
+  const marcarWatchTv = async (tem: boolean) => {
+    if (!loaded) return;
+    if (
+      !window.confirm(
+        tem
+          ? "Marcar que este cliente TEM a Watch TV? Ele passa a poder criar a conta."
+          : "Marcar que este cliente NÃO TEM a Watch TV?",
+      )
+    )
+      return;
+    setMarcandoWatch(true);
+    try {
+      const res = await axios.post(
+        `${base}/sercontratos/watchtv`,
+        { login: loaded.login, watchtv: tem },
+        { headers },
+      );
+      setLoaded((l) => (l ? { ...l, watchtv: res.data } : l));
+    } catch (e: any) {
+      showMsg(e?.response?.data?.message || "Erro ao marcar a Watch TV.", "error");
+    } finally {
+      setMarcandoWatch(false);
+    }
+  };
+
+  const addServico = async (
+    tipo: "STREAMER" | "STREAMER_COLAB" | "CAMERA",
+    extras?: Record<string, any>,
+  ) => {
+    if (!loaded) return;
+    setAdding(true);
+    try {
+      const body = { login: loaded.login, tipo, ...(extras || {}) };
+      const res = await axios.post(`${base}/sercontratos`, body, { headers });
+      const fl = res.data?.faturasLimpeza;
+      let extraMsg = "";
+      if (fl?.removidos > 0) {
+        extraMsg += ` ${fl.removidos} fatura(s) em aberto fora do mês foram removidas.`;
+      }
+      if (fl?.registradosPendentes?.length > 0) {
+        const detalhes = fl.registradosPendentes
+          .map(
+            (t: any) =>
+              `#${t.id} (venc ${new Date(t.datavenc).toLocaleDateString("pt-BR")}) — ${t.motivo}`,
+          )
+          .join("\n");
+        window.alert(
+          `Atenção: as faturas abaixo NÃO foram removidas porque já estão registradas no banco/gateway. Trate manualmente:\n\n${detalhes}`,
+        );
+      }
+      showMsg((res.data.message || "Adicionado com sucesso.") + extraMsg, "success");
+      await fetchList(loaded.login);
+      if (tipo === "CAMERA") {
+        await ensureCameraClient(loaded.login, extras?.storageGb);
+      }
+    } catch (e: any) {
+      if (
+        e?.response?.status === 409 &&
+        e?.response?.data?.code === "STREAMING_REPLACE_REQUIRED"
+      ) {
+        const atual = e.response.data.currentType || "STREAMING";
+        if (
+          window.confirm(
+            `Cliente já possui ${atual}. Deseja substituir pelo novo streaming?`,
+          )
+        ) {
+          try {
+            const retry = await axios.post(
+              `${base}/sercontratos`,
+              {
+                login: loaded.login,
+                tipo,
+                replace: true,
+                ...(extras || {}),
+              },
+              { headers },
+            );
+            showMsg(retry.data.message || "Substituído com sucesso.", "success");
+            await fetchList(loaded.login);
+          } catch (e2: any) {
+            showMsg(
+              e2?.response?.data?.message || "Erro ao substituir streaming.",
+              "error",
+            );
+          }
+        }
+      } else {
+        showMsg(
+          e?.response?.data?.message || "Erro ao adicionar serviço.",
+          "error",
+        );
+      }
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  // Garante a conta de câmeras do cliente e abre o popup com o link de cadastro.
+  const ensureCameraClient = async (login: string, storageGb?: number) => {
+    try {
+      const res = await axios.post(
+        `${base}/cameras/admin/clientes/ensure`,
+        { login, storageGb },
+        { headers },
+      );
+      setLinkCopied(false);
+      setCamLinkModal({
+        login,
+        setupLink: res.data.setupLink ?? null,
+        status: res.data.status,
+        alreadyConfigured: res.data.alreadyConfigured,
+      });
+    } catch (e: any) {
+      showMsg(
+        e?.response?.data?.message ||
+          "Câmera adicionada, mas falhou ao gerar o link de acesso.",
+        "error",
+      );
+    }
+  };
+
+  const copySetupLink = async () => {
+    if (!camLinkModal?.setupLink) return;
+    try {
+      await navigator.clipboard.writeText(camLinkModal.setupLink);
+      setLinkCopied(true);
+    } catch {
+      // ignore
+    }
+  };
+
+  const validateStreamingForm = (): string | null => {
+    const { email, phone } = streamingForm;
+    if (!email.trim()) return "Email obrigatório.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      return "Email inválido.";
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (phoneDigits.length < 10 || phoneDigits.length > 11)
+      return "Celular inválido (10 ou 11 dígitos).";
+    return null;
+  };
+
+  const submitStreamingForm = async () => {
+    const err = validateStreamingForm();
+    if (err) {
+      setStreamingFormError(err);
+      return;
+    }
+    setStreamingFormError(null);
+    await addServico(streamingFormTipo, {
+      email: streamingForm.email.trim(),
+      phone: streamingForm.phone.replace(/\D/g, ""),
+      ...(testeAtivo ? { teste } : {}),
+    });
+    setShowStreamingForm(false);
+    setStreamingForm({ email: "", phone: "" });
+  };
+
+  const openStreamingForm = (tipo: "STREAMER" | "STREAMER_COLAB") => {
+    setStreamingFormError(null);
+    setStreamingFormTipo(tipo);
+    setStreamingForm({ email: "", phone: "" });
+    setTesteAtivo(false);
+    setTeste({ dias: 7, horas: 0, minutos: 0 });
+    setShowStreamingForm(true);
+  };
+
+  const removeItem = async (id: number) => {
+    if (!loaded) return;
+    if (!window.confirm("Remover este serviço do cliente?")) return;
+    setRemovingId(id);
+    try {
+      await axios.delete(`${base}/sercontratos/${id}`, { headers });
+      showMsg("Removido.", "success");
+      await fetchList(loaded.login);
+    } catch (e: any) {
+      showMsg(e?.response?.data?.message || "Erro ao remover.", "error");
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const convertStreaming = async (
+    novoTipo: "STREAMER" | "STREAMER_COLAB",
+  ) => {
+    if (!loaded) return;
+    const labelNovo =
+      novoTipo === "STREAMER_COLAB" ? "Colaborador (grátis)" : "Pago";
+    if (
+      !window.confirm(
+        `Converter o streaming deste cliente para ${labelNovo}? A conta no Watch Brasil será mantida.`,
+      )
+    )
+      return;
+    setAdding(true);
+    try {
+      const res = await axios.post(
+        `${base}/sercontratos/streaming/convert`,
+        { login: loaded.login, novoTipo },
+        { headers },
+      );
+      showMsg(
+        res.data?.updated
+          ? `Streaming convertido para ${novoTipo}.`
+          : "Nada para converter.",
+        "success",
+      );
+      await fetchList(loaded.login);
+    } catch (e: any) {
+      showMsg(
+        e?.response?.data?.message || "Erro ao converter streaming.",
+        "error",
+      );
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const tagDoItem = (i: ContratoItem) =>
+    i.tag ?? String(i.nome || "").toUpperCase();
+  const totalStreaming = loaded?.items.filter(
+    (i) => tagDoItem(i) === "STREAMER",
+  ).length || 0;
+  const totalStreamingColab = loaded?.items.filter(
+    (i) => tagDoItem(i) === "STREAMER_COLAB",
+  ).length || 0;
+  const temStreaming = totalStreaming > 0 || totalStreamingColab > 0;
+  // Combo com Watch TV conta como streaming mesmo sem a linha de R$ 0,00.
+  const temWatch = loaded?.watchtv ? loaded.watchtv.tem : temStreaming;
+  const valorStreamerUnit =
+    loaded?.valoresUnitarios.STREAMER ?? VALOR_STREAMER_PADRAO;
+  const nomeStreamingAtual =
+    loaded?.nomesServicos?.STREAMER ?? nomeStreaming(valorStreamerUnit);
+  const nomeStreamingColabAtual =
+    loaded?.nomesServicos?.STREAMER_COLAB ?? nomeStreamingColab();
+  const totalCameras = loaded?.items.filter(
+    (i) => tagDoItem(i) === "CAMERA",
+  ).length || 0;
+  const nomeCameraAtual =
+    totalCameras > 0
+      ? (loaded?.nomesServicos?.CAMERA ??
+        (loaded?.camera
+          ? nomeCamera(loaded.camera.canais, loaded.camera.storageGb)
+          : nomeCamera(maxCamerasPorCota(planos, cameraGb), cameraGb)))
+      : nomeCamera(maxCamerasPorCota(planos, cameraGb), cameraGb);
+
+  return (
+    <>
+      <NavBar />
+      <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">
+              Serviços Adicionais — Streaming e Câmeras
+            </h1>
+            {/* No celular os botões viram uma grade: em linha única o
+                último era cortado fora da tela. */}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+              {(user?.permission ?? 0) >= 5 && (
+                <button
+                  onClick={() => navigate("/Cameras/Admin")}
+                  className="flex items-center justify-center gap-2 whitespace-nowrap rounded bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 sm:px-4"
+                  title="Gerenciar câmeras (CFTV) dos clientes"
+                >
+                  <BsCamera /> Gerenciar Câmeras
+                </button>
+              )}
+              <button
+                onClick={() => navigate("/Streaming")}
+                className="flex items-center justify-center gap-2 whitespace-nowrap rounded bg-gray-800 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-900 sm:px-4"
+                title="Gerenciar assinantes do Watch Brasil"
+              >
+                <BsGearFill /> Admin Streaming
+              </button>
+              <button
+                onClick={() => navigate("/tv-wip")}
+                className="col-span-2 flex items-center justify-center gap-2 whitespace-nowrap rounded bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 sm:col-span-1 sm:px-4"
+                title="Clientes com a TV WIP grátis (não é o streaming da Watch Brasil)"
+              >
+                <BsTv /> TV WIP Grátis
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-md mb-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Login do cliente
+            </label>
+            {/* flex-wrap: com os dois botões ao lado, o campo ficava
+                estreito demais numa tela de celular. */}
+            <div className="flex flex-wrap gap-2">
+              <input
+                type="text"
+                value={loginInput}
+                onChange={(e) => {
+                  setLoginInput(e.target.value.toUpperCase().trim());
+                  if (notFound) setNotFound(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") fetchList();
+                }}
+                placeholder="Ex: PEDROJOVANUZZI"
+                className="min-w-[12rem] flex-1 rounded border border-gray-300 p-2 uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              {loaded && (
+                <button
+                  onClick={() => {
+                    setLoaded(null);
+                    setLoginInput("");
+                    fetchClientes();
+                  }}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded font-semibold hover:bg-gray-300"
+                  title="Voltar para a lista de clientes"
+                >
+                  Ver lista
+                </button>
+              )}
+              <button
+                onClick={() => fetchList()}
+                disabled={loading || !loginInput.trim()}
+                className="px-4 py-2 bg-indigo-600 text-white rounded font-semibold hover:bg-indigo-700 disabled:bg-gray-400"
+              >
+                {loading ? (
+                  <AiOutlineLoading3Quarters className="animate-spin" />
+                ) : (
+                  "Buscar"
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Clientes que já têm serviço contratado: evita ter que saber o
+              login de cor. Some quando um cliente está aberto na tela. */}
+          {!loaded && (
+            <div className="bg-white p-4 rounded-lg shadow-md mb-4">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="font-bold text-gray-800">
+                  Clientes com serviço
+                  {clientes && (
+                    <span className="ml-2 text-xs font-normal text-gray-500">
+                      {clientesFiltrados.length} de {clientes.length}
+                    </span>
+                  )}
+                </h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={detalharNomes}
+                    disabled={detalhando}
+                    title="Regrava contratos antigos que ainda saem no boleto como CAMERA/STREAMER"
+                    className="whitespace-nowrap rounded bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:text-gray-400"
+                  >
+                    {detalhando ? "Verificando…" : "Detalhar no boleto"}
+                  </button>
+                  <input
+                    type="text"
+                    value={filtroClientes}
+                    onChange={(e) => setFiltroClientes(e.target.value)}
+                    placeholder="Filtrar por login ou nome"
+                    className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:w-64"
+                  />
+                </div>
+              </div>
+
+              {loadingClientes ? (
+                <div className="flex items-center gap-2 text-gray-500 text-sm p-4">
+                  <AiOutlineLoading3Quarters className="animate-spin" />
+                  Carregando clientes…
+                </div>
+              ) : clientesFiltrados.length === 0 ? (
+                <p className="text-sm text-gray-500 p-2">
+                  {clientes && clientes.length > 0
+                    ? "Nenhum cliente encontrado com esse filtro."
+                    : "Nenhum cliente com streaming ou câmera contratados."}
+                </p>
+              ) : (
+                <div className="max-h-96 overflow-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 sticky top-0 text-gray-600 text-xs uppercase">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold">Login</th>
+                        <th className="px-3 py-2 text-left font-semibold">Cliente</th>
+                        <th className="px-3 py-2 text-left font-semibold">Serviços</th>
+                        <th className="px-3 py-2 text-right font-semibold">Mensal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {clientesFiltrados.map((c) => (
+                        <tr
+                          key={c.login}
+                          className="hover:bg-indigo-50 cursor-pointer"
+                          onClick={() => {
+                            setLoginInput(c.login);
+                            fetchList(c.login);
+                          }}
+                        >
+                          <td className="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">
+                            {c.login}
+                            {!c.ativo && (
+                              <span className="ml-2 px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-semibold">
+                                inativo
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {c.nome || "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-1 flex-wrap">
+                              {c.servicos.map((sv) => (
+                                <span
+                                  key={sv}
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                    sv === "CAMERA"
+                                      ? "bg-indigo-100 text-indigo-800"
+                                      : sv === "STREAMER_COLAB"
+                                        ? "bg-blue-100 text-blue-800"
+                                        : "bg-purple-100 text-purple-800"
+                                  }`}
+                                >
+                                  {sv === "CAMERA"
+                                    ? "Câmera"
+                                    : sv === "STREAMER_COLAB"
+                                      ? "Streaming colab."
+                                      : "Streaming"}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-right whitespace-nowrap">
+                            R$ {formatBRL(c.total)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {message && (
+            <div
+              className={`mb-4 p-3 rounded text-sm ${
+                message.type === "success"
+                  ? "bg-green-100 text-green-800 border border-green-200"
+                  : "bg-red-100 text-red-800 border border-red-200"
+              }`}
+            >
+              {message.text}
+            </div>
+          )}
+
+          {notFound && (
+            <div className="mb-4 p-4 rounded bg-red-50 border border-red-200 text-red-800 text-center">
+              <p className="font-semibold">Cliente não cadastrado.</p>
+              <p className="text-sm">
+                Verifique o login digitado. Não é possível adicionar Streaming
+                ou Câmera para um cliente inexistente.
+              </p>
+            </div>
+          )}
+
+          {loaded && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="bg-white p-4 rounded-lg shadow-md">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BsCollectionPlay className="text-2xl text-purple-600" />
+                    <h2 className="font-bold text-gray-800">
+                      {nomeStreamingAtual}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Pago R$ {valorStreamerUnit.toFixed(2)} · Colaborador grátis —
+                    máx. 1 por cliente
+                  </p>
+                  {loaded.streamingTesteExpiraEm && (
+                    <div className="mb-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                      <b>Teste até</b>{" "}
+                      {new Date(loaded.streamingTesteExpiraEm).toLocaleString(
+                        "pt-BR",
+                      )}
+                      . Depois disso o cadastro sai da Watch Brasil sozinho.
+                    </div>
+                  )}
+                  <div className="mb-2 flex flex-wrap items-center gap-2 rounded border border-gray-200 p-2 text-xs">
+                    <span className="font-semibold text-gray-700">
+                      Watch TV:{" "}
+                      <span className={temWatch ? "text-green-700" : "text-red-700"}>
+                        {temWatch ? "tem (1)" : "não tem (0)"}
+                      </span>
+                    </span>
+                    {loaded.watchtv?.origem && (
+                      <span className="text-gray-500">
+                        · {ORIGEM_WATCHTV[loaded.watchtv.origem] ?? loaded.watchtv.origem}
+                      </span>
+                    )}
+                    {(user?.permission ?? 0) >= 2 && (
+                      <button
+                        onClick={() => marcarWatchTv(!temWatch)}
+                        disabled={marcandoWatch}
+                        className="ml-auto rounded bg-gray-100 px-2 py-1 font-semibold text-gray-700 hover:bg-gray-200 disabled:text-gray-400"
+                        title="Para plano ou serviço com nome que o sistema não reconhece. A sincronização diária não desfaz."
+                      >
+                        {temWatch ? "Marcar que não tem" : "Marcar que tem"}
+                      </button>
+                    )}
+                    {(user?.permission ?? 0) >= 2 && (
+                      <button
+                        onClick={conferirWatch}
+                        disabled={conferindoWatch}
+                        className="rounded bg-indigo-100 px-2 py-1 font-semibold text-indigo-800 hover:bg-indigo-200 disabled:text-gray-400"
+                        title="Consulta a Watch Brasil agora e compara com o que está guardado aqui"
+                      >
+                        {conferindoWatch ? "Consultando..." : "Conferir na Watch"}
+                      </button>
+                    )}
+                  </div>
+                  {temWatch && (
+                    <div className="bg-purple-50 p-2 rounded mb-2">
+                      <span className="text-sm text-purple-800 font-semibold">
+                        ✓ Cliente possui{" "}
+                        {!temStreaming
+                          ? loaded.watchtv?.origem === "manual"
+                            ? "Watch TV (marcada manualmente)"
+                            : "Watch TV incluída no plano (combo)"
+                          : totalStreamingColab > 0
+                            ? nomeStreamingColabAtual
+                            : nomeStreamingAtual}
+                      </span>
+                      <p className="text-xs text-purple-700 mt-0.5">
+                        {loaded.streamingConta
+                          ? `Conta na Watch TV: ${loaded.streamingConta.email || "criada"}`
+                          : "Conta na Watch TV ainda não criada."}
+                      </p>
+                    </div>
+                  )}
+                  {temWatch && loaded.streamingLink && (
+                    <div className="mb-2">
+                      <LinkContaWatchTv
+                        link={loaded.streamingLink.link}
+                        expiraEm={loaded.streamingLink.expira_em}
+                        substitui={!!loaded.streamingConta}
+                      />
+                    </div>
+                  )}
+                  {temWatch && !loaded.streamingLink && (
+                    <button
+                      onClick={gerarLinkWatch}
+                      disabled={gerandoLinkWatch}
+                      className={`w-full py-2 mb-2 rounded font-semibold text-white disabled:bg-gray-400 ${
+                        loaded.streamingConta
+                          ? "bg-purple-500 hover:bg-purple-600"
+                          : "bg-amber-600 hover:bg-amber-700"
+                      }`}
+                      title="O cliente escolhe o e-mail e o celular; se já houver conta, ela é substituída"
+                    >
+                      {gerandoLinkWatch
+                        ? "Gerando..."
+                        : loaded.streamingConta
+                          ? "Gerar link para o cliente refazer a conta"
+                          : "Gerar link para o cliente criar a conta"}
+                    </button>
+                  )}
+                  <div className="flex flex-col gap-2">
+                    {!temWatch && (
+                      <>
+                        <button
+                          onClick={() => openStreamingForm("STREAMER")}
+                          disabled={adding}
+                          className="w-full py-2 bg-purple-600 text-white rounded font-semibold hover:bg-purple-700 disabled:bg-gray-400"
+                        >
+                          {adding ? "Aguarde..." : "Adicionar Streaming"}
+                        </button>
+                        <button
+                          onClick={() => openStreamingForm("STREAMER_COLAB")}
+                          disabled={adding}
+                          className="w-full py-2 bg-emerald-600 text-white rounded font-semibold hover:bg-emerald-700 disabled:bg-gray-400"
+                          title="Libera a TV sem custo na mensalidade"
+                        >
+                          {adding
+                            ? "Aguarde..."
+                            : "Adicionar Streaming Colaborador (grátis)"}
+                        </button>
+                      </>
+                    )}
+                    {totalStreaming > 0 && (
+                      <button
+                        onClick={() => convertStreaming("STREAMER_COLAB")}
+                        disabled={adding}
+                        className="w-full py-2 bg-emerald-600 text-white rounded font-semibold hover:bg-emerald-700 disabled:bg-gray-400"
+                        title="Mantém a conta no Watch Brasil; só zera a cobrança"
+                      >
+                        {adding
+                          ? "Aguarde..."
+                          : "Converter para Colaborador (grátis)"}
+                      </button>
+                    )}
+                    {totalStreamingColab > 0 && (
+                      <button
+                        onClick={() => convertStreaming("STREAMER")}
+                        disabled={adding}
+                        className="w-full py-2 bg-purple-600 text-white rounded font-semibold hover:bg-purple-700 disabled:bg-gray-400"
+                        title="Mantém a conta no Watch Brasil; passa a cobrar"
+                      >
+                        {adding
+                          ? "Aguarde..."
+                          : "Converter para Pago"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-lg shadow-md">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BsCamera className="text-2xl text-blue-600" />
+                    <h2 className="font-bold text-gray-800">
+                      {nomeCameraAtual}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Plano de armazenamento das gravações — máx. 1 por cliente ·
+                    câmeras ilimitadas no portal
+                  </p>
+                  {totalCameras > 0 && (
+                    <div className="flex items-center bg-blue-50 p-2 rounded mb-2">
+                      <span className="text-sm text-blue-800 font-semibold">
+                        ✓ Cliente possui Câmeras
+                      </span>
+                    </div>
+                  )}
+                  {totalCameras === 0 && (
+                    <label className="block mb-2">
+                      <span className="text-xs font-medium text-gray-600">
+                        Armazenamento
+                      </span>
+                      <select
+                        value={cameraGb}
+                        onChange={(e) => setCameraGb(Number(e.target.value))}
+                        disabled={adding}
+                        className="mt-1 w-full ring-1 ring-gray-300 rounded px-2 py-1.5 text-sm"
+                      >
+                        {planos
+                          .filter((p) => p.ativo !== false)
+                          .map((p) => (
+                            <option key={p.gb} value={p.gb}>
+                              {p.gb} GB · {p.maxCameras} câm. — R${" "}
+                              {Number(p.priceBRL).toFixed(2)}/mês
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  )}
+                  <div className="flex gap-2">
+                    {totalCameras === 0 ? (
+                      <button
+                        onClick={() => addServico("CAMERA", { storageGb: cameraGb })}
+                        disabled={adding}
+                        className="flex-1 py-2 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+                      >
+                        {adding ? "Adicionando..." : "Adicionar Câmeras"}
+                      </button>
+                    ) : (
+                      <p className="flex-1 text-xs text-gray-500">
+                        Para remover, acesse <b>Gerenciar Câmeras</b> e exclua o
+                        cliente — isso também remove esta tag do cadastro.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-md overflow-hidden mb-4">
+                <div className="bg-gray-800 text-white p-3 flex items-center justify-between">
+                  <h2 className="font-bold">
+                    Serviços contratados — {loaded.login}
+                  </h2>
+                  <span className="text-lg font-bold">
+                    Total: R$ {loaded.total.toFixed(2)}
+                  </span>
+                </div>
+                {loaded.items.length === 0 ? (
+                  <p className="p-4 text-center text-gray-500 text-sm">
+                    Nenhum serviço contratado.
+                  </p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-600 uppercase text-xs">
+                        <th className="p-2 text-left">#</th>
+                        <th className="p-2 text-left">Serviço</th>
+                        <th className="p-2 text-right">Valor</th>
+                        <th className="p-2 text-left">Data</th>
+                        <th className="p-2 text-left">Criado por</th>
+                        <th className="p-2 text-center">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loaded.items.map((it) => (
+                        <tr
+                          key={it.id}
+                          className="border-t border-gray-100 hover:bg-gray-50"
+                        >
+                          <td className="p-2 text-gray-500">{it.id}</td>
+                          <td className="p-2 font-semibold">
+                            {it.nomeExibicao ??
+                              (tagDoItem(it) === "STREAMER_COLAB"
+                                ? nomeStreamingColabAtual
+                                : tagDoItem(it) === "STREAMER"
+                                  ? nomeStreaming(Number(it.valor))
+                                  : tagDoItem(it) === "CAMERA"
+                                    ? nomeCameraAtual
+                                    : it.nome)}
+                          </td>
+                          <td className="p-2 text-right">
+                            R$ {Number(it.valor).toFixed(2)}
+                          </td>
+                          <td className="p-2 text-gray-600">
+                            {it.data
+                              ? new Date(it.data).toLocaleString("pt-BR")
+                              : "—"}
+                          </td>
+                          <td className="p-2 text-gray-600">{it.insuser}</td>
+                          <td className="p-2 text-center">
+                            {tagDoItem(it) === "STREAMER" ||
+                            tagDoItem(it) === "STREAMER_COLAB" ? (
+                              <div className="flex items-center justify-center gap-3">
+                                <button
+                                  onClick={gerarLinkWatch}
+                                  disabled={gerandoLinkWatch}
+                                  className="whitespace-nowrap rounded bg-amber-500 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-600 disabled:bg-gray-400"
+                                  title="Link para o cliente criar a conta da Watch TV (substitui a atual, se houver)"
+                                >
+                                  {loaded.streamingLink
+                                    ? "Link gerado ↑"
+                                    : "Link da conta"}
+                                </button>
+                                {tagDoItem(it) === "STREAMER" ? (
+                                  <span className="text-gray-300" title="Streaming pago não pode ser removido por aqui">
+                                    —
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => removeItem(it.id)}
+                                    disabled={removingId === it.id}
+                                    className="text-red-600 hover:text-red-800 disabled:text-gray-400"
+                                  >
+                                    <BsTrash />
+                                  </button>
+                                )}
+                              </div>
+                            ) : tagDoItem(it) === "CAMERA" ? (
+                              <span className="text-gray-300" title="Para remover, exclua o cliente em Gerenciar Câmeras">
+                                —
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => removeItem(it.id)}
+                                disabled={removingId === it.id}
+                                className="text-red-600 hover:text-red-800 disabled:text-gray-400"
+                              >
+                                <BsTrash />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {showStreamingForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <BsCollectionPlay className="text-2xl text-purple-600" />
+                <h2 className="text-xl font-bold text-gray-800">
+                  {streamingFormTipo === "STREAMER_COLAB"
+                    ? "Cadastro do Streaming Colaborador (grátis)"
+                    : "Cadastro do Streaming"}
+                </h2>
+              </div>
+              <p className="text-xs text-gray-500 mb-4">
+                {streamingFormTipo === "STREAMER_COLAB"
+                  ? "Libera a TV sem custo na mensalidade. Substitui qualquer streaming anterior."
+                  : "Preencha os dados do cliente para ativar o streaming."}
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={streamingForm.email}
+                    onChange={(e) =>
+                      setStreamingForm((f) => ({ ...f, email: e.target.value }))
+                    }
+                    placeholder="cliente@email.com"
+                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Celular
+                  </label>
+                  <input
+                    type="tel"
+                    value={streamingForm.phone}
+                    onChange={(e) =>
+                      setStreamingForm((f) => ({ ...f, phone: e.target.value }))
+                    }
+                    placeholder="(14) 99999-9999"
+                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 rounded border border-amber-300 bg-amber-50 p-3">
+                <label className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                  <input
+                    type="checkbox"
+                    checked={testeAtivo}
+                    onChange={(e) => setTesteAtivo(e.target.checked)}
+                  />
+                  Liberar como período de teste
+                </label>
+                {testeAtivo && (
+                  <>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {(["dias", "horas", "minutos"] as const).map((campo) => (
+                        <div key={campo}>
+                          <label className="block text-xs font-medium text-amber-900 mb-1 capitalize">
+                            {campo}
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={teste[campo]}
+                            onChange={(e) =>
+                              setTeste((t) => ({
+                                ...t,
+                                [campo]: Math.max(0, Number(e.target.value) || 0),
+                              }))
+                            }
+                            className="w-full p-2 border border-amber-300 rounded focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-amber-800">
+                      Sem cobrança na mensalidade. Quando o prazo acabar, o
+                      cadastro é removido da Watch Brasil e o serviço sai do
+                      contrato automaticamente.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {streamingFormError && (
+                <div className="mt-3 p-2 bg-red-100 border border-red-200 text-red-800 text-sm rounded">
+                  {streamingFormError}
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-5">
+                <button
+                  onClick={() => setShowStreamingForm(false)}
+                  disabled={adding}
+                  className="flex-1 py-2 bg-gray-200 text-gray-800 rounded font-semibold hover:bg-gray-300 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={submitStreamingForm}
+                  disabled={adding}
+                  className="flex-1 py-2 bg-purple-600 text-white rounded font-semibold hover:bg-purple-700 disabled:bg-gray-400"
+                >
+                  {adding ? "Adicionando..." : "Confirmar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Popup: conferência da conta direto na Watch Brasil */}
+        {conferenciaWatch && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <BsCollectionPlay className="text-2xl text-purple-600" />
+                <h2 className="text-xl font-bold text-gray-800">
+                  Conta na Watch Brasil
+                </h2>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">
+                Cliente <b>{conferenciaWatch.login}</b>
+              </p>
+
+              <div
+                className={`mb-3 rounded p-3 text-sm font-semibold ${
+                  conferenciaWatch.cadastradoNaWatch
+                    ? conferenciaWatch.divergencias.length
+                      ? "bg-amber-50 text-amber-900 border border-amber-300"
+                      : "bg-green-50 text-green-800 border border-green-200"
+                    : "bg-red-50 text-red-800 border border-red-200"
+                }`}
+              >
+                {conferenciaWatch.cadastradoNaWatch
+                  ? conferenciaWatch.divergencias.length
+                    ? "Cadastrado na Watch, mas com diferenças em relação ao sistema."
+                    : "Cadastrado na Watch e igual ao que está guardado aqui."
+                  : "Não encontrado na Watch Brasil."}
+              </div>
+
+              {conferenciaWatch.divergencias.length > 0 && (
+                <ul className="mb-3 list-disc pl-5 text-sm text-amber-900">
+                  {conferenciaWatch.divergencias.map((d: string) => (
+                    <li key={d}>{d}</li>
+                  ))}
+                </ul>
+              )}
+
+              {conferenciaWatch.avisos?.length > 0 && (
+                <ul className="mb-3 list-disc pl-5 text-sm text-blue-900">
+                  {conferenciaWatch.avisos.map((a: string) => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
+              )}
+
+              <table className="mb-3 w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-xs uppercase text-gray-600">
+                    <th className="p-2 text-left"></th>
+                    <th className="p-2 text-left">Neste sistema</th>
+                    <th className="p-2 text-left">Na Watch</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(
+                    [
+                      ["Ticket", "ticket"],
+                      ["E-mail", "email"],
+                      ["Celular", "telefone"],
+                    ] as const
+                  ).map(([rotulo, k]) => (
+                    <tr key={k} className="border-t border-gray-100">
+                      <td className="p-2 font-semibold text-gray-600">{rotulo}</td>
+                      <td className="p-2 break-all">
+                        {conferenciaWatch.local?.[k] || "—"}
+                      </td>
+                      <td className="p-2 break-all">
+                        {conferenciaWatch.naWatch?.[k] || "—"}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-gray-100">
+                    <td className="p-2 font-semibold text-gray-600">Status</td>
+                    <td className="p-2">
+                      {conferenciaWatch.local
+                        ? conferenciaWatch.local.ativo
+                          ? "ativo"
+                          : "inativo"
+                        : "sem conta"}
+                    </td>
+                    <td className="p-2">
+                      {conferenciaWatch.naWatch?.ativo === true
+                        ? "ativo"
+                        : conferenciaWatch.naWatch?.ativo === false
+                          ? "inativo"
+                          : "—"}
+                    </td>
+                  </tr>
+                  {conferenciaWatch.naWatch && (
+                    <>
+                      <tr className="border-t border-gray-100">
+                        <td className="p-2 font-semibold text-gray-600">E-mail de acesso</td>
+                        <td className="p-2">—</td>
+                        <td className="p-2">
+                          {conferenciaWatch.naWatch.emailEnviado === true
+                            ? "enviado"
+                            : conferenciaWatch.naWatch.emailEnviado === false
+                              ? "não enviado"
+                              : "—"}
+                        </td>
+                      </tr>
+                      <tr className="border-t border-gray-100">
+                        <td className="p-2 font-semibold text-gray-600">Criado em</td>
+                        <td className="p-2">—</td>
+                        <td className="p-2">{conferenciaWatch.naWatch.criadoEm || "—"}</td>
+                      </tr>
+                    </>
+                  )}
+                </tbody>
+              </table>
+
+              {conferenciaWatch.consultas.map((c: any) => (
+                <details key={c.por} className="mb-2 rounded border border-gray-200 p-2 text-xs">
+                  <summary className="cursor-pointer font-semibold text-gray-700">
+                    Consulta por {c.por}:{" "}
+                    {c.erro
+                      ? `erro — ${c.erro}`
+                      : c.encontrado
+                        ? "encontrado"
+                        : "nada encontrado"}
+                  </summary>
+                  <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all bg-gray-50 p-2">
+                    {JSON.stringify(c.resposta, null, 2)}
+                  </pre>
+                </details>
+              ))}
+
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={() => setConferenciaWatch(null)}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded font-semibold hover:bg-gray-300"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Popup: link de cadastro de câmeras do cliente */}
+        {camLinkModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <BsCamera className="text-2xl text-indigo-600" />
+                <h2 className="text-xl font-bold text-gray-800">
+                  Acesso às câmeras
+                </h2>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">
+                Cliente <span className="font-semibold">{camLinkModal.login}</span>
+              </p>
+
+              {camLinkModal.setupLink ? (
+                <>
+                  <p className="text-sm text-gray-700 mb-2">
+                    Envie este link para o cliente definir o <b>e-mail e a senha</b> de
+                    acesso ao portal de câmeras:
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      readOnly
+                      value={camLinkModal.setupLink}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="flex-1 p-2 border border-gray-300 rounded text-sm bg-gray-50"
+                    />
+                    <button
+                      onClick={copySetupLink}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded font-semibold hover:bg-indigo-700 whitespace-nowrap"
+                    >
+                      {linkCopied ? "Copiado!" : "Copiar"}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    O login do cliente é o próprio PPPOE e não pode ser alterado.
+                  </p>
+                </>
+              ) : (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                  Este cliente já configurou o acesso (status:{" "}
+                  <b>{camLinkModal.status}</b>). Para gerar um novo link, use o
+                  botão <b>Gerenciar Câmeras</b>.
+                </div>
+              )}
+
+              <div className="flex justify-end mt-5">
+                <button
+                  onClick={() => setCamLinkModal(null)}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded font-semibold hover:bg-gray-300"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};

@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import OnuSettingsClient from "./OnuSettingsClient";
+import Tela from "./Tela";
 
-export const metadata = { title: "ONU — Configurações Avançadas" };
+export const metadata = {
+  title: "Configurações da ONU — Wip Diversos",
+};
 
-export default async function OnuSettingsPage() {
+export default async function Page() {
   const user = await requireUser(5);
   if (!user) redirect("/auth/login");
-  return <OnuSettingsClient user={user} />;
+
+  return <Tela />;
 }

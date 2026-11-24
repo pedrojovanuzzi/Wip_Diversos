@@ -9,6 +9,10 @@ export const metadata: Metadata = {
 
 import { getUser } from "@/lib/auth";
 import { NotificationProvider } from "@/lib/NotificationContext";
+import { AuthProvider } from "@/lib/AuthContext";
+// Estilos do MUI (emotion) no SSR do App Router. Sem isso as telas com MUI
+// piscam sem estilo até o JavaScript carregar.
+import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 
 export default async function RootLayout({
   children,
@@ -20,10 +24,14 @@ export default async function RootLayout({
   return (
     <html lang="pt-BR">
       <body suppressHydrationWarning>
-        <NotificationProvider user={user}>
-          <LocalhostBanner />
-          {children}
-        </NotificationProvider>
+        <AppRouterCacheProvider>
+          <AuthProvider user={user}>
+            <NotificationProvider user={user}>
+              <LocalhostBanner />
+              {children}
+            </NotificationProvider>
+          </AuthProvider>
+        </AppRouterCacheProvider>
       </body>
     </html>
   );

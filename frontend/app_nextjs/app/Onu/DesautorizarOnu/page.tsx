@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import DesautorizarOnuClient from "./DesautorizarOnuClient";
+import Tela from "./Tela";
 
-export const metadata = { title: "Desautorizar ONU" };
+export const metadata = {
+  title: "Desautorizar ONU — Wip Diversos",
+};
 
-export default async function DesautorizarOnuPage() {
+export default async function Page() {
   const user = await requireUser(2);
   if (!user) redirect("/auth/login");
-  return <DesautorizarOnuClient user={user} />;
+
+  return <Tela />;
 }

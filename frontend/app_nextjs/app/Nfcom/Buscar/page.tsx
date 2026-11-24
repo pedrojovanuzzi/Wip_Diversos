@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import BuscarNfcomClient from "./BuscarNfcomClient";
+import Tela from "./Tela";
 
 export const metadata = {
   title: "Buscar NFCom — Wip Diversos",
 };
 
-export default async function BuscarNfcomPage() {
-  const user = await requireUser(5);
+export default async function Page() {
+  const user = await requireUser(1);
   if (!user) redirect("/auth/login");
 
-  return <BuscarNfcomClient user={user} />;
+  return <Tela />;
 }

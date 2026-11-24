@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import BuscarNfseGeradaClient from "./BuscarNfseGeradaClient";
+import Tela from "./Tela";
 
 export const metadata = {
-  title: "Buscar NFS-e Geradas — Wip Diversos",
+  title: "Buscar NFS-e — Wip Diversos",
 };
 
-export default async function BuscarNfseGeradaPage() {
+export default async function Page() {
   const user = await requireUser(2);
   if (!user) redirect("/auth/login");
 
-  return <BuscarNfseGeradaClient user={user} />;
+  return <Tela />;
 }

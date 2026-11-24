@@ -7,7 +7,7 @@ export const metadata = {
 };
 
 export default async function ComodatoPage() {
-  const user = await requireUser(5);
+  const user = await requireUser(2);
   if (!user) redirect("/auth/login");
 
   return <ComodatoClient user={user} />;

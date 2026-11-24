@@ -1,14 +1,11 @@
-import { getUser } from "@/lib/auth";
-import ClockInClient from "./ClockInClient";
+import Tela from "./Tela";
 
 export const metadata = {
-  title: "Bater Ponto",
+  title: "Registrar ponto — Wip Diversos",
 };
 
-export default async function ClockInPage() {
-  // Esta página é pública (quiosque), mas usamos getUser() 
-  // para verificar se há um admin logado (habilita edição de data).
-  const user = await getUser();
+export default async function Page() {
+  // Rota pública no app antigo: sem login.
 
-  return <ClockInClient user={user} />;
+  return <Tela />;
 }
