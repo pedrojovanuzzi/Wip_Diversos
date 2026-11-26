@@ -15,8 +15,10 @@ import {
   normalizeStorageGb,
   isValidStorageGb,
   planFor,
-  maxCamerasFor,
   carregarPlanosDoBanco,
+  lerPlanoPersonalizado,
+  maxCamerasDoCliente,
+  PlanoPersonalizado,
 } from "../config/cameraStoragePlans";
 import { CameraPlano } from "../entities/CameraPlano";
 import {
@@ -121,9 +123,25 @@ class Camera {
       }
       const repo = CamsSource.getRepository(CameraCliente);
       let cliente = await repo.findOne({ where: { login } });
-      // Plano de armazenamento escolhido ao adicionar o serviço (opcional).
-      const storageGb =
-        req.body.storageGb !== undefined ? normalizeStorageGb(req.body.storageGb) : null;
+      // Plano escolhido ao adicionar o serviço (opcional): um da tabela
+      // (storageGb) ou um personalizado (GB + limite de câmeras próprios).
+      let personalizado: PlanoPersonalizado | null = null;
+      if (req.body.personalizado) {
+        const lido = lerPlanoPersonalizado(req.body.personalizado);
+        if ("erro" in lido) {
+          res.status(400).json({ message: lido.erro });
+          return;
+        }
+        personalizado = lido.plano;
+      }
+      const storageGb = personalizado
+        ? personalizado.storageGb
+        : req.body.storageGb !== undefined
+          ? normalizeStorageGb(req.body.storageGb)
+          : null;
+      // Só mexe no limite próprio quando veio um plano; plano da tabela limpa.
+      const maxCameras =
+        storageGb === null ? undefined : (personalizado?.maxCameras ?? null);
 
       if (!cliente) {
         const mkRepo = MkauthSource.getRepository(ClientesEntities);
@@ -138,6 +156,7 @@ class Camera {
           setup_uuid,
           status: "pendente",
           storage_gb: storageGb ?? undefined,
+          max_cameras: maxCameras ?? null,
         });
         await repo.save(cliente);
         res.status(201).json({
@@ -150,9 +169,14 @@ class Camera {
         return;
       }
 
-      // Conta já existe: se veio um plano, atualiza a cota.
-      if (storageGb !== null && cliente.storage_gb !== storageGb) {
+      // Conta já existe: se veio um plano, atualiza a cota (e o limite).
+      if (
+        storageGb !== null &&
+        (cliente.storage_gb !== storageGb ||
+          (cliente.max_cameras ?? null) !== maxCameras)
+      ) {
         cliente.storage_gb = storageGb;
+        cliente.max_cameras = maxCameras ?? null;
         await repo.save(cliente);
       }
 
@@ -307,12 +331,26 @@ class Camera {
    * Troca o plano de armazenamento de um cliente (upgrade/downgrade).
    * Atualiza a cota (camera_clientes.storage_gb) E o valor cobrado no contrato
    * CAMERA (sis_sercontratos). Se ainda não houver contrato CAMERA, só a cota muda.
+   *
+   * Body: `{ storageGb }` (plano da tabela) ou
+   * `{ personalizado: { storageGb, maxCameras, valor } }` (valor 0 = grátis).
    */
   public async updatePlano(req: Request, res: Response) {
     try {
       const id = Number(req.params.id);
-      const storageGb = Number(req.body.storageGb);
-      if (!isValidStorageGb(storageGb)) {
+      let personalizado: PlanoPersonalizado | null = null;
+      if (req.body.personalizado) {
+        const lido = lerPlanoPersonalizado(req.body.personalizado);
+        if ("erro" in lido) {
+          res.status(400).json({ message: lido.erro });
+          return;
+        }
+        personalizado = lido.plano;
+      }
+      const storageGb = personalizado
+        ? personalizado.storageGb
+        : Number(req.body.storageGb);
+      if (!personalizado && !isValidStorageGb(storageGb)) {
         res.status(400).json({
           message:
             "Plano inválido. Use: " +
@@ -328,10 +366,12 @@ class Camera {
       }
 
       cliente.storage_gb = storageGb;
+      cliente.max_cameras = personalizado?.maxCameras ?? null;
       await repo.save(cliente);
 
-      // Ajusta o valor do contrato CAMERA do cliente (se existir) para o preço do plano.
-      const plano = planFor(storageGb)!;
+      // Ajusta o valor do contrato CAMERA do cliente (se existir) para o preço
+      // do plano (ou o valor do personalizado).
+      const valor = personalizado ? personalizado.valor : planFor(storageGb)!.priceBRL;
       const serRepo = MkauthSource.getRepository(SisSerContratos);
       // O nome do contrato descreve o plano (câmeras + GB) e é o texto impresso
       // no boleto, então muda junto com o valor.
@@ -339,8 +379,13 @@ class Camera {
         .createQueryBuilder()
         .update(SisSerContratos)
         .set({
-          valor: plano.priceBRL,
-          nome: nomeContratoParaGravar("CAMERA", plano.priceBRL, storageGb),
+          valor,
+          nome: nomeContratoParaGravar(
+            "CAMERA",
+            valor,
+            storageGb,
+            personalizado?.maxCameras,
+          ),
         })
         .where("UPPER(TRIM(login)) = UPPER(TRIM(:l))", { l: cliente.login })
         .andWhere(`${sqlTagServico("nome")} = :nome`, { nome: "CAMERA" })
@@ -349,7 +394,8 @@ class Camera {
       res.json({
         ok: true,
         storageGb: cliente.storage_gb,
-        priceBRL: plano.priceBRL,
+        maxCameras: maxCamerasDoCliente(cliente),
+        priceBRL: valor,
         contratoAtualizado: (updated.affected ?? 0) > 0,
       });
     } catch (e: any) {
@@ -365,6 +411,22 @@ class Camera {
       const camRepo = CamsSource.getRepository(CameraEntity);
       const clientes = await repo.find({ order: { id: "DESC" } });
 
+      // Valor cobrado hoje no contrato CAMERA de cada login (mkauth). É o que
+      // vale para plano personalizado, que pode ser grátis (R$ 0,00).
+      const valorContrato = new Map<string, number>();
+      try {
+        const linhas = await MkauthSource.getRepository(SisSerContratos)
+          .createQueryBuilder("s")
+          .select("UPPER(TRIM(s.login))", "login")
+          .addSelect("SUM(s.valor)", "valor")
+          .where(`${sqlTagServico("s.nome")} = :nome`, { nome: "CAMERA" })
+          .groupBy("UPPER(TRIM(s.login))")
+          .getRawMany();
+        for (const l of linhas) valorContrato.set(String(l.login), Number(l.valor || 0));
+      } catch (e: any) {
+        console.warn("listarClientes: sem valores do mkauth:", e?.message);
+      }
+
       const items = await Promise.all(
         clientes.map(async (c) => ({
           id: c.id,
@@ -372,8 +434,14 @@ class Camera {
           email: c.email,
           status: c.status,
           storageGb: c.storage_gb,
-          storagePriceBRL: planFor(c.storage_gb)?.priceBRL ?? null,
-          maxCameras: maxCamerasFor(c.storage_gb),
+          storagePriceBRL:
+            valorContrato.get(c.login.trim().toUpperCase()) ??
+            planFor(c.storage_gb)?.priceBRL ??
+            null,
+          maxCameras: maxCamerasDoCliente(c),
+          // Fora da tabela de planos: limite próprio ou cota que não é plano.
+          personalizado: c.max_cameras != null || !planFor(c.storage_gb),
+          temContrato: valorContrato.has(c.login.trim().toUpperCase()),
           cleanupDays: c.cleanup_days ?? null,
           setupLink: c.setup_uuid
             ? `${FRONT_URL}/Cameras/Setup/${c.setup_uuid}`

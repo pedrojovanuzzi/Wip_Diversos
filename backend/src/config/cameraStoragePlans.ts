@@ -154,3 +154,61 @@ export function normalizeStorageGb(input: unknown): number {
   const n = Number(input);
   return Number.isFinite(n) && isValidStorageGb(n) ? n : DEFAULT_STORAGE_GB;
 }
+
+// ===================== Plano personalizado =====================
+
+/** Limites aceitos num plano personalizado (fora da tabela camera_planos). */
+export const LIMITES_PERSONALIZADO = {
+  gbMax: 10_000,
+  camerasMax: 200,
+  valorMax: 100_000,
+};
+
+/** Plano montado na mão para um cliente: cota, câmeras e valor (0 = grátis). */
+export interface PlanoPersonalizado {
+  storageGb: number;
+  maxCameras: number;
+  valor: number;
+}
+
+/**
+ * Valida o plano personalizado vindo do corpo da requisição. Devolve o plano
+ * ou a mensagem de erro para responder 400.
+ */
+export function lerPlanoPersonalizado(
+  input: any,
+): { plano: PlanoPersonalizado } | { erro: string } {
+  const storageGb = Number(input?.storageGb);
+  const maxCameras = Number(input?.maxCameras);
+  const valor = Math.round(Number(input?.valor) * 100) / 100;
+  if (
+    !Number.isInteger(storageGb) ||
+    storageGb < 1 ||
+    storageGb > LIMITES_PERSONALIZADO.gbMax
+  ) {
+    return { erro: `Armazenamento inválido (1 a ${LIMITES_PERSONALIZADO.gbMax} GB).` };
+  }
+  if (
+    !Number.isInteger(maxCameras) ||
+    maxCameras < 1 ||
+    maxCameras > LIMITES_PERSONALIZADO.camerasMax
+  ) {
+    return { erro: `Quantidade de câmeras inválida (1 a ${LIMITES_PERSONALIZADO.camerasMax}).` };
+  }
+  if (!Number.isFinite(valor) || valor < 0 || valor > LIMITES_PERSONALIZADO.valorMax) {
+    return { erro: "Valor inválido (use 0 para deixar gratuito)." };
+  }
+  return { plano: { storageGb, maxCameras, valor } };
+}
+
+/**
+ * Limite de câmeras de um cliente: o personalizado (camera_clientes.max_cameras)
+ * vale sobre o da tabela de planos.
+ */
+export function maxCamerasDoCliente(c: {
+  storage_gb: number;
+  max_cameras?: number | null;
+}): number {
+  const n = Number(c.max_cameras);
+  return Number.isInteger(n) && n > 0 ? n : maxCamerasFor(c.storage_gb);
+}

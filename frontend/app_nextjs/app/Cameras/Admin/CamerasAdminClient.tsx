@@ -31,6 +31,19 @@ export interface ClienteItem {
   setupLink: string | null;
   totalCameras: number;
   created_at: string;
+  /** Plano fora da tabela (GB/câmeras/valor próprios; valor 0 = grátis). */
+  personalizado?: boolean;
+  /** Já existe o contrato CAMERA no cadastro (é onde fica o valor). */
+  temContrato?: boolean;
+}
+
+/** Formulário do plano personalizado de um cliente. */
+interface FormPersonalizado {
+  cliente: ClienteItem;
+  storageGb: string;
+  maxCameras: string;
+  valor: string;
+  gratis: boolean;
 }
 
 /**
@@ -75,6 +88,7 @@ export default function CamerasAdminClient({
   } | null>(null);
   const [nginxLoading, setNginxLoading] = useState(false);
   const [nginxApplying, setNginxApplying] = useState(false);
+  const [formPers, setFormPers] = useState<FormPersonalizado | null>(null);
   const [msg, setMsg] = useState<{ text: string; type: "ok" | "err" } | null>(
     erroInicial ? { text: erroInicial, type: "err" } : null,
   );
@@ -250,6 +264,55 @@ export default function CamerasAdminClient({
       flash("Plano atualizado.", "ok");
     } catch (e: any) {
       flash(e?.response?.data?.message || "Erro ao mudar plano.", "err");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const abrirPersonalizado = (c: ClienteItem) => {
+    const valor = Number(c.storagePriceBRL ?? 0);
+    setFormPers({
+      cliente: c,
+      storageGb: String(c.storageGb),
+      maxCameras: String(c.maxCameras),
+      valor: valor.toFixed(2),
+      gratis: c.personalizado === true && valor === 0,
+    });
+  };
+
+  const salvarPersonalizado = async () => {
+    if (!formPers) return;
+    const c = formPers.cliente;
+    const storageGb = Math.trunc(Number(formPers.storageGb));
+    const maxCameras = Math.trunc(Number(formPers.maxCameras));
+    const valor = formPers.gratis
+      ? 0
+      : Number(String(formPers.valor).replace(",", "."));
+    if (!(storageGb >= 1) || !(maxCameras >= 1) || !Number.isFinite(valor) || valor < 0) {
+      flash("Preencha GB, câmeras e valor (0 para gratuito).", "err");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Plano personalizado de ${c.login}: ${storageGb} GB · ${maxCameras} câm. — ` +
+          (valor === 0 ? "GRATUITO" : `R$ ${valor.toFixed(2)}/mês`) +
+          "?\nIsto ajusta a cobrança do serviço CAMERA e reaplica a cota " +
+          "(reduzir a cota pode apagar as gravações mais antigas).",
+      )
+    )
+      return;
+    setBusyId(c.id);
+    try {
+      await axios.put(
+        `${base}/cameras/admin/clientes/${c.id}/plano`,
+        { personalizado: { storageGb, maxCameras, valor } },
+        { headers },
+      );
+      setFormPers(null);
+      await load();
+      flash("Plano personalizado salvo.", "ok");
+    } catch (e: any) {
+      flash(e?.response?.data?.message || "Erro ao salvar o plano.", "err");
     } finally {
       setBusyId(null);
     }
@@ -444,9 +507,13 @@ export default function CamerasAdminClient({
                     <td className="px-3 py-2">{statusBadge(c.status)}</td>
                     <td className="px-3 py-2">
                       <select
-                        value={c.storageGb}
+                        value={c.personalizado ? "personalizado" : c.storageGb}
                         disabled={busyId === c.id}
-                        onChange={(e) => mudarPlano(c, Number(e.target.value))}
+                        onChange={(e) =>
+                          e.target.value === "personalizado"
+                            ? abrirPersonalizado(c)
+                            : mudarPlano(c, Number(e.target.value))
+                        }
                         className="ring-1 ring-gray-300 rounded px-2 py-1 text-sm disabled:opacity-50"
                         title="Plano de armazenamento (ajusta a cobrança do CAMERA)"
                       >
@@ -458,7 +525,25 @@ export default function CamerasAdminClient({
                               {Number(p.priceBRL).toFixed(2)}
                             </option>
                           ))}
+                        <option value="personalizado">
+                          {c.personalizado
+                            ? `Personalizado: ${c.storageGb} GB · ${c.maxCameras} câm. — ` +
+                              (Number(c.storagePriceBRL ?? 0) === 0
+                                ? "grátis"
+                                : `R$ ${Number(c.storagePriceBRL).toFixed(2)}`)
+                            : "Personalizado…"}
+                        </option>
                       </select>
+                      {c.personalizado && (
+                        <button
+                          onClick={() => abrirPersonalizado(c)}
+                          disabled={busyId === c.id}
+                          className="ml-1 text-gray-400 hover:text-gray-700 align-middle"
+                          title="Editar plano personalizado"
+                        >
+                          <BsPencil />
+                        </button>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <span
@@ -533,6 +618,88 @@ export default function CamerasAdminClient({
           </div>
         )}
       </div>
+
+      {formPers && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-4 shadow-lg">
+            <h3 className="mb-1 font-semibold">
+              Plano personalizado — {formPers.cliente.login}
+            </h3>
+            <p className="mb-3 text-xs text-gray-500">
+              Cota, limite de câmeras e valor próprios, fora da tabela de planos.
+              {!formPers.cliente.temContrato &&
+                " O cliente ainda não tem o serviço CAMERA no cadastro: só a cota e o limite mudam."}
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <label className="block">
+                <span className="text-xs font-medium text-gray-600">GB</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={formPers.storageGb}
+                  onChange={(e) =>
+                    setFormPers((f) => (f ? { ...f, storageGb: e.target.value } : f))
+                  }
+                  className="mt-1 w-full ring-1 ring-gray-300 rounded px-2 py-1 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-gray-600">Câmeras</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={formPers.maxCameras}
+                  onChange={(e) =>
+                    setFormPers((f) => (f ? { ...f, maxCameras: e.target.value } : f))
+                  }
+                  className="mt-1 w-full ring-1 ring-gray-300 rounded px-2 py-1 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-gray-600">R$/mês</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={formPers.gratis ? "0" : formPers.valor}
+                  disabled={formPers.gratis}
+                  onChange={(e) =>
+                    setFormPers((f) => (f ? { ...f, valor: e.target.value } : f))
+                  }
+                  className="mt-1 w-full ring-1 ring-gray-300 rounded px-2 py-1 text-sm disabled:bg-gray-100"
+                />
+              </label>
+            </div>
+            <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={formPers.gratis}
+                onChange={(e) =>
+                  setFormPers((f) => (f ? { ...f, gratis: e.target.checked } : f))
+                }
+              />
+              Gratuito (R$ 0,00 — não cobra no boleto)
+            </label>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setFormPers(null)}
+                className="px-3 py-1.5 text-sm ring-1 ring-gray-300 rounded hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={salvarPersonalizado}
+                disabled={busyId === formPers.cliente.id}
+                className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {busyId === formPers.cliente.id ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

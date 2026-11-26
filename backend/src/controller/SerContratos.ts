@@ -18,7 +18,12 @@ import {
   linkAbertoDoLogin,
   registrarAssinanteStreaming,
 } from "../services/streamingCadastro";
-import { planFor, normalizeStorageGb } from "../config/cameraStoragePlans";
+import {
+  planFor,
+  normalizeStorageGb,
+  lerPlanoPersonalizado,
+  PlanoPersonalizado,
+} from "../config/cameraStoragePlans";
 import {
   VALOR_STREAMER,
   VALOR_STREAMER_COLAB,
@@ -194,6 +199,7 @@ class SerContratos {
         phone: phoneForm,
         replace,
         storageGb,
+        personalizado,
         teste,
       } = req.body as {
         login?: string;
@@ -203,6 +209,11 @@ class SerContratos {
         phone?: string;
         replace?: boolean;
         storageGb?: number;
+        /**
+         * CAMERA com plano personalizado: GB, câmeras e valor (0 = grátis),
+         * fora da tabela camera_planos.
+         */
+        personalizado?: { storageGb?: number; maxCameras?: number; valor?: number };
         /** Assinatura de teste: prazo em dias/horas/minutos. */
         teste?: { dias?: number; horas?: number; minutos?: number };
       };
@@ -238,6 +249,16 @@ class SerContratos {
         minutosTeste > 0
           ? new Date(Date.now() + minutosTeste * 60_000)
           : null;
+
+      let planoPersonalizado: PlanoPersonalizado | null = null;
+      if (tipoNorm === "CAMERA" && personalizado) {
+        const lido = lerPlanoPersonalizado(personalizado);
+        if ("erro" in lido) {
+          res.status(400).json({ message: lido.erro });
+          return;
+        }
+        planoPersonalizado = lido.plano;
+      }
 
       const ClientRepo = MkauthSource.getRepository(ClientesEntities);
       const cliente = await ClientRepo.findOne({ where: { login } });
@@ -386,14 +407,17 @@ class SerContratos {
 
       const qtd = Math.max(1, Math.min(Number(quantidade) || 1, 20));
       // CAMERA: o valor cobrado vem do plano de armazenamento escolhido
-      // (5GB=R$20, 10GB=R$30, 15GB=R$35, 20GB=R$40). Demais tipos: valor fixo.
+      // (tabela camera_planos) ou do personalizado, que pode ser 0 (grátis).
+      // Demais tipos: valor fixo.
       const valorUnitario = expiraTeste
         ? // Teste não entra na mensalidade; se o cliente ficar, o serviço é
           // recadastrado depois pelo valor cheio.
           0
-        : tipoNorm === "CAMERA"
-          ? planFor(normalizeStorageGb(storageGb))!.priceBRL
-          : VALORES[tipoNorm];
+        : planoPersonalizado
+          ? planoPersonalizado.valor
+          : tipoNorm === "CAMERA"
+            ? planFor(normalizeStorageGb(storageGb))!.priceBRL
+            : VALORES[tipoNorm];
 
       // O boleto do mkauth imprime este campo literalmente ("Valor adicional:
       // <nome>"), então o que vai gravado é a descrição comercial — a tag do
@@ -401,7 +425,10 @@ class SerContratos {
       const nomeContrato = nomeContratoParaGravar(
         tipoNorm,
         valorUnitario,
-        tipoNorm === "CAMERA" ? normalizeStorageGb(storageGb) : undefined,
+        tipoNorm === "CAMERA"
+          ? (planoPersonalizado?.storageGb ?? normalizeStorageGb(storageGb))
+          : undefined,
+        planoPersonalizado?.maxCameras,
       );
 
       // STREAMER / STREAMER_COLAB: valida na Watch Brasil ANTES de gravar local
@@ -811,12 +838,20 @@ class SerContratos {
       for (const item of itens) {
         const tag = tagDoServico(item.nome);
         const valor = Number(item.valor || 0);
+        const resumo =
+          tag === "CAMERA"
+            ? resumos.get(String(item.login || "").trim().toUpperCase())
+            : undefined;
         const gb =
           tag === "CAMERA"
-            ? (resumos.get(String(item.login || "").trim().toUpperCase())
-                ?.storageGb ?? storageGbDoValor(valor))
+            ? (resumo?.storageGb ?? storageGbDoValor(valor))
             : undefined;
-        const novo = nomeContratoParaGravar(tag, valor, gb);
+        const novo = nomeContratoParaGravar(
+          tag,
+          valor,
+          gb,
+          resumo?.personalizado ? resumo.maxCameras : undefined,
+        );
         if (novo && novo !== String(item.nome || "").trim()) {
           mudancas.push({ id: item.id, login: item.login, de: item.nome, para: novo });
         }

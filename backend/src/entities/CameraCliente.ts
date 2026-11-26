@@ -37,6 +37,11 @@ export class CameraCliente {
   @Column({ type: "int", default: 5 })
   storage_gb!: number;
 
+  // Limite de câmeras de um plano personalizado. NULL = segue camera_planos
+  // pela cota (storage_gb). A coluna é criada pela migration do Wip_Cams.
+  @Column({ type: "int", nullable: true })
+  max_cameras?: number | null;
+
   // Limpeza periódica por idade: apaga gravações com mais de N dias.
   // NULL ou 0 = desligado. A coluna é criada pela migration do Wip_Cams.
   @Column({ type: "int", nullable: true })

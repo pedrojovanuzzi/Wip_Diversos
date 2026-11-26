@@ -61,7 +61,10 @@ interface ListResponse {
   camera?: {
     storageGb: number;
     canais: number;
-    nome: string;
+    /** Limite de câmeras (do plano ou do personalizado). */
+    maxCameras?: number;
+    /** Plano personalizado (GB/câmeras/valor fora da tabela). */
+    personalizado?: boolean;
   } | null;
   /** Nomes comerciais dos serviços, montados pelo backend. */
   nomesServicos?: {
@@ -143,6 +146,14 @@ export const SerContratos: React.FC = () => {
   const [linkCopied, setLinkCopied] = useState(false);
   // Plano de armazenamento escolhido ao adicionar Câmeras (padrão 5 GB).
   const [cameraGb, setCameraGb] = useState(5);
+  // Plano personalizado: GB, câmeras e valor livres (gratuito = R$ 0,00).
+  const [cameraPersonalizado, setCameraPersonalizado] = useState(false);
+  const [camPers, setCamPers] = useState({
+    storageGb: "10",
+    maxCameras: "2",
+    valor: "0",
+    gratis: false,
+  });
   // Clientes que já têm streaming/câmera: a tela abre com eles listados.
   const [clientes, setClientes] = useState<ClienteComServico[] | null>(null);
   const [loadingClientes, setLoadingClientes] = useState(false);
@@ -364,7 +375,7 @@ Regravar com a descrição completa?`,
       showMsg((res.data.message || "Adicionado com sucesso.") + extraMsg, "success");
       await fetchList(loaded.login);
       if (tipo === "CAMERA") {
-        await ensureCameraClient(loaded.login, extras?.storageGb);
+        await ensureCameraClient(loaded.login, extras);
       }
     } catch (e: any) {
       if (
@@ -409,11 +420,18 @@ Regravar com a descrição completa?`,
   };
 
   // Garante a conta de câmeras do cliente e abre o popup com o link de cadastro.
-  const ensureCameraClient = async (login: string, storageGb?: number) => {
+  const ensureCameraClient = async (
+    login: string,
+    plano?: Record<string, any>,
+  ) => {
     try {
       const res = await axios.post(
         `${base}/cameras/admin/clientes/ensure`,
-        { login, storageGb },
+        {
+          login,
+          storageGb: plano?.storageGb,
+          personalizado: plano?.personalizado,
+        },
         { headers },
       );
       setLinkCopied(false);
@@ -549,13 +567,45 @@ Regravar com a descrição completa?`,
   const totalCameras = loaded?.items.filter(
     (i) => tagDoItem(i) === "CAMERA",
   ).length || 0;
+  // Plano personalizado montado no formulário (valores já convertidos).
+  const persGb = Math.trunc(Number(camPers.storageGb));
+  const persCams = Math.trunc(Number(camPers.maxCameras));
+  const persValor = camPers.gratis
+    ? 0
+    : Number(String(camPers.valor).replace(",", "."));
+  const persValido =
+    persGb >= 1 && persCams >= 1 && Number.isFinite(persValor) && persValor >= 0;
+  const nomeCameraNovo = cameraPersonalizado
+    ? nomeCamera(persCams || 0, persGb || 0)
+    : nomeCamera(maxCamerasPorCota(planos, cameraGb), cameraGb);
   const nomeCameraAtual =
     totalCameras > 0
       ? (loaded?.nomesServicos?.CAMERA ??
         (loaded?.camera
           ? nomeCamera(loaded.camera.canais, loaded.camera.storageGb)
-          : nomeCamera(maxCamerasPorCota(planos, cameraGb), cameraGb)))
-      : nomeCamera(maxCamerasPorCota(planos, cameraGb), cameraGb);
+          : nomeCameraNovo))
+      : nomeCameraNovo;
+
+  const adicionarCameras = () => {
+    if (!cameraPersonalizado) {
+      addServico("CAMERA", { storageGb: cameraGb });
+      return;
+    }
+    if (!persValido) {
+      showMsg("Preencha GB, câmeras e valor do plano personalizado.", "error");
+      return;
+    }
+    if (
+      persValor === 0 &&
+      !window.confirm(
+        `Adicionar Câmeras GRATUITAS para ${loaded?.login} (${persGb} GB · ${persCams} câm.)?`,
+      )
+    )
+      return;
+    addServico("CAMERA", {
+      personalizado: { storageGb: persGb, maxCameras: persCams, valor: persValor },
+    });
+  };
 
   return (
     <>
@@ -948,8 +998,15 @@ Regravar com a descrição completa?`,
                         Armazenamento
                       </span>
                       <select
-                        value={cameraGb}
-                        onChange={(e) => setCameraGb(Number(e.target.value))}
+                        value={cameraPersonalizado ? "personalizado" : cameraGb}
+                        onChange={(e) => {
+                          if (e.target.value === "personalizado") {
+                            setCameraPersonalizado(true);
+                          } else {
+                            setCameraPersonalizado(false);
+                            setCameraGb(Number(e.target.value));
+                          }
+                        }}
                         disabled={adding}
                         className="mt-1 w-full ring-1 ring-gray-300 rounded px-2 py-1.5 text-sm"
                       >
@@ -961,13 +1018,81 @@ Regravar com a descrição completa?`,
                               {Number(p.priceBRL).toFixed(2)}/mês
                             </option>
                           ))}
+                        <option value="personalizado">
+                          Personalizado (GB, câmeras e valor)
+                        </option>
                       </select>
                     </label>
+                  )}
+                  {totalCameras === 0 && cameraPersonalizado && (
+                    <div className="mb-2 rounded border border-blue-200 bg-blue-50 p-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        <label className="block">
+                          <span className="text-xs font-medium text-gray-600">
+                            GB
+                          </span>
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={camPers.storageGb}
+                            onChange={(e) =>
+                              setCamPers((p) => ({ ...p, storageGb: e.target.value }))
+                            }
+                            disabled={adding}
+                            className="mt-1 w-full ring-1 ring-gray-300 rounded px-2 py-1 text-sm"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-medium text-gray-600">
+                            Câmeras
+                          </span>
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={camPers.maxCameras}
+                            onChange={(e) =>
+                              setCamPers((p) => ({ ...p, maxCameras: e.target.value }))
+                            }
+                            disabled={adding}
+                            className="mt-1 w-full ring-1 ring-gray-300 rounded px-2 py-1 text-sm"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-medium text-gray-600">
+                            Valor (R$/mês)
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={camPers.gratis ? "0" : camPers.valor}
+                            onChange={(e) =>
+                              setCamPers((p) => ({ ...p, valor: e.target.value }))
+                            }
+                            disabled={adding || camPers.gratis}
+                            className="mt-1 w-full ring-1 ring-gray-300 rounded px-2 py-1 text-sm disabled:bg-gray-100"
+                          />
+                        </label>
+                      </div>
+                      <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={camPers.gratis}
+                          onChange={(e) =>
+                            setCamPers((p) => ({ ...p, gratis: e.target.checked }))
+                          }
+                          disabled={adding}
+                        />
+                        Gratuito (R$ 0,00 — não cobra no boleto)
+                      </label>
+                    </div>
                   )}
                   <div className="flex gap-2">
                     {totalCameras === 0 ? (
                       <button
-                        onClick={() => addServico("CAMERA", { storageGb: cameraGb })}
+                        onClick={adicionarCameras}
                         disabled={adding}
                         className="flex-1 py-2 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 disabled:bg-gray-400"
                       >

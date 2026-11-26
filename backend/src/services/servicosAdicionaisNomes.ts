@@ -19,6 +19,7 @@ import {
   STORAGE_PLANS,
   DEFAULT_STORAGE_GB,
   maxCamerasFor,
+  maxCamerasDoCliente,
 } from "../config/cameraStoragePlans";
 import {
   nomeStreaming,
@@ -31,6 +32,10 @@ export interface ResumoCameras {
   storageGb: number;
   /** Câmeras efetivamente cadastradas no portal. */
   canais: number;
+  /** Limite de câmeras (do plano ou do personalizado). */
+  maxCameras: number;
+  /** Plano personalizado (limite de câmeras próprio). */
+  personalizado: boolean;
 }
 
 /** Plano deduzido do valor cobrado no contrato (usado quando falta a conta). */
@@ -81,6 +86,8 @@ export async function buscarResumoCameras(
       mapa.set(c.login.trim().toUpperCase(), {
         storageGb: c.storage_gb,
         canais: porId.get(Number(c.id)) ?? 0,
+        maxCameras: maxCamerasDoCliente(c),
+        personalizado: c.max_cameras != null,
       });
     }
   } catch (e: any) {
@@ -175,13 +182,15 @@ export function nomeContratoParaGravar(
   tag: string,
   valor: number,
   storageGb?: number,
+  /** Limite de câmeras de um plano personalizado (senão vem da tabela). */
+  maxCameras?: number | null,
 ): string {
   const t = tagDoServico(tag);
   if (t === "STREAMER") return nomeStreaming(Number(valor || 0));
   if (t === "STREAMER_COLAB") return nomeStreamingColab();
   if (t === "CAMERA") {
     const gb = storageGb ?? DEFAULT_STORAGE_GB;
-    return nomeCamera(maxCamerasFor(gb), gb);
+    return nomeCamera(maxCameras || maxCamerasFor(gb), gb);
   }
   return String(tag || "").trim();
 }
