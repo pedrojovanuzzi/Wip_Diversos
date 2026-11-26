@@ -1,5 +1,14 @@
 # Wip Diversos
 
+## React e Next.js andam juntos
+
+O sistema está migrando do React (`frontend/app`) para o Next.js
+(`frontend/app_nextjs`). **A partir de agora, toda adição ou mudança feita no
+React deve ser feita também no Next.js, na mesma tarefa**, para as duas versões
+continuarem sincronizadas. Isso vale para tela nova, componente, campo,
+botão, chamada de API, regra de permissão, correção de bug e ajuste visual.
+Se a página ainda não existir no Next, avise em vez de pular em silêncio.
+
 ## Mapa da fábrica (`docs/fabrica.html`)
 
 `docs/fabrica.html` é um mapa interativo do repositório inteiro: telas do
