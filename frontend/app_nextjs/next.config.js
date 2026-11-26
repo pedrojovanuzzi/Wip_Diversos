@@ -1,5 +1,10 @@
 const path = require("path");
 
+// Fuso do servidor = fuso dos usuários. As telas montam a primeira versão no
+// servidor; com o servidor em UTC, datas do moment/toLocaleString sairiam com
+// 3 horas de diferença do navegador (e o React acusa erro de hydration).
+process.env.TZ = "America/Sao_Paulo";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,

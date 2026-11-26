@@ -1,0 +1,354 @@
+{
+  "_leia": "Telas do Next e de qual versão do React cada uma saiu. 'origem' são arquivos ou pastas de frontend/app/src; 'commit' é o último commit deles quando a tela foi feita/conferida. Rode: node scripts/checar-origem.mjs",
+  "telas": {
+    "/auditoria": {
+      "nativa": "app/auditoria",
+      "origem": [
+        "pages/Auditoria/Auditoria.tsx"
+      ],
+      "commit": "48b1c828"
+    },
+    "/TimeTracking/ClockIn": {
+      "nativa": "app/TimeTracking/ClockIn",
+      "origem": [
+        "pages/TimeTracking/TimeClock.tsx"
+      ],
+      "commit": "3ff4aeba"
+    },
+    "/feedbackCreate": {
+      "nativa": "app/feedbackCreate",
+      "origem": [
+        "pages/feedback/FeedBackLinkGenerator.tsx",
+        "pages/feedback/components/Select.tsx",
+        "pages/feedback/components/Toggle.tsx"
+      ],
+      "commit": "ad2801fb"
+    },
+    "/solicitacoes-servico": {
+      "nativa": "app/solicitacoes-servico",
+      "origem": [
+        "pages/SolicitacoesServico/SolicitacoesServico.tsx"
+      ],
+      "commit": "df88014e"
+    },
+    "/servicos/links": {
+      "nativa": "app/servicos/links",
+      "origem": [
+        "pages/ServicosWeb/GerarLinksServico.tsx"
+      ],
+      "commit": "22a102d5"
+    },
+    "/chamados/ficha-tecnica": {
+      "nativa": "app/chamados/ficha-tecnica",
+      "origem": [
+        "pages/ChamadosFichaTecnica/ListarFichasTecnicas.tsx"
+      ],
+      "commit": "976b9958"
+    },
+    "/chamados/ficha-tecnica/nova": {
+      "nativa": "app/chamados/ficha-tecnica/nova",
+      "origem": [
+        "pages/ChamadosFichaTecnica/CriarFichaTecnica.tsx"
+      ],
+      "commit": "755ed194"
+    },
+    "/mensalidades (+ /relatorio, /:login)": {
+      "nativa": "app/mensalidades",
+      "origem": [
+        "pages/Mensalidades"
+      ],
+      "commit": "e225edbe"
+    },
+    "/calculadora-debitos": {
+      "nativa": "app/calculadora-debitos",
+      "origem": [
+        "pages/CalculadoraDebitos"
+      ],
+      "commit": "68e34194"
+    },
+    "/codef": {
+      "nativa": "app/codef",
+      "origem": [
+        "pages/Codef/Codef.tsx"
+      ],
+      "commit": "0231e596"
+    },
+    "/NFSE (+ /ServicosAdicionais, /BuscarNfseGerada, /GerarNotaDeServicoIndependente)": {
+      "nativa": "app/NFSE",
+      "origem": [
+        "pages/Nfse"
+      ],
+      "commit": "c5cfec79"
+    },
+    "/Nfcom (+ /Buscar, /DeclaracaoQuitacao, /DeclaracoesQuitacao)": {
+      "nativa": "app/Nfcom",
+      "origem": [
+        "pages/Nfcom"
+      ],
+      "commit": "c2296104"
+    },
+    "/ZapSignConfig, /zapsign-config": {
+      "nativa": "app/ZapSignConfig",
+      "origem": [
+        "pages/zapsign/ZapSignConfig.tsx"
+      ],
+      "commit": "19e10e64"
+    },
+    "/zapsign-teste": {
+      "nativa": "app/zapsign-teste",
+      "origem": [
+        "pages/zapsign/ZapSignTeste.tsx"
+      ],
+      "commit": "b435a029"
+    },
+    "/SerContratos": {
+      "nativa": "app/SerContratos",
+      "origem": [
+        "pages/SerContratos/SerContratos.tsx"
+      ],
+      "commit": "4da63be4"
+    },
+    "/Streaming": {
+      "nativa": "app/Streaming",
+      "origem": [
+        "pages/SerContratos/StreamingAdmin.tsx"
+      ],
+      "commit": "4a776d8c"
+    },
+    "/tv-wip": {
+      "nativa": "app/tv-wip",
+      "origem": [
+        "pages/TvWip"
+      ],
+      "commit": "142b6126"
+    },
+    "/arquivos": {
+      "nativa": "app/arquivos",
+      "origem": [
+        "pages/FileShare/FileShareManager.tsx"
+      ],
+      "commit": "e4a21f2a"
+    },
+    "/licencas": {
+      "nativa": "app/licencas",
+      "origem": [
+        "pages/Licencas"
+      ],
+      "commit": "0f6e0359"
+    },
+    "/ClientAnalytics (+ Logs, Servidores, SemQueue, Consumo, Monitor/:id)": {
+      "nativa": "app/ClientAnalytics",
+      "origem": [
+        "pages/ClientAnalytics"
+      ],
+      "commit": "115ee9b8"
+    },
+    "/Onu (+ AutorizarOnu, DesautorizarOnu, Settings)": {
+      "nativa": "app/Onu",
+      "origem": [
+        "pages/onu"
+      ],
+      "commit": "54364bca"
+    },
+    "/ServerLogs, /LogViewer": {
+      "nativa": "app/ServerLogs",
+      "origem": [
+        "pages/logs/ServerLogs.tsx",
+        "pages/logs/LogViewer.tsx",
+        "pages/logs/components/FolderList.tsx"
+      ],
+      "commit": "035cd32f"
+    },
+    "/ClientLogsSearch": {
+      "nativa": "app/ClientLogsSearch",
+      "origem": [
+        "pages/logs/ClientLogsSearch.tsx"
+      ],
+      "commit": "a699c46e"
+    },
+    "/DDDOS": {
+      "nativa": "app/DDDOS",
+      "origem": [
+        "pages/DDDOS_Monitoring/DDDOS_Home.tsx"
+      ],
+      "commit": "df5e585c"
+    },
+    "/TimeTracking/Admin": {
+      "nativa": "app/TimeTracking/Admin",
+      "origem": [
+        "pages/TimeTracking/Admin/EmployeeManager.tsx"
+      ],
+      "commit": "e4a21f2a"
+    },
+    "/TimeTracking/Report": {
+      "nativa": "app/TimeTracking/Report",
+      "origem": [
+        "pages/TimeTracking/Reports/MonthlyReport.tsx"
+      ],
+      "commit": "e4a21f2a"
+    },
+    "/TimeTracking/Map": {
+      "nativa": "app/TimeTracking/Map",
+      "origem": [
+        "pages/TimeTracking/TimeTrackingMap.tsx"
+      ],
+      "commit": "e4a21f2a"
+    },
+    "/phone-location": {
+      "nativa": "app/phone-location",
+      "origem": [
+        "pages/PhoneLocation/PhoneLocationMap.tsx"
+      ],
+      "commit": "a82f1637"
+    },
+    "/grafico-instalacoes": {
+      "nativa": "app/grafico-instalacoes",
+      "origem": [
+        "pages/Chamados/GraficoInstalacoes.tsx"
+      ],
+      "commit": "2a3ec6d2"
+    },
+    "/Create": {
+      "nativa": "app/Create",
+      "origem": [
+        "pages/create_users/Create.tsx"
+      ],
+      "commit": "4d4be80d"
+    },
+    "/TokenAutoAtendimento (+ pagar-fatura, criar-chamado, fazer-cadastro)": {
+      "nativa": "app/TokenAutoAtendimento",
+      "origem": [
+        "pages/TokenAutoAtendimento"
+      ],
+      "commit": "81b84986"
+    },
+    "/Cameras/Admin": {
+      "nativa": "app/Cameras/Admin",
+      "origem": [
+        "pages/Cameras/CamerasAdmin.tsx"
+      ],
+      "commit": "3626eb47"
+    },
+    "/Cameras/Setup/:uuid": {
+      "nativa": "app/Cameras/Setup",
+      "origem": [
+        "pages/Cameras/CameraSetup.tsx"
+      ],
+      "commit": "a0c96c3c"
+    },
+    "/WatchTv/Conta/:token": {
+      "nativa": "app/WatchTv/Conta",
+      "origem": [
+        "pages/WatchTvConta/WatchTvConta.tsx"
+      ],
+      "commit": "2abb1e8e"
+    },
+    "/s/:token": {
+      "nativa": "app/s",
+      "origem": [
+        "pages/ServicosWeb/SolicitacaoServicoPublica.tsx"
+      ],
+      "commit": "208185bc"
+    },
+    "/feedback/:technician/:id": {
+      "nativa": "app/feedback/[technician]",
+      "origem": [
+        "pages/feedback/FeedbackPage.tsx",
+        "pages/feedback/components/PopUp.tsx",
+        "pages/feedback/components/PopUpError.tsx"
+      ],
+      "commit": "035cd32f"
+    },
+    "/doc/:fileName": {
+      "nativa": "app/doc",
+      "origem": [
+        "pages/PdfViewer/PdfViewer.tsx"
+      ],
+      "commit": "614346b0"
+    },
+    "/Prefeitura/Login, /Prefeitura/CodeOtp": {
+      "nativa": "app/Prefeitura",
+      "origem": [
+        "pages/prefeitura_login"
+      ],
+      "commit": "df5e585c"
+    },
+    "/whatsapp-teste": {
+      "nativa": "app/whatsapp-teste",
+      "origem": [
+        "pages/whatsapp/WhatsappTeste.tsx"
+      ],
+      "commit": "b435a029"
+    },
+    "/Pix (todas)": {
+      "nativa": "app/Pix",
+      "origem": [
+        "pages/Pix"
+      ],
+      "commit": "84479ba1"
+    },
+    "/Whatsapp, /Whatsapp/:id": {
+      "nativa": "app/Whatsapp",
+      "origem": [
+        "pages/whatsapp_chat"
+      ],
+      "commit": "035cd32f"
+    },
+    "/whatsapp/broadcast": {
+      "nativa": "app/(marketing)/whatsapp/broadcast",
+      "origem": [
+        "pages/Marketing/EnviarMensagem.tsx"
+      ],
+      "commit": "e225edbe"
+    },
+    "/": {
+      "nativa": "app/page.tsx",
+      "origem": [
+        "pages/home/HomePage.tsx"
+      ],
+      "commit": "ed22bff7"
+    },
+    "/auth/login": {
+      "nativa": "app/auth/login",
+      "origem": [
+        "pages/auth/AuthPage.tsx"
+      ],
+      "commit": "df5e585c"
+    },
+    "/feedback/Opnion": {
+      "nativa": "app/feedback/Opnion",
+      "origem": [
+        "pages/feedback/Opnion.tsx"
+      ],
+      "commit": "2019ef73"
+    },
+    "/PowerDns": {
+      "nativa": "app/PowerDns",
+      "origem": [
+        "pages/powerdns/PowerDns.tsx"
+      ],
+      "commit": "90b6db5d"
+    },
+    "/Pm2Logs": {
+      "nativa": "app/Pm2Logs",
+      "origem": [
+        "pages/logs/Pm2Logs.tsx"
+      ],
+      "commit": "ff3a8c77"
+    },
+    "/nfe/comodato, /NfeComodato": {
+      "nativa": "app/nfe",
+      "origem": [
+        "pages/Nfe/Comodato.tsx"
+      ],
+      "commit": "85310f91"
+    },
+    "/BuscarNfe": {
+      "nativa": "app/BuscarNfe",
+      "origem": [
+        "pages/Nfe/BuscarNfe.tsx"
+      ],
+      "commit": "90b845ef"
+    }
+  }
+}

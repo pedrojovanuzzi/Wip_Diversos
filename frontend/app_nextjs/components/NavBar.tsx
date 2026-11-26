@@ -50,14 +50,12 @@ import { usePathname } from "next/navigation";
 import { SinoPagamentos } from "./SinoPagamentos";
 import { logoutAction } from "@/app/auth/login/actions";
 import type { User } from "@/lib/auth";
-import { useAuth } from "@/lib/AuthContext";
 import { BsFillSendPlusFill, BsCameraVideoFill, BsTv } from "react-icons/bs";
 
 type Color = {
   color?: string;
   className?: string;
-  /** Sem a prop, usa o usuário do layout (useAuth). */
-  user?: User | null;
+  user: User | null;
 };
 
 /**
@@ -493,10 +491,8 @@ const LinhaMenu = ({ item, ativo, onNavegar, onSair }: LinhaProps) => {
 export default function NavBar({
   color = "black",
   className = "",
-  user: userProp,
+  user,
 }: Color) {
-  const { user: userLayout } = useAuth();
-  const user = userProp ?? userLayout;
   // Lembra se o menu ficou aberto — antes ele fechava a cada troca de página.
   // Começa fechado e lê o localStorage no useEffect: o servidor não tem
   // localStorage, e o primeiro render precisa sair igual nos dois lados.

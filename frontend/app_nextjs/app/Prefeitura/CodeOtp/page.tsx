@@ -1,11 +1,10 @@
-import Tela from "./Tela";
+import CodeOtpClient from "./CodeOtpClient";
 
 export const metadata = {
   title: "Código de verificação — Wip Diversos",
 };
 
-export default async function Page() {
-  // Rota pública no app antigo: sem login.
-
-  return <Tela />;
+/** Público: código enviado por SMS no hotspot da prefeitura. */
+export default function CodeOtpPage() {
+  return <CodeOtpClient />;
 }

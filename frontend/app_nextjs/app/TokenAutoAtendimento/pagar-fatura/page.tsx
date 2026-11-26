@@ -1,11 +1,10 @@
-import Tela from "./Tela";
+import { PagarFatura } from "../_componentes/PagarFatura";
 
 export const metadata = {
   title: "Pagar fatura — Wip Diversos",
 };
 
-export default async function Page() {
-  // Rota pública no app antigo: sem login.
-
-  return <Tela />;
+/** Totem (público). */
+export default function PagarFaturaPage() {
+  return <PagarFatura />;
 }

@@ -425,8 +425,8 @@ SCREENS.forEach(([dir, name, paths, apis], i) => add("s_" + dir.toLowerCase(), {
 ].forEach(([id, name, dirs, apis], i) => add(id, {
   k: "next", x: 130 + (i % 4) * 180, y: 1350 + Math.floor(i / 4) * 100, tag: "app_nextjs", name, apis: apis.split(" "),
   dir: "frontend/app_nextjs/app",
-  desc: "Next.js 15 (App Router, porta 3001). Todas as rotas do app React já existem aqui, com a mesma URL e o mesmo nível. As portadas à mão ficam na pasta da rota (page.tsx + Client); as outras são cópia do React em app/_telas, só com os imports trocados, e rodam só no navegador (dynamic com ssr: false). Pastas: " + dirs + ".",
-  files: [["frontend/app_nextjs/MIGRATION_INSTRUCTIONS.md", 0, "como a migração está organizada"], ["frontend/app_nextjs/lib/navigation.tsx", 0, "compatibilidade com o react-router"]],
+  desc: "Next.js 15 (App Router, porta 3001). Todas as rotas do app React já existem aqui, com a mesma URL e o mesmo nível. Cada tela tem um page.tsx (servidor: confere o nível e busca no backend o que a tela mostra ao abrir) e um Client (navegador: recebe os dados por props e faz as ações com axios). Pastas: " + dirs + ".",
+  files: [["frontend/app_nextjs/MIGRATION_INSTRUCTIONS.md", 0, "como a migração está organizada"], ["frontend/app_nextjs/lib/api.ts", 0, "apiFetch (busca no servidor)"], ["frontend/app_nextjs/scripts/checar-origem.mjs", 0, "telas atrasadas em relação ao React"]],
 }));
 
 // ---- Outros clientes e entradas externas ----

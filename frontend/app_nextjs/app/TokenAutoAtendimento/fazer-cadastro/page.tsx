@@ -1,11 +1,10 @@
-import Tela from "./Tela";
+import { FazerCadastro } from "../_componentes/FazerCadastro";
 
 export const metadata = {
   title: "Fazer cadastro — Wip Diversos",
 };
 
-export default async function Page() {
-  // Rota pública no app antigo: sem login.
-
-  return <Tela />;
+/** Totem (público). */
+export default function FazerCadastroPage() {
+  return <FazerCadastro />;
 }

@@ -3,122 +3,102 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import axios from "axios";
+import moment from "moment";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import NavBar from "@/components/NavBar";
 import { CpfVerificationModal } from "@/components/CpfVerificationModal";
 import { ErrorModal } from "@/components/ErrorModal";
-import moment from "moment";
+import { agoraLocal } from "@/lib/hora";
 import type { User } from "@/lib/auth";
 
-// Dynamic imports for SSR-incompatible libraries
+// Câmera e assinatura mexem no navegador ao carregar: só no cliente.
 const Webcam = dynamic<any>(() => import("react-webcam"), { ssr: false });
 const SignatureModal = dynamic(
-  () => import("@/components/SignatureModal").then((mod) => mod.SignatureModal),
-  { ssr: false }
+  () => import("@/components/SignatureModal").then((m) => m.SignatureModal),
+  { ssr: false },
 );
 
-interface Employee {
-  id: string;
+export interface Funcionario {
+  id: number;
   name: string;
 }
 
-export default function ClockInClient({ user }: { user: User | null }) {
+type Escala = "8h" | "12h" | "Integral" | "4h";
+
+/**
+ * Origem: frontend/app/src/pages/TimeTracking/TimeClock.tsx
+ * A lista de funcionários e a hora inicial chegam do page.tsx (servidor).
+ */
+export default function ClockInClient({
+  user,
+  funcionarios,
+  agoraInicial,
+}: {
+  user: User | null;
+  funcionarios: Funcionario[];
+  agoraInicial: string;
+}) {
   const webcamRef = useRef<any>(null);
   const [employeeId, setEmployeeId] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Modal States
+  // Modais
   const [showCpfModal, setShowCpfModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [pendingAction, setPendingAction] = useState<{
-    type: string;
-    payload?: any;
-  } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ type: string } | null>(null);
 
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
-    null
-  );
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  const [selectedTime, setSelectedTime] = useState(
-    moment().format("YYYY-MM-DDTHH:mm:ss")
-  );
-
-  const [signatureDate, setSignatureDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  // Começa com a hora que o servidor mandou: assim o primeiro desenho é igual
+  // no servidor e no navegador. Depois o relógio anda pelo setInterval.
+  const [selectedTime, setSelectedTime] = useState(agoraInicial);
+  const [signatureDate, setSignatureDate] = useState(agoraInicial.slice(0, 10));
   const [showSigModal, setShowSigModal] = useState(false);
+  // CPF validado na batida, reaproveitado para salvar a assinatura do dia
+  const [verifiedCpf, setVerifiedCpf] = useState("");
 
-  const [scale, setScale] = useState<"8h" | "12h" | "Integral" | "4h">("8h");
+  const [scale, setScale] = useState<Escala>("8h");
   const [dailyRecords, setDailyRecords] = useState<any[]>([]);
 
-  // Check permission (admin can edit date)
-  const canEditDate = (user?.permission || 0) >= 5;
+  const permission = user?.permission || 0;
+  const canEditDate = permission >= 5;
 
-  const capture = useCallback(() => {
-    const imageSrc = webcamRef.current?.getScreenshot();
-    return imageSrc;
-  }, [webcamRef]);
+  const capture = useCallback(() => webcamRef.current?.getScreenshot(), []);
 
-  const getLocation = useCallback(() => {
-    if (typeof window === "undefined") return;
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          console.log("Accuracy:", position.coords.accuracy);
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-          if (position.coords.accuracy > 100) {
-            setMessage(
-              `Atenção: A precisão do GPS está baixa (${Math.round(
-                position.coords.accuracy
-              )}m). Tente usar o celular.`
-            );
-          } else {
-            setMessage("");
-          }
-        },
-        (error) => {
-          console.error("Error getting location: ", error);
-          const msg = "Erro ao obter localização. Permita o acesso.";
-          setMessage(msg);
-        },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-      );
-    } else {
+  const getLocation = () => {
+    if (!navigator.geolocation) {
       setMessage("Geolocalização não suportada neste navegador.");
+      return;
     }
-  }, []);
-
-  const fetchEmployees = async () => {
-    try {
-      const res = await axios.get(
-        `${process.env.REACT_APP_URL}/time-tracking/employee`
-      );
-      const sorted = [...res.data].sort((a: any, b: any) => {
-        const nameA = a.name ? a.name.trim().toUpperCase() : "";
-        const nameB = b.name ? b.name.trim().toUpperCase() : "";
-        if (nameA < nameB) return -1;
-        if (nameA > nameB) return 1;
-        return 0;
-      });
-      setEmployees(sorted);
-    } catch (error) {
-      console.error(error);
-    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+        if (position.coords.accuracy > 100) {
+          setMessage(
+            `Atenção: A precisão do GPS está baixa (${Math.round(
+              position.coords.accuracy,
+            )}m). Tente usar o celular.`,
+          );
+        } else {
+          setMessage("");
+        }
+      },
+      (error) => {
+        console.error("Error getting location: ", error);
+        setMessage("Erro ao obter localização. Permita o acesso.");
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    );
   };
 
   const fetchDailyRecords = useCallback(async () => {
     if (!employeeId || !selectedTime) return;
-
     try {
       const datePart = selectedTime.split("T")[0];
       const res = await axios.get(
-        `${process.env.REACT_APP_URL}/time-tracking/records/date/${employeeId}?date=${datePart}`
+        `${process.env.REACT_APP_URL}/time-tracking/records/date/${employeeId}?date=${datePart}`,
       );
       setDailyRecords(res.data);
     } catch (error) {
@@ -126,29 +106,29 @@ export default function ClockInClient({ user }: { user: User | null }) {
     }
   }, [employeeId, selectedTime]);
 
+  // GPS só existe no navegador
   useEffect(() => {
     getLocation();
-    fetchEmployees();
-  }, [getLocation]);
+  }, []);
+
+  // Relógio: quem não pode editar a data vê a hora andando
+  useEffect(() => {
+    if (canEditDate) return;
+    const interval = setInterval(() => setSelectedTime(agoraLocal()), 1000);
+    return () => clearInterval(interval);
+  }, [canEditDate]);
 
   useEffect(() => {
     if (selectedTime) {
-      const datePart = selectedTime.split("T")[0];
-      setSignatureDate(datePart);
-
+      setSignatureDate(selectedTime.split("T")[0]);
       const isSaturday = moment(selectedTime).day() === 6;
-      if (isSaturday && scale === "8h") {
-        setScale("4h");
-      } else if (!isSaturday && scale === "4h") {
-        setScale("8h");
-      }
+      if (isSaturday && scale === "8h") setScale("4h");
+      else if (!isSaturday && scale === "4h") setScale("8h");
     }
     fetchDailyRecords();
   }, [selectedTime, employeeId, fetchDailyRecords, scale]);
 
-  const isTypeRegistered = (type: string) => {
-    return dailyRecords.some((record) => record.type === type);
-  };
+  const isTypeRegistered = (type: string) => dailyRecords.some((r) => r.type === type);
 
   const initiateClockIn = (type: string) => {
     if (!employeeId) {
@@ -156,89 +136,81 @@ export default function ClockInClient({ user }: { user: User | null }) {
       setShowErrorModal(true);
       return;
     }
-
     if (isTypeRegistered(type)) {
       setErrorMessage(`O registro de "${type}" já foi realizado hoje.`);
       setShowErrorModal(true);
       return;
     }
-
     if (!location) {
-      setErrorMessage(
-        "Aguardando localização... Tente novamente em instantes."
-      );
+      setErrorMessage("Aguardando localização... Tente novamente em instantes.");
       setShowErrorModal(true);
       getLocation();
       return;
     }
-
+    // Operador com permissão >= 5 dispensa o CPF (autentica pelo token).
+    if (permission >= 5) {
+      doClockIn(type, "");
+      return;
+    }
     setPendingAction({ type });
     setShowCpfModal(true);
   };
 
   const handleConfirmCpf = async (cpf: string) => {
     if (!pendingAction) return;
+    await doClockIn(pendingAction.type, cpf);
+  };
 
-    const { type } = pendingAction;
-
-    if (type !== "signature") {
-      if (!location) {
-        setErrorMessage("Localização perdida. Tente novamente.");
-        setShowErrorModal(true);
-        setShowCpfModal(false);
-        return;
-      }
+  const doClockIn = async (type: string, cpf: string) => {
+    if (!location) {
+      setErrorMessage("Localização perdida. Tente novamente.");
+      setShowErrorModal(true);
+      setShowCpfModal(false);
+      return;
     }
 
     setLoading(true);
     setMessage("");
 
     try {
-      if (type === "signature") {
-        const { date, signature } = pendingAction.payload;
-        await axios.post(
-          `${process.env.REACT_APP_URL}/time-tracking/signature`,
-          {
-            employeeId,
-            date,
-            signature,
-            cpf,
-          }
-        );
-        setMessage("Assinatura salva com sucesso!");
-        setShowSigModal(false);
-      } else {
-        // Clock In
-        const photo = capture();
-        if (!photo) {
-          throw new Error("Erro ao capturar foto.");
-        }
-        await axios.post(
-          `${process.env.REACT_APP_URL}/time-tracking/clock-in`,
-          {
-            employeeId,
-            lat: location?.lat,
-            lng: location?.lng,
-            photo,
-            type,
-            timestamp: selectedTime,
-            cpf,
-            scale,
-          }
-        );
-        setMessage(`Ponto registrado com sucesso: ${type}!`);
-        setEmployeeId("");
-        fetchDailyRecords();
-      }
+      const photo = capture();
+      if (!photo) throw new Error("Erro ao capturar foto.");
 
+      // É a primeira batida do dia? (avaliado antes de atualizar os registros)
+      const isFirstPunchOfDay = dailyRecords.length === 0;
+
+      await axios.post(
+        `${process.env.REACT_APP_URL}/time-tracking/clock-in`,
+        {
+          employeeId,
+          lat: location?.lat,
+          lng: location?.lng,
+          photo,
+          type,
+          timestamp: selectedTime,
+          cpf,
+          scale,
+        },
+        // Envia o token para o backend reconhecer operador permissão >= 5.
+        user?.token ? { headers: { Authorization: `Bearer ${user.token}` } } : undefined,
+      );
+      setMessage(`Ponto registrado com sucesso: ${type}!`);
+      fetchDailyRecords();
       setShowCpfModal(false);
+
+      if (isFirstPunchOfDay && cpf) {
+        // Na primeira batida do dia, abre a assinatura da folha automaticamente,
+        // reaproveitando o CPF já validado. Sem CPF (nível 5), não abre.
+        setVerifiedCpf(cpf);
+        setShowSigModal(true);
+      } else {
+        setEmployeeId("");
+      }
     } catch (error: any) {
       console.error(error);
-      const errorMsg =
-        error.response?.data?.error ||
-        error.message ||
-        "Erro ao realizar operação.";
-      setErrorMessage(errorMsg);
+      setErrorMessage(
+        error.response?.data?.error || error.message || "Erro ao realizar operação.",
+      );
       setShowErrorModal(true);
     } finally {
       setLoading(false);
@@ -257,22 +229,41 @@ export default function ClockInClient({ user }: { user: User | null }) {
       return;
     }
 
-    const [y, m, d] = signatureDate.split("-");
-    const formattedDate = `${y}-${m}-${d}`;
+    setLoading(true);
+    setMessage("");
 
-    setPendingAction({
-      type: "signature",
-      payload: {
-        date: formattedDate,
+    try {
+      await axios.post(`${process.env.REACT_APP_URL}/time-tracking/signature`, {
+        employeeId,
+        date: signatureDate,
         signature: signatureData,
-      },
-    });
-    setShowCpfModal(true);
+        cpf: verifiedCpf,
+      });
+      setMessage("Assinatura salva com sucesso!");
+      setShowSigModal(false);
+      setEmployeeId("");
+    } catch (error: any) {
+      console.error(error);
+      setErrorMessage(
+        error.response?.data?.error || error.message || "Erro ao salvar a assinatura.",
+      );
+      setShowErrorModal(true);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const ehSabado = moment(selectedTime).day() === 6;
+  const botaoEscala = (ativo: boolean, cor: string) =>
+    `flex-1 py-2 rounded text-sm font-bold transition-all ${
+      ativo ? `bg-white ${cor} shadow-sm` : "text-gray-500 hover:text-gray-700"
+    }`;
+  const botaoPonto = (tipo: string, cor: string) =>
+    `${isTypeRegistered(tipo) ? "bg-gray-400 cursor-not-allowed" : cor} text-white font-bold py-2 px-4 rounded transition duration-200`;
 
   return (
     <>
-      <NavBar user={user}></NavBar>
+      <NavBar user={user} />
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
         <h1 className="text-3xl font-bold mb-6 text-gray-800">Bater Ponto</h1>
 
@@ -290,9 +281,7 @@ export default function ClockInClient({ user }: { user: User | null }) {
           {location ? (
             <p className="text-xs text-green-600 mb-4">📍 Localização obtida</p>
           ) : (
-            <p className="text-xs text-red-500 mb-4">
-              ⚠️ Obtendo localização...
-            </p>
+            <p className="text-xs text-red-500 mb-4">⚠️ Obtendo localização...</p>
           )}
 
           <select
@@ -301,65 +290,35 @@ export default function ClockInClient({ user }: { user: User | null }) {
             className="w-full p-3 border border-gray-300 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Selecione seu nome</option>
-            {employees.map((emp) => (
+            {funcionarios.map((emp) => (
               <option key={emp.id} value={emp.id}>
                 {emp.name}
               </option>
             ))}
           </select>
 
-          {/* Scale Selector */}
+          {/* Escala */}
           <div className="flex space-x-2 mb-4 w-full bg-gray-200 p-1 rounded">
-            {moment(selectedTime).day() === 6 ? (
-              <button
-                onClick={() => setScale("4h")}
-                className={`flex-1 py-2 rounded text-sm font-bold transition-all ${
-                  scale === "4h"
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
+            {ehSabado ? (
+              <button onClick={() => setScale("4h")} className={botaoEscala(scale === "4h", "text-blue-600")}>
                 5x2
               </button>
             ) : (
-              <button
-                onClick={() => setScale("8h")}
-                className={`flex-1 py-2 rounded text-sm font-bold transition-all ${
-                  scale === "8h"
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
+              <button onClick={() => setScale("8h")} className={botaoEscala(scale === "8h", "text-blue-600")}>
                 5x2
               </button>
             )}
-            <button
-              onClick={() => setScale("12h")}
-              className={`flex-1 py-2 rounded text-sm font-bold transition-all ${
-                scale === "12h"
-                  ? "bg-white text-purple-600 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
+            <button onClick={() => setScale("12h")} className={botaoEscala(scale === "12h", "text-purple-600")}>
               12x36
             </button>
-            <button
-              onClick={() => setScale("Integral")}
-              className={`flex-1 py-2 rounded text-sm font-bold transition-all ${
-                scale === "Integral"
-                  ? "bg-white text-green-600 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
+            <button onClick={() => setScale("Integral")} className={botaoEscala(scale === "Integral", "text-green-600")}>
               Integral
             </button>
           </div>
 
           <div className="grid grid-cols-2 gap-3 w-full">
             <div className="col-span-2 mb-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Data e Hora
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Data e Hora</label>
               <input
                 type="datetime-local"
                 step="1"
@@ -372,51 +331,31 @@ export default function ClockInClient({ user }: { user: User | null }) {
             <button
               onClick={() => initiateClockIn("Entrada")}
               disabled={loading || isTypeRegistered("Entrada")}
-              className={`${isTypeRegistered("Entrada") ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"} text-white font-bold py-2 px-4 rounded transition duration-200`}
+              className={botaoPonto("Entrada", "bg-green-600 hover:bg-green-700")}
             >
               Entrada
             </button>
             <button
               onClick={() => initiateClockIn("Saída Almoço")}
               disabled={loading || isTypeRegistered("Saída Almoço")}
-              className={`${isTypeRegistered("Saída Almoço") ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-500 hover:bg-yellow-600"} text-white font-bold py-2 px-4 rounded transition duration-200`}
+              className={botaoPonto("Saída Almoço", "bg-yellow-500 hover:bg-yellow-600")}
             >
               Saída Almoço
             </button>
             <button
               onClick={() => initiateClockIn("Volta Almoço")}
               disabled={loading || isTypeRegistered("Volta Almoço")}
-              className={`${isTypeRegistered("Volta Almoço") ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-600 hover:bg-yellow-700"} text-white font-bold py-2 px-4 rounded transition duration-200`}
+              className={botaoPonto("Volta Almoço", "bg-yellow-600 hover:bg-yellow-700")}
             >
               Volta Almoço
             </button>
             <button
               onClick={() => initiateClockIn("Saída")}
               disabled={loading || isTypeRegistered("Saída")}
-              className={`${isTypeRegistered("Saída") ? "bg-gray-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"} text-white font-bold py-2 px-4 rounded transition duration-200`}
+              className={botaoPonto("Saída", "bg-red-600 hover:bg-red-700")}
             >
               Saída
             </button>
-
-            {/* Signature Section */}
-            <div className="col-span-2 mt-4 pt-4 border-t border-gray-200">
-              <div className="flex justify-center gap-2">
-                <button
-                  onClick={() => {
-                    if (!employeeId) {
-                      setErrorMessage("Selecione um funcionário primeiro.");
-                      setShowErrorModal(true);
-                      return;
-                    }
-                    setShowSigModal(true);
-                  }}
-                  disabled={loading}
-                  className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded transition duration-200 flex items-center justify-center gap-2"
-                >
-                  <span>✍️</span> Assinar Dia
-                </button>
-              </div>
-            </div>
           </div>
 
           {loading && (
@@ -439,10 +378,7 @@ export default function ClockInClient({ user }: { user: User | null }) {
       </div>
 
       {showSigModal && (
-        <SignatureModal
-          onClose={() => setShowSigModal(false)}
-          onSave={handleSaveSignature}
-        />
+        <SignatureModal onClose={() => setShowSigModal(false)} onSave={handleSaveSignature} />
       )}
 
       <CpfVerificationModal

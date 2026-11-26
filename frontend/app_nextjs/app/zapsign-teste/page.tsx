@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import Tela from "./Tela";
+import ZapSignTesteClient from "./ZapSignTesteClient";
 
 export const metadata = {
   title: "Teste de documentos — Wip Diversos",
@@ -16,5 +16,5 @@ export default async function Page() {
   const user = await requireUser(0); // no app antigo: só logado, qualquer nível
   if (!user) redirect("/auth/login");
 
-  return <Tela />;
+  return <ZapSignTesteClient user={user} />;
 }

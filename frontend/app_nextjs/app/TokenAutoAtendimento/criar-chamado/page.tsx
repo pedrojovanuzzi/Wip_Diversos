@@ -1,11 +1,10 @@
-import Tela from "./Tela";
+import { CriarChamado } from "../_componentes/CriarChamado";
 
 export const metadata = {
   title: "Criar chamado — Wip Diversos",
 };
 
-export default async function Page() {
-  // Rota pública no app antigo: sem login.
-
-  return <Tela />;
+/** Totem (público). */
+export default function CriarChamadoPage() {
+  return <CriarChamado />;
 }

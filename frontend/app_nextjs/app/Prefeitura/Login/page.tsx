@@ -1,11 +1,10 @@
-import Tela from "./Tela";
+import PrefeituraLoginClient from "./PrefeituraLoginClient";
 
 export const metadata = {
   title: "Login Prefeitura — Wip Diversos",
 };
 
-export default async function Page() {
-  // Rota pública no app antigo: sem login.
-
-  return <Tela />;
+/** Público: página de login do hotspot da prefeitura. */
+export default function PrefeituraLoginPage() {
+  return <PrefeituraLoginClient />;
 }
