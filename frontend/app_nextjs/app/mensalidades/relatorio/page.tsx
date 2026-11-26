@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
+import { hojeLocal } from "@/lib/hora";
 import {
-  mesAtual,
   RelatorioMensalidades,
   type Aba,
   type Linha,
@@ -26,8 +26,9 @@ export default async function RelatorioMensalidadesPage({
   const sp = await searchParams;
   const aba: Aba = sp.aba === "wip2" ? "wip2" : "wip1";
   const mesUrl = typeof sp.mes === "string" ? sp.mes : "";
-  // mesAtual usa o fuso do processo (Brasília, ver next.config.js)
-  const mes = /^\d{4}-\d{2}$/.test(mesUrl) ? mesUrl : mesAtual();
+  // Mês atual (AAAA-MM). Não dá para chamar o mesAtual() do componente: ele
+  // está num arquivo "use client" e o servidor não executa funções de lá.
+  const mes = /^\d{4}-\d{2}$/.test(mesUrl) ? mesUrl : hojeLocal().slice(0, 7);
 
   const qs = new URLSearchParams({ aba, mes });
   const { linhas, erro } = await apiFetch<{ linhas?: Linha[] }>(`/mensalidades/relatorio?${qs}`)

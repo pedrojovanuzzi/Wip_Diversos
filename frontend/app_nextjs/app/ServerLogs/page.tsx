@@ -4,7 +4,8 @@ import { FaSearch } from "react-icons/fa";
 import { requireUser } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
 import type { Folder } from "@/lib/types";
-import FolderList, { ROOT } from "./_componentes/FolderList";
+import FolderList from "./_componentes/FolderList";
+import { ROOT } from "./_componentes/raiz";
 
 export const metadata = {
   title: "Logs do servidor — Wip Diversos",

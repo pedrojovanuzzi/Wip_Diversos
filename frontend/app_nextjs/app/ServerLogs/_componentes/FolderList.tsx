@@ -17,7 +17,8 @@ interface FoldersProps {
   folders: Folder[];
 }
 
-export const ROOT = "/var/log/cgnat/syslog";
+import { ROOT } from "./raiz";
+export { ROOT };
 
 const isFile = (name: string) =>
   name.endsWith(".gz") || name.endsWith(".log");

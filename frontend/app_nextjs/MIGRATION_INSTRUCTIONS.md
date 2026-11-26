@@ -111,6 +111,23 @@ Ele lista as telas cujo arquivo de origem mudou depois (commits novos ou
 alterações não commitadas). Refaça a mudança na tela do Next e atualize o
 `commit` no JSON.
 
+## 3.1 Testes automáticos das páginas
+
+```bash
+npm run test:paginas
+```
+
+Abre todas as páginas num Chrome de verdade contra um backend de mentira
+(`testes/mock`) e reprova página que quebra, dá erro de hydration, manda para
+o login sem motivo ou chama rota da API que o mock não conhece. Também testa a
+portaria. Detalhes em [testes/LEIAME.md](testes/LEIAME.md). Rode depois de
+qualquer mudança em tela, e ao criar uma (acrescente a rota em `testes/rotas.ts`).
+
+Um cuidado que o teste pegou e o `npm run build` não pega: o `page.tsx` não
+pode **executar** nada importado de um arquivo `"use client"` (função ou
+constante). Componentes e tipos podem; o resto vai num arquivo comum (ex.:
+`app/ServerLogs/_componentes/raiz.ts`).
+
 ## 4. Tela nova
 
 ```ts

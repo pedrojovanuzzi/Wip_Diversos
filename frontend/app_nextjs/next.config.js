@@ -8,6 +8,9 @@ process.env.TZ = "America/Sao_Paulo";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Os testes (npm run test:paginas) fazem um build próprio apontando para o
+  // backend de mentira, numa pasta separada, para não estragar o .next normal.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Há outros package-lock.json acima na árvore (raiz do monorepo + app/).
   // Fixar a raiz aqui evita o warning "inferred workspace root".
   outputFileTracingRoot: path.join(__dirname),

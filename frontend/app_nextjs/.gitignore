@@ -28,3 +28,8 @@ yarn-error.log*
 /out/
 next-env.d.ts
 *.tsbuildinfo
+
+# testes das páginas (npm run test:paginas)
+/.next-teste
+/testes/relatorio
+/testes/resultados
